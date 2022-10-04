@@ -57,3 +57,4 @@ and the following suite of E2E tests are performed on that cluster:
 * Physical replica clusters;
 * Storage expansion;
 * Data corruption;
+* Replication Slots;

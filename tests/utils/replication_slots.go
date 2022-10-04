@@ -23,12 +23,56 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-// CompareLsn returns true if all the LSN values inside a given list are the same
-func CompareLsn(lsnList []string) bool {
+// PrintReplicationSlots prints replications slots with their restart_lsn
+func PrintReplicationSlots(
+	namespace,
+	clusterName string,
+	env *TestingEnvironment,
+) string {
+	podList, err := env.GetClusterPodList(namespace, clusterName)
+	if err != nil {
+		return fmt.Sprintf("Couldn't retrieve the cluster's podlist: %v\n", err)
+	}
+	var output strings.Builder
+	for i, pod := range podList.Items {
+		slots, err := GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
+		if err != nil {
+			return fmt.Sprintf("Couldn't retrieve slots for pod %v: %v\n", pod.GetName(), err)
+		}
+		if len(slots) == 0 {
+			return fmt.Sprintf("No Replication slots have been found on %v pod %v\n",
+				pod.Labels["role"],
+				pod.GetName())
+		}
+		m := make(map[string]string)
+		for _, slot := range slots {
+			restartLsn, _, err := RunQueryFromPod(
+				&podList.Items[i], PGLocalSocketDir,
+				"app",
+				"postgres",
+				"''",
+				fmt.Sprintf("SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '%v'", slot),
+				env)
+			if err != nil {
+				output.WriteString(fmt.Sprintf("Couldn't retrieve restart_lsn for slot %v: %v\n", slot, err))
+			}
+			m[slot] = strings.TrimSpace(restartLsn)
+		}
+		output.WriteString(fmt.Sprintf("Replication slots on %v pod %v: %v\n", pod.Labels["role"], pod.GetName(), m))
+	}
+	return output.String()
+}
+
+// AreSameLsn returns true if all the LSN values inside a given list are the same
+func AreSameLsn(lsnList []string) bool {
+	if len(lsnList) == 0 {
+		return true
+	}
 	for _, lsn := range lsnList {
 		if lsn != lsnList[0] {
 			return false
@@ -37,9 +81,12 @@ func CompareLsn(lsnList []string) bool {
 	return true
 }
 
-// GetExpectedRepSlotsOnPod returns a slice of replication slot names which should be present
+// GetExpectedReplicationSlotsOnPod returns a slice of replication slot names which should be present
 // in a given pod
-func GetExpectedRepSlotsOnPod(namespace, clusterName, podName string, env *TestingEnvironment) ([]string, error) {
+func GetExpectedReplicationSlotsOnPod(
+	namespace, clusterName, podName string,
+	env *TestingEnvironment,
+) ([]string, error) {
 	podList, err := env.GetClusterPodList(namespace, clusterName)
 	if err != nil {
 		return nil, err
@@ -53,17 +100,17 @@ func GetExpectedRepSlotsOnPod(namespace, clusterName, podName string, env *Testi
 	var slots []string
 	for _, pod := range podList.Items {
 		if pod.Name != podName && !specs.IsPodPrimary(pod) {
-			repSlotName := cluster.GetSlotNameFromInstanceName(pod.Name)
-			slots = append(slots, repSlotName)
+			replicationSlotName := cluster.GetSlotNameFromInstanceName(pod.Name)
+			slots = append(slots, replicationSlotName)
 		}
 	}
 	sort.Strings(slots)
 	return slots, err
 }
 
-// GetRepSlotsOnPod returns a slice containing the names of the current replication slots present in
+// GetReplicationSlotsOnPod returns a slice containing the names of the current replication slots present in
 // a given pod
-func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]string, error) {
+func GetReplicationSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]string, error) {
 	namespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      podName,
@@ -80,16 +127,24 @@ func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]str
 	if err != nil {
 		return nil, err
 	}
-
-	slots := strings.Split(strings.TrimSpace(stdout), "\n")
-	sort.Strings(slots)
-	return slots, err
+	var slots []string
+	// To avoid list with space entry when stdout value is empty
+	// then just skip split and return empty list.
+	if stdout != "" {
+		slots = strings.Split(strings.TrimSpace(stdout), "\n")
+		sort.Strings(slots)
+	}
+	return slots, nil
 }
 
-// GetRepSlotsLsnOnPod returns a slice containing the current restart_lsn values of each
+// GetReplicationSlotLsnsOnPod returns a slice containing the current restart_lsn values of each
 // replication slot present in a given pod
-func GetRepSlotsLsnOnPod(namespace, clusterName string, pod corev1.Pod, env *TestingEnvironment) ([]string, error) {
-	slots, err := GetExpectedRepSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+func GetReplicationSlotLsnsOnPod(
+	namespace, clusterName string,
+	pod corev1.Pod,
+	env *TestingEnvironment,
+) ([]string, error) {
+	slots, err := GetExpectedReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
 	if err != nil {
 		return nil, err
 	}
@@ -106,4 +161,19 @@ func GetRepSlotsLsnOnPod(namespace, clusterName string, pod corev1.Pod, env *Tes
 		lsnList = append(lsnList, strings.TrimSpace(restartLsn))
 	}
 	return lsnList, err
+}
+
+// ToggleReplicationSlots sets the HA Replication Slot feature on/off depending on `enable`
+func ToggleReplicationSlots(namespace, clusterName string, enable bool, env *TestingEnvironment) error {
+	cluster, err := env.GetCluster(namespace, clusterName)
+	if err != nil {
+		return err
+	}
+	clusterToggle := cluster.DeepCopy()
+	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = enable
+	err = env.Client.Patch(env.Ctx, clusterToggle, ctrlclient.MergeFrom(cluster))
+	if err != nil {
+		return err
+	}
+	return nil
 }
