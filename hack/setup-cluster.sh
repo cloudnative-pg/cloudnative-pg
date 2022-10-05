@@ -403,6 +403,7 @@ Commands:
     prepare <dest_dir>    Downloads the prerequisite into <dest_dir>
     create                Create the test cluster
     load                  Build and load the operator image in the cluster
+    load-helper-images    Load the catalog of HELPER_IMGS into the local registry
     deploy                Deploy the operator manifests in the cluster
     print-image           Print the CONTROLLER_IMG name to be used inside
                           the cluster
@@ -459,8 +460,6 @@ create() {
   fi
 
   deploy_fluentd
-
-  load_helper_images
 
   echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }
@@ -623,7 +622,7 @@ main() {
       prepare "${dest_dir}"
       ;;
 
-    create | load | deploy | print-image | export-logs | destroy | pyroscope)
+    create | load | load-helper-images | deploy | print-image | export-logs | destroy | pyroscope)
       ensure_registry
       "${command//-/_}"
       ;;
