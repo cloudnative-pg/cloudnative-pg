@@ -23,15 +23,22 @@ import (
 	"math"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/spool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+)
+
+const (
+	// CheckWalArchiveFile the flag file that activates the wal archiver checks
+	CheckWalArchiveFile = ".check-wal-archive"
 )
 
 // WALArchiver is a structure containing every info need to archive a set of WAL files
@@ -45,6 +52,8 @@ type WALArchiver struct {
 
 	// The environment that should be used to invoke barman-cloud-wal-archive
 	env []string
+
+	pgDataDirectory string
 }
 
 // WALArchiverResult contains the result of the archival of one WAL
@@ -68,6 +77,7 @@ func New(
 	cluster *apiv1.Cluster,
 	env []string,
 	spoolDirectory string,
+	pgDataDirectory string,
 ) (archiver *WALArchiver, err error) {
 	contextLog := log.FromContext(ctx)
 	var walArchiveSpool *spool.WALSpool
@@ -78,9 +88,10 @@ func New(
 	}
 
 	archiver = &WALArchiver{
-		cluster: cluster,
-		spool:   walArchiveSpool,
-		env:     env,
+		cluster:         cluster,
+		spool:           walArchiveSpool,
+		env:             env,
+		pgDataDirectory: pgDataDirectory,
 	}
 	return archiver, nil
 }
@@ -180,22 +191,35 @@ func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error
 		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalArchive, err)
 	}
 
+	filePath := path.Join(archiver.pgDataDirectory, CheckWalArchiveFile)
+	if exists, err := fileutils.FileExists(filePath); exists {
+		if err != nil {
+			return fmt.Errorf("error while checking file existence: %w", err)
+		}
+		if err := fileutils.RemoveFile(filePath); err != nil {
+			return fmt.Errorf("error while deleting the check wal file flag: %w", err)
+		}
+	}
+
 	return nil
 }
 
-// FileListStartsAtFirstWAL returns true if the first file in the list is the
+// IsCheckWalArchiveFlagFilePresent returns true if the first file in the list is the
 // first WAL file of the first timeline
-func (archiver *WALArchiver) FileListStartsAtFirstWAL(ctx context.Context, walFilesList []string) bool {
+func (archiver *WALArchiver) IsCheckWalArchiveFlagFilePresent(ctx context.Context, pgDataDirectory string) bool {
 	contextLogger := log.FromContext(ctx)
+	filePath := filepath.Join(pgDataDirectory, CheckWalArchiveFile)
 	// If walFileList is empty then, this is a no-op just like the method ArchiveList
-	if len(walFilesList) == 0 {
-		contextLogger.Debug("WAL file list is empty, skipping check")
+	exists, err := fileutils.FileExists(filePath)
+	if err != nil {
+		contextLogger.Error(err, "error while checking for the existence of the CheckWalArchiveFile")
+	}
+	if !exists {
+		contextLogger.Debug("WAL check flag file not found, skipping check")
 		return false
 	}
 
-	firstWalFirstTimeline := "000000010000000000000001"
-	walName := path.Base(walFilesList[0])
-	return walName == firstWalFirstTimeline
+	return exists
 }
 
 // CheckWalArchiveDestination checks if the destinationObjectStore is ready perform archiving.

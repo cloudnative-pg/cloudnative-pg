@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"sort"
 
 	"github.com/jackc/pgx/v4"
@@ -34,6 +35,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -351,7 +353,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		}
 	}
 
-	return instance.WithActiveInstance(func() error {
+	err = instance.WithActiveInstance(func() error {
 		err = info.ConfigureNewInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
@@ -368,6 +370,21 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	filePath := filepath.Join(info.PgData, archiver.CheckWalArchiveFile)
+	if exists, _ := fileutils.FileExists(filePath); exists {
+		return nil
+	}
+
+	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
+		return fmt.Errorf("could not create .check-wal-archive file: %w", err)
+	}
+
+	return nil
 }
 
 func executeLogicalImport(

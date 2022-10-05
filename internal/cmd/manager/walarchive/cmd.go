@@ -141,7 +141,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 
 	// Create the archiver
 	var walArchiver *archiver.WALArchiver
-	if walArchiver, err = archiver.New(ctx, cluster, env, SpoolDirectory); err != nil {
+	if walArchiver, err = archiver.New(ctx, cluster, env, SpoolDirectory, os.Getenv("PGDATA")); err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}
 
@@ -163,7 +163,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 	walFilesList := gatherWALFilesToArchive(ctx, walName, maxParallel)
 
 	// Step 4: Check if the archive location is safe to perform archiving
-	if err := checkWalArchive(ctx, cluster, walArchiver, client, walFilesList); err != nil {
+	if err := checkWalArchive(ctx, cluster, walArchiver, client); err != nil {
 		return err
 	}
 
@@ -355,8 +355,8 @@ func checkWalArchive(ctx context.Context,
 	cluster *apiv1.Cluster,
 	walArchiver *archiver.WALArchiver,
 	client client.WithWatch,
-	walFilesList []string,
 ) error {
+	pgDataDirectory := os.Getenv("PGDATA")
 	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
@@ -372,7 +372,7 @@ func checkWalArchive(ctx context.Context,
 		return err
 	}
 
-	if !walArchiver.FileListStartsAtFirstWAL(ctx, walFilesList) {
+	if !walArchiver.IsCheckWalArchiveFlagFilePresent(ctx, pgDataDirectory) {
 		return nil
 	}
 
