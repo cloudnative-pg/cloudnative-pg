@@ -18,7 +18,6 @@ package hibernate
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -77,7 +76,7 @@ func (off *offCommand) execute() error {
 	pvc := pvcGroup[0]
 
 	// We get the original cluster resource from the annotation
-	clusterFromPVC, err := off.getClusterFromPVCAnnotationStep(pvc)
+	clusterFromPVC, err := getClusterFromPVCAnnotation(pvc)
 	if err != nil {
 		return err
 	}
@@ -134,17 +133,6 @@ func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.Persistent
 	}
 
 	return nil
-}
-
-// getClusterFromPVCAnnotationStep reads the original cluster resource from the chosen PVC
-func (off *offCommand) getClusterFromPVCAnnotationStep(pvc corev1.PersistentVolumeClaim) (v1.Cluster, error) {
-	var clusterFromPVC v1.Cluster
-	// get the cluster manifest
-	clusterJSON := pvc.Annotations[utils.HibernateClusterManifestAnnotationName]
-	if err := json.Unmarshal([]byte(clusterJSON), &clusterFromPVC); err != nil {
-		return v1.Cluster{}, err
-	}
-	return clusterFromPVC, nil
 }
 
 // createClusterWithoutRuntimeDataStep recreate the original cluster back into Kubernetes
