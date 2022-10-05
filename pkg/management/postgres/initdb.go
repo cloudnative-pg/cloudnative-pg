@@ -375,11 +375,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		return err
 	}
 
-	filePath := filepath.Join(info.PgData, archiver.CheckWalArchiveFile)
-	if exists, _ := fileutils.FileExists(filePath); exists {
-		return nil
-	}
-
+	filePath := filepath.Join(info.PgData, archiver.CheckEmptyWalArchiveFile)
 	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
 		return fmt.Errorf("could not create .check-wal-archive file: %w", err)
 	}

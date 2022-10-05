@@ -37,8 +37,8 @@ import (
 )
 
 const (
-	// CheckWalArchiveFile the flag file that activates the wal archiver checks
-	CheckWalArchiveFile = ".check-wal-archive"
+	// CheckEmptyWalArchiveFile the flag file that activates the wal archiver checks
+	CheckEmptyWalArchiveFile = ".check-empty-wal-archive"
 )
 
 // WALArchiver is a structure containing every info need to archive a set of WAL files
@@ -191,28 +191,22 @@ func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error
 		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalArchive, err)
 	}
 
-	filePath := path.Join(archiver.pgDataDirectory, CheckWalArchiveFile)
-	if exists, err := fileutils.FileExists(filePath); exists {
-		if err != nil {
-			return fmt.Errorf("error while checking file existence: %w", err)
-		}
-		if err := fileutils.RemoveFile(filePath); err != nil {
-			return fmt.Errorf("error while deleting the check wal file flag: %w", err)
-		}
+	filePath := path.Join(archiver.pgDataDirectory, CheckEmptyWalArchiveFile)
+	if err := fileutils.RemoveFile(filePath); err != nil {
+		return fmt.Errorf("error while deleting the check wal file flag: %w", err)
 	}
 
 	return nil
 }
 
-// IsCheckWalArchiveFlagFilePresent returns true if the first file in the list is the
-// first WAL file of the first timeline
+// IsCheckWalArchiveFlagFilePresent returns true if the file CheckEmptyWalArchiveFile is present in the PGDATA directory
 func (archiver *WALArchiver) IsCheckWalArchiveFlagFilePresent(ctx context.Context, pgDataDirectory string) bool {
 	contextLogger := log.FromContext(ctx)
-	filePath := filepath.Join(pgDataDirectory, CheckWalArchiveFile)
+	filePath := filepath.Join(pgDataDirectory, CheckEmptyWalArchiveFile)
 	// If walFileList is empty then, this is a no-op just like the method ArchiveList
 	exists, err := fileutils.FileExists(filePath)
 	if err != nil {
-		contextLogger.Error(err, "error while checking for the existence of the CheckWalArchiveFile")
+		contextLogger.Error(err, "error while checking for the existence of the CheckEmptyWalArchiveFile")
 	}
 	if !exists {
 		contextLogger.Debug("WAL check flag file not found, skipping check")

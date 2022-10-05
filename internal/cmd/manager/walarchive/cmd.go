@@ -54,6 +54,7 @@ const (
 // NewCmd creates the new cobra command
 func NewCmd() *cobra.Command {
 	var podName string
+	var pgData string
 
 	cmd := cobra.Command{
 		Use:           "wal-archive [name]",
@@ -77,7 +78,7 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			err = run(ctx, podName, args, typedClient)
+			err = run(ctx, podName, pgData, args, typedClient)
 			if err != nil {
 				contextLog.Error(err, logErrorMessage)
 				return err
@@ -88,11 +89,12 @@ func NewCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
 		"current pod in k8s")
+	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 
 	return &cmd
 }
 
-func run(ctx context.Context, podName string, args []string, client client.WithWatch) error {
+func run(ctx context.Context, podName, pgData string, args []string, client client.WithWatch) error {
 	startTime := time.Now()
 	contextLog := log.FromContext(ctx)
 	walName := args[0]
@@ -141,7 +143,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 
 	// Create the archiver
 	var walArchiver *archiver.WALArchiver
-	if walArchiver, err = archiver.New(ctx, cluster, env, SpoolDirectory, os.Getenv("PGDATA")); err != nil {
+	if walArchiver, err = archiver.New(ctx, cluster, env, SpoolDirectory, pgData); err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}
 
@@ -163,7 +165,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 	walFilesList := gatherWALFilesToArchive(ctx, walName, maxParallel)
 
 	// Step 4: Check if the archive location is safe to perform archiving
-	if err := checkWalArchive(ctx, cluster, walArchiver, client); err != nil {
+	if err := checkWalArchive(ctx, cluster, walArchiver, client, pgData); err != nil {
 		return err
 	}
 
@@ -355,8 +357,8 @@ func checkWalArchive(ctx context.Context,
 	cluster *apiv1.Cluster,
 	walArchiver *archiver.WALArchiver,
 	client client.WithWatch,
+	pgData string,
 ) error {
-	pgDataDirectory := os.Getenv("PGDATA")
 	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
@@ -372,7 +374,7 @@ func checkWalArchive(ctx context.Context,
 		return err
 	}
 
-	if !walArchiver.IsCheckWalArchiveFlagFilePresent(ctx, pgDataDirectory) {
+	if !walArchiver.IsCheckWalArchiveFlagFilePresent(ctx, pgData) {
 		return nil
 	}
 
