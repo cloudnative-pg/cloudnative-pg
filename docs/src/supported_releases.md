@@ -67,7 +67,6 @@ Git tags for versions are prepended with `v`.
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|
 | 1.17.x          | Yes                  | September 6, 2022 | ~ February 12, 2023      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
 | 1.16.x          | Yes                  | July 7, 2022      | ~ November 25, 2022      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
-| 1.15.x          | Yes                  | April 21, 2022    | October 6, 2022          | 1.21, 1.22, 1.23              | 1.19, 1.20, 1.24          |
 | main            | No, development only |                   |                          |                               |                           |
 
 The list of supported Kubernetes versions in the above table depends on what
@@ -88,6 +87,12 @@ by the CloudNativePG maintainers).
 
 !!! Note
     Dates in the future are uncertain and might change. This applies to Kubernetes versions too.
+
+## Old releases
+
+| Version         | Release Date      | End of Life              | Compatible Kubernetes Versions |
+|-----------------|-------------------|--------------------------|--------------------------------|
+| 1.15.x          | April 21, 2022    | October 6, 2022          | 1.21, 1.22, 1.23               |
 
 ## What we mean by support
 
