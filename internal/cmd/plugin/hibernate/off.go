@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -34,9 +33,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
-
-// errNoHibernatedPVCsFound indicates that no PVCs were found. This is also used by the status command
-var errNoHibernatedPVCsFound = fmt.Errorf("no hibernated PVCs to reactivate found")
 
 // offCommand represent the `hibernate off` command
 type offCommand struct {
@@ -65,7 +61,7 @@ func (off *offCommand) execute() error {
 	}
 
 	// Get the list of PVC from which we need to resume this cluster
-	pvcGroup, err := off.getHibernatedPVCGroupStep()
+	pvcGroup, err := getHibernatedPVCGroup(off.ctx, off.clusterName)
 	if err != nil {
 		return err
 	}
@@ -112,24 +108,6 @@ func (off *offCommand) ensureClusterDoesNotExistStep() error {
 		return err
 	}
 	return nil
-}
-
-// getHibernatedPVCGroupStep gets the PVC group resulting from the hibernation process
-func (off *offCommand) getHibernatedPVCGroupStep() ([]corev1.PersistentVolumeClaim, error) {
-	// Get the list of PVCs belonging to this group
-	var pvcList corev1.PersistentVolumeClaimList
-	if err := plugin.Client.List(
-		off.ctx,
-		&pvcList,
-		client.MatchingLabels{utils.ClusterLabelName: off.clusterName},
-	); err != nil {
-		return nil, err
-	}
-	if len(pvcList.Items) == 0 {
-		return nil, errNoHibernatedPVCsFound
-	}
-
-	return pvcList.Items, nil
 }
 
 // ensurePVCsArePartOfAPVCGroupStep check if the passed PVCs are really part of the same group
