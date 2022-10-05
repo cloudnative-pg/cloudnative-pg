@@ -203,11 +203,12 @@ func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error
 func (archiver *WALArchiver) IsCheckWalArchiveFlagFilePresent(ctx context.Context, pgDataDirectory string) bool {
 	contextLogger := log.FromContext(ctx)
 	filePath := filepath.Join(pgDataDirectory, CheckEmptyWalArchiveFile)
-	// If walFileList is empty then, this is a no-op just like the method ArchiveList
+
 	exists, err := fileutils.FileExists(filePath)
 	if err != nil {
 		contextLogger.Error(err, "error while checking for the existence of the CheckEmptyWalArchiveFile")
 	}
+	// If the check empty wal archive file doesn't exist this it's a no-op
 	if !exists {
 		contextLogger.Debug("WAL check flag file not found, skipping check")
 		return false

@@ -250,8 +250,10 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	}
 
 	filePath := filepath.Join(info.PgData, archiver.CheckEmptyWalArchiveFile)
+	// We create the check empty wal archive file to tell that we should check if the
+	// destination path it is empty
 	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
-		return fmt.Errorf("could not create .check-empty-wal-archive file: %w", err)
+		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
 
 	return nil

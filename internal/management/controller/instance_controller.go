@@ -876,6 +876,7 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster) error {
 	filePath := filepath.Join(r.instance.PgData, archiver.CheckEmptyWalArchiveFile)
 	for _, condition := range cluster.Status.Conditions {
+		// If our current condition is archiving we can delete the file
 		if condition.Type == string(apiv1.ConditionContinuousArchiving) && condition.Status == metav1.ConditionTrue {
 			return fileutils.RemoveFile(filePath)
 		}
