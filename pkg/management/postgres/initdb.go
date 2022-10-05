@@ -249,6 +249,11 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
 	}
 
+	filePath := filepath.Join(info.PgData, archiver.CheckEmptyWalArchiveFile)
+	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
+		return fmt.Errorf("could not create .check-wal-archive file: %w", err)
+	}
+
 	return nil
 }
 
@@ -353,7 +358,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		}
 	}
 
-	err = instance.WithActiveInstance(func() error {
+	return instance.WithActiveInstance(func() error {
 		err = info.ConfigureNewInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
@@ -370,17 +375,6 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 		return nil
 	})
-
-	if err != nil {
-		return err
-	}
-
-	filePath := filepath.Join(info.PgData, archiver.CheckEmptyWalArchiveFile)
-	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
-		return fmt.Errorf("could not create .check-wal-archive file: %w", err)
-	}
-
-	return nil
 }
 
 func executeLogicalImport(
