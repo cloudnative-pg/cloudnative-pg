@@ -31,7 +31,6 @@ spec:
     initdb:
       database: app
       owner: app
-      walSegmentSize: 64
 
   monitoring:
     customQueriesConfigMap:
