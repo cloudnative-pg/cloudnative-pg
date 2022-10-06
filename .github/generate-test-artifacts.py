@@ -19,7 +19,7 @@ import json
 import re
 import os
 import hashlib
-
+from datetime import *
 
 def flatten(arr):
     """flatten an array of arrays"""
@@ -94,6 +94,53 @@ def convert_ginkgo_test(t, matrix):
     }
     return x
 
+def write_artifact(artifact, matrix):
+    """writes an artifact to local storage as a JSON file
+
+    The computed filename will be used as the ID to introduce the payload into
+    Elastic for the E2E Test . Should be unique across the current GH run.
+    So: MatrixID + Test
+    Because we may run this on MSFT Azure, where filename length limits still
+    exist, we HASH the test name.
+    The platform team's scraping script will add the GH Run ID to this, and the
+    Repository, and with Repo + Run ID + MatrixID + Test Hash, gives a unique
+    ID in Elastic to each object.
+    """
+    whitespace = re.compile("\s")
+    slug = whitespace.sub("_", artifact["name"])
+    h = hashlib.sha224(slug.encode("utf-8")).hexdigest()
+    filename = matrix["id"] + "_" + h + ".json"
+    if dir != "":
+        filename = dir + "/" + filename
+    with open(filename, "w") as f:
+        f.write(json.dumps(artifact))
+
+def create_artifact(matrix, name, state, error):
+    """creates an artifact with a given name, state and error,
+    with the metadata provided by the `matrix` argument.
+    Useful to generate artifacts that signal failures outside the Test Suite,
+    for example if the suite never executed
+    """
+    branch = matrix["branch"]
+    if branch == "":
+        branch = matrix["refname"]
+    kind = "PostgreSQL"
+
+    return {
+        "name": name,
+        "state": state,
+        "start_time": datetime.now().isoformat(),
+        "end_time": datetime.now().isoformat(),  # NOTE: Grafana will need a default timestamp field. This is a good candidate
+        "error": error,
+        "platform": matrix["runner"],
+        "matrix_id": matrix["id"],
+        "postgres_kind": kind,
+        "postgres_version": matrix["postgres"],
+        "k8s_version": matrix["kubernetes"],
+        "workflow_id": matrix["runid"],
+        "repo": matrix["repo"],
+        "branch": branch,
+    }
 
 if __name__ == "__main__":
 
@@ -111,7 +158,7 @@ if __name__ == "__main__":
         "--outdir",
         type=str,
         default="",
-        help="directory where we write the artifiacts",
+        help="directory where we write the artifacts",
     )
     parser.add_argument(
         "-m", "--matrix", type=str, help="the matrix with GH execution variables"
@@ -131,25 +178,32 @@ if __name__ == "__main__":
             os.makedirs(dir)
             print("Directory ", dir, " Created ")
 
+    # If the ginkgo report file is not found, produce a "failed" artifact
+    if not os.path.exists(args.file):
+        print("Report ", args.file, " not found ")
+        # we still want to get an entry in the E2E Dashboard for workflows that even
+        # failed to run the ginkgo suite or failed to produce a JSON report.
+        # We create a custom Artifact with a `failed` status for the Dashboard
+        artifact = create_artifact(matrix,
+            "[report missing] Generate artifacts from Ginkgo report",
+            "failed",
+            "ginkgo Report Not Found: " + args.file)
+        write_artifact(artifact, matrix)
+        exit(0)
+
     # MAIN LOOP: go over each `SpecReport` in the Ginkgo JSON output, convert
     # each to the normalized JSON format and create a JSON file for each of those
-    whitespace = re.compile("\s")
-    with open(args.file) as json_file:
-        testResults = json.load(json_file)
-        for t in testResults[0]["SpecReports"]:
-            if (t["State"] != "skipped") and (t["LeafNodeText"] != ""):
-                test1 = convert_ginkgo_test(t, matrix)
-                # the filename will be used as the ID to introduce the payload into
-                # Elastic. Should be unique across the current GH run. So: MatrixID + Test
-                # But, because we may run this on MSFT Azure, where filename length limits still
-                # exist, we HASH the test name.
-                # The platform team's scraping script will add the GH Run ID to this, and the
-                # Repository, and with Repo + Run ID + MatrixID + Test Hash, gives a unique
-                # ID in Elastic to each object.
-                slug = whitespace.sub("_", test1["name"])
-                h = hashlib.sha224(slug.encode("utf-8")).hexdigest()
-                filename = matrix["id"] + "_" + h + ".json"
-                if dir != "":
-                    filename = dir + "/" + filename
-                with open(filename, "w") as f:
-                    f.write(json.dumps(test1))
+    try:
+        with open(args.file) as json_file:
+            testResults = json.load(json_file)
+            for t in testResults[0]["SpecReports"]:
+                if (t["State"] != "skipped") and (t["LeafNodeText"] != ""):
+                    test1 = convert_ginkgo_test(t, matrix)
+                    write_artifact(test1, matrix)
+    except Exception as e:
+        # Reflect any unexpected failure in an artifact
+        artifact = create_artifact(matrix,
+            "Generate artifacts from Ginkgo report",
+            "failed",
+            f"{e}")
+        write_artifact(artifact, matrix)
