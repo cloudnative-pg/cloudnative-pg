@@ -37,7 +37,9 @@ import (
 )
 
 const (
-	// CheckEmptyWalArchiveFile the flag file that activates the wal archiver checks
+	// CheckEmptyWalArchiveFile is the name of the file in the PGDATA that,
+	// if present, requires the WAL archiver to check that the backup object
+	// store is empty.
 	CheckEmptyWalArchiveFile = ".check-empty-wal-archive"
 )
 
@@ -191,9 +193,11 @@ func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error
 		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalArchive, err)
 	}
 
+	// Removes the `.check-empty-wal-archive` file inside PGDATA after the
+	// first successful archival of a WAL file.
 	filePath := path.Join(archiver.pgDataDirectory, CheckEmptyWalArchiveFile)
 	if err := fileutils.RemoveFile(filePath); err != nil {
-		return fmt.Errorf("error while deleting the check wal file flag: %w", err)
+		return fmt.Errorf("error while deleting the check WAL file flag: %w", err)
 	}
 
 	return nil

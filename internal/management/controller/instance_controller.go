@@ -111,6 +111,10 @@ func (r *InstanceReconciler) Reconcile(
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
 
+	// Takes care of the `.check-empty-wal-archive` file inside the PGDATA
+	// which, if present, before running the WAL archiver verifies that
+	// the backup object store is empty. This file is created immediately
+	// after initdb and removed after the first WAL is archived.
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
 		return reconcile.Result{}, err
 	}
