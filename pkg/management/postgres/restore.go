@@ -654,7 +654,7 @@ func (info *InitInfo) checkBackupDestination(
 
 	// Instantiate the WALArchiver to get the proper configuration
 	var walArchiver *archiver.WALArchiver
-	walArchiver, err = archiver.New(ctx, cluster, env, walarchive.SpoolDirectory)
+	walArchiver, err = archiver.New(ctx, cluster, env, walarchive.SpoolDirectory, info.PgData)
 	if err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}
