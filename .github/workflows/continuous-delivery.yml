@@ -78,42 +78,42 @@ jobs:
       shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
       go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Check for changes
-        uses: dorny/paths-filter@v2.10.2
-        id: filter
-        # Remember to add new folders in the operator-changed filter if needed
-        with:
-          base: ${{ (github.event_name == 'schedule') && 'main' || '' }}
-          filters: |
-            docs-changed:
-              - '**/*.md'
-              - 'docs/**'
-              - '.wordlist-en-custom.txt'
-            operator-changed:
-              - 'api/**'
-              - 'cmd/**'
-              - 'config/**'
-              - 'controllers/**'
-              - 'internal/**'
-              - 'licenses/**'
-              - 'pkg/**'
-              - '.github/workflows/continuous-delivery.yml'
-              - '.goreleaser.yml'
-              - 'Dockerfile'
-              - 'Makefile'
-              - 'go.mod'
-              - 'go.sum'
-            test-changed:
-              - 'tests/**'
-              - 'hack/**'
-            shell-script-changed:
-              - '**/*.sh'
-            go-code-changed:
-              - '**/*.go'
-              - '.golangci.yml'
+    - name: Check for changes
+      uses: dorny/paths-filter@v2.10.2
+      id: filter
+      # Remember to add new folders in the operator-changed filter if needed
+      with:
+        base: ${{ (github.event_name == 'schedule') && 'main' || '' }}
+        filters: |
+          docs-changed:
+            - '**/*.md'
+            - 'docs/**'
+            - '.wordlist-en-custom.txt'
+          operator-changed:
+            - 'api/**'
+            - 'cmd/**'
+            - 'config/**'
+            - 'controllers/**'
+            - 'internal/**'
+            - 'licenses/**'
+            - 'pkg/**'
+            - '.github/workflows/continuous-delivery.yml'
+            - '.goreleaser.yml'
+            - 'Dockerfile'
+            - 'Makefile'
+            - 'go.mod'
+            - 'go.sum'
+          test-changed:
+            - 'tests/**'
+            - 'hack/**'
+          shell-script-changed:
+            - '**/*.sh'
+          go-code-changed:
+            - '**/*.go'
+            - '.golangci.yml'
 
   golangci:
     name: Run linters
@@ -154,13 +154,13 @@ jobs:
       needs.change-triage.outputs.shell-script-changed == 'true'
     runs-on: ubuntu-20.04
     env:
-      SHELLCHECK_OPTS: -a -S style
+        SHELLCHECK_OPTS: -a -S style
     steps:
-      -
-        uses: actions/checkout@v3
-      -
-        name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@1.1.0
+    -
+      uses: actions/checkout@v3
+    -
+      name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@1.1.0
 
   tests:
     name: Run unit tests
@@ -251,25 +251,25 @@ jobs:
       )
     runs-on: ubuntu-20.04
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GOLANG_VERSION }}
 
-      - name: Run make apidoc
-        run: |
-          make apidoc
+    - name: Run make apidoc
+      run: |
+        make apidoc
 
-      - name: Verify apidoc changes
-        run: |
-          apidoc_file_path='docs/src/api_reference.md'
-          if git status --porcelain $apidoc_file_path | grep '^ M'; then
-            echo "The API documentation doesn't reflect the current API. Please run make apidoc."
-            exit 1
-          fi
+    - name: Verify apidoc changes
+      run: |
+        apidoc_file_path='docs/src/api_reference.md'
+        if git status --porcelain $apidoc_file_path | grep '^ M'; then
+          echo "The API documentation doesn't reflect the current API. Please run make apidoc."
+          exit 1
+        fi
 
   crd:
     name: Verify CRD is up to date
@@ -374,12 +374,15 @@ jobs:
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+
           # shortened commit sha
           commit_short=$(git rev-parse --short "${commit_sha}")
           commit_message=$(git show -s --format=%B "${commit_sha}")
+
           # get git user and email
           author_name=$(git show -s --format='%an' "${commit_sha}")
           author_email=$(git show -s --format='%ae' "${commit_sha}")
+
           # extract branch name
           if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
           then
@@ -834,10 +837,10 @@ jobs:
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
 
-  # Adds the 'ok-to-merge' label to workflows that have run successfully and
-  # have adequate test and matrix coverage.
-  # This label is a prerequisite to be able to merge a PR.
-  # Also see to 'require-labels.yml'
+# Adds the 'ok-to-merge' label to workflows that have run successfully and
+# have adequate test and matrix coverage.
+# This label is a prerequisite to be able to merge a PR.
+# Also see to 'require-labels.yml'
   ok-to-merge:
     name: Label the PR as "ok to merge"
     needs:
@@ -869,8 +872,8 @@ jobs:
       -
         name: Label the PR as "ok to merge"
         if: |
-          steps.get_pr_number_and_labels.outputs.pr_number != '' &&
-          steps.get_pr_number_and_labels.outputs.ok_label == ''
+           steps.get_pr_number_and_labels.outputs.pr_number != '' &&
+           steps.get_pr_number_and_labels.outputs.ok_label == ''
         uses: actions-ecosystem/action-add-labels@v1.1.3
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}

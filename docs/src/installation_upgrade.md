@@ -24,13 +24,13 @@ kubectl apply -f \
 >   https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
 >   kubectl apply -f -
 > ```
-> 
+>
 > Or you can install the operator [e.g. the latest operator manifest on main branch](https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml) directly as follows:
 > ```sh
 > kubectl apply -f \
 >    https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml
 > ```
-> 
+>
 > Also, you can find out which exact commit in [cloudnative-pg/cloudnative-pg](https://github.com/cloudnative-pg/cloudnative-pg) that produces the corresponding operator manifest in the commit message of the manifest itself.
 
 Once you have run the `kubectl` command, CloudNativePG will be installed in your Kubernetes cluster.
