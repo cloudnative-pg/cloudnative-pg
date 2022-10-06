@@ -24,10 +24,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
+	"path/filepath"
 
 	"github.com/lib/pq"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
@@ -200,6 +202,13 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		if err = info.executeQueries(appDB, info.PostInitApplicationSQL); err != nil {
 			return fmt.Errorf("could not execute init Application queries: %w", err)
 		}
+	}
+
+	filePath := filepath.Join(info.PgData, archiver.CheckEmptyWalArchiveFile)
+	// We create the check empty wal archive file to tell that we should check if the
+	// destination path it is empty
+	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
+		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
 
 	return nil
