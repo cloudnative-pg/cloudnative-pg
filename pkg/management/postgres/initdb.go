@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 
 	"github.com/jackc/pgx/v4"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,6 +34,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -230,6 +232,13 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	log.Info("executing Application instructions")
 	if err = info.executeQueries(appDB, info.PostInitApplicationSQL); err != nil {
 		return fmt.Errorf("could not execute init Application queries: %w", err)
+	}
+
+	filePath := filepath.Join(info.PgData, archiver.CheckEmptyWalArchiveFile)
+	// We create the check empty wal archive file to tell that we should check if the
+	// destination path it is empty
+	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
+		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
 
 	return nil
