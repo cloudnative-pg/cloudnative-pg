@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -42,6 +44,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	postgresManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
@@ -72,7 +75,7 @@ type shoudRequeue bool
 // Reconcile is the main reconciliation loop for the instance
 // TODO this function needs to be refactor
 //
-//nolint:gocognit
+//nolint:gocognit,gocyclo
 func (r *InstanceReconciler) Reconcile(
 	ctx context.Context,
 	request reconcile.Request,
@@ -105,6 +108,14 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
+
+	// Takes care of the `.check-empty-wal-archive` file inside the PGDATA
+	// which, if present, before running the WAL archiver verifies that
+	// the backup object store is empty. This file is created immediately
+	// after initdb and removed after the first WAL is archived.
+	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
+		return reconcile.Result{}, err
+	}
 
 	// Refresh the cache
 	requeue := r.updateCacheFromCluster(ctx, cluster)
@@ -837,6 +848,18 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
 	r.instance.MaxSwitchoverDelay = cluster.GetMaxSwitchoverDelay()
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
+}
+
+func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster) error {
+	filePath := filepath.Join(r.instance.PgData, archiver.CheckEmptyWalArchiveFile)
+	for _, condition := range cluster.Status.Conditions {
+		// If our current condition is archiving we can delete the file
+		if condition.Type == string(apiv1.ConditionContinuousArchiving) && condition.Status == metav1.ConditionTrue {
+			return fileutils.RemoveFile(filePath)
+		}
+	}
+
+	return nil
 }
 
 // waitForConfigurationReload waits for the db to be up and
