@@ -8,6 +8,8 @@ on:
   push:
     branches:
       - 'main'
+      # TODO after review/testing, the branch 'dev/771' should be removed
+      - 'dev/771'
   # A pull request (from this repository or a forked one) which is labelled
   pull_request_target:
     types: [labeled]
@@ -339,7 +341,11 @@ jobs:
       image: ${{ steps.image-meta.outputs.image }}
       # 'branch_name' is used in 'GetMostRecentReleaseTag' in the Go code
       branch_name: ${{ steps.build-meta.outputs.branch_name }}
-
+      upload_artifact: ${{ steps.build-meta.outputs.upload_artifact }}
+      commit_msg: ${{ steps.build-meta.outputs.commit_msg }}
+      commit_sha: ${{ steps.build-meta.outputs.commit_sha }}
+      author_name: ${{ steps.build-meta.outputs.author_name }}
+      author_email: ${{ steps.build-meta.outputs.author_email }}
     steps:
       -
         name: Checkout
@@ -386,9 +392,15 @@ jobs:
           # extract branch name
           if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
           then
-            echo "::set-output name=branch_name::${GITHUB_REF#refs/heads/}"
+            branch_name=${GITHUB_REF#refs/heads/}
           else
-            echo "::set-output name=branch_name::${GITHUB_HEAD_REF}"
+            branch_name=${GITHUB_HEAD_REF}
+          fi
+
+          upload_artifacts=false
+          # TODO after review/testing, the `|| ${branch_name} == 'dev/771'` should be removed
+          if [[ ${branch_name} == 'main' || ${branch_name} =~ 'release/' || ${branch_name} == 'dev/771' ]]; then
+            upload_artifacts=true
           fi
 
           echo "::set-output name=images::${images}"
@@ -401,6 +413,8 @@ jobs:
           echo "::set-output name=commit_msg::${commit_message}"
           echo "::set-output name=author_name::${author_name}"
           echo "::set-output name=author_email::${author_email}"
+          echo "::set-output name=branch_name::${branch_name}"
+          echo "::set-output name=upload_artifacts::${upload_artifacts}"
       -
         name: Set GoReleaser environment
         run: |
@@ -505,64 +519,54 @@ jobs:
           make generate-manifest
       -
         name: Upload the operator manifest as artifact in workflow
-        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
           retention-days: 7
-      -
-        name: Replicate the artifact or not (to cloudnative-pg/artifacts repo)
-        id: replicate-or-not
-        run: |
-          branch_name=${{ steps.build-meta.outputs.branch_name }}
-          # TODO after review/testing, the `|| ${branch_name} == 'dev/771'` should be removed
-          if [[ ${branch_name} == 'main' || ${branch_name} =~ 'release/' || ${branch_name} == 'dev/771' ]]; then
-            echo "::set-output name=replicate::true"
-          else
-            echo "::set-output name=replicate::false"
-          fi
+
+  publish-artifacts:
+    name: Publish artifacts
+    needs:
+      - buildx
+      - duplicate_runs
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      always() &&
+      needs.buildx.result == 'success' &&
+      needs.buildx.outputs.upload_artifacts == 'true' &&
+      github.repository == 'cloudnative-pg/cloudnative-pg'
+    runs-on: ubuntu-20.04
+    steps:
       -
         name: Checkout artifact
         uses: actions/checkout@v3
-        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
-          path: work
           fetch-depth: 0
       -
-        name: Configure git user
-        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
-        working-directory: work
-        run: |
-          git config user.email "${{ steps.build-meta.outputs.author_email }}"
-          git config user.name "${{ steps.build-meta.outputs.author_name }}"
-      -
         name: Switch to or create the right branch
-        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
-        working-directory: work
         run: |
           git switch -C ${{ steps.build-meta.outputs.branch_name }}
       -
-        name: Replicate the manifest and commit
-        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
-        working-directory: work
-        run: |
-          mkdir -p manifests
-          cp ../dist/operator-manifest.yaml manifests/
-          git add .
-          git commit -m "${{ steps.build-meta.outputs.commit_msg }}" -m "https://github.com/cloudnative-pg/cloudnative-pg/commit/${{ steps.build-meta.outputs.commit_sha }}"
-      -
-        name: Push changes
-        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
-        uses: ad-m/github-push-action@v0.6.0
+        name: Prepare the operator manifest
+        uses: actions/download-artifact@v3
         with:
-          github_token: ${{ secrets.REPO_GHA_PAT }}
-          repository: cloudnative-pg/artifacts
-          directory: work
-          branch: ${{ steps.build-meta.outputs.branch_name }}
-          force: true
+          name: operator-manifest.yaml
+          path: manifests/operator-manifest.yaml
+      -
+        name: Upload the operator manifest
+        uses: EndBug/add-and-commit@v7
+        with:
+          fetch: false
+          new_branch: ${{ steps.build-meta.outputs.branch_name }}
+          author_name: ${{ needs.buildx.outputs.author_name }}
+          author_email: ${{ needs.buildx.outputs.author_email }}
+          message: |
+            ${{ needs.buildx.outputs.commit_msg }}
+
+            https://github.com/cloudnative-pg/cloudnative-pg/commit/${{ needs.buildx.outputs.commit_sha }}
 
   generate-jobs:
     name: Generate jobs for E2E tests
