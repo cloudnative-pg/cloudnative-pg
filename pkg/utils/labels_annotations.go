@@ -63,6 +63,13 @@ const (
 	HibernatePgControlDataAnnotationName = "cnpg.io/hibernatePgControlData"
 )
 
+type annotationStatus string
+
+const (
+	annotationStatusDisabled annotationStatus = "disabled"
+	annotationStatusEnabled  annotationStatus = "enabled"
+)
+
 // PodRole describes the Role of a given pod
 type PodRole string
 
@@ -192,5 +199,5 @@ func AnnotateAppArmor(object *metav1.ObjectMeta, annotations map[string]string) 
 
 // IsReconciliationDisabled checks if the reconciliation loop is disabled on the given resource
 func IsReconciliationDisabled(object *metav1.ObjectMeta) bool {
-	return object.Annotations[ReconciliationLoopAnnotationName] == ReconciliationDisabledValue
+	return object.Annotations[ReconciliationLoopAnnotationName] == string(annotationStatusDisabled)
 }
