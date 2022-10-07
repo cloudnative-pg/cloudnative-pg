@@ -383,7 +383,12 @@ jobs:
 
           # shortened commit sha
           commit_short=$(git rev-parse --short "${commit_sha}")
+
+          # multiline strings are weird
           commit_message=$(git show -s --format=%B "${commit_sha}")
+          commit_message=${commit_message//$'%'/'%25'}
+          commit_message=${commit_message//$'\n'/'%0A'}
+          commit_message=${commit_message//$'\r'/'%0D'}
 
           # get git user and email
           author_name=$(git show -s --format='%an' "${commit_sha}")
