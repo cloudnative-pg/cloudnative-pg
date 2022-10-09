@@ -41,6 +41,12 @@ The required setup depends on the chosen storage provider and is
 discussed in the following sections.
 
 ### S3
+There are 2 ways in order to get the permissions to store backups in S3 buckets:
+
+- If CNPG is running in EKS you may want to use the [IRSA](https://aws.amazon.com/blogs/opensource/introducing-fine-grained-iam-roles-service-accounts/) authentication method.
+- The alternative is to use `ACCESS_KEY_ID` and `ACCESS_SECRET_KEY` credentials.
+
+#### AWS Access key
 
 You will need the following information about your environment:
 
@@ -88,6 +94,26 @@ spec:
 The destination path can be any URL pointing to a folder where
 the instance can upload the WAL files, e.g.
 `s3://BUCKET_NAME/path/to/folder`.
+
+#### IAM Role for Service Account (IRSA)
+
+In order to use IRSA we need an `annotation` in the cluster's serviceaccount.
+Using the `inheritedMetadata` configuration, the metadatas are propagated to **all** the resources created by the operator for a given cluster.
+
+!!! Warning
+    Currently the annotation is only propagated at cluster's Creation
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+[...]
+spec:
+  inheritedMetadata:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:[...]
+      [...]
+```
 
 ### Other S3-compatible Object Storages providers
 
@@ -358,11 +384,26 @@ spec:
 ```
 
 This, will tell the operator that the cluster is running inside a Google Kubernetes
-Engine meaning that no credentials are needed to upload the files
+Engine meaning that no credentials are needed to upload the files.
 
-!!! Important
-    This method will require carefully defined permissions for cluster
-    and pods, which have to be defined by a cluster administrator.
+However this will require proper [Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) configuration and a specifica `annotation` in the cluster's service account.
+
+Using the `inheritedMetadata` configuration, the metadatas arepropagated to **all** the resources created by the operator for a given cluster.
+
+!!! Warning
+    Currently the annotation is only propagated at cluster's Creation
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+[...]
+spec:
+  inheritedMetadata:
+    annotations:
+      iam.gke.io/gcp-service-account:  [...].iam.gserviceaccount.com
+      [...]
+```
 
 #### Using authentication
 
