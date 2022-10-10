@@ -549,7 +549,7 @@ jobs:
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
-          branch: main
+          ref: main
           fetch-depth: 0
       -
         name: Configure git user
@@ -580,6 +580,9 @@ jobs:
 
             https://github.com/cloudnative-pg/cloudnative-pg/commit/${{ needs.buildx.outputs.commit_sha }}
         run: |
+          # Skip creating the commit if there are no changes
+          [ -n "$(git status -s)" ] || exit 0
+
           git add .
           git commit -m "${COMMIT_MESSAGE}"
       -
