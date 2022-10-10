@@ -26,23 +26,25 @@ import (
 
 // CreatePodMonitor create a new podmonitor for cluster
 func CreatePodMonitor(cluster *apiv1.Cluster) *monitoringv1.PodMonitor {
-	labels := make(map[string]string)
-	labels[utils.ClusterLabelName] = cluster.Name
+	meta := metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+	utils.LabelClusterName(&meta, cluster.Name)
+
+	spec := monitoringv1.PodMonitorSpec{
+		Selector: metav1.LabelSelector{
+			MatchLabels: meta.Labels,
+		},
+		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
+			{
+				Port: "metrics",
+			},
+		},
+	}
 
 	return &monitoringv1.PodMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
-		},
-		Spec: monitoringv1.PodMonitorSpec{
-			Selector: metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
-				{
-					Port: "metrics",
-				},
-			},
-		},
+		ObjectMeta: meta,
+		Spec:       spec,
 	}
 }
