@@ -402,10 +402,10 @@ jobs:
             branch_name=${GITHUB_HEAD_REF}
           fi
 
-          upload_artifacts=false
+          upload_artifact=false
           # TODO after review/testing, the `|| ${branch_name} == 'dev/771'` should be removed
           if [[ ${branch_name} == 'main' || ${branch_name} =~ 'release/' || ${branch_name} == 'dev/771' ]]; then
-            upload_artifacts=true
+            upload_artifact=true
           fi
 
           echo "::set-output name=images::${images}"
@@ -419,7 +419,7 @@ jobs:
           echo "::set-output name=author_name::${author_name}"
           echo "::set-output name=author_email::${author_email}"
           echo "::set-output name=branch_name::${branch_name}"
-          echo "::set-output name=upload_artifacts::${upload_artifacts}"
+          echo "::set-output name=upload_artifact::${upload_artifact}"
       -
         name: Set GoReleaser environment
         run: |
@@ -539,7 +539,7 @@ jobs:
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       always() &&
       needs.buildx.result == 'success' &&
-      needs.buildx.outputs.upload_artifacts == 'true' &&
+      needs.buildx.outputs.upload_artifact == 'true' &&
       github.repository == 'cloudnative-pg/cloudnative-pg'
     runs-on: ubuntu-20.04
     steps:
