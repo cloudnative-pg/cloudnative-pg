@@ -8,20 +8,39 @@ The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
 You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.17/releases/cnpg-1.17.1.yaml)
-as follows:
+for this minor release as follows:
 
 ```sh
 kubectl apply -f \
   https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.17/releases/cnpg-1.17.1.yaml
 ```
 
-Once you have run the `kubectl` command, CloudNativePG will be installed in your Kubernetes cluster.
-
 You can verify that with:
 
 ```sh
 kubectl get deploy -n cnpg-system cnpg-controller-manager
 ```
+
+#### Testing the latest development snapshot
+
+If you want to test or evaluate the latest development snapshot of
+CloudNativePG before the next official patch release, you can download the
+manifests from the
+[`cloudnative-pg/artifacts`](https://github.com/cloudnative-pg/artifacts)
+which provides easy access to the current trunk (main) as well as to each
+supported release.
+
+For example, you can install the latest snapshot of the operator for
+this minor release with:
+
+```sh
+curl -sSfL \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
+  kubectl apply -f -
+```
+
+!!! Important
+    Snapshots are not supported by the CloudNativePG and not intended for production usage.
 
 ### Using the Helm Chart
 
