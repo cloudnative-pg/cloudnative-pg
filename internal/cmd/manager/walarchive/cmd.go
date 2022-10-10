@@ -165,8 +165,10 @@ func run(ctx context.Context, podName, pgData string, args []string, client clie
 	walFilesList := gatherWALFilesToArchive(ctx, walName, maxParallel)
 
 	// Step 4: Check if the archive location is safe to perform archiving
-	if err := checkWalArchive(ctx, cluster, walArchiver, client, pgData); err != nil {
-		return err
+	if utils.IsEmptyWalArchiveCheckEnabled(&cluster.ObjectMeta) {
+		if err := checkWalArchive(ctx, cluster, walArchiver, client, pgData); err != nil {
+			return err
+		}
 	}
 
 	options, err := barmanCloudWalArchiveOptions(cluster, cluster.Name)
