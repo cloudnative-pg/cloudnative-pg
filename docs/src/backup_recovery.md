@@ -388,7 +388,7 @@ Engine meaning that no credentials are needed to upload the files.
 
 However this will require proper [Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) configuration and a specifica `annotation` in the cluster's service account.
 
-Using the `inheritedMetadata` configuration, the metadatas arepropagated to **all** the resources created by the operator for a given cluster.
+Using the `inheritedMetadata` configuration, the metadatas are propagated to **all** the resources created by the operator for a given cluster.
 
 !!! Warning
     Currently the annotation is only propagated at cluster's creation
