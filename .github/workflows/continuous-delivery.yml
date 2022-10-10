@@ -7,7 +7,8 @@ on:
   # A push from any branch
   push:
     branches:
-      - 'main'
+      - main
+      - release-*
   # A pull request (from this repository or a forked one) which is labelled
   pull_request_target:
     types: [labeled]
@@ -339,7 +340,11 @@ jobs:
       image: ${{ steps.image-meta.outputs.image }}
       # 'branch_name' is used in 'GetMostRecentReleaseTag' in the Go code
       branch_name: ${{ steps.build-meta.outputs.branch_name }}
-
+      upload_artifacts: ${{ steps.build-meta.outputs.upload_artifacts }}
+      commit_msg: ${{ steps.build-meta.outputs.commit_msg }}
+      commit_sha: ${{ steps.build-meta.outputs.commit_sha }}
+      author_name: ${{ steps.build-meta.outputs.author_name }}
+      author_email: ${{ steps.build-meta.outputs.author_email }}
     steps:
       -
         name: Checkout
@@ -374,14 +379,31 @@ jobs:
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+
+          # shortened commit sha
           commit_short=$(git rev-parse --short "${commit_sha}")
-          
+
+          # multiline strings are weird
+          commit_message=$(git show -s --format=%B "${commit_sha}")
+          commit_message=${commit_message//$'%'/'%25'}
+          commit_message=${commit_message//$'\n'/'%0A'}
+          commit_message=${commit_message//$'\r'/'%0D'}
+
+          # get git user and email
+          author_name=$(git show -s --format='%an' "${commit_sha}")
+          author_email=$(git show -s --format='%ae' "${commit_sha}")
+
           # extract branch name
           if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
           then
-            echo "::set-output name=branch_name::${GITHUB_REF#refs/heads/}"
+            branch_name=${GITHUB_REF#refs/heads/}
           else
-            echo "::set-output name=branch_name::${GITHUB_HEAD_REF}"
+            branch_name=${GITHUB_HEAD_REF}
+          fi
+
+          upload_artifacts=false
+          if [[ ${branch_name} == main || ${branch_name} =~ ^release- ]]; then
+            upload_artifacts=true
           fi
 
           echo "::set-output name=images::${images}"
@@ -390,6 +412,12 @@ jobs:
           echo "::set-output name=date::${commit_date}"
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
+          echo "::set-output name=commit_sha::${commit_sha}"
+          echo "::set-output name=commit_msg::${commit_message}"
+          echo "::set-output name=author_name::${author_name}"
+          echo "::set-output name=author_email::${author_email}"
+          echo "::set-output name=branch_name::${branch_name}"
+          echo "::set-output name=upload_artifacts::${upload_artifacts}"
       -
         name: Set GoReleaser environment
         run: |
@@ -487,6 +515,81 @@ jobs:
           # TAGS could be separated by newlines or commas
           image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
           echo "::set-output name=image::${image}"
+      -
+        name: Generate manifest for operator deployment
+        id: generate-manifest
+        run: |
+          make generate-manifest
+      -
+        name: Upload the operator manifest as artifact in workflow
+        uses: actions/upload-artifact@v3
+        with:
+          name: operator-manifest.yaml
+          path: dist/operator-manifest.yaml
+          retention-days: 7
+
+  publish-artifacts:
+    name: Publish artifacts
+    needs:
+      - buildx
+      - duplicate_runs
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      always() &&
+      needs.buildx.result == 'success' &&
+      needs.buildx.outputs.upload_artifacts == 'true' &&
+      github.repository == 'cloudnative-pg/cloudnative-pg'
+    runs-on: ubuntu-20.04
+    steps:
+      -
+        name: Checkout artifact
+        uses: actions/checkout@v3
+        with:
+          repository: cloudnative-pg/artifacts
+          token: ${{ secrets.REPO_GHA_PAT }}
+          ref: main
+          fetch-depth: 0
+      -
+        name: Configure git user
+        run: |
+          git config user.email "${{ needs.buildx.outputs.author_email }}"
+          git config user.name "${{ needs.buildx.outputs.author_name }}"
+      -
+        name: Switch to or create the right branch
+        env:
+          BRANCH: ${{ needs.buildx.outputs.branch_name }}
+        run: |
+          git checkout "${BRANCH}" 2>/dev/null || git checkout -b "${BRANCH}"
+
+          # Remove the previous operator manifest if present because the next
+          # step doesn't overwrite existing files
+          rm -fr manifests/operator-manifest.yaml
+      -
+        name: Prepare the operator manifest
+        uses: actions/download-artifact@v3
+        with:
+          name: operator-manifest.yaml
+          path: manifests
+      -
+        name: Prepare the commit
+        env:
+          COMMIT_MESSAGE: |
+            ${{ needs.buildx.outputs.commit_msg }}
+
+            https://github.com/cloudnative-pg/cloudnative-pg/commit/${{ needs.buildx.outputs.commit_sha }}
+        run: |
+          # Skip creating the commit if there are no changes
+          [ -n "$(git status -s)" ] || exit 0
+
+          git add .
+          git commit -m "${COMMIT_MESSAGE}"
+      -
+        name: Push changes
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
+          repository: cloudnative-pg/artifacts
+          branch: ${{ needs.buildx.outputs.branch_name }}
 
   generate-jobs:
     name: Generate jobs for E2E tests

@@ -31,6 +31,8 @@ VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-
 LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=${VERSION} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
+DIST_PATH := $(shell pwd)/dist
+OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= ghcr.io/cloudnative-pg/postgresql:14
@@ -43,7 +45,7 @@ GORELEASER_VERSION ?= v1.10.3
 export CONTROLLER_IMG
 export BUILD_IMAGE
 export POSTGRES_IMAGE_NAME
-
+export OPERATOR_MANIFEST_PATH
 # We don't need `trivialVersions=true` anymore, with `crd` it's ok for multi versions
 CRD_OPTIONS ?= "crd"
 
@@ -116,7 +118,10 @@ install: manifests kustomize ## Install CRDs into a cluster.
 uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
+deploy: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
+	kubectl apply -f ${OPERATOR_MANIFEST_PATH}
+
+generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
 	cp -r config/* $$CONFIG_TMP_DIR ;\
@@ -129,7 +134,8 @@ deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cl
 		$(KUSTOMIZE) edit add configmap controller-manager-env \
 			--from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" ;\
 	} ;\
-	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default | kubectl apply -f - ;\
+	mkdir -p ${DIST_PATH} ;\
+	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default > ${OPERATOR_MANIFEST_PATH} ;\
 	rm -fr $$CONFIG_TMP_DIR
 
 manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
