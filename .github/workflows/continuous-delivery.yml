@@ -553,7 +553,7 @@ jobs:
       -
         name: Switch to or create the right branch
         run: |
-          git switch -C ${{ steps.build-meta.outputs.branch_name }}
+          git switch -C ${{ needs.buildx.outputs.branch_name }}
       -
         name: Prepare the operator manifest
         uses: actions/download-artifact@v3
@@ -565,7 +565,7 @@ jobs:
         uses: EndBug/add-and-commit@v7
         with:
           fetch: false
-          new_branch: ${{ steps.build-meta.outputs.branch_name }}
+          new_branch: ${{ needs.buildx.outputs.branch_name }}
           author_name: ${{ needs.buildx.outputs.author_name }}
           author_email: ${{ needs.buildx.outputs.author_email }}
           message: |
