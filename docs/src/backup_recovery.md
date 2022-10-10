@@ -386,7 +386,7 @@ spec:
 This, will tell the operator that the cluster is running inside a Google Kubernetes
 Engine meaning that no credentials are needed to upload the files.
 
-However this will require proper [Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) configuration and a specifica `annotation` in the cluster's service account.
+However this will require proper [Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) configuration and a specific `annotation` in the cluster's service account.
 
 Using the `inheritedMetadata` configuration, the metadatas are propagated to **all** the resources created by the operator for a given cluster.
 
