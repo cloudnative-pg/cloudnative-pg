@@ -7,9 +7,8 @@ on:
   # A push from any branch
   push:
     branches:
-      - 'main'
-      # TODO after review/testing, the branch 'dev/771' should be removed
-      - 'dev/771'
+      - main
+      - release-*
   # A pull request (from this repository or a forked one) which is labelled
   pull_request_target:
     types: [labeled]
@@ -403,8 +402,7 @@ jobs:
           fi
 
           upload_artifacts=false
-          # TODO after review/testing, the `|| ${branch_name} == 'dev/771'` should be removed
-          if [[ ${branch_name} == 'main' || ${branch_name} =~ 'release/' || ${branch_name} == 'dev/771' ]]; then
+          if [[ ${branch_name} == main || ${branch_name} =~ ^release- ]]; then
             upload_artifacts=true
           fi
 
