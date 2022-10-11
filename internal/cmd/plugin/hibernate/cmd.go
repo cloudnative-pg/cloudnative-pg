@@ -47,7 +47,8 @@ var (
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-			return hibernateOff(cmd.Context(), clusterName)
+			off := newOffCommand(cmd.Context(), clusterName)
+			return off.execute()
 		},
 	}
 )
