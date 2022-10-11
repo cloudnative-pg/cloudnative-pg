@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - release-*
+      - dev/fix_operator_image_env
   # A pull request (from this repository or a forked one) which is labelled
   pull_request_target:
     types: [labeled]
@@ -174,6 +175,7 @@ jobs:
     #        'ready to test :elephant:'
     # OR     it's on main branch
     if: |
+      false &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
