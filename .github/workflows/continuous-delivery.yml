@@ -519,6 +519,7 @@ jobs:
         name: Generate manifest for operator deployment
         id: generate-manifest
         run: |
+          CONTROLLER_IMG=${{ steps.image-meta.outputs.image }}
           make generate-manifest
       -
         name: Upload the operator manifest as artifact in workflow
