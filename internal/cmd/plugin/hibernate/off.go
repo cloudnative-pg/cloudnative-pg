@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -94,7 +94,7 @@ func (off *offCommand) execute() error {
 // ensureClusterDoesNotExistStep checks if this cluster exist or not, ensuring
 // that it is not present
 func (off *offCommand) ensureClusterDoesNotExistStep() error {
-	var cluster v1.Cluster
+	var cluster apiv1.Cluster
 	err := plugin.Client.Get(
 		off.ctx,
 		types.NamespacedName{Name: off.clusterName, Namespace: plugin.Namespace},
@@ -136,7 +136,7 @@ func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.Persistent
 }
 
 // createClusterWithoutRuntimeDataStep recreate the original cluster back into Kubernetes
-func (off *offCommand) createClusterWithoutRuntimeDataStep(clusterFromPVC v1.Cluster) error {
+func (off *offCommand) createClusterWithoutRuntimeDataStep(clusterFromPVC apiv1.Cluster) error {
 	cluster := clusterFromPVC.DeepCopy()
 	// remove any runtime kubernetes metadata
 	cluster.ObjectMeta.ResourceVersion = ""
@@ -145,7 +145,7 @@ func (off *offCommand) createClusterWithoutRuntimeDataStep(clusterFromPVC v1.Clu
 	cluster.ObjectMeta.Generation = 0
 	cluster.ObjectMeta.CreationTimestamp = metav1.Time{}
 	// remove cluster status
-	cluster.Status = v1.ClusterStatus{}
+	cluster.Status = apiv1.ClusterStatus{}
 
 	// remove any runtime kubernetes annotations
 	delete(cluster.Annotations, corev1.LastAppliedConfigAnnotation)

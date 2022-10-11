@@ -213,7 +213,7 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 // The role should describe the purpose of the executed job
 func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
-	jobName := fmt.Sprintf("%s-%v-%s", cluster.Name, nodeSerial, role)
+	jobName := GetJobName(cluster.Name, nodeSerial, role)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -279,4 +279,9 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 	}
 
 	return job
+}
+
+// GetJobName returns a string indicating the job name
+func GetJobName(clusterName string, nodeSerial int, role string) string {
+	return fmt.Sprintf("%s-%v-%s", clusterName, nodeSerial, role)
 }

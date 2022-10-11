@@ -99,7 +99,7 @@ func getOrphanPVCs(
 		return nil, err
 	}
 
-	orphanPVCs := make([]corev1.PersistentVolumeClaim, 0, len(pvcList.Items)) // nolint
+	orphanPVCs := make([]corev1.PersistentVolumeClaim, 0, len(pvcList.Items))
 	for _, pvc := range pvcList.Items {
 		if len(pvc.OwnerReferences) != 0 {
 			contextLogger.Warning("skipping pvc because it has owner metadata",
@@ -148,7 +148,7 @@ func restoreOrphanPVCs(
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	for i := range pvcs {
-		pvc := pvcs[i]
+		pvc := &pvcs[i]
 		if pvc.Annotations == nil {
 			pvc.Annotations = map[string]string{}
 		}
@@ -160,7 +160,7 @@ func restoreOrphanPVCs(
 		delete(pvc.Annotations, utils.HibernateClusterManifestAnnotationName)
 		delete(pvc.Annotations, utils.HibernatePgControlDataAnnotationName)
 
-		if err := c.Patch(ctx, &pvc, client.MergeFrom(pvcOrig)); err != nil {
+		if err := c.Patch(ctx, pvc, client.MergeFrom(pvcOrig)); err != nil {
 			return err
 		}
 	}

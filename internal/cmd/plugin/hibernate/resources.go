@@ -21,10 +21,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -51,12 +51,12 @@ func getHibernatedPVCGroup(ctx context.Context, clusterName string) ([]corev1.Pe
 }
 
 // getClusterFromPVCAnnotation reads the original cluster resource from the chosen PVC
-func getClusterFromPVCAnnotation(pvc corev1.PersistentVolumeClaim) (v1.Cluster, error) {
-	var clusterFromPVC v1.Cluster
+func getClusterFromPVCAnnotation(pvc corev1.PersistentVolumeClaim) (apiv1.Cluster, error) {
+	var clusterFromPVC apiv1.Cluster
 	// get the cluster manifest
 	clusterJSON := pvc.Annotations[utils.HibernateClusterManifestAnnotationName]
 	if err := json.Unmarshal([]byte(clusterJSON), &clusterFromPVC); err != nil {
-		return v1.Cluster{}, err
+		return apiv1.Cluster{}, err
 	}
 	return clusterFromPVC, nil
 }
