@@ -19,11 +19,10 @@ package log
 import (
 	"flag"
 	"fmt"
-	"os"
-
 	"github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/klog/v2"
+	"os"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -37,6 +36,11 @@ type Flags struct {
 var (
 	logLevel       string
 	logDestination string
+
+	logfieldsRemap struct {
+		TimeKey  string
+		LevelKey string
+	}
 )
 
 // AddFlags binds manager configuration flags to a given flagset
@@ -46,14 +50,17 @@ func (l *Flags) AddFlags(flags *pflag.FlagSet) {
 		"the desired log level, one of error, info, debug and trace")
 	loggingFlagSet.StringVar(&logDestination, "log-destination", "",
 		"where the log stream will be written")
+	loggingFlagSet.StringVar(&logfieldsRemap.LevelKey, "log-field-level", "level", "JSON log field to report severity in")
+	loggingFlagSet.StringVar(&logfieldsRemap.TimeKey, "log-field-timestamp", "ts", "JSON log field to report timestamp in")
 	l.zapOptions.BindFlags(loggingFlagSet)
 	flags.AddGoFlagSet(loggingFlagSet)
 }
 
 // ConfigureLogging configure the logging honoring the flags
 // passed from the user
+// This is executed after args were already parsed.
 func (l *Flags) ConfigureLogging() {
-	logger := zap.New(zap.UseFlagOptions(&l.zapOptions), customLevel, customDestination)
+	logger := zap.New(zap.UseFlagOptions(&l.zapOptions), customLevel, customDestination, remapKeys)
 	switch logLevel {
 	case ErrorLevelString,
 		WarningLevelString,
@@ -102,6 +109,17 @@ func getLogLevelString(l zapcore.Level) string {
 	default:
 		return DefaultLevelString
 	}
+}
+
+func remapKeys(in *zap.Options) {
+	in.EncoderConfigOptions = append(in.EncoderConfigOptions, func(c *zapcore.EncoderConfig) {
+		if logfieldsRemap.TimeKey != "" {
+			c.TimeKey = logfieldsRemap.TimeKey
+		}
+		if logfieldsRemap.LevelKey != "" {
+			c.LevelKey = logfieldsRemap.LevelKey
+		}
+	})
 }
 
 func customLevel(in *zap.Options) {

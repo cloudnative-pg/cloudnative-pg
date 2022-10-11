@@ -20,6 +20,10 @@ Each log entry has the following fields:
     [Kubernetes Logging Architecture](https://kubernetes.io/docs/concepts/cluster-administration/logging/)
     documentation.
 
+!!! Info
+    `level` and `ts` fields can be renamed with `log-field-level` and `log-field-timestamp`
+    CLI flags should you log ingestion system require it.
+
 ## Operator log
 
 A log level can be specified in the cluster spec with the option `logLevel` and
