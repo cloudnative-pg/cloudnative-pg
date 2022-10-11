@@ -519,6 +519,8 @@ jobs:
       -
         name: Generate manifest for operator deployment
         id: generate-manifest
+        env:
+          CONTROLLER_IMG: ${{ steps.image-meta.outputs.image }}
         run: |
           make generate-manifest
       -
