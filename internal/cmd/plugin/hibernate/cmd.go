@@ -107,7 +107,7 @@ func NewCmd() *cobra.Command {
 		StringP(
 			"file",
 			"f",
-			"-",
+			outputFileStdout,
 			"the path/name of the output file if the output is json format")
 
 	return cmd

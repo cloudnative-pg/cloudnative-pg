@@ -41,6 +41,9 @@ import (
 const (
 	// statusClusterManifestNotFound is an error message reported when no cluster manifest is not found
 	statusClusterManifestNotFound = "Cluster manifest not found"
+
+	// outputFileStdout is the file name that requires the output on the standard output
+	outputFileStdout = "-"
 )
 
 // statusOutputManager is a type capable of executing a status output request
@@ -208,43 +211,47 @@ func (t *jsonStatusOutputManager) addPVCGroupInformation(
 	t.mapToSerialize["pgControlData"] = tmp
 }
 
-func (t *jsonStatusOutputManager) execute() error {
-	byteArray, err := json.MarshalIndent(t.mapToSerialize, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	var f io.WriteCloser
-	if t.jsonFilePath == "-" {
-		f = os.Stdout
-	} else {
-		if exists, _ := fileutils.FileExists(t.jsonFilePath); exists {
-			return fmt.Errorf("file already exist will not overwrite")
-		}
-
-		f, err = os.Create(t.jsonFilePath)
-		if err != nil {
-			return err
-		}
-	}
-
-	contextLogger := log.FromContext(t.ctx)
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil {
-			contextLogger.Error(closeErr, "error while closing the file")
-		}
-	}()
-
-	_, err = f.Write(byteArray)
+func writeJsonOutput(writer io.WriteCloser, byteArray []byte) error {
+	_, err := writer.Write(byteArray)
 	if err != nil {
 		return err
 	}
 
 	// JSON files should end with a newline
-	_, err = io.WriteString(f, "\n")
+	_, err = io.WriteString(writer, "\n")
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (t *jsonStatusOutputManager) execute() error {
+	jsonOutput, err := json.MarshalIndent(t.mapToSerialize, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	switch t.jsonFilePath {
+	case outputFileStdout:
+		return writeJsonOutput(os.Stdout, jsonOutput)
+	default:
+		if exists, _ := fileutils.FileExists(t.jsonFilePath); exists {
+			return fmt.Errorf("file already exist will not overwrite")
+		}
+
+		outputFile, err := os.Create(t.jsonFilePath)
+		if err != nil {
+			return err
+		}
+
+		contextLogger := log.FromContext(t.ctx)
+		defer func() {
+			if closeErr := outputFile.Close(); closeErr != nil {
+				contextLogger.Error(closeErr, "error while closing the file")
+			}
+		}()
+
+		return writeJsonOutput(outputFile, jsonOutput)
+	}
 }
