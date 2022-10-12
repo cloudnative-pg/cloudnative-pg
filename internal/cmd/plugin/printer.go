@@ -49,5 +49,11 @@ func Print(o interface{}, format OutputFormat, writer io.Writer) error {
 		}
 	}
 
+	// Files should end with a newline
+	_, err := io.WriteString(writer, "\n")
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

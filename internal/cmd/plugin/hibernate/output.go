@@ -19,9 +19,7 @@ package hibernate
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -33,7 +31,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -41,9 +38,6 @@ import (
 const (
 	// statusClusterManifestNotFound is an error message reported when no cluster manifest is not found
 	statusClusterManifestNotFound = "Cluster manifest not found"
-
-	// outputFileStdout is the file name that requires the output on the standard output
-	outputFileStdout = "-"
 )
 
 // statusOutputManager is a type capable of executing a status output request
@@ -136,21 +130,21 @@ func (t *textStatusOutputManager) execute() error {
 	return nil
 }
 
-type jsonStatusOutputManager struct {
+type structuredStatusOutputManager struct {
 	mapToSerialize map[string]interface{}
-	jsonFilePath   string
+	format         plugin.OutputFormat
 	ctx            context.Context
 }
 
-func newJSONOutputManager(ctx context.Context, jsonFilePath string) *jsonStatusOutputManager {
-	return &jsonStatusOutputManager{
+func newStructuredOutputManager(ctx context.Context, format plugin.OutputFormat) *structuredStatusOutputManager {
+	return &structuredStatusOutputManager{
 		mapToSerialize: map[string]interface{}{},
-		jsonFilePath:   jsonFilePath,
+		format:         format,
 		ctx:            ctx,
 	}
 }
 
-func (t *jsonStatusOutputManager) addHibernationSummaryInformation(
+func (t *structuredStatusOutputManager) addHibernationSummaryInformation(
 	level statusLevel,
 	statusMessage string,
 	clusterName string,
@@ -163,7 +157,7 @@ func (t *jsonStatusOutputManager) addHibernationSummaryInformation(
 	}
 }
 
-func (t *jsonStatusOutputManager) addClusterManifestInformation(
+func (t *structuredStatusOutputManager) addClusterManifestInformation(
 	cluster *apiv1.Cluster,
 ) {
 	tmpMap := map[string]interface{}{}
@@ -179,7 +173,7 @@ func (t *jsonStatusOutputManager) addClusterManifestInformation(
 	tmpMap["spec"] = cluster.Spec
 }
 
-func (t *jsonStatusOutputManager) addPVCGroupInformation(
+func (t *structuredStatusOutputManager) addPVCGroupInformation(
 	pvcs []corev1.PersistentVolumeClaim,
 ) {
 	contextLogger := log.FromContext(t.ctx)
@@ -211,47 +205,6 @@ func (t *jsonStatusOutputManager) addPVCGroupInformation(
 	t.mapToSerialize["pgControlData"] = tmp
 }
 
-func writeJsonOutput(writer io.WriteCloser, byteArray []byte) error {
-	_, err := writer.Write(byteArray)
-	if err != nil {
-		return err
-	}
-
-	// JSON files should end with a newline
-	_, err = io.WriteString(writer, "\n")
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (t *jsonStatusOutputManager) execute() error {
-	jsonOutput, err := json.MarshalIndent(t.mapToSerialize, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	switch t.jsonFilePath {
-	case outputFileStdout:
-		return writeJsonOutput(os.Stdout, jsonOutput)
-	default:
-		if exists, _ := fileutils.FileExists(t.jsonFilePath); exists {
-			return fmt.Errorf("file already exist will not overwrite")
-		}
-
-		outputFile, err := os.Create(t.jsonFilePath)
-		if err != nil {
-			return err
-		}
-
-		contextLogger := log.FromContext(t.ctx)
-		defer func() {
-			if closeErr := outputFile.Close(); closeErr != nil {
-				contextLogger.Error(closeErr, "error while closing the file")
-			}
-		}()
-
-		return writeJsonOutput(outputFile, jsonOutput)
-	}
+func (t *structuredStatusOutputManager) execute() error {
+	return plugin.Print(t.mapToSerialize, t.format, os.Stdout)
 }

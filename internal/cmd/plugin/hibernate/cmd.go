@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 var (
@@ -65,14 +67,11 @@ var (
 				return err
 			}
 
-			switch statusOutput(rawOutput) {
-			case jsonStatusOutput:
-				filePath, err := cmd.Flags().GetString("file")
-				if err != nil {
-					return err
-				}
-				return newStatusCommandJSONOutput(cmd.Context(), clusterName, filePath).execute()
-			case textStatusOutput:
+			outputFormat := plugin.OutputFormat(rawOutput)
+			switch outputFormat {
+			case plugin.OutputFormatJSON, plugin.OutputFormatYAML:
+				return newStatusCommandStructuredOutput(cmd.Context(), clusterName, outputFormat).execute()
+			case plugin.OutputFormatText:
 				return newStatusCommandTextOutput(cmd.Context(), clusterName).execute()
 			default:
 				return fmt.Errorf("output: %s is not supported by the hibernate CLI", rawOutput)
@@ -101,14 +100,8 @@ func NewCmd() *cobra.Command {
 			"output",
 			"o",
 			"text",
-			"Output format. One of text|json. json format also accepts file output",
+			"Output format. One of text, json, or yaml",
 		)
-	hibernateStatusCmd.Flags().
-		StringP(
-			"file",
-			"f",
-			outputFileStdout,
-			"the path/name of the output file if the output is json format")
 
 	return cmd
 }

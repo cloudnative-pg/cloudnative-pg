@@ -29,14 +29,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-// statusOutput is a supported type of stdout for the status command
-type statusOutput string
-
-const (
-	jsonStatusOutput statusOutput = "json"
-	textStatusOutput statusOutput = "text"
-)
-
 // statusLevel describes if the output should communicate an ok,warning or error status
 type statusLevel string
 
@@ -52,9 +44,13 @@ type statusCommand struct {
 	clusterName   string
 }
 
-func newStatusCommandJSONOutput(ctx context.Context, clusterName string, jsonFilePath string) *statusCommand {
+func newStatusCommandStructuredOutput(
+	ctx context.Context,
+	clusterName string,
+	format plugin.OutputFormat,
+) *statusCommand {
 	return &statusCommand{
-		outputManager: newJSONOutputManager(ctx, jsonFilePath),
+		outputManager: newStructuredOutputManager(ctx, format),
 		ctx:           ctx,
 		clusterName:   clusterName,
 	}
