@@ -1520,20 +1520,6 @@ func (r *Cluster) validateRecoveryAndBackupTarget() field.ErrorList {
 		return allErrors
 	}
 
-	barmanObjectStore := r.Spec.Backup.BarmanObjectStore
-	sourceBarmanObjectStore := sourceCluster.BarmanObjectStore
-
-	if barmanObjectStore.ServerName == sourceBarmanObjectStore.ServerName &&
-		barmanObjectStore.EndpointURL == sourceBarmanObjectStore.EndpointURL &&
-		barmanObjectStore.DestinationPath == sourceBarmanObjectStore.DestinationPath {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				field.NewPath("spec", "backup", "barmanObjectStore"),
-				"",
-				"Cannot be equal to the ExternalCluster used to recover from"))
-	}
-
 	return allErrors
 }
 
