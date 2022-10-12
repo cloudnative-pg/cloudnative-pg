@@ -37,6 +37,12 @@ func Print(o interface{}, format OutputFormat, writer io.Writer) error {
 			return err
 		}
 
+		// json.MarshalIndent doesn't add the final newline
+		_, err = io.WriteString(writer, "\n")
+		if err != nil {
+			return err
+		}
+
 	case OutputFormatYAML:
 		data, err := yaml.Marshal(o)
 		if err != nil {
@@ -47,12 +53,6 @@ func Print(o interface{}, format OutputFormat, writer io.Writer) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	// Files should end with a newline
-	_, err := io.WriteString(writer, "\n")
-	if err != nil {
-		return err
 	}
 
 	return nil
