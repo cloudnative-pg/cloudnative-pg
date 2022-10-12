@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -208,18 +209,23 @@ func (t *jsonStatusOutputManager) addPVCGroupInformation(
 }
 
 func (t *jsonStatusOutputManager) execute() error {
-	byteArray, err := json.Marshal(t.mapToSerialize)
+	byteArray, err := json.MarshalIndent(t.mapToSerialize, "", "    ")
 	if err != nil {
 		return err
 	}
 
-	if exists, _ := fileutils.FileExists(t.jsonFilePath); exists {
-		return fmt.Errorf("file already exist will not overwrite")
-	}
+	var f io.WriteCloser
+	if t.jsonFilePath == "-" {
+		f = os.Stdout
+	} else {
+		if exists, _ := fileutils.FileExists(t.jsonFilePath); exists {
+			return fmt.Errorf("file already exist will not overwrite")
+		}
 
-	f, err := os.Create(t.jsonFilePath)
-	if err != nil {
-		return err
+		f, err = os.Create(t.jsonFilePath)
+		if err != nil {
+			return err
+		}
 	}
 
 	contextLogger := log.FromContext(t.ctx)
@@ -235,7 +241,7 @@ func (t *jsonStatusOutputManager) execute() error {
 	}
 
 	// JSON files should end with a newline
-	_, err = f.WriteString("\n")
+	_, err = io.WriteString(f, "\n")
 	if err != nil {
 		return err
 	}
