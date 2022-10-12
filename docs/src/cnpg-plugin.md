@@ -613,3 +613,11 @@ A hibernated cluster can be resumed with:
 ```
 kubectl cnpg hibernate off <cluster-name>
 ```
+
+Once the cluster has been hibernated, it's possible to show the last
+configuration and the status that PostgreSQL had after it was shut down.
+That can be done with:
+
+```
+kubectl cnpg hibernate status <cluster-name>
+```

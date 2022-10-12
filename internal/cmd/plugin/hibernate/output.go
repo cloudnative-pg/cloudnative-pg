@@ -119,7 +119,7 @@ func (t *textStatusOutputManager) addPVCGroupInformation(
 		return
 	}
 
-	t.textPrinter.AddHeader(aurora.Green("PG CONTROL DATA"))
+	t.textPrinter.AddHeader(aurora.Green("PostgreSQL instance control information"))
 	t.textPrinter.AddLine(value)
 }
 
