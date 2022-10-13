@@ -284,7 +284,6 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateName,
 		r.validateBootstrapPgBaseBackupSource,
 		r.validateBootstrapRecoverySource,
-		r.validateRecoveryAndBackupTarget,
 		r.validateExternalClusters,
 		r.validateTolerations,
 		r.validateAntiAffinity,
@@ -1494,44 +1493,6 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 				"not a valid retention policy",
 			))
 		}
-	}
-
-	return allErrors
-}
-
-// validateRecoveryAndBackupTarget validates that the recovery point and
-// the backup point are not the same
-func (r *Cluster) validateRecoveryAndBackupTarget() field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.Source == "" ||
-		r.Spec.Backup == nil || r.Spec.Backup.BarmanObjectStore == nil {
-		return allErrors
-	}
-
-	var sourceCluster *ExternalCluster
-	for i, cluster := range r.Spec.ExternalClusters {
-		if cluster.Name == r.Spec.Bootstrap.Recovery.Source {
-			sourceCluster = &r.Spec.ExternalClusters[i]
-		}
-	}
-
-	if sourceCluster == nil || sourceCluster.BarmanObjectStore == nil {
-		return allErrors
-	}
-
-	barmanObjectStore := r.Spec.Backup.BarmanObjectStore
-	sourceBarmanObjectStore := sourceCluster.BarmanObjectStore
-
-	if barmanObjectStore.ServerName == sourceBarmanObjectStore.ServerName &&
-		barmanObjectStore.EndpointURL == sourceBarmanObjectStore.EndpointURL &&
-		barmanObjectStore.DestinationPath == sourceBarmanObjectStore.DestinationPath {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				field.NewPath("spec", "backup", "barmanObjectStore"),
-				"",
-				"Cannot be equal to the ExternalCluster used to recover from"))
 	}
 
 	return allErrors
