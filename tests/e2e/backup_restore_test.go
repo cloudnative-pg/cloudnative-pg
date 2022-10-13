@@ -1091,13 +1091,6 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("restore a cluster with same backup destination path as source and it fails", func() {
-			// Restoring cluster with same destination path.
-			err := CreateResourcesFromFileWithError(namespace, clusterRestoreSampleFile)
-			Expect(err).To(HaveOccurred())
-			Expect(strings.Contains(err.Error(), "Cannot be equal to the ExternalCluster"))
-		})
-
 		It("restore a cluster with different backup destination and creates another cluster with same path as "+
 			"source cluster and it fails", func() {
 			restoredClusterName, err := env.GetResourceNameFromYAML(clusterRestoreSampleFile2)
