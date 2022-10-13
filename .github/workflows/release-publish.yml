@@ -166,7 +166,7 @@ jobs:
       -
         name: Build and push
         id: build
-        uses: docker/build-push-action@v3.1.1
+        uses: docker/build-push-action@v3.2.0
         with:
           platforms: ${{ steps.docker-platforms.outputs.platforms }}
           context: .
