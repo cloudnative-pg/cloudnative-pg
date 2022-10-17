@@ -126,6 +126,10 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 
 	cluster := fullStatus.Cluster
 
+	if cluster.IsReplica() {
+		fmt.Println(aurora.Red("This is a Replica Cluster"))
+	}
+
 	primaryInstance := cluster.Status.CurrentPrimary
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 		primaryInstance = fmt.Sprintf("%v (switching to %v)",
@@ -150,7 +154,12 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
 	}
 	summary.AddLine("PostgreSQL Image:", cluster.GetImageName())
-	summary.AddLine("Primary instance:", primaryInstance)
+	if cluster.IsReplica() {
+		summary.AddLine("Designated primary:", primaryInstance)
+		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)
+	} else {
+		summary.AddLine("Primary instance:", primaryInstance)
+	}
 	summary.AddLine("Status:", status)
 	if cluster.Spec.Instances == cluster.Status.Instances {
 		summary.AddLine("Instances:", aurora.Green(cluster.Spec.Instances))
@@ -446,6 +455,11 @@ func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.Postgresql
 		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 {
 			return &fullStatus.InstanceStatus.Items[idx]
 		}
+		// TODO there should be a specific condition in the instance manager to find
+		// if an instance is a Designated Primary
+		if instanceStatus.Pod.Name == fullStatus.PrimaryPod.Name {
+			return &fullStatus.InstanceStatus.Items[idx]
+		}
 	}
 
 	return nil
@@ -462,7 +476,9 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if instance.IsPrimary {
 		return "Primary"
 	}
-	if fullStatus.Cluster.IsReplica() && len(instance.ReplicationInfo) > 0 {
+	// TODO there should be a specific condition in the instance manager to find
+	// if an instance is a Designated Primary
+	if fullStatus.Cluster.IsReplica() && instance.Pod.Name == fullStatus.PrimaryPod.Name {
 		return "Designated primary"
 	}
 
@@ -498,6 +514,13 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 		default:
 			continue
 		}
+	}
+
+	// TODO this is a hack to catch the case of a standby node in a Replica Cluster
+	// A fuller fix would make sure the Designated Primary gets the replication
+	// list from pg_stat_replication
+	if len(primaryInstanceStatus.ReplicationInfo) == 0 {
+		return "Standby (in Replica Cluster)"
 	}
 
 	return "Unknown"
