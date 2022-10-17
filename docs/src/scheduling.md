@@ -58,7 +58,7 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:14.5
+  imageName: ghcr.io/cloudnative-pg/postgresql:15.0
 
   affinity:
     enablePodAntiAffinity: true #default value
