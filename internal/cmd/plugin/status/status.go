@@ -280,6 +280,10 @@ func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
 }
 
 func (fullStatus *PostgresqlStatus) printReplicaStatus() {
+	if fullStatus.Cluster.IsReplica() {
+		return
+	}
+
 	fmt.Println(aurora.Green("Streaming Replication status"))
 	if fullStatus.Cluster.Spec.Instances == 1 {
 		fmt.Println(aurora.Yellow("Not configured").String())
