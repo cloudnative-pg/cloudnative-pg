@@ -21,13 +21,17 @@ import (
 
 var _ = Describe("Cluster Hibernation with plugin", func() {
 	type Mode string
+	type hibernateSatusMessage string
 	const (
-		sampleFileClusterWithPGWalVolume         = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		sampleFileClusterWithOutPGWalVolume      = fixturesDir + "/hibernate/cluster-storage-class-without-wal.yaml.template"
-		level                                    = tests.Medium
-		HibernateOn                         Mode = "on"
-		HibernateOff                        Mode = "off"
-		HibernateStatus                     Mode = "status"
+		sampleFileClusterWithPGWalVolume    = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFileClusterWithOutPGWalVolume = fixturesDir + "/hibernate/" +
+			"cluster-storage-class-without-wal.yaml.template"
+		level                                         = tests.Medium
+		HibernateOn             Mode                  = "on"
+		HibernateOff            Mode                  = "off"
+		HibernateStatus         Mode                  = "status"
+		clusterOffStatusMessage hibernateSatusMessage = "No Hibernation. Cluster Deployed."
+		clusterOnStatusMessage  hibernateSatusMessage = "Cluster Hibernated"
 	)
 	var namespace string
 	BeforeEach(func() {
@@ -47,13 +51,14 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	Context("hibernate on", func() {
+	Context("hibernate", func() {
 		var beforeHibernationCurrentPrimary, clusterName string
 		var beforeHibernationPgWalPvcUID, beforeHibernationPgDataPvcUID types.UID
 		var beforeHibernationClusterInfo *apiv1.Cluster
 		var clusterManifest []byte
+		tableName := "test"
 		var err error
-		getPrimaryAndClusterManifest := func(namespace, clusterName string) {
+		getPrimaryAndClusterManifest := func(namespace, clusterName string) ([]byte, *apiv1.Cluster) {
 			By("collecting current primary details", func() {
 				beforeHibernationClusterInfo, err = env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
@@ -62,9 +67,10 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 				clusterManifest, err = json.Marshal(&beforeHibernationClusterInfo)
 				Expect(err).ToNot(HaveOccurred())
 			})
+			return clusterManifest, beforeHibernationClusterInfo
 		}
-		getPvc := func(role utils.PVCRole) corev1.PersistentVolumeClaim {
-			pvcName := specs.GetPVCName(*beforeHibernationClusterInfo,
+		getPvc := func(role utils.PVCRole, clusterInfo *apiv1.Cluster) corev1.PersistentVolumeClaim {
+			pvcName := specs.GetPVCName(*clusterInfo,
 				beforeHibernationCurrentPrimary, role)
 			pvcInfo := corev1.PersistentVolumeClaim{}
 			err = testsUtils.GetObject(env, ctrlclient.ObjectKey{Namespace: namespace, Name: pvcName}, &pvcInfo)
@@ -72,7 +78,7 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 			return pvcInfo
 		}
 		performHibernation := func(mode Mode) {
-			By("performing hibernation", func() {
+			By(fmt.Sprintf("performing hibernation %v", mode), func() {
 				_, _, err := testsUtils.Run(fmt.Sprintf("kubectl cnpg hibernate %v %v -n %v",
 					mode, clusterName, namespace))
 				Expect(err).ToNot(HaveOccurred())
@@ -135,8 +141,8 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 				})
 			})
 		}
-		verifyPvc := func(role utils.PVCRole, pvcUid types.UID) {
-			pvcInfo := getPvc(role)
+		verifyPvc := func(role utils.PVCRole, pvcUid types.UID, clusterInfo *apiv1.Cluster) {
+			pvcInfo := getPvc(role, clusterInfo)
 			Expect(pvcUid).Should(BeEquivalentTo(pvcInfo.GetUID()))
 			// pvc should be attached annotation with pgControlData and Cluster manifesto
 			expectedAnnotationKeyPresent := []string{
@@ -153,20 +159,24 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 		When("cluster setup with PG-WAL volume", func() {
 			It("hibernation process should work", func() {
 				namespace = "hibernation-on-with-pg-wal"
+				tableName := "test"
 				clusterName, err = env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
 				err = env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
-				getPrimaryAndClusterManifest(namespace, clusterName)
+				// Write a table and some data on the "app" database
+				AssertCreateTestData(namespace, clusterName, tableName)
+				clusterManifest, beforeHibernationClusterInfo = getPrimaryAndClusterManifest(namespace, clusterName)
+				currentPrimary := beforeHibernationClusterInfo.Status.CurrentPrimary
 				By("collecting pgWal pvc details of current primary", func() {
-					pvcInfo := getPvc(utils.PVCRolePgWal)
+					pvcInfo := getPvc(utils.PVCRolePgWal, beforeHibernationClusterInfo)
 					beforeHibernationPgWalPvcUID = pvcInfo.GetUID()
 				})
 
 				By("collecting pgData pvc details of current primary", func() {
-					pvcInfo := getPvc(utils.PVCRolePgData)
+					pvcInfo := getPvc(utils.PVCRolePgData, beforeHibernationClusterInfo)
 					beforeHibernationPgDataPvcUID = pvcInfo.GetUID()
 				})
 
@@ -177,15 +187,18 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 				verifyClusterResources(namespace, clusterName, []utils.PVCRole{utils.PVCRolePgWal, utils.PVCRolePgData})
 
 				By("verifying primary pgWal pvc info", func() {
-					verifyPvc(utils.PVCRolePgWal, beforeHibernationPgWalPvcUID)
+					verifyPvc(utils.PVCRolePgWal, beforeHibernationPgWalPvcUID, beforeHibernationClusterInfo)
 				})
 
 				By("verifying primary pgData pvc info", func() {
-					verifyPvc(utils.PVCRolePgData, beforeHibernationPgDataPvcUID)
+					verifyPvc(utils.PVCRolePgData, beforeHibernationPgDataPvcUID, beforeHibernationClusterInfo)
 				})
-				By("verify PVC group", func() {
-					// TODO PVC group
-				})
+
+				// verifying hibernation off
+				performHibernation(HibernateOff)
+				AssertClusterIsReady(namespace, clusterName, 600, env)
+				// Test data should be present after hibernation off
+				AssertDataExpectedCount(namespace, currentPrimary, tableName, 2)
 			})
 		})
 		When("cluster setup without PG-WAL volume", func() {
@@ -197,9 +210,12 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 				err = env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
-				getPrimaryAndClusterManifest(namespace, clusterName)
+				// Write a table and some data on the "app" database
+				AssertCreateTestData(namespace, clusterName, tableName)
+				clusterManifest, beforeHibernationClusterInfo = getPrimaryAndClusterManifest(namespace, clusterName)
+				currentPrimary := beforeHibernationClusterInfo.Status.CurrentPrimary
 				By("collecting pgData pvc details of current primary", func() {
-					pvcInfo := getPvc(utils.PVCRolePgData)
+					pvcInfo := getPvc(utils.PVCRolePgData, beforeHibernationClusterInfo)
 					beforeHibernationPgDataPvcUID = pvcInfo.GetUID()
 				})
 
@@ -210,8 +226,14 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 				verifyClusterResources(namespace, clusterName, []utils.PVCRole{utils.PVCRolePgData})
 
 				By("verifying primary pgData pvc info", func() {
-					verifyPvc(utils.PVCRolePgData, beforeHibernationPgDataPvcUID)
+					verifyPvc(utils.PVCRolePgData, beforeHibernationPgDataPvcUID, beforeHibernationClusterInfo)
 				})
+
+				// verifying hibernation off
+				performHibernation(HibernateOff)
+				AssertClusterIsReady(namespace, clusterName, 600, env)
+				// Test data should be present after hibernation off
+				AssertDataExpectedCount(namespace, currentPrimary, tableName, 2)
 			})
 		})
 	})
