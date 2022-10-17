@@ -90,6 +90,8 @@ type PostgresqlStatus struct {
 
 	// contains the PgStatReplication rows content.
 	ReplicationInfo PgStatReplicationList `json:"replicationInfo,omitempty"`
+	// contains the PgReplicationSlot rows content.
+	ReplicationSlotsInfo PgReplicationSlotList `json:"replicationSlotsInfo,omitempty"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
@@ -135,6 +137,24 @@ func (status PostgresqlStatus) IsPostgresqlReady() bool {
 
 // PgStatReplicationList is a list of PgStatReplication reported by the primary instance
 type PgStatReplicationList []PgStatReplication
+
+// PgReplicationSlot contains the replication slots status as reported by the primary instance
+type PgReplicationSlot struct {
+	SlotName    string `json:"slotName,omitempty"`
+	Plugin      string `json:"plugin,omitempty"`
+	SlotType    string `json:"slotType,omitempty"`
+	Datoid      string `json:"datoid,omitempty"`
+	Database    string `json:"database,omitempty"`
+	Active      bool   `json:"active,omitempty"`
+	Xmin        string `json:"xmin,omitempty"`
+	CatalogXmin string `json:"catalogXmin,omitempty"`
+	RestartLsn  string `json:"restartLsn,omitempty"`
+	WalStatus   string `json:"walStatus,omitempty"`
+	SafeWalSize *int   `json:"safeWalSize,omitempty"`
+}
+
+// PgReplicationSlotList is a list of PgReplicationSlot reported by the primary instance
+type PgReplicationSlotList []PgReplicationSlot
 
 // Len implements sort.Interface extracting the length of the list
 func (list PgStatReplicationList) Len() int {

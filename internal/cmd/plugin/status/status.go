@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +56,33 @@ type PostgresqlStatus struct {
 	PrimaryPod corev1.Pod
 }
 
+func (fullStatus *PostgresqlStatus) getReplicationSlotList() postgres.PgReplicationSlotList {
+	primary := fullStatus.tryGetPrimaryInstance()
+	if primary == nil {
+		return nil
+	}
+
+	return primary.ReplicationSlotsInfo
+}
+
+func (fullStatus *PostgresqlStatus) getPrintableReplicationSlotInfo(instanceName string) *postgres.PgReplicationSlot {
+	for _, slot := range fullStatus.getReplicationSlotList() {
+		expectedSlotName := fullStatus.Cluster.GetSlotNameFromInstanceName(instanceName)
+		if slot.SlotName == expectedSlotName {
+			return &slot
+		}
+	}
+
+	return nil
+}
+
+func getPrintableIntegerPointer(i *int) string {
+	if i == nil {
+		return "NULL"
+	}
+	return strconv.Itoa(*i)
+}
+
 // Status implements the "status" subcommand
 func Status(ctx context.Context, clusterName string, verbose bool, format plugin.OutputFormat) error {
 	status, err := ExtractPostgresqlStatus(ctx, clusterName)
@@ -82,6 +110,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printCertificatesStatus()
 	status.printBackupStatus()
 	status.printReplicaStatus()
+	status.printUnmanagedReplicationSlotStatus()
 	status.printInstancesStatus()
 
 	if nonFatalError != nil {
@@ -345,12 +374,17 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 		"State",
 		"Sync State",
 		"Sync Priority",
+		"RS Active", // RS = Replication Slot
+		"RS Name",
+		"RS Restart LSN",
+		"RS WAL Status",
+		"RS Safe WAL Size",
 	)
 
 	replicationInfo := primaryInstanceStatus.ReplicationInfo
 	sort.Sort(replicationInfo)
 	for _, replication := range replicationInfo {
-		status.AddLine(
+		output := []interface{}{
 			replication.ApplicationName,
 			replication.SentLsn,
 			replication.WriteLsn,
@@ -362,7 +396,27 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 			replication.State,
 			replication.SyncState,
 			replication.SyncPriority,
-		)
+		}
+
+		if rs := fullStatus.getPrintableReplicationSlotInfo(replication.ApplicationName); rs != nil {
+			output = append(output,
+				rs.Active,
+				rs.SlotName,
+				rs.RestartLsn,
+				rs.WalStatus,
+				getPrintableIntegerPointer(rs.SafeWalSize),
+			)
+		} else {
+			output = append(output,
+				"-",
+				"-",
+				"-",
+				"-",
+				"-",
+			)
+		}
+
+		status.AddLine(output...)
 	}
 	status.Print()
 	fmt.Println()
@@ -555,4 +609,69 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 // TODO: improve the way we detect the Designated Primary in a replica cluster
 func (fullStatus *PostgresqlStatus) isReplicaClusterDesignatedPrimary(instance postgres.PostgresqlStatus) bool {
 	return fullStatus.Cluster.IsReplica() && instance.Pod.Name == fullStatus.PrimaryPod.Name
+}
+
+func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
+	var unmanagedReplicationSlots postgres.PgReplicationSlotList
+	for _, slot := range fullStatus.getReplicationSlotList() {
+		// we skip replication slots that we manage
+		replicationSlots := fullStatus.Cluster.Spec.ReplicationSlots
+		if replicationSlots != nil && replicationSlots.HighAvailability != nil &&
+			strings.HasPrefix(slot.SlotName, replicationSlots.HighAvailability.GetSlotPrefix()) {
+			continue
+		}
+		unmanagedReplicationSlots = append(unmanagedReplicationSlots, slot)
+	}
+
+	const headerMessage = "Unmanaged Replication Slot Status"
+	status := tabby.New()
+	if len(unmanagedReplicationSlots) == 0 {
+		status.AddLine(aurora.Green(headerMessage))
+		status.AddLine("No unmanaged replication slots found")
+		fmt.Println()
+		return
+	}
+
+	status.AddHeader(
+		"Slot Name",
+		"Slot Type",
+		"Database",
+		"Active",
+		"Restart LSN",
+		"XMin",
+		"Catalog XMin",
+		"Datoid",
+		"Plugin",
+		"Wal Status",
+		"Safe Wal Size",
+	)
+
+	var containsFailure bool
+	for _, slot := range unmanagedReplicationSlots {
+		// add any other failure conditions here
+		if !slot.Active {
+			containsFailure = true
+		}
+		status.AddLine(
+			slot.SlotName,
+			slot.SlotType,
+			slot.Database,
+			slot.Active,
+			slot.RestartLsn,
+			slot.Xmin,
+			slot.CatalogXmin,
+			slot.Datoid,
+			slot.Plugin,
+			slot.WalStatus,
+			getPrintableIntegerPointer(slot.SafeWalSize),
+		)
+	}
+	color := aurora.Green
+	if containsFailure {
+		color = aurora.Red
+	}
+
+	fmt.Println(color(headerMessage))
+	status.Print()
+	fmt.Println()
 }
