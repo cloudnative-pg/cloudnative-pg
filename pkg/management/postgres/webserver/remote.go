@@ -73,31 +73,31 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, r *ht
 	// If `pg_rewind` is running the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
 	// Same goes for instances with fencing on.
-	if !ws.instance.PgRewindIsRunning && !ws.instance.MightBeUnavailable() {
-		err := ws.instance.IsServerHealthy()
-		if err != nil {
-			log.Info("Liveness probe failing", "err", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		log.Trace("Liveness probe succeeding")
-	} else {
+	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
 		log.Trace("Liveness probe skipped")
+		_, _ = fmt.Fprint(w, "Skipped")
 	}
+
+	err := ws.instance.IsServerHealthy()
+	if err != nil {
+		log.Info("Liveness probe failing", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Trace("Liveness probe succeeding")
 	_, _ = fmt.Fprint(w, "OK")
 }
 
 // This is the readiness probe
 func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
-	err := ws.instance.IsServerReady()
-	if err != nil {
+	if err := ws.instance.IsServerReady(); err != nil {
 		log.Info("Readiness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	log.Trace("Readiness probe succeeding")
-
 	_, _ = fmt.Fprint(w, "OK")
 }
 
