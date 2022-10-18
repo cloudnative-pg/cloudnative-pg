@@ -456,12 +456,8 @@ func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
 
 func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.PostgresqlStatus {
 	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
-		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 {
-			return &fullStatus.InstanceStatus.Items[idx]
-		}
-		// TODO: improve the way we detect in the instance manager (condition?)
-		// a Designated Primary in a replica cluster
-		if instanceStatus.Pod.Name == fullStatus.PrimaryPod.Name {
+		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 ||
+			fullStatus.isReplicaClusterDesignatedPrimary(instanceStatus) {
 			return &fullStatus.InstanceStatus.Items[idx]
 		}
 	}
@@ -480,9 +476,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if instance.IsPrimary {
 		return "Primary"
 	}
-	// TODO: improve the way we detect in the instance manager (condition?)
-	// a Designated Primary in a replica cluster
-	if fullStatus.Cluster.IsReplica() && instance.Pod.Name == fullStatus.PrimaryPod.Name {
+	if fullStatus.isReplicaClusterDesignatedPrimary(instance) {
 		return "Designated primary"
 	}
 
@@ -528,4 +522,9 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	}
 
 	return "Unknown"
+}
+
+// TODO: improve the way we detect the Designated Primary in a replica cluster
+func (fullStatus *PostgresqlStatus) isReplicaClusterDesignatedPrimary(instance postgres.PostgresqlStatus) bool {
+	return fullStatus.Cluster.IsReplica() && instance.Pod.Name == fullStatus.PrimaryPod.Name
 }
