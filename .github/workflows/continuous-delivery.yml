@@ -83,7 +83,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Check for changes
-      uses: dorny/paths-filter@v2.11.0
+      uses: dorny/paths-filter@v2.11.1
       id: filter
       # Remember to add new folders in the operator-changed filter if needed
       with:
@@ -495,7 +495,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v3.1.1
+        uses: docker/build-push-action@v3.2.0
         with:
           platforms: ${{ steps.docker-platforms.outputs.platforms }}
           context: .
