@@ -83,35 +83,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		level               = tests.Lowest
 	)
 
-	var upgradeNamespace string
-
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(upgradeNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			// Dump the operator namespace, as operator is changing too
-			env.DumpOperator(operatorNamespace,
-				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
-		}
-	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(upgradeNamespace)
-		Expect(err).ToNot(HaveOccurred())
-		// Delete the operator's namespace in case that the previous test make corrupted changes to
-		// the operator's namespace so that affects subsequent test
-		err = env.DeleteNamespaceAndWait(operatorNamespace, 60)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
 	// Check that the amount of backups is increasing on minio.
 	// This check relies on the fact that nothing is performing backups
 	// but a single scheduled backups during the check
-	AssertScheduledBackupsAreScheduled := func() {
+	AssertScheduledBackupsAreScheduled := func(upgradeNamespace string) {
 		By("verifying scheduled backups are still happening", func() {
 			out, _, err := testsUtils.Run(fmt.Sprintf(
 				"kubectl exec -n %v %v -- %v",
@@ -146,7 +127,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		return env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(oldCluster))
 	}
 
-	AssertConfUpgrade := func(clusterName string) {
+	AssertConfUpgrade := func(clusterName, upgradeNamespace string) {
 		By("checking basic functionality performing a configuration upgrade on the cluster", func() {
 			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -434,7 +415,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// We create a ScheduledBackup
 			CreateResourceFromFile(upgradeNamespace, scheduledBackupFile)
 		})
-		AssertScheduledBackupsAreScheduled()
+		AssertScheduledBackupsAreScheduled(upgradeNamespace)
 
 		var podUIDs []types.UID
 		podList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
@@ -511,14 +492,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		AssertClusterIsReady(upgradeNamespace, clusterName1, 300, env)
 
-		AssertConfUpgrade(clusterName1)
+		AssertConfUpgrade(clusterName1, upgradeNamespace)
 
 		By("installing a second Cluster on the upgraded operator", func() {
 			CreateResourceFromFile(upgradeNamespace, sampleFile2)
 			AssertClusterIsReady(upgradeNamespace, clusterName2, 600, env)
 		})
 
-		AssertConfUpgrade(clusterName2)
+		AssertConfUpgrade(clusterName2, upgradeNamespace)
 
 		// We verify that the backup taken before the upgrade is usable to
 		// create a v1 cluster
@@ -562,22 +543,53 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
 		})
-		AssertScheduledBackupsAreScheduled()
+		AssertScheduledBackupsAreScheduled(upgradeNamespace)
 	}
 
 	It("works after an upgrade with rolling upgrade ", func() {
+		// set upgradeNamespace for log naming
+		upgradeNamespace := rollingUpgradeNamespace
+		DeferCleanup(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(upgradeNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				// Dump the operator namespace, as operator is changing too
+				env.DumpOperator(operatorNamespace,
+					"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
+			}
+
+			err := env.DeleteNamespace(upgradeNamespace)
+			Expect(err).ToNot(HaveOccurred())
+			// Delete the operator's namespace in case that the previous test make corrupted changes to
+			// the operator's namespace so that affects subsequent test
+			err = env.DeleteNamespaceAndWait(operatorNamespace, 60)
+			Expect(err).ToNot(HaveOccurred())
+		})
 		mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
 		Expect(err).NotTo(HaveOccurred())
 
 		GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
-
-		// set upgradeNamespace for log naming
-		upgradeNamespace = rollingUpgradeNamespace
 		applyUpgrade(upgradeNamespace)
 	})
 
 	It("works after an upgrade with online upgrade", func() {
+		// set upgradeNamespace for log naming
+		upgradeNamespace := onlineUpgradeNamespace
+		DeferCleanup(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(upgradeNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				// Dump the operator namespace, as operator is changing too
+				env.DumpOperator(operatorNamespace,
+					"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
+			}
+
+			err := env.DeleteNamespace(upgradeNamespace)
+			Expect(err).ToNot(HaveOccurred())
+			// Delete the operator's namespace in case that the previous test make corrupted changes to
+			// the operator's namespace so that affects subsequent test
+			err = env.DeleteNamespaceAndWait(operatorNamespace, 60)
+			Expect(err).ToNot(HaveOccurred())
+		})
 		By("applying environment changes for current upgrade to be performed", func() {
 			testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
 		})
@@ -588,8 +600,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
 
-		// set upgradeNamespace for log naming
-		upgradeNamespace = onlineUpgradeNamespace
 		applyUpgrade(upgradeNamespace)
 
 		assertManagerRollout()
