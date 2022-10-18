@@ -683,15 +683,6 @@ A manifest for a cluster restore may include a `backup` section.
 This means that the new cluster, after recovery, will start archiving WAL's and
 taking backups if configured to do so.
 
-!!! Warning
-    It is not allowed to use the same `barmanObjectStore` object in the `backup`
-    section as in the `externalClusters` section, for the recovery. While in some
-    cases this *could* work, the operator will prevent recovery into a new
-    cluster if using the same backup object as the source cluster. This is to
-    guard against edge cases where the source WAL's could be overwritten.
-    A cluster with the same `barmanObjectStore` reused for recovery and backup
-    will generate a validation error: `spec.backup.barmanObjectStore: Invalid value: …`
-
 For example, the section below could be part of a manifest for a Cluster
 bootstrapping from Cluster `cluster-example-backup`, and would create a
 new folder in the storage bucket named `recoveredCluster` where the base backups
@@ -725,12 +716,12 @@ for different clusters. There could be cases where the existing information
 in the storage buckets could be overwritten by the new cluster.
 
 !!! Warning
-    The operator now includes a safety check to ensure a cluster will not
+    The operator includes a safety check to ensure a cluster will not
     overwrite a storage bucket that contained information. A cluster that would
     overwrite existing storage will remain in state `Setting up primary` with
     Pods in an Error state.
     The pod logs will show:
-    `ERROR: WAL archive check failed for server recoveredCluster: Expected empty archive"`
+    `ERROR: WAL archive check failed for server recoveredCluster: Expected empty archive`
 
 ## Retention policies
 

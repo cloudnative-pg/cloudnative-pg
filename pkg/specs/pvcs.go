@@ -81,7 +81,7 @@ func CreatePVC(
 	nodeSerial int,
 	role utils.PVCRole,
 ) (*corev1.PersistentVolumeClaim, error) {
-	instanceName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	pvcName := GetPVCName(cluster, instanceName, role)
 
 	result := &corev1.PersistentVolumeClaim{

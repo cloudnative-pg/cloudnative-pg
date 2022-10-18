@@ -17,7 +17,11 @@ limitations under the License.
 package hibernate
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 var (
@@ -47,7 +51,31 @@ var (
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-			return hibernateOff(cmd.Context(), clusterName)
+			off := newOffCommand(cmd.Context(), clusterName)
+			return off.execute()
+		},
+	}
+
+	hibernateStatusCmd = &cobra.Command{
+		Use:   "status [cluster]",
+		Short: "Prints the hibernation status for the [cluster]",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clusterName := args[0]
+			rawOutput, err := cmd.Flags().GetString("output")
+			if err != nil {
+				return err
+			}
+
+			outputFormat := plugin.OutputFormat(rawOutput)
+			switch outputFormat {
+			case plugin.OutputFormatJSON, plugin.OutputFormatYAML:
+				return newStatusCommandStructuredOutput(cmd.Context(), clusterName, outputFormat).execute()
+			case plugin.OutputFormatText:
+				return newStatusCommandTextOutput(cmd.Context(), clusterName).execute()
+			default:
+				return fmt.Errorf("output: %s is not supported by the hibernate CLI", rawOutput)
+			}
 		},
 	}
 )
@@ -61,11 +89,19 @@ func NewCmd() *cobra.Command {
 
 	cmd.AddCommand(hibernateOnCmd)
 	cmd.AddCommand(hibernateOffCmd)
+	cmd.AddCommand(hibernateStatusCmd)
 
 	hibernateOnCmd.Flags().Bool(
 		"force",
 		false,
 		"Force the hibernation procedure even if the preconditions are not met")
+	hibernateStatusCmd.Flags().
+		StringP(
+			"output",
+			"o",
+			"text",
+			"Output format. One of text, json, or yaml",
+		)
 
 	return cmd
 }

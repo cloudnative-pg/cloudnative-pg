@@ -79,7 +79,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:14.5
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.0
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -124,7 +124,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:14.5
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.0
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -612,4 +612,12 @@ A hibernated cluster can be resumed with:
 
 ```
 kubectl cnpg hibernate off <cluster-name>
+```
+
+Once the cluster has been hibernated, it's possible to show the last
+configuration and the status that PostgreSQL had after it was shut down.
+That can be done with:
+
+```
+kubectl cnpg hibernate status <cluster-name>
 ```

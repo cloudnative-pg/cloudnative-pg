@@ -291,7 +291,7 @@ func CreatePodSecurityContext(user, group int64) *corev1.PodSecurityContext {
 
 // PodWithExistingStorage create a new instance with an existing storage
 func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
-	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 
 	pod := &corev1.Pod{
@@ -329,6 +329,11 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 		utils.AnnotateAppArmor(&pod.ObjectMeta, cluster.Annotations)
 	}
 	return pod
+}
+
+// GetInstanceName returns a string indicating the instance name
+func GetInstanceName(clusterName string, nodeSerial int) string {
+	return fmt.Sprintf("%s-%v", clusterName, nodeSerial)
 }
 
 // AddBarmanEndpointCAToPodSpec adds the required volumes and env variables needed by barman to work correctly

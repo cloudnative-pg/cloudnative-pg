@@ -20,31 +20,28 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-// CreatePodMonitor create a new podmonitor for cluster
-func CreatePodMonitor(cluster *apiv1.Cluster) *monitoringv1.PodMonitor {
-	meta := metav1.ObjectMeta{
-		Namespace: cluster.Namespace,
-		Name:      cluster.Name,
-	}
-	utils.LabelClusterName(&meta, cluster.Name)
-
-	spec := monitoringv1.PodMonitorSpec{
-		Selector: metav1.LabelSelector{
-			MatchLabels: meta.Labels,
-		},
-		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
-			{
-				Port: "metrics",
+var _ = Describe("PodMonitor test", func() {
+	It("should create a valid monitoringv1.PodMonitor object", func() {
+		const (
+			clusterName      = "test"
+			clusterNamespace = "test-namespace"
+		)
+		cluster := v1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: clusterNamespace,
+				Name:      clusterName,
 			},
-		},
-	}
-
-	return &monitoringv1.PodMonitor{
-		ObjectMeta: meta,
-		Spec:       spec,
-	}
-}
+		}
+		monitor := CreatePodMonitor(&cluster)
+		Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(clusterName))
+		Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(clusterName))
+		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(monitoringv1.PodMetricsEndpoint{Port: "metrics"}))
+	})
+})

@@ -166,6 +166,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
+// nolint:gocognit
 func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -192,6 +193,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	err = r.setDefaults(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
+	if err := r.reconcileRestoredCluster(ctx, cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile restored Cluster: %w", err)
 	}
 
 	// Ensure we have the required global objects
