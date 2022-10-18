@@ -459,8 +459,8 @@ func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.Postgresql
 		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 {
 			return &fullStatus.InstanceStatus.Items[idx]
 		}
-		// TODO there should be a specific condition in the instance manager to find
-		// if an instance is a Designated Primary
+		// TODO: improve the way we detect in the instance manager (condition?)
+		// a Designated Primary in a replica cluster
 		if instanceStatus.Pod.Name == fullStatus.PrimaryPod.Name {
 			return &fullStatus.InstanceStatus.Items[idx]
 		}
@@ -480,8 +480,8 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if instance.IsPrimary {
 		return "Primary"
 	}
-	// TODO there should be a specific condition in the instance manager to find
-	// if an instance is a Designated Primary
+	// TODO: improve the way we detect in the instance manager (condition?)
+	// a Designated Primary in a replica cluster
 	if fullStatus.Cluster.IsReplica() && instance.Pod.Name == fullStatus.PrimaryPod.Name {
 		return "Designated primary"
 	}
@@ -520,7 +520,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 		}
 	}
 
-	// TODO this is a hack to catch the case of a standby node in a Replica Cluster
+	// TODO: improve the way we detect a standby in a replica cluster.
 	// A fuller fix would make sure the Designated Primary gets the replication
 	// list from pg_stat_replication
 	if len(primaryInstanceStatus.ReplicationInfo) == 0 {
