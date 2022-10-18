@@ -121,13 +121,14 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 }
 
 func (fullStatus *PostgresqlStatus) printBasicInfo() {
-	fmt.Println(aurora.Green("Cluster Summary"))
 	summary := tabby.New()
 
 	cluster := fullStatus.Cluster
 
 	if cluster.IsReplica() {
-		fmt.Println(aurora.Red("This is a Replica Cluster"))
+		fmt.Println(aurora.Yellow("Replica Cluster Summary"))
+	} else {
+		fmt.Println(aurora.Green("Cluster Summary"))
 	}
 
 	primaryInstance := cluster.Status.CurrentPrimary
