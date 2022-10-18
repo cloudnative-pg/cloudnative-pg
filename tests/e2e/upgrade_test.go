@@ -261,27 +261,47 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	applyUpgrade := func(upgradeNamespace string) {
+	cleanupNamespace := func(namespace string) error {
+		GinkgoWriter.Println("cleaning up")
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			// Dump the operator namespace, as operator is changing too
+			env.DumpOperator(operatorNamespace,
+				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
+		}
+
+		err := env.DeleteNamespace(namespace)
+		if err != nil {
+			return fmt.Errorf("could not cleanup. Failed to delete namespace: %v", err)
+		}
+		// Delete the operator's namespace in case that the previous test make corrupted changes to
+		// the operator's namespace so that affects subsequent test
+		return env.DeleteNamespaceAndWait(operatorNamespace, 60)
+	}
+
+	assertCreateNamespace := func(namespace string) {
 		By(fmt.Sprintf(
 			"having a '%s' upgradeNamespace",
-			upgradeNamespace), func() {
+			namespace), func() {
 			// Create a upgradeNamespace for all the resources
-			err := env.CreateNamespace(upgradeNamespace)
+			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Creating a upgradeNamespace should be quick
 			namespacedName := types.NamespacedName{
-				Namespace: upgradeNamespace,
-				Name:      upgradeNamespace,
+				Namespace: namespace,
+				Name:      namespace,
 			}
 
 			Eventually(func() (string, error) {
 				namespaceResource := &corev1.Namespace{}
 				err := env.Client.Get(env.Ctx, namespacedName, namespaceResource)
 				return namespaceResource.GetName(), err
-			}, 20).Should(BeEquivalentTo(upgradeNamespace))
+			}, 20).Should(BeEquivalentTo(namespace))
 		})
+	}
 
+	applyUpgrade := func(upgradeNamespace string) {
 		// Create the secrets used by the clusters and minio
 		By("creating the postgres secrets", func() {
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
@@ -549,47 +569,19 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	It("works after an upgrade with rolling upgrade ", func() {
 		// set upgradeNamespace for log naming
 		upgradeNamespace := rollingUpgradeNamespace
-		DeferCleanup(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(upgradeNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				// Dump the operator namespace, as operator is changing too
-				env.DumpOperator(operatorNamespace,
-					"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
-			}
-
-			err := env.DeleteNamespace(upgradeNamespace)
-			Expect(err).ToNot(HaveOccurred())
-			// Delete the operator's namespace in case that the previous test make corrupted changes to
-			// the operator's namespace so that affects subsequent test
-			err = env.DeleteNamespaceAndWait(operatorNamespace, 60)
-			Expect(err).ToNot(HaveOccurred())
-		})
 		mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
 		Expect(err).NotTo(HaveOccurred())
 
 		GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
+		assertCreateNamespace(upgradeNamespace)
+		DeferCleanup(cleanupNamespace, upgradeNamespace)
 		applyUpgrade(upgradeNamespace)
 	})
 
 	It("works after an upgrade with online upgrade", func() {
 		// set upgradeNamespace for log naming
 		upgradeNamespace := onlineUpgradeNamespace
-		DeferCleanup(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(upgradeNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				// Dump the operator namespace, as operator is changing too
-				env.DumpOperator(operatorNamespace,
-					"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
-			}
-
-			err := env.DeleteNamespace(upgradeNamespace)
-			Expect(err).ToNot(HaveOccurred())
-			// Delete the operator's namespace in case that the previous test make corrupted changes to
-			// the operator's namespace so that affects subsequent test
-			err = env.DeleteNamespaceAndWait(operatorNamespace, 60)
-			Expect(err).ToNot(HaveOccurred())
-		})
 		By("applying environment changes for current upgrade to be performed", func() {
 			testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
 		})
@@ -600,6 +592,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
 
+		assertCreateNamespace(upgradeNamespace)
+		DeferCleanup(cleanupNamespace, upgradeNamespace)
 		applyUpgrade(upgradeNamespace)
 
 		assertManagerRollout()
