@@ -81,7 +81,7 @@ func CreateObject(env *TestingEnvironment, object client.Object, opts ...client.
 			return nil
 		},
 		retry.Delay(PollingTime*time.Second),
-		retry.Attempts(RetryTimeout),
+		retry.Attempts(RetryAttempts),
 		retry.DelayType(retry.FixedDelay),
 		retry.RetryIf(func(err error) bool { return !apierrs.IsAlreadyExists(err) }),
 	)
@@ -95,7 +95,7 @@ func DeleteObject(env *TestingEnvironment, object client.Object, opts ...client.
 			return env.Client.Delete(env.Ctx, object, opts...)
 		},
 		retry.Delay(PollingTime*time.Second),
-		retry.Attempts(RetryTimeout),
+		retry.Attempts(RetryAttempts),
 		retry.DelayType(retry.FixedDelay),
 		retry.RetryIf(func(err error) bool { return !apierrs.IsNotFound(err) }),
 	)
@@ -113,7 +113,7 @@ func GetObjectList(env *TestingEnvironment, objectList client.ObjectList, opts .
 			return nil
 		},
 		retry.Delay(PollingTime*time.Second),
-		retry.Attempts(RetryTimeout),
+		retry.Attempts(RetryAttempts),
 		retry.DelayType(retry.FixedDelay),
 	)
 	return err
@@ -130,7 +130,7 @@ func GetObject(env *TestingEnvironment, objectKey client.ObjectKey, object clien
 			return nil
 		},
 		retry.Delay(PollingTime*time.Second),
-		retry.Attempts(RetryTimeout),
+		retry.Attempts(RetryAttempts),
 		retry.DelayType(retry.FixedDelay),
 	)
 	return err
