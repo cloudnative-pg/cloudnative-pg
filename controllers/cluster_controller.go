@@ -248,6 +248,39 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		onlineUpdateEnabled = false
 	}
 
+	// The instance list is sorted and will present the primary as the first
+	// element, followed by the replicas, the most updated coming first.
+	// Pods that are not responding will be at the end of the list. We use
+	// the information reported by the instance manager to sort the
+	// instances. When we need to elect a new primary, we take the first item
+	// on this list.
+	//
+	// Here we check the readiness status of the first Pod as we can't
+	// promote an instance that is not ready from the Kubernetes
+	// point-of-view: the services will not forward traffic to it even if
+	// PostgreSQL is up and running.
+	//
+	// An instance can be up and running even if the readiness probe is
+	// negative: this is going to happen, i.e., when an instance is
+	// un-fenced, and the Kubelet still hasn't refreshed the status of the
+	// readiness probe.
+	if instancesStatus.Len() > 0 {
+		isPostgresReady := instancesStatus.Items[0].IsPostgresqlReady()
+		isPodReady := instancesStatus.Items[0].IsReadinessProbePositive()
+
+		if isPostgresReady && !isPodReady {
+			// The readiness probe status from the Kubelet is not updated, so
+			// we need to wait for it to be refreshed
+			contextLogger.Info(
+				"Waiting for the Kubelet to refresh the readiness probe",
+				"instanceName", instancesStatus.Items[0].Node,
+				"instanceStatus", instancesStatus.Items[0],
+				"isPostgresReady", isPostgresReady,
+				"isPodReady", isPodReady)
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
+	}
+
 	// We have already updated the status in updateResourceStatus call,
 	// so we need to issue an extra update when the OnlineUpdateEnabled changes.
 	// It's okay because it should not change often.

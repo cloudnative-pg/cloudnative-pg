@@ -37,7 +37,7 @@ import (
 var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 
 // updateTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
-// this function will returns the name of the new primary selected for promotion
+// this function will return the name of the new primary selected for promotion
 func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
