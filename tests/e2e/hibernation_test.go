@@ -117,18 +117,18 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 			By(fmt.Sprintf("verifying cluster resources are removed "+
 				"post hibernation where roles %v", roles), func() {
 				timeout := 120
-				//nolint
+
 				By(fmt.Sprintf("verifying cluster %v is removed", clusterName), func() {
-					Eventually(func() (error, apiv1.Cluster) {
+					Eventually(func() (bool, apiv1.Cluster) {
 						cluster := &apiv1.Cluster{}
 						err := env.Client.Get(env.Ctx,
 							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
 							cluster)
 						if err != nil {
-							return err, apiv1.Cluster{}
+							return true, apiv1.Cluster{}
 						}
-						return nil, *cluster
-					}, timeout).ShouldNot(BeNil())
+						return false, *cluster
+					}, timeout).Should(BeTrue())
 				})
 
 				By(fmt.Sprintf("verifying cluster %v PVCs are removed", clusterName), func() {
@@ -140,52 +140,58 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 						return len(pvcList.Items), nil
 					}, timeout).Should(BeEquivalentTo(len(roles)))
 				})
-				//nolint
+
 				By(fmt.Sprintf("verifying cluster %v configMap is removed", clusterName), func() {
-					Eventually(func() (error, corev1.ConfigMap) {
+					Eventually(func() (bool, corev1.ConfigMap) {
 						configMap := corev1.ConfigMap{}
 						err = env.Client.Get(env.Ctx,
 							ctrlclient.ObjectKey{Namespace: namespace, Name: apiv1.DefaultMonitoringConfigMapName},
 							&configMap)
 						if err != nil {
-							return err, corev1.ConfigMap{}
+							return true, corev1.ConfigMap{}
 						}
-						return nil, configMap
-					}, timeout).ShouldNot(BeNil())
+						return false, configMap
+					}, timeout).Should(BeTrue())
 				})
 
 				By(fmt.Sprintf("verifying cluster %v secrets are removed", clusterName), func() {
-					Eventually(func() int {
+					Eventually(func() (bool, corev1.SecretList, error) {
 						secretList := corev1.SecretList{}
-						_ = env.Client.List(env.Ctx, &secretList, ctrlclient.InNamespace(namespace))
-						return len(secretList.Items)
-					}, timeout).Should(BeEquivalentTo(0))
+						err = env.Client.List(env.Ctx, &secretList, ctrlclient.InNamespace(namespace))
+						if err != nil {
+							return false, corev1.SecretList{}, err
+						}
+						if len(secretList.Items) == 0 {
+							return true, corev1.SecretList{}, nil
+						}
+						return false, secretList, nil
+					}, timeout).Should(BeTrue())
 				})
-				//nolint
+
 				By(fmt.Sprintf("verifying cluster %v role is removed", clusterName), func() {
-					Eventually(func() (error, v1.Role) {
+					Eventually(func() (bool, v1.Role) {
 						role := v1.Role{}
 						err = env.Client.Get(env.Ctx,
 							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
 							&role)
 						if err != nil {
-							return err, v1.Role{}
+							return true, v1.Role{}
 						}
-						return nil, role
-					}, timeout).ShouldNot(BeNil())
+						return false, role
+					}, timeout).Should(BeTrue())
 				})
-				//nolint
+
 				By(fmt.Sprintf("verifying cluster %v rolebinding is removed", clusterName), func() {
-					Eventually(func() (error, v1.RoleBinding) {
+					Eventually(func() (bool, v1.RoleBinding) {
 						roleBinding := v1.RoleBinding{}
 						err = env.Client.Get(env.Ctx,
 							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
 							&roleBinding)
 						if err != nil {
-							return err, v1.RoleBinding{}
+							return true, v1.RoleBinding{}
 						}
-						return nil, roleBinding
-					}, timeout).ShouldNot(BeNil())
+						return false, roleBinding
+					}, timeout).Should(BeTrue())
 				})
 			})
 		}
