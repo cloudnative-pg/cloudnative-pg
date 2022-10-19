@@ -386,7 +386,6 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 			"Sync State",
 			"Sync Priority",
 			"RS Active", // RS = Replication Slot
-			"RS Name",
 			"RS Restart LSN",
 			"RS WAL Status",
 			"RS Safe WAL Size",
@@ -414,14 +413,12 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 			if rs := fullStatus.getPrintableReplicationSlotInfo(applicationName); rs != nil {
 				columns = append(columns,
 					rs.Active,
-					rs.SlotName,
 					rs.RestartLsn,
 					rs.WalStatus,
 					getPrintableIntegerPointer(rs.SafeWalSize),
 				)
 			} else {
 				columns = append(columns,
-					"-",
 					"-",
 					"-",
 					"-",
