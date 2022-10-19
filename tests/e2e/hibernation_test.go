@@ -37,6 +37,7 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 		clusterManifestoInStatus ExpectedKeysInStatus  = "cluster"
 		summaryInStatus          ExpectedKeysInStatus  = "summary"
 		pgControlDataInStatus    ExpectedKeysInStatus  = "pgControlData"
+		tableName                                      = "test"
 	)
 	var namespace string
 	BeforeEach(func() {
@@ -61,7 +62,6 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 		var beforeHibernationPgWalPvcUID, beforeHibernationPgDataPvcUID types.UID
 		var beforeHibernationClusterInfo *apiv1.Cluster
 		var clusterManifest []byte
-		tableName := "test"
 		var err error
 		getPrimaryAndClusterManifest := func(namespace, clusterName string) ([]byte, *apiv1.Cluster) {
 			By("collecting current primary details", func() {
@@ -88,10 +88,12 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 					mode, clusterName, namespace))
 				Expect(err).ToNot(HaveOccurred())
 			})
-			Eventually(func(g Gomega) {
-				podList, _ := env.GetClusterPodList(namespace, clusterName)
-				g.Expect(len(podList.Items)).Should(BeEquivalentTo(0))
-			}, 180).Should(Succeed())
+			By(fmt.Sprintf("verifying cluster %v pods are removed", clusterName), func() {
+				Eventually(func(g Gomega) {
+					podList, _ := env.GetClusterPodList(namespace, clusterName)
+					g.Expect(len(podList.Items)).Should(BeEquivalentTo(0))
+				}, 300).Should(Succeed())
+			})
 		}
 
 		getHibernationStatusInJSON := func(namespace, clusterName string) map[string]interface{} {
@@ -114,53 +116,76 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 		verifyClusterResources := func(namespace, clusterName string, roles []utils.PVCRole) {
 			By(fmt.Sprintf("verifying cluster resources are removed "+
 				"post hibernation where roles %v", roles), func() {
+				timeout := 120
+				//nolint
 				By(fmt.Sprintf("verifying cluster %v is removed", clusterName), func() {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-						cluster)
-					Expect(err).To(HaveOccurred())
-				})
-
-				By(fmt.Sprintf("verifying cluster %v pods are removed", clusterName), func() {
-					podList, _ := env.GetClusterPodList(namespace, clusterName)
-					Expect(len(podList.Items)).Should(BeEquivalentTo(0))
+					Eventually(func() (error, apiv1.Cluster) {
+						cluster := &apiv1.Cluster{}
+						err := env.Client.Get(env.Ctx,
+							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+							cluster)
+						if err != nil {
+							return err, apiv1.Cluster{}
+						}
+						return nil, *cluster
+					}, timeout).ShouldNot(BeNil())
 				})
 
 				By(fmt.Sprintf("verifying cluster %v PVCs are removed", clusterName), func() {
-					pvcList, err := env.GetPVCList(namespace)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(len(pvcList.Items)).Should(BeEquivalentTo(len(roles)))
+					Eventually(func() (int, error) {
+						pvcList, err := env.GetPVCList(namespace)
+						if err != nil {
+							return -1, err
+						}
+						return len(pvcList.Items), nil
+					}, timeout).Should(BeEquivalentTo(len(roles)))
 				})
-
+				//nolint
 				By(fmt.Sprintf("verifying cluster %v configMap is removed", clusterName), func() {
-					configMap := corev1.ConfigMap{}
-					err = env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: apiv1.DefaultMonitoringConfigMapName},
-						&configMap)
-					Expect(err).To(HaveOccurred())
+					Eventually(func() (error, corev1.ConfigMap) {
+						configMap := corev1.ConfigMap{}
+						err = env.Client.Get(env.Ctx,
+							ctrlclient.ObjectKey{Namespace: namespace, Name: apiv1.DefaultMonitoringConfigMapName},
+							&configMap)
+						if err != nil {
+							return err, corev1.ConfigMap{}
+						}
+						return nil, configMap
+					}, timeout).ShouldNot(BeNil())
 				})
 
 				By(fmt.Sprintf("verifying cluster %v secrets are removed", clusterName), func() {
-					secretList := corev1.SecretList{}
-					_ = env.Client.List(env.Ctx, &secretList, ctrlclient.InNamespace(namespace))
-					Expect(len(secretList.Items)).Should(BeEquivalentTo(0))
+					Eventually(func() int {
+						secretList := corev1.SecretList{}
+						_ = env.Client.List(env.Ctx, &secretList, ctrlclient.InNamespace(namespace))
+						return len(secretList.Items)
+					}, timeout).Should(BeEquivalentTo(0))
 				})
-
+				//nolint
 				By(fmt.Sprintf("verifying cluster %v role is removed", clusterName), func() {
-					role := v1.Role{}
-					err = env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-						&role)
-					Expect(err).To(HaveOccurred())
+					Eventually(func() (error, v1.Role) {
+						role := v1.Role{}
+						err = env.Client.Get(env.Ctx,
+							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+							&role)
+						if err != nil {
+							return err, v1.Role{}
+						}
+						return nil, role
+					}, timeout).ShouldNot(BeNil())
 				})
-
+				//nolint
 				By(fmt.Sprintf("verifying cluster %v rolebinding is removed", clusterName), func() {
-					roleBinding := v1.RoleBinding{}
-					err = env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-						&roleBinding)
-					Expect(err).To(HaveOccurred())
+					Eventually(func() (error, v1.RoleBinding) {
+						roleBinding := v1.RoleBinding{}
+						err = env.Client.Get(env.Ctx,
+							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+							&roleBinding)
+						if err != nil {
+							return err, v1.RoleBinding{}
+						}
+						return nil, roleBinding
+					}, timeout).ShouldNot(BeNil())
 				})
 			})
 		}
@@ -182,7 +207,6 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 		When("cluster setup with PG-WAL volume", func() {
 			It("hibernation process should work", func() {
 				namespace = "hibernation-on-with-pg-wal"
-				tableName := "test"
 				clusterName, err = env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
