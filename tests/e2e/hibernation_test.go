@@ -47,7 +47,7 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().FullText()+".log")
 		}
 	})
 
@@ -99,7 +99,7 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 			By("getting hibernation status", func() {
 				stdOut, _, err := testsUtils.Run(fmt.Sprintf("kubectl cnpg hibernate %v %v -n %v -ojson",
 					HibernateStatus, clusterName, namespace))
-				Expect(err).ToNot(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred(), stdOut)
 				err = json.Unmarshal([]byte(stdOut), &data)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -108,7 +108,7 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 
 		verifySummaryInHibernationStatus := func(message HibernateSatusMessage) {
 			statusOut := getHibernationStatusInJSON(namespace, clusterName)
-			actualStatus := statusOut[string(summaryInStatus)].(interface{}).(map[string]interface{})["status"].(string)
+			actualStatus := statusOut[string(summaryInStatus)].(map[string]interface{})["status"].(string)
 			Expect(strings.Contains(string(message), actualStatus)).Should(BeEquivalentTo(true), statusOut)
 		}
 		verifyClusterResources := func(namespace, clusterName string, roles []utils.PVCRole) {
