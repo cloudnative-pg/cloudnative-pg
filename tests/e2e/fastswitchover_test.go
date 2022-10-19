@@ -71,7 +71,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
 			assertFastSwitchover(namespace, sampleFileWithoutReplicationSlots, clusterName, webTestFile, webTestJob)
 		})
@@ -86,7 +86,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
 			AssertClusterReplicationSlots(namespace, clusterName)

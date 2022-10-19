@@ -49,7 +49,7 @@ var _ = Describe("Switchover", Serial, func() {
 				if CurrentSpecReport().Failed() {
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
-				return env.DeleteNamespace(namespace)
+				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
@@ -67,7 +67,7 @@ var _ = Describe("Switchover", Serial, func() {
 				if CurrentSpecReport().Failed() {
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
-				return env.DeleteNamespace(namespace)
+				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
