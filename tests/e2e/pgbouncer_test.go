@@ -51,16 +51,15 @@ var _ = Describe("PGBouncer Connections", func() {
 			namespace = "pgbouncer-auth-no-user-certs"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
 		JustAfterEach(func() {
 			DeleteTableUsingPgBouncerService(namespace, clusterName, poolerBasicAuthRWSampleFile, env)
-		})
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("can connect to Postgres via pgbouncer service using basic authentication", func() {
@@ -135,11 +134,6 @@ var _ = Describe("PGBouncer Connections", func() {
 	})
 
 	Context("user-defined certificates", func() {
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
 		It("can connect to Postgres via pgbouncer using different client and server CA", func() {
 			const (
 				folderPath                    = fixturesDir + "/pgbouncer/pgbouncer_separate_client_server_ca/"
@@ -155,6 +149,9 @@ var _ = Describe("PGBouncer Connections", func() {
 			namespace = "pgbouncer-separate-certificates"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFileWithCertificate)
 			Expect(err).ToNot(HaveOccurred())
 

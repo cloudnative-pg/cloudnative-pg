@@ -69,10 +69,6 @@ var _ = Describe("Imports with Monolithic Approach", func() {
 		}
 	})
 
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 	It("can import data from a cluster with a different major version", func() {
 		var primaryPod *corev1.Pod
 		var targetDatabasePrimaryPod *corev1.Pod
@@ -87,6 +83,9 @@ var _ = Describe("Imports with Monolithic Approach", func() {
 			Expect(err).ToNot(HaveOccurred())
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			AssertCreateCluster(namespace, sourceClusterName, sourceClusterFile, env)
 		})
 

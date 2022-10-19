@@ -61,10 +61,6 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 			env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(webhookNamespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	BeforeAll(func() {
 		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
@@ -83,6 +79,12 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 		// Create a basic PG cluster
 		err := env.CreateNamespace(webhookNamespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(webhookNamespace)
+		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
 		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
@@ -121,6 +123,12 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 		// Create a basic PG cluster
 		err = env.CreateNamespace(webhookNamespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(webhookNamespace)
+		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
 		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)

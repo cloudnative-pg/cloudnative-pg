@@ -63,11 +63,6 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	//
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	It("can import a database with large objects", func() {
 		var err error
@@ -79,6 +74,9 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 		data := "large object test"
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		AssertCreateTestData(namespace, sourceClusterName, tableName)
 		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data)
@@ -98,6 +96,9 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		assertCreateTableWithDataOnSourceCluster(namespace, tableName, sourceClusterName)
 
@@ -111,6 +112,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 	It("can select one from several databases to import", func() {
 		namespace = "microservice-different-db"
 		importedClusterName = "cluster-pgdump-different-db"
+		// create namespace
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 		assertImportRenamesSelectedDatabase(namespace, sourceSampleFile,
 			importedClusterName, tableName, "")
 	})
@@ -124,6 +131,9 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 		Expect(err).ToNot(HaveOccurred())
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 
 		importedClusterName = "cluster-pgdump-error"
@@ -158,6 +168,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 		targetImage := versions.DefaultImageName
 
 		By(fmt.Sprintf("import cluster with different major, target version is %s", targetImage), func() {
+			// create namespace
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			assertImportRenamesSelectedDatabase(namespace, sourceSampleFile, importedClusterName,
 				tableName, targetImage)
 		})
@@ -241,9 +257,7 @@ func assertImportRenamesSelectedDatabase(
 	var sourceClusterPrimaryInfo, importedClusterPrimaryInfo *corev1.Pod
 	clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 	Expect(err).ToNot(HaveOccurred())
-	// create namespace
-	err = env.CreateNamespace(namespace)
-	Expect(err).ToNot(HaveOccurred())
+
 	AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 	By("creating multiple dbs on source and set ownership to app", func() {

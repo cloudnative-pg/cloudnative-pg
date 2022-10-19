@@ -127,16 +127,15 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			namespace = "single-instance-pod-eviction"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			By("creating a cluster", func() {
 				// Create a cluster in a namespace we'll delete after the test
 				clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, singleInstanceSampleFile, env)
 			})
-		})
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("evicts the primary pod in single instance cluster", func() {
@@ -194,6 +193,9 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			namespace = "multi-instance-pod-eviction"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			By("Creating a cluster with multiple instances", func() {
 				// Create a cluster in a namespace and shared in containers, we'll delete after the test
 				clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)
@@ -211,9 +213,6 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			})
 		})
 		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-
 			if needRemoveTaint {
 				By("cleaning the taint on node", func() {
 					cmd := fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute-", taintNodeName)

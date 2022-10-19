@@ -62,13 +62,12 @@ var _ = Describe("PGBouncer Types", Ordered, func() {
 		namespace = "pgbouncer-types"
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-	})
-	AfterAll(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should have proper service ip and host details for ro and rw with default installation", func() {

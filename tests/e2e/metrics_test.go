@@ -75,11 +75,6 @@ var _ = Describe("Metrics", func() {
 		}
 	})
 
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
 	It("can gather metrics", func() {
 		// Create the cluster namespace
 		namespace = "cluster-metrics-e2e"
@@ -87,6 +82,9 @@ var _ = Describe("Metrics", func() {
 		Expect(err).ToNot(HaveOccurred())
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 
 		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
 
@@ -122,6 +120,9 @@ var _ = Describe("Metrics", func() {
 		// Create the cluster namespace
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 
 		// Create the curl client pod and wait for it to be ready.
@@ -147,6 +148,9 @@ var _ = Describe("Metrics", func() {
 		Expect(err).ToNot(HaveOccurred())
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 
 		// Create the curl client pod and wait for it to be ready.
 		By("setting up curl client pod", func() {
@@ -182,6 +186,9 @@ var _ = Describe("Metrics", func() {
 		Expect(err).ToNot(HaveOccurred())
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 
 		// Create the curl client pod and wait for it to be ready.
 		By("setting up curl client pod", func() {
@@ -219,6 +226,9 @@ var _ = Describe("Metrics", func() {
 		// create namespace
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 
 		// Creating and verifying custom queries configmap
 		AssertCustomMetricsResourcesExist(namespace, configMapFIle, 1, 0)

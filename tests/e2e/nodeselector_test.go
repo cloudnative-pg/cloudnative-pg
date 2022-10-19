@@ -47,15 +47,14 @@ var _ = Describe("nodeSelector", func() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 		It("verifies that pods can't be scheduled", func() {
 			// We create a namespace and verify it exists
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				err := env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					return env.DeleteNamespace(namespace)
+				})
 
 				// Creating a namespace should be quick
 				timeout := 20
@@ -112,16 +111,15 @@ var _ = Describe("nodeSelector", func() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 
 		It("verifies the pods run on the labeled node", func() {
 			var nodeName string
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 
 			// We label one node with the label we have defined in the cluster
 			// YAML definition
