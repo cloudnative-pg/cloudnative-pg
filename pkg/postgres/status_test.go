@@ -30,44 +30,41 @@ import (
 )
 
 var _ = Describe("PostgreSQL status", func() {
+	errCannotConnectToPostgres := fmt.Errorf("cannot connect to PostgreSQL")
+
 	list := PostgresqlStatusList{
 		Items: []PostgresqlStatus{
 			{
-				Pod:     corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-04"}},
-				Error:   fmt.Errorf("cannot find postgres container"),
-				IsReady: true,
+				Pod:   corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-04"}},
+				Error: errCannotConnectToPostgres,
 			},
 			{
 				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-06"}},
 				IsPrimary:   false,
 				ReceivedLsn: "1/23",
 				ReplayLsn:   "1/22",
-				IsReady:     false,
+				Error:       errCannotConnectToPostgres,
 			},
 			{
 				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-30"}},
 				IsPrimary:   false,
 				ReceivedLsn: "1/23",
 				ReplayLsn:   "1/22",
-				IsReady:     true,
 			},
 			{
 				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
 				IsPrimary:   false,
 				ReceivedLsn: "1/21",
-				IsReady:     true,
 			},
 			{
 				Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
 				IsPrimary: true,
-				IsReady:   true,
 			},
 			{
 				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-40"}},
 				IsPrimary:   false,
 				ReceivedLsn: "1/23",
 				ReplayLsn:   "1/23",
-				IsReady:     true,
 			},
 		},
 	}
@@ -79,12 +76,10 @@ var _ = Describe("PostgreSQL status", func() {
 					Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
 					IsPrimary:   false,
 					ReceivedLsn: "1/21",
-					IsReady:     true,
 				},
 				{
 					Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
 					IsPrimary: true,
-					IsReady:   true,
 				},
 			},
 		}
@@ -100,12 +95,10 @@ var _ = Describe("PostgreSQL status", func() {
 					Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
 					IsPrimary:   false,
 					ReceivedLsn: "1/21",
-					IsReady:     true,
 				},
 				{
 					Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
 					IsPrimary: true,
-					IsReady:   true,
 				},
 			},
 		}
@@ -120,12 +113,10 @@ var _ = Describe("PostgreSQL status", func() {
 				{
 					Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
 					IsPrimary: false,
-					IsReady:   true,
 				},
 				{
 					Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
 					IsPrimary: true,
-					IsReady:   true,
 				},
 			},
 		}
