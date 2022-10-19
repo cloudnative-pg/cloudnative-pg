@@ -147,6 +147,15 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		status = fmt.Sprintf("%v %v", aurora.Red(cluster.Status.Phase), cluster.Status.PhaseReason)
 	}
 
+	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
+	if err != nil {
+		fmt.Printf("could not check if cluster is fenced: %v", err)
+	}
+	isPrimaryFenced := cluster.IsInstanceFenced(cluster.Status.CurrentPrimary)
+	if isPrimaryFenced {
+		status = fmt.Sprintf("%v", aurora.Red("Primary instance is fenced"))
+	}
+
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 
 	summary.AddLine("Name:", cluster.Name)
@@ -171,6 +180,14 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("Ready instances:", aurora.Green(cluster.Status.ReadyInstances))
 	} else {
 		summary.AddLine("Ready instances:", aurora.Red(cluster.Status.ReadyInstances))
+	}
+
+	if fencedInstances != nil && fencedInstances.Len() > 0 {
+		if isPrimaryFenced {
+			summary.AddLine("Fenced instances:", aurora.Red(fencedInstances.ToList()))
+		}else{
+			summary.AddLine("Fenced instances:", aurora.Yellow(fencedInstances.ToList()))
+		}
 	}
 
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
