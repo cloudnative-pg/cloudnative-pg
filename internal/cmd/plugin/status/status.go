@@ -336,6 +336,12 @@ func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
 	}
 }
 
+func (fullStatus *PostgresqlStatus) areReplicationSlotsEnabled() bool {
+	return fullStatus.Cluster.Spec.ReplicationSlots != nil &&
+		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability != nil &&
+		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability.Enabled
+}
+
 func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 	if fullStatus.Cluster.IsReplica() {
 		return
@@ -361,30 +367,76 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 		return
 	}
 
+	if fullStatus.areReplicationSlotsEnabled() {
+		fmt.Println(aurora.Yellow("Replication Slots (RS) Enabled").String())
+	}
+
 	status := tabby.New()
-	status.AddHeader(
-		"Name",
-		"Sent LSN",
-		"Write LSN",
-		"Flush LSN",
-		"Replay LSN", // For standby use "Replay LSN"
-		"Write Lag",
-		"Flush Lag",
-		"Replay Lag",
-		"State",
-		"Sync State",
-		"Sync Priority",
-		"RS Active", // RS = Replication Slot
-		"RS Name",
-		"RS Restart LSN",
-		"RS WAL Status",
-		"RS Safe WAL Size",
-	)
+	if fullStatus.areReplicationSlotsEnabled() {
+		status.AddHeader(
+			"Name",
+			"Sent LSN",
+			"Write LSN",
+			"Flush LSN",
+			"Replay LSN", // For standby use "Replay LSN"
+			"Write Lag",
+			"Flush Lag",
+			"Replay Lag",
+			"State",
+			"Sync State",
+			"Sync Priority",
+			"RS Active", // RS = Replication Slot
+			"RS Name",
+			"RS Restart LSN",
+			"RS WAL Status",
+			"RS Safe WAL Size",
+		)
+	} else {
+		status.AddHeader(
+			"Name",
+			"Sent LSN",
+			"Write LSN",
+			"Flush LSN",
+			"Replay LSN", // For standby use "Replay LSN"
+			"Write Lag",
+			"Flush Lag",
+			"Replay Lag",
+			"State",
+			"Sync State",
+			"Sync Priority",
+		)
+	}
+
+	// print Replication Slots columns only if the cluster has replication slots enabled
+	addReplicationSlotsColumns := func(applicationName string, columns []interface{}) {}
+	if fullStatus.areReplicationSlotsEnabled() {
+		addReplicationSlotsColumns = func(applicationName string, columns []interface{}) {
+			if rs := fullStatus.getPrintableReplicationSlotInfo(applicationName); rs != nil {
+				columns = append(columns,
+					rs.Active,
+					rs.SlotName,
+					rs.RestartLsn,
+					rs.WalStatus,
+					getPrintableIntegerPointer(rs.SafeWalSize),
+				)
+			} else {
+				columns = append(columns,
+					"-",
+					"-",
+					"-",
+					"-",
+					"-",
+				)
+			}
+
+			status.AddLine(columns...)
+		}
+	}
 
 	replicationInfo := primaryInstanceStatus.ReplicationInfo
 	sort.Sort(replicationInfo)
 	for _, replication := range replicationInfo {
-		output := []interface{}{
+		columns := []interface{}{
 			replication.ApplicationName,
 			replication.SentLsn,
 			replication.WriteLsn,
@@ -398,25 +450,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 			replication.SyncPriority,
 		}
 
-		if rs := fullStatus.getPrintableReplicationSlotInfo(replication.ApplicationName); rs != nil {
-			output = append(output,
-				rs.Active,
-				rs.SlotName,
-				rs.RestartLsn,
-				rs.WalStatus,
-				getPrintableIntegerPointer(rs.SafeWalSize),
-			)
-		} else {
-			output = append(output,
-				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-			)
-		}
-
-		status.AddLine(output...)
+		addReplicationSlotsColumns(replication.ApplicationName, columns)
 	}
 	status.Print()
 	fmt.Println()
