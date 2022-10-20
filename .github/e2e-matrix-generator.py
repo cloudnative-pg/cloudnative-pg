@@ -16,6 +16,7 @@
 
 import argparse
 import json
+import os
 import re
 import sys
 from operator import itemgetter
@@ -252,5 +253,6 @@ if __name__ == "__main__":
         for job in include:
             job["id"] = engine + "-" + job["id"]
             print(f"Generating {engine}: {job['id']}", file=sys.stderr)
-        print(f"::set-output name={engine}Matrix::" + json.dumps({"include": include}))
-        print(f"::set-output name={engine}Enabled::" + str(len(include) > 0))
+        with open(os.getenv("GITHUB_OUTPUT"), 'a') as env:
+            print(f"{engine}Matrix=" + json.dumps({"include": include}), file=env)
+            print(f"{engine}Enabled=" + str(len(include) > 0), file=env)

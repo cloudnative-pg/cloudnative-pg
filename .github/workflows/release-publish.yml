@@ -95,11 +95,11 @@ jobs:
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
-          echo "::set-output name=images::${images}"
-          echo "::set-output name=date::${commit_date}"
-          echo "::set-output name=version::${commit_version}"
-          echo "::set-output name=commit::${commit_short}"
-          echo "::set-output name=skip_krew::${skip_krew}"
+          echo "IMAGES=${images}" >> $GITHUB_ENV
+          echo "DATE=${commit_date}" >> $GITHUB_ENV
+          echo "version=${commit_version}" >> $GITHUB_OUTPUT
+          echo "COMMIT=${commit_short}" >> $GITHUB_ENV
+          echo "SKIP_KREW=${skip_krew}" >> $GITHUB_ENV
       -
         name: Import GPG key
         id: import_gpg
@@ -120,14 +120,14 @@ jobs:
           version: latest
           args: release --rm-dist
         env:
-          DATE: ${{ steps.build-meta.outputs.date }}
-          COMMIT: ${{ steps.build-meta.outputs.commit }}
+          DATE: ${{ env.DATE }}
+          COMMIT: ${{ env.COMMIT }}
           VERSION: ${{ steps.build-meta.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
       -
         name: Publish Krew
-        if: ${{ steps.build-meta.outputs.skip_krew == 'false' }}
+        if: ${{ env.SKIP_KREW == 'false' }}
         uses: rajatjindal/krew-release-bot@v0.0.43
         with:
           krew_template_file: dist/cnpg.yaml
@@ -136,7 +136,7 @@ jobs:
         id: docker-meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ steps.build-meta.outputs.images }}
+          images: ${{ env.IMAGES }}
           tags: |
             type=semver,pattern={{version}}
       -
@@ -146,13 +146,13 @@ jobs:
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
           platforms="linux/amd64,linux/arm64,linux/arm/v7"
-          echo "::set-output name=platforms::${platforms}"
+          echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
           image: tonistiigi/binfmt:qemu-v6.1.0
-          platforms: ${{ steps.docker-platforms.outputs.platforms }}
+          platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
         id: buildx
@@ -169,7 +169,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v3.2.0
         with:
-          platforms: ${{ steps.docker-platforms.outputs.platforms }}
+          platforms: ${{ env.PLATFORMS }}
           context: .
           push: true
           build-args: |
