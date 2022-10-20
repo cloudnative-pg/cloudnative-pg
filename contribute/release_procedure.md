@@ -96,25 +96,44 @@ releases of CloudNativePG:
 4. Wait until all [GitHub Actions](https://github.com/cloudnative-pg/cloudnative-pg/actions)
    complete successfully.
 5. Perform manual smoke tests to verify that installation instructions work on
-   your workstation using `kind`
-6. In case of a new minor release, merge the new release commit on `main` with
-   `git merge --ff-only release-X.Y` followed by `git push`
+   your workstation: with a local `kind` cluster up, you should be able to
+   install the operator, create a multi-instance cluster, verify it becomes
+   healthy, and once healthy, you can execute `psql` in the primary and interact
+   with with the database.
+6. In case of a new **minor** release, merge the new release commit on `main`
+   with `git merge --ff-only release-X.Y` followed by `git push`
 
-## Helm chart release:
+## Documentation
 
-After having created a new release of CloudNativePG you need to create a release of
-the `cloudnative-pg` and `cnpg-sandbox` charts, whose definitions can be found
-in the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) repository.
+The documentation, including the release notes, is created in the current `cloudnative-pg` repository, but in order to publish it in the
+[CloudNativePG public webpage](https://cloudnative-pg.io), it needs to be ported
+to the [`cloudnative-pg.github.io`](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
+repository.
 
-The following is a summary of the steps to be taken in that direction. The
-[RELEASE.md](https://github.com/cloudnative-pg/charts/blob/a47596cb/RELEASE.md)
-document inside the relative repo contains an in-depth discussion of the
-process.
+The [`README`](https://github.com/cloudnative-pg/cloudnative-pg.github.io#readme)
+in that repository has complete instructions on the deployment of documentation,
+for new minor releases as well as patch releases.
+
+Please follow the instructions, and once done, also think of creating a blog
+post announcing the new releases that can be shared in various channels.
+
+## Helm chart release
+
+After having created a new release of CloudNativePG you need to create a release
+of the `cloudnative-pg` and `cnpg-sandbox` charts, whose definitions can be
+found in the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts)
+repository.
+
+The following is a rough outline of the steps to be taken in that direction. The
+[RELEASE.md](https://github.com/cloudnative-pg/charts/blob/main/RELEASE.md)
+document inside the `charts` repo contains an in-depth discussion of the
+process, please refer to it.
 
 1. Copy the output of `kustomize build config/helm` to `charts/cloudnative-pg/templates/crds/crds.yaml`
-   in the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) repository.
+   in the `charts` repository (keeping the template guards).
 2. Diff the new release version with the previous one
-   (e.g.: `vimdiff releases/cnpg-1.15.0.yaml releases/cnpg-1.15.1.yaml` using your IDE of choice)
-3. Port any diff to the templates in the helm chart accordingly
-4. Proceed with the release process described in the `RELEASE.md`
-   file in the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) repository.
+   (e.g.: `vimdiff releases/cnpg-1.17.0.yaml releases/cnpg-1.17.1.yaml`)
+3. Port any difference found in the previous step to the items in the
+   `templates` folder, in the helm chart.
+4. Proceed with the release process as described in the `RELEASE.md`
+   file in the `charts` repository.
