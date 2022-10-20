@@ -42,7 +42,7 @@ func NewCmd() *cobra.Command {
 	}
 
 	statusCmd.Flags().BoolP(
-		"verbose", "v", false, "Print also the PostgreSQL configuration and HBA rules")
+		"verbose", "v", false, "Include PostgreSQL configuration, HBA rules, and full replication slots info")
 	statusCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
 

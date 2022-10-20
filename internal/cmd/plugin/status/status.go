@@ -109,7 +109,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	}
 	status.printCertificatesStatus()
 	status.printBackupStatus()
-	status.printReplicaStatus()
+	status.printReplicaStatus(verbose)
 	status.printUnmanagedReplicationSlotStatus()
 	status.printInstancesStatus()
 
@@ -342,7 +342,101 @@ func (fullStatus *PostgresqlStatus) areReplicationSlotsEnabled() bool {
 		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability.Enabled
 }
 
-func (fullStatus *PostgresqlStatus) printReplicaStatus() {
+func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.Tabby, verbose bool) {
+	switch {
+	case fullStatus.areReplicationSlotsEnabled() && verbose:
+		table.AddHeader(
+			"Name",
+			"Sent LSN",
+			"Write LSN",
+			"Flush LSN",
+			"Replay LSN", // For standby use "Replay LSN"
+			"Write Lag",
+			"Flush Lag",
+			"Replay Lag",
+			"State",
+			"Sync State",
+			"Sync Priority",
+			"Replication Slot", // Replication Slots
+			"Slot Restart LSN",
+			"Slot WAL Status",
+			"Slot Safe WAL Size",
+		)
+	case fullStatus.areReplicationSlotsEnabled() && !verbose:
+		table.AddHeader(
+			"Name",
+			"Sent LSN",
+			"Write LSN",
+			"Flush LSN",
+			"Replay LSN", // For standby use "Replay LSN"
+			"Write Lag",
+			"Flush Lag",
+			"Replay Lag",
+			"State",
+			"Sync State",
+			"Sync Priority",
+			"Replication Slot", // Replication Slots
+		)
+	default:
+		table.AddHeader(
+			"Name",
+			"Sent LSN",
+			"Write LSN",
+			"Flush LSN",
+			"Replay LSN", // For standby use "Replay LSN"
+			"Write Lag",
+			"Flush Lag",
+			"Replay Lag",
+			"State",
+			"Sync State",
+			"Sync Priority",
+		)
+	}
+}
+
+func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
+	applicationName string,
+	columns []interface{},
+	table *tabby.Tabby,
+	verbose bool,
+) {
+	printSlotActivity := func(isActive bool) string {
+		if isActive {
+			return "active"
+		}
+		return "inactive"
+	}
+
+	slot := fullStatus.getPrintableReplicationSlotInfo(applicationName)
+	switch {
+	case slot != nil && verbose:
+		columns = append(columns,
+			printSlotActivity(slot.Active),
+			slot.RestartLsn,
+			slot.WalStatus,
+			getPrintableIntegerPointer(slot.SafeWalSize),
+		)
+	case slot != nil && !verbose:
+		columns = append(columns,
+			printSlotActivity(slot.Active),
+		)
+	case slot == nil && verbose:
+		columns = append(columns,
+			"-",
+			"-",
+			"-",
+			"-",
+		)
+	default:
+		columns = append(columns,
+			"-",
+		)
+	}
+
+	table.AddLine(columns...)
+}
+
+func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
 	if fullStatus.Cluster.IsReplica() {
 		return
 	}
@@ -368,65 +462,17 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 	}
 
 	if fullStatus.areReplicationSlotsEnabled() {
-		fmt.Println(aurora.Yellow("Replication Slots (RS) Enabled").String())
+		fmt.Println(aurora.Yellow("Replication Slots Enabled").String())
 	}
 
 	status := tabby.New()
-	if fullStatus.areReplicationSlotsEnabled() {
-		status.AddHeader(
-			"Name",
-			"Sent LSN",
-			"Write LSN",
-			"Flush LSN",
-			"Replay LSN", // For standby use "Replay LSN"
-			"Write Lag",
-			"Flush Lag",
-			"Replay Lag",
-			"State",
-			"Sync State",
-			"Sync Priority",
-			"RS Active", // RS = Replication Slot
-			"RS Restart LSN",
-			"RS WAL Status",
-			"RS Safe WAL Size",
-		)
-	} else {
-		status.AddHeader(
-			"Name",
-			"Sent LSN",
-			"Write LSN",
-			"Flush LSN",
-			"Replay LSN", // For standby use "Replay LSN"
-			"Write Lag",
-			"Flush Lag",
-			"Replay Lag",
-			"State",
-			"Sync State",
-			"Sync Priority",
-		)
-	}
+	fullStatus.printReplicaStatusTableHeader(status, verbose)
 
 	// print Replication Slots columns only if the cluster has replication slots enabled
 	addReplicationSlotsColumns := func(applicationName string, columns []interface{}) {}
 	if fullStatus.areReplicationSlotsEnabled() {
 		addReplicationSlotsColumns = func(applicationName string, columns []interface{}) {
-			if rs := fullStatus.getPrintableReplicationSlotInfo(applicationName); rs != nil {
-				columns = append(columns,
-					rs.Active,
-					rs.RestartLsn,
-					rs.WalStatus,
-					getPrintableIntegerPointer(rs.SafeWalSize),
-				)
-			} else {
-				columns = append(columns,
-					"-",
-					"-",
-					"-",
-					"-",
-				)
-			}
-
-			status.AddLine(columns...)
+			fullStatus.addReplicationSlotsColumns(applicationName, columns, status, verbose)
 		}
 	}
 
