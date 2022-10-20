@@ -252,6 +252,10 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 									Name:      "cert",
 								},
 							},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -279,6 +283,9 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 								},
 							},
 						},
+					},
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
 				},
 			},

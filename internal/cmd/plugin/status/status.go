@@ -121,10 +121,15 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 }
 
 func (fullStatus *PostgresqlStatus) printBasicInfo() {
-	fmt.Println(aurora.Green("Cluster Summary"))
 	summary := tabby.New()
 
 	cluster := fullStatus.Cluster
+
+	if cluster.IsReplica() {
+		fmt.Println(aurora.Yellow("Replica Cluster Summary"))
+	} else {
+		fmt.Println(aurora.Green("Cluster Summary"))
+	}
 
 	primaryInstance := cluster.Status.CurrentPrimary
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
@@ -150,7 +155,12 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
 	}
 	summary.AddLine("PostgreSQL Image:", cluster.GetImageName())
-	summary.AddLine("Primary instance:", primaryInstance)
+	if cluster.IsReplica() {
+		summary.AddLine("Designated primary:", primaryInstance)
+		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)
+	} else {
+		summary.AddLine("Primary instance:", primaryInstance)
+	}
 	summary.AddLine("Status:", status)
 	if cluster.Spec.Instances == cluster.Status.Instances {
 		summary.AddLine("Instances:", aurora.Green(cluster.Spec.Instances))
@@ -271,6 +281,10 @@ func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
 }
 
 func (fullStatus *PostgresqlStatus) printReplicaStatus() {
+	if fullStatus.Cluster.IsReplica() {
+		return
+	}
+
 	fmt.Println(aurora.Green("Streaming Replication status"))
 	if fullStatus.Cluster.Spec.Instances == 1 {
 		fmt.Println(aurora.Yellow("Not configured").String())
@@ -443,7 +457,8 @@ func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
 
 func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.PostgresqlStatus {
 	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
-		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 {
+		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 ||
+			fullStatus.isReplicaClusterDesignatedPrimary(instanceStatus) {
 			return &fullStatus.InstanceStatus.Items[idx]
 		}
 	}
@@ -462,7 +477,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if instance.IsPrimary {
 		return "Primary"
 	}
-	if fullStatus.Cluster.IsReplica() && len(instance.ReplicationInfo) > 0 {
+	if fullStatus.isReplicaClusterDesignatedPrimary(instance) {
 		return "Designated primary"
 	}
 
@@ -500,5 +515,17 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 		}
 	}
 
+	// TODO: improve the way we detect a standby in a replica cluster.
+	// A fuller fix would make sure the Designated Primary gets the replication
+	// list from pg_stat_replication
+	if len(primaryInstanceStatus.ReplicationInfo) == 0 {
+		return "Standby (in Replica Cluster)"
+	}
+
 	return "Unknown"
+}
+
+// TODO: improve the way we detect the Designated Primary in a replica cluster
+func (fullStatus *PostgresqlStatus) isReplicaClusterDesignatedPrimary(instance postgres.PostgresqlStatus) bool {
+	return fullStatus.Cluster.IsReplica() && instance.Pod.Name == fullStatus.PrimaryPod.Name
 }
