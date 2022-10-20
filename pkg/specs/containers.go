@@ -70,5 +70,8 @@ func CreateContainerSecurityContext() *corev1.SecurityContext {
 		RunAsNonRoot:             &trueValue,
 		ReadOnlyRootFilesystem:   &trueValue,
 		AllowPrivilegeEscalation: &falseValue,
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 	}
 }

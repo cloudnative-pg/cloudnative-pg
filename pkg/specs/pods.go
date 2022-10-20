@@ -286,6 +286,9 @@ func CreatePodSecurityContext(user, group int64) *corev1.PodSecurityContext {
 		RunAsUser:    &user,
 		RunAsGroup:   &group,
 		FSGroup:      &group,
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 	}
 }
 
