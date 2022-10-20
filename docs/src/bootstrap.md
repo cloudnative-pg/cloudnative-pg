@@ -324,7 +324,7 @@ by `name` (our recommendation is to use the same `name` of the origin cluster).
     cluster in the `externalClusters` section to locate the main folder
     of the backup data within the object store, which is normally reserved
     for the name of the server. You can specify a different one with the
-    `backupObjectStore.serverName` property (by default assigned to the
+    `barmanObjectStore.serverName` property (by default assigned to the
     value of `name` in the external cluster definition).
 
 
@@ -393,7 +393,7 @@ spec:
     cluster in the `externalClusters` section to locate the main folder
     of the backup data within the object store, which is normally reserved
     for the name of the server. You can specify a different one with the
-    `backupObjectStore.serverName` property (by default assigned to the
+    `barmanObjectStore.serverName` property (by default assigned to the
     value of `name` in the external clusters definition).
 
 !!! Note
