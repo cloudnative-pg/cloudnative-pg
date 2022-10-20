@@ -132,7 +132,7 @@ process, please refer to it.
 1. Copy the output of `kustomize build config/helm` to `charts/cloudnative-pg/templates/crds/crds.yaml`
    in the `charts` repository (keeping the template guards).
 2. Diff the new release version with the previous one
-   (e.g.: `vimdiff releases/cnpg-1.15.0.yaml releases/cnpg-1.15.1.yaml`)
+   (e.g.: `vimdiff releases/cnpg-1.17.0.yaml releases/cnpg-1.17.1.yaml`)
 3. Port any difference found in the previous step to the items in the
    `templates` folder, in the helm chart.
 4. Proceed with the release process as described in the `RELEASE.md`
