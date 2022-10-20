@@ -123,12 +123,11 @@ var _ = Describe("Configuration update", Ordered, func() {
 		By("create cluster with default configuration", func() {
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
-	})
-	AfterAll(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
 	})
 
 	JustAfterEach(func() {
@@ -422,6 +421,9 @@ var _ = Describe("Configuration update with primaryUpdateMethod", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterFileWithPrimaryUpdateRestart)
 			Expect(err).ToNot(HaveOccurred())
@@ -433,11 +435,6 @@ var _ = Describe("Configuration update with primaryUpdateMethod", func() {
 			By("setting up cluster with primaryUpdateMethod value set to restart", func() {
 				AssertCreateCluster(namespace, clusterName, clusterFileWithPrimaryUpdateRestart, env)
 			})
-		})
-
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should restart primary in place after increasing config parameter `max_connection` value", func() {

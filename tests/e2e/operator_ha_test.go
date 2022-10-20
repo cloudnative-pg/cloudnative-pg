@@ -46,17 +46,6 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
 	It("can work as HA mode", func() {
 		// Get Operator Pod name
 		operatorPodName, err := env.GetOperatorPod()
@@ -80,6 +69,12 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 		// Create the cluster namespace
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
 
 		// Create Cluster
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)

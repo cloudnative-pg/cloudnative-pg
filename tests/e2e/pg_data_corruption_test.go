@@ -52,10 +52,6 @@ var _ = Describe("PGDATA Corruption", func() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	It("cluster can be recovered after pgdata corruption on primary", func() {
 		var oldPrimaryPodName, oldPrimaryPVCName string
@@ -64,6 +60,9 @@ var _ = Describe("PGDATA Corruption", func() {
 		tableName := "test_pg_data_corruption"
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		AssertCreateTestData(namespace, clusterName, tableName)
 		By("gather current primary pod and pvc info", func() {

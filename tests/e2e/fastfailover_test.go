@@ -82,11 +82,6 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 		}
 	})
 
-	AfterEach(func() {
-		err := env.DeleteNamespaceAndWait(namespace, 120)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
 	Context("with async replicas cluster", func() {
 		// Confirm that a standby closely following the primary doesn't need more
 		// than 10 seconds to be promoted and be able to start inserting records.
@@ -96,6 +91,12 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 		It("can do a fast failover", func() {
 			namespace = "primary-failover-time"
 			clusterName = "cluster-fast-failover"
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespaceAndWait(namespace, 120)
+			})
 			AssertFastFailOver(namespace, sampleFileWithoutReplicationSlots, clusterName,
 				webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
 		})
@@ -113,6 +114,12 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 			}
 			namespace = "primary-failover-time"
 			clusterName = "cluster-fast-failover"
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespaceAndWait(namespace, 120)
+			})
 			AssertFastFailOver(namespace, sampleFileWithReplicationSlots,
 				clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
 			AssertClusterReplicationSlots(namespace, clusterName)
@@ -123,6 +130,12 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 		It("can do a fast failover", func() {
 			namespace = "primary-failover-time-sync-replicas"
 			clusterName = "cluster-syncreplicas-fast-failover"
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespaceAndWait(namespace, 120)
+			})
 			AssertFastFailOver(
 				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime)
 		})

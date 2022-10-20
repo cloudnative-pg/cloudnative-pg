@@ -85,11 +85,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			}
 		})
 
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
 		// We cordon one node, so pods will run on one or two nodes. This
 		// is only to create a harder situation for the operator.
 		// We then drain the node containing the primary and expect the pod(s)
@@ -113,6 +108,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			By("waiting for the jobs to be removed", func() {
@@ -228,6 +226,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 				// Create a cluster in a namespace we'll delete after the test
 				err := env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					return env.DeleteNamespace(namespace)
+				})
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 				By("waiting for the jobs to be removed", func() {
@@ -325,10 +326,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 
 		// With reusePVC set to off, draining a node should create new pods
 		// on different nodes. We expect to see the cluster pods having
@@ -347,6 +344,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Avoid pod from init jobs interfering with the tests

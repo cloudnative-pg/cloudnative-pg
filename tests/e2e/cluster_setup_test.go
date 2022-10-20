@@ -44,21 +44,18 @@ var _ = Describe("Cluster setup", func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	It("sets up a cluster", func() {
 		namespace = "cluster-storageclass-e2e"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("having three PostgreSQL pods with status ready", func() {
@@ -135,6 +132,12 @@ var _ = Describe("Cluster setup", func() {
 		namespace = "cluster-conditions"
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
 
 		By(fmt.Sprintf("having a %v namespace", namespace), func() {
 			// Creating a namespace should be quick

@@ -172,28 +172,6 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 	})
 }
 
-// AssertCreateNamespace creates and waits for the namespace
-func AssertCreateNamespace(namespace string, env *testsUtils.TestingEnvironment) {
-	By(fmt.Sprintf("creating the %v namespace", namespace), func() {
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-	By(fmt.Sprintf("having the %v namespace", namespace), func() {
-		// Creating a namespace should be quick
-		timeout := 20
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      namespace,
-		}
-
-		Eventually(func() (string, error) {
-			namespaceResource := &corev1.Namespace{}
-			err := env.Client.Get(env.Ctx, namespacedName, namespaceResource)
-			return namespaceResource.GetName(), err
-		}, timeout).Should(BeEquivalentTo(namespace))
-	})
-}
-
 // AssertCreateCluster creates the cluster and verifies that the ready pods
 // correspond to the number of Instances in the cluster spec.
 // Important: this is not equivalent to "kubectl apply", and is not able
@@ -933,10 +911,7 @@ func AssertFastFailOver(
 	maxReattachTime,
 	maxFailoverTime int32,
 ) {
-	// Create a cluster in a namespace we'll delete after the test
-	err := env.CreateNamespace(namespace)
-	Expect(err).ToNot(HaveOccurred())
-
+	var err error
 	By(fmt.Sprintf("having a %v namespace", namespace), func() {
 		// Creating a namespace should be quick
 		timeout := 20
@@ -1232,15 +1207,12 @@ func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName str
 
 func AssertSetupPgBasebackup(namespace, srcClusterName, srcCluster string) string {
 	primarySrc := srcClusterName + "-1"
-	// Create a cluster in a namespace we'll delete after the test
-	err := env.CreateNamespace(namespace)
-	Expect(err).ToNot(HaveOccurred())
 
 	// Create the src Cluster
 	AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
 
 	cmd := "psql -U postgres app -tAc 'CREATE TABLE to_bootstrap AS VALUES (1), (2);'"
-	_, _, err = testsUtils.Run(fmt.Sprintf(
+	_, _, err := testsUtils.Run(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		namespace,
 		primarySrc,

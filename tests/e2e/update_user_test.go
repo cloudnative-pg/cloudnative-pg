@@ -54,16 +54,18 @@ var _ = Describe("Update user and superuser password", func() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	It("can update the user application password", func() {
 		const namespace = "cluster-update-user-password"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
@@ -125,16 +127,18 @@ var _ = Describe("Disabling superuser password", func() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	It("enable disable superuser access", func() {
 		var secret corev1.Secret
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		// we use a pod in the cluster to have a psql client ready and
 		// internal access to the k8s cluster
@@ -233,10 +237,6 @@ var _ = Describe("Creating a cluster without superuser password", func() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	It("create a cluster without postgres password", func() {
 		var secret corev1.Secret
@@ -246,6 +246,12 @@ var _ = Describe("Creating a cluster without superuser password", func() {
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		// we use a pod in the cluster to have a psql client ready and
 		// internal access to the k8s cluster

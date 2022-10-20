@@ -36,20 +36,17 @@ var _ = Describe("Cluster objectmeta", func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	It("verify label's and annotation's inheritance when per-cluster objectmeta changed ", func() {
 		clusterName := "objectmeta-inheritance"
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, clusterName, clusterWithObjectMeta, env)
 
 		By("checking the pods have the expected labels", func() {

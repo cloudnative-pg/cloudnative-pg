@@ -94,6 +94,9 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 
 			By("creating ca and tls certificate secrets", func() {
 				// create CA certificates
@@ -155,11 +158,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					return connectionStatus, nil
 				}, 60).Should(BeTrue())
 			})
-		})
-
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// We backup and restore a cluster, and verify some expected data to
@@ -386,6 +384,9 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 
 			// The Azure Blob Storage should have been created ad-hoc for the test.
 			// The credentials are retrieved from the environment variables, as we can't create
@@ -396,11 +397,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, azureBlobSampleFile, env)
-		})
-
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// We backup and restore a cluster, and verify some expected data to
@@ -513,6 +509,10 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
+
 			// Create and assert ca and tls certificate secrets on Azurite
 			By("creating ca and tls certificate secrets", func() {
 				err := testUtils.CreateCertificateSecretsOnAzurite(namespace, clusterName,
@@ -521,11 +521,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			})
 			// Setup Azurite and az cli along with Postgresql cluster
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFile, tableName)
-		})
-
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("restores a backed up cluster", func() {
@@ -651,6 +646,10 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			// Create a cluster in a namespace we'll delete after the test
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
+
 			By("creating ca and tls certificate secrets", func() {
 				// create CA certificate
 				_, caPair, err := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
@@ -702,10 +701,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			})
 		})
 
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 		It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 			externalClusterName, err := env.GetResourceNameFromYAML(externalClusterFileMinio)
 			Expect(err).ToNot(HaveOccurred())
@@ -815,6 +810,9 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				// Create a cluster in a namespace we'll delete after the test
 				err = env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					return env.DeleteNamespace(namespace)
+				})
 
 				// The Azure Blob Storage should have been created ad-hoc for the test.
 				// The credentials are retrieved from the environment variables, as we can't create
@@ -827,10 +825,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				// Create the cluster
 				AssertCreateCluster(namespace, clusterName, clusterSourceFileAzure, env)
 			})
-			AfterAll(func() {
-				err := env.DeleteNamespace(namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
+
 			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName)
@@ -884,6 +879,9 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				// Create a cluster in a namespace we'll delete after the test
 				err = env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					return env.DeleteNamespace(namespace)
+				})
 
 				// The Azure Blob Storage should have been created ad-hoc for the test,
 				// we get the credentials from the environment variables as we can't create
@@ -896,10 +894,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				AssertCreateCluster(namespace, clusterName, clusterSourceFileAzureSAS, env)
 			})
 
-			AfterAll(func() {
-				err := env.DeleteNamespace(namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
 			It("restores cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName)
@@ -957,6 +951,10 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			// Create a cluster in a namespace we'll delete after the test
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
+
 			// Create and assert ca and tls certificate secrets on Azurite
 			By("creating ca and tls certificate secrets", func() {
 				err := testUtils.CreateCertificateSecretsOnAzurite(namespace, clusterName,
@@ -966,10 +964,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			// Setup Azurite and az cli along with PostgreSQL cluster
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFileAzurite, tableName)
 		})
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
+
 		It("restore cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 			// Restore backup in a new cluster
 			AssertClusterRestoreWithApplicationDB(namespace, externalClusterFileAzurite, tableName)
@@ -1052,9 +1047,15 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 
 			err = env.CreateNamespace(namespace2)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace2)
+			})
 
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
@@ -1082,13 +1083,6 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 
 			// Taking backup of source cluster
 			testUtils.ExecuteBackup(namespace, sourceBackup, env)
-		})
-
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-			err = env.DeleteNamespace(namespace2)
-			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("restore a cluster with different backup destination and creates another cluster with same path as "+

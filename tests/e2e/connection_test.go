@@ -87,16 +87,15 @@ var _ = Describe("Connection via services", func() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 		// If we don't specify secrets, the operator should autogenerate them.
 		// We check that we're able to use them
 		It("can connect with auto-generated passwords", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Get the superuser password from the -superuser secret
@@ -135,10 +134,6 @@ var _ = Describe("Connection via services", func() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 		// If we have specified secrets, we test that we're able to use them
 		// to connect
 		It("can connect with user-supplied passwords", func() {
@@ -148,6 +143,9 @@ var _ = Describe("Connection via services", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertServices(namespace, clusterName, appDBName, appDBUser,
 				suppliedAppUserPassword, suppliedSuperuserPassword, env)

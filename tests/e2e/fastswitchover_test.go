@@ -58,10 +58,6 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	AfterEach(func() {
-		err := env.DeleteNamespaceAndWait(namespace, 120)
-		Expect(err).ToNot(HaveOccurred())
-	})
 	// Confirm that a standby closely following the primary doesn't need more
 	// than maxSwitchoverTime seconds to be promoted and be able to start
 	// inserting records. We then expect the old primary to be back in
@@ -74,7 +70,9 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
-
+			DeferCleanup(func() error {
+				return env.DeleteNamespaceAndWait(namespace, 60)
+			})
 			assertFastSwitchover(namespace, sampleFileWithoutReplicationSlots, clusterName, webTestFile, webTestJob)
 		})
 	})
@@ -87,7 +85,9 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
-
+			DeferCleanup(func() error {
+				return env.DeleteNamespaceAndWait(namespace, 60)
+			})
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
 			AssertClusterReplicationSlots(namespace, clusterName)
 		})

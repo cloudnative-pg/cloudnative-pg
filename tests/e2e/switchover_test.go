@@ -37,15 +37,6 @@ var _ = Describe("Switchover", Serial, func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-	AfterEach(func() {
-		err := env.DeleteNamespaceAndWait(namespace, 120)
-		Expect(err).ToNot(HaveOccurred())
-	})
 	Context("with HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
 			if env.PostgresVersion == 10 {
@@ -54,6 +45,12 @@ var _ = Describe("Switchover", Serial, func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespaceAndWait(namespace, 60)
+			})
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 			AssertSwitchover(namespace, clusterName, env)
@@ -66,6 +63,12 @@ var _ = Describe("Switchover", Serial, func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespaceAndWait(namespace, 60)
+			})
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 			AssertSwitchover(namespace, clusterName, env)

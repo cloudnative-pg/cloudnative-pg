@@ -60,12 +60,9 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive)
 	})
 
 	AfterAll(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-
 		// Delete the configmap and restore the previous behaviour
 		configMap := &corev1.ConfigMap{}
-		err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: operatorNamespace, Name: configName}, configMap)
+		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: operatorNamespace, Name: configName}, configMap)
 		Expect(err).ToNot(HaveOccurred())
 		err = env.Client.Delete(env.Ctx, configMap)
 		Expect(err).NotTo(HaveOccurred())
@@ -119,6 +116,9 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive)
 	It("creates a cluster", func() {
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 
 		// Create the curl client pod and wait for it to be ready.
 		By("setting up curl client pod", func() {

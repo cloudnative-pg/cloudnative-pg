@@ -53,17 +53,6 @@ var _ = Describe("Replica Mode", func() {
 	var replicaClusterName, replicaNamespace string
 	replicaCommandTimeout := time.Second * 2
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(replicaNamespace,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(replicaNamespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
 	Context("can bootstrap a replica cluster using TLS auth", func() {
 		const replicaClusterSampleTLS = fixturesDir + replicaModeClusterDir + "cluster-replica-tls.yaml.template"
 
@@ -72,6 +61,12 @@ var _ = Describe("Replica Mode", func() {
 			replicaClusterName = "cluster-replica-tls"
 			err := env.CreateNamespace(replicaNamespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(replicaNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(replicaNamespace)
+			})
 			AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample, replicaClusterName,
 				replicaClusterSampleTLS, checkQuery)
 		})
@@ -89,7 +84,12 @@ var _ = Describe("Replica Mode", func() {
 
 			err = env.CreateNamespace(replicaNamespace)
 			Expect(err).ToNot(HaveOccurred())
-
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(replicaNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(replicaNamespace)
+			})
 			AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample,
 				replicaClusterName, replicaClusterSampleBasicAuth, checkQuery)
 
@@ -143,7 +143,12 @@ var _ = Describe("Replica Mode", func() {
 			replicaNamespace = "replica-mode-archive"
 			err := env.CreateNamespace(replicaNamespace)
 			Expect(err).ToNot(HaveOccurred())
-
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(replicaNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(replicaNamespace)
+			})
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
 			Expect(err).ToNot(HaveOccurred())
 			By("creating the credentials for minio", func() {
