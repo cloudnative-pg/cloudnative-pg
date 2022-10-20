@@ -333,6 +333,14 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 			Labels:    map[string]string{"run": "mc"},
 		},
 		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "mc",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:  "mc",
@@ -345,6 +353,16 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 						{
 							Name:  "MC_URL",
 							Value: "https://minio-service:9000",
+						},
+						{
+							Name:  "HOME",
+							Value: "/mc",
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "mc",
+							MountPath: "/mc",
 						},
 					},
 					SecurityContext: &corev1.SecurityContext{
