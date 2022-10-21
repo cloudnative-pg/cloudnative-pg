@@ -87,7 +87,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// We are supposed to start a new backup. Let's extract
-	// the list of backups we already taken to see if anything
+	// the list of backups we have already taken to see if anything
 	// is running now
 	childBackups, err := r.GetChildBackups(ctx, scheduledBackup)
 	if err != nil {
@@ -97,7 +97,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// We are supposed to start a new backup. Let's extract
-	// the list of backups we already taken to see if anything
+	// the list of backups we have already taken to see if anything
 	// is running now
 	for _, backup := range childBackups {
 		if backup.GetStatus().IsInProgress() {
