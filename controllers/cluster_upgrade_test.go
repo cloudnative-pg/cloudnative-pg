@@ -78,7 +78,7 @@ var _ = Describe("Pod upgrade", func() {
 		Expect(inplacePossible).To(BeFalse())
 		Expect(reason).To(BeEmpty())
 
-		status.IsReady = true
+		status.IsPodReady = true
 		needRollout, inplacePossible, reason = IsPodNeedingRollout(status, &cluster)
 		Expect(needRollout).To(BeTrue())
 		Expect(inplacePossible).To(BeFalse())

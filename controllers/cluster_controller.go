@@ -271,7 +271,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// readiness probe.
 	if instancesStatus.Len() > 0 {
 		isPostgresReady := instancesStatus.Items[0].IsPostgresqlReady()
-		isPodReady := instancesStatus.Items[0].IsReadinessProbePositive()
+		isPodReady := instancesStatus.Items[0].IsPodReady
 
 		if isPostgresReady && !isPodReady {
 			// The readiness probe status from the Kubelet is not updated, so

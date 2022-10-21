@@ -71,7 +71,6 @@ func ExtractInstancesStatus(
 	for idx := range filteredPods {
 		instanceStatus := getReplicaStatusFromPodViaExec(
 			ctx, config, filteredPods[idx], postgresContainerName)
-		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
 		result.Items = append(result.Items, instanceStatus)
 	}
 
@@ -84,10 +83,7 @@ func getReplicaStatusFromPodViaExec(
 	pod v1.Pod,
 	postgresContainerName string,
 ) postgres.PostgresqlStatus {
-	result := postgres.PostgresqlStatus{
-		Pod: pod,
-	}
-
+	var result postgres.PostgresqlStatus
 	timeout := time.Second * 2
 	clientInterface := kubernetes.NewForConfigOrDie(config)
 	stdout, _, err := utils.ExecCommand(
@@ -99,17 +95,17 @@ func getReplicaStatusFromPodViaExec(
 		&timeout,
 		"/controller/manager", "instance", "status")
 	if err != nil {
-		result.Pod = pod
+		result.AddPod(pod)
 		result.Error = fmt.Errorf("pod not available")
 		return result
 	}
 
 	err = json.Unmarshal([]byte(stdout), &result)
 	if err != nil {
-		result.Pod = pod
 		result.Error = fmt.Errorf("can't parse pod output")
-		return result
 	}
+
+	result.AddPod(pod)
 
 	return result
 }
