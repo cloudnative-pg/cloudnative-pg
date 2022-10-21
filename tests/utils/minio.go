@@ -387,7 +387,7 @@ func MinioSSLClient(namespace string) corev1.Pod {
 	const (
 		minioServerCASecret = "minio-server-ca-secret" // #nosec
 		tlsVolumeName       = "secret-volume"
-		tlsVolumeMountPath  = "/root/.mc/certs/CAs"
+		tlsVolumeMountPath  = "/mc/.mc/certs/CAs"
 	)
 	var secretMode int32 = 0o600
 
