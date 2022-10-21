@@ -171,7 +171,7 @@ The operation is performed in the following steps:
 
 For example, the YAML below creates a new 3 instance PostgreSQL cluster (latest
 available major version at the time the operator was released) called
-`cluster-microservice` that imports the `accountant` and the `bank_user` roles,
+`cluster-monolith` that imports the `accountant` and the `bank_user` roles,
 as well as the `accounting`, `banking`, `resort` databases from the
 `cluster-pg96` cluster (with the unsupported PostgreSQL 9.6), by connecting to
 the `postgres` database using the `postgres` user, via the password stored in
