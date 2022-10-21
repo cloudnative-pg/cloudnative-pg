@@ -333,6 +333,14 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 			Labels:    map[string]string{"run": "mc"},
 		},
 		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "mc",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:  "mc",
@@ -346,9 +354,26 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 							Name:  "MC_URL",
 							Value: "https://minio-service:9000",
 						},
+						{
+							Name:  "HOME",
+							Value: "/mc",
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "mc",
+							MountPath: "/mc",
+						},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
 					Command: []string{"sleep", "3600"},
 				},
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 			DNSPolicy:     corev1.DNSClusterFirst,
 			RestartPolicy: corev1.RestartPolicyAlways,
@@ -362,7 +387,7 @@ func MinioSSLClient(namespace string) corev1.Pod {
 	const (
 		minioServerCASecret = "minio-server-ca-secret" // #nosec
 		tlsVolumeName       = "secret-volume"
-		tlsVolumeMountPath  = "/root/.mc/certs/CAs"
+		tlsVolumeMountPath  = "/mc/.mc/certs/CAs"
 	)
 	var secretMode int32 = 0o600
 

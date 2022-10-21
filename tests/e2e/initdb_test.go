@@ -50,25 +50,22 @@ var _ = Describe("InitDB settings", func() {
 		)
 
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 
 		It("can find the tables created by the post-init SQL queries", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace = "initdb-postqueries"
 			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
 
 			CreateResourceFromFile(namespace, postInitSQLSecretRef)
 			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
 
-			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 
 			primaryDst := clusterName + "-1"
@@ -139,21 +136,18 @@ var _ = Describe("InitDB settings", func() {
 		)
 
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 
 		It("use the custom default locale specified", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace = "initdb-locale"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 
 			primaryDst := clusterName + "-1"

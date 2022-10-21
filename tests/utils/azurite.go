@@ -132,11 +132,19 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 							Name:  "REQUESTS_CA_BUNDLE",
 							Value: "/etc/ssl/certs/rootCA.pem",
 						},
+						{
+							Name:  "HOME",
+							Value: "/azurite",
+						},
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "cert",
 							MountPath: "/etc/ssl/certs",
+						},
+						{
+							Name:      "azurite",
+							MountPath: "/azurite",
 						},
 					},
 					SecurityContext: &corev1.SecurityContext{
@@ -159,6 +167,12 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 								},
 							},
 						},
+					},
+				},
+				{
+					Name: "azurite",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
 					},
 				},
 			},
@@ -252,6 +266,10 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 									Name:      "cert",
 								},
 							},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+							},
 						},
 					},
 					Volumes: []corev1.Volume{
@@ -279,6 +297,9 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 								},
 							},
 						},
+					},
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
 				},
 			},

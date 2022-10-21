@@ -296,15 +296,6 @@ var _ = Describe("Rolling updates", func() {
 		const namespace = "cluster-rolling-e2e-three-instances"
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml.template"
 		const clusterName = "postgresql-three-instances"
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 		It("can do a rolling update", func() {
 			// We set up a cluster with a previous release of the same PG major
 			// The yaml has been previously generated from a template and
@@ -313,6 +304,12 @@ var _ = Describe("Rolling updates", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
 			AssertRollingUpdate(namespace, clusterName, sampleFile, 2)
 		})
 	})
@@ -321,15 +318,6 @@ var _ = Describe("Rolling updates", func() {
 		const namespace = "cluster-rolling-e2e-single-instance"
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-single-instance.yaml.template"
 		const clusterName = "postgresql-single-instance"
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
 		It("can do a rolling updates on a single instance", func() {
 			// We set up a cluster with a previous release of the same PG major
 			// The yaml has been previously generated from a template and
@@ -338,6 +326,12 @@ var _ = Describe("Rolling updates", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
 			AssertRollingUpdate(namespace, clusterName, sampleFile, 1)
 		})
 	})
@@ -346,21 +340,16 @@ var _ = Describe("Rolling updates", func() {
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
 		var namespace, clusterName string
 
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
 		It("can do rolling update", func() {
 			namespace = "cluster-rolling-with-primary-update-method"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
 
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())

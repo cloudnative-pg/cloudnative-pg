@@ -51,10 +51,6 @@ var _ = Describe("JSON log output", func() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
 
 	It("correctly produces logs in JSON format", func() {
 		namespace = "json-logs-e2e"
@@ -63,6 +59,9 @@ var _ = Describe("JSON log output", func() {
 		// Create a cluster in a namespace we'll delete after the test
 		namespaceErr := env.CreateNamespace(namespace)
 		Expect(namespaceErr).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("verifying the presence of possible logger values", func() {

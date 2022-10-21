@@ -97,13 +97,12 @@ var _ = Describe("Certificates", func() {
 			fmt.Println(namespace + " BeforeAll")
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		})
-		AfterAll(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
 		})
 		AfterEach(func() {
 			// deleting root CA certificates
@@ -261,16 +260,14 @@ var _ = Describe("Certificates", func() {
 			clusterName = "postgresql-server-cert"
 		})
 
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
 		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin "+
 			"and verify-ca the provided server certificate", func() {
 			// Create a cluster in a namespace that will be deleted after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 			CreateAndAssertServerCertificatesSecrets(
 				namespace,
 				clusterName,
@@ -310,15 +307,13 @@ var _ = Describe("Certificates", func() {
 			clusterName = "postgresql-cert"
 		})
 
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
 		It("can authenticate custom CA to verify client certificates for a cluster", func() {
 			// Create a cluster in a namespace that will be deleted after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 
 			// Create certificates secret for client
 			CreateAndAssertClientCertificatesSecrets(
@@ -345,15 +340,13 @@ var _ = Describe("Certificates", func() {
 			clusterName = "postgresql-client-server-cert"
 		})
 
-		AfterEach(func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
 		It("can authenticate custom CA to verify both client and server certificates for a cluster", func() {
 			// Create a cluster in a namespace that will be deleted after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
 
 			// Create certificates secret for server
 			CreateAndAssertServerCertificatesSecrets(

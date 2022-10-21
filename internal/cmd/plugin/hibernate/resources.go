@@ -40,6 +40,7 @@ func getHibernatedPVCGroup(ctx context.Context, clusterName string) ([]corev1.Pe
 		ctx,
 		&pvcList,
 		client.MatchingLabels{utils.ClusterLabelName: clusterName},
+		client.InNamespace(plugin.Namespace),
 	); err != nil {
 		return nil, err
 	}

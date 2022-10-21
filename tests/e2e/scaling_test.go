@@ -40,15 +40,6 @@ var _ = Describe("Cluster scale up and down", Serial, func() {
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-	AfterEach(func() {
-		err := env.DeleteNamespaceAndWait(namespace, 120)
-		Expect(err).ToNot(HaveOccurred())
-	})
 	Context("with HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
 			if env.PostgresVersion == 10 {
@@ -58,6 +49,12 @@ var _ = Describe("Cluster scale up and down", Serial, func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespaceAndWait(namespace, 60)
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
 			AssertClusterReplicationSlots(clusterName, namespace)
@@ -89,6 +86,12 @@ var _ = Describe("Cluster scale up and down", Serial, func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespaceAndWait(namespace, 60)
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 
 			// Add a node to the cluster and verify the cluster has one more
