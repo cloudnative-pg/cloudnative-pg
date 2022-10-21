@@ -226,7 +226,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	inPlacePossible bool,
 	reason string,
 ) {
-	if !status.IsReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
+	if !status.IsPodReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
 		return false, false, ""
 	}
 

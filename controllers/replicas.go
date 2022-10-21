@@ -54,7 +54,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	// First step: check if the current primary is running in an unschedulable node
 	// and issue a switchover if that's the case
-	if primary := status.Items[0]; (primary.IsPrimary || (cluster.IsReplica() && primary.IsReady)) &&
+	if primary := status.Items[0]; (primary.IsPrimary || (cluster.IsReplica() && primary.IsPodReady)) &&
 		primary.Pod.Name == cluster.Status.CurrentPrimary &&
 		cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
 		isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulable(ctx, primary.Node)
