@@ -4,7 +4,7 @@ The CloudNativePG operator for Kubernetes is designed to
 work with any compatible container image of PostgreSQL that complies
 with the following requirements:
 
-- PostgreSQL 10+ executables that must be in the path:
+- PostgreSQL executables that must be in the path:
     - `initdb`
     - `postgres`
     - `pg_ctl`
@@ -20,7 +20,10 @@ with the following requirements:
     - `barman-cloud-wal-restore`
 - PGAudit extension installed (optional - only if PGAudit is required
   in the deployed clusters)
-- Sensible locale settings
+- Appropriate locale settings
+
+!!! Important
+    Only [PostgreSQL versions supported by the PGDG](https://postgresql.org/) are allowed.
 
 No entry point and/or command is required in the image definition, as
 CloudNativePG overrides it with its instance manager.
@@ -30,9 +33,10 @@ CloudNativePG overrides it with its instance manager.
     in a **Primary with multiple/optional Hot Standby Servers Architecture**
     only.
 
-EDB provides and supports public container images for CloudNativePG
-and publishes them on
-[Quay.io](https://quay.io/repository/enterprisedb/postgresql).
+The CloudNativePG community provides and supports
+[public PostgreSQL container images](https://github.com/cloudnative-pg/postgres-containers)
+that work with CloudNativePG, and publishes them on
+[ghcr.io](https://ghcr.io/cloudnative-pg/postgresql).
 
 ## Image tag requirements
 
@@ -40,12 +44,11 @@ While the image name can be anything valid for Docker, the CloudNativePG
 operator relies on the *image tag* to detect the Postgres major
 version carried out by the image.
 
-The image tag must start with a valid PostgreSQL major version number (e.g. 11.1 or 12) optionally followed by a dot and the patch level.
+The image tag must start with a valid PostgreSQL major version number (e.g.
+14.5 or 15) optionally followed by a dot and the patch level.
 
 The prefix can be followed by any valid character combination that is valid and
 accepted in a Docker tag, preceded by a dot, an underscore, or a minus sign.
-
-![An example of Tag Structure](./images/tag_structure.png)
 
 Examples of accepted image tags:
 
@@ -53,7 +56,8 @@ Examples of accepted image tags:
 - `12.3.2.1-1`
 - `12.4`
 - `13`
-- `14.1-1`
+- `14.5-10`
+- `15.0`
 
 !!! Warning
     `latest` is not considered a valid tag for the image.
