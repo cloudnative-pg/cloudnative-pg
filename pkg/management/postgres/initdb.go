@@ -256,14 +256,6 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("could not create %v file: %w", filePath, err)
 	}
 
-	// We make sure we have a new WAL to archive
-	if _, err := dbSuperUser.Exec("CHECKPOINT"); err != nil {
-		return fmt.Errorf("error while requiring a checkpoint: %w", err)
-	}
-
-	if _, err := dbSuperUser.Exec("SELECT pg_switch_wal()"); err != nil {
-		return fmt.Errorf("error while switching to a new WAL: %w", err)
-	}
 	return nil
 }
 

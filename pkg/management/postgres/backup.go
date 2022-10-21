@@ -198,6 +198,8 @@ func waitForWalArchiveWorking() error {
 
 	walError := errors.New("wal-archive not working")
 
+	firstWalArchiveTriggered := false
+
 	return retry.OnError(retryUntilWalArchiveWorking, func(err error) bool {
 		return errors.Is(err, walError)
 	}, func() error {
@@ -217,8 +219,20 @@ func waitForWalArchiveWorking() error {
 			log.Info("WAL archiving is working, proceeding with the backup")
 			return nil
 
-		case !walArchivingWorking && !lastFailedTimePresent:
+		case !walArchivingWorking && !lastFailedTimePresent && firstWalArchiveTriggered:
 			log.Info("Waiting for the first WAL file to be archived")
+			return walError
+
+		case !walArchivingWorking && !lastFailedTimePresent && !firstWalArchiveTriggered:
+			log.Info("Triggering the first WAL file to be archived")
+			if _, err := db.Exec("CHECKPOINT"); err != nil {
+				return fmt.Errorf("error while requiring a checkpoint: %w", err)
+			}
+
+			if _, err := db.Exec("SELECT pg_switch_wal()"); err != nil {
+				return fmt.Errorf("error while switching to a new WAL: %w", err)
+			}
+			firstWalArchiveTriggered = true
 			return walError
 
 		default:
