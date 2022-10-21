@@ -137,25 +137,11 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 			cluster.Status.CurrentPrimary, cluster.Status.TargetPrimary)
 	}
 
-	var status string
-	switch cluster.Status.Phase {
-	case apiv1.PhaseHealthy, apiv1.PhaseFirstPrimary, apiv1.PhaseCreatingReplica:
-		status = fmt.Sprintf("%v %v", aurora.Green(cluster.Status.Phase), cluster.Status.PhaseReason)
-	case apiv1.PhaseUpgrade, apiv1.PhaseWaitingForUser:
-		status = fmt.Sprintf("%v %v", aurora.Yellow(cluster.Status.Phase), cluster.Status.PhaseReason)
-	default:
-		status = fmt.Sprintf("%v %v", aurora.Red(cluster.Status.Phase), cluster.Status.PhaseReason)
-	}
-
 	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
 	if err != nil {
 		fmt.Printf("could not check if cluster is fenced: %v", err)
 	}
 	isPrimaryFenced := cluster.IsInstanceFenced(cluster.Status.CurrentPrimary)
-	if isPrimaryFenced {
-		status = fmt.Sprintf("%v", aurora.Red("Primary instance is fenced"))
-	}
-
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 
 	summary.AddLine("Name:", cluster.Name)
@@ -170,7 +156,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	} else {
 		summary.AddLine("Primary instance:", primaryInstance)
 	}
-	summary.AddLine("Status:", status)
+	summary.AddLine("Status:", fullStatus.getStatus(isPrimaryFenced, cluster))
 	if cluster.Spec.Instances == cluster.Status.Instances {
 		summary.AddLine("Instances:", aurora.Green(cluster.Spec.Instances))
 	} else {
@@ -185,7 +171,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	if fencedInstances != nil && fencedInstances.Len() > 0 {
 		if isPrimaryFenced {
 			summary.AddLine("Fenced instances:", aurora.Red(fencedInstances.ToList()))
-		}else{
+		} else {
 			summary.AddLine("Fenced instances:", aurora.Yellow(fencedInstances.ToList()))
 		}
 	}
@@ -209,6 +195,21 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 
 	summary.Print()
 	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *apiv1.Cluster) string {
+	if isPrimaryFenced {
+		return fmt.Sprintf("%v", aurora.Red("Primary instance is fenced"))
+	}
+
+	switch cluster.Status.Phase {
+	case apiv1.PhaseHealthy, apiv1.PhaseFirstPrimary, apiv1.PhaseCreatingReplica:
+		return fmt.Sprintf("%v %v", aurora.Green(cluster.Status.Phase), cluster.Status.PhaseReason)
+	case apiv1.PhaseUpgrade, apiv1.PhaseWaitingForUser:
+		return fmt.Sprintf("%v %v", aurora.Yellow(cluster.Status.Phase), cluster.Status.PhaseReason)
+	default:
+		return fmt.Sprintf("%v %v", aurora.Red(cluster.Status.Phase), cluster.Status.PhaseReason)
+	}
 }
 
 func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) error {
