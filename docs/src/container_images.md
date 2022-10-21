@@ -42,12 +42,12 @@ that work with CloudNativePG, and publishes them on
 
 While the image name can be anything valid for Docker, the CloudNativePG
 operator relies on the *image tag* to detect the Postgres major
-version carried out by the image.
+version contained in the image.
 
 The image tag must start with a valid PostgreSQL major version number (e.g.
 14.5 or 15) optionally followed by a dot and the patch level.
 
-The prefix can be followed by any valid character combination that is valid and
+This can be followed by any character combination that is valid and
 accepted in a Docker tag, preceded by a dot, an underscore, or a minus sign.
 
 Examples of accepted image tags:
