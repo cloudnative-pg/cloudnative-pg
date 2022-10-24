@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/cheynewallace/tabby"
@@ -37,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -120,6 +122,13 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	return &status, nil
 }
 
+func listFencedInstances(fencedInstances *stringset.Data) string {
+	if fencedInstances.Has(utils.FenceAllServers) {
+		return "All Instances"
+	}
+	return strings.Join(fencedInstances.ToList(), ", ")
+}
+
 func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	summary := tabby.New()
 
@@ -170,9 +179,9 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 
 	if fencedInstances != nil && fencedInstances.Len() > 0 {
 		if isPrimaryFenced {
-			summary.AddLine("Fenced instances:", aurora.Red(fencedInstances.ToList()))
+			summary.AddLine("Fenced instances:", aurora.Red(listFencedInstances(fencedInstances)))
 		} else {
-			summary.AddLine("Fenced instances:", aurora.Yellow(fencedInstances.ToList()))
+			summary.AddLine("Fenced instances:", aurora.Yellow(listFencedInstances(fencedInstances)))
 		}
 	}
 
