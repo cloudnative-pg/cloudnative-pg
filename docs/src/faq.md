@@ -152,6 +152,13 @@ Our advice is for everyone that wants to fully exploit Cloud Native
 PostgreSQL to acquire the "Certified Kubernetes Administrator (CKA)"
 status from the CNCF certification program.
 
+**Why isn't CloudNativePG using statefulsets?**
+
+Most database operators rely on `StatefulSet` resources. CloudNativePG
+instead manages directly the underlying PVC by relying on the selected
+storage class for dynamic provisioning. Please refer to the
+["Custom Pod Controller"](controller.md) section for details and reasons behind
+this decision.
 
 ## High availability
 
