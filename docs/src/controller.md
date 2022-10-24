@@ -105,7 +105,7 @@ The first solution is useful when your database size permits that, allowing you
 to immediately bring back the desired number of replicas.
 
 The second solution is only feasible when you're not using the storage of the
-local node and re-mounting the PVC in another host is possible in a resonable
+local node and re-mounting the PVC in another host is possible in a reasonable
 amount of time (which only you and your organization know).
 
 The third solution is appropriate when the database is big and is using local
