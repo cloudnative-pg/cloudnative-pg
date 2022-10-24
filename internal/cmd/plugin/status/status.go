@@ -394,10 +394,10 @@ func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.T
 	}
 }
 
+// addReplicationSlotsColumns append the column data for replication slot
 func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	applicationName string,
-	columns []interface{},
-	table *tabby.Tabby,
+	columns *[]interface{},
 	verbose bool,
 ) {
 	printSlotActivity := func(isActive bool) string {
@@ -406,34 +406,31 @@ func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 		}
 		return "inactive"
 	}
-
 	slot := fullStatus.getPrintableReplicationSlotInfo(applicationName)
 	switch {
 	case slot != nil && verbose:
-		columns = append(columns,
+		*columns = append(*columns,
 			printSlotActivity(slot.Active),
 			slot.RestartLsn,
 			slot.WalStatus,
 			getPrintableIntegerPointer(slot.SafeWalSize),
 		)
 	case slot != nil && !verbose:
-		columns = append(columns,
+		*columns = append(*columns,
 			printSlotActivity(slot.Active),
 		)
 	case slot == nil && verbose:
-		columns = append(columns,
+		*columns = append(*columns,
 			"-",
 			"-",
 			"-",
 			"-",
 		)
 	default:
-		columns = append(columns,
+		*columns = append(*columns,
 			"-",
 		)
 	}
-
-	table.AddLine(columns...)
 }
 
 func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
@@ -469,10 +466,10 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
 	fullStatus.printReplicaStatusTableHeader(status, verbose)
 
 	// print Replication Slots columns only if the cluster has replication slots enabled
-	addReplicationSlotsColumns := func(applicationName string, columns []interface{}) {}
+	addReplicationSlotsColumns := func(applicationName string, columns *[]interface{}) {}
 	if fullStatus.areReplicationSlotsEnabled() {
-		addReplicationSlotsColumns = func(applicationName string, columns []interface{}) {
-			fullStatus.addReplicationSlotsColumns(applicationName, columns, status, verbose)
+		addReplicationSlotsColumns = func(applicationName string, columns *[]interface{}) {
+			fullStatus.addReplicationSlotsColumns(applicationName, columns, verbose)
 		}
 	}
 
@@ -492,8 +489,8 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
 			replication.SyncState,
 			replication.SyncPriority,
 		}
-
-		addReplicationSlotsColumns(replication.ApplicationName, columns)
+		addReplicationSlotsColumns(replication.ApplicationName, &columns)
+		status.AddLine(columns...)
 	}
 	status.Print()
 	fmt.Println()
