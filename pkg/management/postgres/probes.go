@@ -258,6 +258,9 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 		return err
 	}
 
+	if err := instance.fillReplicationSlotsStatus(result); err != nil {
+		return err
+	}
 	return instance.fillWalStatus(result)
 }
 
@@ -292,6 +295,69 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 	)
 
 	return err
+}
+
+func (instance *Instance) fillReplicationSlotsStatus(result *postgres.PostgresqlStatus) error {
+	if !result.IsPrimary {
+		return nil
+	}
+	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
+		return nil
+	}
+
+	var err error
+	var slots postgres.PgReplicationSlotList
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	rows, err := superUserDB.Query(
+		`SELECT 
+    slot_name,
+	coalesce(plugin::text, ''),
+	coalesce(slot_type::text, ''),	
+	coalesce(datoid::text,''),	
+	coalesce(database::text,''),	
+	active,
+	coalesce(xmin::text, ''),	
+	coalesce(catalog_xmin::text, ''),	
+	coalesce(restart_lsn::text, ''),
+	coalesce(wal_status::text, ''),
+	safe_wal_size
+    FROM pg_replication_slots`)
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+	for rows.Next() {
+		slot := postgres.PgReplicationSlot{}
+		if err := rows.Scan(
+			&slot.SlotName,
+			&slot.Plugin,
+			&slot.SlotType,
+			&slot.Datoid,
+			&slot.Database,
+			&slot.Active,
+			&slot.Xmin,
+			&slot.CatalogXmin,
+			&slot.RestartLsn,
+			&slot.WalStatus,
+			&slot.SafeWalSize,
+		); err != nil {
+			return err
+		}
+		slots = append(slots, slot)
+	}
+
+	result.ReplicationSlotsInfo = slots
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // fillWalStatus retrieves information about the WAL senders processes
