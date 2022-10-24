@@ -150,7 +150,6 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: pointer.Bool(false),
 						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
-						RunAsNonRoot:             pointer.Bool(false),
 					},
 				},
 			},
@@ -177,7 +176,6 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsNonRoot:   pointer.Bool(false),
 				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 		},
