@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/cheynewallace/tabby"
@@ -38,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -135,6 +137,13 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	return &status, nil
 }
 
+func listFencedInstances(fencedInstances *stringset.Data) string {
+	if fencedInstances.Has(utils.FenceAllServers) {
+		return "All Instances"
+	}
+	return strings.Join(fencedInstances.ToList(), ", ")
+}
+
 func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	fmt.Println(aurora.Green("Cluster Summary"))
 	summary := tabby.New()
@@ -147,16 +156,11 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 			cluster.Status.CurrentPrimary, cluster.Status.TargetPrimary)
 	}
 
-	var status string
-	switch cluster.Status.Phase {
-	case apiv1.PhaseHealthy, apiv1.PhaseFirstPrimary, apiv1.PhaseCreatingReplica:
-		status = fmt.Sprintf("%v %v", aurora.Green(cluster.Status.Phase), cluster.Status.PhaseReason)
-	case apiv1.PhaseUpgrade, apiv1.PhaseWaitingForUser:
-		status = fmt.Sprintf("%v %v", aurora.Yellow(cluster.Status.Phase), cluster.Status.PhaseReason)
-	default:
-		status = fmt.Sprintf("%v %v", aurora.Red(cluster.Status.Phase), cluster.Status.PhaseReason)
+	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
+	if err != nil {
+		fmt.Printf("could not check if cluster is fenced: %v", err)
 	}
-
+	isPrimaryFenced := cluster.IsInstanceFenced(cluster.Status.CurrentPrimary)
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 
 	summary.AddLine("Name:", cluster.Name)
@@ -165,8 +169,13 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
 	}
 	summary.AddLine("PostgreSQL Image:", cluster.GetImageName())
-	summary.AddLine("Primary instance:", primaryInstance)
-	summary.AddLine("Status:", status)
+	if cluster.IsReplica() {
+		summary.AddLine("Designated primary:", primaryInstance)
+		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)
+	} else {
+		summary.AddLine("Primary instance:", primaryInstance)
+	}
+	summary.AddLine("Status:", fullStatus.getStatus(isPrimaryFenced, cluster))
 	if cluster.Spec.Instances == cluster.Status.Instances {
 		summary.AddLine("Instances:", aurora.Green(cluster.Spec.Instances))
 	} else {
@@ -176,6 +185,14 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("Ready instances:", aurora.Green(cluster.Status.ReadyInstances))
 	} else {
 		summary.AddLine("Ready instances:", aurora.Red(cluster.Status.ReadyInstances))
+	}
+
+	if fencedInstances != nil && fencedInstances.Len() > 0 {
+		if isPrimaryFenced {
+			summary.AddLine("Fenced instances:", aurora.Red(listFencedInstances(fencedInstances)))
+		} else {
+			summary.AddLine("Fenced instances:", aurora.Yellow(listFencedInstances(fencedInstances)))
+		}
 	}
 
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
@@ -197,6 +214,21 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 
 	summary.Print()
 	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *apiv1.Cluster) string {
+	if isPrimaryFenced {
+		return fmt.Sprintf("%v", aurora.Red("Primary instance is fenced"))
+	}
+
+	switch cluster.Status.Phase {
+	case apiv1.PhaseHealthy, apiv1.PhaseFirstPrimary, apiv1.PhaseCreatingReplica:
+		return fmt.Sprintf("%v %v", aurora.Green(cluster.Status.Phase), cluster.Status.PhaseReason)
+	case apiv1.PhaseUpgrade, apiv1.PhaseWaitingForUser:
+		return fmt.Sprintf("%v %v", aurora.Yellow(cluster.Status.Phase), cluster.Status.PhaseReason)
+	default:
+		return fmt.Sprintf("%v %v", aurora.Red(cluster.Status.Phase), cluster.Status.PhaseReason)
+	}
 }
 
 func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) error {
