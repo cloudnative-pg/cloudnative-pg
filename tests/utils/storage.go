@@ -61,14 +61,14 @@ func PvcHasLabels(
 	return true
 }
 
-// PvcHasAnnotationKeys returns true if a PVC contains a given keys of annotations
-func PvcHasAnnotationKeys(
-	pvc corev1.PersistentVolumeClaim,
+// ObjectHasAnnotations returns true if the object has the passed annotations
+func ObjectHasAnnotations(
+	object client.Object,
 	annotations []string,
 ) bool {
-	pvcAnnotations := pvc.Annotations
+	objectAnnotations := object.GetAnnotations()
 	for _, v := range annotations {
-		_, ok := pvcAnnotations[v]
+		_, ok := objectAnnotations[v]
 		if !ok {
 			return false
 		}
@@ -76,14 +76,14 @@ func PvcHasAnnotationKeys(
 	return true
 }
 
-// PvcHasAnnotation returns true if a PVC contains a given keys and corresponding of annotations
-func PvcHasAnnotation(
-	pvc corev1.PersistentVolumeClaim,
+// ObjectMatchesAnnotations returns true if the object has the passed annotations key/value
+func ObjectMatchesAnnotations(
+	object client.Object,
 	annotations map[string]string,
 ) bool {
-	pvcAnnotations := pvc.Annotations
+	objectAnnotations := object.GetAnnotations()
 	for k, v := range annotations {
-		value, ok := pvcAnnotations[k]
+		value, ok := objectAnnotations[k]
 		if !ok && (v != value) {
 			return false
 		}

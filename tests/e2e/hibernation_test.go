@@ -209,11 +209,11 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 				utils.HibernatePgControlDataAnnotationName,
 				utils.HibernateClusterManifestAnnotationName,
 			}
-			testsUtils.PvcHasAnnotationKeys(pvcInfo, expectedAnnotationKeyPresent)
+			testsUtils.ObjectHasAnnotations(&pvcInfo, expectedAnnotationKeyPresent)
 			expectedAnnotation := map[string]string{
 				utils.HibernateClusterManifestAnnotationName: string(clusterManifest),
 			}
-			testsUtils.PvcHasAnnotation(pvcInfo, expectedAnnotation)
+			testsUtils.ObjectMatchesAnnotations(&pvcInfo, expectedAnnotation)
 		}
 
 		assertHibernation := func(namespace, clusterName, tableName string) {
