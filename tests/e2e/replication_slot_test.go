@@ -17,6 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -80,8 +84,14 @@ var _ = Describe("Replication Slot", func() {
 		})
 
 		By("checking standbys HA slots exist", func() {
-			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
-			Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
+			var replicaPods *corev1.PodList
+			var err error
+			before := time.Now()
+			Eventually(func(g Gomega) {
+				replicaPods, err = env.GetClusterReplicas(namespace, clusterName)
+				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
+			}, 90, 2).Should(Succeed())
+			GinkgoWriter.Println("standby slot check succeeded in", time.Since(before))
 			for _, pod := range replicaPods.Items {
 				AssertReplicationSlotsOnPod(namespace, clusterName, pod)
 			}
