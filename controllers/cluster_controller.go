@@ -585,6 +585,10 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		return nil
 	}
 
+	// Size is empty would due to size is defined through request and not changed yet
+	if cluster.Spec.StorageConfiguration.Size == "" {
+		return nil
+	}
 	quantity, err := resource.ParseQuantity(cluster.Spec.StorageConfiguration.Size)
 	if err != nil {
 		return fmt.Errorf("while parsing PVC size %v: %w", cluster.Spec.StorageConfiguration.Size, err)
