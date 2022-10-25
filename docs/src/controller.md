@@ -68,11 +68,10 @@ usable anymore.
 This behavior is specific to PostgreSQL and is not implemented in the
 `StatefulSet` controller - the latter not being application specific.
 
-The `StatefulSet` would just recreate the missing PVC and a new Pod for it
-after the user drops one of the two PVCs and the corresponding Pod, leading
+After the user drops a PVC, the `StatefulSet` would just recreate it, leading
 to a corrupted PostgreSQL instance.
 
-CloudNativePG would instead classify the remaining Pod as unusable and
+CloudNativePG would instead classify the remaining PVC as unusable, and
 start creating a new pair of PVCs for another instance to join the cluster
 correctly.
 
