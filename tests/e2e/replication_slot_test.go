@@ -87,6 +87,8 @@ var _ = Describe("Replication Slot", func() {
 			var replicaPods *corev1.PodList
 			var err error
 			before := time.Now()
+			GinkgoWriter.Println("KUBERNETES NODES")
+			GinkgoWriter.Println(env.DescribeKubernetesNodes())
 			Eventually(func(g Gomega) {
 				replicaPods, err = env.GetClusterReplicas(namespace, clusterName)
 				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))

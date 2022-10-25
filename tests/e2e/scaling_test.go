@@ -66,10 +66,10 @@ var _ = Describe("Cluster scale up and down", Serial, func() {
 				GinkgoWriter.Println("DISK SPACE", stdout)
 				_, _, err = utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
-				timeout := 300
-				AssertClusterIsReady(namespace, clusterName, timeout, env)
 				GinkgoWriter.Println("KUBERNETES NODES")
 				GinkgoWriter.Println(env.DescribeKubernetesNodes())
+				timeout := 300
+				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
 			AssertPvcHasLabels(namespace, clusterName)
 			AssertClusterReplicationSlots(clusterName, namespace)
