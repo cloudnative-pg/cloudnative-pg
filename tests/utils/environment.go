@@ -111,12 +111,12 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 
 	clientDiscovery, err := utils.GetDiscoveryClient()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get the discovery client: %w", err)
 	}
 
 	err = utils.DetectSeccompSupport(clientDiscovery)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not detect SeccompProfile support: %w", err)
 	}
 
 	return &env, nil

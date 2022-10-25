@@ -24,10 +24,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// This variable store the result of the DetectSecurityContextConstraints check
+// This variable stores the result of the DetectSecurityContextConstraints check
 var haveSCC bool
 
-// This variable say if we should set the SeccompProfile or not in the pods
+// This variable specifies whether we should set the SeccompProfile or not in the pods
 var supportSeccomp bool
 
 // GetDiscoveryClient creates a discovery client or return error
@@ -92,12 +92,14 @@ func PodMonitorExist(client *discovery.DiscoveryClient) (bool, error) {
 	return exist, nil
 }
 
-// HaveSeccompSupport returns true if we should set the SeccompProfile in the pods
+// HaveSeccompSupport returns true if Seccomp is supported. If it is, we should
+// set the SeccompProfile in the pods
 func HaveSeccompSupport() bool {
 	return supportSeccomp
 }
 
-// DetectSeccompSupport returns the current Kubernetes Cluster version
+// DetectSeccompSupport checks the version of Kubernetes in the cluster to determine
+// whether Seccomp is supported
 func DetectSeccompSupport(client *discovery.DiscoveryClient) (err error) {
 	supportSeccomp = false
 	kubernetesVersion, err := client.ServerVersion()
