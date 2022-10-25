@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -113,6 +114,10 @@ func MinioDefaultSetup(namespace string) (MinioSetup, error) {
 
 // MinioDefaultDeployment returns a default Deployment for minio
 func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) appsv1.Deployment {
+	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	if !utils.HaveSeccompSupport() {
+		seccompProfile = nil
+	}
 	minioDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "minio",
@@ -189,12 +194,12 @@ func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeCl
 							},
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: pointer.Bool(false),
-								SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+								SeccompProfile:           seccompProfile,
 							},
 						},
 					},
 					SecurityContext: &corev1.PodSecurityContext{
-						SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						SeccompProfile: seccompProfile,
 					},
 				},
 			},
@@ -324,6 +329,11 @@ func MinioSSLSetup(namespace string) (MinioSetup, error) {
 
 // MinioDefaultClient returns the default Pod definition for a minio client
 func MinioDefaultClient(namespace string) corev1.Pod {
+	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	if !utils.HaveSeccompSupport() {
+		seccompProfile = nil
+	}
+
 	minioClient := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -365,13 +375,13 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 					},
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: pointer.Bool(false),
-						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						SeccompProfile:           seccompProfile,
 					},
 					Command: []string{"sleep", "3600"},
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+				SeccompProfile: seccompProfile,
 			},
 			DNSPolicy:     corev1.DNSClusterFirst,
 			RestartPolicy: corev1.RestartPolicyAlways,

@@ -109,6 +109,16 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 		env.PreserveNamespaces = strings.Fields(preserveNamespaces)
 	}
 
+	clientDiscovery, err := utils.GetDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	err = utils.DetectSeccompSupport(clientDiscovery)
+	if err != nil {
+		return nil, err
+	}
+
 	return &env, nil
 }
 

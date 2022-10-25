@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"strconv"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -24,6 +26,9 @@ import (
 
 // This variable store the result of the DetectSecurityContextConstraints check
 var haveSCC bool
+
+// This variable say if we should set the SeccompProfile or not in the pods
+var supportSeccomp bool
 
 // GetDiscoveryClient creates a discovery client or return error
 func GetDiscoveryClient() (*discovery.DiscoveryClient, error) {
@@ -85,4 +90,29 @@ func PodMonitorExist(client *discovery.DiscoveryClient) (bool, error) {
 	}
 
 	return exist, nil
+}
+
+// HaveSeccompSupport returns true if we should set the SeccompProfile in the pods
+func HaveSeccompSupport() bool {
+	return supportSeccomp
+}
+
+// DetectSeccompSupport returns the current Kubernetes Cluster version
+func DetectSeccompSupport(client *discovery.DiscoveryClient) (err error) {
+	supportSeccomp = false
+	kubernetesVersion, err := client.ServerVersion()
+	if err != nil {
+		return err
+	}
+
+	minor, err := strconv.Atoi(kubernetesVersion.Minor)
+	if err != nil {
+		return err
+	}
+
+	if minor >= 24 {
+		supportSeccomp = true
+	}
+
+	return
 }
