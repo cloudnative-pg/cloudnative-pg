@@ -280,6 +280,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validatePrimaryUpdateStrategy,
 		r.validateMinSyncReplicas,
 		r.validateMaxSyncReplicas,
+		r.validateStorageSize,
 		r.validateWalStorageSize,
 		r.validateName,
 		r.validateBootstrapPgBaseBackupSource,
@@ -1088,6 +1089,10 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 	}
 
 	return result
+}
+
+func (r *Cluster) validateStorageSize() field.ErrorList {
+	return validateStorageConfigurationSize("Storage", r.Spec.StorageConfiguration)
 }
 
 func (r *Cluster) validateWalStorageSize() field.ErrorList {
