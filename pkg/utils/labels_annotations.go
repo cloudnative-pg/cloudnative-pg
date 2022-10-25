@@ -53,9 +53,6 @@ const (
 	// the status of the reconciliation loop for the cluster
 	ReconciliationLoopAnnotationName = "cnpg.io/reconciliationLoop"
 
-	// ReconciliationDisabledValue it the value that stops the reconciliation loop
-	ReconciliationDisabledValue = "disabled"
-
 	// HibernateClusterManifestAnnotationName contains the hibernated cluster manifest
 	HibernateClusterManifestAnnotationName = "cnpg.io/hibernateClusterManifest"
 
