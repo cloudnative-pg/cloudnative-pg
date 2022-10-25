@@ -53,9 +53,6 @@ const (
 	// the status of the reconciliation loop for the cluster
 	ReconciliationLoopAnnotationName = "cnpg.io/reconciliationLoop"
 
-	// ReconciliationDisabledValue it the value that stops the reconciliation loop
-	ReconciliationDisabledValue = "disabled"
-
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"
 )
