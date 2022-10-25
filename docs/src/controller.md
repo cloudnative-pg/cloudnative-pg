@@ -27,7 +27,8 @@ PVCs. This is inconvenient for a database. Resizing volumes requires
 convoluted workarounds.
 
 In contrast, CloudNativePG leverages the configured storage class to
-manage the underlying PVCs directly.
+manage the underlying PVCs directly, and can handle PVC resizing if
+the storage class supports it.
 
 ## Primary Instances versus Replicas
 
