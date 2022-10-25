@@ -317,6 +317,7 @@ jobs:
     #   AND
     #   none of the preceding jobs failed
     if: |
+      (always() && !cancelled()) &&
       (
         github.event_name == 'schedule' ||
         needs.duplicate_runs.outputs.should_skip != 'true' &&
@@ -327,7 +328,6 @@ jobs:
           needs.change-triage.outputs.go-code-changed == 'true'
         )
       ) &&
-      always() &&
       (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
       (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
@@ -537,8 +537,8 @@ jobs:
       - buildx
       - duplicate_runs
     if: |
+      (always() && !cancelled()) &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
-      always() &&
       needs.buildx.result == 'success' &&
       needs.buildx.outputs.upload_artifacts == 'true' &&
       github.repository == 'cloudnative-pg/cloudnative-pg'
@@ -604,8 +604,8 @@ jobs:
     # branches, when triggered by dependabot, when a PR is first opened, or when
     # a PR from a forked repo is labeled
     if: |
+      (always() && !cancelled()) &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
-      always() &&
       needs.buildx.result == 'success' &&
       ( github.event_name == 'workflow_dispatch' ||
         github.head_ref == 'main' ||
@@ -642,8 +642,8 @@ jobs:
     needs:
       - generate-jobs
     if: |
+      (always() && !cancelled()) &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
-      always() &&
       needs.generate-jobs.result == 'success'
     runs-on: ubuntu-20.04
     outputs:
@@ -669,9 +669,9 @@ jobs:
   e2e-local:
     name: Run E2E on local executors
     if: |
+      (always() && !cancelled()) &&
       needs.generate-jobs.outputs.localEnabled == 'true' &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
-      always() &&
       needs.generate-jobs.result == 'success' &&
       needs.evaluate-test-level.result == 'success'
     needs:
@@ -767,7 +767,7 @@ jobs:
         # Create an individual artifact for each E2E test, which will be used to
         # generate E2E test summary in the follow-up job 'summarize-e2e-tests'
         name: Create individual artifact for each E2E test
-        if: always()
+        if: (always() && !cancelled())
         run: |
           set +x
           echo '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
@@ -783,7 +783,7 @@ jobs:
           fi
       -
         name: Archive test artifacts
-        if: always()
+        if: (always() && !cancelled())
         uses: actions/upload-artifact@v3
         with:
           name: testartifacts-local
@@ -832,7 +832,7 @@ jobs:
       - duplicate_runs
       - evaluate-test-level
       - e2e-local
-    if: always() &&
+    if: (always() && !cancelled()) &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.evaluate-test-level.result == 'success'
     runs-on: ubuntu-20.04
