@@ -290,6 +290,7 @@ ServiceMonitor
 Silvela
 Slonik
 SnapshotType
+StatefulSets
 StorageClass
 StorageConfiguration
 Storages
@@ -714,7 +715,6 @@ podMetricsEndpoints
 podName
 podmonitor
 podtemplates
-pood
 poolMode
 pooler
 poolerName
