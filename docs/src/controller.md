@@ -57,8 +57,8 @@ replication technology.
 
 ## Coherence of PVCs
 
-Sometimes one PostgreSQL instance works on multiple PVCs: this happens
-when WAL storage is kept separated from `PGDATA`.
+PostgreSQL instances can be configured to work with multiple PVCs: this is how
+WAL storage can be separated from `PGDATA`.
 
 The two data stores need to be coherent from the PostgreSQL point of view,
 as they're used simultaneously. If you delete the PVC corresponding to
@@ -68,7 +68,7 @@ usable anymore.
 This behavior is specific to PostgreSQL and is not implemented in the
 `StatefulSet` controller - the latter not being application specific.
 
-After the user drops a PVC, the `StatefulSet` would just recreate it, leading
+After the user dropped a PVC, a `StatefulSet` would just recreate it, leading
 to a corrupted PostgreSQL instance.
 
 CloudNativePG would instead classify the remaining PVC as unusable, and
