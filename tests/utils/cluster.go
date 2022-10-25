@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/cheynewallace/tabby"
@@ -334,6 +335,9 @@ func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnviro
 		clusterInfo.AddLine()
 		clusterInfo.AddLine()
 		clusterInfo.AddLine("Cluster information:")
+		clusterInfo.AddLine("Name", cluster.GetName())
+		clusterInfo.AddLine("Namespace", cluster.GetNamespace())
+		clusterInfo.AddLine()
 		clusterInfo.AddHeader("Items", "Values")
 		clusterInfo.AddLine("Spec.Instances", cluster.Spec.Instances)
 		clusterInfo.AddLine("Wal storage", cluster.ShouldCreateWalArchiveVolume())
@@ -363,6 +367,15 @@ func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnviro
 			}
 		}
 
+		clusterInfo.AddLine("Jobs information:")
+		clusterInfo.AddLine()
+		clusterInfo.AddHeader("Items", "Values")
+		jobList, _ := env.GetJobList(cluster.GetNamespace())
+		for _, job := range jobList.Items {
+			clusterInfo.AddLine("Job name", job.Name)
+			clusterInfo.AddLine("Job status", job.Status)
+		}
+
 		pvcList, _ := env.GetPVCList(cluster.GetNamespace())
 		clusterInfo.AddLine()
 		clusterInfo.AddLine("Cluster PVC information: (dumping all pvc under the namespace)")
@@ -380,4 +393,22 @@ func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnviro
 
 		return buffer.String()
 	}
+}
+
+func (env TestingEnvironment) DescribeKubernetesNodes() (string, error) {
+	nodeList, err := env.GetNodeList()
+	if err != nil {
+		return "", err
+	}
+	var report strings.Builder
+	for _, node := range nodeList.Items {
+		command := fmt.Sprintf("kubectl describe node %v", node.Name)
+		stdout, _, err := Run(command)
+		if err != nil {
+			return "", err
+		}
+		report.WriteString(stdout)
+		report.WriteString("\n")
+	}
+	return report.String(), nil
 }

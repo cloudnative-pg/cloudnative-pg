@@ -68,6 +68,8 @@ var _ = Describe("Cluster scale up and down", Serial, func() {
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 300
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
+				GinkgoWriter.Println("KUBERNETES NODES")
+				GinkgoWriter.Println(env.DescribeKubernetesNodes())
 			})
 			AssertPvcHasLabels(namespace, clusterName)
 			AssertClusterReplicationSlots(clusterName, namespace)
