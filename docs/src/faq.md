@@ -154,7 +154,7 @@ status from the CNCF certification program.
 
 **Why isn't CloudNativePG using StatefulSets?**
 
-Most database operators rely on `StatefulSet` resources. CloudNativePG
+CloudNativePG does not rely on `StatefulSet` resources and
 instead manages the underlying PVC directly by relying on the selected
 storage class for dynamic provisioning. Please refer to the
 ["Custom Pod Controller"](controller.md) section for details and reasons behind
