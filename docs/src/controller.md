@@ -29,9 +29,7 @@ we have two kinds of Pods:
 - one for the primary instance, and
 - the other ones for replicas.
 
-While the operator uses the same spec for every Pod, and the role
-is managed using labels, the rolling deployment mechanism depends on the
-operation that triggered it.
+This difference is relevant when deciding the correct deployment strategy to execute for a given operation.
 
 Some operations should be applied on the replicas first
 and then on the primary, but only after an updated replica is promoted
@@ -58,8 +56,7 @@ replication technology.
 ## Coherence of PVCs
 
 Sometimes the same PostgreSQL instance works on multiple PVCs: this happens
-when the WAL storage is separated from `PGDATA`, and in the future when CloudNativePG
-will support tablespaces.
+when the WAL storage is separated from `PGDATA`.
 
 The two data stores need to be coherent from the PostgreSQL point of view,
 as they're used simultaneously. If you delete the PVC corresponding to
