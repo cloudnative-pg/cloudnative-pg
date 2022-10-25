@@ -26,8 +26,8 @@ The `StatefulSet` controller is designed to create a set of Pods
 from just one template. Given that we use one `Pod` per PostgreSQL instance,
 we have two kinds of Pods:
 
-- one for the primary instance
-- the other pods, for replicas.
+1. primary instance (only one)
+2. replicas (multiple, optional)
 
 This difference is relevant when deciding the correct deployment strategy to
 execute for a given operation.

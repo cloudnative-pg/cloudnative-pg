@@ -46,10 +46,10 @@ nav:
   - e2e.md
   - container_images.md
   - operator_capability_levels.md
+  - controller.md
   - samples.md
   - commercial_support.md
   - faq.md
-  - controller.md
   - api_reference.md
   - supported_releases.md
   - release_notes.md
