@@ -20,6 +20,15 @@ compromises. The following sections discuss a few points where we believe
 this design choice has made the implementation of CloudNativePG
 more reliable, and easier to understand.
 
+## PVC resizing
+
+This is a well known limitation of `StatefulSet`: it does not support resizing
+PVCs. This is inconvenient for a database. Resizing volumes requires
+convoluted workarounds.
+
+In contrast, CloudNativePG leverages the configured storage class to
+manage the underlying PVCs directly.
+
 ## Primary Instances versus Replicas
 
 The `StatefulSet` controller is designed to create a set of Pods
