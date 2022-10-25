@@ -715,7 +715,6 @@ podMetricsEndpoints
 podName
 podmonitor
 podtemplates
-pood
 poolMode
 pooler
 poolerName

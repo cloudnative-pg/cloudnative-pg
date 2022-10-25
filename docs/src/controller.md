@@ -7,18 +7,18 @@ to align the current cluster state with the desired one.
 Stateful applications are usually managed with the
 [`StatefulSet`](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
 controller, which creates and reconciles a set of Pods built from the same
-specification and assigns them a sticky identity.
+specification, and assigns them a sticky identity.
 
-CloudNativePG, instead of relying on the `StatefulSet` controller to manage
-the PostgreSQL instances, implements its own custom controller.
+CloudNativePG implements its own custom controller to manage PostgreSQL
+instances, instead of relying on the `StatefulSet` controller.
 While bringing more complexity to the implementation, this design choice
-provided the operator with more flexibility on how we manage the cluster
+provides the operator with more flexibility on how we manage the cluster,
 while being transparent on the topology of PostgreSQL clusters.
 
 Like many choices in the design realm, different ones lead to other
 compromises. The following sections discuss a few points where we believe
 this design choice has made the implementation of CloudNativePG
-more reliable and easy to understand.
+more reliable, and easier to understand.
 
 ## Primary Instances versus Replicas
 
@@ -26,17 +26,19 @@ The `StatefulSet` controller is designed to create a set of Pods
 from just one template. Given that we use one `Pod` per PostgreSQL instance,
 we have two kinds of Pods:
 
-- one for the primary instance, and
-- the other ones for replicas.
+- one for the primary instance
+- the other pods, for replicas.
 
-This difference is relevant when deciding the correct deployment strategy to execute for a given operation.
+This difference is relevant when deciding the correct deployment strategy to
+execute for a given operation.
 
-Some operations should be applied on the replicas first
+Some operations should be performed on the replicas first,
 and then on the primary, but only after an updated replica is promoted
 as the new primary.
-For example, when you want to apply a different image version
+For example, when you want to apply a different PostgreSQL image version,
 or when you increase configuration parameters like `max_connections` (which are
-[treated specially by PostgreSQL when hot standby replicas are around](https://www.postgresql.org/docs/current/hot-standby.html)).
+[treated specially by PostgreSQL because CloudNativePG uses hot standby
+replicas](https://www.postgresql.org/docs/current/hot-standby.html)).
 
 While doing that, CloudNativePG considers the PostgreSQL instance's
 role - and not just its serial number.
@@ -55,8 +57,8 @@ replication technology.
 
 ## Coherence of PVCs
 
-Sometimes the same PostgreSQL instance works on multiple PVCs: this happens
-when the WAL storage is separated from `PGDATA`.
+Sometimes one PostgreSQL instance works on multiple PVCs: this happens
+when WAL storage is kept separated from `PGDATA`.
 
 The two data stores need to be coherent from the PostgreSQL point of view,
 as they're used simultaneously. If you delete the PVC corresponding to
@@ -84,8 +86,8 @@ Supposing the unavailable node was hosting a PostgreSQL instance,
 depending on your database size and your cloud infrastructure, you
 may prefer to choose one of the following actions:
 
-1. drop the PVC and the Pod residing on the down node;
-   create a new PVC cloning the data from another one;
+1. drop the PVC and the Pod residing on the downed node;
+   create a new PVC cloning the data from another PVC;
    after that, schedule a Pod for it
 
 2. drop the Pod, schedule the Pod in a different node, and mount

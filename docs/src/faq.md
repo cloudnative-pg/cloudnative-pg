@@ -154,8 +154,8 @@ status from the CNCF certification program.
 
 **Why isn't CloudNativePG using StatefulSets?**
 
-CloudNativePG does not rely on `StatefulSet` resources and
-instead manages the underlying PVC directly by relying on the selected
+CloudNativePG does not rely on `StatefulSet` resources, and
+instead manages the underlying PVC directly by leveraging the selected
 storage class for dynamic provisioning. Please refer to the
 ["Custom Pod Controller"](controller.md) section for details and reasons behind
 this decision.
@@ -323,7 +323,7 @@ enhances:
 -   resource management: in PostgreSQL, CPU, and memory constrained
     resources are generally handled at the instance level, not the
     database level, making it easier to integrate it with Kubernetes
-    resource management policies at the pood level
+    resource management policies at the pod level
 -   physical continuous backup and Point-In-Time-Recovery (PITR): given
     that PostgreSQL handles continuous backup and recovery at the
     instance level, having one database per instance simplifies PITR
