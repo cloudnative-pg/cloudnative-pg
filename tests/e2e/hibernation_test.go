@@ -21,20 +21,20 @@ import (
 )
 
 var _ = Describe("Cluster Hibernation with plugin", func() {
-	type Mode string
-	type HibernateSatusMessage string
-	type ExpectedKeysInStatus string
+	type mode string
+	type hibernateSatusMessage string
+	type expectedKeysInStatus string
 	const (
 		sampleFileClusterWithPGWalVolume    = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		sampleFileClusterWithOutPGWalVolume = fixturesDir + "/hibernate/" +
 			"cluster-storage-class-without-wal.yaml.template"
 		level                                         = tests.Medium
-		HibernateOn             Mode                  = "on"
-		HibernateOff            Mode                  = "off"
-		HibernateStatus         Mode                  = "status"
-		clusterOffStatusMessage HibernateSatusMessage = "No Hibernation. Cluster Deployed."
-		clusterOnStatusMessage  HibernateSatusMessage = "Cluster Hibernated"
-		summaryInStatus         ExpectedKeysInStatus  = "summary"
+		HibernateOn             mode                  = "on"
+		HibernateOff            mode                  = "off"
+		HibernateStatus         mode                  = "status"
+		clusterOffStatusMessage hibernateSatusMessage = "No Hibernation. Cluster Deployed."
+		clusterOnStatusMessage  hibernateSatusMessage = "Cluster Hibernated"
+		summaryInStatus         expectedKeysInStatus  = "summary"
 		tableName                                     = "test"
 	)
 	var namespace string
@@ -80,7 +80,7 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 			Expect(err).ToNot(HaveOccurred())
 			return pvcInfo
 		}
-		performHibernation := func(mode Mode, namespace, clusterName string) {
+		performHibernation := func(mode mode, namespace, clusterName string) {
 			By(fmt.Sprintf("performing hibernation %v", mode), func() {
 				_, _, err := testsUtils.Run(fmt.Sprintf("kubectl cnpg hibernate %v %v -n %v",
 					mode, clusterName, namespace))
@@ -106,7 +106,7 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 			return data
 		}
 
-		verifySummaryInHibernationStatus := func(message HibernateSatusMessage) {
+		verifySummaryInHibernationStatus := func(message hibernateSatusMessage) {
 			statusOut := getHibernationStatusInJSON(namespace, clusterName)
 			actualStatus := statusOut[string(summaryInStatus)].(map[string]interface{})["status"].(string)
 			Expect(strings.Contains(string(message), actualStatus)).Should(BeEquivalentTo(true), statusOut)
