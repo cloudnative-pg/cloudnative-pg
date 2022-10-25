@@ -790,14 +790,14 @@ jobs:
           retention-days: 7
       -
         name: Cleanup test artifacts
-        if: always()
+        if: (always() && !cancelled())
         run:
           rm -rf testartifacts-${{ env.MATRIX }}/
       -
         name: Cleanup ginkgo JSON report
         # Delete report.json after the analysis. File should always exist.
         # Delete upgrade_report.json. It may not exist depending on test level.
-        if: always()
+        if: (always() && !cancelled())
         run: |
           if [ -f tests/e2e/out/upgrade_report.json ]; then
             rm tests/e2e/out/upgrade_report.json
