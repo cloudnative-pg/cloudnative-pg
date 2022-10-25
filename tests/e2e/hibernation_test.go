@@ -28,16 +28,14 @@ var _ = Describe("Cluster Hibernation with plugin", func() {
 		sampleFileClusterWithPGWalVolume    = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		sampleFileClusterWithOutPGWalVolume = fixturesDir + "/hibernate/" +
 			"cluster-storage-class-without-wal.yaml.template"
-		level                                          = tests.Medium
-		HibernateOn              Mode                  = "on"
-		HibernateOff             Mode                  = "off"
-		HibernateStatus          Mode                  = "status"
-		clusterOffStatusMessage  HibernateSatusMessage = "No Hibernation. Cluster Deployed."
-		clusterOnStatusMessage   HibernateSatusMessage = "Cluster Hibernated"
-		clusterManifestoInStatus ExpectedKeysInStatus  = "cluster"
-		summaryInStatus          ExpectedKeysInStatus  = "summary"
-		pgControlDataInStatus    ExpectedKeysInStatus  = "pgControlData"
-		tableName                                      = "test"
+		level                                         = tests.Medium
+		HibernateOn             Mode                  = "on"
+		HibernateOff            Mode                  = "off"
+		HibernateStatus         Mode                  = "status"
+		clusterOffStatusMessage HibernateSatusMessage = "No Hibernation. Cluster Deployed."
+		clusterOnStatusMessage  HibernateSatusMessage = "Cluster Hibernated"
+		summaryInStatus         ExpectedKeysInStatus  = "summary"
+		tableName                                     = "test"
 	)
 	var namespace string
 	BeforeEach(func() {
