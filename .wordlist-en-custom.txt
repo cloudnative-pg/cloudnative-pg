@@ -290,6 +290,7 @@ ServiceMonitor
 Silvela
 Slonik
 SnapshotType
+StatefulSets
 StorageClass
 StorageConfiguration
 Storages
@@ -835,7 +836,6 @@ sso
 startDelay
 startedAt
 stateful
-statefulsets
 stderr
 stdout
 stedolan
