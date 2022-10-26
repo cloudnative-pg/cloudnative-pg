@@ -71,14 +71,12 @@ func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSe
 						},
 					},
 					SecurityContext: &corev1.SecurityContext{
-						RunAsNonRoot:             pointer.Bool(false),
 						AllowPrivilegeEscalation: pointer.Bool(false),
 						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsNonRoot:   pointer.Bool(false),
 				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 		},
