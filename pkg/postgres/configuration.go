@@ -135,6 +135,10 @@ host all all all {{.DefaultAuthenticationMethod}}
 	// `.csv` and `.log` as needed.
 	LogFileName = "postgres"
 
+	// ManagerJSONLogFileName is the name of the file produced by the manager
+	// itself when run as a subprocess (e.g. wal restore/backup subcommands issued by pg itself)
+	ManagerJSONLogFileName = "manager.json"
+
 	// CNPGConfigSha256 is the parameter to be used to inject the sha256 of the
 	// config in the custom.conf file
 	CNPGConfigSha256 = "cnpg.config_sha256"
@@ -356,7 +360,7 @@ var (
 			"max_worker_processes":       "32",
 			"max_replication_slots":      "32",
 			"logging_collector":          "on",
-			"log_destination":            "csvlog",
+			"log_destination":            "jsonlog",
 			"log_rotation_age":           "0",
 			"log_rotation_size":          "0",
 			"log_truncate_on_rotation":   "false",
@@ -381,6 +385,9 @@ var (
 			{130000, MajorVersionRangeUnlimited}: {
 				"wal_keep_size":      "512MB",
 				"shared_memory_type": "mmap",
+			},
+			{MajorVersionRangeUnlimited, 150000}: {
+				"log_destination": "csvlog",
 			},
 		},
 		MandatorySettings: SettingsCollection{

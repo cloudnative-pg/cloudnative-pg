@@ -90,7 +90,6 @@ var _ = Describe("PgAudit CVS logging decorator", func() {
 				QueryPos:             "20",
 				Location:             "21",
 				ApplicationName:      "22",
-				BackendType:          "",
 			}))
 			Expect(*typedResult.Audit).To(Equal(PgAuditRecord{
 				AuditType:      "A0",
@@ -193,7 +192,6 @@ var _ = Describe("PgAudit CVS logging decorator", func() {
 				QueryPos:             "20",
 				Location:             "21",
 				ApplicationName:      "22",
-				BackendType:          "",
 			}))
 		})
 

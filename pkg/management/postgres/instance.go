@@ -465,17 +465,24 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 func (instance *Instance) WithActiveInstance(inner func() error) error {
 	// Start the CSV logpipe to redirect log to stdout
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	csvPipe := logpipe.NewLogPipe()
+	csvPipe := logpipe.NewLogPipe(logpipe.CSVFormat)
+	jsonPipe := logpipe.NewLogPipe(logpipe.JSONFormat)
 
 	go func() {
 		if err := csvPipe.Start(ctx); err != nil {
 			log.Info("csv pipeline encountered an error", "err", err)
 		}
 	}()
+	go func() {
+		if err := jsonPipe.Start(ctx); err != nil {
+			log.Info("json pipeline encountered an error", "err", err)
+		}
+	}()
 
 	defer func() {
 		ctxCancel()
 		csvPipe.GetExitedCondition().Wait()
+		jsonPipe.GetExitedCondition().Wait()
 	}()
 
 	err := instance.Startup()

@@ -139,12 +139,20 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
 
 	// postgres CSV logs handler (PGAudit too)
-	postgresLogPipe := logpipe.NewLogPipe()
+	postgresLogPipe := logpipe.NewLogPipe(logpipe.CSVFormat)
 	if err := mgr.Add(postgresLogPipe); err != nil {
 		return err
 	}
 	postgresStartConditions = append(postgresStartConditions, postgresLogPipe.GetInitializedCondition())
 	exitedConditions = append(exitedConditions, postgresLogPipe.GetExitedCondition())
+
+	// postgres JSON logs handler
+	jsonPostgresPipe := logpipe.NewLogPipe(logpipe.JSONFormat)
+	if err := mgr.Add(jsonPostgresPipe); err != nil {
+		return err
+	}
+	postgresStartConditions = append(postgresStartConditions, jsonPostgresPipe.GetInitializedCondition())
+	exitedConditions = append(exitedConditions, jsonPostgresPipe.GetExitedCondition())
 
 	// raw logs handler
 	rawPipe := logpipe.NewRawLineLogPipe(filepath.Join(pg.LogPath, pg.LogFileName),
@@ -155,8 +163,8 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	postgresStartConditions = append(postgresStartConditions, rawPipe.GetExecutedCondition())
 	exitedConditions = append(exitedConditions, rawPipe.GetExitedCondition())
 
-	// json logs handler
-	jsonPipe := logpipe.NewJSONLineLogPipe(filepath.Join(pg.LogPath, pg.LogFileName+".json"))
+	// manager json logs handler
+	jsonPipe := logpipe.NewJSONLineLogPipe(filepath.Join(pg.LogPath, pg.ManagerJSONLogFileName))
 	if err := mgr.Add(jsonPipe); err != nil {
 		return err
 	}

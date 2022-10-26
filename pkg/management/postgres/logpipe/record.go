@@ -16,13 +16,14 @@ limitations under the License.
 
 package logpipe
 
-// CSVRecordParser is implemented by structs that can be filled when parsing a CSV line.
+// RecordParser is implemented by structs that can be filled when parsing a CSV line.
 // The FromCSV method just stores the CSV record fields inside the struct fields.
 // A validation check of the CSV fields should be performed by the caller.
 // Also handling recover from panic should be provided by the caller, in order to take care of runtime error,
 // e.g. index out of range because of CSV malformation
-type CSVRecordParser interface {
+type RecordParser interface {
 	FromCSV(content []string) NamedRecord
+	FromJSON(content []byte) (NamedRecord, error)
 	NamedRecord
 }
 

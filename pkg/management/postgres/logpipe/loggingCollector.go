@@ -17,6 +17,7 @@ limitations under the License.
 package logpipe
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -32,11 +33,15 @@ const FieldsPerRecord13 int = 24
 // since PostgreSQL 14
 const FieldsPerRecord14 int = 26
 
+const maxFieldNumber = FieldsPerRecord14
+
 // LoggingCollectorRecordName is the value of the logger field for logging_collector
 const LoggingCollectorRecordName = "postgres"
 
-// LogFieldValidator checks if the provided number of fields is valid or not for logging_collector logs
-func LogFieldValidator(fields int) *ErrFieldCountExtended {
+var clearContentSlice = make([]string, maxFieldNumber)
+
+// CSVLogFieldValidator checks if the provided number of fields is valid or not for logging_collector logs
+func CSVLogFieldValidator(fields int) *ErrFieldCountExtended {
 	if fields != FieldsPerRecord12 && fields != FieldsPerRecord13 && fields != FieldsPerRecord14 {
 		// If the number of fields is not recognised return an error
 		return &ErrFieldCountExtended{
@@ -48,32 +53,32 @@ func LogFieldValidator(fields int) *ErrFieldCountExtended {
 
 // LoggingRecord is used to store all the fields of the logging_collector CSV format
 type LoggingRecord struct {
-	LogTime              string `json:"log_time,omitempty"`
-	Username             string `json:"user_name,omitempty"`
-	DatabaseName         string `json:"database_name,omitempty"`
-	ProcessID            string `json:"process_id,omitempty"`
-	ConnectionFrom       string `json:"connection_from,omitempty"`
-	SessionID            string `json:"session_id,omitempty"`
-	SessionLineNum       string `json:"session_line_num,omitempty"`
-	CommandTag           string `json:"command_tag,omitempty"`
-	SessionStartTime     string `json:"session_start_time,omitempty"`
-	VirtualTransactionID string `json:"virtual_transaction_id,omitempty"`
-	TransactionID        string `json:"transaction_id,omitempty"`
-	ErrorSeverity        string `json:"error_severity,omitempty"`
-	SQLStateCode         string `json:"sql_state_code,omitempty"`
+	LogTime              any    `json:"log_time,omitempty"`
+	Username             any    `json:"user_name,omitempty"`
+	DatabaseName         any    `json:"database_name,omitempty"`
+	ProcessID            any    `json:"process_id,omitempty"`
+	ConnectionFrom       any    `json:"connection_from,omitempty"`
+	SessionID            any    `json:"session_id,omitempty"`
+	SessionLineNum       any    `json:"session_line_num,omitempty"`
+	CommandTag           any    `json:"command_tag,omitempty"`
+	SessionStartTime     any    `json:"session_start_time,omitempty"`
+	VirtualTransactionID any    `json:"virtual_transaction_id,omitempty"`
+	TransactionID        any    `json:"transaction_id,omitempty"`
+	ErrorSeverity        any    `json:"error_severity,omitempty"`
+	SQLStateCode         any    `json:"sql_state_code,omitempty"`
 	Message              string `json:"message,omitempty"`
-	Detail               string `json:"detail,omitempty"`
-	Hint                 string `json:"hint,omitempty"`
-	InternalQuery        string `json:"internal_query,omitempty"`
-	InternalQueryPos     string `json:"internal_query_pos,omitempty"`
-	Context              string `json:"context,omitempty"`
-	Query                string `json:"query,omitempty"`
-	QueryPos             string `json:"query_pos,omitempty"`
-	Location             string `json:"location,omitempty"`
-	ApplicationName      string `json:"application_name,omitempty"`
-	BackendType          string `json:"backend_type,omitempty"`
-	LeaderPid            string `json:"leader_pid,omitempty"`
-	QueryID              string `json:"query_id,omitempty"`
+	Detail               any    `json:"detail,omitempty"`
+	Hint                 any    `json:"hint,omitempty"`
+	InternalQuery        any    `json:"internal_query,omitempty"`
+	InternalQueryPos     any    `json:"internal_query_pos,omitempty"`
+	Context              any    `json:"context,omitempty"`
+	Query                any    `json:"query,omitempty"`
+	QueryPos             any    `json:"query_pos,omitempty"`
+	Location             any    `json:"location,omitempty"`
+	ApplicationName      any    `json:"application_name,omitempty"`
+	BackendType          any    `json:"backend_type,omitempty"`
+	LeaderPid            any    `json:"leader_pid,omitempty"`
+	QueryID              any    `json:"query_id,omitempty"`
 }
 
 // FromCSV stores inside the record structure the relative fields
@@ -118,6 +123,22 @@ func (r *LoggingRecord) FromCSV(content []string) NamedRecord {
 		r.QueryID = content[25]
 	}
 	return r
+}
+
+// FromJSON unmarshals the provided content into the given LoggingRecord,
+// returning it and any possible error
+func (r *LoggingRecord) FromJSON(content []byte) (NamedRecord, error) {
+	r.Clear()
+	err := json.Unmarshal(content, r)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// Clear will reset all the LoggingRecord fields to empty string
+func (r *LoggingRecord) Clear() NamedRecord {
+	return r.FromCSV(clearContentSlice)
 }
 
 // GetName implements the NamedRecord interface

@@ -206,8 +206,8 @@ func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (change
 	options := map[string]string{
 		"standby_mode": "on",
 		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
+			"/controller/manager wal-restore --log-destination %s/%s %%f %%p",
+			postgres.LogPath, postgres.ManagerJSONLogFileName),
 		"recovery_target_timeline": "latest",
 	}
 
@@ -242,8 +242,8 @@ func configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName string) (ch
 
 	options := map[string]string{
 		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
+			"/controller/manager wal-restore --log-destination %s/%s %%f %%p",
+			postgres.LogPath, postgres.ManagerJSONLogFileName),
 		"recovery_target_timeline": "latest",
 		"primary_slot_name":        slotName,
 	}

@@ -19,6 +19,7 @@ limitations under the License.
 package logpipe
 
 import (
+	"bufio"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -36,10 +37,21 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
+// LogFormat defines which format logging_collector logs should be expected to be in
+type LogFormat string
+
+const (
+	// CSVFormat encodes the CSV format for logging_collector logs
+	CSVFormat = "CSV"
+	// JSONFormat encodes the JSON format for logging_collector logs
+	JSONFormat = "JSON"
+)
+
 // LogPipe creates a pipe for a given file
 type LogPipe struct {
 	fileName        string
-	record          CSVRecordParser
+	record          RecordParser
+	fileContentType LogFormat
 	fieldsValidator FieldsValidator
 
 	initialized *concurrency.Executed
@@ -53,15 +65,26 @@ var tagRegex = regexp.MustCompile(`(?s)(?P<Tag>^[a-zA-Z]+): (?P<Record>.*)$`)
 type FieldsValidator func(int) *ErrFieldCountExtended
 
 // NewLogPipe returns a new LogPipe
-func NewLogPipe() *LogPipe {
-	return &LogPipe{
-		fileName:        filepath.Join(postgres.LogPath, postgres.LogFileName+".csv"),
+func NewLogPipe(format LogFormat) *LogPipe {
+	lp := LogPipe{
 		record:          NewPgAuditLoggingDecorator(),
-		fieldsValidator: LogFieldValidator,
-
+		fileContentType: format,
+		fieldsValidator: func(i int) *ErrFieldCountExtended {
+			return nil
+		},
 		initialized: concurrency.NewExecuted(),
 		exited:      concurrency.NewExecuted(),
 	}
+	switch lp.fileContentType {
+	case JSONFormat:
+		lp.fileName = filepath.Join(postgres.LogPath, postgres.LogFileName+".json")
+	default:
+		// We'll default to CSV format if not specified, this should never happen
+		lp.fileName = filepath.Join(postgres.LogPath, postgres.LogFileName+".csv")
+		lp.fieldsValidator = CSVLogFieldValidator
+	}
+
+	return &lp
 }
 
 // GetInitializedCondition returns the condition that can be checked in order to
@@ -147,7 +170,13 @@ func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
 	// the cancellation signal happened
 	go func() {
 		defer close(errChan)
-		errChan <- p.streamLogFromCSVFile(ctx, f, &LogRecordWriter{})
+		switch p.fileContentType {
+		case JSONFormat:
+			errChan <- p.streamLogFromJSONFile(ctx, f, &LogRecordWriter{})
+		default:
+			// we'll default to CSV if not specified, should never happen
+			errChan <- p.streamLogFromCSVFile(ctx, f, &LogRecordWriter{})
+		}
 	}()
 	select {
 	case <-ctx.Done():
@@ -234,4 +263,28 @@ reader:
 	}
 
 	return nil
+}
+
+// streamLogFromCSVFile is a function reading csv lines from an io.Reader and
+// writing them to the passed RecordWriter. This function can return
+// ErrFieldCountExtended which enrich the csv.ErrFieldCount with the
+// decoded invalid line
+func (p *LogPipe) streamLogFromJSONFile(ctx context.Context, inputFile io.Reader, writer RecordWriter) error {
+	scanner := bufio.NewScanner(inputFile)
+	scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+		// If the context has been cancelled, let's avoid reading another
+		// line
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		r, err := p.record.FromJSON(scanner.Bytes())
+		if err != nil {
+			return err
+		}
+		writer.Write(r)
+	}
+
+	return ctx.Err()
 }

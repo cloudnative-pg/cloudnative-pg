@@ -51,7 +51,8 @@ func getTagAndContent(record *LoggingRecord) (string, string) {
 	return "", ""
 }
 
-// FromCSV implements the CSVRecordParser interface, parsing a LoggingRecord and then
+// FromCSV implements the RecordParser interface, parsing a LoggingRecord and its
+// pgaudit msg if any
 func (r *PgAuditLoggingDecorator) FromCSV(content []string) NamedRecord {
 	r.LoggingRecord.FromCSV(content)
 
@@ -72,6 +73,32 @@ func (r *PgAuditLoggingDecorator) FromCSV(content []string) NamedRecord {
 	r.LoggingRecord.Message = ""
 	r.Audit.fromCSV(auditContent)
 	return r
+}
+
+// FromJSON implements the JSONRecordParser interface, parsing a LoggingRecord and its
+// pgaudit msg if any
+func (r *PgAuditLoggingDecorator) FromJSON(content []byte) (NamedRecord, error) {
+	if r, err := r.LoggingRecord.FromJSON(content); err != nil {
+		return r, err
+	}
+
+	tag, record := getTagAndContent(r.LoggingRecord)
+	if tag != "AUDIT" || record == "" {
+		return r.LoggingRecord, nil
+	}
+
+	_, err := r.CSVReadWriter.Write([]byte(record))
+	if err != nil {
+		return r.LoggingRecord, nil
+	}
+	auditContent, err := r.Read()
+	if err != nil {
+		return r.LoggingRecord, nil
+	}
+
+	r.LoggingRecord.Message = ""
+	r.Audit.fromCSV(auditContent)
+	return r, nil
 }
 
 func (r *PgAuditRecord) fromCSV(auditContent []string) {

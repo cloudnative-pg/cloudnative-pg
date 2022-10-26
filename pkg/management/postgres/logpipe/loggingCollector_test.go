@@ -129,4 +129,63 @@ var _ = Describe("PostgreSQL CSV log record", func() {
 			}))
 		})
 	})
+	Context("Given a JSON record from logging collector", func() {
+		It("fills the fields for PostgreSQL 15", func() {
+			content := "{\"log_time\":\"2022-10-26 06:50:03.375 UTC\",\"user_name\":\"USER\"," +
+				"\"database_name\":\"DB\",\"process_id\":\"31\",\"connection_from\":\"SOURCE_IP\"," +
+				"\"session_id\":\"6358d89b.1f\",\"session_line_num\":\"1\",\"command_tag\":\"\"," +
+				"\"session_start_time\":\"2022-10-26 06:50:03 UTC\"," +
+				"\"virtual_transaction_id\":\"VIRTUAL_TRANSACTION_ID\"," +
+				"\"transaction_id\":\"0\",\"error_severity\":\"LOG\",\"sql_state_code\":\"00000\"," +
+				"\"message\":\"ending log output to stderr\",\"detail\":\"\"," +
+				"\"hint\":\"Future log output will go to log destination \\\"csvlog\\\".\"," +
+				"\"internal_query\":\"INTERNAL_QUERY\",\"internal_query_pos\":\"INTERNAL_QUERY_POS\"," +
+				"\"context\":\"CONTEXT\",\"query\":\"QUERY\",\"query_pos\":\"42\",\"location\":\"LOCATION\"," +
+				"\"application_name\":\"APP_NAME\",\"backend_type\":\"postmaster\"," +
+				"\"leader_pid\":\"\",\"query_id\":\"0\"}"
+			var r LoggingRecord
+			_, err := r.FromJSON([]byte(content))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(r).To(Equal(LoggingRecord{
+				LogTime:              "2022-10-26 06:50:03.375 UTC",
+				Username:             "USER",
+				DatabaseName:         "DB",
+				ProcessID:            "31",
+				ConnectionFrom:       "SOURCE_IP",
+				SessionID:            "6358d89b.1f",
+				SessionLineNum:       "1",
+				CommandTag:           "",
+				SessionStartTime:     "2022-10-26 06:50:03 UTC",
+				VirtualTransactionID: "VIRTUAL_TRANSACTION_ID",
+				TransactionID:        "0",
+				ErrorSeverity:        "LOG",
+				SQLStateCode:         "00000",
+				Message:              "ending log output to stderr",
+				Detail:               "",
+				Hint:                 "Future log output will go to log destination \"csvlog\".",
+				InternalQuery:        "INTERNAL_QUERY",
+				InternalQueryPos:     "INTERNAL_QUERY_POS",
+				Context:              "CONTEXT",
+				Query:                "QUERY",
+				QueryPos:             "42",
+				Location:             "LOCATION",
+				ApplicationName:      "APP_NAME",
+				BackendType:          "postmaster",
+				LeaderPid:            "",
+				QueryID:              "0",
+			}))
+		})
+		It("cleans up fields between runs for PostgreSQL 15", func() {
+			firstLogLine := "{\"log_time\":\"2022-10-26 06:50:03.375 UTC\"}"
+			var r LoggingRecord
+			_, err := r.FromJSON([]byte(firstLogLine))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(r.LogTime).To(Equal("2022-10-26 06:50:03.375 UTC"))
+			secondLogLine := "{\"user_name\":\"USER\"}"
+			_, err = r.FromJSON([]byte(secondLogLine))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(r.Username).To(Equal("USER"))
+			Expect(r.LogTime).To(Equal(""))
+		})
+	})
 })

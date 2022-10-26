@@ -113,6 +113,22 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		})
 	})
 
+	When("version is 15", func() {
+		It("will use appropriate settings", func() {
+			info := ConfigurationInfo{
+				Settings:              CnpgConfigurationSettings,
+				MajorVersion:          150000,
+				UserSettings:          settings,
+				IncludingMandatory:    true,
+				SyncReplicasElectable: nil,
+				SyncReplicas:          0,
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig("wal_keep_size")).To(Equal("512MB"))
+			Expect(config.GetConfig("log_destination")).To(Equal("jsonlog"))
+		})
+	})
+
 	When("replica cluster is being configured", func() {
 		It("will set archive_mode to always", func() {
 			info := ConfigurationInfo{

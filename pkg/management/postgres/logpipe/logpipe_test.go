@@ -51,7 +51,7 @@ var _ = Describe("CSV file reader", func() {
 			spy := SpyRecordWriter{}
 			p := LogPipe{
 				record:          &LoggingRecord{},
-				fieldsValidator: LogFieldValidator,
+				fieldsValidator: CSVLogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(2))
@@ -67,7 +67,7 @@ var _ = Describe("CSV file reader", func() {
 			spy := SpyRecordWriter{}
 			p := LogPipe{
 				record:          &LoggingRecord{},
-				fieldsValidator: LogFieldValidator,
+				fieldsValidator: CSVLogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(2))
@@ -83,7 +83,7 @@ var _ = Describe("CSV file reader", func() {
 			spy := SpyRecordWriter{}
 			p := LogPipe{
 				record:          &LoggingRecord{},
-				fieldsValidator: LogFieldValidator,
+				fieldsValidator: CSVLogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(2))
@@ -99,7 +99,7 @@ var _ = Describe("CSV file reader", func() {
 			spy := SpyRecordWriter{}
 			p := LogPipe{
 				record:          NewPgAuditLoggingDecorator(),
-				fieldsValidator: LogFieldValidator,
+				fieldsValidator: CSVLogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(2))
@@ -117,7 +117,7 @@ var _ = Describe("CSV file reader", func() {
 				reader := strings.NewReader(longerInput)
 				p := LogPipe{
 					record:          &LoggingRecord{},
-					fieldsValidator: LogFieldValidator,
+					fieldsValidator: CSVLogFieldValidator,
 				}
 				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
@@ -135,7 +135,7 @@ var _ = Describe("CSV file reader", func() {
 				reader := strings.NewReader(shorterInput)
 				p := LogPipe{
 					record:          &LoggingRecord{},
-					fieldsValidator: LogFieldValidator,
+					fieldsValidator: CSVLogFieldValidator,
 				}
 				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
@@ -153,7 +153,7 @@ var _ = Describe("CSV file reader", func() {
 				reader := strings.NewReader(trailingCommaInput)
 				p := LogPipe{
 					record:          &LoggingRecord{},
-					fieldsValidator: LogFieldValidator,
+					fieldsValidator: CSVLogFieldValidator,
 				}
 				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
@@ -171,7 +171,7 @@ var _ = Describe("CSV file reader", func() {
 				reader := strings.NewReader(longerInput)
 				p := LogPipe{
 					record:          &LoggingRecord{},
-					fieldsValidator: LogFieldValidator,
+					fieldsValidator: CSVLogFieldValidator,
 				}
 				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
@@ -187,7 +187,7 @@ var _ = Describe("CSV file reader", func() {
 			spy := SpyRecordWriter{}
 			p := LogPipe{
 				record:          &LoggingRecord{},
-				fieldsValidator: LogFieldValidator,
+				fieldsValidator: CSVLogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, strings.NewReader(""), &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(0))
