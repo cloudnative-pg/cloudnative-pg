@@ -61,13 +61,8 @@ var _ = Describe("Cluster scale up and down", Serial, func() {
 			// Add a node to the cluster and verify the cluster has one more
 			// element
 			By("adding an instance to the cluster", func() {
-				stdout, _, err := utils.Run("df -h")
+				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
-				GinkgoWriter.Println("DISK SPACE", stdout)
-				_, _, err = utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
-				Expect(err).ToNot(HaveOccurred())
-				GinkgoWriter.Println("KUBERNETES NODES")
-				GinkgoWriter.Println(env.DescribeKubernetesNodes())
 				timeout := 300
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
