@@ -21,6 +21,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -115,5 +116,57 @@ var _ = Describe("PVC detection", func() {
 		Expect(pvcUsage.InstanceNames).Should(HaveLen(3))
 		// the PVC clusterName+"-3" is not ready, and has no Job nor Pod
 		Expect(pvcUsage.InstanceNames).Should(ConsistOf(clusterName+"-1", clusterName+"-2", clusterName+"-4"))
+	})
+})
+
+var _ = Describe("PVC Creation", func() {
+	storageClass := "default"
+	It("handles size properly only with size specified", func() {
+		pvc, err := CreatePVC(
+			apiv1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClass,
+			},
+			apiv1.Cluster{},
+			0,
+			utils.PVCRolePgData,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("1Gi"))
+	})
+	It("handles size properly with only template specified", func() {
+		pvc, err := CreatePVC(
+			apiv1.StorageConfiguration{
+				StorageClass: &storageClass,
+				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+					},
+				},
+			},
+			apiv1.Cluster{},
+			0,
+			utils.PVCRolePgData,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("1Gi"))
+	})
+	It("handles size properly with both template and size specified, size taking precedence", func() {
+		pvc, err := CreatePVC(
+			apiv1.StorageConfiguration{
+				Size:         "2Gi",
+				StorageClass: &storageClass,
+				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+					},
+				},
+			},
+			apiv1.Cluster{},
+			0,
+			utils.PVCRolePgData,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))
 	})
 })
