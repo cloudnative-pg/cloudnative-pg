@@ -39,23 +39,23 @@ jobs:
         run: |
           LATEST_POSTGRES_VERSION=$(jq -r 'del(.[] | select(.[] | match("alpha|beta|rc"))) | .[keys | max][0]' < .github/pg_versions.json)
           LATEST_POSTGRES_VERSION_IMAGE="${IMAGE_REPO}:${LATEST_POSTGRES_VERSION}"
-          echo "::set-output name=LATEST_POSTGRES_VERSION::$LATEST_POSTGRES_VERSION"
-          echo "::set-output name=LATEST_POSTGRES_VERSION_IMAGE::$LATEST_POSTGRES_VERSION_IMAGE"
+          echo "LATEST_POSTGRES_VERSION=$LATEST_POSTGRES_VERSION" >> $GITHUB_ENV
+          echo "LATEST_POSTGRES_VERSION_IMAGE=$LATEST_POSTGRES_VERSION_IMAGE" >> $GITHUB_ENV
 
       - name: Get the current version of PostgreSQL
         id: current
         run: |
           CURRENT_POSTGRES_VERSION_IMAGE=$(awk -F '"' '/DefaultImageName *=/{print $2}' pkg/versions/versions.go)
           CURRENT_POSTGRES_VERSION=${CURRENT_POSTGRES_VERSION_IMAGE##*:}
-          echo "::set-output name=CURRENT_POSTGRES_VERSION::$CURRENT_POSTGRES_VERSION"
-          echo "::set-output name=CURRENT_POSTGRES_VERSION_IMAGE::$CURRENT_POSTGRES_VERSION_IMAGE"
+          echo "CURRENT_POSTGRES_VERSION=$CURRENT_POSTGRES_VERSION" >> $GITHUB_ENV
+          echo "CURRENT_POSTGRES_VERSION_IMAGE=$CURRENT_POSTGRES_VERSION_IMAGE" >> $GITHUB_ENV
 
       - name: Update files to match the latest version of PostgreSQL
-        if: steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE != steps.current.outputs.CURRENT_POSTGRES_VERSION_IMAGE
+        if: env.LATEST_POSTGRES_VERSION_IMAGE != env.CURRENT_POSTGRES_VERSION_IMAGE
         env:
-          CURRENT_POSTGRES_VERSION: ${{ steps.current.outputs.CURRENT_POSTGRES_VERSION }}
-          LATEST_POSTGRES_VERSION: ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}
-          LATEST_POSTGRES_VERSION_IMAGE: ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE }}
+          CURRENT_POSTGRES_VERSION: ${{ env.CURRENT_POSTGRES_VERSION }}
+          LATEST_POSTGRES_VERSION: ${{ env.LATEST_POSTGRES_VERSION }}
+          LATEST_POSTGRES_VERSION_IMAGE: ${{ env.LATEST_POSTGRES_VERSION_IMAGE }}
         run: |
           echo "New PostgreSQL version detected ; updating!"
 
@@ -66,20 +66,20 @@ jobs:
           find docs -type f \( -name '*.md' -o -name '*.yaml' \) -exec sed -i "s/${CURRENT_POSTGRES_VERSION//./\\.}/${LATEST_POSTGRES_VERSION}/g" {} +
 
       - name: Create PR to update PostgreSQL version
-        if: steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE != steps.current.outputs.CURRENT_POSTGRES_VERSION_IMAGE
+        if: env.LATEST_POSTGRES_VERSION_IMAGE != env.CURRENT_POSTGRES_VERSION_IMAGE
         uses: peter-evans/create-pull-request@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          title: "feat: update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
-          body: "Update default PostgreSQL version from ${{ steps.current.outputs.CURRENT_POSTGRES_VERSION }} to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
+          title: "feat: update default PostgreSQL version to ${{ env.LATEST_POSTGRES_VERSION }}"
+          body: "Update default PostgreSQL version from ${{ env.CURRENT_POSTGRES_VERSION }} to ${{ env.LATEST_POSTGRES_VERSION }}"
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
-          commit-message: "feat: update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
+          commit-message: "feat: update default PostgreSQL version to ${{ env.LATEST_POSTGRES_VERSION }}"
           signoff: true
 
       - name: Create Pull Request if postgresql versions have been updated
-        if: steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE == steps.current.outputs.CURRENT_POSTGRES_VERSION_IMAGE
+        if: env.LATEST_POSTGRES_VERSION_IMAGE == env.CURRENT_POSTGRES_VERSION_IMAGE
         uses: peter-evans/create-pull-request@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
