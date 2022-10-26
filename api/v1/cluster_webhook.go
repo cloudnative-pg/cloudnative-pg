@@ -280,6 +280,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validatePrimaryUpdateStrategy,
 		r.validateMinSyncReplicas,
 		r.validateMaxSyncReplicas,
+		r.validateStorageSize,
 		r.validateWalStorageSize,
 		r.validateName,
 		r.validateBootstrapPgBaseBackupSource,
@@ -1090,6 +1091,10 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 	return result
 }
 
+func (r *Cluster) validateStorageSize() field.ErrorList {
+	return validateStorageConfigurationSize("Storage", r.Spec.StorageConfiguration)
+}
+
 func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	var result field.ErrorList
 
@@ -1103,13 +1108,23 @@ func (r *Cluster) validateWalStorageSize() field.ErrorList {
 func validateStorageConfigurationSize(structPath string, storageConfiguration StorageConfiguration) field.ErrorList {
 	var result field.ErrorList
 
-	if _, err := resource.ParseQuantity(storageConfiguration.Size); err != nil {
+	if storageConfiguration.Size != "" {
+		if _, err := resource.ParseQuantity(storageConfiguration.Size); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", structPath, "size"),
+				storageConfiguration.Size,
+				"Size value isn't valid"))
+		}
+	}
+
+	if storageConfiguration.Size == "" &&
+		(storageConfiguration.PersistentVolumeClaimTemplate == nil ||
+			storageConfiguration.PersistentVolumeClaimTemplate.Resources.Requests.Storage().IsZero()) {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", structPath, "size"),
 			storageConfiguration.Size,
-			"Size value isn't valid"))
+			"Size not configured. Please add it, or a storage request in the pvcTemplate."))
 	}
-
 	return result
 }
 

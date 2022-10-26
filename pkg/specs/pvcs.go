@@ -109,22 +109,28 @@ func CreatePVC(
 		result.Spec.StorageClassName = storageConfiguration.StorageClass
 	}
 
-	// Insert the storage requirement
-	parsedSize, err := resource.ParseQuantity(storageConfiguration.Size)
-	if err != nil {
-		return nil, ErrorInvalidSize
-	}
+	if storageConfiguration.Size != "" {
+		// Insert the storage requirement
+		parsedSize, err := resource.ParseQuantity(storageConfiguration.Size)
+		if err != nil {
+			return nil, ErrorInvalidSize
+		}
 
-	result.Spec.Resources = corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			"storage": parsedSize,
-		},
+		result.Spec.Resources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				"storage": parsedSize,
+			},
+		}
 	}
 
 	if len(result.Spec.AccessModes) == 0 {
 		result.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
 			corev1.ReadWriteOnce,
 		}
+	}
+
+	if result.Spec.Resources.Requests.Storage().IsZero() {
+		return nil, ErrorInvalidSize
 	}
 
 	return result, nil
