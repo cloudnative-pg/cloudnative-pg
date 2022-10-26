@@ -766,7 +766,7 @@ func (instance *Instance) Rewind(postgresMajorVersion int) error {
 }
 
 // PgIsReady gets the status from the pg_isready command
-func (instance *Instance) PgIsReady() error {
+func PgIsReady() error {
 	// We just use the environment variables we already have
 	// to pass the connection parameters
 	options := []string{
@@ -777,7 +777,7 @@ func (instance *Instance) PgIsReady() error {
 
 	// Run `pg_isready` which returns 0 if everything is OK.
 	// It returns 1 when PostgreSQL is not ready to accept
-	// connections but it is starting up (this is a valid
+	// connections but, it is starting up (this is a valid
 	// condition for example for a standby that is fetching
 	// WAL files and trying to reach a consistent state).
 	cmd := exec.Command(pgIsReady, options...) // #nosec G204
