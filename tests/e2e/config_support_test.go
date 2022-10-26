@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2/types"
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -60,6 +61,9 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive)
 	})
 
 	AfterAll(func() {
+		if CurrentSpecReport().State.Is(types.SpecStateSkipped) {
+			return
+		}
 		// Delete the configmap and restore the previous behaviour
 		configMap := &corev1.ConfigMap{}
 		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: operatorNamespace, Name: configName}, configMap)
