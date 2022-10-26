@@ -1069,7 +1069,7 @@ type StorageConfiguration struct {
 	// Size of the storage. Required if not already specified in the PVC template.
 	// Changes to this field are automatically reapplied to the created PVCs.
 	// Size cannot be decreased.
-	Size string `json:"size"`
+	Size string `json:"size,omitempty"`
 
 	// Resize existent PVCs, defaults to true
 	// +optional

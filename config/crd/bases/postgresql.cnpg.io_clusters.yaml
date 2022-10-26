@@ -2305,8 +2305,6 @@ spec:
                       not specified, generated PVCs will be satisfied by the default
                       storage class
                     type: string
-                required:
-                - size
                 type: object
               superuserSecret:
                 description: The secret containing the superuser password. If not
@@ -2514,8 +2512,6 @@ spec:
                       not specified, generated PVCs will be satisfied by the default
                       storage class
                     type: string
-                required:
-                - size
                 type: object
             required:
             - instances

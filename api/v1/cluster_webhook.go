@@ -1123,7 +1123,7 @@ func validateStorageConfigurationSize(structPath string, storageConfiguration St
 		result = append(result, field.Invalid(
 			field.NewPath("spec", structPath, "size"),
 			storageConfiguration.Size,
-			"You should at least set a size or a storage request in the pvcTemplate."))
+			"Size not configured. Please add it, or a storage request in the pvcTemplate."))
 	}
 	return result
 }
