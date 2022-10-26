@@ -42,7 +42,7 @@ jobs:
           if [[ "${{ github.event.client_payload.pull_request.head.ref }}" != "" ]]
           then
             ref=${{ github.event.client_payload.pull_request.head.ref }}
-            echo ::set-output name=ref::$ref
+            echo "REF=$ref" >> $GITHUB_ENV
           fi
       - name: Invoke workflow-dispatch
         id: trigger-workflow
@@ -50,7 +50,7 @@ jobs:
         with:
           workflow: continuous-delivery
           token: ${{ secrets.REPO_GHA_PAT }}
-          ref: ${{ steps.vars.outputs.ref }}
+          ref: ${{ env.REF }}
           display-workflow-run-url: true
           wait-for-completion: false
           inputs: >
