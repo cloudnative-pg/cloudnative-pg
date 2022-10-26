@@ -41,8 +41,6 @@ func CurlClient(namespace string) corev1.Pod {
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: pointer.Bool(false),
 						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
-						// Curl image doesn't have a numeric user, so it cannot have RunAsNonRoot set to true
-						RunAsNonRoot: pointer.Bool(false),
 					},
 				},
 			},
@@ -50,8 +48,6 @@ func CurlClient(namespace string) corev1.Pod {
 			RestartPolicy: corev1.RestartPolicyAlways,
 			SecurityContext: &corev1.PodSecurityContext{
 				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
-				// Curl image doesn't have a numeric user, so it cannot have RunAsNonRoot set to true
-				RunAsNonRoot: pointer.Bool(false),
 			},
 		},
 	}
