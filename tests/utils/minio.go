@@ -114,10 +114,13 @@ func MinioDefaultSetup(namespace string) (MinioSetup, error) {
 
 // MinioDefaultDeployment returns a default Deployment for minio
 func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) appsv1.Deployment {
-	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 	if !utils.HaveSeccompSupport() {
 		seccompProfile = nil
 	}
+
 	minioDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "minio",
@@ -329,7 +332,9 @@ func MinioSSLSetup(namespace string) (MinioSetup, error) {
 
 // MinioDefaultClient returns the default Pod definition for a minio client
 func MinioDefaultClient(namespace string) corev1.Pod {
-	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 	if !utils.HaveSeccompSupport() {
 		seccompProfile = nil
 	}

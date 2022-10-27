@@ -28,7 +28,9 @@ import (
 
 // CurlClient returns the Pod definition for a curl client
 func CurlClient(namespace string) corev1.Pod {
-	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 	if !utils.HaveSeccompSupport() {
 		seccompProfile = nil
 	}

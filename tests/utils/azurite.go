@@ -105,7 +105,9 @@ func InstallAzCli(namespace string, env *TestingEnvironment) error {
 
 // getAzuriteClientPod get the cli client pod
 func getAzuriteClientPod(namespace string) corev1.Pod {
-	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 	if !utils.HaveSeccompSupport() {
 		seccompProfile = nil
 	}
@@ -216,7 +218,9 @@ func getAzuriteService(namespace string) corev1.Service {
 // getAzuriteDeployment get the deployment for Azurite
 func getAzuriteDeployment(namespace string) apiv1.Deployment {
 	replicas := int32(1)
-	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 	if !utils.HaveSeccompSupport() {
 		seccompProfile = nil
 	}

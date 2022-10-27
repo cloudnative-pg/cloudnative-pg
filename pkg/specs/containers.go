@@ -60,8 +60,10 @@ func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container
 func CreateContainerSecurityContext() *corev1.SecurityContext {
 	trueValue := true
 	falseValue := false
-	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
 
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 	if !utils.HaveSeccompSupport() {
 		seccompProfile = nil
 	}

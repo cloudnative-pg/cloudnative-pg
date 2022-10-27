@@ -279,7 +279,10 @@ func CreatePodSecurityContext(user, group int64) *corev1.PodSecurityContext {
 	if utils.HaveSecurityContextConstraints() {
 		return nil
 	}
-	seccompProfile := &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}
+
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 	if !utils.HaveSeccompSupport() {
 		seccompProfile = nil
 	}
