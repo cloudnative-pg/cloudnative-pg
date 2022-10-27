@@ -20,11 +20,20 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // DefaultWebapp returns a struct representing a
 func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSecretName string) corev1.Pod {
 	var secretMode int32 = 0o600
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
+	if !utils.HaveSeccompSupport() {
+		seccompProfile = nil
+	}
+
 	return corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -72,12 +81,12 @@ func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSe
 					},
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: pointer.Bool(false),
-						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						SeccompProfile:           seccompProfile,
 					},
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+				SeccompProfile: seccompProfile,
 			},
 		},
 	}
