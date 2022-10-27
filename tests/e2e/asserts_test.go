@@ -230,7 +230,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 				utils.CountReadyPods(podList.Items)), nil
 		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy),
 			func() string {
-				cluster := testsUtils.NewClusterResourcePrinter(namespace, clusterName, env)
+				cluster := testsUtils.PrintClusterResources(namespace, clusterName, env)
 				nodes, _ := env.DescribeKubernetesNodes()
 				return fmt.Sprintf("%s\n\n%s", cluster, nodes)
 			})

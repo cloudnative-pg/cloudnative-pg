@@ -312,8 +312,8 @@ func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, ne
 	return nil
 }
 
-// NewClusterResourcePrinter returns a function that fetches and then prints a summary of the cluster resources
-func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnvironment) string {
+// PrintClusterResources returns a function that fetches and then prints a summary of the cluster resources
+func PrintClusterResources(namespace, clusterName string, env *TestingEnvironment) string {
 	namespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      clusterName,
