@@ -97,7 +97,7 @@ func ExecCommand(
 		Stderr: &stderr,
 	})
 	if err != nil {
-		return stdout.String(), stderr.String(), fmt.Errorf("%v - %v", err, stderr.String())
+		return stdout.String(), stderr.String(), fmt.Errorf("%w - %v", err, stderr.String())
 	}
 
 	return stdout.String(), stderr.String(), nil
