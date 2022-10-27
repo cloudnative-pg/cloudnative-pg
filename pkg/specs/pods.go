@@ -280,15 +280,20 @@ func CreatePodSecurityContext(user, group int64) *corev1.PodSecurityContext {
 		return nil
 	}
 
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
+	if !utils.HaveSeccompSupport() {
+		seccompProfile = nil
+	}
+
 	trueValue := true
 	return &corev1.PodSecurityContext{
-		RunAsNonRoot: &trueValue,
-		RunAsUser:    &user,
-		RunAsGroup:   &group,
-		FSGroup:      &group,
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
+		RunAsNonRoot:   &trueValue,
+		RunAsUser:      &user,
+		RunAsGroup:     &group,
+		FSGroup:        &group,
+		SeccompProfile: seccompProfile,
 	}
 }
 
