@@ -312,7 +312,7 @@ func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, ne
 	return nil
 }
 
-// PrintClusterResources returns a function that fetches and then prints a summary of the cluster resources
+// PrintClusterResources prints a summary of the cluster pods, jobs, pvcs etc.
 func PrintClusterResources(namespace, clusterName string, env *TestingEnvironment) string {
 	namespacedName := types.NamespacedName{
 		Namespace: namespace,
