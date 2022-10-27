@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -104,6 +105,13 @@ func InstallAzCli(namespace string, env *TestingEnvironment) error {
 
 // getAzuriteClientPod get the cli client pod
 func getAzuriteClientPod(namespace string) corev1.Pod {
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
+	if !utils.HaveSeccompSupport() {
+		seccompProfile = nil
+	}
+
 	cliClientPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "az-cli",
@@ -149,7 +157,7 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 					},
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: pointer.Bool(false),
-						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						SeccompProfile:           seccompProfile,
 					},
 				},
 			},
@@ -176,7 +184,7 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+				SeccompProfile: seccompProfile,
 			},
 		},
 	}
@@ -210,6 +218,13 @@ func getAzuriteService(namespace string) corev1.Service {
 // getAzuriteDeployment get the deployment for Azurite
 func getAzuriteDeployment(namespace string) apiv1.Deployment {
 	replicas := int32(1)
+	seccompProfile := &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
+	if !utils.HaveSeccompSupport() {
+		seccompProfile = nil
+	}
+
 	azuriteDeployment := apiv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "azurite",
@@ -266,7 +281,7 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 							},
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: pointer.Bool(false),
-								SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+								SeccompProfile:           seccompProfile,
 							},
 						},
 					},
@@ -297,7 +312,7 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 						},
 					},
 					SecurityContext: &corev1.PodSecurityContext{
-						SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						SeccompProfile: seccompProfile,
 					},
 				},
 			},

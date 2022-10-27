@@ -202,6 +202,12 @@ func RunController(
 		return err
 	}
 
+	// Detect if we support SeccompProfile
+	if err = utils.DetectSeccompSupport(discoveryClient); err != nil {
+		setupLog.Error(err, "unable to detect SeccompProfile support")
+		return err
+	}
+
 	// Retrieve the Kubernetes cluster system UID
 	if err = utils.DetectKubeSystemUID(ctx, clientSet); err != nil {
 		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
@@ -210,7 +216,8 @@ func RunController(
 
 	setupLog.Info("Kubernetes system metadata",
 		"systemUID", utils.GetKubeSystemUID(),
-		"haveSCC", utils.HaveSecurityContextConstraints())
+		"haveSCC", utils.HaveSecurityContextConstraints(),
+		"haveSeccompProfile", utils.HaveSeccompSupport())
 
 	if err := ensurePKI(ctx, mgr.GetWebhookServer().CertDir); err != nil {
 		return err
