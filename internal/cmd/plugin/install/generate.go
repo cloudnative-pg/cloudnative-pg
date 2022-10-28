@@ -90,9 +90,14 @@ func newGenerateCmd() *cobra.Command {
 }
 
 func (cmd *generateExecutor) execute() error {
-	irs, err := cmd.getInstallationResources()
+	manifest, err := cmd.getInstallationYAML()
 	if err != nil {
 		return err
+	}
+
+	irs, err := cmd.getInstallationResourcesFromYAML(manifest)
+	if err != nil {
+		return nil
 	}
 
 	cmd.reconcileNamespace(irs)
@@ -108,7 +113,7 @@ func (cmd *generateExecutor) execute() error {
 	return cmd.printResources(irs)
 }
 
-func (cmd *generateExecutor) printResources(irs []installResource) error {
+func (cmd *generateExecutor) printResources(irs []installationResource) error {
 	for _, ir := range irs {
 		b, err := yaml.Marshal(ir.obj)
 		if err != nil {
@@ -120,36 +125,7 @@ func (cmd *generateExecutor) printResources(irs []installResource) error {
 	return nil
 }
 
-func (cmd *generateExecutor) parseInstallationResources(manifests []byte) ([]installResource, error) {
-	var irs []installResource
-
-	contextLogger := log.FromContext(cmd.ctx).WithName("parseInstallationResources")
-	reader := bufio.NewReader(bytes.NewReader(manifests))
-	yamlReader := machineryYaml.NewYAMLReader(reader)
-	for {
-		rawObj, err := yamlReader.Read()
-		if errors.Is(err, io.EOF) {
-			return irs, nil
-		}
-
-		if err != nil {
-			contextLogger.Info("encountered an error while reading",
-				"err", err,
-			)
-			break
-		}
-
-		ir, err := cmd.getInstallResource(rawObj)
-		if err != nil {
-			return nil, err
-		}
-		irs = append(irs, ir)
-	}
-
-	return irs, nil
-}
-
-func (cmd *generateExecutor) getInstallationResources() ([]installResource, error) {
+func (cmd *generateExecutor) getInstallationYAML() ([]byte, error) {
 	contextLogger := log.FromContext(cmd.ctx)
 
 	version, err := cmd.getVersion()
@@ -163,59 +139,40 @@ func (cmd *generateExecutor) getInstallationResources() ([]installResource, erro
 		version,
 	)
 
-	resp, err := http.Get(manifestURL) //nolint:gosec
-	if err != nil {
-		log.Error(err, "Error while requesting instance status")
-		return nil, err
-	}
+	return executeGetRequest(cmd.ctx, manifestURL)
+}
 
-	defer func() {
-		err = resp.Body.Close()
-		if err != nil {
-			contextLogger.Error(err, "Can't close the connection",
-				"manifestURL", manifestURL,
-				"statusCode", resp.StatusCode,
-			)
+func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([]installationResource, error) {
+	var irs []installationResource
+
+	reader := bufio.NewReader(bytes.NewReader(rawYaml))
+	yamlReader := machineryYaml.NewYAMLReader(reader)
+	for {
+		document, err := yamlReader.Read()
+		if errors.Is(err, io.EOF) {
+			break
 		}
-	}()
+		if err != nil {
+			return nil, err
+		}
 
-	manifests, err := io.ReadAll(resp.Body)
-	if err != nil {
-		contextLogger.Error(err, "Error while reading status response body",
-			"manifestURL", manifestURL,
-			"statusCode", resp.StatusCode,
-		)
-		return nil, err
-	}
-
-	irs, err := cmd.parseInstallationResources(manifests)
-	if err != nil {
-		return nil, err
+		ir, err := cmd.getResourceFromDocument(document)
+		if err != nil {
+			return nil, err
+		}
+		irs = append(irs, ir)
 	}
 
 	return irs, nil
 }
 
-func (cmd *generateExecutor) getInstallResource(rawObj []byte) (installResource, error) {
-	for _, ir := range cmd.getSupportedInstallResources() {
-		ir := ir
-		err := machineryYaml.UnmarshalStrict(rawObj, ir.obj)
-		if err != nil {
-			continue
-		}
-		return ir, nil
-	}
-
-	return installResource{}, fmt.Errorf("could not parse the raw object: %s", string(rawObj))
-}
-
-type installResource struct {
+type installationResource struct {
 	obj           client.Object
 	isClusterWide bool
 }
 
-func (cmd *generateExecutor) getSupportedInstallResources() []installResource {
-	return []installResource{
+func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installationResource, error) {
+	supportedResources := []installationResource{
 		{obj: &corev1.Namespace{}, isClusterWide: true},
 		{obj: &appsv1.Deployment{}},
 		{obj: &corev1.ServiceAccount{}},
@@ -229,6 +186,17 @@ func (cmd *generateExecutor) getSupportedInstallResources() []installResource {
 		{obj: &admissionregistrationv1.MutatingWebhookConfiguration{}},
 		{obj: &admissionregistrationv1.ValidatingWebhookConfiguration{}},
 	}
+
+	for _, ir := range supportedResources {
+		ir := ir
+		err := machineryYaml.UnmarshalStrict(document, ir.obj)
+		if err != nil {
+			continue
+		}
+		return ir, nil
+	}
+
+	return installationResource{}, fmt.Errorf("could not parse the yaml document: \n %s", string(document))
 }
 
 func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment) error {
@@ -253,7 +221,7 @@ func (cmd *generateExecutor) reconcileOperatorConfig(cm *corev1.ConfigMap) error
 	return nil
 }
 
-func (cmd *generateExecutor) reconcileNamespace(irs []installResource) {
+func (cmd *generateExecutor) reconcileNamespace(irs []installationResource) {
 	if cmd.namespace == "" {
 		return
 	}
@@ -280,9 +248,32 @@ type Branch struct {
 }
 
 func (cmd *generateExecutor) getLatestOperatorVersion() (string, error) {
-	contextLogger := log.FromContext(cmd.ctx)
 	url := "https://api.github.com/repos/cloudnative-pg/artifacts/branches"
-	resp, err := http.Get(url)
+	body, err := executeGetRequest(cmd.ctx, url)
+	if err != nil {
+		return "", err
+	}
+
+	var tags []Branch
+	if err := json.Unmarshal(body, &tags); err != nil {
+		return "", err
+	}
+	if len(tags) == 0 {
+		return "", fmt.Errorf("no branches found")
+	}
+
+	// we order the slice in reverse order, so the latest version is the first element
+	sort.Slice(tags, func(i, j int) bool {
+		return tags[i].Name > tags[j].Name
+	})
+
+	return tags[0].Name, nil
+}
+
+func executeGetRequest(ctx context.Context, url string) ([]byte, error) {
+	contextLogger := log.FromContext(ctx)
+
+	resp, err := http.Get(url) //nolint:gosec
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
@@ -299,28 +290,16 @@ func (cmd *generateExecutor) getLatestOperatorVersion() (string, error) {
 			"url", url,
 			"statusCode", resp.StatusCode,
 		)
-		return "", err
+		return nil, err
 	}
 
-	var tags []Branch
-	if err := json.Unmarshal(body, &tags); err != nil {
-		return "", err
-	}
-	if len(tags) == 0 {
-		return "", fmt.Errorf("no branches found")
-	}
-
-	sort.Slice(tags, func(i, j int) bool {
-		return tags[i].Name > tags[j].Name
-	})
-
-	return tags[0].Name, nil
+	return body, nil
 }
 
 type reconcileResourceCallback[T client.Object] func(obj T) error
 
 func reconcileResource[T client.Object](
-	irs []installResource,
+	irs []installationResource,
 	reconciler reconcileResourceCallback[T],
 ) error {
 	for _, ir := range irs {
