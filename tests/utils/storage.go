@@ -60,3 +60,33 @@ func PvcHasLabels(
 	}
 	return true
 }
+
+// ObjectHasAnnotations returns true if the object has the passed annotations
+func ObjectHasAnnotations(
+	object client.Object,
+	annotations []string,
+) bool {
+	objectAnnotations := object.GetAnnotations()
+	for _, v := range annotations {
+		_, ok := objectAnnotations[v]
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// ObjectMatchesAnnotations returns true if the object has the passed annotations key/value
+func ObjectMatchesAnnotations(
+	object client.Object,
+	annotations map[string]string,
+) bool {
+	objectAnnotations := object.GetAnnotations()
+	for k, v := range annotations {
+		value, ok := objectAnnotations[k]
+		if !ok && (v != value) {
+			return false
+		}
+	}
+	return true
+}

@@ -19,21 +19,32 @@ package resources
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/exec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+)
+
+// https://www.postgresql.org/docs/current/app-pg-ctl.html
+type pgCtlStatusExitCode int
+
+const (
+	pgCtlStatusStopped               pgCtlStatusExitCode = 3
+	pgCtlStatusNoAccessibleDirectory pgCtlStatusExitCode = 4
 )
 
 // GetInstancePods gets all the pods belonging to a given cluster
@@ -155,11 +166,50 @@ func GetInstancePVCs(
 func getPVC(ctx context.Context, name string) (*v1.PersistentVolumeClaim, error) {
 	var pvc v1.PersistentVolumeClaim
 	err := plugin.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: plugin.Namespace}, &pvc)
-	if errors.IsNotFound(err) {
+	if apierrs.IsNotFound(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 	return &pvc, nil
+}
+
+// IsInstanceRunning returns a boolean indicating if the given instance is running and any error encountered
+func IsInstanceRunning(
+	ctx context.Context,
+	pod v1.Pod,
+) (bool, error) {
+	contextLogger := log.FromContext(ctx).WithName("plugin.IsInstanceRunning")
+	timeout := time.Second * 2
+	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
+	stdout, stderr, err := utils.ExecCommand(
+		ctx,
+		clientInterface,
+		plugin.Config,
+		pod,
+		specs.PostgresContainerName,
+		&timeout,
+		"pg_ctl", "status")
+	if err == nil {
+		return true, nil
+	}
+
+	var codeExitError exec.CodeExitError
+	if errors.As(err, &codeExitError) {
+		switch pgCtlStatusExitCode(codeExitError.Code) {
+		case pgCtlStatusStopped:
+			return false, nil
+		case pgCtlStatusNoAccessibleDirectory:
+			return false, fmt.Errorf("could not check instance status: no accessible data directory")
+		}
+	}
+
+	contextLogger.Debug("encountered an error while getting instance status",
+		"stdout", stdout,
+		"stderr", stderr,
+		"err", err,
+	)
+
+	return false, err
 }

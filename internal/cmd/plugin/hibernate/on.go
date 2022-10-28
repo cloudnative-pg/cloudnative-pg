@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -221,11 +220,11 @@ func (on *onCommand) waitInstancesToBeFencedStep() error {
 	for _, instance := range on.managedInstances {
 		always := func(err error) bool { return true }
 		if err := retry.OnError(hibernationBackoff, always, func() error {
-			stopped, err := isInstanceStopped(on.ctx, instance)
+			running, err := resources.IsInstanceRunning(on.ctx, instance)
 			if err != nil {
 				return fmt.Errorf("error checking instance status (%v): %w", instance.Name, err)
 			}
-			if !stopped {
+			if running {
 				return fmt.Errorf("instance still running (%v)", instance.Name)
 			}
 			return nil
@@ -387,27 +386,4 @@ func getPGControlData(ctx context.Context,
 	}
 
 	return stdout, nil
-}
-
-func isInstanceStopped(
-	ctx context.Context,
-	pod corev1.Pod,
-) (bool, error) {
-	timeout := time.Second * 2
-	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
-	stdout, _, err := utils.ExecCommand(
-		ctx,
-		clientInterface,
-		plugin.Config,
-		pod,
-		specs.PostgresContainerName,
-		&timeout,
-		"pg_ctl", "status")
-
-	// todo: do not rely on strings
-	// pg_ctl returns exit code 3 if no postgres is running
-	if err != nil && !strings.Contains(err.Error(), "command terminated with exit code 3") {
-		return false, fmt.Errorf("isInstanceStopped command returned the following error: %s", err)
-	}
-	return strings.Contains(stdout, "pg_ctl: no server running"), nil
 }
