@@ -81,7 +81,7 @@ and the following suite of E2E tests are performed on that cluster:
 - **Recovery:**
     * Data corruption;
     * pg_basebackup;
-- **ImportDatabase:**
+- **Import Database:**
     * Microservice;
     * Monolith;
 - **Storage:**
