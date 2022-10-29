@@ -86,7 +86,6 @@ and the following suite of E2E tests are performed on that cluster:
     * Monolith;
 - **Storage:**
     * Storage expansion;
-- **Security:**
-    * AppArmor;
+AppArmor annotation propagation. Executed only on Azure environment;
 - **Maintenance:**
     * Node Drain;
