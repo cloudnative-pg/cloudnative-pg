@@ -33,11 +33,11 @@ var haveSCC bool
 // This variable specifies whether we should set the SeccompProfile or not in the pods
 var supportSeccomp bool
 
-// minorVersionRegexp is used to extract the minor version from
+// `minorVersionRegexp` is used to extract the minor version from
 // the Kubernetes API server version. Some providers, like AWS,
-// append a "+" to the Kubernetes minor version indicated that
-// there's some maintenance backport patch over the standard
-// release beyond its end-of-life.
+// append a "+" to the Kubernetes minor version to presumably
+// indicate that some maintenance patches have been back-ported
+// beyond the standard end-of-life of the release.
 var minorVersionRegexp = regexp.MustCompile(`^([0-9]+)\+?$`)
 
 // GetDiscoveryClient creates a discovery client or return error
