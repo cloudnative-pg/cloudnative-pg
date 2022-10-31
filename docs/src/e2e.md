@@ -1,12 +1,11 @@
 # End-to-End Tests
 
-CloudNativePG operator is automatically tested after each
-commit via a suite of **End-to-end (E2E) tests**. It ensures that
-the operator correctly deploys and manages the PostgreSQL clusters.
+CloudNativePG is automatically tested after each
+commit via a suite of **End-to-end (E2E) tests**, which ensures that
+the operator correctly deploys and manages PostgreSQL clusters.
 
 Moreover, the following Kubernetes versions are tested for each commit,
-ensuring failure and bugs detection at an early stage of the development
-process:
+helping detect bugs at an early stage of the development process:
 
 * 1.25
 * 1.24
@@ -35,18 +34,17 @@ and the following suite of E2E tests are performed on that cluster:
     * Connection via services, including read-only;
     * Connection via user-provided server and/or client certificates;
     * PgBouncer;
-- **Performance:**
-    * Scale-up and scale-down of a `Cluster`;
+- **Self-healing:**
     * Failover;
     * Switchover;
     * Primary endpoint switch in case of failover in less than 10 seconds;
     * Primary endpoint switch in case of switchover in less than 20 seconds;
     * Recover from a degraded state in less than 60 seconds;
-    * Webhook;
     * PVC Deletion;
 - **Backup and Restore:**
     * Backup and ScheduledBackups execution using Barman Cloud on S3;
-    * Backup and ScheduledBackups execution using Barman Cloud on Azure blob storage;
+    * Backup and ScheduledBackups execution using Barman Cloud on Azure
+    blob storage;
     * Restore from backup using Barman Cloud on S3;
     * Restore from backup using Barman Cloud on Azure blob storage;
     * Wal-Restore;
@@ -65,27 +63,29 @@ and the following suite of E2E tests are performed on that cluster:
     * Physical replica clusters;
     * Replication Slots;
     * Synchronous replication;
+    * Scale-up and scale-down of a Cluster;
 - **Plugin:**
     * Cluster Hibernation using CNPG plugin;
     * Fencing;
-    * Certificate;
+    * Creation of a connection certificate;
 - **Postgres Configuration:**
     * Manage PostgreSQL configuration changes;
     * Rolling updates when changing PostgreSQL images;
-- **Scheduling:**
-    * Toleration;
+- **Pod Scheduling:**
+    * Tolerations and taints;
     * Pod affinity using `NodeSelector`;
 - **Cluster Metadata:**
-    * ConfigMap for Cluster `Labels and Annotation`;
+    * ConfigMap for Cluster Labels and Annotations;
     * Object metadata;
 - **Recovery:**
     * Data corruption;
     * pg_basebackup;
-- **Import Database:**
-    * Microservice;
-    * Monolith;
+- **Importing Databases:**
+    * Microservice approach;
+    * Monolith approach;
 - **Storage:**
     * Storage expansion;
-AppArmor annotation propagation. Executed only on Azure environment;
+- **Security:**
+    * AppArmor annotation propagation. Executed only on Azure environment;
 - **Maintenance:**
     * Node Drain;
