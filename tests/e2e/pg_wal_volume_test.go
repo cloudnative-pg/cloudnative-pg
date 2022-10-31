@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Separate pg_wal volume", func() {
+var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func() {
 	const (
 		namespace   = "pg-wal-volume-e2e"
 		sampleFile  = fixturesDir + "/pg_wal_volume/cluster-pg-wal-volume.yaml.template"

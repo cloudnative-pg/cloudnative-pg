@@ -31,7 +31,7 @@ import (
 
 // Set of tests in which we check that we're able to connect to the -rw,
 // -ro and -r services, using both the application user and the superuser one
-var _ = Describe("Connection via services", func() {
+var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity), func() {
 	// We test custom db name and user
 	const (
 		appDBName = "appdb"

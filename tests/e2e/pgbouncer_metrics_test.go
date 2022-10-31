@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("PGBouncer Metrics", func() {
+var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 	const (
 		cnpgCluster                 = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
 		poolerBasicAuthRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"

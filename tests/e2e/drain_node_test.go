@@ -33,7 +33,7 @@ import (
 
 // Set of tests in which we check that operator is able to fail over a new
 // primary and bring back the replicas when we drain nodes
-var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() {
+var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.LabelMaintenance), func() {
 	var nodesWithLabels []string
 	const level = tests.Lowest
 

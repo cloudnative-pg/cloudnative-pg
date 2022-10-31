@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisruptive, tests.LabelNoOpenshift), func() {
+var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisruptive, tests.LabelNoOpenshift, tests.LabelOperator), func() { // nolint:lll
 	const (
 		namespace   = "operator-ha-e2e"
 		sampleFile  = fixturesDir + "/operator-ha/operator-ha.yaml.template"

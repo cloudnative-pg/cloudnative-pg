@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster Hibernation with plugin", func() {
+var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), func() {
 	type mode string
 	type hibernateSatusMessage string
 	type expectedKeysInStatus string

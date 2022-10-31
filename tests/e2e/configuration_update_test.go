@@ -38,7 +38,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Configuration update", Ordered, func() {
+var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetadata), func() {
 	const (
 		clusterName          = "postgresql-storage-class"
 		namespace            = "cluster-update-config-e2e"
@@ -395,7 +395,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 		})
 })
 
-var _ = Describe("Configuration update with primaryUpdateMethod", func() {
+var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.LabelClusterMetadata), func() {
 	const level = tests.High
 
 	BeforeEach(func() {

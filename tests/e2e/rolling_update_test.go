@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Rolling updates", func() {
+var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), func() {
 	const level = tests.Medium
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {

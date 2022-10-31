@@ -29,7 +29,7 @@ import (
 // - spinning up a cluster with some post-init-sql query and verifying that they are really executed
 
 // Set of tests in which we check that the initdb options are really applied
-var _ = Describe("InitDB settings", func() {
+var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), func() {
 	const (
 		fixturesCertificatesDir = fixturesDir + "/initdb"
 		level                   = tests.Medium

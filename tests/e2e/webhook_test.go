@@ -36,7 +36,7 @@ Check if webhook works as expected, then disable webhook and check if default va
 affected.
 */
 
-var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func() {
+var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOperator), Ordered, func() {
 	// Define some constants to be used in the test
 	const (
 		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"

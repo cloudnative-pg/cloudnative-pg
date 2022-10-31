@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() {
+var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.LabelSelfHealing), func() {
 	const (
 		sampleFileWithoutReplicationSlots = fixturesDir + "/fastfailover/cluster-fast-failover.yaml.template"
 		sampleFileWithReplicationSlots    = fixturesDir + "/fastfailover/cluster-fast-failover-with-repl-slots.yaml.template"

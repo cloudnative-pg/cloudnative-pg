@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Replica Mode", func() {
+var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 	const (
 		replicaModeClusterDir = "/replica_mode_cluster/"
 		srcClusterName        = "cluster-replica-src"

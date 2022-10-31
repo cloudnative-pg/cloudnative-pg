@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
+var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.LabelRecovery), func() {
 	const (
 		namespace      = "cluster-pg-basebackup-basic-auth"
 		srcCluster     = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
@@ -101,7 +101,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 	})
 })
 
-var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
+var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.LabelRecovery), func() {
 	const namespace = "cluster-pg-basebackup-tls-auth"
 
 	const srcCluster = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"

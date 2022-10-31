@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Switchover", Serial, func() {
+var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	const (
 		namespace                         = "switchover-e2e"
 		sampleFileWithoutReplicationSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"

@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Synchronous Replicas", func() {
+var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	var namespace string
 	var clusterName string
 	const level = tests.Medium

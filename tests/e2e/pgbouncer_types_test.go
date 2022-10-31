@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("PGBouncer Types", Ordered, func() {
+var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivity), func() {
 	const (
 		sampleFile                    = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
 		poolerCertificateRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer_types/pgbouncer-pooler-rw.yaml"

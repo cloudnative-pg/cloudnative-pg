@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster scale up and down", Serial, func() {
+var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplication), func() {
 	const (
 		namespace                         = "cluster-scale-e2e-storage-class"
 		sampleFileWithoutReplicationSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"

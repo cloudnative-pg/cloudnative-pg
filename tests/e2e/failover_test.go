@@ -35,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Failover", func() {
+var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 	const (
 		namespace   = "failover-e2e"
 		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
