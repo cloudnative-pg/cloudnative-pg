@@ -109,7 +109,7 @@ var _ = Describe("Certificates", func() {
 			cleanClusterCertification()
 		})
 
-		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin", func() {
+		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin", Label(tests.LabelPlugin), func() { // nolint:lll
 			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
 			Expect(err).ToNot(HaveOccurred())
@@ -128,7 +128,7 @@ var _ = Describe("Certificates", func() {
 			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 		})
 
-		It("can authenticate after switching to user-supplied server certs", func() {
+		It("can authenticate after switching to user-supplied server certs", Label(tests.LabelServiceConnectivity), func() {
 			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
 			Expect(err).ToNot(HaveOccurred())
@@ -179,7 +179,7 @@ var _ = Describe("Certificates", func() {
 			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 		})
 
-		It("can connect after switching to user-supplied client certificates", func() {
+		It("can connect after switching to user-supplied client certificates", Label(tests.LabelServiceConnectivity), func() {
 			// Create certificates secret for client
 			CreateAndAssertClientCertificatesSecrets(namespace, clusterName, clientCASecretName, replicaCertSecretName,
 				clientCertSecretName, false)
@@ -212,7 +212,7 @@ var _ = Describe("Certificates", func() {
 			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 		})
 
-		It("can connect after switching both server and client certificates to user-supplied mode", func() {
+		It("can connect after switching both server and client certificates to user-supplied mode", Label(tests.LabelServiceConnectivity), func() { // nolint:lll
 			// Updating defaults certificates entries with user provided certificates,
 			// i.e server and client CA and TLS secrets inside the cluster
 			Eventually(func() error {
@@ -261,7 +261,7 @@ var _ = Describe("Certificates", func() {
 		})
 
 		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin "+
-			"and verify-ca the provided server certificate", func() {
+			"and verify-ca the provided server certificate", Label(tests.LabelPlugin), func() {
 			// Create a cluster in a namespace that will be deleted after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
@@ -307,7 +307,7 @@ var _ = Describe("Certificates", func() {
 			clusterName = "postgresql-cert"
 		})
 
-		It("can authenticate custom CA to verify client certificates for a cluster", func() {
+		It("can authenticate custom CA to verify client certificates for a cluster", Label(tests.LabelServiceConnectivity), func() { // nolint:lll
 			// Create a cluster in a namespace that will be deleted after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
@@ -340,7 +340,7 @@ var _ = Describe("Certificates", func() {
 			clusterName = "postgresql-client-server-cert"
 		})
 
-		It("can authenticate custom CA to verify both client and server certificates for a cluster", func() {
+		It("can authenticate custom CA to verify both client and server certificates for a cluster", Label(tests.LabelServiceConnectivity), func() { // nolint:lll
 			// Create a cluster in a namespace that will be deleted after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())

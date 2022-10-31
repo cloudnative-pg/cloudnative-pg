@@ -18,7 +18,7 @@ limitations under the License.
 package tests
 
 // List of the labels we use for labeling test specs
-// See https://github.com/onsi/ginkgo/v2/blob/ver2/docs/MIGRATING_TO_V2.md#label-decoration
+// See https://github.com/onsi/ginkgo/blob/c70867a9661d9eb6eeb706dd7580bf510a99f35b/docs/MIGRATING_TO_V2.md
 const (
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"
@@ -35,6 +35,54 @@ const (
 	// LabelIgnoreFails is the string for labelling tests that should not be considered when failing.
 	LabelIgnoreFails = "ignore-fails"
 
+	// LabelSmoke is a label for selecting  smoke test
+	LabelSmoke = "smoke"
+
+	// LabelBasic is a label for  selecting basic test
+	LabelBasic = "basic"
+
+	// LabelServiceConnectivity is a label for selecting service connections test
+	LabelServiceConnectivity = "service-connectivity"
+
+	// LabelSelfHealing is a label for selecting self-healing test
+	LabelSelfHealing = "self-healing"
+
 	// LabelBackupRestore is a label for only selecting backup and restore tests
 	LabelBackupRestore = "backup-restore"
+
+	// LabelOperator is a label for only selecting operator tests
+	LabelOperator = "operator"
+
+	// LabelObservability is a label for selecting observability test
+	LabelObservability = "observability"
+
+	// LabelReplication is a label for selecting replication test
+	LabelReplication = "replication"
+
+	// LabelPlugin is a label for selecting plugin test
+	LabelPlugin = "plugin"
+
+	// LabelPostgresConfiguration is a label for selecting postgres-configuration test
+	LabelPostgresConfiguration = "postgres-configuration"
+
+	// LabelPodScheduling is a label for selecting pod-scheduling test
+	LabelPodScheduling = "pod-scheduling"
+
+	// LabelClusterMetadata is a label for selecting cluster-metadata test
+	LabelClusterMetadata = "cluster-metadata"
+
+	// LabelRecovery is a label for selecting cluster-metadata test
+	LabelRecovery = "recovery"
+
+	// LabelImportingDatabases is a label for selecting importing-databases test
+	LabelImportingDatabases = "importing-databases"
+
+	// LabelStorage is a label for selecting storage test
+	LabelStorage = "storage"
+
+	// LabelSecurity is a label for selecting security test
+	LabelSecurity = "security"
+
+	// LabelMaintenance is a label for selecting importing-databases test
+	LabelMaintenance = "maintenance"
 )

@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Metrics", func() {
+var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	const (
 		targetDBOne                    = "test"
 		targetDBTwo                    = "test1"

@@ -28,7 +28,7 @@ import (
 )
 
 // Set of tests that set up a cluster with apparmor support enabled
-var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift), func() {
+var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests.LabelSecurity), func() {
 	const (
 		clusterName         = "cluster-apparmor"
 		clusterAppArmorFile = fixturesDir + "/apparmor/cluster-apparmor.yaml"

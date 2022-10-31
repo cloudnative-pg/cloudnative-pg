@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("PostgreSQL operator deployment", func() {
+var _ = Describe("PostgreSQL operator deployment", Label(tests.LabelBasic, tests.LabelOperator), func() {
 	const level = tests.Highest
 
 	BeforeEach(func() {

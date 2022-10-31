@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster objectmeta", func() {
+var _ = Describe("Cluster object metadata", Label(tests.LabelClusterMetadata), func() {
 	const (
 		level                 = tests.Low
 		clusterWithObjectMeta = fixturesDir + "/cluster_objectmeta/cluster-level-objectMeta.yaml.template"

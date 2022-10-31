@@ -29,7 +29,7 @@ import (
 
 // Test case for validating storage expansion
 // with different storage providers in different k8s environments
-var _ = Describe("Verify storage", func() {
+var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 	const (
 		sampleFile  = fixturesDir + "/storage_expansion/cluster-storage-expansion.yaml.template"
 		clusterName = "storage-expansion"

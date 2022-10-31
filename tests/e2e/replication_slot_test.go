@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Replication Slot", func() {
+var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 	const (
 		namespace   = "replication-slot-e2e"
 		clusterName = "cluster-pg-replication-slot"

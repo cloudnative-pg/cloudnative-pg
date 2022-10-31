@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func() {
+var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.LabelSelfHealing), func() {
 	const (
 		namespace                      = "primary-switchover-time"
 		sampleFileWithReplicationSlots = fixturesDir +

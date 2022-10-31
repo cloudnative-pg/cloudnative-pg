@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("PVC Deletion", func() {
+var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 	const (
 		namespace   = "cluster-pvc-deletion"
 		sampleFile  = fixturesDir + "/pvc_deletion/cluster-pvc-deletion.yaml.template"

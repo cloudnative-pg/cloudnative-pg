@@ -36,7 +36,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("JSON log output", func() {
+var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 	var namespace, clusterName string
 	const level = tests.Low
 
@@ -217,7 +217,7 @@ var _ = Describe("JSON log output", func() {
 	})
 })
 
-var _ = Describe("JSON log output unit tests", func() {
+var _ = Describe("JSON log output unit tests", Label(tests.LabelObservability), func() {
 	const errorTestQuery = "selecct 1\nwith newlines\n"
 	const user = "postgres"
 	const database = "app"

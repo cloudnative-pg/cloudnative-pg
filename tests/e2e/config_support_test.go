@@ -32,7 +32,7 @@ import (
 
 // Set of tests for config map for the operator. It is useful to configure the operator globally to survive
 // the upgrades (especially in OLM installation like OpenShift).
-var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive), func() {
+var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive, tests.LabelClusterMetadata), func() {
 	const (
 		clusterWithInheritedLabelsFile = fixturesDir + "/configmap-support/config-support.yaml.template"
 		configMapFile                  = fixturesDir + "/configmap-support/configmap.yaml"

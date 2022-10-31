@@ -35,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Fencing", func() {
+var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	const (
 		sampleFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		level      = tests.Medium

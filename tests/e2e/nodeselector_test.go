@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("nodeSelector", func() {
+var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 	const level = tests.Low
 
 	BeforeEach(func() {

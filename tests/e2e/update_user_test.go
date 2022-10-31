@@ -35,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Update user and superuser password", func() {
+var _ = Describe("Update user and superuser password", Label(tests.LabelServiceConnectivity), func() {
 	const (
 		namespace   = "cluster-update-user-password"
 		sampleFile  = fixturesDir + "/base/cluster-basic.yaml"
@@ -117,7 +117,7 @@ var _ = Describe("Update user and superuser password", func() {
 	})
 })
 
-var _ = Describe("Disabling superuser password", func() {
+var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnectivity), func() {
 	const namespace = "cluster-superuser-enable"
 	const sampleFile = fixturesDir + "/base/cluster-basic.yaml"
 	const clusterName = "cluster-basic"
@@ -227,7 +227,7 @@ var _ = Describe("Disabling superuser password", func() {
 	})
 })
 
-var _ = Describe("Creating a cluster without superuser password", func() {
+var _ = Describe("Creating a cluster without superuser password", Label(tests.LabelServiceConnectivity), func() {
 	const namespace = "no-postgres-pwd"
 	const sampleFile = fixturesDir + "/secrets/cluster-no-postgres-pwd.yaml.template"
 	const clusterName = "cluster-no-postgres-pwd"

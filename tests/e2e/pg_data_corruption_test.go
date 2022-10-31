@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("PGDATA Corruption", func() {
+var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 	const (
 		namespace   = "pg-data-corruption"
 		sampleFile  = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"

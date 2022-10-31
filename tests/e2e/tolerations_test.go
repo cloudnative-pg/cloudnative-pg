@@ -28,7 +28,7 @@ import (
 
 // Set of tests in which we check that the operator is able to failover primary and brings back
 // replicas when we drain node
-var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive), func() {
+var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, tests.LabelPodScheduling), func() {
 	var taintedNodes []string
 	namespace := "test-tolerations"
 	const (
