@@ -108,8 +108,8 @@ func HaveSeccompSupport() bool {
 	return supportSeccomp
 }
 
-// extractK8sMinorVersion extracts and parse the Kubernetes minor version from
-// the version info as detected by discovery client
+// extractK8sMinorVersion extracts and parses the Kubernetes minor version from
+// the version info that's been  detected by discovery client
 func extractK8sMinorVersion(info *version.Info) (int, error) {
 	matches := minorVersionRegexp.FindStringSubmatch(info.Minor)
 	if matches == nil {
