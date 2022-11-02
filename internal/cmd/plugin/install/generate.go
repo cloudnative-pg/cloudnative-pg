@@ -42,6 +42,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// installationResource is a resource part of the CNPG installation
+type installationResource struct {
+	// obj is the client object that is part of the installation
+	obj client.Object
+	// isClusterWide indicates a resource not affected by the namespace
+	isClusterWide bool
+	// referenceKind is needed to ensure that the yaml was correctly parsed
+	referenceKind string
+}
+
 type generateExecutor struct {
 	ctx                  context.Context
 	watchNamespaces      string
@@ -129,10 +139,6 @@ func (cmd *generateExecutor) execute() error {
 		return err
 	}
 
-	if err := reconcileResource(irs, cmd.reconcileRoleBind); err != nil {
-		return err
-	}
-
 	if err := reconcileResource(irs, cmd.reconcileClusterRoleBind); err != nil {
 		return err
 	}
@@ -193,12 +199,6 @@ func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([
 	return irs, nil
 }
 
-type installationResource struct {
-	obj           client.Object
-	isClusterWide bool
-	referenceKind string
-}
-
 func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installationResource, error) {
 	contextLogger := log.FromContext(cmd.ctx)
 	supportedResources := []installationResource{
@@ -208,8 +208,6 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 		{obj: &corev1.ConfigMap{}, referenceKind: "ConfigMap"},
 		{obj: &rbacv1.ClusterRole{}, isClusterWide: true, referenceKind: "ClusterRole"},
 		{obj: &rbacv1.ClusterRoleBinding{}, isClusterWide: true, referenceKind: "ClusterRoleBinding"},
-		{obj: &rbacv1.Role{}, referenceKind: "Role"},
-		{obj: &rbacv1.RoleBinding{}, referenceKind: "RoleBinding"},
 		{obj: &appsv1.Deployment{}, referenceKind: "Deployment"},
 		{obj: &admissionregistrationv1.MutatingWebhookConfiguration{}, referenceKind: "MutatingWebhookConfiguration"},
 		{obj: &admissionregistrationv1.ValidatingWebhookConfiguration{}, referenceKind: "ValidatingWebhookConfiguration"},
@@ -262,18 +260,6 @@ func (cmd *generateExecutor) reconcileClusterRoleBind(crb *rbacv1.ClusterRoleBin
 
 	for _, subject := range crb.Subjects {
 		subject.Namespace = cmd.namespace
-	}
-
-	return nil
-}
-
-func (cmd *generateExecutor) reconcileRoleBind(rb *rbacv1.RoleBinding) error {
-	if cmd.namespace == "" {
-		return nil
-	}
-
-	for _, sub := range rb.Subjects {
-		sub.Namespace = cmd.namespace
 	}
 
 	return nil
