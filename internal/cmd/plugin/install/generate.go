@@ -119,8 +119,8 @@ func (cmd *generateExecutor) printResources(irs []installationResource) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(b))
-		fmt.Println("-----")
+		fmt.Print(string(b))
+		fmt.Println("---")
 	}
 	return nil
 }
