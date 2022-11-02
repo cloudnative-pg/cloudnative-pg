@@ -172,11 +172,12 @@ type installationResource struct {
 }
 
 func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installationResource, error) {
+	// Object sequence sensitive here, keep serviceAccount before namespace to avoid generate status for SA
 	supportedResources := []installationResource{
-		{obj: &corev1.Namespace{}, isClusterWide: true},
-		{obj: &appsv1.Deployment{}},
 		{obj: &corev1.ServiceAccount{}},
+		{obj: &appsv1.Deployment{}},
 		{obj: &corev1.ConfigMap{}},
+		{obj: &corev1.Namespace{}, isClusterWide: true},
 		{obj: &apiextensionsv1.CustomResourceDefinition{}},
 		{obj: &rbacv1.ClusterRole{}, isClusterWide: true},
 		{obj: &rbacv1.ClusterRoleBinding{}, isClusterWide: true},
