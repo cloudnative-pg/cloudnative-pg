@@ -20,7 +20,15 @@ The manager command is the main entrypoint of CloudNativePG operator.
 package main
 
 import (
+	"errors"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/istio"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
+	"net"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -34,11 +42,14 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {
+	if !isK8sRESTServerReadyWithRetries() {
+		log.Warning("The K8S REST API Server is not ready")
+		os.Exit(1)
+	}
 	logFlags := &log.Flags{}
 
 	cmd := &cobra.Command{
@@ -60,8 +71,58 @@ func main() {
 	cmd.AddCommand(walrestore.NewCmd())
 	cmd.AddCommand(versions.NewCmd())
 	cmd.AddCommand(pgbouncer.NewCmd())
+	cmd.AddCommand(istio.NewCmd())
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// isK8sRESTServerReadyWithRetries attempts to retrieve the version of k8s REST API server, retrying
+// the request if some communication error is encountered
+func isK8sRESTServerReadyWithRetries() bool {
+
+	// readinessCheckRetry is the default backoff used to query the healthiness of the k8s REST API Server
+	var readinessCheckRetry = wait.Backoff{
+		Steps:    10,
+		Duration: 10 * time.Millisecond,
+		Factor:   5.0,
+		Jitter:   0.1,
+	}
+
+	isErrorRetryable := func(err error) bool {
+
+		// If it's a timeout, we do not want to retry
+		var netError net.Error
+		if errors.As(err, &netError) && netError.Timeout() {
+			return false
+		}
+
+		return true
+	}
+
+	err := retry.OnError(readinessCheckRetry, isErrorRetryable, isK8sRESTServerReady)
+	return err == nil
+}
+
+// isK8sRESTServerReady attempts to retrieve the version of k8s REST API server to test the readiness of the k8s REST
+// API server.
+func isK8sRESTServerReady() error {
+
+	// creates the in-cluster config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	_, err = clientset.DiscoveryClient.ServerVersion()
+	if err != nil {
+		return err
+	}
+	return nil
 }
