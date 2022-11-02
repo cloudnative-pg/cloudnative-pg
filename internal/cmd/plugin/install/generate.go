@@ -67,9 +67,15 @@ func newGenerateCmd() *cobra.Command {
 		Use:   "generate",
 		Short: "generates the manifests needed for the CNPG operator installation",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// we consider the namespace only if explicitly passed for this command
+			namespace := ""
+			if plugin.NamespaceExplicitlyPassed {
+				namespace = plugin.Namespace
+			}
+
 			command := generateExecutor{
 				userRequestedVersion: version,
-				namespace:            plugin.Namespace,
+				namespace:            namespace,
 				watchNamespaces:      watchNamespaces,
 				replicas:             replicas,
 				ctx:                  cmd.Context(),
@@ -102,6 +108,7 @@ func newGenerateCmd() *cobra.Command {
 
 func (cmd *generateExecutor) execute() error {
 	contextLogger := log.FromContext(cmd.ctx)
+
 	discoveryClient, err := utils.GetDiscoveryClient()
 	if err != nil {
 		return err
@@ -303,6 +310,10 @@ func (cmd *generateExecutor) reconcileNamespaceResource(ns *corev1.Namespace) er
 func (cmd *generateExecutor) reconcileValidatingWebhook(
 	wh *admissionregistrationv1.ValidatingWebhookConfiguration,
 ) error {
+	if cmd.namespace == "" {
+		return nil
+	}
+
 	for i := range wh.Webhooks {
 		wh.Webhooks[i].ClientConfig.Service.Namespace = cmd.namespace
 	}
@@ -310,6 +321,10 @@ func (cmd *generateExecutor) reconcileValidatingWebhook(
 }
 
 func (cmd *generateExecutor) reconcileMutatingWebhook(wh *admissionregistrationv1.MutatingWebhookConfiguration) error {
+	if cmd.namespace == "" {
+		return nil
+	}
+
 	for i := range wh.Webhooks {
 		wh.Webhooks[i].ClientConfig.Service.Namespace = cmd.namespace
 	}
