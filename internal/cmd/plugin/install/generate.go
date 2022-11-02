@@ -129,6 +129,14 @@ func (cmd *generateExecutor) execute() error {
 		return err
 	}
 
+	if err := reconcileResource(irs, cmd.reconcileRoleBind); err != nil {
+		return err
+	}
+
+	if err := reconcileResource(irs, cmd.reconcileClusterRoleBind); err != nil {
+		return err
+	}
+
 	return cmd.printResources(irs)
 }
 
@@ -193,7 +201,6 @@ type installationResource struct {
 
 func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installationResource, error) {
 	contextLogger := log.FromContext(cmd.ctx)
-	// Object sequence sensitive here, keep serviceAccount before namespace to avoid generate status for SA
 	supportedResources := []installationResource{
 		{obj: &corev1.Namespace{}, isClusterWide: true, referenceKind: "Namespace"},
 		{obj: &corev1.ServiceAccount{}, referenceKind: "ServiceAccount"},
@@ -244,6 +251,30 @@ func (cmd *generateExecutor) reconcileOperatorConfig(cm *corev1.ConfigMap) error
 	}
 
 	cm.Data["WATCH_NAMESPACES"] = cmd.watchNamespaces
+
+	return nil
+}
+
+func (cmd *generateExecutor) reconcileClusterRoleBind(crb *rbacv1.ClusterRoleBinding) error {
+	if cmd.namespace == "" {
+		return nil
+	}
+
+	for _, subject := range crb.Subjects {
+		subject.Namespace = cmd.namespace
+	}
+
+	return nil
+}
+
+func (cmd *generateExecutor) reconcileRoleBind(rb *rbacv1.RoleBinding) error {
+	if cmd.namespace == "" {
+		return nil
+	}
+
+	for _, sub := range rb.Subjects {
+		sub.Namespace = cmd.namespace
+	}
 
 	return nil
 }
