@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"io"
 	"net/http"
 	"sort"
@@ -40,6 +39,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type generateExecutor struct {
@@ -196,17 +196,17 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 	// Object sequence sensitive here, keep serviceAccount before namespace to avoid generate status for SA
 	supportedResources := []installationResource{
 		{obj: &corev1.Namespace{}, isClusterWide: true, referenceKind: "Namespace"},
-		{obj: &appsv1.Deployment{}},
-		{obj: &corev1.ConfigMap{}},
-		{obj: &apiextensionsv1.CustomResourceDefinition{}},
-		{obj: &rbacv1.ClusterRole{}, isClusterWide: true},
-		{obj: &rbacv1.ClusterRoleBinding{}, isClusterWide: true},
-		{obj: &rbacv1.Role{}},
-		{obj: &rbacv1.RoleBinding{}},
-		{obj: &corev1.Service{}},
-		{obj: &admissionregistrationv1.MutatingWebhookConfiguration{}},
-		{obj: &admissionregistrationv1.ValidatingWebhookConfiguration{}},
 		{obj: &corev1.ServiceAccount{}, referenceKind: "ServiceAccount"},
+		{obj: &corev1.Service{}, referenceKind: "Service"},
+		{obj: &corev1.ConfigMap{}, referenceKind: "ConfigMap"},
+		{obj: &rbacv1.ClusterRole{}, isClusterWide: true, referenceKind: "ClusterRole"},
+		{obj: &rbacv1.ClusterRoleBinding{}, isClusterWide: true, referenceKind: "ClusterRoleBinding"},
+		{obj: &rbacv1.Role{}, referenceKind: "Role"},
+		{obj: &rbacv1.RoleBinding{}, referenceKind: "RoleBinding"},
+		{obj: &appsv1.Deployment{}, referenceKind: "Deployment"},
+		{obj: &admissionregistrationv1.MutatingWebhookConfiguration{}, referenceKind: "MutatingWebhookConfiguration"},
+		{obj: &admissionregistrationv1.ValidatingWebhookConfiguration{}, referenceKind: "ValidatingWebhookConfiguration"},
+		{obj: &apiextensionsv1.CustomResourceDefinition{}, referenceKind: "CustomResourceDefinition"},
 	}
 
 	for _, ir := range supportedResources {
@@ -215,7 +215,7 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 		if err != nil {
 			continue
 		}
-		if ir.referenceKind != "" && ir.referenceKind != ir.obj.GetObjectKind().GroupVersionKind().Kind {
+		if ir.referenceKind != ir.obj.GetObjectKind().GroupVersionKind().Kind {
 			continue
 		}
 
