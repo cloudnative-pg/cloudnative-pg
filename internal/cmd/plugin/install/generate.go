@@ -71,7 +71,7 @@ func newGenerateCmd() *cobra.Command {
 		&version,
 		"version",
 		"",
-		"The operator version to install. If not passed defaults to the latest version",
+		"The operator version (<major>.<minor>, e.g. 1.17, 1.16) to install, If not passed defaults to the latest version",
 	)
 	cmd.Flags().StringVar(
 		&watchNamespaces,
@@ -144,7 +144,6 @@ func (cmd *generateExecutor) getInstallationYAML() ([]byte, error) {
 
 func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([]installationResource, error) {
 	var irs []installationResource
-
 	reader := bufio.NewReader(bytes.NewReader(rawYaml))
 	yamlReader := machineryYaml.NewYAMLReader(reader)
 	for {
@@ -172,6 +171,7 @@ type installationResource struct {
 }
 
 func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installationResource, error) {
+	contextLogger := log.FromContext(cmd.ctx)
 	// Object sequence sensitive here, keep serviceAccount before namespace to avoid generate status for SA
 	supportedResources := []installationResource{
 		{obj: &corev1.ServiceAccount{}},
@@ -196,8 +196,9 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 		}
 		return ir, nil
 	}
-
-	return installationResource{}, fmt.Errorf("could not parse the yaml document: \n %s", string(document))
+	err := errors.New("unsupported yaml resource")
+	contextLogger.Error(err, "Could not parse the yaml document", "document", string(document))
+	return installationResource{}, err
 }
 
 func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment) error {
@@ -243,7 +244,7 @@ func (cmd *generateExecutor) getVersion() (string, error) {
 	return cmd.getLatestOperatorVersion()
 }
 
-// Branch is an object returned by github query
+// Branch is an object returned by gitHub query
 type Branch struct {
 	Name string `json:"name,omitempty"`
 }
@@ -273,8 +274,10 @@ func (cmd *generateExecutor) getLatestOperatorVersion() (string, error) {
 
 func executeGetRequest(ctx context.Context, url string) ([]byte, error) {
 	contextLogger := log.FromContext(ctx)
-
 	resp, err := http.Get(url) //nolint:gosec
+	if err != nil {
+		contextLogger.Error(err, "Error while visiting url", "url", url)
+	}
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
@@ -284,7 +287,6 @@ func executeGetRequest(ctx context.Context, url string) ([]byte, error) {
 			)
 		}
 	}()
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		contextLogger.Error(err, "Error while reading status response body",
@@ -293,7 +295,10 @@ func executeGetRequest(ctx context.Context, url string) ([]byte, error) {
 		)
 		return nil, err
 	}
-
+	if resp.StatusCode > 299 {
+		return nil, fmt.Errorf("statusCode=%v while visiting url: %v",
+			resp.StatusCode, url)
+	}
 	return body, nil
 }
 
