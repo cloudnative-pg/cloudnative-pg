@@ -215,6 +215,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
+		start := time.Now()
 		Eventually(func() (string, error) {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			if err != nil {
@@ -227,8 +228,13 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			return fmt.Sprintf("Ready pod is not as expected. Spec Instances: %d, ready pods: %d \n",
 				cluster.Spec.Instances,
 				utils.CountReadyPods(podList.Items)), nil
-		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy), testsUtils.NewClusterResourcePrinter(namespace,
-			clusterName, env))
+		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy),
+			func() string {
+				cluster := testsUtils.PrintClusterResources(namespace, clusterName, env)
+				nodes, _ := env.DescribeKubernetesNodes()
+				return fmt.Sprintf("%s\n\n%s", cluster, nodes)
+			})
+		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
 	})
 }
 

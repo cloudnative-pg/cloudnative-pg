@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/cheynewallace/tabby"
@@ -311,73 +312,101 @@ func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, ne
 	return nil
 }
 
-// ClusterResourcePrinter is a function that returns a string containing a summary of the cluster resources
-type ClusterResourcePrinter = func() string
-
-// NewClusterResourcePrinter returns a function that fetches and then prints a summary of the cluster resources
-func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnvironment) ClusterResourcePrinter {
-	return func() string {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
-		err := GetObject(env, namespacedName, cluster)
-		if err != nil {
-			return fmt.Sprintf("Error while Getting Object %v", err)
-		}
-
-		buffer := &bytes.Buffer{}
-		w := tabwriter.NewWriter(buffer, 0, 0, 4, ' ', 0)
-		clusterInfo := tabby.NewCustom(w)
-		clusterInfo.AddLine("Timeout while waiting for cluster ready, dumping more cluster information for analysis...")
-		clusterInfo.AddLine()
-		clusterInfo.AddLine()
-		clusterInfo.AddLine("Cluster information:")
-		clusterInfo.AddHeader("Items", "Values")
-		clusterInfo.AddLine("Spec.Instances", cluster.Spec.Instances)
-		clusterInfo.AddLine("Wal storage", cluster.ShouldCreateWalArchiveVolume())
-		clusterInfo.AddLine("Cluster phase", cluster.Status.Phase)
-		clusterInfo.AddLine("Phase reason", cluster.Status.PhaseReason)
-		clusterInfo.AddLine("Cluster target primary", cluster.Status.TargetPrimary)
-		clusterInfo.AddLine("Cluster current primary", cluster.Status.CurrentPrimary)
-		clusterInfo.AddLine()
-
-		podList, _ := env.GetClusterPodList(cluster.GetNamespace(), cluster.GetName())
-
-		clusterInfo.AddLine("Cluster Pods information:")
-		clusterInfo.AddLine("Ready pod number: ", utils.CountReadyPods(podList.Items))
-		clusterInfo.AddLine()
-		clusterInfo.AddHeader("Items", "Values")
-		for _, pod := range podList.Items {
-			clusterInfo.AddLine("Pod name", pod.Name)
-			clusterInfo.AddLine("Pod phase", pod.Status.Phase)
-			if cluster.Status.InstancesReportedState != nil {
-				if instanceReportState, ok := cluster.Status.InstancesReportedState[apiv1.PodName(pod.Name)]; ok {
-					clusterInfo.AddLine("Is Primary", instanceReportState.IsPrimary)
-					clusterInfo.AddLine("TimeLineID", instanceReportState.TimeLineID)
-					clusterInfo.AddLine("---", "---")
-				}
-			} else {
-				clusterInfo.AddLine("InstanceReportState not exit", "")
-			}
-		}
-
-		pvcList, _ := env.GetPVCList(cluster.GetNamespace())
-		clusterInfo.AddLine()
-		clusterInfo.AddLine("Cluster PVC information: (dumping all pvc under the namespace)")
-		clusterInfo.AddLine("Available PVCCount", cluster.Status.PVCCount)
-		clusterInfo.AddLine()
-		clusterInfo.AddHeader("Items", "Values")
-		for _, pvc := range pvcList.Items {
-			clusterInfo.AddLine("PVC name", pvc.Name)
-			clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
-			clusterInfo.AddLine("---", "---")
-		}
-
-		// do not remove, this is needed to ensure that the writer cache is always flushed.
-		clusterInfo.Print()
-
-		return buffer.String()
+// PrintClusterResources prints a summary of the cluster pods, jobs, pvcs etc.
+func PrintClusterResources(namespace, clusterName string, env *TestingEnvironment) string {
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      clusterName,
 	}
+	cluster := &apiv1.Cluster{}
+	err := GetObject(env, namespacedName, cluster)
+	if err != nil {
+		return fmt.Sprintf("Error while Getting Object %v", err)
+	}
+
+	buffer := &bytes.Buffer{}
+	w := tabwriter.NewWriter(buffer, 0, 0, 4, ' ', 0)
+	clusterInfo := tabby.NewCustom(w)
+	clusterInfo.AddLine("Timeout while waiting for cluster ready, dumping more cluster information for analysis...")
+	clusterInfo.AddLine()
+	clusterInfo.AddLine()
+	clusterInfo.AddLine("Cluster information:")
+	clusterInfo.AddLine("Name", cluster.GetName())
+	clusterInfo.AddLine("Namespace", cluster.GetNamespace())
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Items", "Values")
+	clusterInfo.AddLine("Spec.Instances", cluster.Spec.Instances)
+	clusterInfo.AddLine("Wal storage", cluster.ShouldCreateWalArchiveVolume())
+	clusterInfo.AddLine("Cluster phase", cluster.Status.Phase)
+	clusterInfo.AddLine("Phase reason", cluster.Status.PhaseReason)
+	clusterInfo.AddLine("Cluster target primary", cluster.Status.TargetPrimary)
+	clusterInfo.AddLine("Cluster current primary", cluster.Status.CurrentPrimary)
+	clusterInfo.AddLine()
+
+	podList, _ := env.GetClusterPodList(cluster.GetNamespace(), cluster.GetName())
+
+	clusterInfo.AddLine("Cluster Pods information:")
+	clusterInfo.AddLine("Ready pod number: ", utils.CountReadyPods(podList.Items))
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Items", "Values")
+	for _, pod := range podList.Items {
+		clusterInfo.AddLine("Pod name", pod.Name)
+		clusterInfo.AddLine("Pod phase", pod.Status.Phase)
+		if cluster.Status.InstancesReportedState != nil {
+			if instanceReportState, ok := cluster.Status.InstancesReportedState[apiv1.PodName(pod.Name)]; ok {
+				clusterInfo.AddLine("Is Primary", instanceReportState.IsPrimary)
+				clusterInfo.AddLine("TimeLineID", instanceReportState.TimeLineID)
+				clusterInfo.AddLine("---", "---")
+			}
+		} else {
+			clusterInfo.AddLine("InstanceReportState not exit", "")
+		}
+	}
+
+	clusterInfo.AddLine("Jobs information:")
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Items", "Values")
+	jobList, _ := env.GetJobList(cluster.GetNamespace())
+	for _, job := range jobList.Items {
+		clusterInfo.AddLine("Job name", job.Name)
+		clusterInfo.AddLine("Job status", fmt.Sprintf("%#v", job.Status))
+	}
+
+	pvcList, _ := env.GetPVCList(cluster.GetNamespace())
+	clusterInfo.AddLine()
+	clusterInfo.AddLine("Cluster PVC information: (dumping all pvc under the namespace)")
+	clusterInfo.AddLine("Available PVCCount", cluster.Status.PVCCount)
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Items", "Values")
+	for _, pvc := range pvcList.Items {
+		clusterInfo.AddLine("PVC name", pvc.Name)
+		clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
+		clusterInfo.AddLine("---", "---")
+	}
+
+	// do not remove, this is needed to ensure that the writer cache is always flushed.
+	clusterInfo.Print()
+
+	return buffer.String()
+}
+
+// DescribeKubernetesNodes prints the `describe node` for each node in the
+// kubernetes cluster
+func (env TestingEnvironment) DescribeKubernetesNodes() (string, error) {
+	nodeList, err := env.GetNodeList()
+	if err != nil {
+		return "", err
+	}
+	var report strings.Builder
+	for _, node := range nodeList.Items {
+		command := fmt.Sprintf("kubectl describe node %v", node.Name)
+		stdout, _, err := Run(command)
+		if err != nil {
+			return "", err
+		}
+		report.WriteString(stdout)
+		report.WriteString("================================================\n")
+		report.WriteString("================================================\n")
+	}
+	return report.String(), nil
 }
