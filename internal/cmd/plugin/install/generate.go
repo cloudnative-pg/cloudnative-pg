@@ -258,8 +258,8 @@ func (cmd *generateExecutor) reconcileClusterRoleBind(crb *rbacv1.ClusterRoleBin
 		return nil
 	}
 
-	for _, subject := range crb.Subjects {
-		subject.Namespace = cmd.namespace
+	for idx := range crb.Subjects {
+		crb.Subjects[idx].Namespace = cmd.namespace
 	}
 
 	return nil
