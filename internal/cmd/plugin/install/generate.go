@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"io"
 	"net/http"
 	"sort"
@@ -90,6 +91,20 @@ func newGenerateCmd() *cobra.Command {
 }
 
 func (cmd *generateExecutor) execute() error {
+	contextLogger := log.FromContext(cmd.ctx)
+	discoveryClient, err := utils.GetDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	// Detect if we are running under a system that implements OpenShift Security Context Constraints
+	if err = utils.DetectSecurityContextConstraints(discoveryClient); err != nil {
+		contextLogger.Error(err, "unable to detect OpenShift Security Context Constraints presence")
+		return err
+	}
+	if utils.HaveSecurityContextConstraints() {
+		fmt.Printf("generate sub-command is not supported to run in openshift environment")
+		return nil
+	}
 	manifest, err := cmd.getInstallationYAML()
 	if err != nil {
 		return err
