@@ -39,7 +39,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // installationResource is a resource part of the CNPG installation
@@ -54,7 +53,7 @@ type installationResource struct {
 
 type generateExecutor struct {
 	ctx                  context.Context
-	watchNamespaces      string
+	watchNamespace       string
 	namespace            string
 	replicas             int32
 	userRequestedVersion string
@@ -76,7 +75,7 @@ func newGenerateCmd() *cobra.Command {
 			command := generateExecutor{
 				userRequestedVersion: version,
 				namespace:            namespace,
-				watchNamespaces:      watchNamespaces,
+				watchNamespace:       watchNamespaces,
 				replicas:             replicas,
 				ctx:                  cmd.Context(),
 			}
@@ -107,21 +106,6 @@ func newGenerateCmd() *cobra.Command {
 }
 
 func (cmd *generateExecutor) execute() error {
-	contextLogger := log.FromContext(cmd.ctx)
-
-	discoveryClient, err := utils.GetDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	// Detect if we are running under a system that implements OpenShift Security Context Constraints
-	if err = utils.DetectSecurityContextConstraints(discoveryClient); err != nil {
-		contextLogger.Error(err, "unable to detect OpenShift Security Context Constraints presence")
-		return err
-	}
-	if utils.HaveSecurityContextConstraints() {
-		fmt.Printf("generate sub-command is not supported to run in openshift environment")
-		return nil
-	}
 	manifest, err := cmd.getInstallationYAML()
 	if err != nil {
 		return err
@@ -134,27 +118,27 @@ func (cmd *generateExecutor) execute() error {
 
 	cmd.reconcileNamespaceMetadata(irs)
 
-	if err := reconcileResource(irs, cmd.reconcileNamespaceResource); err != nil {
+	if err := applyReconcile(irs, cmd.reconcileNamespaceResource); err != nil {
 		return err
 	}
 
-	if err := reconcileResource(irs, cmd.reconcileOperatorDeployment); err != nil {
+	if err := applyReconcile(irs, cmd.reconcileOperatorDeployment); err != nil {
 		return err
 	}
 
-	if err := reconcileResource(irs, cmd.reconcileOperatorConfig); err != nil {
+	if err := applyReconcile(irs, cmd.reconcileOperatorConfig); err != nil {
 		return err
 	}
 
-	if err := reconcileResource(irs, cmd.reconcileClusterRoleBind); err != nil {
+	if err := applyReconcile(irs, cmd.reconcileClusterRoleBind); err != nil {
 		return err
 	}
 
-	if err := reconcileResource(irs, cmd.reconcileMutatingWebhook); err != nil {
+	if err := applyReconcile(irs, cmd.reconcileMutatingWebhook); err != nil {
 		return err
 	}
 
-	if err := reconcileResource(irs, cmd.reconcileValidatingWebhook); err != nil {
+	if err := applyReconcile(irs, cmd.reconcileValidatingWebhook); err != nil {
 		return err
 	}
 
@@ -259,7 +243,7 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 }
 
 func (cmd *generateExecutor) reconcileOperatorConfig(cm *corev1.ConfigMap) error {
-	if cmd.watchNamespaces == "" {
+	if cmd.watchNamespace == "" {
 		return nil
 	}
 	// means it's not the operator configuration configmap
@@ -267,13 +251,13 @@ func (cmd *generateExecutor) reconcileOperatorConfig(cm *corev1.ConfigMap) error
 		return nil
 	}
 
-	cm.Data["WATCH_NAMESPACES"] = cmd.watchNamespaces
+	cm.Data["WATCH_NAMESPACE"] = cmd.watchNamespace
 
 	return nil
 }
 
 func (cmd *generateExecutor) reconcileClusterRoleBind(crb *rbacv1.ClusterRoleBinding) error {
-	if cmd.namespace == "" {
+	if cmd.isNamespaceEmpty() {
 		return nil
 	}
 
@@ -285,7 +269,7 @@ func (cmd *generateExecutor) reconcileClusterRoleBind(crb *rbacv1.ClusterRoleBin
 }
 
 func (cmd *generateExecutor) reconcileNamespaceMetadata(irs []installationResource) {
-	if cmd.namespace == "" {
+	if cmd.isNamespaceEmpty() {
 		return
 	}
 
@@ -298,7 +282,7 @@ func (cmd *generateExecutor) reconcileNamespaceMetadata(irs []installationResour
 }
 
 func (cmd *generateExecutor) reconcileNamespaceResource(ns *corev1.Namespace) error {
-	if cmd.namespace == "" {
+	if cmd.isNamespaceEmpty() {
 		return nil
 	}
 
@@ -310,7 +294,7 @@ func (cmd *generateExecutor) reconcileNamespaceResource(ns *corev1.Namespace) er
 func (cmd *generateExecutor) reconcileValidatingWebhook(
 	wh *admissionregistrationv1.ValidatingWebhookConfiguration,
 ) error {
-	if cmd.namespace == "" {
+	if cmd.isNamespaceEmpty() {
 		return nil
 	}
 
@@ -321,7 +305,7 @@ func (cmd *generateExecutor) reconcileValidatingWebhook(
 }
 
 func (cmd *generateExecutor) reconcileMutatingWebhook(wh *admissionregistrationv1.MutatingWebhookConfiguration) error {
-	if cmd.namespace == "" {
+	if cmd.isNamespaceEmpty() {
 		return nil
 	}
 
@@ -399,7 +383,8 @@ func executeGetRequest(ctx context.Context, url string) ([]byte, error) {
 
 type reconcileResourceCallback[T client.Object] func(obj T) error
 
-func reconcileResource[T client.Object](
+// applyReconcile invokes the passed reconciler for the resources matching T
+func applyReconcile[T client.Object](
 	irs []installationResource,
 	reconciler reconcileResourceCallback[T],
 ) error {
@@ -411,4 +396,8 @@ func reconcileResource[T client.Object](
 		}
 	}
 	return nil
+}
+
+func (cmd *generateExecutor) isNamespaceEmpty() bool {
+	return cmd.namespace == ""
 }
