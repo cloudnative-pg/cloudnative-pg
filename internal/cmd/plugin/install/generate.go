@@ -115,7 +115,11 @@ func (cmd *generateExecutor) execute() error {
 		return nil
 	}
 
-	cmd.reconcileNamespace(irs)
+	cmd.reconcileNamespaceMetadata(irs)
+
+	if err := reconcileResource(irs, cmd.reconcileNamespaceResource); err != nil {
+		return err
+	}
 
 	if err := reconcileResource(irs, cmd.reconcileOperatorDeployment); err != nil {
 		return err
@@ -174,6 +178,7 @@ func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([
 		if err != nil {
 			return nil, err
 		}
+
 		irs = append(irs, ir)
 	}
 
@@ -183,16 +188,16 @@ func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([
 type installationResource struct {
 	obj           client.Object
 	isClusterWide bool
+	referenceKind string
 }
 
 func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installationResource, error) {
 	contextLogger := log.FromContext(cmd.ctx)
 	// Object sequence sensitive here, keep serviceAccount before namespace to avoid generate status for SA
 	supportedResources := []installationResource{
-		{obj: &corev1.ServiceAccount{}},
+		{obj: &corev1.Namespace{}, isClusterWide: true, referenceKind: "Namespace"},
 		{obj: &appsv1.Deployment{}},
 		{obj: &corev1.ConfigMap{}},
-		{obj: &corev1.Namespace{}, isClusterWide: true},
 		{obj: &apiextensionsv1.CustomResourceDefinition{}},
 		{obj: &rbacv1.ClusterRole{}, isClusterWide: true},
 		{obj: &rbacv1.ClusterRoleBinding{}, isClusterWide: true},
@@ -201,6 +206,7 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 		{obj: &corev1.Service{}},
 		{obj: &admissionregistrationv1.MutatingWebhookConfiguration{}},
 		{obj: &admissionregistrationv1.ValidatingWebhookConfiguration{}},
+		{obj: &corev1.ServiceAccount{}, referenceKind: "ServiceAccount"},
 	}
 
 	for _, ir := range supportedResources {
@@ -209,6 +215,10 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 		if err != nil {
 			continue
 		}
+		if ir.referenceKind != "" && ir.referenceKind != ir.obj.GetObjectKind().GroupVersionKind().Kind {
+			continue
+		}
+
 		return ir, nil
 	}
 	err := errors.New("unsupported yaml resource")
@@ -238,7 +248,7 @@ func (cmd *generateExecutor) reconcileOperatorConfig(cm *corev1.ConfigMap) error
 	return nil
 }
 
-func (cmd *generateExecutor) reconcileNamespace(irs []installationResource) {
+func (cmd *generateExecutor) reconcileNamespaceMetadata(irs []installationResource) {
 	if cmd.namespace == "" {
 		return
 	}
@@ -249,6 +259,16 @@ func (cmd *generateExecutor) reconcileNamespace(irs []installationResource) {
 		}
 		ir.obj.SetNamespace(cmd.namespace)
 	}
+}
+
+func (cmd *generateExecutor) reconcileNamespaceResource(ns *corev1.Namespace) error {
+	if cmd.namespace == "" {
+		return nil
+	}
+
+	ns.Name = cmd.namespace
+
+	return nil
 }
 
 func (cmd *generateExecutor) getVersion() (string, error) {
