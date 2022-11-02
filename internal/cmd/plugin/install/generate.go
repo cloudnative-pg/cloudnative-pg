@@ -165,11 +165,15 @@ func (cmd *generateExecutor) getInstallationYAML() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	contextLogger.Info("fetching installation manifests", "branch", version)
 
 	manifestURL := fmt.Sprintf(
 		"https://raw.githubusercontent.com/cloudnative-pg/artifacts/%s/manifests/operator-manifest.yaml",
 		version,
+	)
+	contextLogger.Info(
+		"fetching installation manifests",
+		"branch", version,
+		"url", manifestURL,
 	)
 
 	return executeGetRequest(cmd.ctx, manifestURL)
