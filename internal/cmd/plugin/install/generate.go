@@ -143,6 +143,14 @@ func (cmd *generateExecutor) execute() error {
 		return err
 	}
 
+	if err := reconcileResource(irs, cmd.reconcileMutatingWebhook); err != nil {
+		return err
+	}
+
+	if err := reconcileResource(irs, cmd.reconcileValidatingWebhook); err != nil {
+		return err
+	}
+
 	return cmd.printResources(irs)
 }
 
@@ -289,6 +297,22 @@ func (cmd *generateExecutor) reconcileNamespaceResource(ns *corev1.Namespace) er
 
 	ns.Name = cmd.namespace
 
+	return nil
+}
+
+func (cmd *generateExecutor) reconcileValidatingWebhook(
+	wh *admissionregistrationv1.ValidatingWebhookConfiguration,
+) error {
+	for i := range wh.Webhooks {
+		wh.Webhooks[i].ClientConfig.Service.Namespace = cmd.namespace
+	}
+	return nil
+}
+
+func (cmd *generateExecutor) reconcileMutatingWebhook(wh *admissionregistrationv1.MutatingWebhookConfiguration) error {
+	for i := range wh.Webhooks {
+		wh.Webhooks[i].ClientConfig.Service.Namespace = cmd.namespace
+	}
 	return nil
 }
 
