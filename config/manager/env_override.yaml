@@ -17,5 +17,5 @@ spec:
         - --leader-elect
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --secret-name=$(OPERATOR_DEPLOYMENT_NAME)-config
-        - --log-level=info
+        - --log-level=debug
         - --pprof-server=true

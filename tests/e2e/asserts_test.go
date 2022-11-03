@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -215,6 +217,18 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
+		// start recording operator logs, dump them if the spec fails
+		var buf bytes.Buffer
+		go func() {
+			_ = env.TailOperatorLogs(context.TODO(), &buf)
+		}()
+		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().Failed() {
+				GinkgoWriter.Println("DUMPING Operator Logs. Failed Spec:", CurrentSpecReport().LeafNodeText)
+				_, _ = buf.WriteTo(GinkgoWriter)
+			}
+		})
+
 		start := time.Now()
 		Eventually(func() (string, error) {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -228,11 +242,12 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			return fmt.Sprintf("Ready pod is not as expected. Spec Instances: %d, ready pods: %d \n",
 				cluster.Spec.Instances,
 				utils.CountReadyPods(podList.Items)), nil
-		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy),
+		}, 2, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy),
 			func() string {
 				cluster := testsUtils.PrintClusterResources(namespace, clusterName, env)
 				nodes, _ := env.DescribeKubernetesNodes()
-				return fmt.Sprintf("%s\n\n%s", cluster, nodes)
+				return fmt.Sprintf("CLUSTER STATE\n%s\n\nK8S NODES\n%s",
+					cluster, nodes)
 			})
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
 	})

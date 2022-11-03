@@ -19,8 +19,10 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,6 +132,9 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLe
 	}
 
 	filename := "out/operator_report_" + pod.Name + ".log"
+	if getPrevious {
+		filename = "out/operator_report_previous_" + pod.Name + ".log"
+	}
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
@@ -148,6 +153,17 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLe
 
 	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
 	return logs.GetPodLogs(env.Ctx, pod, getPrevious, f, requestedLineLength)
+}
+
+// TailOperatorLogs dumps the operator logs to a file, and returns the log lines
+// as a slice.
+func (env TestingEnvironment) TailOperatorLogs(ctx context.Context, writer io.Writer) error {
+	pod, err := env.GetOperatorPod()
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(writer, "Dumping operator pod %v log\n", pod.Name)
+	return logs.TailPodLogs(env.Ctx, pod, writer)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
@@ -404,8 +420,8 @@ func (env TestingEnvironment) DescribeKubernetesNodes() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		report.WriteString(stdout)
 		report.WriteString("================================================\n")
+		report.WriteString(stdout)
 		report.WriteString("================================================\n")
 	}
 	return report.String(), nil

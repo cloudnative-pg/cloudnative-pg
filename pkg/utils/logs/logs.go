@@ -24,6 +24,7 @@ import (
 	"io"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -35,7 +36,38 @@ func StreamPodLogs(ctx context.Context, pod corev1.Pod, getPrevious bool, writer
 	conf := ctrl.GetConfigOrDie()
 	pods := kubernetes.NewForConfigOrDie(conf).CoreV1().Pods(pod.Namespace)
 	logsRequest := pods.GetLogs(pod.Name, &corev1.PodLogOptions{
-		Previous: getPrevious,
+		Previous:   getPrevious,
+		Timestamps: true,
+	})
+	logStream, err := logsRequest.Stream(ctx)
+	if err != nil {
+		return wrapErr(err)
+	}
+	defer func() {
+		innerErr := logStream.Close()
+		if err == nil && innerErr != nil {
+			err = innerErr
+		}
+	}()
+
+	_, err = io.Copy(writer, logStream)
+	if err != nil {
+		err = wrapErr(err)
+	}
+	return err
+}
+
+// TailPodLogs streams the pod logs and shunts them to the `writer`, keeps waiting
+// for new logs to arrive, until the connection is closed
+func TailPodLogs(ctx context.Context, pod corev1.Pod, writer io.Writer) (err error) {
+	wrapErr := func(err error) error { return fmt.Errorf("in StreamPodLogs: %w", err) }
+	conf := ctrl.GetConfigOrDie()
+	pods := kubernetes.NewForConfigOrDie(conf).CoreV1().Pods(pod.Namespace)
+	now := metav1.Now()
+	logsRequest := pods.GetLogs(pod.Name, &corev1.PodLogOptions{
+		Timestamps: true,
+		Follow:     true,
+		SinceTime:  &now,
 	})
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
@@ -65,7 +97,8 @@ func GetPodLogs(ctx context.Context, pod corev1.Pod, getPrevious bool, writer io
 	conf := ctrl.GetConfigOrDie()
 	pods := kubernetes.NewForConfigOrDie(conf).CoreV1().Pods(pod.Namespace)
 	logsRequest := pods.GetLogs(pod.Name, &corev1.PodLogOptions{
-		Previous: getPrevious,
+		Previous:   getPrevious,
+		Timestamps: true,
 	})
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
