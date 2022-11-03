@@ -1,6 +1,12 @@
 
 # Monitoring
 
+!!! Important
+    Installing Prometheus and Grafana is beyond the scope of this project.
+    We assume they are correctly installed in your system. However, for
+    experimentation we provide instructions as part of the [Quickstart](quickstart.md),
+    in *Part 4*.
+
 ## Monitoring Instances
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
@@ -650,4 +656,29 @@ At the end of the inspection, please make sure you delete the `curl` pod:
 ```shell
 kubectl delete -f curl.yaml
 ```
+
+## Auxiliary resources
+
+!!! Important
+    These resources are provided for illustration and experimentation, and do
+    not represent any kind of recommendation for your production system
+
+In the [`samples/monitoring/`](../src/samples/monitoring/) folder you can find
+a series of sample files for observability. Please refer to Part 4 of the
+[quickstart](quickstart.md) section for context:
+
+- `kube-stack-config.yaml`: a configuration file for the kube-stack helm chart
+  installation. It ensures that Prometheus listens for all PodMonitor resources.
+- `prometheus-alerts.yaml`: a set of alerts for Prometheus. NOTE: this does not
+  include inter-operation with notification services. Please refer
+  to the [Prometheus documentation](https://prometheus.io/docs/alerting/latest/alertmanager/).
+- `grafana-configmap.yaml`: a ConfigMap containing the definition of the sample
+  CloudNativePG Dashboard. Note the labels in the definition, which ensure that
+  the Grafana deployment will find the ConfigMap.
+
+In addition, we provide the "raw" sources for the Grafana dashboard and the
+Prometheus alert rules, for your reference:
+
+- `alerts.yaml`: Prometheus rules with alerts
+- `grafana-dashboard.json`: the CloudNativePG dashboard as a native Grafana JSON.
 
