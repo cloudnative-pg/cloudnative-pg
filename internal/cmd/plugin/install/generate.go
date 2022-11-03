@@ -64,7 +64,7 @@ func newGenerateCmd() *cobra.Command {
 	var replicas int32
 	cmd := &cobra.Command{
 		Use:   "generate",
-		Short: "generates the manifests needed for the CNPG operator installation",
+		Short: "generates the YAML manifests needed to install the CloudNativePG operator",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// we consider the namespace only if explicitly passed for this command
 			namespace := ""
@@ -87,19 +87,19 @@ func newGenerateCmd() *cobra.Command {
 		&version,
 		"version",
 		"",
-		"The operator version (<major>.<minor>, e.g. 1.17, 1.16) to install, If not passed defaults to the latest version",
+		"The version of the operator to install, specified in the '<major>.<minor>' format (e.g. 1.17). The default empty value installs the latest minor version",
 	)
 	cmd.Flags().StringVar(
 		&watchNamespaces,
 		"watch-namespace",
 		"",
-		"makes the operator watch a single namespace. If empty watches all the namespaces",
+		"Limit the namespace to watch. You can pass a list of namespaces through a comma separated list string. When empty, the operator watches all namespace",
 	)
 	cmd.Flags().Int32Var(
 		&replicas,
 		"replicas",
 		0,
-		"Overrides the operator deployment replicas. If zero applies the defaults value from the installation manifest",
+		"Number of replicas in the deployment. Default is zero, meaning that no override is applied on the installation manifest (normally it is a single replica deployment)",
 	)
 
 	return cmd

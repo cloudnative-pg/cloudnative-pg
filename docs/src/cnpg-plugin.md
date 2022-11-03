@@ -46,6 +46,40 @@ Once the plugin was installed and deployed, you can start using it like this:
 kubectl cnpg <command> <args...>
 ```
 
+### Generation of installation manifests
+
+The `cnpg` operator can be used to generate the YAML manifest for the
+installation of the operator, in case you want to override some default
+configurations such as number of replicas, installation namespace, namespaces
+to watch, and so on.
+
+For details and available options, type:
+
+```shell
+kubectl cnpg install generate --help
+```
+
+The main options are:
+
+- `-n`: the namespace in which to install the operator (by default: `cnpg-system`)
+- `--replicas`: number of replicas in the deployment
+- `--version`: minor version of the operator to be installed, such as `1.17` (by default the latest available one is used)
+- `--watch-namespace`: comma separated list string containing the namespaces you want to watch (by default all namespaces)
+
+For example, if you want to generate a YAML manifest to install in the `king`
+namespace the latest available version the operator in `1.17`, with a 3 replica
+deployment, watching in the `albert`, `bb`, and `freddie` namespaces, you can
+run:
+
+```shell
+kubectl cnpg install generate \
+  -n king \
+  --version 1.17 \
+  --replicas 3 \
+  --watch-namespace "albert, bb, freddie" \
+  > operator.yaml
+```
+
 ### Status
 
 The `status` command provides an overview of the current status of your

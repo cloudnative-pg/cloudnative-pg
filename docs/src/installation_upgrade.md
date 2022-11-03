@@ -21,6 +21,13 @@ You can verify that with:
 kubectl get deploy -n cnpg-system cnpg-controller-manager
 ```
 
+### Using the `cnpg` plugin for `kubectl`
+
+In case you want to override some default configuration options that are in the
+static manifest, you can use the `cnpg` plugin.
+
+TODO: Please expand this.
+
 #### Testing the latest development snapshot
 
 If you want to test or evaluate the latest development snapshot of
