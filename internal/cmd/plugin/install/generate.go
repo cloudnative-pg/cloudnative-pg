@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"net/http"
 	"sort"
 
@@ -32,7 +33,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	yamlserializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	machineryYaml "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -47,8 +48,6 @@ type installationResource struct {
 	obj client.Object
 	// isClusterWide indicates a resource not affected by the namespace
 	isClusterWide bool
-	// referenceKind is needed to ensure that the yaml was correctly parsed
-	referenceKind string
 }
 
 type generateExecutor struct {
@@ -73,11 +72,11 @@ func newGenerateCmd() *cobra.Command {
 			}
 
 			command := generateExecutor{
-				userRequestedVersion: version,
-				namespace:            namespace,
-				watchNamespace:       watchNamespaces,
-				replicas:             replicas,
 				ctx:                  cmd.Context(),
+				watchNamespace:       watchNamespaces,
+				namespace:            namespace,
+				replicas:             replicas,
+				userRequestedVersion: version,
 			}
 			return command.execute()
 		},
@@ -87,19 +86,23 @@ func newGenerateCmd() *cobra.Command {
 		&version,
 		"version",
 		"",
-		"The version of the operator to install, specified in the '<major>.<minor>' format (e.g. 1.17). The default empty value installs the latest minor version",
+		"The version of the operator to install, specified in the '<major>.<minor>' format (e.g. 1.17). "+
+			"The default empty value installs the latest major.minor.patch version. If a <major>.<minor> version is "+
+			"provided, the latest patch version of that minor version will be installed",
 	)
 	cmd.Flags().StringVar(
 		&watchNamespaces,
 		"watch-namespace",
 		"",
-		"Limit the namespace to watch. You can pass a list of namespaces through a comma separated list string. When empty, the operator watches all namespace",
+		"Limit the namespaces to watch. You can pass a list of namespaces through a comma separated string. "+
+			"When empty, the operator watches all namespaces",
 	)
 	cmd.Flags().Int32Var(
 		&replicas,
 		"replicas",
 		0,
-		"Number of replicas in the deployment. Default is zero, meaning that no override is applied on the installation manifest (normally it is a single replica deployment)",
+		"Number of replicas in the deployment. Default is zero, meaning that no override is applied on the "+
+			"installation manifest (normally it is a single replica deployment)",
 	)
 
 	return cmd
@@ -118,28 +121,41 @@ func (cmd *generateExecutor) execute() error {
 
 	cmd.reconcileNamespaceMetadata(irs)
 
-	if err := applyReconcile(irs, cmd.reconcileNamespaceResource); err != nil {
-		return err
-	}
+	for _, ir := range irs {
+		switch ir.obj.(type) {
+		case *appsv1.Deployment:
+			deployment := ir.obj.(*appsv1.Deployment)
+			if err := cmd.reconcileOperatorDeployment(deployment); err != nil {
+				return err
+			}
+		case *corev1.ConfigMap:
+			configMap := ir.obj.(*corev1.ConfigMap)
+			if err := cmd.reconcileOperatorConfigMap(configMap); err != nil {
+				return err
+			}
+		case *rbacv1.ClusterRoleBinding:
+			clusterRoleBinding := ir.obj.(*rbacv1.ClusterRoleBinding)
+			if err := cmd.reconcileClusterRoleBinding(clusterRoleBinding); err != nil {
+				return err
+			}
+		case *corev1.Namespace:
+			namspace := ir.obj.(*corev1.Namespace)
+			err := cmd.reconcileNamespaceResource(namspace)
+			if err != nil {
+				return err
+			}
 
-	if err := applyReconcile(irs, cmd.reconcileOperatorDeployment); err != nil {
-		return err
-	}
-
-	if err := applyReconcile(irs, cmd.reconcileOperatorConfig); err != nil {
-		return err
-	}
-
-	if err := applyReconcile(irs, cmd.reconcileClusterRoleBind); err != nil {
-		return err
-	}
-
-	if err := applyReconcile(irs, cmd.reconcileMutatingWebhook); err != nil {
-		return err
-	}
-
-	if err := applyReconcile(irs, cmd.reconcileValidatingWebhook); err != nil {
-		return err
+		case *admissionregistrationv1.ValidatingWebhookConfiguration:
+			webhook := ir.obj.(*admissionregistrationv1.ValidatingWebhookConfiguration)
+			if err := cmd.reconcileValidatingWebhook(webhook); err != nil {
+				return err
+			}
+		case *admissionregistrationv1.MutatingWebhookConfiguration:
+			webhook := ir.obj.(*admissionregistrationv1.MutatingWebhookConfiguration)
+			if err := cmd.reconcileMutatingWebhook(webhook); err != nil {
+				return err
+			}
+		}
 	}
 
 	return cmd.printResources(irs)
@@ -182,12 +198,12 @@ func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([
 	var irs []installationResource
 	reader := bufio.NewReader(bytes.NewReader(rawYaml))
 	yamlReader := machineryYaml.NewYAMLReader(reader)
+
 	for {
 		document, err := yamlReader.Read()
-		if errors.Is(err, io.EOF) {
+		if err == io.EOF {
 			break
-		}
-		if err != nil {
+		} else if err != nil {
 			return nil, err
 		}
 
@@ -204,34 +220,37 @@ func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([
 
 func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installationResource, error) {
 	contextLogger := log.FromContext(cmd.ctx)
-	supportedResources := []installationResource{
-		{obj: &corev1.Namespace{}, isClusterWide: true, referenceKind: "Namespace"},
-		{obj: &corev1.ServiceAccount{}, referenceKind: "ServiceAccount"},
-		{obj: &corev1.Service{}, referenceKind: "Service"},
-		{obj: &corev1.ConfigMap{}, referenceKind: "ConfigMap"},
-		{obj: &rbacv1.ClusterRole{}, isClusterWide: true, referenceKind: "ClusterRole"},
-		{obj: &rbacv1.ClusterRoleBinding{}, isClusterWide: true, referenceKind: "ClusterRoleBinding"},
-		{obj: &appsv1.Deployment{}, referenceKind: "Deployment"},
-		{obj: &admissionregistrationv1.MutatingWebhookConfiguration{}, referenceKind: "MutatingWebhookConfiguration"},
-		{obj: &admissionregistrationv1.ValidatingWebhookConfiguration{}, referenceKind: "ValidatingWebhookConfiguration"},
-		{obj: &apiextensionsv1.CustomResourceDefinition{}, referenceKind: "CustomResourceDefinition"},
+
+	supportedResources := map[string]installationResource{}
+	supportedResources["Namespace"] = installationResource{obj: &corev1.Namespace{}, isClusterWide: true}
+	supportedResources["ServiceAccount"] = installationResource{obj: &corev1.ServiceAccount{}}
+	supportedResources["Service"] = installationResource{obj: &corev1.Service{}}
+	supportedResources["ConfigMap"] = installationResource{obj: &corev1.ConfigMap{}}
+	supportedResources["ClusterRole"] = installationResource{obj: &rbacv1.ClusterRole{}, isClusterWide: true}
+	supportedResources["ClusterRoleBinding"] = installationResource{obj: &rbacv1.ClusterRoleBinding{}, isClusterWide: true}
+	supportedResources["Deployment"] = installationResource{obj: &appsv1.Deployment{}}
+	supportedResources["MutatingWebhookConfiguration"] = installationResource{obj: &admissionregistrationv1.MutatingWebhookConfiguration{}}
+	supportedResources["ValidatingWebhookConfiguration"] = installationResource{obj: &admissionregistrationv1.ValidatingWebhookConfiguration{}}
+	supportedResources["CustomResourceDefinition"] = installationResource{obj: &apiextensionsv1.CustomResourceDefinition{}}
+
+	ir := installationResource{}
+
+	gvk, err := yamlserializer.DefaultMetaFactory.Interpret(document)
+	if err != nil {
+		return installationResource{}, err
 	}
 
-	for _, ir := range supportedResources {
-		ir := ir
-		err := machineryYaml.UnmarshalStrict(document, ir.obj)
+	if supportedResource, ok := supportedResources[gvk.Kind]; ok {
+		err := machineryYaml.UnmarshalStrict(document, supportedResource.obj)
 		if err != nil {
-			continue
+			return installationResource{}, err
 		}
-		if ir.referenceKind != ir.obj.GetObjectKind().GroupVersionKind().Kind {
-			continue
-		}
-
-		return ir, nil
+		return supportedResource, nil
+	} else {
+		err := errors.New("unsupported yaml resource")
+		contextLogger.Error(err, "Could not parse the yaml document", "document", string(document))
+		return ir, err
 	}
-	err := errors.New("unsupported yaml resource")
-	contextLogger.Error(err, "Could not parse the yaml document", "document", string(document))
-	return installationResource{}, err
 }
 
 func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment) error {
@@ -242,7 +261,7 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 	return nil
 }
 
-func (cmd *generateExecutor) reconcileOperatorConfig(cm *corev1.ConfigMap) error {
+func (cmd *generateExecutor) reconcileOperatorConfigMap(cm *corev1.ConfigMap) error {
 	if cmd.watchNamespace == "" {
 		return nil
 	}
@@ -256,7 +275,7 @@ func (cmd *generateExecutor) reconcileOperatorConfig(cm *corev1.ConfigMap) error
 	return nil
 }
 
-func (cmd *generateExecutor) reconcileClusterRoleBind(crb *rbacv1.ClusterRoleBinding) error {
+func (cmd *generateExecutor) reconcileClusterRoleBinding(crb *rbacv1.ClusterRoleBinding) error {
 	if cmd.isNamespaceEmpty() {
 		return nil
 	}
@@ -379,23 +398,6 @@ func executeGetRequest(ctx context.Context, url string) ([]byte, error) {
 			resp.StatusCode, url)
 	}
 	return body, nil
-}
-
-type reconcileResourceCallback[T client.Object] func(obj T) error
-
-// applyReconcile invokes the passed reconciler for the resources matching T
-func applyReconcile[T client.Object](
-	irs []installationResource,
-	reconciler reconcileResourceCallback[T],
-) error {
-	for _, ir := range irs {
-		if t, ok := ir.obj.(T); ok {
-			if err := reconciler(t); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func (cmd *generateExecutor) isNamespaceEmpty() bool {
