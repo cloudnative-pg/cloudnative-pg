@@ -22,6 +22,11 @@ on:
       test_level:
         description: 'Test level (0-4)'
         required: false
+      feature_type:
+        description: 'Feature Type (disruptive, performance, upgrade, smoke, basic, service-connectivity, self-healing,
+        backup-restore, operator, observability, replication, plugin, postgres-configuration, pod-scheduling,
+        cluster-metadata, recovery, importing-databases, storage, security, maintenance)'
+        required: false
       build_plugin:
         type: boolean
         required: false
@@ -39,6 +44,7 @@ env:
   KIND_VERSION: "v0.11.0"
   ROOK_VERSION: "v1.6.8"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
+  FEATURE_TYPE: "${{github.event.inputs.feature_type}}"
 
 defaults:
   run:
