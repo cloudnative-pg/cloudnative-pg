@@ -121,7 +121,7 @@ if [ "${FEATURE_TYPE-}" ]; then
 fi
 
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
-ginkgo --nodes=4 --timeout 3h --poll-progress-after=300s --poll-progress-interval=30s --label-filter "${LABEL_FILTERS}" \
+ginkgo --nodes=4 --timeout 3h --slow-spec-threshold 5m --label-filter "${LABEL_FILTERS}" \
        --output-dir "${ROOT_DIR}/tests/e2e/out/"  --json-report  "report.json" \
        -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
 
