@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"net/http"
 	"sort"
 
@@ -33,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	yamlserializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	machineryYaml "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -122,37 +122,31 @@ func (cmd *generateExecutor) execute() error {
 	cmd.reconcileNamespaceMetadata(irs)
 
 	for _, ir := range irs {
-		switch ir.obj.(type) {
+		switch v := ir.obj.(type) {
 		case *appsv1.Deployment:
-			deployment := ir.obj.(*appsv1.Deployment)
-			if err := cmd.reconcileOperatorDeployment(deployment); err != nil {
+			if err := cmd.reconcileOperatorDeployment(v); err != nil {
 				return err
 			}
 		case *corev1.ConfigMap:
-			configMap := ir.obj.(*corev1.ConfigMap)
-			if err := cmd.reconcileOperatorConfigMap(configMap); err != nil {
+			if err := cmd.reconcileOperatorConfigMap(v); err != nil {
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:
-			clusterRoleBinding := ir.obj.(*rbacv1.ClusterRoleBinding)
-			if err := cmd.reconcileClusterRoleBinding(clusterRoleBinding); err != nil {
+			if err := cmd.reconcileClusterRoleBinding(v); err != nil {
 				return err
 			}
 		case *corev1.Namespace:
-			namspace := ir.obj.(*corev1.Namespace)
-			err := cmd.reconcileNamespaceResource(namspace)
+			err := cmd.reconcileNamespaceResource(v)
 			if err != nil {
 				return err
 			}
 
 		case *admissionregistrationv1.ValidatingWebhookConfiguration:
-			webhook := ir.obj.(*admissionregistrationv1.ValidatingWebhookConfiguration)
-			if err := cmd.reconcileValidatingWebhook(webhook); err != nil {
+			if err := cmd.reconcileValidatingWebhook(v); err != nil {
 				return err
 			}
 		case *admissionregistrationv1.MutatingWebhookConfiguration:
-			webhook := ir.obj.(*admissionregistrationv1.MutatingWebhookConfiguration)
-			if err := cmd.reconcileMutatingWebhook(webhook); err != nil {
+			if err := cmd.reconcileMutatingWebhook(v); err != nil {
 				return err
 			}
 		}
@@ -227,11 +221,20 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 	supportedResources["Service"] = installationResource{obj: &corev1.Service{}}
 	supportedResources["ConfigMap"] = installationResource{obj: &corev1.ConfigMap{}}
 	supportedResources["ClusterRole"] = installationResource{obj: &rbacv1.ClusterRole{}, isClusterWide: true}
-	supportedResources["ClusterRoleBinding"] = installationResource{obj: &rbacv1.ClusterRoleBinding{}, isClusterWide: true}
+	supportedResources["ClusterRoleBinding"] = installationResource{
+		obj:           &rbacv1.ClusterRoleBinding{},
+		isClusterWide: true,
+	}
 	supportedResources["Deployment"] = installationResource{obj: &appsv1.Deployment{}}
-	supportedResources["MutatingWebhookConfiguration"] = installationResource{obj: &admissionregistrationv1.MutatingWebhookConfiguration{}}
-	supportedResources["ValidatingWebhookConfiguration"] = installationResource{obj: &admissionregistrationv1.ValidatingWebhookConfiguration{}}
-	supportedResources["CustomResourceDefinition"] = installationResource{obj: &apiextensionsv1.CustomResourceDefinition{}}
+	supportedResources["MutatingWebhookConfiguration"] = installationResource{
+		obj: &admissionregistrationv1.MutatingWebhookConfiguration{},
+	}
+	supportedResources["ValidatingWebhookConfiguration"] = installationResource{
+		obj: &admissionregistrationv1.ValidatingWebhookConfiguration{},
+	}
+	supportedResources["CustomResourceDefinition"] = installationResource{
+		obj: &apiextensionsv1.CustomResourceDefinition{},
+	}
 
 	ir := installationResource{}
 
@@ -246,11 +249,10 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 			return installationResource{}, err
 		}
 		return supportedResource, nil
-	} else {
-		err := errors.New("unsupported yaml resource")
-		contextLogger.Error(err, "Could not parse the yaml document", "document", string(document))
-		return ir, err
 	}
+	err = errors.New("unsupported yaml resource")
+	contextLogger.Error(err, "Could not parse the yaml document", "document", string(document))
+	return ir, err
 }
 
 func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment) error {
