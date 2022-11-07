@@ -107,7 +107,7 @@ func newGenerateCmd() *cobra.Command {
 		&postgresImage,
 		"image",
 		"",
-		"The Postgres image to use. Default is empty, in this case the default Postgres image will be used",
+		"Optional flag to specify a PostgreSQL image to use. If not specified, the default image is used",
 	)
 
 	return cmd
