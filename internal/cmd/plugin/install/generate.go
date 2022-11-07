@@ -52,10 +52,11 @@ type generateExecutor struct {
 	namespace            string
 	replicas             int32
 	userRequestedVersion string
+	postgresImage        string
 }
 
 func newGenerateCmd() *cobra.Command {
-	var version, watchNamespaces string
+	var version, watchNamespaces, postgresImage string
 	var replicas int32
 	cmd := &cobra.Command{
 		Use:   "generate",
@@ -73,6 +74,7 @@ func newGenerateCmd() *cobra.Command {
 				namespace:            namespace,
 				replicas:             replicas,
 				userRequestedVersion: version,
+				postgresImage:        postgresImage,
 			}
 			return command.execute()
 		},
@@ -99,6 +101,13 @@ func newGenerateCmd() *cobra.Command {
 		0,
 		"Number of replicas in the deployment. Default is zero, meaning that no override is applied on the "+
 			"installation manifest (normally it is a single replica deployment)",
+	)
+
+	cmd.Flags().StringVar(
+		&postgresImage,
+		"image",
+		"",
+		"The Postgres image to use. Default is empty, in this case the default Postgres image will be used",
 	)
 
 	return cmd
@@ -262,6 +271,10 @@ func (cmd *generateExecutor) reconcileOperatorConfigMap(cm *corev1.ConfigMap) er
 	}
 
 	cm.Data["WATCH_NAMESPACE"] = cmd.watchNamespace
+
+	if cmd.postgresImage != "" {
+		cm.Data["POSTGRES_IMAGE_NAME"] = cmd.postgresImage
+	}
 
 	return nil
 }
