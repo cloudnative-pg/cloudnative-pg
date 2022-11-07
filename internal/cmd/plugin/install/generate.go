@@ -22,9 +22,9 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/google/go-github/v48/github"
 	"io"
 
+	"github.com/google/go-github/v48/github"
 	"github.com/spf13/cobra"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -192,7 +192,6 @@ func (cmd *generateExecutor) getInstallationYAML() ([]byte, error) {
 		return nil, err
 	}
 	return base64.StdEncoding.DecodeString(*manifest.Content)
-
 }
 
 func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([]installationResource, error) {

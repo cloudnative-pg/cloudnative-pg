@@ -18,8 +18,9 @@ package install
 
 import (
 	"context"
-	"github.com/google/go-github/v48/github"
 	"sort"
+
+	"github.com/google/go-github/v48/github"
 )
 
 func getLatestOperatorVersion(ctx context.Context) (string, error) {
@@ -34,5 +35,4 @@ func getLatestOperatorVersion(ctx context.Context) (string, error) {
 		return branches[i].GetName() > branches[j].GetName()
 	})
 	return branches[0].GetName(), nil
-
 }
