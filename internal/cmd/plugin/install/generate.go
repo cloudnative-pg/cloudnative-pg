@@ -20,7 +20,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"github.com/google/go-github/v48/github"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -35,7 +37,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // installationResource is a resource part of the CNPG installation
@@ -178,24 +179,20 @@ func (cmd *generateExecutor) printResources(irs []installationResource) error {
 }
 
 func (cmd *generateExecutor) getInstallationYAML() ([]byte, error) {
-	contextLogger := log.FromContext(cmd.ctx)
-
 	version, err := cmd.getVersion()
 	if err != nil {
 		return nil, err
 	}
+	ghclient := github.NewClient(nil)
+	manifest, _, _, err := ghclient.Repositories.GetContents(cmd.ctx, "cloudnative-pg", "artifacts",
+		"manifests/operator-manifest.yaml", &github.RepositoryContentGetOptions{
+			Ref: version,
+		})
+	if err != nil {
+		return nil, err
+	}
+	return base64.StdEncoding.DecodeString(*manifest.Content)
 
-	manifestURL := fmt.Sprintf(
-		"https://raw.githubusercontent.com/cloudnative-pg/artifacts/%s/manifests/operator-manifest.yaml",
-		version,
-	)
-	contextLogger.Info(
-		"fetching installation manifests",
-		"branch", version,
-		"url", manifestURL,
-	)
-
-	return executeGetRequest(cmd.ctx, manifestURL)
 }
 
 func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([]installationResource, error) {
