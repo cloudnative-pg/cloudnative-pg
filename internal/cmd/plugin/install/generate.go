@@ -121,32 +121,37 @@ func (cmd *generateExecutor) execute() error {
 
 	cmd.reconcileNamespaceMetadata(irs)
 
+	/*
+			The following code is a type switch that iterates over the installation resources and reconciles with the
+		correct method. The reconciliation methods are responsible for reconciling the installation resource with the
+		installation options provided by the user.
+	*/
 	for _, ir := range irs {
-		switch v := ir.obj.(type) {
+		switch irObjectType := ir.obj.(type) {
 		case *appsv1.Deployment:
-			if err := cmd.reconcileOperatorDeployment(v); err != nil {
+			if err := cmd.reconcileOperatorDeployment(irObjectType); err != nil {
 				return err
 			}
 		case *corev1.ConfigMap:
-			if err := cmd.reconcileOperatorConfigMap(v); err != nil {
+			if err := cmd.reconcileOperatorConfigMap(irObjectType); err != nil {
 				return err
 			}
 		case *rbacv1.ClusterRoleBinding:
-			if err := cmd.reconcileClusterRoleBinding(v); err != nil {
+			if err := cmd.reconcileClusterRoleBinding(irObjectType); err != nil {
 				return err
 			}
 		case *corev1.Namespace:
-			err := cmd.reconcileNamespaceResource(v)
+			err := cmd.reconcileNamespaceResource(irObjectType)
 			if err != nil {
 				return err
 			}
 
 		case *admissionregistrationv1.ValidatingWebhookConfiguration:
-			if err := cmd.reconcileValidatingWebhook(v); err != nil {
+			if err := cmd.reconcileValidatingWebhook(irObjectType); err != nil {
 				return err
 			}
 		case *admissionregistrationv1.MutatingWebhookConfiguration:
-			if err := cmd.reconcileMutatingWebhook(v); err != nil {
+			if err := cmd.reconcileMutatingWebhook(irObjectType); err != nil {
 				return err
 			}
 		}
@@ -212,9 +217,14 @@ func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([
 	return irs, nil
 }
 
+// getResourceFromDocument returns the installation resource from the given document
 func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installationResource, error) {
 	contextLogger := log.FromContext(cmd.ctx)
-
+	/*
+		The document is a YAML file that contains a single Kubernetes resource. We need to check if that resource is
+		any of the supported resources and, if it is we unmarshal it into the client.Object superclass contained in the
+		installationResource struct. This is done to avoid having to create a separate unmarshaler for each resource type.
+	*/
 	supportedResources := map[string]installationResource{}
 	supportedResources["Namespace"] = installationResource{obj: &corev1.Namespace{}, isClusterWide: true}
 	supportedResources["ServiceAccount"] = installationResource{obj: &corev1.ServiceAccount{}}
@@ -236,8 +246,6 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 		obj: &apiextensionsv1.CustomResourceDefinition{},
 	}
 
-	ir := installationResource{}
-
 	gvk, err := yamlserializer.DefaultMetaFactory.Interpret(document)
 	if err != nil {
 		return installationResource{}, err
@@ -252,7 +260,7 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 	}
 	err = errors.New("unsupported yaml resource")
 	contextLogger.Error(err, "Could not parse the yaml document", "document", string(document))
-	return ir, err
+	return installationResource{}, err
 }
 
 func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment) error {
