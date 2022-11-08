@@ -242,7 +242,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			return fmt.Sprintf("Ready pod is not as expected. Spec Instances: %d, ready pods: %d \n",
 				cluster.Spec.Instances,
 				utils.CountReadyPods(podList.Items)), nil
-		}, 2, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy),
+		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy),
 			func() string {
 				cluster := testsUtils.PrintClusterResources(namespace, clusterName, env)
 				nodes, _ := env.DescribeKubernetesNodes()
