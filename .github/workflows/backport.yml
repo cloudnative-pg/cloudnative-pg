@@ -1,0 +1,84 @@
+name: backport_manually
+on:
+   pull_request_target:
+     types:
+       - closed
+     branches:
+       - main
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
+
+jobs:
+  back-porting-pr:
+    name: backport to release branches
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'backport-requested')
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          -  release-1.16
+          -  release-1.17
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      -
+        id: findPr
+        uses: jwalton/gh-find-current-pr@v1.3.2
+        with:
+          state: closed
+      -
+        name: Check labels
+        if: success() && steps.findPr.outputs.number
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.findPr.outputs.pr }}
+        run: |
+          label=$(gh pr view ${PR} --json labels -q ".labels.[].name" 2>/dev/null | grep ${{ matrix.branch }} || :)
+          echo "LABEL=${label}" >> $GITHUB_ENV
+          echo "PR=${{steps.findPr.outputs.pr}}" >> $GITHUB_ENV
+          echo "find label ${label} in pull request ${PR}"
+      -
+        name: cherry pick
+        if: |
+          env.LABEL != '' &&
+          env.LABEL == matrix.branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.findPr.outputs.pr }}
+        run: |
+          git config --global user.email "tao.li@enterprisedb.com"
+          git config --global user.name "litaocdl"
+          commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
+          echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
+          if [[ "$commit" != "" ]]; then
+             echo "COMMIT=${commit}" >> $GITHUB_ENV
+             git fetch
+             git checkout -B ${{ matrix.branch }} origin/${{ matrix.branch }} -t -f
+             git checkout -B cherry-pick-${{ matrix.branch }}-${PR}-${commit} -f
+             git cherry-pick -x --allow-empty-message --mainline 1 $commit
+             git push origin cherry-pick-${{ matrix.branch }}-${PR}-${commit}:cherry-pick-${{ matrix.branch }}-${PR}-${commit}
+          fi
+      -
+        name: create pull request
+        uses: devops-infra/action-pull-request@v0.5.2
+        if: |
+          success() &&
+          env.COMMIT != ''
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          source_branch: cherry-pick-${{ matrix.branch }}-${{ env.PR }}-${{ env.COMMIT }}
+          target_branch: ${{ matrix.branch }}
+          title: "backport pr ${{ env.PR }} to branch ${{ matrix.branch }}"
+          body: "**Automated pull request**"
+          label: backport
+
+
