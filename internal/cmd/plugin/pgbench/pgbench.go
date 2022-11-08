@@ -22,12 +22,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,7 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-type createPgBenchJobOptions struct {
+type pgBenchCommand struct {
 	jobName            string
 	clusterName        string
 	dbName             string
@@ -45,7 +43,6 @@ type createPgBenchJobOptions struct {
 }
 
 const (
-	pgBenchDBName  = "app"
 	pgBenchKeyWord = "pgbench"
 )
 
@@ -57,87 +54,90 @@ var jobExample = templates.Examples(i18n.T(`
 		kubectl-cnpg pgbench cluster-example 
 		
 		# Dry-run command with given values and clusterName "cluster-example"
-		kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name jobName --dry-run -- --time 30 
+		kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name job-name --dry-run -- --time 30 
 		--client 1 --jobs 1
 
 		# Create a job with given values and clusterName "cluster-example"
-		kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name jobName -- --time 30 --client 1
+		kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name job-name -- --time 30 --client 1
         --jobs 1`))
 
-// initJobOptions initialize pgbench job options
-func initJobOptions(cmd *cobra.Command, args []string) (*createPgBenchJobOptions, error) {
-	argsLen := cmd.ArgsLenAtDash()
-	// ArgsLenAtDash returns -1 when -- was not specified
-	if argsLen == -1 {
-		argsLen = len(args)
-	}
-	if argsLen != 1 {
-		return nil, cmdutil.UsageErrorf(cmd, "Cluster Name is required to create pgbench job, got empty %d",
-			argsLen)
-	}
-	clusterName := args[0]
-	var pgBenchCommandArgs []string
-	if len(args) > 1 {
-		pgBenchCommandArgs = args[1:]
-	}
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	jobName, _ := cmd.Flags().GetString("pgbench-job-name")
-	dbName, _ := cmd.Flags().GetString("db-name")
+// newPGBenchCommand initialize pgbench job options
+func newPGBenchCommand(
+	clusterName string,
+	jobName string,
+	dbName string,
+	dryRun bool,
+	pgBenchCommandArgs []string,
+) *pgBenchCommand {
 	if jobName == "" {
-		jobName = fmt.Sprintf("%v-%v-%v", clusterName,
-			pgBenchKeyWord, rand.Intn(1000000))
+		jobName = fmt.Sprintf("%v-%v-%v", clusterName, pgBenchKeyWord, rand.Intn(1000000))
 	}
-	return &createPgBenchJobOptions{
+
+	bench := &pgBenchCommand{
 		jobName:            jobName,
 		pgBenchCommandArgs: pgBenchCommandArgs,
 		dryRun:             dryRun,
 		clusterName:        clusterName,
 		dbName:             dbName,
-	}, nil
+	}
+	return bench
 }
 
-// Create a new job with given inputs
-func Create(ctx context.Context, createOptions *createPgBenchJobOptions) error {
-	var cluster apiv1.Cluster
-	clusterName := createOptions.clusterName
+func (cmd *pgBenchCommand) execute(ctx context.Context) error {
+	cluster, err := cmd.getCluster(ctx)
+	if err != nil {
+		return err
+	}
 
-	// Get the Cluster object
+	job := cmd.buildJob(cluster)
+
+	if cmd.dryRun {
+		return plugin.Print(job, plugin.OutputFormatYAML, os.Stdout)
+	}
+
+	if err := plugin.Client.Create(ctx, job); err != nil {
+		return err
+	}
+
+	fmt.Printf("job/%v created\n", job.Name)
+	return nil
+}
+
+func (cmd *pgBenchCommand) getCluster(ctx context.Context) (apiv1.Cluster, error) {
+	var cluster apiv1.Cluster
 	err := plugin.Client.Get(
 		ctx,
-		client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName},
+		client.ObjectKey{Namespace: plugin.Namespace, Name: cmd.clusterName},
 		&cluster)
 	if err != nil {
-		return fmt.Errorf("could not get cluster: %v", err)
+		return apiv1.Cluster{}, fmt.Errorf("could not get cluster: %v", err)
 	}
+	return cluster, nil
+}
 
-	// Get the cluster image
-	imageName := cluster.Spec.ImageName
-	if imageName == "" {
-		return fmt.Errorf("could not get imageName: %v", err)
+func (cmd *pgBenchCommand) buildJob(cluster apiv1.Cluster) *batchv1.Job {
+	clusterImageName := cluster.Spec.ImageName
+	labels := map[string]string{
+		"pbBenchJob": cluster.Name,
 	}
-
-	job := &batchv1.Job{
+	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      createOptions.jobName,
+			Name:      cmd.jobName,
 			Namespace: cluster.Namespace,
-			Labels: map[string]string{
-				"pbBenchJob": cluster.Name,
-			},
+			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"pbBenchJob": cluster.Name,
-					},
+					Labels: labels,
 				},
-
 				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
 					InitContainers: []corev1.Container{
 						{
 							Name:  "wait-for-cnpg",
-							Image: imageName,
-							Env:   createEnvVariables(*createOptions),
+							Image: clusterImageName,
+							Env:   cmd.buildEnvVariables(),
 							Command: []string{
 								"sh",
 								"-c",
@@ -146,8 +146,8 @@ func Create(ctx context.Context, createOptions *createPgBenchJobOptions) error {
 						},
 						{
 							Name:  "pgbench-init",
-							Image: imageName,
-							Env:   createEnvVariables(*createOptions),
+							Image: clusterImageName,
+							Env:   cmd.buildEnvVariables(),
 							Command: []string{
 								"pgbench",
 							},
@@ -158,41 +158,24 @@ func Create(ctx context.Context, createOptions *createPgBenchJobOptions) error {
 							},
 						},
 					},
-
-					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
 							Name:            "pgbench",
-							Image:           imageName,
+							Image:           clusterImageName,
 							ImagePullPolicy: corev1.PullAlways,
-							Env:             createEnvVariables(*createOptions),
+							Env:             cmd.buildEnvVariables(),
 							Command:         []string{pgBenchKeyWord},
-							Args:            createOptions.pgBenchCommandArgs,
+							Args:            cmd.pgBenchCommandArgs,
 						},
 					},
 				},
 			},
 		},
 	}
-	if createOptions.dryRun {
-		outPutFormate := plugin.OutputFormatYAML
-		err = plugin.Print(job, plugin.OutputFormat(outPutFormate), os.Stdout)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	err = plugin.Client.Create(ctx, job)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("job/%v created\n", job.Name)
-	return nil
 }
 
-func createEnvVariables(createOptions createPgBenchJobOptions) []corev1.EnvVar {
-	clusterName := createOptions.clusterName
+func (cmd *pgBenchCommand) buildEnvVariables() []corev1.EnvVar {
+	clusterName := cmd.clusterName
 	pgHost := fmt.Sprintf("%v%v", clusterName, apiv1.ServiceReadWriteSuffix)
 	appSecreteName := fmt.Sprintf("%v-%v", clusterName, "app")
 
@@ -203,7 +186,7 @@ func createEnvVariables(createOptions createPgBenchJobOptions) []corev1.EnvVar {
 		},
 		{
 			Name:  "PGDATABASE",
-			Value: createOptions.dbName,
+			Value: cmd.dbName,
 		},
 		{
 			Name:  "PGPORT",

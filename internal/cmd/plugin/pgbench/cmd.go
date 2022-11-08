@@ -18,31 +18,59 @@ package pgbench
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 )
 
 // NewCmd initializes the pgBench command
 func NewCmd() *cobra.Command {
+	var pgBenchJobName, dbName string
+	var dryRun bool
+
 	pgBenchCmd := &cobra.Command{
-		Use:     "pgbench [cluster] [pgBenchCommandArgs...]",
-		Short:   "create pgbench job",
-		Long:    `This command will create a pgbench job with given values : cluster and pgBenchCommandArgs.`,
+		Use:     "pgbench [cluster] [-- pgBenchCommandArgs...]",
+		Short:   "Creates a pgbench job",
+		Args:    validateCommandArgs,
+		Long:    `Creates a pgbench job that will be executed on the specified Postgres Cluster.`,
 		Example: jobExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			jobOptions, err := initJobOptions(cmd, args)
-			if err != nil {
-				return err
-			}
-			return Create(ctx, jobOptions)
+			clusterName := args[0]
+			pgBenchArgs := args[1:]
+			benchCommand := newPGBenchCommand(clusterName, pgBenchJobName, dbName, dryRun, pgBenchArgs)
+			return benchCommand.execute(ctx)
 		},
 	}
-	pgBenchCmd.Flags().String(
-		"pgbench-job-name", "", "default value : <clusterName>-pgbench-XXXXX")
-	pgBenchCmd.Flags().String(
-		"db-name", "app", "default value : app")
-	pgBenchCmd.Flags().Bool(
-		"dry-run", false, "If specified, the job is not created and it will print YAML content")
+	pgBenchCmd.Flags().StringVar(
+		&pgBenchJobName,
+		"pgbench-job-name",
+		"",
+		"The name used to created the job. Defaults to: <clusterName>-pgbench-xxxx",
+	)
+	pgBenchCmd.Flags().StringVar(
+		&dbName,
+		"db-name",
+		"app",
+		"The name of the database that will be used by pgbench. Defaults to: app",
+	)
+	pgBenchCmd.Flags().BoolVar(
+		&dryRun,
+		"dry-run",
+		false,
+		"When true prints the job manifest instead of creating it",
+	)
+
 	return pgBenchCmd
+}
+
+func validateCommandArgs(cmd *cobra.Command, args []string) error {
+	if err := cobra.MinimumNArgs(1)(cmd, args); err != nil {
+		return err
+	}
+	if cmd.ArgsLenAtDash() != 1 {
+		return fmt.Errorf("pgBenchCommands should be passed after -- delimitator")
+	}
+
+	return nil
 }
