@@ -21,6 +21,23 @@ You can verify that with:
 kubectl get deploy -n cnpg-system cnpg-controller-manager
 ```
 
+### Using the `cnpg` plugin for `kubectl`
+
+You can use the `cnpg` plugin to override the default configuration options
+that are in the static manifests. 
+
+For example, to generate the default latest manifest but change the watch
+namespaces to only be a specific namespace, you could run:
+
+```shell
+kubectl cnpg install generate \
+  --watch-namespaces "specific-namespace" \
+  > cnpg_for_specific_namespace.yaml
+```
+
+Please refer to ["`cnpg` plugin"](./cnpg-plugin.md#generation-of-installation-manifests) documentation
+for a more comprehensive example. 
+
 #### Testing the latest development snapshot
 
 If you want to test or evaluate the latest development snapshot of
