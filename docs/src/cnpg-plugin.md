@@ -66,7 +66,7 @@ The main options are:
 - `--version`: minor version of the operator to be installed, such as `1.17`.
   If a minor version is specified, the plugin will install the latest patch
   version of that minor version. If no version is supplied the plugin will
-  install the latest MAJOR.MINOR.PATCH version of the operator.
+  install the latest `MAJOR.MINOR.PATCH` version of the operator.
 - `--watch-namespace`: comma separated string containing the namespaces to
   watch (by default all namespaces)
 
