@@ -25,13 +25,15 @@ import (
 	"time"
 
 	"github.com/robfig/cron"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -135,7 +137,7 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 // Setup ensures that we have the required PKI infrastructure to make the operator and the clusters working
 func (pki *PublicKeyInfrastructure) Setup(
 	ctx context.Context,
-	clientSet *kubernetes.Clientset,
+	clientSet client.Client,
 	apiClientSet *apiextensionsclientset.Clientset,
 ) error {
 	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
@@ -158,10 +160,11 @@ func (pki *PublicKeyInfrastructure) Setup(
 // ensureRootCACertificate ensure that in the cluster there is a root CA Certificate
 func (pki *PublicKeyInfrastructure) ensureRootCACertificate(
 	ctx context.Context,
-	client kubernetes.Interface,
+	client client.Client,
 ) (*v1.Secret, error) {
+	secret := &v1.Secret{}
 	// Checking if the root CA already exist
-	secret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Get(ctx, pki.CaSecretName, metav1.GetOptions{})
+	err := client.Get(ctx, types.NamespacedName{Namespace: pki.OperatorNamespace, Name: pki.CaSecretName}, secret)
 	if err == nil {
 		// Verify the temporal validity of this CA and renew the secret if needed
 		secret, err = renewCACertificate(ctx, client, secret)
@@ -186,16 +189,16 @@ func (pki *PublicKeyInfrastructure) ensureRootCACertificate(
 		return nil, err
 	}
 
-	createdSecret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
+	err = client.Create(ctx, secret)
 	if err != nil {
 		return nil, err
 	}
-	return createdSecret, nil
+	return secret, nil
 }
 
 // renewCACertificate renews a CA certificate if needed, returning the updated
 // secret if the secret has been renewed
-func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret *v1.Secret) (*v1.Secret, error) {
+func renewCACertificate(ctx context.Context, client client.Client, secret *v1.Secret) (*v1.Secret, error) {
 	// Verify the temporal validity of this CA
 	pair, err := ParseCASecret(secret)
 	if err != nil {
@@ -221,19 +224,19 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 	}
 
 	secret.Data[CACertKey] = pair.Certificate
-	updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(ctx, secret, metav1.UpdateOptions{})
+	err = client.Update(ctx, secret)
 	if err != nil {
 		return nil, err
 	}
 
-	return updatedSecret, nil
+	return secret, nil
 }
 
 // ensureCertificatesAreUpToDate will setup the PKI infrastructure that is needed for the operator
 // to correctly work and makes sure that the mounted certificates are the latest.
 func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 	ctx context.Context,
-	client kubernetes.Interface,
+	client client.Client,
 	apiClient apiextensionsclientset.Interface,
 ) error {
 	caSecret, err := pki.ensureRootCACertificate(
@@ -261,7 +264,7 @@ func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 
 func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	ctx context.Context,
-	client kubernetes.Interface,
+	client client.Client,
 	apiClient apiextensionsclientset.Interface,
 	caSecret *v1.Secret,
 ) (*v1.Secret, error) {
@@ -301,7 +304,7 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 // to automatically renew TLS certificates
 func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 	ctx context.Context,
-	client kubernetes.Interface,
+	client client.Client,
 	apiClient apiextensionsclientset.Interface,
 ) error {
 	maintenance := func() {
@@ -325,12 +328,15 @@ func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 
 // ensureCertificate will ensure that a webhook certificate exists and is usable
 func (pki PublicKeyInfrastructure) ensureCertificate(
-	ctx context.Context, client kubernetes.Interface, caSecret *v1.Secret,
+	ctx context.Context, client client.Client, caSecret *v1.Secret,
 ) (*v1.Secret, error) {
+	secret := &v1.Secret{}
 	// Checking if the secret already exist
-	secret, err := client.CoreV1().Secrets(
-		pki.OperatorNamespace).Get(ctx, pki.SecretName, metav1.GetOptions{})
-	if err == nil {
+	if err := client.Get(
+		ctx,
+		types.NamespacedName{Namespace: pki.OperatorNamespace, Name: pki.SecretName},
+		secret,
+	); err == nil {
 		// Verify the temporal validity of this certificate and
 		// renew it if needed
 		return renewServerCertificate(ctx, client, *caSecret, secret)
@@ -354,23 +360,26 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 	}
 
 	secret = webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
-	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta, pki.OperatorDeploymentLabelSelector)
-	if err != nil {
+	if err := utils.SetAsOwnedByOperatorDeployment(
+		ctx,
+		client,
+		&secret.ObjectMeta,
+		pki.OperatorDeploymentLabelSelector,
+	); err != nil {
 		return nil, err
 	}
 
-	createdSecret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
-	if err != nil {
+	if err := client.Create(ctx, secret); err != nil {
 		return nil, err
 	}
 
-	return createdSecret, nil
+	return secret, nil
 }
 
 // renewServerCertificate renews a server certificate if needed
 // Returns the renewed secret or the original one if unchanged
 func renewServerCertificate(
-	ctx context.Context, client kubernetes.Interface, caSecret v1.Secret, secret *v1.Secret,
+	ctx context.Context, client client.Client, caSecret v1.Secret, secret *v1.Secret,
 ) (*v1.Secret, error) {
 	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret)
 	if err != nil {
@@ -378,11 +387,10 @@ func renewServerCertificate(
 	}
 
 	if hasBeenRenewed {
-		updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(ctx, secret, metav1.UpdateOptions{})
-		if err != nil {
+		if err := client.Update(ctx, secret); err != nil {
 			return nil, err
 		}
-		return updatedSecret, nil
+		return secret, nil
 	}
 
 	return secret, nil
@@ -407,15 +415,13 @@ func ensureMountedSecretsAreInSync(secret *v1.Secret, certDir string) error {
 // injectPublicKeyIntoMutatingWebhook inject the TLS public key into the admitted
 // ones for a certain mutating webhook configuration
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
-	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
+	ctx context.Context, client client.Client, tlsSecret *v1.Secret,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		config, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
-			ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
-		if err != nil {
+		config := &admissionregistrationv1.MutatingWebhookConfiguration{}
+		if err := client.Get(ctx, types.NamespacedName{Name: pki.MutatingWebhookConfigurationName}, config); err != nil {
 			return err
 		}
-
 		if len(config.Webhooks) == 0 {
 			return nil
 		}
@@ -430,22 +436,19 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
 			return nil
 		}
 
-		_, err = client.AdmissionregistrationV1().
-			MutatingWebhookConfigurations().
-			Update(ctx, config, metav1.UpdateOptions{})
-		return err
+		// TODO: change to patch
+		return client.Update(ctx, config)
 	})
 }
 
 // injectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
 // ones for a certain validating webhook configuration
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
-	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
+	ctx context.Context, client client.Client, tlsSecret *v1.Secret,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		config, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-			ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
-		if err != nil {
+		config := &admissionregistrationv1.ValidatingWebhookConfiguration{}
+		if err := client.Get(ctx, types.NamespacedName{Name: pki.ValidatingWebhookConfigurationName}, config); err != nil {
 			return err
 		}
 
@@ -463,10 +466,8 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
 			return nil
 		}
 
-		_, err = client.AdmissionregistrationV1().
-			ValidatingWebhookConfigurations().
-			Update(ctx, config, metav1.UpdateOptions{})
-		return err
+		// TODO: patch
+		return client.Update(ctx, config)
 	})
 }
 

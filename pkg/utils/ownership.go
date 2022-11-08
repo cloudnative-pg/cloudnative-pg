@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // SetAsOwnedBy sets the controlled object as owned by a certain other
@@ -46,7 +46,7 @@ func SetAsOwnedBy(controlled *metav1.ObjectMeta, controller metav1.ObjectMeta, t
 // IMPORTANT: The controlled resource must reside in the same namespace as the operator as described by:
 // https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
 func SetAsOwnedByOperatorDeployment(ctx context.Context,
-	client kubernetes.Interface,
+	client client.Client,
 	controlled *metav1.ObjectMeta,
 	operatorLabelSelector string,
 ) error {
@@ -70,11 +70,17 @@ func SetAsOwnedByOperatorDeployment(ctx context.Context,
 // or we find more than one, we just return an error.
 func GetOperatorDeployment(
 	ctx context.Context,
-	client kubernetes.Interface,
+	kclient client.Client,
 	namespace, operatorLabelSelector string,
 ) (*v1.Deployment, error) {
-	deploymentList, err := client.AppsV1().Deployments(namespace).List(
-		ctx, metav1.ListOptions{LabelSelector: operatorLabelSelector})
+	deploymentList := &v1.DeploymentList{}
+	err := kclient.List(
+		ctx,
+		deploymentList,
+		client.InNamespace(namespace),
+		// TODO: check if equivalent
+		client.HasLabels{operatorLabelSelector},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -85,9 +91,10 @@ func GetOperatorDeployment(
 		return nil, fmt.Errorf("more than one operator deployment running")
 	}
 
-	deploymentList, err = client.AppsV1().Deployments(namespace).List(
-		ctx, metav1.ListOptions{LabelSelector: "operators.coreos.com/cloudnative-pg.openshift-operators="})
-	if err != nil {
+	// TODO: check
+	if err := kclient.List(ctx, deploymentList, client.InNamespace(namespace), client.HasLabels{
+		"operators.coreos.com/cloudnative-pg.openshift-operators=",
+	}); err != nil {
 		return nil, err
 	}
 

@@ -26,14 +26,15 @@ import (
 	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
@@ -51,9 +52,7 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = log.WithName("setup")
 
-	// clientSet is the kubernetes client used during
-	// the initialization of the operator
-	clientSet *kubernetes.Clientset
+	kclient client.Client
 
 	// apiClientSet is the kubernetes client set with
 	// support for the apiextensions that is used
@@ -209,7 +208,7 @@ func RunController(
 	}
 
 	// Retrieve the Kubernetes cluster system UID
-	if err = utils.DetectKubeSystemUID(ctx, clientSet); err != nil {
+	if err = utils.DetectKubeSystemUID(ctx, kclient); err != nil {
 		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
 		return err
 	}
@@ -348,7 +347,7 @@ func readinessProbeHandler(w http.ResponseWriter, _r *http.Request) {
 // the operator initialization
 func createKubernetesClient(config *rest.Config) error {
 	var err error
-	clientSet, err = kubernetes.NewForConfig(config)
+	kclient, err = client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
 		return fmt.Errorf("cannot create a K8s client: %w", err)
 	}
@@ -386,7 +385,7 @@ func ensurePKI(ctx context.Context, mgrCertDir string) error {
 		},
 		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
 	}
-	err := pkiConfig.Setup(ctx, clientSet, apiClientSet)
+	err := pkiConfig.Setup(ctx, kclient, apiClientSet)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 	}
@@ -407,7 +406,8 @@ func readConfigMap(ctx context.Context, namespace, name string) (map[string]stri
 		"namespace", namespace,
 		"name", name)
 
-	configMap, err := clientSet.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+	configMap := &corev1.ConfigMap{}
+	err := kclient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, configMap)
 	if apierrs.IsNotFound(err) {
 		return nil, nil
 	}
@@ -432,7 +432,8 @@ func readSecret(ctx context.Context, namespace, name string) (map[string]string,
 		"namespace", namespace,
 		"name", name)
 
-	secret, err := clientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	secret := &corev1.Secret{}
+	err := kclient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret)
 	if apierrs.IsNotFound(err) {
 		return nil, nil
 	}
