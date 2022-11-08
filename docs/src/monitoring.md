@@ -682,3 +682,10 @@ Prometheus alert rules, for your reference:
 - `alerts.yaml`: Prometheus rules with alerts
 - `grafana-dashboard.json`: the CloudNativePG dashboard as a native Grafana JSON.
 
+Note that, for the configuration of `kube-prometheus-stack`, other fields and
+settings are available over what we provide in `kube-stack-config.yaml`.
+
+You can execute `helm show values prometheus-community/kube-prometheus-stack`
+to view them. For further information, please refer to the
+[kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
+page.
