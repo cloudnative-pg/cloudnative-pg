@@ -4,8 +4,8 @@
 !!! Important
     Installing Prometheus and Grafana is beyond the scope of this project.
     We assume they are correctly installed in your system. However, for
-    experimentation we provide instructions as part of the [Quickstart](quickstart.md),
-    in *Part 4*.
+    experimentation we provide instructions in 
+    [Part 4 of the Quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana).
 
 ## Monitoring Instances
 
@@ -663,9 +663,9 @@ kubectl delete -f curl.yaml
     These resources are provided for illustration and experimentation, and do
     not represent any kind of recommendation for your production system
 
-In the [`samples/monitoring/`](../src/samples/monitoring/) folder you can find
-a series of sample files for observability. Please refer to Part 4 of the
-[quickstart](quickstart.md) section for context:
+In the [`samples/monitoring/`](../src/samples/monitoring) directory you will find
+a series of sample files for observability. Please refer to [Part 4 of the
+quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana) section for context:
 
 - `kube-stack-config.yaml`: a configuration file for the kube-stack helm chart
   installation. It ensures that Prometheus listens for all PodMonitor resources.
