@@ -18,10 +18,13 @@ limitations under the License.
 package quit
 
 import (
+	"fmt"
+	"net/http"
+	"os"
+	"time"
+
 	istioproxy "github.com/allisson/go-istio-proxy-wait"
 	"github.com/spf13/cobra"
-	"net/http"
-	"time"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
@@ -30,9 +33,8 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "quit",
-		Short: "Quit istio sidecar if exist",
+		Short: "Quit istio-proxy",
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-
 			return quitSubCommand()
 		},
 	}
@@ -41,30 +43,39 @@ func NewCmd() *cobra.Command {
 }
 
 func quitSubCommand() error {
-	if isIstioReady() {
-
-		IstioQuitEndpoint := "http://localhost:15000/quitquitquit"
-
-		resp, err := http.Post(IstioQuitEndpoint, "", nil)
-		if err != nil {
-			log.Warning("Fail to quit istio-proxy")
-		}
-		defer resp.Body.Close()
-
+	if !isIstioReady(5) {
+		return nil
 	}
-	log.Warning("istio-proxy is not ready or is not enabled at all, no need to quit it")
+
+	istioProxyQuitEndpoint := "http://localhost:15000/quitquitquit"
+	resp, err := http.Post(istioProxyQuitEndpoint, "", nil)
+	if err != nil {
+		log.Warning(fmt.Sprintf("Fail to quit istio-proxy: %s", err.Error()))
+	}
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Warning(err.Error())
+		}
+	}()
 	return nil
 }
 
-func isIstioReady() bool {
-	istioProxy := istioproxy.New(time.Second, time.Second, 5)
-	// Wait until the istio-proxy is ready, or it's out of the timeout.
+func isIstioReady(maxRetries int) bool {
+	if err := os.Setenv("ISTIO_PROXY_ENABLED", "true"); err != nil {
+		log.Warning(err.Error())
+	}
+
+	istioProxy := istioproxy.New(time.Second, time.Second, maxRetries)
+	// Wait until the istio-proxy is ready, or we have tried `maxRetires` times.
 	if err := istioProxy.Wait(); err != nil {
-		log.Warning("istio-proxy is not ready or is not enabled at all: %s", err.Error())
+		log.Warning(fmt.Sprintf("istio-proxy is not ready or is not enabled at all: %s", err.Error()))
 		return false
 	}
 	defer func() {
 		if err := istioProxy.Close(); err != nil {
+			log.Warning(err.Error())
+		}
+		if err := os.Unsetenv("ISTIO_PROXY_ENABLED"); err != nil {
 			log.Warning(err.Error())
 		}
 	}()

@@ -159,9 +159,9 @@ var _ = Describe("Job created via InitDB", func() {
 			},
 		}
 		job := CreatePrimaryJobViaInitdb(cluster, 0)
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitSql"))
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitTemplateSql"))
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement(postInitApplicationSQLRefsFolder))
+		Expect(job.Spec.Template.Spec.Containers[0].Args[1]).Should(ContainSubstring("testPostInitSql"))
+		Expect(job.Spec.Template.Spec.Containers[0].Args[1]).Should(ContainSubstring("testPostInitTemplateSql"))
+		Expect(job.Spec.Template.Spec.Containers[0].Args[1]).Should(ContainSubstring("testPostInitApplicationSql"))
+		Expect(job.Spec.Template.Spec.Containers[0].Args[1]).Should(ContainSubstring(postInitApplicationSQLRefsFolder))
 	})
 })

@@ -19,8 +19,10 @@ package istio
 
 import (
 	"fmt"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/istio/quit"
+
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/istio/quit"
 )
 
 // NewCmd creates the new cobra command
