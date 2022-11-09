@@ -31,10 +31,9 @@ func NewCmd() *cobra.Command {
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all created PostgreSQL cluster",
-		// Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			// clusterName := args[0]
 
 			output, _ := cmd.Flags().GetString("output")
 
