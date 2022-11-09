@@ -36,13 +36,16 @@ func NewCmd() *cobra.Command {
 			ctx := context.Background()
 
 			output, _ := cmd.Flags().GetString("output")
+			selector, _ := cmd.Flags().GetString("selector")
 
-			return List(ctx, allNamespaces, plugin.OutputFormat(output))
+			return List(ctx, allNamespaces, selector, plugin.OutputFormat(output))
 		},
 	}
 
 	listCmd.PersistentFlags().BoolVarP(&allNamespaces,
 		"all-namespaces", "A", false, "Apply operation to all clusters in all namespaces")
+	listCmd.PersistentFlags().StringP(
+		"selector", "", "", "Label selector: label=value,label in (foo, bar)")
 	listCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
 

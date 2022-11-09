@@ -24,12 +24,13 @@ import (
 	"github.com/cheynewallace/tabby"
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	apiLabels "k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // FIXME(till): could unify some of this with the maintenance plugin
-func List(ctx context.Context, allNamespaces bool, output plugin.OutputFormat) error {
-	clusterList, err := getClusters(ctx, allNamespaces)
+func List(ctx context.Context, allNamespaces bool, labels string, output plugin.OutputFormat) error {
+	clusterList, err := getClusters(ctx, allNamespaces, labels)
 	if err != nil {
 		return err
 	}
@@ -49,12 +50,14 @@ func List(ctx context.Context, allNamespaces bool, output plugin.OutputFormat) e
 	clusters.AddHeader(
 		"Namespace",
 		"Cluster Name",
+		"Labels",
 	)
 
 	for _, item := range clusterList.Items {
 		clusters.AddLine(
 			item.Namespace,
 			item.Name,
+			item.Labels,
 		)
 	}
 
@@ -62,12 +65,21 @@ func List(ctx context.Context, allNamespaces bool, output plugin.OutputFormat) e
 	return nil
 }
 
-func getClusters(ctx context.Context, allNamespaces bool) (v1.ClusterList, error) {
+func getClusters(ctx context.Context, allNamespaces bool, labels string) (v1.ClusterList, error) {
 	var clusterList v1.ClusterList
 	var opts []client.ListOption
 	if !allNamespaces {
 		opts = append(opts, client.InNamespace(plugin.Namespace))
 	}
+
+	if labels != "" {
+		selector, err := apiLabels.Parse(labels)
+		if err != nil {
+			return clusterList, err
+		}
+		opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
+	}
+
 	err := plugin.Client.List(ctx, &clusterList, opts...)
 	return clusterList, err
 }
