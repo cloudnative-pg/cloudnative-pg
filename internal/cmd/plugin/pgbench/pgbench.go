@@ -26,8 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/kubectl/pkg/util/i18n"
-	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -46,20 +44,20 @@ const (
 	pgBenchKeyWord = "pgbench"
 )
 
-var jobExample = templates.Examples(i18n.T(`
-		# Dry-run command with default values and clusterName "cluster-example"
-		kubectl-cnpg pgbench cluster-example --dry-run
-		
-		# Create a pgbench job with default values and clusterName "cluster-example"
-		kubectl-cnpg pgbench cluster-example 
-		
-		# Dry-run command with given values and clusterName "cluster-example"
-		kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name job-name --dry-run -- --time 30 
-		--client 1 --jobs 1
+var jobExample = `
+  # Dry-run command with default values and clusterName "cluster-example"
+  kubectl-cnpg pgbench cluster-example --dry-run
 
-		# Create a job with given values and clusterName "cluster-example"
-		kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name job-name -- --time 30 --client 1
-        --jobs 1`))
+  # Create a pgbench job with default values and clusterName "cluster-example"
+  kubectl-cnpg pgbench cluster-example
+
+  # Dry-run command with given values and clusterName "cluster-example"
+  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name job-name --dry-run -- \
+    --time 30 --client 1 --jobs 1
+
+  # Create a job with given values and clusterName "cluster-example"
+  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name job-name -- \
+    --time 30 --client 1 --jobs 1`
 
 // newPGBenchCommand initialize pgbench job options
 func newPGBenchCommand(
