@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/install"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/list"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
@@ -74,6 +75,7 @@ func main() {
 	rootCmd.AddCommand(versions.NewCmd())
 	rootCmd.AddCommand(pgbench.NewCmd())
 	rootCmd.AddCommand(install.NewCmd())
+	rootCmd.AddCommand(list.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
