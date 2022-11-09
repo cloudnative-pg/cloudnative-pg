@@ -181,13 +181,17 @@ install the *Kube Prometheus stack* using the sample configuration we provide:
 We can accomplish this with the following commands:
 
 ``` sh
-% helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add prometheus-community \
+  https://prometheus-community.github.io/helm-charts
 
-% helm upgrade --install -f docs/src/samples/monitoring/kube-stack-config.yaml  prometheus-community prometheus-community/kube-prometheus-stack
+helm upgrade --install \
+  -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring/kube-stack-config.yaml \
+  prometheus-community \
+  prometheus-community/kube-prometheus-stack
 ```
 
 After completion, you will have Prometheus, Grafana and Alert Manager installed with values from the
-`docs/src/samples/monitoring/kube-stack-config.yaml` file:
+`kube-stack-config.yaml` file:
 
 - From the Prometheus installation, you will have the Prometheus Operator watching for **any** `PodMonitor`
   (see [*monitoring*](monitoring.md)).
@@ -256,7 +260,7 @@ kubectl port-forward svc/prometheus-community-kube-prometheus 9090
 Then access the Prometheus console locally at: [`http://localhost:9090/`](http://localhost:9090/)
 
 Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitoring: true` 
-you should find a series of metrics relating to CNPG clusters. Again, please
+you should find a series of metrics relating to CloudNativePG clusters. Again, please
 refer to the [*monitoring section*](monitoring.md) for more information.
 
 ![local prometheus](images/prometheus-local.png)
@@ -264,7 +268,8 @@ refer to the [*monitoring section*](monitoring.md) for more information.
 You can now define some alerts by creating a `prometheusRule`:
 
 ``` sh
-kubectl apply -f docs/src/samples/monitoring/cnpg-prometheusrule.yaml
+kubectl apply -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring/cnpg-prometheusrule.yaml
 ```
 
 You should see the default alerts now:
@@ -294,7 +299,8 @@ providing the credentials `admin` as username, `prom-operator` as password (defi
 We can now install our sample Grafana dashboard:
 
 ``` sh
-kubectl apply -f docs/src/samples/monitoring/grafana-configmap.yaml
+kubectl apply -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring/grafana-configmap.yaml
 ```
 
 Which will be picked up by the Grafana page in a few seconds. You should now
