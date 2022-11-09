@@ -305,14 +305,16 @@ func (ds *databaseSnapshotter) dropExtensionsFromDatabase(
 	database string,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("dropping extensions from the target (empty) database")
+	contextLogger.Info("dropping user-defined extensions from the target (empty) database")
 
 	db, err := target.Connection(database)
 	if err != nil {
 		return err
 	}
 
-	rows, err := db.QueryContext(ctx, "SELECT extname FROM pg_extension")
+	// In Postgres, OID 16384 is the first non system ID that can be used in the database
+	// catalog, as defined in the `FirstNormalObjectId` constant (src/include/access/transam.h)
+	rows, err := db.QueryContext(ctx, "SELECT extname FROM pg_extension WHERE oid >= 16384")
 	if err != nil {
 		return err
 	}
