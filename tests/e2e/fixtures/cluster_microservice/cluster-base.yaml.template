@@ -15,17 +15,13 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
 
-  # Example of rolling update strategy:
-  # - unsupervised: automated update of the primary once all
-  #                 replicas have been upgraded (default)
-  # - supervised: requires manual supervision to perform
-  #               the switchover of the primary
-  primaryUpdateStrategy: unsupervised
-
   bootstrap:
     initdb:
       database: app
       owner: app
+      # Creates a fake plpgsql function to prove that restore works
+      postInitApplicationSQL:
+      - "CREATE FUNCTION one() RETURNS INT LANGUAGE plpgsql IMMUTABLE AS 'BEGIN RETURN 1; END;'"
 
   # Persistent storage configuration
   storage:
