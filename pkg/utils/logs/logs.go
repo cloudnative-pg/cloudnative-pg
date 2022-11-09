@@ -57,8 +57,8 @@ func StreamPodLogs(ctx context.Context, pod corev1.Pod, getPrevious bool, writer
 	return err
 }
 
-// TailPodLogs streams the pod logs and shunts them to the `writer`, keeps waiting
-// for new logs to arrive, until the connection is closed
+// TailPodLogs streams the pod logs starting from the current time, and keeps
+// waiting for any new logs, until the  context is cancelled by the calling process
 func TailPodLogs(ctx context.Context, pod corev1.Pod, writer io.Writer) (err error) {
 	wrapErr := func(err error) error { return fmt.Errorf("in StreamPodLogs: %w", err) }
 	conf := ctrl.GetConfigOrDie()

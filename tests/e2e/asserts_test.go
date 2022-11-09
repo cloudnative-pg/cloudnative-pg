@@ -224,7 +224,8 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 		}()
 		DeferCleanup(func(ctx SpecContext) {
 			if CurrentSpecReport().Failed() {
-				GinkgoWriter.Println("DUMPING Operator Logs. Failed Spec:", CurrentSpecReport().LeafNodeText)
+				GinkgoWriter.Println("DUMPING Operator Logs. Failed Spec:",
+					CurrentSpecReport().LeafNodeText)
 				_, _ = buf.WriteTo(GinkgoWriter)
 			}
 		})
