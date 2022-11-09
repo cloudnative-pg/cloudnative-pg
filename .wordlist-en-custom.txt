@@ -532,6 +532,7 @@ goodwithtech
 googleCredentials
 goroutines
 gosec
+grafana
 gzip
 hashicorp
 hba
