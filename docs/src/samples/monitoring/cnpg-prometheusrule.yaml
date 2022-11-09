@@ -1,0 +1,69 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-default-alerts
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/instance: prometheus-community
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/version: 9.1.7
+    helm.sh/chart: grafana-6.40.4
+spec:
+  groups:
+  - name: cnp-default.rules
+    rules:
+    - alert: LongRunningTransaction
+      annotations:
+        description: Pod {{ $labels.pod }} is taking more than 5 minutes (300 seconds) for a query.
+        summary: A query is taking longer than 5 minutes.
+      expr: |-
+        cnpg_backends_max_tx_duration_seconds > 300
+      for: 1m
+      labels:
+        severity: warning
+    - alert: BackendsWaiting
+      annotations:
+        description: Pod {{ $labels.pod  }} has been waiting for longer than 5 minutes
+        summary: If a backend is waiting for longer than 5 minutes
+      expr: |-
+        cnpg_backends_waiting_total > 300
+      for: 1m
+      labels:
+        severity: warning
+    - alert: PGDatabase
+      annotations:
+        description: Over 150,000,000 transactions from frozen xid on pod {{ $labels.pod  }}
+        summary: Number of transactions from the frozen XID to the current one
+      expr: |-
+        cnpg_pg_database_xid_age > 150000000
+      for: 1m
+      labels:
+        severity: warning
+    - alert: PGReplication
+      annotations:
+        description: Standby is lagging behind by over 300 seconds (5 minutes)
+        summary: The standby is lagging behind the primary
+      expr: |-
+        cnpg_pg_replication_lag > 300
+      for: 1m
+      labels:
+        severity: warning
+    - alert: LastFailedArchiveTime 
+      annotations:
+        description: Archiving failed for {{ $labels.pod }}
+        summary: Checks the last time archiving failed. Will be -1 when it has not failed.
+      expr: |-
+        cnpg_pg_stat_archiver_last_failed_time > 1
+      for: 1m
+      labels:
+        severity: warning
+    - alert: DatabaseDeadlockConflicts 
+      annotations:
+        description: There are over 10 deadlock conflicts in {{ $labels.pod }}
+        summary: Checks the number of database conflicts
+      expr: |-
+        cnpg_pg_stat_database_deadlocks > 10
+      for: 1m
+      labels:
+        severity: warning

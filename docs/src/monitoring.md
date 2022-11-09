@@ -1,6 +1,12 @@
 
 # Monitoring
 
+!!! Important
+    Installing Prometheus and Grafana is beyond the scope of this project.
+    We assume they are correctly installed in your system. However, for
+    experimentation we provide instructions in 
+    [Part 4 of the Quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana).
+
 ## Monitoring Instances
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
@@ -651,3 +657,36 @@ At the end of the inspection, please make sure you delete the `curl` pod:
 kubectl delete -f curl.yaml
 ```
 
+## Auxiliary resources
+
+!!! Important
+    These resources are provided for illustration and experimentation, and do
+    not represent any kind of recommendation for your production system
+
+In the [`doc/src/samples/monitoring/`](https://github.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring)
+directory you will find a series of sample files for observability.
+Please refer to [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
+section for context:
+
+- `kube-stack-config.yaml`: a configuration file for the kube-stack helm chart
+  installation. It ensures that Prometheus listens for all PodMonitor resources.
+- `cnpg-prometheusrule.yaml`: a `PrometheusRule` with alerts for CloudNativePG.
+  NOTE: this does not include inter-operation with notification services. Please refer
+  to the [Prometheus documentation](https://prometheus.io/docs/alerting/latest/alertmanager/).
+- `grafana-configmap.yaml`: a ConfigMap containing the definition of the sample
+  CloudNativePG Dashboard. Note the labels in the definition, which ensure that
+  the Grafana deployment will find the ConfigMap.
+
+In addition, we provide the "raw" sources for the Grafana dashboard and the
+Prometheus alert rules, for your reference:
+
+- `alerts.yaml`: Prometheus rules with alerts
+- `grafana-dashboard.json`: the CloudNativePG dashboard as a native Grafana JSON.
+
+Note that, for the configuration of `kube-prometheus-stack`, other fields and
+settings are available over what we provide in `kube-stack-config.yaml`.
+
+You can execute `helm show values prometheus-community/kube-prometheus-stack`
+to view them. For further information, please refer to the
+[kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
+page.
