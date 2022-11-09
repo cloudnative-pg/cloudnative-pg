@@ -68,7 +68,8 @@ func validateCommandArgs(cmd *cobra.Command, args []string) error {
 	if err := cobra.MinimumNArgs(1)(cmd, args); err != nil {
 		return err
 	}
-	if cmd.ArgsLenAtDash() != 1 {
+
+	if cmd.ArgsLenAtDash() > 1 {
 		return fmt.Errorf("pgBenchCommands should be passed after -- delimitator")
 	}
 
