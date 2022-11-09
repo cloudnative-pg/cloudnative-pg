@@ -26,7 +26,7 @@ reading about the systems and decide which one to proceed with.
 After setting up one of them, please proceed with part 2.
 
 We also provide instructions for setting up monitoring with Prometheus and
-Grafana for local testing/evaluation, in part 4
+Grafana for local testing/evaluation, in [part 4](#part-4-monitor-clusters-with-prometheus-and-grafana)
 
 ### Minikube
 
@@ -156,7 +156,7 @@ spec:
 
 In this section we show how to deploy Prometheus and Grafana for observability,
 and how to create a Grafana Dashboard to monitor CloudNativePG clusters, and a
-set of Prometheus rules defining alert conditions.
+set of Prometheus Rules defining alert conditions.
 
 We leverage the [Kube-Prometheus stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack),
 Helm chart, which is maintained by the [Prometheus Community](https://github.com/prometheus-community).
@@ -178,16 +178,26 @@ system.
 We need to add the `prometheus-community` helm chart repository, and then
 install the *Kube Prometheus stack* using the sample configuration we provide:
 
-1. `helm repo add prometheus-community https://prometheus-community.github.io/helm-charts`
-2. `helm upgrade --install -f docs/src/samples/monitoring/kube-stack-config.yaml  prometheus-community prometheus-community/kube-prometheus-stack`
+We can accomplish this with the following commands:
 
-After completion, you will have:
+``` sh
+% helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 
-- A Prometheus installation, watching for **any** `PodMonitor`
+% helm upgrade --install -f docs/src/samples/monitoring/kube-stack-config.yaml  prometheus-community prometheus-community/kube-prometheus-stack
+```
+
+After completion, you will have Prometheus, Grafana and Alert Manager installed with values from the
+`docs/src/samples/monitoring/kube-stack-config.yaml` file:
+
+- From the Prometheus installation, you will have the Prometheus Operator watching for **any** `PodMonitor`
   (see [*monitoring*](monitoring.md)).
-- A Grafana installation with no dashboards.
+- The Grafana installation will be watching for a Grafana dashboard `ConfigMap`.
 
-You can see several Custom Resources have been created for Prometheus:
+!!! Seealso
+    For further information about the above command see the [helm install](https://helm.sh/docs/helm/helm_install/) 
+    documentation. 
+
+You can see several Custom Resources have been created:
 
 ``` sh
 % kubectl get crds
@@ -245,16 +255,16 @@ kubectl port-forward svc/prometheus-community-kube-prometheus 9090
 
 Then access the Prometheus console locally at: [`http://localhost:9090/`](http://localhost:9090/)
 
-You should find a series of metrics relating to CNPG clusters. Again, please
+Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitoring: true` 
+you should find a series of metrics relating to CNPG clusters. Again, please
 refer to the [*monitoring section*](monitoring.md) for more information.
 
 ![local prometheus](images/prometheus-local.png)
 
-You can deploy some Prometheus Rules defining Alerts with our sample
-file:
+You can now define some alerts by creating a `prometheusRule`:
 
 ``` sh
-kubectl apply -f docs/src/samples/monitoring/prometheus-alerts.yaml
+kubectl apply -f docs/src/samples/monitoring/cnpg-prometheusrule.yaml
 ```
 
 You should see the default alerts now:
@@ -279,7 +289,7 @@ kubectl port-forward svc/prometheus-community-grafana 3000:80
 ```
 
 And access Grafana locally at [`http://localhost:3000/`](http://localhost:3000/)
-providing the credentials `admin` as username, `prom-operator` as password.
+providing the credentials `admin` as username, `prom-operator` as password (defined in `kube-stack-config.yaml`).
 
 We can now install our sample Grafana dashboard:
 
