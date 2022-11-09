@@ -1,10 +1,10 @@
-name: backport_manually
+name: pull_request_backport
 on:
-   pull_request_target:
-     types:
-       - closed
-     branches:
-       - main
+  pull_request_target:
+    types:
+      - closed
+    branches:
+      - main
   pull_request:
     types:
       - closed
@@ -46,27 +46,33 @@ jobs:
           echo "LABEL=${label}" >> $GITHUB_ENV
           echo "PR=${{steps.findPr.outputs.pr}}" >> $GITHUB_ENV
           echo "find label ${label} in pull request ${PR}"
+          commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
+          echo "COMMIT=${commit}" >> $GITHUB_ENV
+          echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
+          author_name=$(git show -s --format='%an' "${commit}")
+          echo "AUTHOR_NAME=${author_name}" >> $GITHUB_ENV
+          author_email=$(git show -s --format='%ae' "${commit}")
+          echo "AUTHOR_EMAIL=${author_email}" >> $GITHUB_ENV
+      -
+        name: Configure git user
+        run: |
+          git config user.email "${{ env.AUTHOR_EMAIL }}"
+          git config user.name "${{ env.AUTHOR_NAME }}"
       -
         name: cherry pick
         if: |
           env.LABEL != '' &&
+          env.COMMIT != '' &&
           env.LABEL == matrix.branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ steps.findPr.outputs.pr }}
         run: |
-          git config --global user.email "tao.li@enterprisedb.com"
-          git config --global user.name "litaocdl"
-          commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
-          echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
-          if [[ "$commit" != "" ]]; then
-             echo "COMMIT=${commit}" >> $GITHUB_ENV
-             git fetch
-             git checkout -B ${{ matrix.branch }} origin/${{ matrix.branch }} -t -f
-             git checkout -B cherry-pick-${{ matrix.branch }}-${PR}-${commit} -f
-             git cherry-pick -x --allow-empty-message --mainline 1 $commit
-             git push origin cherry-pick-${{ matrix.branch }}-${PR}-${commit}:cherry-pick-${{ matrix.branch }}-${PR}-${commit}
-          fi
+           git fetch
+           git checkout -B ${{ matrix.branch }} origin/${{ matrix.branch }} -t -f
+           git checkout -B cherry-pick-${{ matrix.branch }}-${PR}-${{ env.COMMIT }} -f
+           git cherry-pick -x --allow-empty-message --mainline 1 ${{ env.COMMIT }}
+           git push origin cherry-pick-${{ matrix.branch }}-${PR}-${{ env.COMMIT }}:cherry-pick-${{ matrix.branch }}-${PR}-${{ env.COMMIT }}
       -
         name: create pull request
         uses: devops-infra/action-pull-request@v0.5.2
@@ -77,8 +83,8 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           source_branch: cherry-pick-${{ matrix.branch }}-${{ env.PR }}-${{ env.COMMIT }}
           target_branch: ${{ matrix.branch }}
-          title: "backport pr ${{ env.PR }} to branch ${{ matrix.branch }}"
-          body: "**Automated pull request**"
-          label: backport
+          title: "chore(backport): backport pull request ${{ env.PR }} to branch ${{ matrix.branch }}"
+          body: "This is a backport pull request, do not squash when merge it"
+          label: backport,do not squash
 
 
