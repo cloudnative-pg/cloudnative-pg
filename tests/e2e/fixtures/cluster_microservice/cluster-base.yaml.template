@@ -19,7 +19,7 @@ spec:
     initdb:
       database: app
       owner: app
-      # Creates a dummy plpgsql function to prove that restore works
+      # Creates a fake plpgsql function to prove that restore works
       postInitApplicationSQL:
       - "CREATE FUNCTION one() RETURNS INT LANGUAGE plpgsql IMMUTABLE AS 'BEGIN RETURN 1; END;'"
 
