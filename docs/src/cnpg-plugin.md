@@ -89,6 +89,27 @@ The flags in the above command have the following meaning:
 - `--watch-namespaces "albert, bb, freddie"` have the operator watch for
   changes in the `albert`, `bb` and `freddie` namespaces only
 
+### List
+
+The `list` command provides a list of created clusters. You can use the "Cluster Name" for subsequent commands described in the documentation.
+
+```shell
+kubectl cnpg list -A
+```
+
+```shell
+The following clusters are created
+Namespace          Cluster Name       Labels
+---------          ------------       ------
+sandbox            sandbox            env: sandbox, user: john
+```
+
+It supports the following options:
+
+* `-A`, `--all-namespaces`, default: the current namespace
+* `-o=text|json`, `--output`, default: text, json is very verbose
+* `--selector`, a k8s-style label selector, e.g. `--selector env=sandbox,user=john`
+
 ### Status
 
 The `status` command provides an overview of the current status of your
