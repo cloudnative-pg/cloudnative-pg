@@ -100,7 +100,7 @@ MariaDB cluster).
 
 ## Communications
 
-- [Slack Channel](https://cloudnativepg.slack.com)
+- [Slack Channel](https://join.slack.com/t/cloudnativepg/shared_invite/zt-17culux7k-P_UsVOOR9teUYi4dGhDSBQ)
 - [Github Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions)
 - [Twitter](https://twitter.com/CloudNativePg)
 
