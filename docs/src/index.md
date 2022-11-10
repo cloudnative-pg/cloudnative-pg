@@ -34,7 +34,8 @@ The [source code repository is in Github](https://github.com/cloudnative-pg/clou
 Each minor release of CloudNativePG is designed to work with a range of
 Kubernetes versions, usually the ones supported by the CNCF at the time the
 minor version was first released.
-For more information, please refer to the ["Supported releases"](supported_releases.md) page.
+
+Please refer to the ["Supported releases"](supported_releases.md) page for details.
 
 ## Container images
 
