@@ -119,7 +119,7 @@ mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # would create CPUs-1 nodes and saturate the testing server
 RC_GINKGO2=0
 LABEL_FILTERS="!(upgrade)"
-if [ "${FEATURE_TYPE}" ]; then
+if [ "${FEATURE_TYPE-}" ]; then
   ADDITIONAL_FILTERS="${FEATURE_TYPE//,/ || }"
   LABEL_FILTERS="!(upgrade) && ${ADDITIONAL_FILTERS}"
 fi
