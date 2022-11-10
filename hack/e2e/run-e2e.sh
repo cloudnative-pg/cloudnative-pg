@@ -112,7 +112,16 @@ mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
 RC_GINKGO2=0
-ginkgo --nodes=4 --timeout 3h --slow-spec-threshold 5m --label-filter "!(upgrade)" --output-dir "${ROOT_DIR}/tests/e2e/out/" --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
+LABEL_FILTERS="!(upgrade)"
+if [ ! -z "${FEATURE_TYPE+x}" ]; then
+  ADDITIONAL_FILTERS="${FEATURE_TYPE//,/ || }"
+  LABEL_FILTERS="!(upgrade) && ${ADDITIONAL_FILTERS}"
+fi
+
+echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
+ginkgo --nodes=4 --timeout 3h --slow-spec-threshold 5m --label-filter "${LABEL_FILTERS}" \
+       --output-dir "${ROOT_DIR}/tests/e2e/out/"  --json-report  "report.json" \
+       -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
 
 # Report if there are any tests that failed and did NOT have an "ignore-fails" label
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
