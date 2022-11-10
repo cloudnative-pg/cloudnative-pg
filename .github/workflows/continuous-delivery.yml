@@ -87,6 +87,7 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      ref: ${{ github.event.pull_request.head.sha }}
 
     - name: Check for changes
       uses: dorny/paths-filter@v2.11.1
@@ -165,6 +166,7 @@ jobs:
     steps:
     -
       uses: actions/checkout@v3
+      ref: ${{ github.event.pull_request.head.sha }}
     -
       name: Run ShellCheck
       uses: ludeeus/action-shellcheck@1.1.0
@@ -260,6 +262,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      ref: ${{ github.event.pull_request.head.sha }}
 
     - name: Install Go
       uses: actions/setup-go@v3
@@ -289,6 +292,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install Go
         uses: actions/setup-go@v3
@@ -630,6 +634,7 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        ref: ${{ github.event.pull_request.head.sha }}
       -
         id: generate-jobs
         # Generates the jobs that will become different matrix branches,
@@ -727,6 +732,7 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -843,6 +849,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+        ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Create a directory for the artifacts
         run: mkdir test-artifacts
@@ -894,6 +901,7 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Check preconditions
         id: get_pr_number_and_labels
@@ -930,6 +938,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        ref: ${{ github.event.pull_request.head.sha }}
       - name: Check preconditions
         id: get_pr_number_and_labels
         env:

@@ -50,7 +50,7 @@ jobs:
         with:
           workflow: continuous-delivery
           token: ${{ secrets.REPO_GHA_PAT }}
-#          ref: ${{ env.REF }}
+          ref: ${{ env.REF }}
           display-workflow-run-url: true
           wait-for-completion: false
           inputs: >
