@@ -31,9 +31,10 @@ The [source code repository is in Github](https://github.com/cloudnative-pg/clou
 
 ## Supported Kubernetes distributions
 
-CloudNativePG requires Kubernetes 1.23 or higher for the latest 1.18 release.
-Previous releases can also support Kubernetes 1.22. For more information, please
-refer to the ["Supported releases"](supported_releases.md) page.
+Each minor release of CloudNativePG is designed to work with a range of
+Kubernetes versions, usually the ones supported by the CNCF at the time the
+minor version was first released.
+For more information, please refer to the ["Supported releases"](supported_releases.md) page.
 
 ## Container images
 
