@@ -664,3 +664,13 @@ That can be done with:
 ```
 kubectl cnpg hibernate status <cluster-name>
 ```
+
+### Benchmarking the database with pgbench
+
+Pgbench can be ran on an existing PostgreSQL cluster with following command:
+
+```
+kubectl cnpg pgbench <cluster-name> -- --time 30 --client 1 --jobs 1
+```
+
+Refer to the [Benchmarking section](benchmarking.md) for more details.
