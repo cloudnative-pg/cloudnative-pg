@@ -31,8 +31,11 @@ The [source code repository is in Github](https://github.com/cloudnative-pg/clou
 
 ## Supported Kubernetes distributions
 
-CloudNativePG requires Kubernetes 1.22 or higher. For more information, please
-refer to the ["Supported releases"](supported_releases.md) page.
+Each minor release of CloudNativePG is designed to work with a range of
+Kubernetes versions, usually the ones supported by the CNCF at the time the
+minor version was first released.
+
+Please refer to the ["Supported releases"](supported_releases.md) page for details.
 
 ## Container images
 
@@ -97,6 +100,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Fencing of an entire PostgreSQL cluster, or a subset of the instances
 * Simple bind and search+bind LDAP client authentication
 * Multi-arch format container images
+* Postgres cluster hibernation
 
 ## About this guide
 
