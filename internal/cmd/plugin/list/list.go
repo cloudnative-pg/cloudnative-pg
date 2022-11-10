@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/cheynewallace/tabby"
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -40,8 +41,8 @@ func List(ctx context.Context, allNamespaces bool, labels string, output plugin.
 	}
 
 	if output == plugin.OutputFormatJSON {
-		j, _ := json.MarshalIndent(clusterList.Items, "", "")
-		fmt.Println(j)
+		j, _ := json.MarshalIndent(clusterList.Items, "", "  ")
+		fmt.Println(string(j))
 		return nil
 	}
 
@@ -54,10 +55,15 @@ func List(ctx context.Context, allNamespaces bool, labels string, output plugin.
 	)
 
 	for _, item := range clusterList.Items {
+		var labelOut []string
+		for k, v := range item.Labels {
+			labelOut = append(labelOut, fmt.Sprintf("%s: %s", k, v))
+		}
+
 		clusters.AddLine(
 			item.Namespace,
 			item.Name,
-			item.Labels,
+			strings.Join(labelOut, ", "),
 		)
 	}
 
