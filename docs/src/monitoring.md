@@ -663,7 +663,7 @@ kubectl delete -f curl.yaml
     These resources are provided for illustration and experimentation, and do
     not represent any kind of recommendation for your production system
 
-In the [`doc/src/samples/monitoring/`](https://github.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring)
+In the [`doc/src/samples/monitoring/`](https://github.com/cloudnative-pg/cloudnative-pg/tree/main/docs/src/samples/monitoring)
 directory you will find a series of sample files for observability.
 Please refer to [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
 section for context:
