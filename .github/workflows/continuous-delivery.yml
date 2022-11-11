@@ -9,6 +9,26 @@ on:
     branches:
       - main
       - release-*
+  # !!! Notes:
+  # We listen on both `pull_request` and `pull_request_target` events because:
+  #   1. We need `pull_request_target` to let community contributors to create pull request from a forked repository and
+  #      trigger the E2E testing (which needs a few secrets available) per the PR, etc.
+  #   2. By default, workflow triggered by a `pull_request_target` event runs on the code base of the base of the PR
+  #      rather than the head of the PR, which leads to much confusion. We can specify
+  #     `ref: ${{ github.event.pull_request.head.sha }}` in `checkout` action to address the issue in most of the
+  #      cases, except that when we are making changes in a workflow in the PR (in this case, the workflow triggered by
+  #     `pull_request_target` is running against the workflow in the base of the PR, aka. the `main` branch). That's
+  #     the time, we need `pull_request` events.
+  #
+  #   However, with those two events both enabled, we will have two duplicated workflows triggered by `pull_request` and
+  #   `pull_request_target` events respectively when a PR get labeled. And to remediate this, we use the check
+  #   `! ${{ github.event_name == "pull_request_target" && github.head.repo.full_name == github.base.repo.full_name }}`
+  #   to skip the whole workflow triggered by `pull_request_target` event when the pull request is actually from our
+  #   repo rather than a forked one.
+  #
+  # A pull request (from this repository) which is labelled
+  pull_request:
+    types: [ labeled ]
   # A pull request (from this repository or a forked one) which is labelled
   pull_request_target:
     types: [labeled]
@@ -56,6 +76,9 @@ jobs:
   #   1. it's on 'main' branch
   #   2. it's triggered by events in the 'do_not_skip' list
   duplicate_runs:
+    # This tricky check is to skip the workflow runs triggered by `pull_request_target` event when the pull request is
+    # actually from our repo rather than a forked one.
+    if: ! ${{ github.event_name == "pull_request_target" && github.head.repo.full_name == github.base.repo.full_name }}
     runs-on: ubuntu-20.04
     name: Skip duplicate runs
     continue-on-error: true
@@ -87,6 +110,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
 
     - name: Check for changes
       uses: dorny/paths-filter@v2.11.1
@@ -165,6 +190,8 @@ jobs:
     steps:
     -
       uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
     -
       name: Run ShellCheck
       uses: ludeeus/action-shellcheck@1.1.0
@@ -260,6 +287,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
 
     - name: Install Go
       uses: actions/setup-go@v3
@@ -289,6 +318,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install Go
         uses: actions/setup-go@v3
@@ -630,6 +661,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         id: generate-jobs
         # Generates the jobs that will become different matrix branches,
@@ -727,6 +760,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -843,6 +878,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Create a directory for the artifacts
         run: mkdir test-artifacts
@@ -894,6 +931,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Check preconditions
         id: get_pr_number_and_labels
@@ -930,6 +969,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Check preconditions
         id: get_pr_number_and_labels
         env:
