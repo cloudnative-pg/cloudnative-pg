@@ -42,7 +42,63 @@ Sometimes, bug fixes might originate in the release branch as well.
 Release notes for patch/security versions are maintained in the release branch
 directly.
 
-### Creating a new release branch from main
+## Preparing the release
+
+One or two weeks before the release, you should start planning the following
+activities:
+
+- **Feature freeze:** Get a clear idea of what tickets are going into the
+  release, what tickets we are waiting on (hopefully few), and make sure to
+  put the focus on finishing those in time.
+
+- **Supported releases:** Make sure that you update the supported releases' page
+  in `docs/src/supported_releases.md` and the changes are approved by the
+  maintainers
+
+- **Check on backporting:** Make sure any code that should be backported to the
+  various release branches is cherry-picked ahead of time. This will also help
+  you compile the release notes.
+
+- **Release notes:** You should create/update the release note documents in
+  `docs/src/release_notes/` for each of the versions to release. Remember to
+  update `docs/src/release_notes.md`.
+  These changes should go in a PR against `main`, and get maintainer approval.
+
+- **Capabilities page:** in case of a new minor release, make sure that the
+  operator capability levels page has been updated in
+  `docs/src/operator_capability_levels.md` and approved by the maintainers
+
+- **Documentation on website:** Remember that after the release, you will
+  need to update the documentation in the
+  [website project](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
+  for each of the supported releases. (See the section **Documentation on the
+  website** below)
+
+<!-- TODO: we should create an issue template with a checklist for the release process -->
+
+## Updating release notes on the branches
+
+Once you are done with the items in the "Preparing the release" section, you
+should add the release notes to each of the release branches.
+
+For existing release branches, get the content for the release notes from
+`main`, add to the relevant documents, commit and push directly.
+Be careful not to "show the future" in this process.
+Say you're releasing versions 1.18.0, 1.17.2 and 1.16.4. In the `release-1.17`
+release branch, you should update the `v1.16.md` and `v1.17.md` documents, but
+NOT create `v1.18.md`. In the `release-1.16` branch, you should update the
+`v1.16.md` document but NOT the `v1.17.md` document, nor `v1.18.md`.
+
+**IMPORTANT**. If you're creating a new minor release, the "backporting" of
+release notes described in this section should be skipped. Since you already
+created the release notes for the new minor in `main`, and you will create the
+new release branch off of `main`, the release notes are done for free.
+
+## If creating a new minor release: create a new release branch from main
+
+NOTE: the instructions in the previous sections should have been completed ahead
+of this. I.e. all cherry-picks should be done, documents should be up to date,
+and release notes should have been merged in `main`.
 
 A new release branch is created starting from the most updated commit in the
 trunk by a maintainer:
@@ -54,36 +110,14 @@ git checkout -b release-X.Y
 git push --set-upstream origin release-X.Y
 ```
 
-## Planning the release
-
-One or two weeks before the release, you should start planning the following
-activities:
-
-- **Supported releases:** Make sure that you update the supported releases' page
-  in `docs/src/supported_releases.md` and have been approved by the maintainers
-
-- **Release notes:** Make sure release notes for the release have been updated
-  in `docs/src/release_notes.md` and have been approved by the maintainers
-
-- **Capabilities page:** in case of a new minor release, make sure that the
-  operator capability levels page has been updated in
-  `docs/src/operator_capability_levels.md` and approved by the maintainers
-
-- **Documentation:** Make sure that you update the documentation in the
-  [website project](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
-  for each of the supported releases via a PR.
-
-<!-- TODO: we should create an issue template with a checklist for the release process -->
-
 ## Release steps
 
 Once the code in the release branch is stable and ready to be released, you can
 proceed with the supervised process.
 
-**IMPORTANT:** You need to operate on an existing release branch. If you are
-releasing a new minor version, you must create the new release branch
-immediately before proceeding with the instructions below. In order to create
-a new release branch, see "Creating a new release branch from main" above.
+**IMPORTANT:** You need to issue the commands below from each release branch.
+If you are releasing a new minor version, you should have created the new
+release branch as per the previous section.
 
 As a maintainer, you need to repeat this process for each of the supported
 releases of CloudNativePG:
@@ -97,13 +131,15 @@ releases of CloudNativePG:
    complete successfully.
 5. Perform manual smoke tests to verify that installation instructions work on
    your workstation: with a local `kind` cluster up, you should be able to
-   install the operator, create a multi-instance cluster, verify it becomes
+   install the operator with the instructions from
+   ["Installation"](../docs/src/installation_upgrade.md),
+   create a multi-instance cluster, verify it becomes
    healthy, and once healthy, you can execute `psql` in the primary and interact
    with with the database.
 6. In case of a new **minor** release, merge the new release commit on `main`
    with `git merge --ff-only release-X.Y` followed by `git push`
 
-## Documentation
+## Documentation on the website
 
 The documentation, including the release notes, is created in the current `cloudnative-pg` repository, but in order to publish it in the
 [CloudNativePG public webpage](https://cloudnative-pg.io), it needs to be ported
