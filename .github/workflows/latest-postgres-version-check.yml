@@ -63,7 +63,7 @@ jobs:
           sed -i '/DefaultImageName *=/s@".*"@"'"${LATEST_POSTGRES_VERSION_IMAGE}"'"@' pkg/versions/versions.go
 
           # Update docs directory (only .md and .yaml filename extensions)
-          find docs -type f \( -name '*.md' -o -name '*.yaml' \) -exec sed -i "s/${CURRENT_POSTGRES_VERSION//./\\.}/${LATEST_POSTGRES_VERSION}/g" {} +
+          find docs -type f \( -name '*.md' -o -name '*.yaml' \) \! -path '*release_notes*' -exec sed -i "/[ :]${CURRENT_POSTGRES_VERSION//./\\.}/s/${CURRENT_POSTGRES_VERSION//./\\.}/${LATEST_POSTGRES_VERSION}/g" {} +
 
       - name: Create PR to update PostgreSQL version
         if: env.LATEST_POSTGRES_VERSION_IMAGE != env.CURRENT_POSTGRES_VERSION_IMAGE
