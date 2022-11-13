@@ -51,6 +51,8 @@ func List(ctx context.Context, allNamespaces bool, labels string, output plugin.
 	clusters.AddHeader(
 		"Namespace",
 		"Cluster Name",
+		"Instances",
+		"Phase",
 		"Labels",
 	)
 
@@ -60,9 +62,15 @@ func List(ctx context.Context, allNamespaces bool, labels string, output plugin.
 			labelOut = append(labelOut, fmt.Sprintf("%s: %s", k, v))
 		}
 
+		instances := fmt.Sprintf("%d/%d",
+			item.Status.ReadyInstances,
+			item.Status.Instances)
+
 		clusters.AddLine(
 			item.Namespace,
 			item.Name,
+			instances,
+			item.Status.Phase,
 			strings.Join(labelOut, ", "),
 		)
 	}
