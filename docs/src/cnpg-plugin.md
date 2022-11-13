@@ -98,7 +98,7 @@ kubectl cnpg list -A
 ```
 
 ```shell
-The following clusters are created
+Available Clusters:
 Namespace          Cluster Name       Labels
 ---------          ------------       ------
 sandbox            sandbox            env: sandbox, user: john

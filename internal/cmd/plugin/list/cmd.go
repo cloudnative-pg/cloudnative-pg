@@ -45,7 +45,7 @@ func NewCmd() *cobra.Command {
 	listCmd.PersistentFlags().BoolVarP(&allNamespaces,
 		"all-namespaces", "A", false, "Apply operation to all clusters in all namespaces")
 	listCmd.PersistentFlags().StringP(
-		"selector", "", "", "Label selector: label=value,label in (foo, bar)")
+		"selector", "l", "", "Label selector: label=value,label in (foo, bar)")
 	listCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
 

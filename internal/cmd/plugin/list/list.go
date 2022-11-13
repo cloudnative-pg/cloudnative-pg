@@ -47,7 +47,7 @@ func List(ctx context.Context, allNamespaces bool, labels string, output plugin.
 	}
 
 	clusters := tabby.New()
-	clusters.AddLine("The following clusters are created")
+	clusters.AddLine("Available Clusters:")
 	clusters.AddHeader(
 		"Namespace",
 		"Cluster Name",
