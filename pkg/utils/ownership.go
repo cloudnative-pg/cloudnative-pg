@@ -46,11 +46,11 @@ func SetAsOwnedBy(controlled *metav1.ObjectMeta, controller metav1.ObjectMeta, t
 // IMPORTANT: The controlled resource must reside in the same namespace as the operator as described by:
 // https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
 func SetAsOwnedByOperatorDeployment(ctx context.Context,
-	client client.Client,
+	kubeClient client.Client,
 	controlled *metav1.ObjectMeta,
 	operatorLabelSelector string,
 ) error {
-	deployment, err := GetOperatorDeployment(ctx, client, controlled.Namespace, operatorLabelSelector)
+	deployment, err := GetOperatorDeployment(ctx, kubeClient, controlled.Namespace, operatorLabelSelector)
 	if err != nil {
 		return err
 	}
@@ -70,11 +70,11 @@ func SetAsOwnedByOperatorDeployment(ctx context.Context,
 // or we find more than one, we just return an error.
 func GetOperatorDeployment(
 	ctx context.Context,
-	kclient client.Client,
+	kubeClient client.Client,
 	namespace, operatorLabelSelector string,
 ) (*v1.Deployment, error) {
 	deploymentList := &v1.DeploymentList{}
-	err := kclient.List(
+	err := kubeClient.List(
 		ctx,
 		deploymentList,
 		client.InNamespace(namespace),
@@ -92,7 +92,7 @@ func GetOperatorDeployment(
 	}
 
 	// TODO: check
-	if err := kclient.List(ctx, deploymentList, client.InNamespace(namespace), client.HasLabels{
+	if err := kubeClient.List(ctx, deploymentList, client.InNamespace(namespace), client.HasLabels{
 		"operators.coreos.com/cloudnative-pg.openshift-operators=",
 	}); err != nil {
 		return nil, err

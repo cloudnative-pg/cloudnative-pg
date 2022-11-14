@@ -25,13 +25,10 @@ import (
 	"net/http/pprof"
 	"time"
 
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,6 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	controllerScheme "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
@@ -52,12 +50,10 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = log.WithName("setup")
 
-	kclient client.Client
-
-	// apiClientSet is the kubernetes client set with
+	// kubeClient is the kubernetes client set with
 	// support for the apiextensions that is used
 	// during the initialization of the operator
-	apiClientSet *apiextensionsclientset.Clientset
+	kubeClient client.Client
 )
 
 const (
@@ -87,10 +83,7 @@ const (
 )
 
 func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = apiv1.AddToScheme(scheme)
-	_ = monitoringv1.AddToScheme(scheme)
-	// +kubebuilder:scaffold:scheme
+	controllerScheme.RegisterUsedApisToScheme(scheme)
 }
 
 // leaderElectionConfiguration contains the leader parameters that will be passed to controllerruntime.Options.
@@ -208,7 +201,7 @@ func RunController(
 	}
 
 	// Retrieve the Kubernetes cluster system UID
-	if err = utils.DetectKubeSystemUID(ctx, kclient); err != nil {
+	if err = utils.DetectKubeSystemUID(ctx, kubeClient); err != nil {
 		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
 		return err
 	}
@@ -347,14 +340,9 @@ func readinessProbeHandler(w http.ResponseWriter, _r *http.Request) {
 // the operator initialization
 func createKubernetesClient(config *rest.Config) error {
 	var err error
-	kclient, err = client.New(config, client.Options{Scheme: scheme})
+	kubeClient, err = client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
 		return fmt.Errorf("cannot create a K8s client: %w", err)
-	}
-
-	apiClientSet, err = apiextensionsclientset.NewForConfig(config)
-	if err != nil {
-		return fmt.Errorf("cannot create a K8s API extension client: %w", err)
 	}
 
 	return nil
@@ -385,7 +373,7 @@ func ensurePKI(ctx context.Context, mgrCertDir string) error {
 		},
 		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
 	}
-	err := pkiConfig.Setup(ctx, kclient, apiClientSet)
+	err := pkiConfig.Setup(ctx, kubeClient)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 	}
@@ -407,7 +395,7 @@ func readConfigMap(ctx context.Context, namespace, name string) (map[string]stri
 		"name", name)
 
 	configMap := &corev1.ConfigMap{}
-	err := kclient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, configMap)
+	err := kubeClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, configMap)
 	if apierrs.IsNotFound(err) {
 		return nil, nil
 	}
@@ -433,7 +421,7 @@ func readSecret(ctx context.Context, namespace, name string) (map[string]string,
 		"name", name)
 
 	secret := &corev1.Secret{}
-	err := kclient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret)
+	err := kubeClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret)
 	if apierrs.IsNotFound(err) {
 		return nil, nil
 	}

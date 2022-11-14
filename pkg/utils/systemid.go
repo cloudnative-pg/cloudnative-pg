@@ -27,9 +27,9 @@ import (
 var systemUID string
 
 // DetectKubeSystemUID retrieves the UID of the kube-system namespace of the containing cluster
-func DetectKubeSystemUID(ctx context.Context, cli client.Client) error {
+func DetectKubeSystemUID(ctx context.Context, kubeClient client.Client) error {
 	ns := &corev1.Namespace{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: "kube-system"}, ns); err != nil {
+	if err := kubeClient.Get(ctx, types.NamespacedName{Name: "kube-system"}, ns); err != nil {
 		return err
 	}
 	systemUID = string(ns.UID)
