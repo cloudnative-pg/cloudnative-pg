@@ -109,9 +109,6 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
-			if env.PostgresVersion == 10 {
-				Skip("replication slots not available in PostgreSQL 10 or older")
-			}
 			namespace = "primary-failover-time"
 			clusterName = "cluster-fast-failover"
 			// Create a cluster in a namespace we'll delete after the test
