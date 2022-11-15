@@ -96,7 +96,7 @@ new release branch off of `main`, the release notes are done for free.
 
 ## If creating a new minor release: create a new release branch from main
 
-IMPORTANT: the instructions in the previous sections should have been completed ahead
+IMPORTANT: The instructions in the previous sections should have been completed ahead
 of this. I.e. all cherry-picks should be done, documents should be up-to-date,
 and release notes should have been merged in `main`.
 
@@ -117,7 +117,7 @@ It is important that this procedure happens immediately before starting the rele
 Once the code in the release branch is stable and ready to be released, you can
 proceed with the supervised process.
 
-**IMPORTANT** If you are creating a new minor release, this steps should immediately
+**IMPORTANT** If you are creating a new minor release, those steps should immediately
 follow the creation of the new release branch from main, described in the previous section.
 I.e. the just created release branch must have the same commit hash of main.
 
