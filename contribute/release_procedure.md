@@ -135,9 +135,11 @@ releases of CloudNativePG:
    ["Installation"](../docs/src/installation_upgrade.md),
    create a multi-instance cluster, verify it becomes
    healthy, and once healthy, you can execute `psql` in the primary and interact
-   with with the database.
-6. In case of a new **minor** release, merge the new release commit on `main`
-   with `git merge --ff-only release-X.Y` followed by `git push`
+   with the database.
+6. If the current release branch is the latest **minor**(or new **minor** release), merge the
+   new release commit on `main` with `git merge --ff-only release-X.Y` followed by `git push`.
+   Say you're releasing 1.18.1, 1.17.2 and 1.16.4, the latest minor release branch is 
+   release-1.18, merge the release commit of that branch on main. 
 
 ## Documentation on the website
 
