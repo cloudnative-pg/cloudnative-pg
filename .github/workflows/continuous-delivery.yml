@@ -76,9 +76,13 @@ jobs:
   #   1. it's on 'main' branch
   #   2. it's triggered by events in the 'do_not_skip' list
   duplicate_runs:
-    # This tricky check is to skip the workflow runs triggered by `pull_request_target` event when the pull request is
-    # actually from our repo rather than a forked one.
-    if: ! ${{ github.event_name == "pull_request_target" && github.head.repo.full_name == github.base.repo.full_name }}
+    # This tricky check is to make sure this workflow will not run:
+    #   1. When it is triggered by `pull_request` event and the pull request is from forked repository
+    #  or
+    #   2. When it is triggred by `pull_request_target` event and the pull request is from this source repository.
+    if: |
+      ! (( github.event_name == "pull_request" && github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name ) || 
+      ( github.event_name == "pull_request_target" && github.event.pull_request_target.head.repo.full_name == github.event.pull_request_target.base.repo.full_name ))
     runs-on: ubuntu-20.04
     name: Skip duplicate runs
     continue-on-error: true
