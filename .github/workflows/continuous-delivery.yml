@@ -66,6 +66,7 @@ env:
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   FEATURE_TYPE: "${{github.event.inputs.feature_type}}"
 
+
 defaults:
   run:
     # default failure handling for shell scripts in 'run' steps
@@ -75,27 +76,38 @@ jobs:
   # Detects if we should skip the workflow due to being duplicated. Exceptions:
   #   1. it's on 'main' branch
   #   2. it's triggered by events in the 'do_not_skip' list
+  #   3. it's triggered by a pull request event from this repository, skip event pull_request_target
+  #   4. it's triggered by a pull request event from fork repository, skip event pull_request
   duplicate_runs:
-    # This tricky check is to make sure this workflow will not run:
-    #   1. When it is triggered by `pull_request` event and the pull request is from forked repository
-    #  or
-    #   2. When it is triggred by `pull_request_target` event and the pull request is from this source repository.
-    if: |
-      ! (( github.event_name == "pull_request" && github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name ) || 
-      ( github.event_name == "pull_request_target" && github.event.pull_request_target.head.repo.full_name == github.event.pull_request_target.base.repo.full_name ))
     runs-on: ubuntu-20.04
     name: Skip duplicate runs
     continue-on-error: true
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
+      should_skip:  ${{ steps.fork_check.outputs.should_skip == 'true' ||
+         steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
     steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5.2.0
-        with:
-          concurrent_skipping: 'same_content'
-          skip_after_successful_duplicate: 'true'
-          paths_ignore: '["README.md", "docs/**"]'
-          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+    - name: fork repository check
+      id: fork_check
+      run: |
+        # This tricky check is to make sure this workflow will not run:
+        #   1. When it is triggered by `pull_request` event and the pull request is from forked repository
+        #  or
+        #   2. When it is triggred by `pull_request_target` event and the pull request is from this source repository.
+        # check if the pull request is from a fork repository
+        fork_repo_pr="${{github.event.pull_request_target.head.repo.full_name != github.event.pull_request_target.base.repo.full_name}}"
+        if [ ${fork_repo_pr} == 'true' ]; then
+           skip="${{ github.event_name == 'pull_request'}}"
+        else
+           skip="${{ github.event_name == 'pull_request_target'}}"
+        fi
+        echo "should_skip=${skip}" >> $GITHUB_OUTPUT
+    - id: skip_check
+      uses: fkirc/skip-duplicate-actions@v5.2.0
+      with:
+        concurrent_skipping: 'same_content'
+        skip_after_successful_duplicate: 'true'
+        paths_ignore: '["README.md", "docs/**"]'
+        do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
 
   # Classify codebase changes along 5 different dimensions based on the files
   # changed in the commit/PR, and create 5 different filters which are used in
