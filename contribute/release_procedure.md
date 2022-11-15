@@ -96,8 +96,8 @@ new release branch off of `main`, the release notes are done for free.
 
 ## If creating a new minor release: create a new release branch from main
 
-NOTE: the instructions in the previous sections should have been completed ahead
-of this. I.e. all cherry-picks should be done, documents should be up to date,
+IMPORTANT: the instructions in the previous sections should have been completed ahead
+of this. I.e. all cherry-picks should be done, documents should be up-to-date,
 and release notes should have been merged in `main`.
 
 A new release branch is created starting from the most updated commit in the
@@ -110,10 +110,16 @@ git checkout -b release-X.Y
 git push --set-upstream origin release-X.Y
 ```
 
+It is important that this procedure happens immediately before starting the release.
+
 ## Release steps
 
 Once the code in the release branch is stable and ready to be released, you can
 proceed with the supervised process.
+
+**IMPORTANT** If you are creating a new minor release, this steps should immediately
+follow the creation of the new release branch from main, described in the previous section.
+I.e. the just created release branch must have the same commit hash of main.
 
 **IMPORTANT:** You need to issue the commands below from each release branch.
 If you are releasing a new minor version, you should have created the new
@@ -136,10 +142,16 @@ releases of CloudNativePG:
    create a multi-instance cluster, verify it becomes
    healthy, and once healthy, you can execute `psql` in the primary and interact
    with the database.
-6. If the current release branch is the latest **minor**(or new **minor** release), merge the
-   new release commit on `main` with `git merge --ff-only release-X.Y` followed by `git push`.
-   Say you're releasing 1.18.1, 1.17.2 and 1.16.4, the latest minor release branch is 
-   release-1.18, merge the release commit of that branch on main. 
+6. If the current release is the latest **minor** release and the branch is new
+   (the patch version is 0), merge the new release commit on `main`
+   with `git merge --ff-only release-X.Y` followed by `git push`.
+   Say you're releasing 1.18.0, the latest minor release branch is
+   release-1.18, merge the release commit from that branch on main.
+7. If the current release is the latest **minor** release but the branch is not new
+   (the patch version is 1 or higher), cherry-pick the new release commit on `main`
+   with `git cherry-pick release-X.Y` followed by `git push`.
+   Say you're releasing 1.18.1, 1.17.2 and 1.16.4, the latest minor release branch
+   is release-1.18, cherry-pick the release commit from that branch on main.
 
 ## Documentation on the website
 
