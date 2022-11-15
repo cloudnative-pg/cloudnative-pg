@@ -18,7 +18,7 @@ jobs:
     steps:
       -
         name: label the pull request
-        uses: actions-ecosystem/action-add-labels@v1.1.3
+        uses: actions-ecosystem/action-add-labels@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           number:  ${{ github.event.pull_request.number }}
@@ -34,8 +34,6 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             By default, the pull request is supposed to backport to all release branches.
-            Currently only pull request merged with one single commit is supported, if `Rebase and merge`
-            is used with more than one commit, need backport manually.
           reactions: heart
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
@@ -49,18 +47,19 @@ jobs:
         branch:
           -  release-1.16
           -  release-1.17
+    env:
+      PR: ${{ github.event.pull_request.number }}
     steps:
       -
         name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          ref: ${{ matrix.branch }}
+          token: ${{ secrets.REPO_GHA_PAT }}
       -
         name: Check labels
         if: success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
         run: |
           label=$(gh pr view ${PR} --json labels -q ".labels.[].name" 2>/dev/null | grep ${{ matrix.branch }} || :)
           echo "LABEL=${label}" >> $GITHUB_ENV
@@ -73,7 +72,7 @@ jobs:
           author_email=$(git show -s --format='%ae' "${commit}")
           echo "AUTHOR_EMAIL=${author_email}" >> $GITHUB_ENV
       -
-        name: Configure git user
+        name: cherry pick
         if: |
           env.LABEL != '' &&
           env.COMMIT != '' &&
@@ -81,45 +80,22 @@ jobs:
         run: |
           git config user.email "${{ env.AUTHOR_EMAIL }}"
           git config user.name "${{ env.AUTHOR_NAME }}"
-      -
-        name: cherry pick
-        if: success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
           git fetch
-          git checkout -B ${{ matrix.branch }} origin/${{ matrix.branch }} -t -f
-          git checkout -B cherry-pick-${{ matrix.branch }}-${PR}-${{ env.COMMIT }} -f
           git cherry-pick -x --allow-empty-message --mainline 1 ${{ env.COMMIT }}
-          git push origin cherry-pick-${{ matrix.branch }}-${PR}-${{ env.COMMIT }}:cherry-pick-${{ matrix.branch }}-${PR}-${{ env.COMMIT }}
-      -
-        name: create pull request
-        uses: devops-infra/action-pull-request@v0.5.2
-        if: |
-          success() &&
-          env.COMMIT != ''
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          source_branch: cherry-pick-${{ matrix.branch }}-${{ github.event.pull_request.number }}-${{ env.COMMIT }}
-          target_branch: ${{ matrix.branch }}
-          title: "chore(backport): backport pull request ${{ github.event.pull_request.number }} to branch ${{ matrix.branch }}"
-          body: "This is a automatically backport pull request"
-          label: backport
+          git push
       -
         name: create ticket
-        uses: dacbd/create-issue-action@v1.2.1
-        if: |
-          failure()
+        uses: dacbd/create-issue-action@v1
+        if: failure()
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          title: Backport failure for pull request ${{ github.event.pull_request.number }}
+          title: Backport failure for pull request ${PR}
           labels: backport failure
           body: |
             ### Context
             Automatically backport failure
 
-            Pull request: ${{ github.event.pull_request.number }}
+            Pull request: ${PR}
             commit: ${{ env.COMMIT }}
             Release Branch: ${{ matrix.branch }}
 
