@@ -78,7 +78,6 @@ func GetOperatorDeployment(
 		ctx,
 		deploymentList,
 		client.InNamespace(namespace),
-		// TODO: check if equivalent
 		client.HasLabels{operatorLabelSelector},
 	)
 	if err != nil {
@@ -91,10 +90,10 @@ func GetOperatorDeployment(
 		return nil, fmt.Errorf("more than one operator deployment running")
 	}
 
-	// TODO: check
-	if err := kubeClient.List(ctx, deploymentList, client.InNamespace(namespace), client.HasLabels{
-		"operators.coreos.com/cloudnative-pg.openshift-operators=",
-	}); err != nil {
+	if err := kubeClient.List(ctx,
+		deploymentList,
+		client.InNamespace(namespace),
+		client.HasLabels{"operators.coreos.com/cloudnative-pg.openshift-operators="}); err != nil {
 		return nil, err
 	}
 

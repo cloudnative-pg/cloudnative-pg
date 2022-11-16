@@ -376,13 +376,14 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 func renewServerCertificate(
 	ctx context.Context, kubeClient client.Client, caSecret v1.Secret, secret *v1.Secret,
 ) (*v1.Secret, error) {
+	origSecret := secret.DeepCopy()
 	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret)
 	if err != nil {
 		return nil, err
 	}
 
 	if hasBeenRenewed {
-		if err := kubeClient.Update(ctx, secret); err != nil {
+		if err := kubeClient.Patch(ctx, secret, client.MergeFrom(origSecret)); err != nil {
 			return nil, err
 		}
 		return secret, nil
