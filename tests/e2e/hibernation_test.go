@@ -44,17 +44,6 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().FullText()+".log")
-		}
-	})
-
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
 	Context("hibernate", func() {
 		var err error
 		getPrimaryAndClusterManifest := func(namespace, clusterName string) ([]byte, *apiv1.Cluster, string) {
@@ -279,6 +268,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				// Create a cluster in a namespace we'll delete after the test
 				err = env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					return env.DeleteNamespace(namespace)
+				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				assertHibernation(namespace, clusterName, tableName)
 			})
@@ -293,6 +288,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				// Create a cluster in a namespace we'll delete after the test
 				err = env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					return env.DeleteNamespace(namespace)
+				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName)
@@ -345,6 +346,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				// Create a cluster in a namespace we'll delete after the test
 				err = env.CreateNamespace(namespace)
 				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					return env.DeleteNamespace(namespace)
+				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				AssertSwitchover(namespace, clusterName, env)
 				assertHibernation(namespace, clusterName, tableName)

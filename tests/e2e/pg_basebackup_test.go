@@ -112,16 +112,6 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.Labe
 
 	const checkQuery = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
 	It("can bootstrap with pg_basebackup using TLS auth", func() {
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
