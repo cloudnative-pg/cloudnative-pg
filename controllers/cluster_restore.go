@@ -94,6 +94,7 @@ func getOrphanPVCs(
 	if err := c.List(
 		ctx,
 		&pvcList,
+		client.InNamespace(cluster.Namespace),
 		client.MatchingLabels{utils.ClusterLabelName: cluster.Name},
 	); err != nil {
 		return nil, err
