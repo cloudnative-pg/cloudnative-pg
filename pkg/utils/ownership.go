@@ -19,9 +19,9 @@ package utils
 import (
 	"context"
 	"fmt"
-
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -73,12 +73,16 @@ func GetOperatorDeployment(
 	kubeClient client.Client,
 	namespace, operatorLabelSelector string,
 ) (*v1.Deployment, error) {
+	labelMap, err := labels.ConvertSelectorToLabelsMap(operatorLabelSelector)
+	if err != nil {
+		return nil, err
+	}
 	deploymentList := &v1.DeploymentList{}
-	err := kubeClient.List(
+	err = kubeClient.List(
 		ctx,
 		deploymentList,
 		client.InNamespace(namespace),
-		client.HasLabels{operatorLabelSelector},
+		client.MatchingLabelsSelector{Selector: labelMap.AsSelector()},
 	)
 	if err != nil {
 		return nil, err
