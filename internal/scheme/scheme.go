@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package scheme implements the scheme used by the CNP controller
 package scheme
 
 import (
@@ -26,12 +25,57 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// RegisterUsedApisToScheme registers the used API to the passed scheme
-func RegisterUsedApisToScheme(scheme *runtime.Scheme) {
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = apiv1.AddToScheme(scheme)
-	_ = monitoringv1.AddToScheme(scheme)
-	_ = apiextensionsv1.AddToScheme(scheme)
+// Builder contains the fluent methods to build a schema
+type Builder struct {
+	scheme *runtime.Scheme
+}
+
+// New creates a new builder
+func New() *Builder {
+	return &Builder{scheme: runtime.NewScheme()}
+}
+
+// WithClientGoScheme adds the kubernetes/scheme
+func (b *Builder) WithClientGoScheme() *Builder {
+	_ = clientgoscheme.AddToScheme(b.scheme)
+
+	return b
+}
+
+// WithAPIV1 adds the v1 scheme
+func (b *Builder) WithAPIV1() *Builder {
+	_ = apiv1.AddToScheme(b.scheme)
+
+	return b
+}
+
+// WithMonitoringV1 adds prometheus-operator scheme
+func (b *Builder) WithMonitoringV1() *Builder {
+	_ = monitoringv1.AddToScheme(b.scheme)
+
+	return b
+}
+
+// WithAPIExtensionV1 adds apiextensions/v1
+func (b *Builder) WithAPIExtensionV1() *Builder {
+	_ = apiextensionsv1.AddToScheme(b.scheme)
+
+	return b
+}
+
+// Build returns the built scheme
+func (b *Builder) Build() *runtime.Scheme {
+	return b.scheme
+}
+
+// BuildWithAllKnownScheme registers all the API used by the manager
+func BuildWithAllKnownScheme() *runtime.Scheme {
+	return New().
+		WithAPIV1().
+		WithClientGoScheme().
+		WithMonitoringV1().
+		WithAPIExtensionV1().
+		Build()
 
 	// +kubebuilder:scaffold:scheme
 }

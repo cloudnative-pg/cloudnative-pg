@@ -27,7 +27,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,7 +34,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	controllerScheme "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
@@ -46,7 +45,7 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	scheme   = schemeBuilder.BuildWithAllKnownScheme()
 	setupLog = log.WithName("setup")
 )
 
@@ -75,10 +74,6 @@ const (
 	CaSecretName = "cnpg-ca-secret" // #nosec
 
 )
-
-func init() {
-	controllerScheme.RegisterUsedApisToScheme(scheme)
-}
 
 // leaderElectionConfiguration contains the leader parameters that will be passed to controllerruntime.Options.
 type leaderElectionConfiguration struct {
