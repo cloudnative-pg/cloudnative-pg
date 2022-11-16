@@ -49,12 +49,6 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("can update the user application password", func() {
 		const namespace = "cluster-update-user-password"
 		// Create a cluster in a namespace we'll delete after the test
@@ -121,12 +115,6 @@ var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnect
 	const namespace = "cluster-superuser-enable"
 	const sampleFile = fixturesDir + "/base/cluster-basic.yaml"
 	const clusterName = "cluster-basic"
-
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	It("enable disable superuser access", func() {
 		var secret corev1.Secret
@@ -231,12 +219,6 @@ var _ = Describe("Creating a cluster without superuser password", Label(tests.La
 	const namespace = "no-postgres-pwd"
 	const sampleFile = fixturesDir + "/secrets/cluster-no-postgres-pwd.yaml.template"
 	const clusterName = "cluster-no-postgres-pwd"
-
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	It("create a cluster without postgres password", func() {
 		var secret corev1.Secret
