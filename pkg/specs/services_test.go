@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,21 +37,21 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterAnyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-any"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeTrue())
-		Expect(service.Spec.Selector["postgresql"]).To(Equal("clustername"))
+		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 	})
 
 	It("create a configured -r service", func() {
 		service := CreateClusterReadService(postgresql)
 		Expect(service.Name).To(Equal("clustername-r"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector["postgresql"]).To(Equal("clustername"))
+		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 	})
 
 	It("create a configured -ro service", func() {
 		service := CreateClusterReadOnlyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-ro"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector["postgresql"]).To(Equal("clustername"))
+		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[ClusterRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
 	})
 
@@ -58,7 +59,7 @@ var _ = Describe("Services specification", func() {
 		service := CreateClusterReadWriteService(postgresql)
 		Expect(service.Name).To(Equal("clustername-rw"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
-		Expect(service.Spec.Selector["postgresql"]).To(Equal("clustername"))
+		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[ClusterRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
 	})
 })
