@@ -29,7 +29,6 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -49,11 +48,6 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = log.WithName("setup")
-
-	// kubeClient is the kubernetes client set with
-	// support for the apiextensions that is used
-	// during the initialization of the operator
-	kubeClient client.Client
 )
 
 const (
@@ -170,13 +164,17 @@ func RunController(
 		mgr.GetWebhookServer().KeyName = "tls.key"
 	}
 
-	err = createKubernetesClient(mgr.GetConfig())
+	// kubeClient is the kubernetes client set with
+	// support for the apiextensions that is used
+	// during the initialization of the operator
+	// kubeClient client.Client
+	kubeClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: scheme})
 	if err != nil {
-		setupLog.Error(err, "unable to create Kubernetes clients")
+		setupLog.Error(err, "unable to create Kubernetes client")
 		return err
 	}
 
-	err = loadConfiguration(ctx, configMapName, secretName)
+	err = loadConfiguration(ctx, kubeClient, configMapName, secretName)
 	if err != nil {
 		return err
 	}
@@ -211,7 +209,7 @@ func RunController(
 		"haveSCC", utils.HaveSecurityContextConstraints(),
 		"haveSeccompProfile", utils.HaveSeccompSupport())
 
-	if err := ensurePKI(ctx, mgr.GetWebhookServer().CertDir); err != nil {
+	if err := ensurePKI(ctx, kubeClient, mgr.GetWebhookServer().CertDir); err != nil {
 		return err
 	}
 
@@ -292,12 +290,17 @@ func RunController(
 }
 
 // loadConfiguration reads the configuration from the provided configmap and secret
-func loadConfiguration(ctx context.Context, configMapName string, secretName string) error {
+func loadConfiguration(
+	ctx context.Context,
+	kubeClient client.Client,
+	configMapName string,
+	secretName string,
+) error {
 	configData := make(map[string]string)
 
 	// First read the configmap if provided and store it in configData
 	if configMapName != "" {
-		configMapData, err := readConfigMap(ctx, configuration.Current.OperatorNamespace, configMapName)
+		configMapData, err := readConfigMap(ctx, kubeClient, configuration.Current.OperatorNamespace, configMapName)
 		if err != nil {
 			setupLog.Error(err, "unable to read ConfigMap",
 				"namespace", configuration.Current.OperatorNamespace,
@@ -311,7 +314,7 @@ func loadConfiguration(ctx context.Context, configMapName string, secretName str
 
 	// Then read the secret if provided and store it in configData, overwriting configmap's values
 	if secretName != "" {
-		secretData, err := readSecret(ctx, configuration.Current.OperatorNamespace, secretName)
+		secretData, err := readSecret(ctx, kubeClient, configuration.Current.OperatorNamespace, secretName)
 		if err != nil {
 			setupLog.Error(err, "unable to read Secret",
 				"namespace", configuration.Current.OperatorNamespace,
@@ -336,21 +339,13 @@ func readinessProbeHandler(w http.ResponseWriter, _r *http.Request) {
 	_, _ = fmt.Fprint(w, "OK")
 }
 
-// createKubernetesClient creates the Kubernetes client that will be used during
-// the operator initialization
-func createKubernetesClient(config *rest.Config) error {
-	var err error
-	kubeClient, err = client.New(config, client.Options{Scheme: scheme})
-	if err != nil {
-		return fmt.Errorf("cannot create a K8s client: %w", err)
-	}
-
-	return nil
-}
-
 // ensurePKI ensures that we have the required PKI infrastructure to make
 // the operator and the clusters working
-func ensurePKI(ctx context.Context, mgrCertDir string) error {
+func ensurePKI(
+	ctx context.Context,
+	kubeClient client.Client,
+	mgrCertDir string,
+) error {
 	if configuration.Current.WebhookCertDir != "" {
 		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
 		return nil
@@ -381,7 +376,12 @@ func ensurePKI(ctx context.Context, mgrCertDir string) error {
 }
 
 // readConfigMap reads the configMap and returns its content as map
-func readConfigMap(ctx context.Context, namespace, name string) (map[string]string, error) {
+func readConfigMap(
+	ctx context.Context,
+	kubeClient client.Client,
+	namespace string,
+	name string,
+) (map[string]string, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -407,7 +407,12 @@ func readConfigMap(ctx context.Context, namespace, name string) (map[string]stri
 }
 
 // readSecret reads the secret and returns its content as map
-func readSecret(ctx context.Context, namespace, name string) (map[string]string, error) {
+func readSecret(
+	ctx context.Context,
+	kubeClient client.Client,
+	namespace,
+	name string,
+) (map[string]string, error) {
 	if name == "" {
 		return nil, nil
 	}
