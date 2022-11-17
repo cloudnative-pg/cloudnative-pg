@@ -1,0 +1,103 @@
+name: pull_request_backport
+on:
+  pull_request_target:
+    types:
+      - closed
+      - opened
+      - reopened
+    branches:
+      - main
+
+jobs:
+  # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
+  # we backport everything
+  label-source-pr:
+    name: label the source pr
+    if: github.event.pull_request.merged == false
+    runs-on: ubuntu-20.04
+    steps:
+      -
+        name: label the pull request
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          number:  ${{ github.event.pull_request.number }}
+          labels: |
+            backport-requested
+            release-1.16
+            release-1.17
+            release-1.18
+      -
+        name: Create comment
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            By default, the pull request is supposed to backport to all release branches.
+          reactions: heart
+
+  ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
+  back-porting-pr:
+    name: backport to release branches
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'backport-requested')
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          -  release-1.16
+          -  release-1.17
+          -  release-1.18
+    env:
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ matrix.branch }}
+          token: ${{ secrets.REPO_GHA_PAT }}
+      -
+        name: Check labels
+        if: success()
+        run: |
+          label=$(gh pr view ${PR} --json labels -q ".labels.[].name" 2>/dev/null | grep ${{ matrix.branch }} || :)
+          echo "LABEL=${label}" >> $GITHUB_ENV
+          echo "find label ${label} in pull request ${PR}"
+          commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
+          echo "COMMIT=${commit}" >> $GITHUB_ENV
+          echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
+          author_name=$(git show -s --format='%an' "${commit}")
+          echo "AUTHOR_NAME=${author_name}" >> $GITHUB_ENV
+          author_email=$(git show -s --format='%ae' "${commit}")
+          echo "AUTHOR_EMAIL=${author_email}" >> $GITHUB_ENV
+      -
+        name: cherry pick
+        if: |
+          env.LABEL != '' &&
+          env.COMMIT != '' &&
+          env.LABEL == matrix.branch
+        run: |
+          git config user.email "${{ env.AUTHOR_EMAIL }}"
+          git config user.name "${{ env.AUTHOR_NAME }}"
+          git fetch
+          git cherry-pick -x --allow-empty-message --mainline 1 ${{ env.COMMIT }}
+          git push
+      -
+        name: create ticket
+        uses: dacbd/create-issue-action@v1
+        if: failure()
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: Backport failure for pull request ${PR}
+          labels: backport failure
+          body: |
+            ### Context
+            Automatically backport failure
+
+            Pull request: ${PR}
+            commit: ${{ env.COMMIT }}
+            Release Branch: ${{ matrix.branch }}
+
