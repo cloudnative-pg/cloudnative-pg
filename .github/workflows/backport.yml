@@ -26,6 +26,7 @@ jobs:
             backport-requested
             release-1.16
             release-1.17
+            release-1.18
       -
         name: Create comment
         uses: peter-evans/create-or-update-comment@v2
@@ -47,6 +48,7 @@ jobs:
         branch:
           -  release-1.16
           -  release-1.17
+          -  release-1.18
     env:
       PR: ${{ github.event.pull_request.number }}
     steps:
