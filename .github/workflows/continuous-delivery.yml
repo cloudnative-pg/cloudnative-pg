@@ -902,7 +902,7 @@ jobs:
         run: |
           pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
           echo "PR_NUMBER=${pr_number}" >> $GITHUB_ENV
-          ok_label=$((gh pr view --json labels -q ".labels.[].name" 2>/dev/null || :) | grep "ok to merge :ok_hand:")
+          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
       -
         name: Label the PR as "ok to merge :ok_hand:"
@@ -937,7 +937,7 @@ jobs:
         run: |
           pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
           echo "PR_NUMBER=${pr_number}" >> $GITHUB_ENV
-          ok_label=$((gh pr view --json labels -q ".labels.[].name" 2>/dev/null || :) | grep "ok to merge :ok_hand:")
+          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
       - name: Remove "ok to merge :ok_hand:" label from PR
         if: |
