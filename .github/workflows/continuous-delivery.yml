@@ -905,7 +905,7 @@ jobs:
 # This label is a prerequisite to be able to merge a PR.
 # Also see to 'require-labels.yml'
   ok-to-merge:
-    name: Label the PR as "ok to merge"
+    name: Label the PR as "ok to merge :ok_hand:"
     needs:
       - duplicate_runs
       - evaluate-test-level
@@ -930,10 +930,10 @@ jobs:
         run: |
           pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
           echo "PR_NUMBER=${pr_number}" >> $GITHUB_ENV
-          ok_label=$((gh pr view --json labels -q ".labels.[].name" 2>/dev/null || :) | grep "ok to merge")
+          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
       -
-        name: Label the PR as "ok to merge"
+        name: Label the PR as "ok to merge :ok_hand:"
         if: |
            env.PR_NUMBER != '' &&
            env.OK_LABEL == ''
@@ -943,9 +943,9 @@ jobs:
           number: ${{ env.PR_NUMBER }}
           labels: "ok to merge :ok_hand:"
 
-  # Remove the 'ok-to-merge' label if the E2E tests or previous steps failed
+  # Remove the "ok to merge :ok_hand:" label if the E2E tests or previous steps failed
   unlabel-ok-to-merge:
-    name: Remove the "ok to merge" label from the PR
+    name: Remove the "ok to merge :ok_hand:" label from the PR
     needs:
       - duplicate_runs
       - evaluate-test-level
@@ -965,9 +965,9 @@ jobs:
         run: |
           pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
           echo "PR_NUMBER=${pr_number}" >> $GITHUB_ENV
-          ok_label=$((gh pr view --json labels -q ".labels.[].name" 2>/dev/null || :) | grep "ok to merge")
+          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
-      - name: Remove "ok to merge" label from PR
+      - name: Remove "ok to merge :ok_hand:" label from PR
         if: |
           env.PR_NUMBER != '' &&
           env.OK_LABEL != ''
