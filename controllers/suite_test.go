@@ -52,9 +52,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
 var (
 	cfg               *rest.Config
 	k8sClient         client.Client
@@ -70,22 +67,13 @@ func init() {
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
-
 	RunSpecs(t, "Controllers Suite")
 }
 
 var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 
-	if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
-		By("using existing config for test environment")
-		testEnv = &envtest.Environment{}
-	} else {
-		By("bootstrapping test environment")
-		testEnv = &envtest.Environment{
-			CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
-		}
-	}
+	testEnv = buildTestEnv()
 
 	var err error
 	cfg, err = testEnv.Start()
@@ -120,6 +108,20 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
+
+func buildTestEnv() *envtest.Environment {
+	const (
+		envUseExistingCluster = "USE_EXISTING_CLUSTER"
+	)
+
+	testEnvironment := &envtest.Environment{}
+	if os.Getenv(envUseExistingCluster) != "true" {
+		By("bootstrapping test environment")
+		testEnvironment.CRDDirectoryPaths = []string{filepath.Join("..", "config", "crd", "bases")}
+	}
+
+	return testEnvironment
+}
 
 func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	pooler := &apiv1.Pooler{
