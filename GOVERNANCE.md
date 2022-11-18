@@ -105,6 +105,25 @@ simple majority vote among current maintainers.
 Maintainers who are selected will be granted the necessary GitHub rights,
 and invited to the private maintainer mailing list.
 
+## Losing Maintainer Status
+
+If a maintainer is no longer interested or cannot perform the maintainer duties
+listed above, they should volunteer to be moved to emeritus status. If
+possible, try to complete your work or help find someone to pick up your work
+before stepping down.
+
+If a maintainer has stopped contributing for a reasonable amount of time, an
+existing maintainer may propose to move such maintainers to emeritus list by
+starting a new [Github discussion under the "Maintainers room" category](https://github.com/cloudnative-pg/cloudnative-pg/discussions/categories/maintainers-room), making sure that the maintainer in question is properly mentioned in the discussion via the GitHub handle.
+
+Two more maintainers need to second the nomination. If no one objects in 10
+working days (Italy's timezone), the move to emeritus status is accepted.
+If anyone objects or wants more information, the maintainers discuss and
+usually come to a consensus (within the 10  working days). If issues can't be
+resolved, there's a simple majority vote among current maintainers.
+
+Emeritus maintainers do not have administration rights in GitHub.
+
 ## Meetings
 
 Time zones permitting, Maintainers are expected to participate in the public
