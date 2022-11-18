@@ -62,11 +62,23 @@ jobs:
       -
         name: Check labels
         if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           label=$(gh pr view ${PR} --json labels -q ".labels.[].name" 2>/dev/null | grep ${{ matrix.branch }} || :)
+          if [ -z "${label}" ]
+          then
+            echo "No ${{ matrix.branch }} label found!"
+            exit 1
+          fi
           echo "LABEL=${label}" >> $GITHUB_ENV
           echo "find label ${label} in pull request ${PR}"
           commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
+          if [ -z "${commit}" ]
+          then
+            echo "No commit found!"
+            exit 1
+          fi
           echo "COMMIT=${commit}" >> $GITHUB_ENV
           echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
           author_name=$(git show -s --format='%an' "${commit}")
@@ -91,13 +103,13 @@ jobs:
         if: failure()
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          title: Backport failure for pull request ${PR}
+          title: Backport failure for pull request ${{ env.PR }}
           labels: backport failure
           body: |
             ### Context
             Automatically backport failure
 
-            Pull request: ${PR}
+            Pull request: ${{ env.PR }}
             commit: ${{ env.COMMIT }}
             Release Branch: ${{ matrix.branch }}
 
