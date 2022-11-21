@@ -79,7 +79,7 @@ nfpms:
     file_name_template: kubectl-cnpg_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}
     homepage: https://github.com/cloudnative-pg/cloudnative-pg
     bindir: /usr/local/bin
-    maintainer: 'Macro marco.nenciarini@enterprisedb.com'
+    maintainer: 'Marco Nenciarini <marco.nenciarini@enterprisedb.com>'
     builds:
       - kubectl-cnpg
     formats:
