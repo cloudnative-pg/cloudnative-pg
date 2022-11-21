@@ -19,6 +19,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -77,12 +78,46 @@ func GetOperatorDeployment(
 	if err != nil {
 		return nil, err
 	}
+	deployment, err := FindOperatorDeploymentByFilter(ctx,
+		kubeClient,
+		namespace,
+		client.MatchingLabelsSelector{Selector: labelMap.AsSelector()})
+	if err != nil {
+		return nil, err
+	}
+	if deployment != nil {
+		return deployment, nil
+	}
+
+	deployment, err = FindOperatorDeploymentByFilter(ctx,
+		kubeClient,
+		namespace,
+		client.HasLabels{"operators.coreos.com/cloudnative-pg.openshift-operators="})
+	if err != nil {
+		return nil, err
+	}
+	if deployment != nil {
+		return deployment, nil
+	}
+
+	return nil, fmt.Errorf("no deployment detected")
+}
+
+// FindOperatorDeploymentByFilter search in a defined namespace
+// looking for a deployment with the defined filter
+func FindOperatorDeploymentByFilter(ctx context.Context,
+	kubeClient client.Client,
+	namespace string,
+	filter client.ListOption,
+) (*v1.Deployment, error) {
+	logger := log.FromContext(ctx)
+
 	deploymentList := &v1.DeploymentList{}
-	err = kubeClient.List(
+	err := kubeClient.List(
 		ctx,
 		deploymentList,
 		client.InNamespace(namespace),
-		client.MatchingLabelsSelector{Selector: labelMap.AsSelector()},
+		filter,
 	)
 	if err != nil {
 		return nil, err
@@ -91,22 +126,12 @@ func GetOperatorDeployment(
 	case len(deploymentList.Items) == 1:
 		return &deploymentList.Items[0], nil
 	case len(deploymentList.Items) > 1:
-		return nil, fmt.Errorf("more than one operator deployment running")
-	}
-
-	if err := kubeClient.List(ctx,
-		deploymentList,
-		client.InNamespace(namespace),
-		client.HasLabels{"operators.coreos.com/cloudnative-pg.openshift-operators="}); err != nil {
+		err = fmt.Errorf("more than one operator deployment running")
+		logger.Error(err, "more than one operator deployment found with the filter", "filter", filter)
 		return nil, err
 	}
 
-	switch {
-	case len(deploymentList.Items) == 0:
-		return nil, fmt.Errorf("no deployment detected")
-	case len(deploymentList.Items) > 1:
-		return nil, fmt.Errorf("more than one operator deployment running")
-	}
-
-	return &deploymentList.Items[0], nil
+	err = fmt.Errorf("no operator deployment found")
+	logger.Error(err, "no operator deployment found with the filter", "filter", filter)
+	return nil, err
 }
