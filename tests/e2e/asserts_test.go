@@ -17,8 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -216,19 +214,6 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
-
-		// start recording operator logs, dump them if the spec fails
-		var buf bytes.Buffer
-		go func() {
-			_ = env.TailOperatorLogs(context.TODO(), &buf)
-		}()
-		DeferCleanup(func(ctx SpecContext) {
-			if CurrentSpecReport().Failed() {
-				GinkgoWriter.Println("DUMPING Operator Logs. Failed Spec:",
-					CurrentSpecReport().LeafNodeText)
-				_, _ = buf.WriteTo(GinkgoWriter)
-			}
-		})
 
 		start := time.Now()
 		Eventually(func() (string, error) {

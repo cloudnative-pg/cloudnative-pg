@@ -65,7 +65,7 @@ func TailPodLogs(ctx context.Context, pod corev1.Pod, writer io.Writer) (err err
 	pods := kubernetes.NewForConfigOrDie(conf).CoreV1().Pods(pod.Namespace)
 	now := metav1.Now()
 	logsRequest := pods.GetLogs(pod.Name, &corev1.PodLogOptions{
-		Timestamps: true,
+		Timestamps: false, // keep false so we get real JSON, and can parse/filter by level
 		Follow:     true,
 		SinceTime:  &now,
 	})
