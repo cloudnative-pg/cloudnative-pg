@@ -138,11 +138,11 @@ var _ = BeforeEach(func() {
 		}
 	}()
 	DeferCleanup(func(ctx SpecContext) {
-		// if CurrentSpecReport().Failed() {
-		GinkgoWriter.Println("DUMPING Operator Logs. Failed Spec:",
-			CurrentSpecReport().LeafNodeText)
-		saveOperatorLogs(buf, CurrentSpecReport().LeafNodeText)
-		// }
+		if CurrentSpecReport().Failed() {
+			GinkgoWriter.Println("DUMPING Operator Logs. Failed Spec:",
+				CurrentSpecReport().LeafNodeText)
+			saveOperatorLogs(buf, CurrentSpecReport().LeafNodeText)
+		}
 	})
 
 	if operatorPodWasRenamed {
