@@ -14,27 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils_test
+package certs
 
 import (
 	"context"
-	controllerScheme "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-const (
-	operatorDeploymentName = "cnpg-controller-manager"
-	operatorNamespaceName  = "operator-namespace"
-)
-
-func createFakeOperatorDeployment(ctx context.Context, kubeClient client.Client, deploymentName string, labels map[string]string) error {
+func createFakeOperatorDeploymentByName(ctx context.Context,
+	kubeClient client.Client,
+	deploymentName string,
+	labels map[string]string,
+) error {
 	operatorDep := appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -48,7 +46,10 @@ func createFakeOperatorDeployment(ctx context.Context, kubeClient client.Client,
 	return kubeClient.Create(ctx, &operatorDep)
 }
 
-func deleteFakeOperatorDeployment(ctx context.Context, kubeClient client.Client, deploymentName string) error {
+func deleteFakeOperatorDeployment(ctx context.Context,
+	kubeClient client.Client,
+	deploymentName string,
+) error {
 	operatorDep := appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,13 +62,6 @@ func deleteFakeOperatorDeployment(ctx context.Context, kubeClient client.Client,
 	return kubeClient.Delete(ctx, &operatorDep)
 }
 
-func generateFakeClient() client.Client {
-	scheme := controllerScheme.BuildWithAllKnownScheme()
-	return fake.NewClientBuilder().
-		WithScheme(scheme).
-		Build()
-}
-
 var _ = Describe("Difference of values of maps", func() {
 	It("fuck", func(ctx SpecContext) {
 		operatorLabelSelector := "app.kubernetes.io/name=cloudnative-pg"
@@ -75,12 +69,12 @@ var _ = Describe("Difference of values of maps", func() {
 			"app.kubernetes.io/name": "cloudnative-pg",
 		}
 		kubeClient := generateFakeClient()
-		err := createFakeOperatorDeployment(ctx, kubeClient, operatorDeploymentName, operatorLabels)
+		err := createFakeOperatorDeploymentByName(ctx, kubeClient, operatorDeploymentName, operatorLabels)
 		Expect(err).To(BeNil())
 		labelMap, err := labels.ConvertSelectorToLabelsMap(operatorLabelSelector)
 		Expect(err).To(BeNil())
 
-		deployment, err := utils.FindOperatorDeploymentByFilter(ctx,
+		deployment, err := findOperatorDeploymentByFilter(ctx,
 			kubeClient,
 			operatorNamespaceName,
 			client.MatchingLabelsSelector{Selector: labelMap.AsSelector()})
@@ -88,13 +82,14 @@ var _ = Describe("Difference of values of maps", func() {
 		Expect(deployment).ToNot(BeNil())
 
 		err = deleteFakeOperatorDeployment(ctx, kubeClient, operatorDeploymentName)
+		Expect(err).To(BeNil())
 
 		operatorLabels = map[string]string{
 			"app.kubernetes.io/name": "some-app",
 		}
-		err = createFakeOperatorDeployment(ctx, kubeClient, "some-app", operatorLabels)
+		err = createFakeOperatorDeploymentByName(ctx, kubeClient, "some-app", operatorLabels)
 		Expect(err).To(BeNil())
-		deployment, err = utils.FindOperatorDeploymentByFilter(ctx,
+		deployment, err = findOperatorDeploymentByFilter(ctx,
 			kubeClient,
 			operatorNamespaceName,
 			client.MatchingLabelsSelector{Selector: labelMap.AsSelector()})
@@ -104,9 +99,9 @@ var _ = Describe("Difference of values of maps", func() {
 		operatorLabels = map[string]string{
 			"app.kubernetes.io/name": "cloudnative-pg",
 		}
-		err = createFakeOperatorDeployment(ctx, kubeClient, operatorNamespaceName, operatorLabels)
+		err = createFakeOperatorDeploymentByName(ctx, kubeClient, operatorNamespaceName, operatorLabels)
 		Expect(err).To(BeNil())
-		deployment, err = utils.FindOperatorDeploymentByFilter(ctx,
+		deployment, err = findOperatorDeploymentByFilter(ctx,
 			kubeClient,
 			operatorNamespaceName,
 			client.MatchingLabelsSelector{Selector: labelMap.AsSelector()})

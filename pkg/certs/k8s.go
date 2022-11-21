@@ -36,7 +36,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var (
@@ -182,7 +181,7 @@ func (pki *PublicKeyInfrastructure) ensureRootCACertificate(
 	}
 
 	secret = pair.GenerateCASecret(pki.OperatorNamespace, pki.CaSecretName)
-	err = utils.SetAsOwnedByOperatorDeployment(ctx, kubeClient, &secret.ObjectMeta, pki.OperatorDeploymentLabelSelector)
+	err = SetAsOwnedByOperatorDeployment(ctx, kubeClient, &secret.ObjectMeta, pki.OperatorDeploymentLabelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +354,7 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 	}
 
 	secret = webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
-	if err := utils.SetAsOwnedByOperatorDeployment(
+	if err := SetAsOwnedByOperatorDeployment(
 		ctx,
 		kubeClient,
 		&secret.ObjectMeta,
