@@ -25,17 +25,17 @@ import (
 	"time"
 
 	"github.com/robfig/cron"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var (
@@ -135,19 +135,18 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 // Setup ensures that we have the required PKI infrastructure to make the operator and the clusters working
 func (pki *PublicKeyInfrastructure) Setup(
 	ctx context.Context,
-	clientSet *kubernetes.Clientset,
-	apiClientSet *apiextensionsclientset.Clientset,
+	kubeClient client.Client,
 ) error {
 	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
 		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err) || isSecretsMountNotRefreshedError(err)
 	}, func() error {
-		return pki.ensureCertificatesAreUpToDate(ctx, clientSet, apiClientSet)
+		return pki.ensureCertificatesAreUpToDate(ctx, kubeClient)
 	})
 	if err != nil {
 		return err
 	}
 
-	err = pki.schedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
+	err = pki.schedulePeriodicMaintenance(ctx, kubeClient)
 	if err != nil {
 		return err
 	}
@@ -158,13 +157,14 @@ func (pki *PublicKeyInfrastructure) Setup(
 // ensureRootCACertificate ensure that in the cluster there is a root CA Certificate
 func (pki *PublicKeyInfrastructure) ensureRootCACertificate(
 	ctx context.Context,
-	client kubernetes.Interface,
+	kubeClient client.Client,
 ) (*v1.Secret, error) {
+	secret := &v1.Secret{}
 	// Checking if the root CA already exist
-	secret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Get(ctx, pki.CaSecretName, metav1.GetOptions{})
+	err := kubeClient.Get(ctx, types.NamespacedName{Namespace: pki.OperatorNamespace, Name: pki.CaSecretName}, secret)
 	if err == nil {
 		// Verify the temporal validity of this CA and renew the secret if needed
-		secret, err = renewCACertificate(ctx, client, secret)
+		secret, err = renewCACertificate(ctx, kubeClient, secret)
 		if err != nil {
 			return nil, err
 		}
@@ -181,21 +181,21 @@ func (pki *PublicKeyInfrastructure) ensureRootCACertificate(
 	}
 
 	secret = pair.GenerateCASecret(pki.OperatorNamespace, pki.CaSecretName)
-	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta, pki.OperatorDeploymentLabelSelector)
+	err = SetAsOwnedByOperatorDeployment(ctx, kubeClient, &secret.ObjectMeta, pki.OperatorDeploymentLabelSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	createdSecret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
+	err = kubeClient.Create(ctx, secret)
 	if err != nil {
 		return nil, err
 	}
-	return createdSecret, nil
+	return secret, nil
 }
 
 // renewCACertificate renews a CA certificate if needed, returning the updated
 // secret if the secret has been renewed
-func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret *v1.Secret) (*v1.Secret, error) {
+func renewCACertificate(ctx context.Context, kubeClient client.Client, secret *v1.Secret) (*v1.Secret, error) {
 	// Verify the temporal validity of this CA
 	pair, err := ParseCASecret(secret)
 	if err != nil {
@@ -221,30 +221,29 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 	}
 
 	secret.Data[CACertKey] = pair.Certificate
-	updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(ctx, secret, metav1.UpdateOptions{})
+	err = kubeClient.Update(ctx, secret)
 	if err != nil {
 		return nil, err
 	}
 
-	return updatedSecret, nil
+	return secret, nil
 }
 
 // ensureCertificatesAreUpToDate will setup the PKI infrastructure that is needed for the operator
 // to correctly work and makes sure that the mounted certificates are the latest.
 func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 	ctx context.Context,
-	client kubernetes.Interface,
-	apiClient apiextensionsclientset.Interface,
+	kubeClient client.Client,
 ) error {
 	caSecret, err := pki.ensureRootCACertificate(
 		ctx,
-		client,
+		kubeClient,
 	)
 	if err != nil {
 		return err
 	}
 
-	webhookSecret, err := pki.setupWebhooksCertificate(ctx, client, apiClient, caSecret)
+	webhookSecret, err := pki.setupWebhooksCertificate(ctx, kubeClient, caSecret)
 	if err != nil {
 		return err
 	}
@@ -261,35 +260,34 @@ func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 
 func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	ctx context.Context,
-	client kubernetes.Interface,
-	apiClient apiextensionsclientset.Interface,
+	kubeClient client.Client,
 	caSecret *v1.Secret,
 ) (*v1.Secret, error) {
 	if err := fileutils.EnsureDirectoryExists(pki.CertDir); err != nil {
 		return nil, err
 	}
 
-	webhookSecret, err := pki.ensureCertificate(ctx, client, caSecret)
+	webhookSecret, err := pki.ensureCertificate(ctx, kubeClient, caSecret)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := pki.injectPublicKeyIntoMutatingWebhook(
 		ctx,
-		client,
+		kubeClient,
 		webhookSecret); err != nil {
 		return nil, err
 	}
 
 	if err := pki.injectPublicKeyIntoValidatingWebhook(
 		ctx,
-		client,
+		kubeClient,
 		webhookSecret); err != nil {
 		return nil, err
 	}
 
 	for _, name := range pki.CustomResourceDefinitionsName {
-		if err := pki.injectPublicKeyIntoCRD(ctx, apiClient, name, webhookSecret); err != nil {
+		if err := pki.injectPublicKeyIntoCRD(ctx, kubeClient, name, webhookSecret); err != nil {
 			return nil, err
 		}
 	}
@@ -301,12 +299,11 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 // to automatically renew TLS certificates
 func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 	ctx context.Context,
-	client kubernetes.Interface,
-	apiClient apiextensionsclientset.Interface,
+	kubeClient client.Client,
 ) error {
 	maintenance := func() {
 		pkiLog.Info("Periodic TLS certificates maintenance")
-		err := pki.ensureCertificatesAreUpToDate(ctx, client, apiClient)
+		err := pki.ensureCertificatesAreUpToDate(ctx, kubeClient)
 		if err != nil {
 			pkiLog.Error(err, "TLS maintenance failed")
 		}
@@ -325,15 +322,18 @@ func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 
 // ensureCertificate will ensure that a webhook certificate exists and is usable
 func (pki PublicKeyInfrastructure) ensureCertificate(
-	ctx context.Context, client kubernetes.Interface, caSecret *v1.Secret,
+	ctx context.Context, kubeClient client.Client, caSecret *v1.Secret,
 ) (*v1.Secret, error) {
+	secret := &v1.Secret{}
 	// Checking if the secret already exist
-	secret, err := client.CoreV1().Secrets(
-		pki.OperatorNamespace).Get(ctx, pki.SecretName, metav1.GetOptions{})
-	if err == nil {
+	if err := kubeClient.Get(
+		ctx,
+		types.NamespacedName{Namespace: pki.OperatorNamespace, Name: pki.SecretName},
+		secret,
+	); err == nil {
 		// Verify the temporal validity of this certificate and
 		// renew it if needed
-		return renewServerCertificate(ctx, client, *caSecret, secret)
+		return renewServerCertificate(ctx, kubeClient, *caSecret, secret)
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -354,35 +354,38 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 	}
 
 	secret = webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
-	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta, pki.OperatorDeploymentLabelSelector)
-	if err != nil {
+	if err := SetAsOwnedByOperatorDeployment(
+		ctx,
+		kubeClient,
+		&secret.ObjectMeta,
+		pki.OperatorDeploymentLabelSelector,
+	); err != nil {
 		return nil, err
 	}
 
-	createdSecret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
-	if err != nil {
+	if err := kubeClient.Create(ctx, secret); err != nil {
 		return nil, err
 	}
 
-	return createdSecret, nil
+	return secret, nil
 }
 
 // renewServerCertificate renews a server certificate if needed
 // Returns the renewed secret or the original one if unchanged
 func renewServerCertificate(
-	ctx context.Context, client kubernetes.Interface, caSecret v1.Secret, secret *v1.Secret,
+	ctx context.Context, kubeClient client.Client, caSecret v1.Secret, secret *v1.Secret,
 ) (*v1.Secret, error) {
+	origSecret := secret.DeepCopy()
 	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret)
 	if err != nil {
 		return nil, err
 	}
 
 	if hasBeenRenewed {
-		updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(ctx, secret, metav1.UpdateOptions{})
-		if err != nil {
+		if err := kubeClient.Patch(ctx, secret, client.MergeFrom(origSecret)); err != nil {
 			return nil, err
 		}
-		return updatedSecret, nil
+		return secret, nil
 	}
 
 	return secret, nil
@@ -407,95 +410,81 @@ func ensureMountedSecretsAreInSync(secret *v1.Secret, certDir string) error {
 // injectPublicKeyIntoMutatingWebhook inject the TLS public key into the admitted
 // ones for a certain mutating webhook configuration
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
-	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
+	ctx context.Context, kubeClient client.Client, tlsSecret *v1.Secret,
 ) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		config, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
-			ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(config.Webhooks) == 0 {
-			return nil
-		}
-
-		oldConfig := config.DeepCopy()
-
-		for idx := range config.Webhooks {
-			config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-		}
-
-		if reflect.DeepEqual(oldConfig.Webhooks, config.Webhooks) {
-			return nil
-		}
-
-		_, err = client.AdmissionregistrationV1().
-			MutatingWebhookConfigurations().
-			Update(ctx, config, metav1.UpdateOptions{})
+	config := &admissionregistrationv1.MutatingWebhookConfiguration{}
+	if err := kubeClient.Get(ctx, types.NamespacedName{Name: pki.MutatingWebhookConfigurationName}, config); err != nil {
 		return err
-	})
+	}
+	if len(config.Webhooks) == 0 {
+		return nil
+	}
+
+	oldConfig := config.DeepCopy()
+
+	for idx := range config.Webhooks {
+		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+	}
+
+	if reflect.DeepEqual(oldConfig.Webhooks, config.Webhooks) {
+		return nil
+	}
+
+	return kubeClient.Patch(ctx, config, client.MergeFrom(oldConfig))
 }
 
 // injectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
 // ones for a certain validating webhook configuration
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
-	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
+	ctx context.Context, kubeClient client.Client, tlsSecret *v1.Secret,
 ) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		config, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-			ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(config.Webhooks) == 0 {
-			return nil
-		}
-
-		oldConfig := config.DeepCopy()
-
-		for idx := range config.Webhooks {
-			config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-		}
-
-		if reflect.DeepEqual(oldConfig.Webhooks, config.Webhooks) {
-			return nil
-		}
-
-		_, err = client.AdmissionregistrationV1().
-			ValidatingWebhookConfigurations().
-			Update(ctx, config, metav1.UpdateOptions{})
+	config := &admissionregistrationv1.ValidatingWebhookConfiguration{}
+	if err := kubeClient.Get(ctx, types.NamespacedName{Name: pki.ValidatingWebhookConfigurationName}, config); err != nil {
 		return err
-	})
+	}
+
+	if len(config.Webhooks) == 0 {
+		return nil
+	}
+
+	oldConfig := config.DeepCopy()
+
+	for idx := range config.Webhooks {
+		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+	}
+
+	if reflect.DeepEqual(oldConfig.Webhooks, config.Webhooks) {
+		return nil
+	}
+
+	return kubeClient.Patch(ctx, config, client.MergeFrom(oldConfig))
 }
 
 // injectPublicKeyIntoCRD inject the TLS public key into the admitted
 // ones from a certain conversion webhook inside a CRD
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoCRD(
 	ctx context.Context,
-	apiClient apiextensionsclientset.Interface,
+	kubeClient client.Client,
 	name string,
 	tlsSecret *v1.Secret,
 ) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crd, err := apiClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		if crd.Spec.Conversion == nil ||
-			crd.Spec.Conversion.Webhook == nil ||
-			crd.Spec.Conversion.Webhook.ClientConfig == nil ||
-			reflect.DeepEqual(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, tlsSecret.Data["tls.crt"]) {
-			return nil
-		}
-
-		crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-
-		_, err = apiClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
+	crd := apiextensionsv1.CustomResourceDefinition{}
+	err := kubeClient.Get(ctx, client.ObjectKey{Name: name}, &crd)
+	if err != nil {
 		return err
-	})
+	}
+
+	oldCrd := crd.DeepCopy()
+	if crd.Spec.Conversion == nil ||
+		crd.Spec.Conversion.Webhook == nil ||
+		crd.Spec.Conversion.Webhook.ClientConfig == nil ||
+		reflect.DeepEqual(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, tlsSecret.Data["tls.crt"]) {
+		return nil
+	}
+
+	crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+
+	return kubeClient.Patch(ctx, &crd, client.MergeFrom(oldCrd))
 }
 
 func isSecretsMountNotRefreshedError(err error) bool {
