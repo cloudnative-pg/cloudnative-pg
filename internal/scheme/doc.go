@@ -14,22 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
-
-import v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-// SetAsOwnedBy sets the controlled object as owned by a certain other
-// controller object with his type information
-func SetAsOwnedBy(controlled *v1.ObjectMeta, controller v1.ObjectMeta, typeMeta v1.TypeMeta) {
-	isController := true
-
-	controlled.SetOwnerReferences([]v1.OwnerReference{
-		{
-			APIVersion: typeMeta.APIVersion,
-			Kind:       typeMeta.Kind,
-			Name:       controller.Name,
-			UID:        controller.UID,
-			Controller: &isController,
-		},
-	})
-}
+// Package scheme offers a builder capable of generating a scheme with the resources known by the CNP manager
+package scheme

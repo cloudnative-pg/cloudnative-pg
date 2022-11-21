@@ -19,20 +19,20 @@ package utils
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var systemUID string
 
 // DetectKubeSystemUID retrieves the UID of the kube-system namespace of the containing cluster
-func DetectKubeSystemUID(ctx context.Context, cli *kubernetes.Clientset) error {
-	kubeSystemNamespace, err := cli.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
-	if err != nil {
+func DetectKubeSystemUID(ctx context.Context, kubeClient client.Client) error {
+	ns := &corev1.Namespace{}
+	if err := kubeClient.Get(ctx, types.NamespacedName{Name: "kube-system"}, ns); err != nil {
 		return err
 	}
-
-	systemUID = string(kubeSystemNamespace.UID)
+	systemUID = string(ns.UID)
 
 	return nil
 }
