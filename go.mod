@@ -18,7 +18,7 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo/v2 v2.5.1
 	github.com/onsi/gomega v1.24.1
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.60.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.61.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.2.0
@@ -35,7 +35,7 @@ require (
 	k8s.io/cli-runtime v0.25.4
 	k8s.io/client-go v0.25.4
 	k8s.io/klog/v2 v2.80.1
-	k8s.io/utils v0.0.0-20220823124924-e9cbc92d1a73
+	k8s.io/utils v0.0.0-20221108210102-8e77b1f39fe2
 	sigs.k8s.io/controller-runtime v0.13.1
 	sigs.k8s.io/yaml v1.3.0
 )
