@@ -78,9 +78,9 @@ func GetAvailableReleases(releasesPath string) ([]*semver.Version, error) {
 func isReleasePullRequestBranch() bool {
 	branchName := os.Getenv("BRANCH_NAME")
 	if branchName == "" {
-		branchNameBytes, err := exec.Command("git", "symbolic-ref ", "--short", "-q", "HEAD").Output()
+		branchNameBytes, err := exec.Command("git", "symbolic-ref", "--short", "-q", "HEAD").Output()
 		if err != nil {
-			return true
+			return false
 		}
 		branchName = string(branchNameBytes)
 	}
