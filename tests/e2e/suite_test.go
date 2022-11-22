@@ -138,11 +138,11 @@ var _ = BeforeEach(func() {
 		// get logs without timestamp parsing; for JSON parseability
 		err = logs.TailPodLogs(context.TODO(), operatorPod, &buf, false)
 		if err != nil {
-			_, _ = fmt.Fprintf(&buf, "Error dumping operator logs: %v\n", err)
+			_, _ = fmt.Fprintf(&buf, "Error tailing logs, dumping operator logs: %v\n", err)
 		}
 	}()
 	DeferCleanup(func(ctx SpecContext) {
-		if CurrentSpecReport().Failed() {
+		if true {
 			specName := CurrentSpecReport().FullText()
 			GinkgoWriter.Println("DUMPING tailed Operator Logs. Failed Spec:",
 				specName)
