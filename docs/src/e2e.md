@@ -11,7 +11,6 @@ helping detect bugs at an early stage of the development process:
 * 1.24
 * 1.23
 * 1.22
-* 1.21
 
 The following PostgreSQL versions are tested:
 

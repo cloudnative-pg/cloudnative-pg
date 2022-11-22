@@ -42,7 +42,6 @@ env:
   GOLANGCI_LINT_VERSION: "v1.50"
   KUBEBUILDER_VERSION: "2.3.1"
   KIND_VERSION: "v0.11.0"
-  ROOK_VERSION: "v1.6.8"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   FEATURE_TYPE: "${{github.event.inputs.feature_type}}"
 
@@ -200,7 +199,6 @@ jobs:
       matrix:
         # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
         k8s-version:
-          - 1.21.x
           - 1.22.x
           - 1.23.x
           - 1.24.x
