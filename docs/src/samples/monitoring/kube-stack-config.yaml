@@ -63,5 +63,8 @@ grafana:
   # -- the grafana admin password
   adminPassword: prom-operator
   defaultDashboardsEnabled: false
+  sidecar:
+      dashboards:
+        enabled: true
 alertmanager:
   enabled: true
