@@ -63,6 +63,7 @@ class MajorVersionList(dict):
     def oldest(self):
         return self.get(self.versions[-1])
 
+
 # go through the version_list and filter the k8s version which is less than min_version
 def filter_version(versions_list, version_range):
     min_version = version_range["min"]
@@ -73,6 +74,7 @@ def filter_version(versions_list, version_range):
             versions_list,
         )
     )
+
 
 # Minimum support k8s version (include) in different cloud vendor
 with open(VERSION_SCOPE_FILE) as json_file:

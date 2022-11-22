@@ -1,6 +1,6 @@
 # Checks the latest kind image version from `https://registry.hub.docker.com/v2/repositories/kindest/node/tags`,
 # and if there is a new one, updates the kind_versions.json
-name: public-cloud-k8s-versions-check
+name: kind-k8s-versions-check
 on:
   schedule:
     - cron: "30 0 * * *"
@@ -17,10 +17,10 @@ defaults:
 
 env:
   # The minimal k8s version supported, k8s version smaller than this one will be removed from vendor
-  MINIMAL_K8S: "1.19"
+  MINIMAL_K8S: "1.22"
 
 jobs:
-  check-public-clouds-k8s-versions:
+  check-kind-k8s-versions:
     runs-on: ubuntu-20.04
     steps:
       -
@@ -40,15 +40,15 @@ jobs:
             echo "${v}"
           done | jq -Rs 'split("\n") | map(select(length>0))' | tee .github/kind_versions.json
       -
-        name: Create Pull Request if public clouds k8s versions have been updated
+        name: Create Pull Request if kind k8s versions have been updated
         uses: peter-evans/create-pull-request@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          title: "feat: Public Cloud K8S versions update"
-          body: "Update the versions used to test the operator on public cloud providers"
-          branch: "k8s-cloud-versions-update"
-          author: "public-cloud-k8s-versions-check <public-cloud-k8s-versions-check@users.noreply.github.com>"
+          title: "feat: Kind K8S versions update"
+          body: "Update the versions used to test the operator on kind k8s clusters"
+          branch: "k8s-kind-versions-update"
+          author: "k8s-kind-versions-check <k8s-kind-versions-check@users.noreply.github.com>"
           add-paths: ".github/"
-          commit-message: "feat: Updated public cloud k8s tested versions"
+          commit-message: "feat: Updated k8s kind tested versions"
           signoff: true
