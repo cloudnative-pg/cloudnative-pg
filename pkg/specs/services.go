@@ -23,6 +23,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // CreateClusterAnyService create a service insisting on all the pods
@@ -37,14 +38,14 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 			PublishNotReadyAddresses: true,
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "postgres",
+					Name:       PostgresContainerName,
 					Protocol:   corev1.ProtocolTCP,
 					TargetPort: intstr.FromInt(postgres.ServerPort),
 					Port:       postgres.ServerPort,
 				},
 			},
 			Selector: map[string]string{
-				"postgresql": cluster.Name,
+				utils.ClusterLabelName: cluster.Name,
 			},
 		},
 	}
@@ -61,14 +62,14 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 			Type: corev1.ServiceTypeClusterIP,
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "postgres",
+					Name:       PostgresContainerName,
 					Protocol:   corev1.ProtocolTCP,
 					TargetPort: intstr.FromInt(postgres.ServerPort),
 					Port:       postgres.ServerPort,
 				},
 			},
 			Selector: map[string]string{
-				"postgresql": cluster.Name,
+				utils.ClusterLabelName: cluster.Name,
 			},
 		},
 	}
@@ -85,15 +86,15 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 			Type: corev1.ServiceTypeClusterIP,
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "postgres",
+					Name:       PostgresContainerName,
 					Protocol:   corev1.ProtocolTCP,
 					TargetPort: intstr.FromInt(postgres.ServerPort),
 					Port:       postgres.ServerPort,
 				},
 			},
 			Selector: map[string]string{
-				"postgresql":         cluster.Name,
-				ClusterRoleLabelName: ClusterRoleLabelReplica,
+				utils.ClusterLabelName: cluster.Name,
+				ClusterRoleLabelName:   ClusterRoleLabelReplica,
 			},
 		},
 	}
@@ -110,15 +111,15 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 			Type: corev1.ServiceTypeClusterIP,
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "postgres",
+					Name:       PostgresContainerName,
 					Protocol:   corev1.ProtocolTCP,
 					TargetPort: intstr.FromInt(postgres.ServerPort),
 					Port:       postgres.ServerPort,
 				},
 			},
 			Selector: map[string]string{
-				"postgresql":         cluster.Name,
-				ClusterRoleLabelName: ClusterRoleLabelPrimary,
+				utils.ClusterLabelName: cluster.Name,
+				ClusterRoleLabelName:   ClusterRoleLabelPrimary,
 			},
 		},
 	}
