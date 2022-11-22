@@ -854,18 +854,21 @@ jobs:
         # The download-artifact action, since we did not give it a name,
         # downloads all artifacts and creates a new folder for each.
         # In this step we bring all the JSONs to a single folder
-        run: mv test-artifacts/*/*.json test-artifacts
+        run: |
+            mkdir test-artifacts/data
+            mv test-artifacts/*/*.json test-artifacts/data
 
       - name: Display the structure of the artifact folder
-        run: ls -R test-artifacts
-
-      - name: Install Summarize dependencies
-        run: |
-          pip install prettytable
+        run: ls -R test-artifacts/data
 
       - name: Compute the E2E test summary
-        run: |
-          python .github/summarize_test_results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
+        uses: cloudnative-pg/ciclops@main
+        with:
+          artifact_directory: test-artifacts/data
+          output_file: test-summary.md
+
+      - name: Create GitHub Job Summary from the file
+        run: cat test-summary.md >> $GITHUB_STEP_SUMMARY
 
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
