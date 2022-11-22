@@ -21,9 +21,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,12 +74,12 @@ var _ = BeforeSuite(func() {
 })
 
 // saveOperatorLogs does 2 things:
-//   - displays the non-DEBUG operator logs as part of the Ginkgo output
+//   - displays the non-DEBUG operator logs on the `output` io.Writer (likely GinkgoWriter)
 //   - saves the full logs to a file
 //
 // along the way it parses the timestamps for convenience, BUT the lines
 // of output are not legal JSON
-func saveOperatorLogs(buf bytes.Buffer, specName string) {
+func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer) {
 	scanner := bufio.NewScanner(&buf)
 	filename := "out/operator_logs_" + specName + ".log"
 	f, err := os.Create(filepath.Clean(filename))
@@ -88,11 +90,11 @@ func saveOperatorLogs(buf bytes.Buffer, specName string) {
 	defer func() {
 		syncErr := f.Sync()
 		if syncErr != nil {
-			fmt.Fprintln(GinkgoWriter, "ERROR while flushing file:", syncErr)
+			fmt.Fprintln(output, "ERROR while flushing file:", syncErr)
 		}
 		closeErr := f.Close()
 		if closeErr != nil {
-			fmt.Fprintln(GinkgoWriter, "ERROR while closing file:", err)
+			fmt.Fprintln(output, "ERROR while closing file:", err)
 		}
 	}()
 	for scanner.Scan() {
@@ -100,7 +102,7 @@ func saveOperatorLogs(buf bytes.Buffer, specName string) {
 		var js map[string]interface{}
 		err = json.Unmarshal([]byte(lg), &js)
 		if err != nil {
-			GinkgoWriter.Println("Error parsing log:", err, lg)
+			fmt.Fprintln(output, "ERROR parsing log:", err, lg)
 		}
 		timestamp, ok := js["ts"].(float64)
 		if ok {
@@ -109,12 +111,12 @@ func saveOperatorLogs(buf bytes.Buffer, specName string) {
 		}
 
 		if js["level"] != "debug" {
-			fmt.Fprintln(GinkgoWriter, lg)
+			fmt.Fprintln(output, lg)
 		}
 		fmt.Fprintln(f, lg)
 	}
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(GinkgoWriter, "ERROR while scanning:", err)
+		fmt.Fprintln(output, "ERROR while scanning:", err)
 	}
 }
 
@@ -141,9 +143,10 @@ var _ = BeforeEach(func() {
 	}()
 	DeferCleanup(func(ctx SpecContext) {
 		if CurrentSpecReport().Failed() {
-			GinkgoWriter.Println("DUMPING Operator Logs. Failed Spec:",
-				CurrentSpecReport().LeafNodeText)
-			saveOperatorLogs(buf, CurrentSpecReport().LeafNodeText)
+			specName := CurrentSpecReport().FullText()
+			GinkgoWriter.Println("DUMPING tailed Operator Logs. Failed Spec:",
+				specName)
+			saveOperatorLogs(buf, strings.ReplaceAll(specName, " ", "_"), GinkgoWriter)
 		}
 	})
 
@@ -193,7 +196,7 @@ var _ = AfterEach(func() {
 			if err == nil {
 				operatorLogDumped = true
 				// print out a sample of the last `requestedLineLength` lines of logs
-				GinkgoWriter.Println("DUMPING previous operator log:")
+				GinkgoWriter.Println("DUMPING previous operator log due to operator restart:")
 				for _, line := range lines {
 					GinkgoWriter.Println(line)
 				}
