@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,7 +104,7 @@ func saveOperatorLogs(buf bytes.Buffer, specName string) {
 		}
 		timestamp, ok := js["ts"].(float64)
 		if ok {
-			ts := time.UnixMicro(int64(timestamp * 1000000))
+			ts := time.UnixMicro(int64(math.Floor(timestamp * 1000000)))
 			lg = ts.Format(time.Stamp) + " - " + lg
 		}
 
@@ -132,7 +133,8 @@ var _ = BeforeEach(func() {
 	GinkgoWriter.Println("Putting Tail on the operator log")
 	var buf bytes.Buffer
 	go func() {
-		err = logs.TailPodLogs(context.TODO(), operatorPod, &buf)
+		// get logs without timestamp parsing; for JSON parseability
+		err = logs.TailPodLogs(context.TODO(), operatorPod, &buf, false)
 		if err != nil {
 			_, _ = fmt.Fprintf(&buf, "Error dumping operator logs: %v\n", err)
 		}

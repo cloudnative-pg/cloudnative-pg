@@ -19,10 +19,8 @@ package utils
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -153,17 +151,6 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLe
 
 	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
 	return logs.GetPodLogs(env.Ctx, pod, getPrevious, f, requestedLineLength)
-}
-
-// TailOperatorLogs gets Operator logs starting from the current time, and keeps
-// going until it is interrupted by the context
-func (env TestingEnvironment) TailOperatorLogs(ctx context.Context, writer io.Writer) error {
-	pod, err := env.GetOperatorPod()
-	if err != nil {
-		return err
-	}
-	_, _ = fmt.Fprintf(writer, "Dumping operator pod %v log\n", pod.Name)
-	return logs.TailPodLogs(ctx, pod, writer)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
