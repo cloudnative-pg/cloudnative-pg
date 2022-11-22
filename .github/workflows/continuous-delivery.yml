@@ -45,7 +45,6 @@ env:
   GOLANGCI_LINT_VERSION: "v1.49"
   KUBEBUILDER_VERSION: "2.3.1"
   KIND_VERSION: "v0.11.0"
-  ROOK_VERSION: "v1.6.8"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   FEATURE_TYPE: "${{github.event.inputs.feature_type}}"
 
