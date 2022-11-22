@@ -240,7 +240,7 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 		LabelSelector: &metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
-					Key:      ClusterLabelName,
+					Key:      utils.ClusterLabelName,
 					Operator: metav1.LabelSelectorOpIn,
 					Values: []string{
 						clusterName,

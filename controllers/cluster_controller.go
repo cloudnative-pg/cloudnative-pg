@@ -1093,7 +1093,7 @@ func (r *ClusterReconciler) mapNodeToClusters(ctx context.Context) handler.MapFu
 		err := r.List(ctx, &childPods,
 			client.MatchingFields{".spec.nodeName": node.Name},
 			client.MatchingLabels{specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
-			client.HasLabels{specs.ClusterLabelName},
+			client.HasLabels{utils.ClusterLabelName},
 		)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "while getting primary instances for node")
