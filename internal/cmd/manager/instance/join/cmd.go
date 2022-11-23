@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -79,14 +80,27 @@ func NewCmd() *cobra.Command {
 }
 
 func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postgres.InitInfo) error {
-	err := info.VerifyPGData()
+	apiClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
+		log.Error(err, "Error creating Kubernetes client")
 		return err
 	}
 
-	client, err := management.NewControllerRuntimeClient()
+	if err := istio.WaitKubernetesAPIServer(
+		ctx,
+		apiClient,
+		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
+	); err != nil {
+		return err
+	}
+	defer func() {
+		if err := istio.QuitIstioProxy(); err != nil {
+			log.Error(err, "Error while asking istio-proxy to finish")
+		}
+	}()
+
+	err = info.VerifyPGData()
 	if err != nil {
-		log.Error(err, "Error creating Kubernetes client")
 		return err
 	}
 
@@ -96,7 +110,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	}
 	// Let's download the crypto material from the cluster
 	// secrets.
-	reconciler := controller.NewInstanceReconciler(instance, client, metricServer)
+	reconciler := controller.NewInstanceReconciler(instance, apiClient, metricServer)
 	if err != nil {
 		log.Error(err, "Error creating reconciler to download certificates")
 		return err

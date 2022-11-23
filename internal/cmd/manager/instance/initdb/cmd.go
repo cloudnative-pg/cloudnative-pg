@@ -23,7 +23,10 @@ import (
 
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/istio"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -124,7 +127,25 @@ func NewCmd() *cobra.Command {
 }
 
 func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
-	err := info.VerifyPGData()
+	apiClient, err := management.NewControllerRuntimeClient()
+	if err != nil {
+		log.Error(err, "Error creating Kubernetes client")
+		return err
+	}
+	if err := istio.WaitKubernetesAPIServer(
+		ctx,
+		apiClient,
+		ctrl.ObjectKey{Namespace: info.Namespace, Name: info.ClusterName},
+	); err != nil {
+		return err
+	}
+	defer func() {
+		if err := istio.QuitIstioProxy(); err != nil {
+			log.Error(err, "Error while asking istio-proxy to finish")
+		}
+	}()
+
+	err = info.VerifyPGData()
 	if err != nil {
 		return err
 	}

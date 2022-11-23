@@ -14,28 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package istio implement the istio utilities
+// Package istio implements functions needed to integrate with istio-proxy
 package istio
-
-import (
-	"fmt"
-
-	"github.com/spf13/cobra"
-
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/istio/quit"
-)
-
-// NewCmd creates the new cobra command
-func NewCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "istio",
-		Short: "Utilities to work with istio",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("missing subcommand")
-		},
-	}
-
-	cmd.AddCommand(quit.NewCmd())
-
-	return cmd
-}
