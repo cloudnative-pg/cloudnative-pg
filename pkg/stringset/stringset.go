@@ -70,3 +70,22 @@ func (set *Data) ToList() (result []string) {
 	}
 	return
 }
+
+// Eq compares two string sets for equality
+func (set *Data) Eq(other *Data) bool {
+	if set == nil || other == nil {
+		return false
+	}
+
+	if set.Len() != other.Len() {
+		return false
+	}
+
+	for key := range set.innerMap {
+		if !other.Has(key) {
+			return false
+		}
+	}
+
+	return true
+}
