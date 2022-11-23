@@ -32,6 +32,7 @@ import (
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/thoas/go-funk"
 	"golang.org/x/net/context"
+	corev1 "k8s.io/api/core/v1"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	// +kubebuilder:scaffold:imports
@@ -45,32 +46,58 @@ import (
 )
 
 const (
-	fixturesDir  = "./fixtures"
-	RetryTimeout = utils.RetryTimeout
-	PollingTime  = utils.PollingTime
+	fixturesDir         = "./fixtures"
+	RetryTimeout        = utils.RetryTimeout
+	PollingTime         = utils.PollingTime
+	psqlClientNamespace = "psql-client-namespace"
 )
 
 var (
 	env                     *utils.TestingEnvironment
 	testLevelEnv            *tests.TestEnvLevel
+	psqlClientPod           *corev1.Pod
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
 	operatorWasRestarted    bool
 	operatorLogDumped       bool
 )
 
-var _ = BeforeSuite(func() {
+var _ = SynchronizedBeforeSuite(func() []byte {
 	var err error
 	env, err = utils.NewTestingEnvironment()
+	Expect(err).ShouldNot(HaveOccurred())
+	pod, err := utils.CreatePsqlClient(psqlClientNamespace, env)
+	Expect(err).ShouldNot(HaveOccurred())
+	// here we serialized psql client pod object info and will be
+	// accessible to all nodes (specs)
+	psqlPodJSONObj, err := json.Marshal(pod)
 	if err != nil {
 		panic(err)
 	}
-	testLevelEnv, err = tests.TestLevel()
+	return psqlPodJSONObj
+}, func(data []byte) {
+	var err error
+	// We are creating new testing env object again because above testing env can not serialize and
+	// accessible to all nodes (specs)
+	env, err = utils.NewTestingEnvironment()
 	if err != nil {
 		panic(err)
 	}
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
+	testLevelEnv, err = tests.TestLevel()
+	if err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal(data, &psqlClientPod); err != nil {
+		panic(err)
+	}
+})
+
+var _ = SynchronizedAfterSuite(func() {
+}, func() {
+	err := env.DeleteNamespace(psqlClientNamespace)
+	Expect(err).ToNot(HaveOccurred())
 })
 
 // saveOperatorLogs does 2 things:
