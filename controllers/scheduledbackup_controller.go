@@ -245,7 +245,7 @@ func createBackup(
 	if err := client.Status().Update(ctx, scheduledBackup); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
-			contextLogger.Debug("Conflict while updating scheduled bakcup", "error", err)
+			contextLogger.Debug("Conflict while updating scheduled backup", "error", err)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
