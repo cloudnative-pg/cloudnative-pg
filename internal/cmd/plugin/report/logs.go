@@ -33,6 +33,10 @@ import (
 
 const jobMatcherLabel = "job-name"
 
+var podLogOptions = &corev1.PodLogOptions{
+	Timestamps: true, // NOTE: when activated, lines are no longer JSON
+}
+
 // streamPodLogsToZip streams the pod logs to a new section in the ZIP
 func streamPodLogsToZip(ctx context.Context, pods []corev1.Pod,
 	dirname, name string, zipper *zip.Writer,
@@ -49,7 +53,7 @@ func streamPodLogsToZip(ctx context.Context, pods []corev1.Pod,
 		if zipperErr != nil {
 			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
 		}
-		if err := logs.StreamPodLogs(ctx, pod, false, writer); err != nil {
+		if err := logs.StreamPodLogs(ctx, pod, writer, podLogOptions); err != nil {
 			return err
 		}
 	}
@@ -85,7 +89,7 @@ func streamClusterLogsToZip(ctx context.Context, clusterName, namespace string,
 				filepath.Join(logsdir, pod.Name), err)
 		}
 
-		err = logs.StreamPodLogs(ctx, pod, false, writer)
+		err = logs.StreamPodLogs(ctx, pod, writer, podLogOptions)
 		if err != nil {
 			return err
 		}
@@ -132,7 +136,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 					filepath.Join(logsdir, pod.Name), err)
 			}
 
-			err = logs.StreamPodLogs(ctx, pod, false, writer)
+			err = logs.StreamPodLogs(ctx, pod, writer, podLogOptions)
 			if err != nil {
 				return err
 			}
