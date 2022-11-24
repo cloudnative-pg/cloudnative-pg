@@ -107,7 +107,8 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		verifySummaryInHibernationStatus := func(clusterName string, message hibernateSatusMessage) {
 			statusOut := getHibernationStatusInJSON(namespace, clusterName)
 			actualStatus := statusOut[string(summaryInStatus)].(map[string]interface{})["status"].(string)
-			Expect(strings.Contains(string(message), actualStatus)).Should(BeEquivalentTo(true), statusOut)
+			Expect(strings.Contains(string(message), actualStatus)).Should(BeEquivalentTo(true),
+				actualStatus+"\\not-contained-in\\"+string(message))
 		}
 		verifyClusterResources := func(namespace, clusterName string, roles []utils.PVCRole) {
 			By(fmt.Sprintf("verifying cluster resources are removed "+

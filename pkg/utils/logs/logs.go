@@ -24,19 +24,22 @@ import (
 	"io"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// StreamPodLogs streams the pod logs and shunts them to the `writer`. If `getPrevious`
-// was activated, it will get the previous logs
-func StreamPodLogs(ctx context.Context, pod corev1.Pod, getPrevious bool, writer io.Writer) (err error) {
+// StreamPodLogs streams the pod logs and shunts them to the `writer`.
+func StreamPodLogs(
+	ctx context.Context,
+	pod corev1.Pod,
+	writer io.Writer,
+	podLogOptions *corev1.PodLogOptions,
+) (err error) {
 	wrapErr := func(err error) error { return fmt.Errorf("in StreamPodLogs: %w", err) }
 	conf := ctrl.GetConfigOrDie()
 	pods := kubernetes.NewForConfigOrDie(conf).CoreV1().Pods(pod.Namespace)
-	logsRequest := pods.GetLogs(pod.Name, &corev1.PodLogOptions{
-		Previous: getPrevious,
-	})
+	logsRequest := pods.GetLogs(pod.Name, podLogOptions)
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
 		return wrapErr(err)
@@ -53,6 +56,20 @@ func StreamPodLogs(ctx context.Context, pod corev1.Pod, getPrevious bool, writer
 		err = wrapErr(err)
 	}
 	return err
+}
+
+// TailPodLogs streams the pod logs starting from the current time, and keeps
+// waiting for any new logs, until the  context is cancelled by the calling process
+// If `parseTimestamps` is true, the log line will have the timestamp in
+// human-readable prepended. NOTE: this will make log-lines NON-JSON
+func TailPodLogs(ctx context.Context, pod corev1.Pod, writer io.Writer, parseTimestamps bool) (err error) {
+	now := metav1.Now()
+	options := &corev1.PodLogOptions{
+		Timestamps: parseTimestamps,
+		Follow:     true,
+		SinceTime:  &now,
+	}
+	return StreamPodLogs(ctx, pod, writer, options)
 }
 
 // GetPodLogs streams the pod logs and shunts them to the `writer`, as well as

@@ -232,7 +232,8 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			func() string {
 				cluster := testsUtils.PrintClusterResources(namespace, clusterName, env)
 				nodes, _ := env.DescribeKubernetesNodes()
-				return fmt.Sprintf("%s\n\n%s", cluster, nodes)
+				return fmt.Sprintf("CLUSTER STATE\n%s\n\nK8S NODES\n%s",
+					cluster, nodes)
 			})
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
 	})

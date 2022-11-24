@@ -130,6 +130,9 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLe
 	}
 
 	filename := "out/operator_report_" + pod.Name + ".log"
+	if getPrevious {
+		filename = "out/operator_report_previous_" + pod.Name + ".log"
+	}
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
@@ -404,8 +407,8 @@ func (env TestingEnvironment) DescribeKubernetesNodes() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		report.WriteString(stdout)
 		report.WriteString("================================================\n")
+		report.WriteString(stdout)
 		report.WriteString("================================================\n")
 	}
 	return report.String(), nil
