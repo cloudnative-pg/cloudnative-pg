@@ -142,7 +142,7 @@ var _ = BeforeEach(func() {
 		}
 	}()
 	DeferCleanup(func(ctx SpecContext) {
-		if true {
+		if CurrentSpecReport().Failed() {
 			specName := CurrentSpecReport().FullText()
 			GinkgoWriter.Println("DUMPING tailed Operator Logs. Failed Spec:",
 				specName)
