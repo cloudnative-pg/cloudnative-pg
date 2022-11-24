@@ -23,7 +23,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           number:  ${{ github.event.pull_request.number }}
           labels: |
-            backport-requested
+            backport-requested :arrow_backward:
             release-1.16
             release-1.17
             release-1.18
@@ -35,12 +35,21 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             By default, the pull request is supposed to backport to all release branches.
+
+            - To stop backporting this pr, remove the label:  backport-requested :arrow_backward:
+            - To stop backporting this pr to certain release branch, remove the specific label: release-x.y
+            
           reactions: heart
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
     name: backport to release branches
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'backport-requested')
+    if: |
+        github.event.pull_request.merged == true &&
+        (
+          contains(github.event.pull_request.labels.*.name, 'backport-requested') ||
+          contains(github.event.pull_request.labels.*.name, 'backport-requested :arrow_backward:')
+        )
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
@@ -60,7 +69,7 @@ jobs:
           ref: ${{ matrix.branch }}
           token: ${{ secrets.REPO_GHA_PAT }}
       -
-        name: Check labels
+        name: Check labels and commits
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,7 +78,7 @@ jobs:
           if [ -z "${label}" ]
           then
             echo "No ${{ matrix.branch }} label found!"
-            exit 1
+            exit 0
           fi
           echo "LABEL=${label}" >> $GITHUB_ENV
           echo "find label ${label} in pull request ${PR}"
@@ -77,7 +86,7 @@ jobs:
           if [ -z "${commit}" ]
           then
             echo "No commit found!"
-            exit 1
+            exit 0
           fi
           echo "COMMIT=${commit}" >> $GITHUB_ENV
           echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
@@ -95,7 +104,7 @@ jobs:
           git config user.email "${{ env.AUTHOR_EMAIL }}"
           git config user.name "${{ env.AUTHOR_NAME }}"
           git fetch
-          git cherry-pick -x --allow-empty-message --mainline 1 ${{ env.COMMIT }}
+          git cherry-pick -x --mainline 1 ${{ env.COMMIT }}
           git push
       -
         name: create ticket
