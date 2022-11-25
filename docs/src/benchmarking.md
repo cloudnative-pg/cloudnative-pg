@@ -11,7 +11,10 @@ kubectl cnpg pgbench <cluster-name> --pgbench-job-name <pgbench-job> --db-name <
 ```
 
 Example of how to run it against a `Cluster` named `cluster-example` in the `pgbench` namespace:
-kubectl cnpg pgbench cluster-example --pgbench-job-name pgbench-job -n pgbench -- --time 30 --client 1 --jobs 1
+kubectl cnpg pgbench \
+   -n pgbench cluster-example \
+   --pgbench-job-name pgbench-job \
+   -- --time 30 --client 1 --jobs 1
 ```
 
 Example of how to run it on an existing database by using the `--db-name` flag and
