@@ -24,6 +24,8 @@ from typing import Dict, List
 
 POSTGRES_REPO = "ghcr.io/cloudnative-pg/postgresql"
 PG_VERSIONS_FILE = ".github/pg_versions.json"
+KIND_VERSIONS_FILE = ".github/kind_versions.json"
+VERSION_SCOPE_FILE = ".github/k8s_versions_scope.json"
 
 
 class VersionList(list):
@@ -62,16 +64,29 @@ class MajorVersionList(dict):
         return self.get(self.versions[-1])
 
 
-# Kubernetes versions to use during the tests
-# Based on the images available at https://hub.docker.com/r/kindest/node/tags
-# and the supported releases https://kubernetes.io/releases/
-K8S = VersionList(
-    [
-        "v1.24.3",
-        "v1.23.6",
-        "v1.22.9",
-    ]
-)
+# go through the version_list and filter the k8s version which is less than min_version
+def filter_version(versions_list, version_range):
+    min_version = version_range["min"]
+    max_version = version_range["max"] or "99.99"
+    return list(
+        filter(
+            lambda x: max_version >= re.sub(r"v", "", x)[0:4] >= min_version,
+            versions_list,
+        )
+    )
+
+
+# Minimum support k8s version (include) in different cloud vendor
+with open(VERSION_SCOPE_FILE) as json_file:
+    version_list = json.load(json_file)
+SUPPORT_K8S_VERSION = version_list["e2e_test"]
+print(SUPPORT_K8S_VERSION)
+
+# Kubernetes versions on kind to use during the tests
+with open(KIND_VERSIONS_FILE) as json_file:
+    version_list = json.load(json_file)
+    kind_versions = filter_version(version_list, SUPPORT_K8S_VERSION["KIND"])
+KIND_K8S = VersionList(kind_versions)
 
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
@@ -111,22 +126,22 @@ class E2EJob(dict):
 def build_push_include_local():
     """Build the list of tests running on push"""
     return {
-        E2EJob(K8S.latest, POSTGRES.latest),
-        E2EJob(K8S.oldest, POSTGRES.oldest),
+        E2EJob(KIND_K8S.latest, POSTGRES.latest),
+        E2EJob(KIND_K8S.oldest, POSTGRES.oldest),
     }
 
 
 def build_pull_request_target_include_local():
     result = build_push_include_local()
     # Iterate over K8S versions
-    for k8s_version in K8S:
+    for k8s_version in KIND_K8S:
         result |= {
             E2EJob(k8s_version, POSTGRES.latest),
         }
 
     # Iterate over PostgreSQL versions
     for postgres_version in POSTGRES.values():
-        result |= {E2EJob(K8S.latest, postgres_version)}
+        result |= {E2EJob(KIND_K8S.latest, postgres_version)}
 
     return result
 
@@ -136,14 +151,14 @@ def build_pull_request_include_local():
     result = build_push_include_local()
 
     # Iterate over K8S versions
-    for k8s_version in K8S:
+    for k8s_version in KIND_K8S:
         result |= {
             E2EJob(k8s_version, POSTGRES.latest),
         }
 
     # Iterate over PostgreSQL versions
     for postgres_version in POSTGRES.values():
-        result |= {E2EJob(K8S.latest, postgres_version)}
+        result |= {E2EJob(KIND_K8S.latest, postgres_version)}
 
     return result
 
@@ -153,14 +168,14 @@ def build_main_include_local():
     result = build_pull_request_include_local()
 
     # Iterate over K8S versions
-    for k8s_version in K8S:
+    for k8s_version in KIND_K8S:
         result |= {
             E2EJob(k8s_version, POSTGRES.latest),
         }
 
     # Iterate over PostgreSQL versions
     for postgres_version in POSTGRES.values():
-        result |= {E2EJob(K8S.latest, postgres_version)}
+        result |= {E2EJob(KIND_K8S.latest, postgres_version)}
 
     return result
 
