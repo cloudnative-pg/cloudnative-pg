@@ -765,6 +765,11 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 
+	cluster.Status.Status = cluster.Status.Phase
+	if cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) {
+		cluster.Status.Status = fmt.Sprintf("%s (%s)", cluster.Status.Phase, "Primary instance is fenced")
+	}
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		if err := r.Status().Update(ctx, cluster); err != nil {
 			return err

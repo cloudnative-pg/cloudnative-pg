@@ -409,6 +409,9 @@ type ClusterStatus struct {
 	// Current list of read pods
 	ReadService string `json:"readService,omitempty"`
 
+	// Current status of the cluster
+	Status string `json:"status,omitempty"`
+
 	// Current phase of the cluster
 	Phase string `json:"phase,omitempty"`
 
@@ -1475,7 +1478,7 @@ func (in ExternalCluster) GetServerName() string {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Instances",type="integer",JSONPath=".status.instances",description="Number of instances"
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyInstances",description="Number of ready instances"
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Cluster current status"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="Cluster current status"
 // +kubebuilder:printcolumn:name="Primary",type="string",JSONPath=".status.currentPrimary",description="Primary pod"
 
 // Cluster is the Schema for the PostgreSQL API
