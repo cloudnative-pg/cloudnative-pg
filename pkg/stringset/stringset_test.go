@@ -50,4 +50,11 @@ var _ = Describe("String set", func() {
 	It("constructs a string slice given a set", func() {
 		Expect(From([]string{"one", "two"}).ToList()).To(ContainElements("one", "two"))
 	})
+
+	It("compares two string set for equality", func() {
+		Expect(From([]string{"one", "two"}).Eq(From([]string{"one", "two"}))).To(BeTrue())
+		Expect(From([]string{"one", "two"}).Eq(From([]string{"two", "three"}))).To(BeFalse())
+		Expect(From([]string{"one", "two"}).Eq(From([]string{"one", "two", "three"}))).To(BeFalse())
+		Expect(From([]string{"one", "two", "three"}).Eq(From([]string{"one", "two"}))).To(BeFalse())
+	})
 })

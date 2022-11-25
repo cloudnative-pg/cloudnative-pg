@@ -17,5 +17,6 @@ spec:
         - --leader-elect
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --secret-name=$(OPERATOR_DEPLOYMENT_NAME)-config
-        - --log-level=info
+        - --webhook-port=9443
+        - --log-level=debug
         - --pprof-server=true
