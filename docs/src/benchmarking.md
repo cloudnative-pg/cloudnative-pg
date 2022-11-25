@@ -14,7 +14,8 @@ Example of how to run it against a `Cluster` named `cluster-example` in the `pgb
 kubectl cnpg pgbench cluster-example --pgbench-job-name pgbench-job -n pgbench -- --time 30 --client 1 --jobs 1
 ```
 
-Example of how to run it on an existing database by using the `--db-name` flag and Namespace `pgbench`:
+Example of how to run it on an existing database by using the `--db-name` flag and
+the `pgbench` namespace:
 ```
 kubectl cnpg pgbench cluster-example --db-name pgbench --pgbench-job-name pgbench-job -n pgbench -- --time 30 --client 1 --jobs 1
 ```
