@@ -212,6 +212,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		if apierrs.IsConflict(err) {
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
+			contextLogger.Debug("Conflict error while reconciling resource status", "error", err)
 			return ctrl.Result{Requeue: true}, nil
 		}
 
@@ -234,6 +235,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
 		if apierrs.IsConflict(err) {
+			contextLogger.Debug("Conflict error while reconciling cluster status nad instance state",
+				"error", err)
 			return ctrl.Result{Requeue: true}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
@@ -292,6 +295,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		if apierrs.IsConflict(err) {
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
+			contextLogger.Debug("Conflict error while reconciling online update", "error", err)
 			return ctrl.Result{Requeue: true}, nil
 		}
 
@@ -476,6 +480,7 @@ func (r *ClusterReconciler) reconcileResources(
 	// Reconcile PVC resource requirements
 	if err := r.ReconcilePVCs(ctx, cluster, resources); err != nil {
 		if apierrs.IsConflict(err) {
+			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
 			return ctrl.Result{Requeue: true}, nil
 		}
 		return ctrl.Result{}, err
@@ -520,6 +525,7 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 				"podStatus", resources.instances.Items[idx].Status)
 			if err := r.Delete(ctx, &resources.instances.Items[idx]); err != nil {
 				if apierrs.IsConflict(err) {
+					contextLogger.Debug("Conflict error while deleting instances item", "error", err)
 					return &ctrl.Result{Requeue: true}, nil
 				}
 				return nil, err
