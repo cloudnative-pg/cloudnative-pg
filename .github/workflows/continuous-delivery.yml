@@ -2,21 +2,15 @@
 # represent different execution environments
 name: continuous-delivery
 on:
-  # Can be triggered by:
-  #
-  # A push from any branch
   push:
     branches:
       - main
       - release-*
-  # A pull request (from this repository or a forked one) which is labelled
-  pull_request_target:
-    types: [labeled]
   # Manually or triggered by another workflow
   workflow_dispatch:
     inputs:
       depth:
-        description: 'Depth (push, pull_request_target, main, schedule)'
+        description: 'Depth (push, pull_request, main, schedule)'
         required: true
         default: 'main'
       test_level:
@@ -32,18 +26,16 @@ on:
         required: false
         default: false
         description: Include kubectl-cnpg plugin building
-  # scheduled
   schedule:
     - cron:  '0 1 * * *'
 
 # set up environment variables to be used across all the jobs
 env:
   GOLANG_VERSION: "1.18.x"
-  GOLANGCI_LINT_VERSION: "v1.50"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.11.0"
+  KIND_VERSION: "v0.17.0"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
-  FEATURE_TYPE: "${{github.event.inputs.feature_type}}"
+  FEATURE_TYPE: "${{ github.event.inputs.feature_type }}"
 
 defaults:
   run:
@@ -51,317 +43,10 @@ defaults:
     shell: 'bash -Eeuo pipefail -x {0}'
 
 jobs:
-  # Detects if we should skip the workflow due to being duplicated. Exceptions:
-  #   1. it's on 'main' branch
-  #   2. it's triggered by events in the 'do_not_skip' list
-  duplicate_runs:
-    runs-on: ubuntu-20.04
-    name: Skip duplicate runs
-    continue-on-error: true
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5.2.0
-        with:
-          concurrent_skipping: 'same_content'
-          skip_after_successful_duplicate: 'true'
-          paths_ignore: '["README.md", "docs/**"]'
-          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
-
-  # Classify codebase changes along 5 different dimensions based on the files
-  # changed in the commit/PR, and create 5 different filters which are used in
-  # the following jobs to decide whether the step should be skipped.
-  change-triage:
-    name: Check changed files
-    needs: duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
-    runs-on: ubuntu-20.04
-    outputs:
-      docs-changed: ${{ steps.filter.outputs.docs-changed }}
-      operator-changed: ${{ steps.filter.outputs.operator-changed }}
-      test-changed: ${{ steps.filter.outputs.test-changed }}
-      shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
-      go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-
-    - name: Check for changes
-      uses: dorny/paths-filter@v2.11.1
-      id: filter
-      # Remember to add new folders in the operator-changed filter if needed
-      with:
-        base: ${{ (github.event_name == 'schedule') && 'main' || '' }}
-        filters: |
-          docs-changed:
-            - '**/*.md'
-            - 'docs/**'
-            - '.wordlist-en-custom.txt'
-          operator-changed:
-            - 'api/**'
-            - 'cmd/**'
-            - 'config/**'
-            - 'controllers/**'
-            - 'internal/**'
-            - 'licenses/**'
-            - 'pkg/**'
-            - '.github/workflows/continuous-delivery.yml'
-            - '.goreleaser.yml'
-            - 'Dockerfile'
-            - 'Makefile'
-            - 'go.mod'
-            - 'go.sum'
-          test-changed:
-            - 'tests/**'
-            - 'hack/**'
-          shell-script-changed:
-            - '**/*.sh'
-          go-code-changed:
-            - '**/*.go'
-            - '.golangci.yml'
-
-  golangci:
-    name: Run linters
-    needs:
-      - duplicate_runs
-      - change-triage
-    # Run Go linter only if Go code has changed
-    if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.change-triage.outputs.go-code-changed == 'true'
-    runs-on: ubuntu-20.04
-    steps:
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout 4m
-
-  shellcheck:
-    name: Run shellcheck linter
-    needs:
-      - duplicate_runs
-      - change-triage
-    # Run shellcheck linter only if shell code has changed
-    if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.change-triage.outputs.shell-script-changed == 'true'
-    runs-on: ubuntu-20.04
-    env:
-        SHELLCHECK_OPTS: -a -S style
-    steps:
-    -
-      uses: actions/checkout@v3
-    -
-      name: Run ShellCheck
-      uses: ludeeus/action-shellcheck@1.1.0
-  generate-unit-tests-jobs:
-    name: Generate jobs for unit tests
-    needs:
-      - duplicate_runs
-      - change-triage
-    runs-on: ubuntu-20.04
-    outputs:
-      k8sMatrix: ${{steps.get-k8s-versions.outputs.k8s_versions}}
-      latest_k8s_version: ${{ steps.get-k8s-versions.outputs.latest_k8s_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - id: get-k8s-versions
-        name: Get k8s versions for unit test
-        shell: bash
-        run: |
-          k8s_versions=$(jq -c '
-            .unit_test.max as $max |
-            .unit_test.min as $min |
-            $min | [ while(. <= $max;
-                . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
-              )
-            ] |
-            .[] |= .+".x"
-          ' < .github/k8s_versions_scope.json)
-          echo "k8s_versions=${k8s_versions}" >> $GITHUB_OUTPUT
-          
-          latest_k8s_version=$(jq -r '.|last' <<<$k8s_versions)
-          echo "latest_k8s_version=${latest_k8s_version}" >> $GITHUB_OUTPUT
-
-  tests:
-    name: Run unit tests
-    needs:
-      - duplicate_runs
-      - change-triage
-      - generate-unit-tests-jobs
-    # Run unit tests only if the operator or the Go codebase have changed
-    # AND
-    # EITHER The slash command ('/test' or '/ready-to-test') is issued in the comment of the PR which is labeled with
-    #        'ready to test :elephant:'
-    # OR     it's on main branch
-    if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      (
-        needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
-      ) &&
-      (
-        github.event.client_payload.slash_command != null ||
-        github.event_name == 'workflow_dispatch' ||
-        (
-           github.event_name == 'pull_request_target' &&
-           github.event.action == 'labeled' &&
-           contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
-        ) ||
-        github.head_ref == 'main'
-      )
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
-        k8s-version: ${{ fromJSON(needs.generate-unit-tests-jobs.outputs.k8sMatrix) }}
-    steps:
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        # Cache Go modules on GitHub runners to be reused across jobs
-        # See to: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows
-        name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      -
-        name: Run unit tests
-        env:
-          ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
-        run: |
-          make test
-      -
-        name: Coverage Summary
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
-        run: |
-          go tool cover -func=cover.out -o coverage.out
-      -
-        name: Publish unit test summary on the latest k8s version
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
-        run: |
-          echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
-  apidoc:
-    name: Verify API doc is up to date
-    needs:
-      - duplicate_runs
-      - change-triage
-    # Run make apidoc if Go code or docs have changed
-    if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      (
-        needs.change-triage.outputs.go-code-changed == 'true' ||
-        needs.change-triage.outputs.docs-changed == 'true'
-      )
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GOLANG_VERSION }}
-
-    - name: Run make apidoc
-      run: |
-        make apidoc
-
-    - name: Verify apidoc changes
-      run: |
-        apidoc_file_path='docs/src/api_reference.md'
-        if git status --porcelain $apidoc_file_path | grep '^ M'; then
-          echo "The API documentation doesn't reflect the current API. Please run make apidoc."
-          exit 1
-        fi
-
-  crd:
-    name: Verify CRD is up to date
-    needs:
-      - duplicate_runs
-      - change-triage
-    # Run make manifests if Go code have changed
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.change-triage.outputs.go-code-changed == 'true' }}
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-
-      - name: Run make manifests
-        run: |
-          make manifests
-
-      - name: Check CRD manifests are up to date
-        run: |
-          crd_path='config/crd'
-          if git status --porcelain $crd_path | grep '^ M'; then
-            echo "The CRD manifests do not reflect the current API. Please run make manifests."
-            exit 1
-          fi
-
   buildx:
     name: Build containers
-    needs:
-      - golangci
-      - shellcheck
-      - tests
-      - apidoc
-      - crd
-      - duplicate_runs
-      - change-triage
-    # Build containers:
-    #   if there have been any code changes OR it is a scheduled execution
-    #   AND
-    #   none of the preceding jobs failed
     if: |
-      (always() && !cancelled()) &&
-      (
-        github.event_name == 'schedule' ||
-        needs.duplicate_runs.outputs.should_skip != 'true' &&
-        (
-          needs.change-triage.outputs.operator-changed == 'true' ||
-          needs.change-triage.outputs.test-changed == 'true' ||
-          needs.change-triage.outputs.shell-script-changed == 'true' ||
-          needs.change-triage.outputs.go-code-changed == 'true'
-        )
-      ) &&
-      (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
-      (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
-      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
-      (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
-      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
+      always() && !cancelled()
     runs-on: ubuntu-20.04
     permissions:
       contents: read
@@ -382,7 +67,6 @@ jobs:
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -500,7 +184,6 @@ jobs:
             type=ref,event=pr
       -
         name: Detect platforms
-        id: docker-platforms
         run: |
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
@@ -510,11 +193,10 @@ jobs:
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
-          image: tonistiigi/binfmt:qemu-v6.1.0
+          image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        id: buildx
         uses: docker/setup-buildx-action@v2
       -
         name: Login to ghcr.io
@@ -525,7 +207,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v3.2.0
+        uses: docker/build-push-action@v3
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -564,13 +246,10 @@ jobs:
     name: Publish artifacts
     needs:
       - buildx
-      - duplicate_runs
     if: |
       (always() && !cancelled()) &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.buildx.result == 'success' &&
-      needs.buildx.outputs.upload_artifacts == 'true' &&
-      github.repository == 'cloudnative-pg/cloudnative-pg'
+      needs.buildx.outputs.upload_artifacts == 'true'
     runs-on: ubuntu-20.04
     steps:
       -
@@ -627,24 +306,15 @@ jobs:
     name: Generate jobs for E2E tests
     needs:
       - buildx
-      - duplicate_runs
     # We try to avoid running the E2E Test Suite in general, to reduce load on
-    # GitHub resources. We should run the tests always: on main and release
-    # branches, when triggered by dependabot, when a PR is first opened, or when
-    # a PR from a forked repo is labeled
+    # GitHub resources.
+    # Currently it's executed in the following cases:
+    # - When dispatched via chatops commands
+    # - On a push in main and release branches
+    # - On scheduled executions
     if: |
       (always() && !cancelled()) &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.buildx.result == 'success' &&
-      ( github.event_name == 'workflow_dispatch' ||
-        github.head_ref == 'main' ||
-        github.ref_name == 'main' ||
-        startsWith(github.head_ref, 'release-') ||
-        startsWith(github.ref_name, 'release-') ||
-        startsWith(github.head_ref, 'dependabot/') ||
-        startsWith(github.ref_name, 'dependabot/') ||
-        (github.event_name == 'pull_request_target' &&  github.event.action == 'labeled')
-       )
+      needs.buildx.result == 'success'
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ needs.buildx.outputs.image }}
@@ -672,7 +342,6 @@ jobs:
       - generate-jobs
     if: |
       (always() && !cancelled()) &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.generate-jobs.result == 'success'
     runs-on: ubuntu-20.04
     outputs:
@@ -682,7 +351,7 @@ jobs:
         id: evaluate-test-level
         run: |
           declare -A events
-          events=([push]=0 [pull_request_target]=2 [main]=3 [schedule]=4)
+          events=([push]=0 [pull_request]=2 [main]=3 [schedule]=4)
           test_level_from_input="${{ github.event.inputs.test_level }}"
           if [ -n "${test_level_from_input}" ]
           then
@@ -700,13 +369,11 @@ jobs:
     if: |
       (always() && !cancelled()) &&
       needs.generate-jobs.outputs.localEnabled == 'true' &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.generate-jobs.result == 'success' &&
       needs.evaluate-test-level.result == 'success'
     needs:
       - buildx
       - generate-jobs
-      - duplicate_runs
       - evaluate-test-level
     strategy:
       fail-fast: false
@@ -833,7 +500,6 @@ jobs:
             rm tests/e2e/out/upgrade_report.json
           fi
           rm tests/e2e/out/report.json
-
       -
         # Archive logs for failed test cases if there are any
         name: Archive Kind logs
@@ -858,16 +524,13 @@ jobs:
   summarize-e2e-tests:
     name: E2E test suite
     needs:
-      - duplicate_runs
       - evaluate-test-level
       - e2e-local
-    if: (always() && !cancelled()) &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
+    if: |
+      (always() && !cancelled()) &&
       needs.evaluate-test-level.result == 'success'
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
-
       - name: Create a directory for the artifacts
         run: mkdir test-artifacts
 
@@ -906,12 +569,10 @@ jobs:
   ok-to-merge:
     name: Label the PR as "ok to merge :ok_hand:"
     needs:
-      - duplicate_runs
       - evaluate-test-level
       - e2e-local
     if: |
       !failure() && !cancelled() &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
       github.ref != 'refs/heads/main' &&
       github.event_name == 'workflow_dispatch' &&
       ( github.event.inputs.depth == 'main' || github.event.inputs.depth == 'schedule' ) &&
@@ -946,13 +607,12 @@ jobs:
   unlabel-ok-to-merge:
     name: Remove the "ok to merge :ok_hand:" label from the PR
     needs:
-      - duplicate_runs
       - evaluate-test-level
       - e2e-local
     if: |
       failure() &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      github.ref != 'refs/heads/main'
+      github.ref != 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
