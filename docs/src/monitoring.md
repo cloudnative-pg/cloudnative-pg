@@ -76,7 +76,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      postgresql: cluster-example
+      "cnpg.io/cluster": cluster-example
   podMetricsEndpoints:
   - port: metrics
 ```

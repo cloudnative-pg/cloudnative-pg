@@ -23,7 +23,19 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
+
+func buildInstanceServicePorts() []corev1.ServicePort {
+	return []corev1.ServicePort{
+		{
+			Name:       PostgresContainerName,
+			Protocol:   corev1.ProtocolTCP,
+			TargetPort: intstr.FromInt(postgres.ServerPort),
+			Port:       postgres.ServerPort,
+		},
+	}
+}
 
 // CreateClusterAnyService create a service insisting on all the pods
 func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
@@ -35,16 +47,9 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 		Spec: corev1.ServiceSpec{
 			Type:                     corev1.ServiceTypeClusterIP,
 			PublishNotReadyAddresses: true,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "postgres",
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(postgres.ServerPort),
-					Port:       postgres.ServerPort,
-				},
-			},
+			Ports:                    buildInstanceServicePorts(),
 			Selector: map[string]string{
-				"postgresql": cluster.Name,
+				utils.ClusterLabelName: cluster.Name,
 			},
 		},
 	}
@@ -58,17 +63,10 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 			Namespace: cluster.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "postgres",
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(postgres.ServerPort),
-					Port:       postgres.ServerPort,
-				},
-			},
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				"postgresql": cluster.Name,
+				utils.ClusterLabelName: cluster.Name,
 			},
 		},
 	}
@@ -82,18 +80,11 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 			Namespace: cluster.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "postgres",
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(postgres.ServerPort),
-					Port:       postgres.ServerPort,
-				},
-			},
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				"postgresql":         cluster.Name,
-				ClusterRoleLabelName: ClusterRoleLabelReplica,
+				utils.ClusterLabelName: cluster.Name,
+				ClusterRoleLabelName:   ClusterRoleLabelReplica,
 			},
 		},
 	}
@@ -107,18 +98,11 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 			Namespace: cluster.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "postgres",
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(postgres.ServerPort),
-					Port:       postgres.ServerPort,
-				},
-			},
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				"postgresql":         cluster.Name,
-				ClusterRoleLabelName: ClusterRoleLabelPrimary,
+				utils.ClusterLabelName: cluster.Name,
+				ClusterRoleLabelName:   ClusterRoleLabelPrimary,
 			},
 		},
 	}

@@ -112,6 +112,12 @@ git push --set-upstream origin release-X.Y
 
 This procedure must happen immediately before starting the release.
 
+**IMPORTANT:** Now we backport merged pull request from main to release branches automatically,
+once a new release branch is created, submit a pull request to update the [backport workflow]
+(https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/workflows/backport.yml) to 
+support the new release branch.
+
+
 ## Release steps
 
 Once the code in the release branch is stable and ready to be released, you can
