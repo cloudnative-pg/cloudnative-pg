@@ -21,8 +21,10 @@ Each log entry has the following fields:
     documentation.
 
 !!! Info
-    `level` and `ts` fields can be renamed with `log-field-level` and `log-field-timestamp`
-    CLI flags should you log ingestion system require it.
+    The `level` and `ts` field names can be renamed via the `log-field-level` and
+    `log-field-timestamp` flags of the operator controller, should your log ingestion
+    system require it. All you have to do is edit the `Deployment` definition of the
+    `cloudnative-pg` operator.
 
 ## Operator log
 
