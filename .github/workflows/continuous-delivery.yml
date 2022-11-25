@@ -168,12 +168,42 @@ jobs:
     -
       name: Run ShellCheck
       uses: ludeeus/action-shellcheck@1.1.0
+  generate-unit-tests-jobs:
+    name: Generate jobs for unit tests
+    needs:
+      - duplicate_runs
+      - change-triage
+    runs-on: ubuntu-20.04
+    outputs:
+      k8sMatrix: ${{steps.get-k8s-versions.outputs.k8s_versions}}
+      latest_k8s_version: ${{ steps.get-k8s-versions.outputs.latest_k8s_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - id: get-k8s-versions
+        name: Get k8s versions for unit test
+        shell: bash
+        run: |
+          k8s_versions=$(jq -c '
+            .unit_test.max as $max |
+            .unit_test.min as $min |
+            $min | [ while(. <= $max;
+                . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
+              )
+            ] |
+            .[] |= .+".x"
+          ' < .github/k8s_versions_scope.json)
+          echo "k8s_versions=${k8s_versions}" >> $GITHUB_OUTPUT
+          
+          latest_k8s_version=$(jq -r '.|last' <<<$k8s_versions)
+          echo "latest_k8s_version=${latest_k8s_version}" >> $GITHUB_OUTPUT
 
   tests:
     name: Run unit tests
     needs:
       - duplicate_runs
       - change-triage
+      - generate-unit-tests-jobs
     # Run unit tests only if the operator or the Go codebase have changed
     # AND
     # EITHER The slash command ('/test' or '/ready-to-test') is issued in the comment of the PR which is labeled with
@@ -199,12 +229,7 @@ jobs:
     strategy:
       matrix:
         # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
-        k8s-version:
-          - 1.21.x
-          - 1.22.x
-          - 1.23.x
-          - 1.24.x
-          - 1.25.x
+        k8s-version: ${{ fromJSON(needs.generate-unit-tests-jobs.outputs.k8sMatrix) }}
     steps:
       -
         name: Checkout code
@@ -236,12 +261,12 @@ jobs:
           make test
       -
         name: Coverage Summary
-        if: matrix.k8s-version == '1.25.x'
+        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           go tool cover -func=cover.out -o coverage.out
       -
-        name: Publish unit test summary
-        if: matrix.k8s-version == '1.25.x'
+        name: Publish unit test summary on the latest k8s version
+        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
         run: |
           echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
   apidoc:
