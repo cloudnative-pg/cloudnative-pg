@@ -7,7 +7,11 @@ The command also accepts the `--dry-run` command, this will output the job manif
 
 Example usage:
 ```
-kubectl cnpg pgbench <cluster-name> --pgbench-job-name <pgbench-job> --db-name <db-name> -n <NAMESPACE> -- --time 30 --client 1 --jobs 1
+kubectl cnpg pgbench \
+  -n <namespace> <cluster-name> \
+  --pgbench-job-name <pgbench-job> \
+  --db-name <db-name> \
+  -- --time 30 --client 1 --jobs 1
 ```
 
 Example of how to run it against a `Cluster` named `cluster-example` in the `pgbench` namespace:
