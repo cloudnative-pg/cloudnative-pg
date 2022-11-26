@@ -19,10 +19,11 @@ package log
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/klog/v2"
-	"os"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
