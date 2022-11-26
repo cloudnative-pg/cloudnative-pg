@@ -51,10 +51,22 @@ func (l *Flags) AddFlags(flags *pflag.FlagSet) {
 		"the desired log level, one of error, info, debug and trace")
 	loggingFlagSet.StringVar(&logDestination, "log-destination", "",
 		"where the log stream will be written")
-	loggingFlagSet.StringVar(&logfieldsRemap.LevelKey, "log-field-level", "level", "JSON log field to report severity in")
-	loggingFlagSet.StringVar(&logfieldsRemap.TimeKey, "log-field-timestamp", "ts", "JSON log field to report timestamp in")
+	loggingFlagSet.StringVar(&logfieldsRemap.LevelKey, "log-field-level", "",
+		"JSON log field to report severity in (default: level)")
+	loggingFlagSet.StringVar(&logfieldsRemap.TimeKey, "log-field-timestamp", "",
+		"JSON log field to report timestamp in (default: ts)")
 	l.zapOptions.BindFlags(loggingFlagSet)
 	flags.AddGoFlagSet(loggingFlagSet)
+}
+
+func GetFieldRemapFlags() (res []string) {
+	if l := logfieldsRemap.LevelKey; l != "" {
+		res = append(res, fmt.Sprintf("--log-field-level=%s", l))
+	}
+	if l := logfieldsRemap.TimeKey; l != "" {
+		res = append(res, fmt.Sprintf("--log-field-timestamp=%s", l))
+	}
+	return res
 }
 
 // ConfigureLogging configure the logging honoring the flags
