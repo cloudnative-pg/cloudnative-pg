@@ -55,7 +55,7 @@ func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container
 	if cluster.Spec.LogLevel != "" {
 		container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
 	}
-	container.Command = append(container.Command, log.GetFieldRemapFlags()...)
+	container.Command = append(container.Command, log.GetFieldsRemapFlags()...)
 }
 
 // CreateContainerSecurityContext initializes container security context

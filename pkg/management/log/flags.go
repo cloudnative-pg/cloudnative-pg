@@ -59,7 +59,8 @@ func (l *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(loggingFlagSet)
 }
 
-func GetFieldRemapFlags() (res []string) {
+// GetFieldsRemapFlags returns the required flags to set the logging fields
+func GetFieldsRemapFlags() (res []string) {
 	if l := logfieldsRemap.LevelKey; l != "" {
 		res = append(res, fmt.Sprintf("--log-field-level=%s", l))
 	}
