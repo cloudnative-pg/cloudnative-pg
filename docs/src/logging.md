@@ -20,6 +20,12 @@ Each log entry has the following fields:
     [Kubernetes Logging Architecture](https://kubernetes.io/docs/concepts/cluster-administration/logging/)
     documentation.
 
+!!! Info
+    The `level` and `ts` field names can be renamed via the `log-field-level` and
+    `log-field-timestamp` flags of the operator controller, should your log ingestion
+    system require it. All you have to do is edit the `Deployment` definition of the
+    `cloudnative-pg` operator.
+
 ## Operator log
 
 A log level can be specified in the cluster spec with the option `logLevel` and
