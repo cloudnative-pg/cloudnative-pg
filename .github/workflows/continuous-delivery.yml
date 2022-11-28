@@ -28,7 +28,7 @@ on:
         cluster-metadata, recovery, importing-databases, storage, security, maintenance)'
         required: false
       log_level:
-        description: 'cluster log level (error, warning, info(default), debug, trace)'
+        description: 'Log level for operator (error, warning, info(default), debug, trace)'
         required: false
       build_plugin:
         type: boolean
