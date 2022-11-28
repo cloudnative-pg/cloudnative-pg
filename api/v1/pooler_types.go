@@ -85,32 +85,12 @@ type PodTemplateSpec struct {
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
-	ObjectMeta PodMeta `json:"metadata,omitempty"`
+	ObjectMeta Metadata `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec corev1.PodSpec `json:"spec,omitempty"`
-}
-
-// PodMeta is a structure similar to the metav1.ObjectMeta, but still
-// parseable by controller-gen to create a suitable CRD for the user.
-// The comment of PodTemplateSpec has an explanation of why we are
-// not using the core data types.
-type PodMeta struct {
-	// Map of string keys and values that can be used to organize and categorize
-	// (scope and select) objects. May match selectors of replication controllers
-	// and services.
-	// More info: http://kubernetes.io/docs/user-guide/labels
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// Annotations is an unstructured key value map stored with a resource that may be
-	// set by external tools to store and retrieve arbitrary metadata. They are not
-	// queryable and should be preserved when modifying objects.
-	// More info: http://kubernetes.io/docs/user-guide/annotations
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // PgBouncerSpec defines how to configure PgBouncer
