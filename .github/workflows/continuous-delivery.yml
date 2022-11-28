@@ -47,10 +47,12 @@ defaults:
 jobs:
   check_commenter:
     name: get commenter
-    uses: actions-cool/check-user-permission@v2
-    if: ${{ startsWith(github.event.comment.body, '/puppa') }}
-    with:
-      require: 'write'
+    steps:
+      - name: permissions
+        uses: actions-cool/check-user-permission@v2
+        if: ${{ startsWith(github.event.comment.body, '/test2') }}
+        with:
+          require: 'write'
 
   buildx:
     name: Build containers
