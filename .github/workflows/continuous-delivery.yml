@@ -46,12 +46,13 @@ defaults:
 
 jobs:
   check_commenter:
+    if: |
+        github.event.issue.pull_request && startsWith(github.event.comment.body, '/test2')
     name: get commenter
     runs-on: ubuntu-20.04
     steps:
       - name: permissions
         uses: actions-cool/check-user-permission@v2
-        if: ${{ startsWith(github.event.comment.body, '/test2') }}
         with:
           require: 'write'
 
