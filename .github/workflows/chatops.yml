@@ -1,0 +1,23 @@
+# This workflow adds support for custom "slash commands" in the CI/CD pipeline.
+# It is triggered by comments made on pull requests.
+#
+# 1. If the comment starts with "/ok-to-merge", it will label the PR with
+#    "ok to merge :ok_hand:"
+#
+name: slash-command
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  ok-to-merge:
+    if: |
+        github.event.issue.pull_request &&
+        startsWith(github.event.comment.body, '/ok-to-merge'
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Add "ok to merge :ok_hand:" label to CNPG PR
+        uses: actions-ecosystem/action-add-labels@v1.1.3
+        with:
+           github_token: ${{ secrets.REPO_GHA_PAT }}
+           labels: "ok to merge :ok_hand:"
