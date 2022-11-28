@@ -15,10 +15,12 @@ kubectl cnpg pgbench \
 ```
 
 Example of how to run it against a `Cluster` named `cluster-example` in the `pgbench` namespace:
+```
 kubectl cnpg pgbench \
    -n pgbench cluster-example \
    --pgbench-job-name pgbench-job \
    -- --time 30 --client 1 --jobs 1
+
 ```
 
 Example of how to run it on an existing database by using the `--db-name` flag and
@@ -34,14 +36,12 @@ kubectl cnpg pgbench \
 The job status can be fetched by running:
 ```
 kubectl get job/pgbench-job -n <namespace>
-```
-```
+
 NAME               COMPLETIONS   DURATION   AGE
 pgbench-job-name   1/1           15s        41s
 ```
 
 Once the job is completed the results can be gathered by executing:
-
 ```
 kubectl logs job/pgbench-job -n <namespace>
 ```
