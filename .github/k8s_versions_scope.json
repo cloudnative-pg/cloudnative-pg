@@ -1,6 +1,6 @@
 {
   "e2e_test": {
-    "KIND": {"min": "1.22", "max": ""}
+    "KIND": {"min": "1.22", "max": "1.24"}
   },
-    "unit_test": {"min":  "1.22", "max":  "1.25"}
+    "unit_test": {"min":  "1.22", "max":  "1.24"}
 }
