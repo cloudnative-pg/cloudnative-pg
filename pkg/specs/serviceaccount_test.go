@@ -18,12 +18,15 @@ package specs
 
 import (
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Service accounts", func() {
+	emptyMeta := metav1.ObjectMeta{}
+
 	It("create a service account with the cluster name", func() {
 		sa := &v1.ServiceAccount{}
 		err := UpdateServiceAccount(nil, sa)
@@ -39,17 +42,17 @@ var _ = Describe("Service accounts", func() {
 	})
 
 	When("the pull secrets are changed", func() {
-		It("can detect that the ServiceAccount is needing a refresh", func() {
+		It("can detect that the ServiceAccount is needing a refresh", func(ctx SpecContext) {
 			sa := &v1.ServiceAccount{}
 			err := UpdateServiceAccount([]string{"one", "two"}, sa)
 			Expect(err).To(BeNil())
-			Expect(IsServiceAccountAligned(sa, []string{"one", "two"})).To(BeTrue())
-			Expect(IsServiceAccountAligned(sa, []string{"one", "two", "three"})).To(BeFalse())
+			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two"}, emptyMeta)).To(BeTrue())
+			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two", "three"}, emptyMeta)).To(BeFalse())
 		})
 	})
 
 	When("there are secrets not directly managed by the operator", func() {
-		It("can detect that the ServiceAccount is needing a refresh", func() {
+		It("can detect that the ServiceAccount is needing a refresh", func(ctx SpecContext) {
 			sa := &v1.ServiceAccount{}
 			err := UpdateServiceAccount([]string{"one", "two"}, sa)
 
@@ -60,8 +63,56 @@ var _ = Describe("Service accounts", func() {
 			})
 			Expect(err).To(BeNil())
 
-			Expect(IsServiceAccountAligned(sa, []string{"one", "two"})).To(BeTrue())
-			Expect(IsServiceAccountAligned(sa, []string{"one", "two", "three"})).To(BeFalse())
+			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two"}, emptyMeta)).To(BeTrue())
+			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two", "three"}, emptyMeta)).To(BeFalse())
+		})
+	})
+
+	When("there are custom labels to set on the ServiceAccount", func() {
+		It("can detect if the ServiceAccount is needing a refresh", func(ctx SpecContext) {
+			meta := metav1.ObjectMeta{
+				Labels: map[string]string{
+					"test": "value",
+				},
+			}
+			updatedMeta := metav1.ObjectMeta{
+				Labels: map[string]string{
+					"test": "valueChanged",
+				},
+			}
+
+			sa := &v1.ServiceAccount{
+				ObjectMeta: meta,
+			}
+			err := UpdateServiceAccount([]string{}, sa)
+			Expect(err).To(BeNil())
+
+			Expect(IsServiceAccountAligned(ctx, sa, nil, meta)).To(BeTrue())
+			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta)).To(BeFalse())
+		})
+	})
+
+	When("there are custom annotations to be set on the ServiceAccount", func() {
+		It("can detect if the ServiceAccount is needing a refresh", func(ctx SpecContext) {
+			meta := metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"test": "value",
+				},
+			}
+			updatedMeta := metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"test": "valueChanged",
+				},
+			}
+
+			sa := &v1.ServiceAccount{
+				ObjectMeta: meta,
+			}
+			err := UpdateServiceAccount([]string{}, sa)
+			Expect(err).To(BeNil())
+
+			Expect(IsServiceAccountAligned(ctx, sa, nil, meta)).To(BeTrue())
+			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta)).To(BeFalse())
 		})
 	})
 })

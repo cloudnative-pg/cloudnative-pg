@@ -400,8 +400,6 @@ func (r *ClusterReconciler) deletePodDisruptionBudget(
 // createOrPatchServiceAccount creates or synchronizes the ServiceAccount used by the
 // cluster with the latest cluster specification
 func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx)
-
 	var sa corev1.ServiceAccount
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &sa); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -417,25 +415,20 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 		return fmt.Errorf("while generating pull secret names: %w", err)
 	}
 
-	serviceAccountAligned, err := specs.IsServiceAccountAligned(&sa, generatedPullSecretNames)
-	if err != nil {
-		contextLogger.Error(err, "Cannot detect if a ServiceAccount need to be refreshed or not, refreshing it",
-			"serviceAccount", sa)
-		serviceAccountAligned = false
-	}
-
-	if serviceAccountAligned {
-		return nil
-	}
-
 	origSa := sa.DeepCopy()
 	err = specs.UpdateServiceAccount(generatedPullSecretNames, &sa)
 	if err != nil {
 		return fmt.Errorf("while generating service account: %w", err)
 	}
 
-	r.Recorder.Event(cluster, "Normal", "UpdatingServiceAccount", "Updating ServiceAccount")
 	SetClusterOwnerAnnotationsAndLabels(&sa.ObjectMeta, cluster)
+	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
+
+	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
+		return nil
+	}
+
+	r.Recorder.Event(cluster, "Normal", "UpdatingServiceAccount", "Updating ServiceAccount")
 	if err := r.Patch(ctx, &sa, client.MergeFrom(origSa)); err != nil {
 		return fmt.Errorf("while patching service account: %w", err)
 	}
@@ -462,6 +455,8 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 	}
 
 	SetClusterOwnerAnnotationsAndLabels(&serviceAccount.ObjectMeta, cluster)
+	cluster.Spec.ServiceAccountTemplate.MergeMetadata(serviceAccount)
+
 	err = r.Create(ctx, serviceAccount)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
 		return err
