@@ -64,30 +64,23 @@ jobs:
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
-      commit: ${{ steps.check_labels_comments.outputs.commit }}
+      commit: ${{ steps.check_commits.outputs.commit }}
     steps:
       -
         name: Checkout code
+        if: contains( github.event.pull_request.labels.*.name, matrix.branch )
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           ref: ${{ matrix.branch }}
           token: ${{ secrets.REPO_GHA_PAT }}
       -
-        name: Check labels and commits
-        id: check_labels_comments
-        if: success()
+        name: Check commits
+        if: contains( github.event.pull_request.labels.*.name, matrix.branch )
+        id: check_commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          label=$(gh pr view ${PR} --json labels -q ".labels.[].name" 2>/dev/null | grep ${{ matrix.branch }} || :)
-          if [ -z "${label}" ]
-          then
-            echo "No ${{ matrix.branch }} label found!"
-            exit 0
-          fi
-          echo "LABEL=${label}" >> $GITHUB_ENV
-          echo "find label ${label} in pull request ${PR}"
           commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
           if [ -z "${commit}" ]
           then
@@ -103,11 +96,9 @@ jobs:
       -
         name: cherry pick
         env:
-          COMMIT: ${{ steps.check_labels_comments.outputs.commit }}
+          COMMIT: ${{ steps.check_commits.outputs.commit }}
         if: |
-          env.LABEL != '' &&
-          env.COMMIT != '' &&
-          env.LABEL == matrix.branch
+          contains( github.event.pull_request.labels.*.name, matrix.branch ) && env.COMMIT != ''
         run: |
           git config user.email "${{ env.AUTHOR_EMAIL }}"
           git config user.name "${{ env.AUTHOR_NAME }}"
