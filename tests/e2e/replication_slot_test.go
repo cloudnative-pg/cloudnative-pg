@@ -39,10 +39,6 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if env.PostgresVersion == 10 {
-			Skip("Test will be skipped for PostgreSQL 10, replication slot " +
-				"high availability requires PostgreSQL 11 or above")
-		}
 	})
 
 	It("Can enable and disable replication slots", func() {

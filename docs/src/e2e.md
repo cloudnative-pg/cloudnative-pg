@@ -19,7 +19,6 @@ The following PostgreSQL versions are tested:
 * PostgreSQL 13
 * PostgreSQL 12
 * PostgreSQL 11
-* PostgreSQL 10
 
 For each tested version of Kubernetes and PostgreSQL, a Kubernetes
 cluster is created using [kind](https://kind.sigs.k8s.io/),

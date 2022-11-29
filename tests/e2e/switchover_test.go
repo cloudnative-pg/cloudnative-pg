@@ -39,9 +39,6 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	})
 	Context("with HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
-			if env.PostgresVersion == 10 {
-				Skip("replication slots not available for PostgreSQL 10 or older")
-			}
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())

@@ -42,10 +42,6 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 
 	Context("with HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
-			if env.PostgresVersion == 10 {
-				Skip("replication slots are not available for PostgreSQL 10 or older")
-			}
-
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
