@@ -207,3 +207,10 @@ func IsReconciliationDisabled(object *metav1.ObjectMeta) bool {
 func IsEmptyWalArchiveCheckEnabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[skipEmptyWalArchiveCheck] != string(annotationStatusEnabled)
 }
+
+// MergeMap transfers the content of a giver map to a receiver
+func MergeMap(receiver, giver map[string]string) {
+	for key, value := range giver {
+		receiver[key] = value
+	}
+}
