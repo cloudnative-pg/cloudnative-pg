@@ -119,6 +119,11 @@ func (cmd *pgBenchCommand) buildJob(cluster apiv1.Cluster) *batchv1.Job {
 		"pbBenchJob": cluster.Name,
 	}
 	return &batchv1.Job{
+		// To ensure we have manifest with Kind and APi in --dry-run
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "batch/v1",
+			Kind:       "Job",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmd.jobName,
 			Namespace: cluster.Namespace,
