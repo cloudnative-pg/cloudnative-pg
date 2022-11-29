@@ -14,7 +14,8 @@ jobs:
   label-source-pr:
     name: label the source pr
     if: github.event.pull_request.merged == false &&
-        !startsWith(github.event.pull_request.title, 'feat:')
+        !startsWith(github.event.pull_request.title, 'feat:') &&
+        !contains(github.event.pull_request.labels.*.name, 'do not backport')
     runs-on: ubuntu-20.04
     steps:
       -
@@ -37,7 +38,7 @@ jobs:
           body: |
             :exclamation: By default, the pull request is configured to backport to all release branches.
 
-            - To stop backporting this pr, remove the label:  backport-requested :arrow_backward:
+            - To stop backporting this pr, remove the label:  backport-requested :arrow_backward: or add label 'do not backport'
             - To stop backporting this pr to certain release branch, remove the specific label: release-x.y
             
           reactions: heart
@@ -50,7 +51,8 @@ jobs:
         (
           contains(github.event.pull_request.labels.*.name, 'backport-requested') ||
           contains(github.event.pull_request.labels.*.name, 'backport-requested :arrow_backward:')
-        )
+        ) &&
+        !contains(github.event.pull_request.labels.*.name, 'do not backport')
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
