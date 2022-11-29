@@ -129,6 +129,7 @@ HistoryTags
 Huß
 IAM
 INPLACE
+IOPS
 IRSA
 Ibryam
 IfNotPresent
@@ -393,6 +394,7 @@ bootstrapinitdb
 bootstraprecovery
 br
 bs
+bw
 bzip
 cGFzc
 cb
@@ -916,6 +918,7 @@ walsender
 webconsole
 webhook
 webhooks
+webserver
 webtest
 wikipedia
 wp

@@ -29,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/install"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
@@ -74,6 +75,7 @@ func main() {
 	rootCmd.AddCommand(versions.NewCmd())
 	rootCmd.AddCommand(pgbench.NewCmd())
 	rootCmd.AddCommand(install.NewCmd())
+	rootCmd.AddCommand(fio.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
