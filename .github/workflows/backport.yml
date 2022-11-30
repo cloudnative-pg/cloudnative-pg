@@ -13,7 +13,9 @@ jobs:
   # we backport everything
   label-source-pr:
     name: label the source pr
-    if: github.event.pull_request.merged == false
+    if: github.event.pull_request.merged == false &&
+        !startsWith(github.event.pull_request.title, 'feat:') &&
+        !contains(github.event.pull_request.labels.*.name, 'do not backport')
     runs-on: ubuntu-20.04
     steps:
       -
@@ -34,11 +36,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            By default, the pull request is supposed to backport to all release branches.
+            :exclamation: By default, the pull request is configured to backport to all release branches.
 
-            - To stop backporting this pr, remove the label:  backport-requested :arrow_backward:
-            - To stop backporting this pr to certain release branch, remove the specific label: release-x.y
-            
+            - To stop backporting this pr, remove the label:  backport-requested :arrow_backward: or add the label 'do not backport'
+            - To stop backporting this pr to a certain release branch, remove the specific branch label: release-x.y
+
           reactions: heart
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
@@ -49,7 +51,8 @@ jobs:
         (
           contains(github.event.pull_request.labels.*.name, 'backport-requested') ||
           contains(github.event.pull_request.labels.*.name, 'backport-requested :arrow_backward:')
-        )
+        ) &&
+        !contains(github.event.pull_request.labels.*.name, 'do not backport')
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
@@ -60,35 +63,31 @@ jobs:
           -  release-1.18
     env:
       PR: ${{ github.event.pull_request.number }}
+    outputs:
+      commit: ${{ steps.check_commits.outputs.commit }}
     steps:
       -
         name: Checkout code
+        if: contains( github.event.pull_request.labels.*.name, matrix.branch )
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           ref: ${{ matrix.branch }}
           token: ${{ secrets.REPO_GHA_PAT }}
       -
-        name: Check labels and commits
-        if: success()
+        name: Check commits
+        if: contains( github.event.pull_request.labels.*.name, matrix.branch )
+        id: check_commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          label=$(gh pr view ${PR} --json labels -q ".labels.[].name" 2>/dev/null | grep ${{ matrix.branch }} || :)
-          if [ -z "${label}" ]
-          then
-            echo "No ${{ matrix.branch }} label found!"
-            exit 0
-          fi
-          echo "LABEL=${label}" >> $GITHUB_ENV
-          echo "find label ${label} in pull request ${PR}"
           commit=$(gh pr view ${PR} --json mergeCommit -q ".mergeCommit.oid" 2>/dev/null || :)
           if [ -z "${commit}" ]
           then
             echo "No commit found!"
             exit 0
           fi
-          echo "COMMIT=${commit}" >> $GITHUB_ENV
+          echo "commit=${commit}" >> $GITHUB_OUTPUT
           echo "cherry-pick commit ${commit} to branch ${{ matrix.branch }}"
           author_name=$(git show -s --format='%an' "${commit}")
           echo "AUTHOR_NAME=${author_name}" >> $GITHUB_ENV
@@ -96,29 +95,46 @@ jobs:
           echo "AUTHOR_EMAIL=${author_email}" >> $GITHUB_ENV
       -
         name: cherry pick
+        env:
+          COMMIT: ${{ steps.check_commits.outputs.commit }}
         if: |
-          env.LABEL != '' &&
-          env.COMMIT != '' &&
-          env.LABEL == matrix.branch
+          contains( github.event.pull_request.labels.*.name, matrix.branch ) && env.COMMIT != ''
         run: |
           git config user.email "${{ env.AUTHOR_EMAIL }}"
           git config user.name "${{ env.AUTHOR_NAME }}"
           git fetch
           git cherry-pick -x --mainline 1 ${{ env.COMMIT }}
           git push
-      -
-        name: create ticket
+
+  create-tickets:
+    name: create tickets for failure
+    needs:
+      - back-porting-pr
+    if: |
+      failure() && !cancelled() &&
+      needs.back-porting-pr.outputs.commit != ''
+    env:
+      PR: ${{ github.event.pull_request.number }}
+      COMMIT: ${{ needs.back-porting-pr.outputs.commit }}
+    runs-on: ubuntu-20.04
+    steps:
+      - name: create ticket
         uses: dacbd/create-issue-action@v1
-        if: failure()
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: Backport failure for pull request ${{ env.PR }}
           labels: backport failure
           body: |
             ### Context
-            Automatically backport failure
+            Automatically backport failure for pull request ${{ env.PR }}
 
-            Pull request: ${{ env.PR }}
-            commit: ${{ env.COMMIT }}
-            Release Branch: ${{ matrix.branch }}
+            Pull request: ${{ github.server_url }}/${{ github.repository }}/pull/${{ env.PR }}
+            Commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT }}
+            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+            To solve the ticket, open the workflow link above, and for each failed release branch check the following:
+
+            1. Whether the commit should be `cherry-pick`(ed) to this release branch, otherwise skip this release branch
+            2. If yes, `cherry-pick` the commit manually and push it to the release branch. You may need to resolve the
+            conflicts and issue `cherry-pick --continue` again. Also, a dependent commit missing may be causing the
+            failure, so if that's the case you may need to `cherry-pick` the dependent commit first.
