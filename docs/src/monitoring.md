@@ -471,7 +471,7 @@ Here is a short description of all the available fields:
     - `primary`: whether to run the query only on the primary instance <!-- wokeignore:rule=master -->
     - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
     - `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on
-       (e.g. `">=10.0.0"` or `">=12.0.0 <=15.0.0"`)
+       (e.g. `">=11.0.0"` or `">=12.0.0 <=15.0.0"`)
     - `target_databases`: a list of databases to run the `query` against,
       or a [shell-like pattern](#example-of-a-user-defined-metric-running-on-multiple-databases)
       to enable auto discovery. Overwrites the default database if provided.

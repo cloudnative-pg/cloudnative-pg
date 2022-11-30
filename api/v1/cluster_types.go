@@ -196,6 +196,10 @@ type ClusterSpec struct {
 	// +optional
 	StorageConfiguration StorageConfiguration `json:"storage,omitempty"`
 
+	// Configure the generation of the service account
+	// +optional
+	ServiceAccountTemplate *ServiceAccountTemplate `json:"serviceAccountTemplate,omitempty"`
+
 	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
 	WalStorage *StorageConfiguration `json:"walStorage,omitempty"`
 
@@ -296,6 +300,29 @@ const (
 	// change is being detected
 	PhaseApplyingConfiguration = "Applying configuration"
 )
+
+// ServiceAccountTemplate contains the template needed to generate the service accounts
+type ServiceAccountTemplate struct {
+	// Metadata are the metadata to be used for the generated
+	// service account
+	Metadata Metadata `json:"metadata"`
+}
+
+// MergeMetadata adds the passed custom annotations and labels in the service account.
+func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
+	if st == nil {
+		return
+	}
+	if sa.Labels == nil {
+		sa.Labels = map[string]string{}
+	}
+	if sa.Annotations == nil {
+		sa.Annotations = map[string]string{}
+	}
+
+	utils.MergeMap(sa.Labels, st.Metadata.Labels)
+	utils.MergeMap(sa.Annotations, st.Metadata.Annotations)
+}
 
 // PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
 type PodTopologyLabels map[string]string

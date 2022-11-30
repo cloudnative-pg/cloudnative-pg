@@ -17,10 +17,14 @@ limitations under the License.
 package specs
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 const (
@@ -77,22 +81,50 @@ func CreateManagedSecretsAnnotationValue(imagePullSecretsNames []string) (string
 // IsServiceAccountAligned compares the given list of pull secrets with the
 // ones managed by the operator inside the given ServiceAccount and returns
 // true when everything is aligned
-func IsServiceAccountAligned(sa *corev1.ServiceAccount, imagePullSecretsNames []string) (bool, error) {
+func IsServiceAccountAligned(
+	ctx context.Context,
+	sa *corev1.ServiceAccount,
+	imagePullSecretsNames []string,
+	updatedMetadata metav1.ObjectMeta,
+) bool {
+	contextLogger := log.FromContext(ctx)
 	// This is an old version of the ServiceAccount, that need to be refreshed to
 	// store the annotation value
 	if sa.Annotations == nil {
-		return false, nil
+		return false
 	}
 
 	value := sa.Annotations[OperatorManagedSecretsName]
 	if value == "" {
-		return false, nil
+		return false
 	}
 
 	var serviceAccountPullSecrets []string
 	if err := json.Unmarshal([]byte(value), &serviceAccountPullSecrets); err != nil {
-		return false, err
+		contextLogger.Error(err, "Cannot detect if a ServiceAccount need to be refreshed or not, refreshing it",
+			"serviceAccount", sa)
+		return false
 	}
 
-	return reflect.DeepEqual(serviceAccountPullSecrets, imagePullSecretsNames), nil
+	if len(serviceAccountPullSecrets) != len(imagePullSecretsNames) {
+		return false
+	}
+	if serviceAccountPullSecrets != nil && imagePullSecretsNames != nil && !reflect.DeepEqual(
+		serviceAccountPullSecrets, imagePullSecretsNames) {
+		return false
+	}
+
+	for name, value := range updatedMetadata.Labels {
+		if sa.Labels[name] != value {
+			return false
+		}
+	}
+
+	for name, value := range updatedMetadata.Annotations {
+		if sa.Annotations[name] != value {
+			return false
+		}
+	}
+
+	return true
 }

@@ -59,9 +59,6 @@ CREATE USER streaming_replica WITH REPLICATION;
    -- NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB NOBYPASSRLS
 ```
 
-!!! Note
-    Due to a `pg_rewind` requirement, in PostgreSQL 10 the `streaming_replica`
-    user is created with `SUPERUSER` privileges.
 
 Out of the box, the operator automatically sets up streaming replication within
 the cluster over an encrypted channel and enforces TLS client certificate

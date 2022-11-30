@@ -42,6 +42,14 @@ discussed in the following sections.
 
 ### S3
 
+You can define the permissions to store backups in S3 buckets in two ways:
+
+- If CloudNativePG is running in EKS. you may want to use the
+  [IRSA authentication method](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+- Alternatively, you can use the `ACCESS_KEY_ID` and `ACCESS_SECRET_KEY` credentials
+
+#### AWS Access key
+
 You will need the following information about your environment:
 
 - `ACCESS_KEY_ID`: the ID of the access key that will be used
@@ -88,6 +96,27 @@ spec:
 The destination path can be any URL pointing to a folder where
 the instance can upload the WAL files, e.g.
 `s3://BUCKET_NAME/path/to/folder`.
+
+#### IAM Role for Service Account (IRSA)
+
+In order to use IRSA you need to set an `annotation` in the `ServiceAccount` of
+the Postgres cluster.
+
+We can configure CloudNativePG to inject them using the `serviceAccountTemplate`
+stanza:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+[...]
+spec:
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        eks.amazonaws.com/role-arn: arn:[...]
+        [...]
+```
 
 ### Other S3-compatible Object Storages providers
 
@@ -336,33 +365,41 @@ Emulator or [Azurite](https://github.com/Azure/Azurite).
 
 ### Google Cloud Storage
 
-Currently, the operator supports two authentication methods for Google Cloud Storage,
-one assumes the pod is running inside a Google Kubernetes Engine cluster, the other one leverages
-the environment variable `GOOGLE_APPLICATION_CREDENTIALS`.
+Currently, the operator supports two authentication methods for Google Cloud Storage:
+
+- the first one assumes that the pod is running inside a Google Kubernetes Engine cluster
+- the second one leverages the environment variable `GOOGLE_APPLICATION_CREDENTIALS`
 
 #### Running inside Google Kubernetes Engine
 
-This could be one of the easiest way to create a backup, and only requires
-the following configuration:
+When running inside Google Kubernetes Engine you can configure your backups to
+simply rely on [Workload Identity](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity),
+without having to set any credentials. In particular, you need to:
+
+- set `.spec.backup.barmanObjectStore.googleCredentials.gkeEnvironment` to `true`
+- set the `iam.gke.io/gcp-service-account` annotation in the `serviceAccountTemplate` stanza
+
+Please use the following example as a reference:
+
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
+  [...]
   backup:
     barmanObjectStore:
       destinationPath: "gs://<destination path here>"
       googleCredentials:
         gkeEnvironment: true
+
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        iam.gke.io/gcp-service-account:  [...].iam.gserviceaccount.com
+        [...]
 ```
-
-This, will tell the operator that the cluster is running inside a Google Kubernetes
-Engine meaning that no credentials are needed to upload the files
-
-!!! Important
-    This method will require carefully defined permissions for cluster
-    and pods, which have to be defined by a cluster administrator.
 
 #### Using authentication
 
