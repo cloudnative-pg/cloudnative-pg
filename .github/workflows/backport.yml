@@ -38,9 +38,9 @@ jobs:
           body: |
             :exclamation: By default, the pull request is configured to backport to all release branches.
 
-            - To stop backporting this pr, remove the label:  backport-requested :arrow_backward: or add label 'do not backport'
-            - To stop backporting this pr to certain release branch, remove the specific label: release-x.y
-            
+            - To stop backporting this pr, remove the label:  backport-requested :arrow_backward: or add the label 'do not backport'
+            - To stop backporting this pr to a certain release branch, remove the specific branch label: release-x.y
+
           reactions: heart
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
@@ -132,11 +132,9 @@ jobs:
             Commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            To solve the ticket, open the workflow link above, and check following for each failed release branch:
+            To solve the ticket, open the workflow link above, and for each failed release branch check the following:
 
-            1. Whether the commit should be `cherry-pick` to this release branch, if no, skip this branch
-            2. If yes, `cherry-pick` the commit manually and push to the release branch. You may need to resolve the
-            conflict and issue `cherry-pick --continue` again. Also it is possible that dependent commit missing cause
-            the failure, you may need cherry-pick the dependent commit first.
-
-
+            1. Whether the commit should be `cherry-pick`(ed) to this release branch, otherwise skip this release branch
+            2. If yes, `cherry-pick` the commit manually and push it to the release branch. You may need to resolve the
+            conflicts and issue `cherry-pick --continue` again. Also, a dependent commit missing may be causing the
+            failure, so if that's the case you may need to `cherry-pick` the dependent commit first.
