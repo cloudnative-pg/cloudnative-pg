@@ -59,6 +59,8 @@ jobs:
             "test_level":"${{ github.event.client_payload.slash_command.args.named.tl
                   || github.event.client_payload.slash_command.args.named.level
                   || github.event.client_payload.slash_command.args.named.test_level }}",
+            "log_level":"${{ github.event.client_payload.slash_command.args.named.ll
+                  || github.event.client_payload.slash_command.args.named.log_level }}",
             "build_plugin":"${{ github.event.client_payload.slash_command.args.named.p
                   || github.event.client_payload.slash_command.args.named.plugin }}"}
       - name: Create comment
