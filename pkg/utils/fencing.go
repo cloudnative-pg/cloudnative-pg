@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -69,6 +70,14 @@ func GetFencedInstances(annotations map[string]string) (*stringset.Data, error) 
 	}
 
 	return stringset.From(fencedInstancesList), nil
+}
+
+// ListFencedInstances lists the fenced instances in a human-readable way
+func ListFencedInstances(fencedInstances *stringset.Data) string {
+	if fencedInstances.Has(FenceAllServers) {
+		return "All Instances"
+	}
+	return strings.Join(fencedInstances.ToList(), ", ")
 }
 
 // SetFencedInstances sets the list of fenced servers inside the annotations

@@ -764,12 +764,7 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	}
 
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
-
-	cluster.Status.Status = cluster.Status.Phase
-	if cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) {
-		cluster.Status.Status = fmt.Sprintf("%s (%s)", cluster.Status.Phase, "Primary instance is fenced")
-	}
-
+	updatePhaseMessage(ctx, cluster)
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		if err := r.Status().Update(ctx, cluster); err != nil {
 			return err
@@ -777,6 +772,29 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	}
 
 	return nil
+}
+
+// updatePhaseMessage update phase message in the cluster status with supplemental
+// explanation to `phase`
+func updatePhaseMessage(ctx context.Context, cluster *apiv1.Cluster,
+) {
+	contextLog := log.FromContext(ctx)
+	phaseMessage := ""
+	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
+	if err != nil {
+		contextLog.Warning("could not check if cluster is fenced: %v", err)
+		return
+	}
+
+	if fencedInstances == nil || fencedInstances.Len() == 0 {
+		return
+	}
+
+	if cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) {
+		phaseMessage = "Primary instance is fenced; "
+	}
+	phaseMessage = phaseMessage + "Fenced instance(s): " + utils.ListFencedInstances(fencedInstances)
+	cluster.Status.PhaseMessage = phaseMessage
 }
 
 // updateClusterStatusThatRequiresInstancesState updates all the cluster status fields that require the instances status

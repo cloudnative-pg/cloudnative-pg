@@ -28,8 +28,12 @@ spec:
       name: Ready
       type: integer
     - description: Cluster current status
-      jsonPath: .status.status
+      jsonPath: .status.phase
       name: Status
+      type: string
+    - description: Additional message for current phase
+      jsonPath: .status.phaseMessage
+      name: PhaseMessage
       type: string
     - description: Primary pod
       jsonPath: .status.currentPrimary
@@ -2766,6 +2770,9 @@ spec:
               phase:
                 description: Current phase of the cluster
                 type: string
+              phaseMessage:
+                description: Additional message for the current phase
+                type: string
               phaseReason:
                 description: Reason for the current phase
                 type: string
@@ -2839,9 +2846,6 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
-              status:
-                description: Current status of the cluster
-                type: string
               targetPrimary:
                 description: Target primary instance, this is different from the previous
                   one during a switchover or a failover
