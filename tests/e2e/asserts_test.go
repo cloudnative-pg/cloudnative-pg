@@ -1129,7 +1129,7 @@ func AssertApplicationDatabaseConnection(
 		}
 		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 
-		AssertConnection(rwService, appUser, appDB, appPassword, pod, 60, env)
+		AssertConnection(rwService, appUser, appDB, appPassword, *psqlClientPod, 60, env)
 	})
 }
 
