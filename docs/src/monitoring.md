@@ -53,7 +53,8 @@ by specifying a list of one or more databases in the `target_databases` option.
 
 !!! Seealso "Prometheus/Grafana"
     If you are interested in evaluating the integration of CloudNativePG
-    with Prometheus and Grafana, please look at [cnp-sandbox](https://github.com/EnterpriseDB/cnp-sandbox).
+    with Prometheus and Grafana, you can find a quick setup guide
+    in [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
 
 ### Prometheus Operator example
 
