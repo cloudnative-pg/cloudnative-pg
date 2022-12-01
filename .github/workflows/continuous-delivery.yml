@@ -14,7 +14,7 @@ on:
       test_level:
         description: 'Test level (0-4)'
         required: false
-        default: 1
+        default: '1'
       feature_type:
         description: 'Feature Type (disruptive, performance, upgrade, smoke, basic, service-connectivity, self-healing,
         backup-restore, operator, observability, replication, plugin, postgres-configuration, pod-scheduling,
@@ -23,6 +23,7 @@ on:
       log_level:
         description: 'Log level for operator (error, warning, info(default), debug, trace)'
         required: false
+        default: 'info'
       build_plugin:
         type: boolean
         required: false
@@ -54,6 +55,7 @@ jobs:
       depth: ${{ env.DEPTH }}
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
+      log_level: ${{ env.LOG_LEVEL }}
       build_plugin: ${{ env.BUILD_PLUGIN }}
     steps:
       - name: Check for Command
@@ -73,24 +75,28 @@ jobs:
           ARGS="${{ steps.command.outputs.command-arguments }}"
           # Set the defaults
           DEPTH="main"
-          TEST_LEVEL=""
+          TEST_LEVEL="4"
           FEATURE_TYPE=""
           BUILD_PLUGIN="false"
+          LOG_LEVEL="info"
 
           for ARG in $ARGS; do
             IFS='=' read name value <<< $ARG
             case "${name}" in
-              "depth")
+              "depth"|"d")
               DEPTH="${value}"
               ;;
-              "test_level")
+              "test_level"|"level"|"tl")
               TEST_LEVEL="${value}"
               ;;
-              "feature_type")
+              "feature_type"|"type"|"ft")
               FEATURE_TYPE="${value}"
               ;;
-              "build_plugin")
+              "build_plugin"|"plugin"|"bp")
               BUILD_PLUGIN="${value}"
+              ;;
+              "log_level"|"ll")
+              LOG_LEVEL="${value}"
               ;;
               *)
               ;;
@@ -101,6 +107,7 @@ jobs:
           echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
           echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
           echo "BUILD_PLUGIN=${BUILD_PLUGIN}" >> $GITHUB_ENV
+          echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
         uses: xt0rted/pull-request-comment-branch@v1
@@ -126,6 +133,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       build_plugin: ${{ env.BUILD_PLUGIN }}
+      log_level: ${{ env.LOG_LEVEL }}
     steps:
       - name: Parse input to env
         run: |
@@ -133,6 +141,7 @@ jobs:
           echo "TEST_LEVEL=${{ github.event.inputs.test_level }}" >> $GITHUB_ENV
           echo "FEATURE_TYPE=${{ github.event.inputs.feature_type }}" >> $GITHUB_ENV
           echo "BUILD_PLUGIN=${{ github.event.inputs.build_plugin }}" >> $GITHUB_ENV
+          echo "LOG_LEVEL=${{ github.event.inputs.log_level }}" >> $GITHUB_ENV
 
   evaluate_options:
     name: Evaluate workflow options
@@ -148,6 +157,7 @@ jobs:
       test_level: ${{ env.TEST_LEVEL }}
       feature_type: ${{ env.FEATURE_TYPE }}
       build_plugin: ${{ env.BUILD_PLUGIN }}
+      log_level: ${{ env.LOG_LEVEL }}
     steps:
       - name: From command
         run: |
@@ -157,6 +167,7 @@ jobs:
             echo 'TEST_LEVEL=${{ needs.test_arguments.outputs.test_level }}' >> $GITHUB_ENV
             echo 'FEATURE_TYPE=${{ needs.test_arguments.outputs.feature_type }}' >> $GITHUB_ENV
             echo 'BUILD_PLUGIN=${{ needs.test_arguments.outputs.build_plugin }}' >> $GITHUB_ENV
+            echo 'LOG_LEVEL=${{ needs.test_arguments.outputs.log_level }}' >> $GITHUB_ENV
           fi
           if [[ ${{ github.event_name }} == 'issue_comment' ]]; then
             echo 'GITHUB_REF=${{ needs.check_commenter.outputs.github_ref }}' >> $GITHUB_ENV
@@ -164,6 +175,7 @@ jobs:
             echo 'TEST_LEVEL=${{ needs.check_commenter.outputs.test_level }}' >> $GITHUB_ENV
             echo 'FEATURE_TYPE=${{ needs.check_commenter.outputs.feature_type }}' >> $GITHUB_ENV
             echo 'BUILD_PLUGIN=${{ needs.check_commenter.outputs.build_plugin }}' >> $GITHUB_ENV
+            echo 'LOG_LEVEL=${{ needs.check_commenter.outputs.log_level }}' >> $GITHUB_ENV
           fi
 
   buildx:
@@ -558,7 +570,7 @@ jobs:
           LEADER_LEASE_DURATION: 15
           LEADER_RENEW_DEADLINE: 10
           LIVENESS_PROBE_THRESHOLD: 3
-          LOG_LEVEL: ${{ github.event.inputs.log_level }}
+          LOG_LEVEL: ${{ needs.evaluate_options.outputs.log_level }}
         run: |
           LOG_LEVEL=${LOG_LEVEL:-info}
           envsubst < hack/e2e/env_override_customized.yaml.template > config/manager/env_override.yaml
