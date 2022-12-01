@@ -477,9 +477,6 @@ and/or `Secret` objects using a syntax that is compatible with the
 [`postgres_exporter` for Prometheus](https://github.com/prometheus-community/postgres_exporter).
 CloudNativePG provides a set of basic monitoring queries for
 PostgreSQL that can be integrated and adapted to your context.
-The [cnp-sandbox project] is an open source Helm chart that demonstrates
-how to integrate CloudNativePG with Prometheus and Grafana, by providing
-some basic metrics and an example of dashboard.
 
 ### Standard output logging of PostgreSQL error messages in JSON format
 
