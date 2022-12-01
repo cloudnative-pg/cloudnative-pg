@@ -368,6 +368,8 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return err
 	}
 
+	updatePhaseMessage(ctx, cluster)
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
@@ -775,7 +777,7 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 }
 
 // updatePhaseMessage update phase message in the cluster status with supplemental
-// explanation to `phase`
+// explanation to `status/phase`
 func updatePhaseMessage(ctx context.Context, cluster *apiv1.Cluster,
 ) {
 	contextLog := log.FromContext(ctx)
@@ -786,14 +788,21 @@ func updatePhaseMessage(ctx context.Context, cluster *apiv1.Cluster,
 		return
 	}
 
-	if fencedInstances == nil || fencedInstances.Len() == 0 {
-		return
+	switch {
+	case fencedInstances == nil || fencedInstances.Len() == 0:
+		phaseMessage = ""
+	case cluster.IsWholeClusterFenced():
+		phaseMessage = "Whole cluster fenced"
+	case cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) && fencedInstances.Len() == 1:
+		phaseMessage = "Primary is fenced"
+	case cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) && fencedInstances.Len() > 1:
+		fencedInstances.Delete(cluster.Status.CurrentPrimary)
+		phaseMessage = fmt.Sprintf("Primary and standby(s): %s fenced",
+			utils.ListFencedInstances(fencedInstances))
+	default:
+		phaseMessage = fmt.Sprintf("Standby(s) fenced: %s", utils.ListFencedInstances(fencedInstances))
 	}
 
-	if cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) {
-		phaseMessage = "Primary instance is fenced; "
-	}
-	phaseMessage = phaseMessage + "Fenced instance(s): " + utils.ListFencedInstances(fencedInstances)
 	cluster.Status.PhaseMessage = phaseMessage
 }
 

@@ -31,13 +31,13 @@ spec:
       jsonPath: .status.phase
       name: Status
       type: string
-    - description: Additional message for current phase
-      jsonPath: .status.phaseMessage
-      name: PhaseMessage
-      type: string
     - description: Primary pod
       jsonPath: .status.currentPrimary
       name: Primary
+      type: string
+    - description: Additional message for current phase
+      jsonPath: .status.phaseMessage
+      name: Message
       type: string
     name: v1
     schema:
