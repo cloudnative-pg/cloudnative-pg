@@ -43,6 +43,7 @@ jobs:
             test_level=4
             depth=push
             plugin=false
+            log_level=info
 
       - name: Add "ok to merge :ok_hand:" label to CNPG PR
         uses: actions-ecosystem/action-add-labels@v1.1.3

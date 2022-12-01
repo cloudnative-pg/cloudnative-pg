@@ -27,6 +27,9 @@ on:
         backup-restore, operator, observability, replication, plugin, postgres-configuration, pod-scheduling,
         cluster-metadata, recovery, importing-databases, storage, security, maintenance)'
         required: false
+      log_level:
+        description: 'Log level for operator (error, warning, info(default), debug, trace)'
+        required: false
       build_plugin:
         type: boolean
         required: false
@@ -780,6 +783,19 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y gettext-base
             sudo hack/setup-cluster.sh prepare /usr/local/bin
+      -
+        name: Prepare patch for customization
+        env:
+          ## the following variable all need be set if we use env_override_customized.yaml.template
+          LEADER_ELECTION: "true"
+          LEADER_LEASE_DURATION: 15
+          LEADER_RENEW_DEADLINE: 10
+          LIVENESS_PROBE_THRESHOLD: 3
+          LOG_LEVEL: ${{ github.event.inputs.log_level }}
+        run: |
+          LOG_LEVEL=${LOG_LEVEL:-info}
+          envsubst < hack/e2e/env_override_customized.yaml.template > config/manager/env_override.yaml
+          cat config/manager/env_override.yaml
       -
         name: Run Kind End-to-End tests
         run:
