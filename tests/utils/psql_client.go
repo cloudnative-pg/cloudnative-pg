@@ -27,8 +27,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-// CreatePsqlClient create the psql client pod for service connectivity
-func CreatePsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, error) {
+// GetPsqlClient gets a psql client pod for service connectivity
+func GetPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, error) {
 	_ = corev1.AddToScheme(env.Scheme)
 	pod := &corev1.Pod{}
 	err := env.CreateNamespace(namespace)
@@ -46,7 +46,7 @@ func CreatePsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 	return pod, nil
 }
 
-// createPsqlClient returns the Pod definition for a psql client
+// createPsqlClient creates a psql client
 func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, error) {
 	name := "psql-client-secret"
 	pass, err := password.Generate(64, 10, 0, false, true)
