@@ -70,8 +70,8 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		roService := fmt.Sprintf("%v-ro.%v.svc", clusterName, namespace)
 		services := []string{rwService, roService, rService}
 		for _, service := range services {
-			AssertConnection(service, "postgres", appDBName, superuserPassword, *pod, 10, env)
-			AssertConnection(service, appDBUser, appDBName, appPassword, *pod, 10, env)
+			AssertConnection(service, "postgres", appDBName, superuserPassword, *psqlClientPod, 10, env)
+			AssertConnection(service, appDBUser, appDBName, appPassword, *psqlClientPod, 10, env)
 		}
 
 		AssertWritesToReplicaFails(pod, roService, appDBName, appDBUser, appPassword)

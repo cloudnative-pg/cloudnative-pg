@@ -80,7 +80,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			const newPassword = "eeh2Zahohx" //nolint:gosec
 
 			AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
-			AssertConnection(rwService, "app", "app", newPassword, pod, 60, env)
+			AssertConnection(rwService, "app", "app", newPassword, *psqlClientPod, 60, env)
 		})
 
 		By("fail updating user application password with wrong user in secret", func() {
@@ -106,7 +106,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			const secretName = clusterName + "-superuser"
 			const newPassword = "fi6uCae7" //nolint:gosec
 			AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
-			AssertConnection(rwService, "postgres", "postgres", newPassword, pod, 60, env)
+			AssertConnection(rwService, "postgres", "postgres", newPassword, *psqlClientPod, 60, env)
 		})
 	})
 })
@@ -209,8 +209,7 @@ var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnect
 
 			rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 			password := string(secret.Data["password"])
-
-			AssertConnection(rwService, "postgres", "postgres", password, *pod, 60, env)
+			AssertConnection(rwService, "postgres", "postgres", password, *psqlClientPod, 60, env)
 		})
 	})
 })
