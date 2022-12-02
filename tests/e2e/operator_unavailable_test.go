@@ -67,7 +67,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			AssertCreateTestData(namespace, clusterName, "test")
+			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateTestData(namespace, clusterName, "test", primary)
 
 			operatorNamespace, err := env.GetOperatorNamespaceName()
 			Expect(err).ToNot(HaveOccurred())
@@ -155,9 +157,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				}, timeout).Should(BeTrue())
 			})
 			// Expect the test data previously created to be available
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			primary, err = env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCount(namespace, primary.GetName(), "test", 2)
+			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
 		})
 	})
 
@@ -180,7 +182,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			AssertCreateTestData(namespace, clusterName, "test")
+			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateTestData(namespace, clusterName, "test", primary)
 
 			operatorNamespace, err := env.GetOperatorNamespaceName()
 			Expect(err).ToNot(HaveOccurred())
@@ -253,9 +257,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				}, timeout).Should(BeTrue())
 			})
 			// Expect the test data previously created to be available
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			primary, err = env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCount(namespace, primary.GetName(), "test", 2)
+			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
 		})
 	})
 })

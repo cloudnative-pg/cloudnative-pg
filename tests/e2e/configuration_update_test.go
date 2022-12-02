@@ -446,21 +446,37 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			var primaryStartTime time.Time
 
 			By("getting old primary info", func() {
-				commandTimeout := time.Second * 2
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				oldPrimaryPodName = primaryPodInfo.GetName()
-				stdout, _, cmdErr := env.EventuallyExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
-					&commandTimeout, "psql", "-U", "postgres", "-tAc",
-					"select to_char(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');")
+
+				pass, err := utils.GetPassword(clusterName, namespace, utils.Superuser, env)
+				Expect(err).ToNot(HaveOccurred())
+				host, err := utils.GetHostName(namespace, clusterName, env)
+				Expect(err).ToNot(HaveOccurred())
+				query := "select to_char(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');"
+				stdout, _, cmdErr := utils.RunQueryFromPod(
+					psqlClientPod,
+					host,
+					utils.AppDBName,
+					utils.PostgresUser,
+					pass,
+					query,
+					env)
 				Expect(cmdErr).ToNot(HaveOccurred())
 
 				primaryStartTime, err = devUtils.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
 				Expect(err).NotTo(HaveOccurred())
-
-				stdout, _, cmdErr = env.EventuallyExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
-					&commandTimeout, "psql", "-U", "postgres", "-tAc", "show max_connections")
+				query = "show max_connections"
+				stdout, _, cmdErr = utils.RunQueryFromPod(
+					psqlClientPod,
+					host,
+					utils.AppDBName,
+					utils.PostgresUser,
+					pass,
+					query,
+					env)
 				Expect(cmdErr).ToNot(HaveOccurred())
 
 				v, err := strconv.Atoi(strings.Trim(stdout, "\n"))

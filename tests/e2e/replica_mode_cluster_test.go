@@ -67,8 +67,14 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				}
 				return env.DeleteNamespace(replicaNamespace)
 			})
-			AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample, replicaClusterName,
-				replicaClusterSampleTLS, checkQuery)
+			AssertReplicaModeCluster(
+				replicaNamespace,
+				srcClusterName,
+				srcClusterSample,
+				replicaClusterName,
+				replicaClusterSampleTLS,
+				checkQuery,
+				psqlClientPod)
 		})
 	})
 
@@ -90,8 +96,14 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				}
 				return env.DeleteNamespace(replicaNamespace)
 			})
-			AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample,
-				replicaClusterName, replicaClusterSampleBasicAuth, checkQuery)
+			AssertReplicaModeCluster(
+				replicaNamespace,
+				srcClusterName,
+				srcClusterSample,
+				replicaClusterName,
+				replicaClusterSampleBasicAuth,
+				checkQuery,
+				psqlClientPod)
 
 			By("disabling the replica mode", func() {
 				Eventually(func() error {
@@ -126,7 +138,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("writing some new data to the source cluster", func() {
-				insertRecordIntoTableWithDatabaseName(replicaNamespace, srcClusterName, "appSrc", "test_replica", 4)
+				insertRecordIntoTableWithDatabaseName(replicaNamespace, srcClusterName, "appSrc", "test_replica", 4, psqlClientPod)
 			})
 
 			By("verifying that replica cluster was not modified", func() {
@@ -168,8 +180,14 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample, replicaClusterName,
-				replicaClusterSample, checkQuery)
+			AssertReplicaModeCluster(
+				replicaNamespace,
+				srcClusterName,
+				srcClusterSample,
+				replicaClusterName,
+				replicaClusterSample,
+				checkQuery,
+				psqlClientPod)
 
 			// Get primary from replica cluster
 			primaryReplicaCluster, err := env.GetClusterPrimary(replicaNamespace, replicaClusterName)

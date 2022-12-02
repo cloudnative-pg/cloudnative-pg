@@ -20,13 +20,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -70,12 +68,10 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 	})
 
 	It("can import data from a cluster with a different major version", func() {
-		var primaryPod *corev1.Pod
-		var targetDatabasePrimaryPod *corev1.Pod
 		var err error
+		var sourceClusterHost, sourceClusterPass, targetClusterHost, targetClusterPass string
 		sourceDatabases := []string{databaseOne, databaseTwo}
 		sourceRoles := []string{databaseSuperUser, databaseUserTwo}
-		commandTimeout := time.Second * 5
 
 		By("creating the source cluster", func() {
 			namespace = "cluster-monolith"
@@ -90,19 +86,35 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		})
 
 		By("creating several roles, one of them a superuser", func() {
-			primaryPod, err = env.GetClusterPrimary(namespace, sourceClusterName)
-			Expect(err).ToNot(HaveOccurred())
 			// create 1st user with superuser role
 			createSuperUserQuery := fmt.Sprintf("create user %v with superuser password '123';",
 				databaseSuperUser)
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", createSuperUserQuery)
+			sourceClusterHost, err = testsUtils.GetHostName(namespace, sourceClusterName, env)
+			Expect(err).ToNot(HaveOccurred())
+			sourceClusterPass, err = testsUtils.GetPassword(sourceClusterName, namespace, testsUtils.Superuser, env)
+			Expect(err).ToNot(HaveOccurred())
+			_, _, err = testsUtils.RunQueryFromPod(
+				psqlClientPod,
+				sourceClusterHost,
+				testsUtils.PostgresDBName,
+				testsUtils.PostgresUser,
+				sourceClusterPass,
+				createSuperUserQuery,
+				env,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
 			// create 2nd user
 			createUserQuery := fmt.Sprintf("create user %v;", databaseUserTwo)
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", createUserQuery)
+			_, _, err = testsUtils.RunQueryFromPod(
+				psqlClientPod,
+				sourceClusterHost,
+				testsUtils.PostgresDBName,
+				testsUtils.PostgresUser,
+				sourceClusterPass,
+				createUserQuery,
+				env,
+			)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -115,17 +127,30 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			}
 
 			for _, query := range queries {
-				_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-					&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", query)
+				_, _, err = testsUtils.RunQueryFromPod(
+					psqlClientPod,
+					sourceClusterHost,
+					testsUtils.PostgresDBName,
+					testsUtils.PostgresUser,
+					sourceClusterPass,
+					query,
+					env,
+				)
 				Expect(err).ToNot(HaveOccurred())
 			}
 
 			// create test data and insert some records in both databases
 			for _, database := range sourceDatabases {
 				query := fmt.Sprintf("CREATE TABLE %v AS VALUES (1), (2);", tableName)
-				_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-					&commandTimeout, "psql", "-U", "postgres", fmt.Sprintf("%v", database),
-					"-tAc", query)
+				_, _, err = testsUtils.RunQueryFromPod(
+					psqlClientPod,
+					sourceClusterHost,
+					database,
+					testsUtils.PostgresUser,
+					sourceClusterPass,
+					query,
+					env,
+				)
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})
@@ -147,13 +172,21 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		})
 
 		By("verifying that the specified source databases were imported", func() {
-			targetDatabasePrimaryPod, err = env.GetClusterPrimary(namespace, targetClusterName)
+			targetClusterHost, err = testsUtils.GetHostName(namespace, targetClusterName, env)
+			Expect(err).ToNot(HaveOccurred())
+			targetClusterPass, err = testsUtils.GetPassword(targetClusterName, namespace, testsUtils.Superuser, env)
 			Expect(err).ToNot(HaveOccurred())
 			for _, database := range sourceDatabases {
 				databaseEntryQuery := fmt.Sprintf("SELECT datname FROM pg_database where datname='%v'", database)
-				stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *targetDatabasePrimaryPod,
-					specs.PostgresContainerName, &commandTimeout,
-					"psql", "-U", "postgres", "postgres", "-tAc", databaseEntryQuery)
+				stdOut, _, err := testsUtils.RunQueryFromPod(
+					psqlClientPod,
+					targetClusterHost,
+					testsUtils.PostgresDBName,
+					testsUtils.PostgresUser,
+					targetClusterPass,
+					databaseEntryQuery,
+					env,
+				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(strings.Contains(stdOut, database)).Should(BeTrue())
 			}
@@ -162,8 +195,15 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		By(fmt.Sprintf("verifying that the source superuser '%s' became a normal user in target",
 			databaseSuperUser), func() {
 			getSuperUserQuery := "select * from pg_user where usesuper"
-			stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *targetDatabasePrimaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", getSuperUserQuery)
+			stdOut, _, err := testsUtils.RunQueryFromPod(
+				psqlClientPod,
+				targetClusterHost,
+				testsUtils.PostgresDBName,
+				testsUtils.PostgresUser,
+				targetClusterPass,
+				getSuperUserQuery,
+				env,
+			)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(stdOut, databaseSuperUser)).Should(BeFalse())
 		})
@@ -171,9 +211,15 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		By("verifying the test data was imported from the source databases", func() {
 			for _, database := range sourceDatabases {
 				selectQuery := fmt.Sprintf("select count(*) from %v", tableName)
-				stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *targetDatabasePrimaryPod,
-					specs.PostgresContainerName, &commandTimeout, "psql", "-U", "postgres",
-					fmt.Sprintf("%v", database), "-tAc", selectQuery)
+				stdOut, _, err := testsUtils.RunQueryFromPod(
+					psqlClientPod,
+					targetClusterHost,
+					database,
+					testsUtils.PostgresUser,
+					targetClusterPass,
+					selectQuery,
+					env,
+				)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(strings.TrimSpace(stdOut)).Should(BeEquivalentTo("2"))
 			}

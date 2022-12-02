@@ -22,11 +22,9 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	clusterv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -62,29 +60,19 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 		// First we check that the starting situation is the expected one
 		By("checking that we have the correct amount of syncreplicas", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-			cluster := &clusterv1.Cluster{}
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
-			Expect(err).ToNot(HaveOccurred())
-			currentPrimary := cluster.Status.CurrentPrimary
-
 			// We should have 2 candidates for quorum standbys
 			timeout := time.Second * 60
 			Eventually(func() (int, error, error) {
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      currentPrimary,
-				}
-				primaryPod := corev1.Pod{}
-				err := env.Client.Get(env.Ctx, namespacedName, &primaryPod)
-				Expect(err).ToNot(HaveOccurred())
 				query := "SELECT count(*) from pg_stat_replication WHERE sync_state = 'quorum'"
-				out, _, err := env.EventuallyExecCommand(
-					env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
-					"psql", "-U", "postgres", "-tAc", query)
+				out, _, err := env.ExecCommandWithPsqlClient(
+					namespace,
+					clusterName,
+					psqlClientPod,
+					utils.Superuser,
+					utils.PostgresUser,
+					utils.AppDBName,
+					query,
+				)
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
 			}, timeout).Should(BeEquivalentTo(2))

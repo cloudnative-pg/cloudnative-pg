@@ -125,18 +125,17 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 			// Terminate the pausedReplica walsender on the primary.
 			// We don't wont to wait for the replication timeout.
-			namespacedName = types.NamespacedName{
-				Namespace: namespace,
-				Name:      currentPrimary,
-			}
-			primaryPod := corev1.Pod{}
-			err = env.Client.Get(env.Ctx, namespacedName, &primaryPod)
-			Expect(err).ToNot(HaveOccurred())
 			query = fmt.Sprintf("SELECT pg_terminate_backend(pid) FROM pg_stat_replication "+
 				"WHERE application_name = '%v'", pausedReplica)
-			_, _, err = env.EventuallyExecCommand(
-				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
-				"psql", "-U", "postgres", "-tAc", query)
+			_, _, err = env.ExecCommandWithPsqlClient(
+				namespace,
+				clusterName,
+				psqlClientPod,
+				utils.Superuser,
+				utils.PostgresUser,
+				utils.AppDBName,
+				query,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Expect the primary to have lost connection with the stopped standby
@@ -165,20 +164,32 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Get the current lsn
-			timeout := time.Second * 2
-			initialLSN, _, err := env.EventuallyExecCommand(
-				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
-				"psql", "-U", "postgres", "-tAc", "SELECT pg_current_wal_lsn()")
+			pass, err := utils.GetPassword(clusterName, namespace, utils.Superuser, env)
 			Expect(err).ToNot(HaveOccurred())
-
-			_, _, err = env.EventuallyExecCommand(
-				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
-				"psql", "-U", "postgres", "-c", "CHECKPOINT")
+			rwService, err := utils.GetHostName(namespace, clusterName, env)
+			Expect(err).ToNot(HaveOccurred())
+			initialLSN, _, err := utils.RunQueryFromPod(
+				psqlClientPod,
+				rwService,
+				utils.AppDBName,
+				utils.PostgresUser,
+				pass,
+				"SELECT pg_current_wal_lsn()",
+				env)
+			Expect(err).ToNot(HaveOccurred())
+			_, _, err = utils.RunQueryFromPod(
+				psqlClientPod,
+				rwService,
+				utils.AppDBName,
+				utils.PostgresUser,
+				pass,
+				"CHECKPOINT",
+				env)
 			Expect(err).ToNot(HaveOccurred())
 
 			// The replay_lsn of the targetPrimary should be ahead
 			// of the one before the checkpoint
-			timeout = time.Second * 60
+			timeout := time.Second * 60
 			Eventually(func() (string, error) {
 				primaryPod := corev1.Pod{}
 				err := env.Client.Get(env.Ctx, namespacedName, &primaryPod)
@@ -186,9 +197,15 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				query := fmt.Sprintf("SELECT true FROM pg_stat_replication "+
 					"WHERE application_name = '%v' AND replay_lsn > '%v'",
 					targetPrimary, strings.Trim(initialLSN, "\n"))
-				out, _, err := env.EventuallyExecCommand(
-					env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
-					"psql", "-U", "postgres", "-tAc", query)
+				out, _, err := env.ExecCommandWithPsqlClient(
+					namespace,
+					clusterName,
+					psqlClientPod,
+					utils.Superuser,
+					utils.PostgresUser,
+					utils.AppDBName,
+					query,
+				)
 				return strings.TrimSpace(out), err
 			}, timeout).Should(BeEquivalentTo("t"))
 		})

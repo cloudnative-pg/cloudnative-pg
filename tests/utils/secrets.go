@@ -26,6 +26,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
 
+// UserPrefix as prefix for postgres and app
+type UserPrefix string
+
+const (
+	// Superuser as prefix for postgres
+	Superuser UserPrefix = "superuser"
+	// App prefix for app user
+	App UserPrefix = "app"
+)
+
 // CreateSecretCA generates a CA for the cluster and return the cluster and the key pair
 func CreateSecretCA(
 	namespace string,
@@ -63,18 +73,18 @@ func CreateSecretCA(
 }
 
 // GetPassword generates password and return it as per user prefix
-func GetPassword(clusterName, namespace, userPrefix string, env *TestingEnvironment) (string, error) {
-	// Get the superuser password from the user prefix secret
-	superuserSecretName := clusterName + "-" + userPrefix
-	superuserSecret := &corev1.Secret{}
-	superuserSecretNamespacedName := types.NamespacedName{
+func GetPassword(clusterName, namespace string, prefix UserPrefix, env *TestingEnvironment) (string, error) {
+	// Get the password as per user prefix in secret
+	secretName := clusterName + "-" + string(prefix)
+	secret := &corev1.Secret{}
+	secretNamespacedName := types.NamespacedName{
 		Namespace: namespace,
-		Name:      superuserSecretName,
+		Name:      secretName,
 	}
-	err := env.Client.Get(env.Ctx, superuserSecretNamespacedName, superuserSecret)
+	err := env.Client.Get(env.Ctx, secretNamespacedName, secret)
 	if err != nil {
 		return "", err
 	}
-	generatedSuperuserPassword := string(superuserSecret.Data["password"])
-	return generatedSuperuserPassword, nil
+	generatedPassword := string(secret.Data["password"])
+	return generatedPassword, nil
 }

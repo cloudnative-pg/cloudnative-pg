@@ -17,7 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -27,8 +26,18 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-// PGLocalSocketDir is the directory containing the PostgreSQL local socket
-const PGLocalSocketDir = "/controller/run"
+const (
+	// PGLocalSocketDir is the directory containing the PostgreSQL local socket
+	PGLocalSocketDir = "/controller/run"
+	// AppUser for app user
+	AppUser = "app"
+	// PostgresUser for postgres user
+	PostgresUser = "postgres"
+	// AppDBName database name app
+	AppDBName = "app"
+	// PostgresDBName database name postgres
+	PostgresDBName = "postgres"
+)
 
 // RunQueryFromPod executes a query from a pod to a host
 func RunQueryFromPod(
@@ -41,8 +50,7 @@ func RunQueryFromPod(
 	env *TestingEnvironment,
 ) (string, string, error) {
 	timeout := time.Second * 2
-	dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
-		host, user, dbname, password)
+	dsn := CreateDSN(host, user, dbname, password, Prefer, 5432)
 
 	stdout, stderr, err := env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
 		"psql", dsn, "-tAc", query)

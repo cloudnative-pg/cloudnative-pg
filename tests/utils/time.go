@@ -18,24 +18,33 @@ package utils
 
 import (
 	"strings"
-	"time"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // GetCurrentTimestamp getting current time stamp from postgres server
-func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment) (string, error) {
-	commandTimeout := time.Second * 5
-	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment, podName *corev1.Pod) (string, error) {
+	host, err := GetHostName(namespace, clusterName, env)
 	if err != nil {
 		return "", err
 	}
-
+	pass, err := GetPassword(clusterName, namespace, Superuser, env)
+	if err != nil {
+		return "", err
+	}
 	query := "select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS');"
-	stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *primaryPodInfo, "postgres",
-		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+	stdOut, _, err := RunQueryFromPod(
+		podName,
+		host,
+		AppDBName,
+		PostgresUser,
+		pass,
+		query,
+		env,
+	)
 	if err != nil {
 		return "", err
 	}
-
 	currentTimestamp := strings.Trim(stdOut, "\n")
 	return currentTimestamp, nil
 }

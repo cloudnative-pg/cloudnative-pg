@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -77,9 +78,20 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 
 			// Put something in the database. We'll check later if it
 			// still exists
+			superUserPass, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+			Expect(err).NotTo(HaveOccurred())
+			host, err := testsUtils.GetHostName(namespace, clusterName, env)
+			Expect(err).NotTo(HaveOccurred())
 			query := "CREATE TABLE test (id bigserial PRIMARY KEY, t text)"
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
-				"psql", "-U", "postgres", "app", "-tAc", query)
+			_, _, err = testsUtils.RunQueryFromPod(
+				psqlClientPod,
+				host,
+				testsUtils.AppDBName,
+				testsUtils.PostgresUser,
+				superUserPass,
+				query,
+				env,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We kill the pid 1 process.
@@ -109,20 +121,17 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				return int32(-1), nil
 			}, timeout).Should(BeEquivalentTo(restart + 1))
 
-			// That pod should also be ready
 			Eventually(func() (bool, error) {
-				pod := &corev1.Pod{}
-				if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
-					return false, err
-				}
-
-				if !utils.IsPodActive(*pod) || !utils.IsPodReady(*pod) {
-					return false, nil
-				}
-
 				query = "SELECT * FROM test"
-				_, _, err = env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
-					"psql", "-U", "postgres", "app", "-tAc", query)
+				_, _, err = env.ExecCommandWithPsqlClient(
+					namespace,
+					clusterName,
+					psqlClientPod,
+					testsUtils.Superuser,
+					testsUtils.PostgresUser,
+					testsUtils.AppDBName,
+					query,
+				)
 				return err == nil, err
 			}, timeout).Should(BeTrue())
 		})

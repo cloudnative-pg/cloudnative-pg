@@ -44,6 +44,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -155,6 +156,32 @@ func (env TestingEnvironment) ExecCommand(
 ) (string, string, error) {
 	return utils.ExecCommand(ctx, env.Interface, env.RestClientConfig,
 		pod, containerName, timeout, command...)
+}
+
+// ExecCommandWithPsqlClient wraps the utils.ExecCommand pre-setting values and
+// run query on psql client pod with rw service as host.
+func (env TestingEnvironment) ExecCommandWithPsqlClient(
+	namespace,
+	clusterName string,
+	pod *corev1.Pod,
+	prefix UserPrefix,
+	user string,
+	dbname string,
+	query string,
+) (string, string, error) {
+	timeout := time.Second * 2
+	pass, err := GetPassword(clusterName, namespace, prefix, &env)
+	if err != nil {
+		return "", "", err
+	}
+	rwService, err := GetRwServiceObject(namespace, clusterName, &env)
+	if err != nil {
+		return "", "", err
+	}
+	host := CreateServiceFQDN(namespace, rwService.GetName())
+	dsn := CreateDSN(host, user, dbname, pass, Prefer, 5432)
+	return utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig,
+		*pod, specs.PostgresContainerName, &timeout, "psql", dsn, "-tAc", query)
 }
 
 // GetPVCList gathers the current list of PVCs in a namespace
