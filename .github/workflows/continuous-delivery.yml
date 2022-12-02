@@ -736,7 +736,7 @@ jobs:
       - e2e-local
       - evaluate_options
     if: |
-      failure() &&
+      needs.e2e-local.result == 'failure' &&
       github.event_name == 'issue_comment'
     runs-on: ubuntu-20.04
     steps:
