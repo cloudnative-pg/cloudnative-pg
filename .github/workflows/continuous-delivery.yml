@@ -71,6 +71,7 @@ jobs:
 
       - name: Process arguments
         id: args
+        if: success()
         run: |
           ARGS="${{ steps.command.outputs.command-arguments }}"
           # Set the defaults
