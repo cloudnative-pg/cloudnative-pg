@@ -16,6 +16,15 @@ jobs:
         startsWith(github.event.comment.body, '/ok-to-merge')
     runs-on: ubuntu-20.04
     steps:
+      - name: Check for Command
+        id: command
+        uses: xt0rted/slash-command-action@v2
+        with:
+          command: ok-to-merge
+          reaction: "true"
+          reaction-type: "eyes"
+          allow-edits: "false"
+          permission-level: write
       - name: Add "ok to merge :ok_hand:" label to CNPG PR
         uses: actions-ecosystem/action-add-labels@v1.1.3
         with:
