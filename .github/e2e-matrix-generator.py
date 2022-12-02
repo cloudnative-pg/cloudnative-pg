@@ -221,6 +221,8 @@ ENGINE_MODES = {
         "push": build_push_include_local,
         "pull_request": build_pull_request_include_local,
         "pull_request_target": build_pull_request_target_include_local,
+        "issue_comment": build_pull_request_include_local,
+        "workflow_dispatch": build_pull_request_include_local,
         "main": build_main_include_local,
         "schedule": build_schedule_include_local,
     },
@@ -234,7 +236,7 @@ if __name__ == "__main__":
         "-m",
         "--mode",
         type=str,
-        choices={"push", "pull_request", "main", "schedule", "pull_request_target"},
+        choices={"push", "pull_request", "main", "schedule", "pull_request_target", "issue_comment", "workflow_dispatch"},
         default="push",
         help="set of tests to run",
     )
