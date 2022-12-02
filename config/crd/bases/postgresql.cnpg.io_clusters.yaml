@@ -31,13 +31,13 @@ spec:
       jsonPath: .status.phase
       name: Status
       type: string
+    - description: Message
+      jsonPath: .status.message
+      name: Message
+      type: string
     - description: Primary pod
       jsonPath: .status.currentPrimary
       name: Primary
-      type: string
-    - description: Additional message for current phase
-      jsonPath: .status.phaseMessage
-      name: Message
       type: string
     name: v1
     schema:
@@ -2763,15 +2763,15 @@ spec:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)
                 type: integer
+              message:
+                description: Additional message
+                type: string
               onlineUpdateEnabled:
                 description: OnlineUpdateEnabled shows if the online upgrade is enabled
                   inside the cluster
                 type: boolean
               phase:
                 description: Current phase of the cluster
-                type: string
-              phaseMessage:
-                description: Additional message for the current phase
                 type: string
               phaseReason:
                 description: Reason for the current phase

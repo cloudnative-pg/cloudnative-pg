@@ -368,8 +368,6 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return err
 	}
 
-	updatePhaseMessage(ctx, cluster)
-
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
@@ -766,7 +764,8 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	}
 
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
-	updatePhaseMessage(ctx, cluster)
+	cluster.Status.Message = getMessage(cluster)
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		if err := r.Status().Update(ctx, cluster); err != nil {
 			return err
@@ -776,34 +775,36 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	return nil
 }
 
-// updatePhaseMessage update phase message in the cluster status with supplemental
+// getMessage update phase message in the cluster status with supplemental
 // explanation to `status/phase`
-func updatePhaseMessage(ctx context.Context, cluster *apiv1.Cluster,
-) {
-	contextLog := log.FromContext(ctx)
-	phaseMessage := ""
-	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
-	if err != nil {
-		contextLog.Warning("could not check if cluster is fenced: %v", err)
-		return
+func getMessage(cluster *apiv1.Cluster) string {
+	fencedReplicas := 0
+	primaryFenced := false
+
+	for _, instanceName := range cluster.Status.InstanceNames {
+		if !cluster.IsInstanceFenced(instanceName) {
+			continue
+		}
+
+		if instanceName == cluster.Status.CurrentPrimary {
+			primaryFenced = true
+		} else {
+			fencedReplicas++
+		}
 	}
 
 	switch {
-	case fencedInstances == nil || fencedInstances.Len() == 0:
-		phaseMessage = ""
-	case cluster.IsWholeClusterFenced():
-		phaseMessage = "Whole cluster fenced"
-	case cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) && fencedInstances.Len() == 1:
-		phaseMessage = "Primary is fenced"
-	case cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) && fencedInstances.Len() > 1:
-		fencedInstances.Delete(cluster.Status.CurrentPrimary)
-		phaseMessage = fmt.Sprintf("Primary and standby(s): %s fenced",
-			utils.ListFencedInstances(fencedInstances))
-	default:
-		phaseMessage = fmt.Sprintf("Standby(s) fenced: %s", utils.ListFencedInstances(fencedInstances))
+	case primaryFenced && fencedReplicas == 0:
+		return "primary is fenced"
+
+	case primaryFenced:
+		return fmt.Sprintf("primary fenced (%d replicas fenced)", fencedReplicas)
+
+	case fencedReplicas > 0:
+		return fmt.Sprintf("%d replica(s) fenced", fencedReplicas)
 	}
 
-	cluster.Status.PhaseMessage = phaseMessage
+	return ""
 }
 
 // updateClusterStatusThatRequiresInstancesState updates all the cluster status fields that require the instances status

@@ -409,11 +409,11 @@ type ClusterStatus struct {
 	// Current list of read pods
 	ReadService string `json:"readService,omitempty"`
 
-	// Additional message for the current phase
-	PhaseMessage string `json:"phaseMessage,omitempty"`
-
 	// Current phase of the cluster
 	Phase string `json:"phase,omitempty"`
+
+	// Additional message
+	Message string `json:"message,omitempty"`
 
 	// Reason for the current phase
 	PhaseReason string `json:"phaseReason,omitempty"`
@@ -1479,8 +1479,8 @@ func (in ExternalCluster) GetServerName() string {
 // +kubebuilder:printcolumn:name="Instances",type="integer",JSONPath=".status.instances",description="Number of instances"
 // +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyInstances",description="Number of ready instances"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Cluster current status"
+// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Message"
 // +kubebuilder:printcolumn:name="Primary",type="string",JSONPath=".status.currentPrimary",description="Primary pod"
-// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.phaseMessage",description="Additional message for current phase"
 
 // Cluster is the Schema for the PostgreSQL API
 type Cluster struct {
@@ -1843,25 +1843,6 @@ func (cluster *Cluster) IsInstanceFenced(instance string) bool {
 		return true
 	}
 	return fencedInstances.Has(instance)
-}
-
-// IsWholeClusterFenced check if the whole cluster is fenced
-func (cluster *Cluster) IsWholeClusterFenced() bool {
-	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
-	if err != nil {
-		return false
-	}
-
-	if fencedInstances.Has(utils.FenceAllServers) {
-		return true
-	}
-
-	for _, instance := range cluster.Status.InstanceNames {
-		if !fencedInstances.Has(instance) {
-			return false
-		}
-	}
-	return true
 }
 
 // ShouldResizeInUseVolumes is true when we should resize PVC we already

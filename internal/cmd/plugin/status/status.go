@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -150,6 +151,13 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	return &status, nil
 }
 
+func listFencedInstances(fencedInstances *stringset.Data) string {
+	if fencedInstances.Has(utils.FenceAllServers) {
+		return "All Instances"
+	}
+	return strings.Join(fencedInstances.ToList(), ", ")
+}
+
 func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	summary := tabby.New()
 
@@ -200,9 +208,9 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 
 	if fencedInstances != nil && fencedInstances.Len() > 0 {
 		if isPrimaryFenced {
-			summary.AddLine("Fenced instances:", aurora.Red(utils.ListFencedInstances(fencedInstances)))
+			summary.AddLine("Fenced instances:", aurora.Red(listFencedInstances(fencedInstances)))
 		} else {
-			summary.AddLine("Fenced instances:", aurora.Yellow(utils.ListFencedInstances(fencedInstances)))
+			summary.AddLine("Fenced instances:", aurora.Yellow(listFencedInstances(fencedInstances)))
 		}
 	}
 
@@ -227,19 +235,31 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *apiv1.Cluster) string {
+func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *apiv1.Cluster) (result string) {
 	if isPrimaryFenced {
-		return fmt.Sprintf("%v", aurora.Red("Primary instance is fenced"))
+		result = fmt.Sprintf("%v", aurora.Red("Primary instance is fenced"))
+		return result
 	}
 
+	// Print the Phase in the right color
 	switch cluster.Status.Phase {
 	case apiv1.PhaseHealthy, apiv1.PhaseFirstPrimary, apiv1.PhaseCreatingReplica:
-		return fmt.Sprintf("%v %v", aurora.Green(cluster.Status.Phase), cluster.Status.PhaseReason)
+		result = aurora.Green(cluster.Status.Phase).String()
 	case apiv1.PhaseUpgrade, apiv1.PhaseWaitingForUser:
-		return fmt.Sprintf("%v %v", aurora.Yellow(cluster.Status.Phase), cluster.Status.PhaseReason)
+		result = aurora.Yellow(cluster.Status.Phase).String()
 	default:
-		return fmt.Sprintf("%v %v", aurora.Red(cluster.Status.Phase), cluster.Status.PhaseReason)
+		result = aurora.Red(cluster.Status.Phase).String()
 	}
+
+	// Print the reason of the phase
+	result = fmt.Sprintf("%v %v", result, cluster.Status.PhaseReason)
+
+	// Add the detailed message if set
+	if len(cluster.Status.Message) > 0 {
+		result = fmt.Sprintf("%v (%v)", result, cluster.Status.Message)
+	}
+
+	return result
 }
 
 func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) error {
