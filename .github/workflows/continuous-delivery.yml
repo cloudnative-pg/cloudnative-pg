@@ -2,26 +2,19 @@
 # represent different execution environments
 name: continuous-delivery
 on:
-  # Can be triggered by:
-  #
-  # A push from any branch
-  push:
-    branches:
-      - main
-      - release-*
-  # A pull request (from this repository or a forked one) which is labelled
-  pull_request_target:
-    types: [labeled]
+  issue_comment:
+    type: [created]
   # Manually or triggered by another workflow
   workflow_dispatch:
     inputs:
       depth:
-        description: 'Depth (push, pull_request_target, main, schedule)'
+        description: 'Depth (push, pull_request, main, schedule)'
         required: true
         default: 'main'
       test_level:
         description: 'Test level (0-4)'
         required: false
+        default: '1'
       feature_type:
         description: 'Feature Type (disruptive, performance, upgrade, smoke, basic, service-connectivity, self-healing,
         backup-restore, operator, observability, replication, plugin, postgres-configuration, pod-scheduling,
@@ -30,23 +23,21 @@ on:
       log_level:
         description: 'Log level for operator (error, warning, info(default), debug, trace)'
         required: false
+        default: 'info'
       build_plugin:
         type: boolean
         required: false
         default: false
         description: Include kubectl-cnpg plugin building
-  # scheduled
   schedule:
     - cron:  '0 1 * * *'
 
 # set up environment variables to be used across all the jobs
 env:
   GOLANG_VERSION: "1.18.x"
-  GOLANGCI_LINT_VERSION: "v1.50"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.11.0"
+  KIND_VERSION: "v0.17.0"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
-  FEATURE_TYPE: "${{github.event.inputs.feature_type}}"
 
 defaults:
   run:
@@ -54,317 +45,152 @@ defaults:
     shell: 'bash -Eeuo pipefail -x {0}'
 
 jobs:
-  # Detects if we should skip the workflow due to being duplicated. Exceptions:
-  #   1. it's on 'main' branch
-  #   2. it's triggered by events in the 'do_not_skip' list
-  duplicate_runs:
-    runs-on: ubuntu-20.04
-    name: Skip duplicate runs
-    continue-on-error: true
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5.2.0
-        with:
-          concurrent_skipping: 'same_content'
-          skip_after_successful_duplicate: 'true'
-          paths_ignore: '["README.md", "docs/**"]'
-          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
-
-  # Classify codebase changes along 5 different dimensions based on the files
-  # changed in the commit/PR, and create 5 different filters which are used in
-  # the following jobs to decide whether the step should be skipped.
-  change-triage:
-    name: Check changed files
-    needs: duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
-    runs-on: ubuntu-20.04
-    outputs:
-      docs-changed: ${{ steps.filter.outputs.docs-changed }}
-      operator-changed: ${{ steps.filter.outputs.operator-changed }}
-      test-changed: ${{ steps.filter.outputs.test-changed }}
-      shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
-      go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-
-    - name: Check for changes
-      uses: dorny/paths-filter@v2.11.1
-      id: filter
-      # Remember to add new folders in the operator-changed filter if needed
-      with:
-        base: ${{ (github.event_name == 'schedule') && 'main' || '' }}
-        filters: |
-          docs-changed:
-            - '**/*.md'
-            - 'docs/**'
-            - '.wordlist-en-custom.txt'
-          operator-changed:
-            - 'api/**'
-            - 'cmd/**'
-            - 'config/**'
-            - 'controllers/**'
-            - 'internal/**'
-            - 'licenses/**'
-            - 'pkg/**'
-            - '.github/workflows/continuous-delivery.yml'
-            - '.goreleaser.yml'
-            - 'Dockerfile'
-            - 'Makefile'
-            - 'go.mod'
-            - 'go.sum'
-          test-changed:
-            - 'tests/**'
-            - 'hack/**'
-          shell-script-changed:
-            - '**/*.sh'
-          go-code-changed:
-            - '**/*.go'
-            - '.golangci.yml'
-
-  golangci:
-    name: Run linters
-    needs:
-      - duplicate_runs
-      - change-triage
-    # Run Go linter only if Go code has changed
+  check_commenter:
     if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.change-triage.outputs.go-code-changed == 'true'
-    runs-on: ubuntu-20.04
-    steps:
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout 4m
-
-  shellcheck:
-    name: Run shellcheck linter
-    needs:
-      - duplicate_runs
-      - change-triage
-    # Run shellcheck linter only if shell code has changed
-    if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.change-triage.outputs.shell-script-changed == 'true'
-    runs-on: ubuntu-20.04
-    env:
-        SHELLCHECK_OPTS: -a -S style
-    steps:
-    -
-      uses: actions/checkout@v3
-    -
-      name: Run ShellCheck
-      uses: ludeeus/action-shellcheck@1.1.0
-  generate-unit-tests-jobs:
-    name: Generate jobs for unit tests
-    needs:
-      - duplicate_runs
-      - change-triage
+      github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/test')
+    name: Retrieve command
     runs-on: ubuntu-20.04
     outputs:
-      k8sMatrix: ${{steps.get-k8s-versions.outputs.k8s_versions}}
-      latest_k8s_version: ${{ steps.get-k8s-versions.outputs.latest_k8s_version }}
+      github_ref: ${{ steps.refs.outputs.head_sha }}
+      depth: ${{ env.DEPTH }}
+      test_level: ${{ env.TEST_LEVEL }}
+      feature_type: ${{ env.FEATURE_TYPE }}
+      log_level: ${{ env.LOG_LEVEL }}
+      build_plugin: ${{ env.BUILD_PLUGIN }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - id: get-k8s-versions
-        name: Get k8s versions for unit test
-        shell: bash
+      - name: Check for Command
+        id: command
+        uses: xt0rted/slash-command-action@v2
+        continue-on-error: false
+        with:
+          command: test
+          reaction: "true"
+          reaction-type: "eyes"
+          allow-edits: "false"
+          permission-level: write
+
+      - name: Process arguments
+        id: args
         run: |
-          k8s_versions=$(jq -c '
-            .unit_test.max as $max |
-            .unit_test.min as $min |
-            $min | [ while(. <= $max;
-                . | split(".") | .[1] |= (.|tonumber|.+1|tostring) | join(".")
-              )
-            ] |
-            .[] |= .+".x"
-          ' < .github/k8s_versions_scope.json)
-          echo "k8s_versions=${k8s_versions}" >> $GITHUB_OUTPUT
-          
-          latest_k8s_version=$(jq -r '.|last' <<<$k8s_versions)
-          echo "latest_k8s_version=${latest_k8s_version}" >> $GITHUB_OUTPUT
+          ARGS="${{ steps.command.outputs.command-arguments }}"
+          # Set the defaults
+          DEPTH="main"
+          TEST_LEVEL="4"
+          FEATURE_TYPE=""
+          BUILD_PLUGIN="false"
+          LOG_LEVEL="info"
 
-  tests:
-    name: Run unit tests
-    needs:
-      - duplicate_runs
-      - change-triage
-      - generate-unit-tests-jobs
-    # Run unit tests only if the operator or the Go codebase have changed
-    # AND
-    # EITHER The slash command ('/test' or '/ready-to-test') is issued in the comment of the PR which is labeled with
-    #        'ready to test :elephant:'
-    # OR     it's on main branch
+          for ARG in $ARGS; do
+            IFS='=' read name value <<< $ARG
+            case "${name}" in
+              "depth"|"d")
+              DEPTH="${value}"
+              ;;
+              "test_level"|"level"|"tl")
+              TEST_LEVEL="${value}"
+              ;;
+              "feature_type"|"type"|"ft")
+              FEATURE_TYPE="${value}"
+              ;;
+              "build_plugin"|"plugin"|"bp")
+              BUILD_PLUGIN="${value}"
+              ;;
+              "log_level"|"ll")
+              LOG_LEVEL="${value}"
+              ;;
+              *)
+              ;;
+            esac
+          done
+
+          echo "DEPTH=${DEPTH}" >> $GITHUB_ENV
+          echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
+          echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
+          echo "BUILD_PLUGIN=${BUILD_PLUGIN}" >> $GITHUB_ENV
+          echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
+
+      - name: Resolve Git reference
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: refs
+
+      - name: Create comment
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            @${{ github.actor }}, here's the link to the E2E on CNPG workflow run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  test_arguments:
+    name: Parse arguments
     if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-20.04
+    outputs:
+      github_ref: ${{ github.ref }}
+      depth: ${{ env.DEPTH }}
+      test_level: ${{ env.TEST_LEVEL }}
+      feature_type: ${{ env.FEATURE_TYPE }}
+      build_plugin: ${{ env.BUILD_PLUGIN }}
+      log_level: ${{ env.LOG_LEVEL }}
+    steps:
+      - name: Parse input to env
+        run: |
+          echo "DEPTH=${{ github.event.inputs.depth }}" >> $GITHUB_ENV
+          echo "TEST_LEVEL=${{ github.event.inputs.test_level }}" >> $GITHUB_ENV
+          echo "FEATURE_TYPE=${{ github.event.inputs.feature_type }}" >> $GITHUB_ENV
+          echo "BUILD_PLUGIN=${{ github.event.inputs.build_plugin }}" >> $GITHUB_ENV
+          echo "LOG_LEVEL=${{ github.event.inputs.log_level }}" >> $GITHUB_ENV
+
+  evaluate_options:
+    name: Evaluate workflow options
+    needs:
+      - check_commenter
+      - test_arguments
+    runs-on: ubuntu-20.04
+    if: |
       (
-        needs.change-triage.outputs.operator-changed == 'true' ||
-        needs.change-triage.outputs.go-code-changed == 'true'
+        needs.check_commenter.result == 'success' ||
+        needs.test_arguments.result == 'success'
       ) &&
-      (
-        github.event.client_payload.slash_command != null ||
-        github.event_name == 'workflow_dispatch' ||
-        (
-           github.event_name == 'pull_request_target' &&
-           github.event.action == 'labeled' &&
-           contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
-        ) ||
-        github.head_ref == 'main'
-      )
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
-        k8s-version: ${{ fromJSON(needs.generate-unit-tests-jobs.outputs.k8sMatrix) }}
+      !cancelled()
+    outputs:
+      git_ref: ${{ env.GITHUB_REF }}
+      depth: ${{ env.DEPTH }}
+      test_level: ${{ env.TEST_LEVEL }}
+      feature_type: ${{ env.FEATURE_TYPE }}
+      build_plugin: ${{ env.BUILD_PLUGIN }}
+      log_level: ${{ env.LOG_LEVEL }}
     steps:
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        # Cache Go modules on GitHub runners to be reused across jobs
-        # See to: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows
-        name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      -
-        name: Run unit tests
-        env:
-          ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
+      - name: From command
         run: |
-          make test
-      -
-        name: Coverage Summary
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
-        run: |
-          go tool cover -func=cover.out -o coverage.out
-      -
-        name: Publish unit test summary on the latest k8s version
-        if: matrix.k8s-version == needs.generate-unit-tests-jobs.outputs.latest_k8s_version
-        run: |
-          echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
-  apidoc:
-    name: Verify API doc is up to date
-    needs:
-      - duplicate_runs
-      - change-triage
-    # Run make apidoc if Go code or docs have changed
-    if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      (
-        needs.change-triage.outputs.go-code-changed == 'true' ||
-        needs.change-triage.outputs.docs-changed == 'true'
-      )
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GOLANG_VERSION }}
-
-    - name: Run make apidoc
-      run: |
-        make apidoc
-
-    - name: Verify apidoc changes
-      run: |
-        apidoc_file_path='docs/src/api_reference.md'
-        if git status --porcelain $apidoc_file_path | grep '^ M'; then
-          echo "The API documentation doesn't reflect the current API. Please run make apidoc."
-          exit 1
-        fi
-
-  crd:
-    name: Verify CRD is up to date
-    needs:
-      - duplicate_runs
-      - change-triage
-    # Run make manifests if Go code have changed
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.change-triage.outputs.go-code-changed == 'true' }}
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-
-      - name: Run make manifests
-        run: |
-          make manifests
-
-      - name: Check CRD manifests are up to date
-        run: |
-          crd_path='config/crd'
-          if git status --porcelain $crd_path | grep '^ M'; then
-            echo "The CRD manifests do not reflect the current API. Please run make manifests."
-            exit 1
+          if [[ ${{ github.event_name }} == 'workflow_dispatch' ]] || [[ ${{ github.event_name }} == 'schedule' ]]; then
+            echo 'GITHUB_REF=${{ needs.test_arguments.outputs.github_ref }}' >> $GITHUB_ENV
+            echo 'DEPTH=${{ needs.test_arguments.outputs.depth }}' >> $GITHUB_ENV
+            echo 'TEST_LEVEL=${{ needs.test_arguments.outputs.test_level }}' >> $GITHUB_ENV
+            echo 'FEATURE_TYPE=${{ needs.test_arguments.outputs.feature_type }}' >> $GITHUB_ENV
+            echo 'BUILD_PLUGIN=${{ needs.test_arguments.outputs.build_plugin }}' >> $GITHUB_ENV
+            echo 'LOG_LEVEL=${{ needs.test_arguments.outputs.log_level }}' >> $GITHUB_ENV
+          fi
+          if [[ ${{ github.event_name }} == 'issue_comment' ]]; then
+            echo 'GITHUB_REF=${{ needs.check_commenter.outputs.github_ref }}' >> $GITHUB_ENV
+            echo 'DEPTH=${{ needs.check_commenter.outputs.depth }}' >> $GITHUB_ENV
+            echo 'TEST_LEVEL=${{ needs.check_commenter.outputs.test_level }}' >> $GITHUB_ENV
+            echo 'FEATURE_TYPE=${{ needs.check_commenter.outputs.feature_type }}' >> $GITHUB_ENV
+            echo 'BUILD_PLUGIN=${{ needs.check_commenter.outputs.build_plugin }}' >> $GITHUB_ENV
+            echo 'LOG_LEVEL=${{ needs.check_commenter.outputs.log_level }}' >> $GITHUB_ENV
           fi
 
   buildx:
     name: Build containers
     needs:
-      - golangci
-      - shellcheck
-      - tests
-      - apidoc
-      - crd
-      - duplicate_runs
-      - change-triage
-    # Build containers:
-    #   if there have been any code changes OR it is a scheduled execution
-    #   AND
-    #   none of the preceding jobs failed
+      - check_commenter
+      - test_arguments
+      - evaluate_options
     if: |
-      (always() && !cancelled()) &&
-      (
-        github.event_name == 'schedule' ||
-        needs.duplicate_runs.outputs.should_skip != 'true' &&
-        (
-          needs.change-triage.outputs.operator-changed == 'true' ||
-          needs.change-triage.outputs.test-changed == 'true' ||
-          needs.change-triage.outputs.shell-script-changed == 'true' ||
-          needs.change-triage.outputs.go-code-changed == 'true'
-        )
-      ) &&
-      (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
-      (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
-      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
-      (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
-      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
+      always() && !cancelled() &&
+      needs.evaluate_options.result == 'success'
     runs-on: ubuntu-20.04
     permissions:
       contents: read
@@ -383,9 +209,9 @@ jobs:
         name: Checkout
         uses: actions/checkout@v3
         with:
+          ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -460,7 +286,7 @@ jobs:
         name: Run GoReleaser to build kubectl-cnpg plugin
         uses: goreleaser/goreleaser-action@v3
         if: |
-          github.event_name == 'schedule' || github.event.inputs.build_plugin == 'true'
+          github.event_name == 'schedule' || needs.evaluate_options.outputs.build_plugin == 'true'
         with:
           distribution: goreleaser
           version: latest
@@ -474,7 +300,8 @@ jobs:
         name: Slack Notification
         uses: rtCamp/action-slack-notify@v2
         if: |
-          failure() && github.event_name == 'schedule'
+          failure() && github.event_name == 'schedule' &&
+          github.organization == 'cloudnative-pg'
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
@@ -503,7 +330,6 @@ jobs:
             type=ref,event=pr
       -
         name: Detect platforms
-        id: docker-platforms
         run: |
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
@@ -513,11 +339,10 @@ jobs:
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
-          image: tonistiigi/binfmt:qemu-v6.1.0
+          image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        id: buildx
         uses: docker/setup-buildx-action@v2
       -
         name: Login to ghcr.io
@@ -528,7 +353,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v3.2.0
+        uses: docker/build-push-action@v3
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -567,13 +392,11 @@ jobs:
     name: Publish artifacts
     needs:
       - buildx
-      - duplicate_runs
     if: |
       (always() && !cancelled()) &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.buildx.result == 'success' &&
       needs.buildx.outputs.upload_artifacts == 'true' &&
-      github.repository == 'cloudnative-pg/cloudnative-pg'
+      github.organization == 'cloudnative-pg'
     runs-on: ubuntu-20.04
     steps:
       -
@@ -630,24 +453,16 @@ jobs:
     name: Generate jobs for E2E tests
     needs:
       - buildx
-      - duplicate_runs
+      - evaluate_options
     # We try to avoid running the E2E Test Suite in general, to reduce load on
-    # GitHub resources. We should run the tests always: on main and release
-    # branches, when triggered by dependabot, when a PR is first opened, or when
-    # a PR from a forked repo is labeled
+    # GitHub resources.
+    # Currently it's executed in the following cases:
+    # - When dispatched via chatops commands
+    # - On a push in main and release branches
+    # - On scheduled executions
     if: |
       (always() && !cancelled()) &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.buildx.result == 'success' &&
-      ( github.event_name == 'workflow_dispatch' ||
-        github.head_ref == 'main' ||
-        github.ref_name == 'main' ||
-        startsWith(github.head_ref, 'release-') ||
-        startsWith(github.ref_name, 'release-') ||
-        startsWith(github.head_ref, 'dependabot/') ||
-        startsWith(github.ref_name, 'dependabot/') ||
-        (github.event_name == 'pull_request_target' &&  github.event.action == 'labeled')
-       )
+      needs.buildx.result == 'success'
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ needs.buildx.outputs.image }}
@@ -657,68 +472,35 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         id: generate-jobs
-        # Generates the jobs that will become different matrix branches,
-        # according to the event, or to the "depth" parameter if manually set
         name: Generate Jobs
         shell: bash
         run: |
           python .github/e2e-matrix-generator.py \
-            -m '${{ github.event.inputs.depth || github.event_name }}'
-
-  evaluate-test-level:
-    # Evaluates the level/depth at which to execute an E2E Test Suite run.
-    # E2E Tests with a level higher than this will be skipped.
-    name: Evaluate test level
-    needs:
-      - generate-jobs
-    if: |
-      (always() && !cancelled()) &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.generate-jobs.result == 'success'
-    runs-on: ubuntu-20.04
-    outputs:
-      testLevel: ${{ steps.evaluate-test-level.outputs.testLevel }}
-    steps:
-      - name: evaluate test level
-        id: evaluate-test-level
-        run: |
-          declare -A events
-          events=([push]=0 [pull_request_target]=2 [main]=3 [schedule]=4)
-          test_level_from_input="${{ github.event.inputs.test_level }}"
-          if [ -n "${test_level_from_input}" ]
-          then
-            echo "testLevel=${test_level_from_input}" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          test_level_generated="${{ github.event.inputs.depth || github.event_name }}"
-          if [ -n "${test_level_generated}" ]
-          then
-            echo "testLevel=${events[${test_level_generated}]}" >> $GITHUB_OUTPUT
-          fi
+            -m '${{ needs.evaluate_options.outputs.depth }}'
 
   e2e-local:
     name: Run E2E on local executors
     if: |
       (always() && !cancelled()) &&
       needs.generate-jobs.outputs.localEnabled == 'true' &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.generate-jobs.result == 'success' &&
-      needs.evaluate-test-level.result == 'success'
+      needs.generate-jobs.result == 'success'
     needs:
       - buildx
       - generate-jobs
-      - duplicate_runs
-      - evaluate-test-level
+      - evaluate_options
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
     runs-on: ubuntu-20.04
     env:
-      # 'TEST_DEPTH' determines which E2E test cases will be run.
-      # i.e. tests that have a level setting higher than TEST_DEPTH are skipped
-      TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
+      # 'TEST_DEPTH' determines the matrix of E2E test cases that will be run.
+      TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
+      # 'TEST_LEVEL' determines the amount of tests that will be run on each job.
+      TEST_LEVEL: ${{ needs.evaluate_options.outputs.test_level }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
       MATRIX: ${{ matrix.id }}
@@ -754,6 +536,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -791,7 +575,7 @@ jobs:
           LEADER_LEASE_DURATION: 15
           LEADER_RENEW_DEADLINE: 10
           LIVENESS_PROBE_THRESHOLD: 3
-          LOG_LEVEL: ${{ github.event.inputs.log_level }}
+          LOG_LEVEL: ${{ needs.evaluate_options.outputs.log_level }}
         run: |
           LOG_LEVEL=${LOG_LEVEL:-info}
           envsubst < hack/e2e/env_override_customized.yaml.template > config/manager/env_override.yaml
@@ -849,7 +633,6 @@ jobs:
             rm tests/e2e/out/upgrade_report.json
           fi
           rm tests/e2e/out/report.json
-
       -
         # Archive logs for failed test cases if there are any
         name: Archive Kind logs
@@ -874,16 +657,15 @@ jobs:
   summarize-e2e-tests:
     name: E2E test suite
     needs:
-      - duplicate_runs
-      - evaluate-test-level
       - e2e-local
-    if: (always() && !cancelled()) &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.evaluate-test-level.result == 'success'
+    if: |
+      always() && !cancelled() &&
+      (
+        needs.e2e-local.result == 'success' ||
+        needs.e2e-local.result == 'failure'
+      )
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
-
       - name: Create a directory for the artifacts
         run: mkdir test-artifacts
 
@@ -922,72 +704,55 @@ jobs:
   ok-to-merge:
     name: Label the PR as "ok to merge :ok_hand:"
     needs:
-      - duplicate_runs
-      - evaluate-test-level
       - e2e-local
+      - evaluate_options
     if: |
-      !failure() && !cancelled() &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      github.ref != 'refs/heads/main' &&
-      github.event_name == 'workflow_dispatch' &&
-      ( github.event.inputs.depth == 'main' || github.event.inputs.depth == 'schedule' ) &&
-      needs.evaluate-test-level.outputs.testLevel >= 4
+      success() && !cancelled() &&
+      github.event_name == 'issue_comment' &&
+      needs.evaluate_options.outputs.test_level == '4'
     runs-on: ubuntu-20.04
     steps:
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-      -
-        name: Check preconditions
+      - name: Check preconditions
         id: get_pr_number_and_labels
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
-          echo "PR_NUMBER=${pr_number}" >> $GITHUB_ENV
           ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
-      -
-        name: Label the PR as "ok to merge :ok_hand:"
+
+      - name: Label the PR as "ok to merge :ok_hand:"
         if: |
-           env.PR_NUMBER != '' &&
-           env.OK_LABEL == ''
+          env.OK_LABEL == ''
         uses: actions-ecosystem/action-add-labels@v1.1.3
         with:
-          github_token: ${{ secrets.REPO_GHA_PAT }}
-          number: ${{ env.PR_NUMBER }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          number: ${{ github.event.issue.number }}
           labels: "ok to merge :ok_hand:"
 
   # Remove the "ok to merge :ok_hand:" label if the E2E tests or previous steps failed
   unlabel-ok-to-merge:
     name: Remove the "ok to merge :ok_hand:" label from the PR
     needs:
-      - duplicate_runs
-      - evaluate-test-level
       - e2e-local
+      - evaluate_options
     if: |
-      failure() &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      github.ref != 'refs/heads/main'
+      needs.e2e-local.result == 'failure' &&
+      github.event_name == 'issue_comment'
     runs-on: ubuntu-20.04
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
       - name: Check preconditions
         id: get_pr_number_and_labels
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
-          echo "PR_NUMBER=${pr_number}" >> $GITHUB_ENV
           ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
+
       - name: Remove "ok to merge :ok_hand:" label from PR
         if: |
-          env.PR_NUMBER != '' &&
           env.OK_LABEL != ''
         uses: actions-ecosystem/action-remove-labels@v1.3.0
         with:
-          github_token: ${{ secrets.REPO_GHA_PAT }}
-          number: ${{ env.PR_NUMBER }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          number: ${{ github.event.issue.number }}
           labels: "ok to merge :ok_hand:"
