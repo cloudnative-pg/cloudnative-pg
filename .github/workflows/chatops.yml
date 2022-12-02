@@ -13,7 +13,7 @@ jobs:
   ok-to-merge:
     if: |
         github.event.issue.pull_request &&
-        startsWith(github.event.comment.body, '/ok-to-merge'
+        startsWith(github.event.comment.body, '/ok-to-merge')
     runs-on: ubuntu-20.04
     steps:
       - name: Add "ok to merge :ok_hand:" label to CNPG PR
