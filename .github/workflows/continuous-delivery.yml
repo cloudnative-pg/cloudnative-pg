@@ -61,7 +61,7 @@ jobs:
       - name: Check for Command
         id: command
         uses: xt0rted/slash-command-action@v2
-        continue-on-error: true
+        continue-on-error: false
         with:
           command: test
           reaction: "true"
@@ -150,7 +150,11 @@ jobs:
       - test_arguments
     runs-on: ubuntu-20.04
     if: |
-      always() && !cancelled()
+      (
+        needs.check_commenter.result == 'success' ||
+        needs.test_arguments.result == 'success'
+      ) &&
+      !cancelled()
     outputs:
       git_ref: ${{ env.GITHUB_REF }}
       depth: ${{ env.DEPTH }}
@@ -185,7 +189,8 @@ jobs:
       - test_arguments
       - evaluate_options
     if: |
-      always() && !cancelled()
+      always() && !cancelled() &&
+      needs.evaluate_options.result == 'success'
     runs-on: ubuntu-20.04
     permissions:
       contents: read
@@ -654,7 +659,11 @@ jobs:
     needs:
       - e2e-local
     if: |
-      always() && !cancelled()
+      always() && !cancelled() &&
+      (
+        needs.e2e-local.result == 'success' ||
+        needs.e2e-local.result == 'failure'
+      )
     runs-on: ubuntu-20.04
     steps:
       - name: Create a directory for the artifacts
@@ -698,7 +707,7 @@ jobs:
       - e2e-local
       - evaluate_options
     if: |
-      !failure() && !cancelled() &&
+      success() && !cancelled() &&
       github.event_name == 'issue_comment' &&
       needs.evaluate_options.outputs.test_level == '4'
     runs-on: ubuntu-20.04
