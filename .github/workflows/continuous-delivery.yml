@@ -514,7 +514,7 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       # 'TEST_DEPTH' determines the matrix of E2E test cases that will be run.
-      TEST_DEPTH: ${{ needs.evaluate_options.outputs.depth }}
+      TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # 'TEST_LEVEL' determines the amount of tests that will be run on each job.
       TEST_LEVEL: ${{ needs.evaluate_options.outputs.test_level }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
