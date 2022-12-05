@@ -146,6 +146,13 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
+    # Generate unit tests jobs only if the operator or the Go codebase have changed
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      (
+        needs.change-triage.outputs.operator-changed == 'true' ||
+        needs.change-triage.outputs.go-code-changed == 'true'
+      )
     runs-on: ubuntu-20.04
     outputs:
       k8sMatrix: ${{ steps.get-k8s-versions.outputs.k8s_versions }}

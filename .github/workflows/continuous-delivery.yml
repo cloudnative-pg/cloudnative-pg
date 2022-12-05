@@ -78,7 +78,7 @@ jobs:
           TEST_LEVEL="4"
           FEATURE_TYPE=""
           BUILD_PLUGIN="false"
-          LOG_LEVEL="info"
+          LOG_LEVEL="debug"
 
           for ARG in $ARGS; do
             IFS='=' read name value <<< $ARG
@@ -139,10 +139,10 @@ jobs:
         run: |
           # Set the defaults for workflow dispatch
           if [[ ${{ github.event_name }} == 'workflow_dispatch' ]]; then
-            DEPTH=${{ github.event.inputs.depth || 'main' }}
-            TEST_LEVEL=${{ github.event.inputs.test_level || '4' }}
+            DEPTH=${{ github.event.inputs.depth }}
+            TEST_LEVEL=${{ github.event.inputs.test_level }}
             FEATURE_TYPE="${{ github.event.inputs.feature_type }}"
-            BUILD_PLUGIN="${{ github.event.inputs.build_plugin || 'false' }}"
+            BUILD_PLUGIN="${{ github.event.inputs.build_plugin }}"
             LOG_LEVEL="${{ github.event.inputs.log_level }}"
           fi
           # Set the defaults for schedule dispatch
@@ -151,7 +151,7 @@ jobs:
             TEST_LEVEL="4"
             FEATURE_TYPE=""
             BUILD_PLUGIN="true"
-            LOG_LEVEL="info"
+            LOG_LEVEL="debug"
           fi
           echo "DEPTH=${DEPTH}" >> $GITHUB_ENV
           echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
@@ -250,7 +250,7 @@ jobs:
           images='${{ env.CNPG_IMAGE_NAME }}'
           tags=''
           labels=''
-          commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
+          commit_sha=${{ needs.evaluate_options.outputs.git_ref }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
@@ -513,10 +513,13 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
     runs-on: ubuntu-20.04
     env:
-      # 'TEST_DEPTH' determines the matrix of E2E test cases that will be run.
-      TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
-      # 'TEST_LEVEL' determines the amount of tests that will be run on each job.
+      # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
+      TEST_DEPTH: ${{ needs.evaluate_options.outputs.depth }}
+      # TEST_LEVEL determines the amount of E2E tests that will be executed on each job
       TEST_LEVEL: ${{ needs.evaluate_options.outputs.test_level }}
+      # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
+      FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
       MATRIX: ${{ matrix.id }}
