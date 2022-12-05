@@ -18,7 +18,10 @@ package fio
 
 import (
 	"context"
+	"fmt"
+	"os"
 
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
 
@@ -35,10 +38,29 @@ func NewCmd() *cobra.Command {
 		Example: jobExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			pgBenchArgs := args[1:]
+			fioArgs := args[1:]
 			deploymentName = args[0]
-			fioCommand := newFioCommand(deploymentName, storageClassName, pvcSize, dryRun, pgBenchArgs)
+			fioCommand := newFioCommand(deploymentName, storageClassName, pvcSize, dryRun, fioArgs)
 			return fioCommand.execute(ctx)
+		},
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if !dryRun {
+				prompt := promptui.Prompt{
+					Label: "Running this directly to the cluster may produce a disruption in the service, " +
+						"are you sure you want to proceed?",
+					IsConfirm: true,
+				}
+				_, err := prompt.Run()
+				if err != nil {
+					os.Exit(1)
+				}
+			}
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			if !dryRun {
+				fmt.Printf("To remove this test you need to delete the Deployment, ConfigMap "+
+					"and PVC the three of them with the name %v\n", deploymentName)
+			}
 		},
 	}
 	fioCmd.Flags().StringVar(

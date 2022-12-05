@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -40,7 +41,7 @@ type fioCommand struct {
 
 const (
 	fioKeyWord = "fio"
-	fioImage   = "wallnerryan/fiotools-aio"
+	fioImage   = "wallnerryan/fiotools-aio:latest"
 )
 
 var jobExample = `
@@ -160,6 +161,7 @@ func (cmd *fioCommand) generateConfigMapObject() *corev1.ConfigMap {
 
 // createFioDeployment creates spec of deployment.
 func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Deployment {
+	runAs := int64(10001)
 	fioDeployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -225,6 +227,27 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 								},
 								InitialDelaySeconds: 60,
 								PeriodSeconds:       10,
+							},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: corev1.SeccompProfileTypeRuntimeDefault,
+								},
+								RunAsGroup:   &runAs,
+								RunAsNonRoot: pointer.Bool(true),
+								RunAsUser:    &runAs,
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{
+										"ALL",
+									},
+								},
+								ReadOnlyRootFilesystem: pointer.Bool(true),
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"memory": resource.MustParse("100M"),
+									"cpu":    resource.MustParse("1"),
+								},
 							},
 						},
 					},
