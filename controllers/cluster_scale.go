@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.
@@ -74,7 +75,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 	// Let's drop the PVC too
 	pvc := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sacrificialInstance.Name,
+			Labels:    map[string]string{utils.InstanceNameLabelName: sacrificialInstance.Name},
 			Namespace: sacrificialInstance.Namespace,
 		},
 	}
