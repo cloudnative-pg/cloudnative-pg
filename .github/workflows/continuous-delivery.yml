@@ -137,11 +137,27 @@ jobs:
     steps:
       - name: Parse input to env
         run: |
-          echo "DEPTH=${{ github.event.inputs.depth }}" >> $GITHUB_ENV
-          echo "TEST_LEVEL=${{ github.event.inputs.test_level }}" >> $GITHUB_ENV
-          echo "FEATURE_TYPE=${{ github.event.inputs.feature_type }}" >> $GITHUB_ENV
-          echo "BUILD_PLUGIN=${{ github.event.inputs.build_plugin }}" >> $GITHUB_ENV
-          echo "LOG_LEVEL=${{ github.event.inputs.log_level }}" >> $GITHUB_ENV
+          # Set the defaults for workflow dispatch
+          if [[ ${{ github.event_name }} == 'workflow_dispatch' ]]; then
+            DEPTH=${{ github.event.inputs.depth || 'main' }}
+            TEST_LEVEL=${{ github.event.inputs.test_level || '4' }}
+            FEATURE_TYPE="${{ github.event.inputs.feature_type }}"
+            BUILD_PLUGIN="${{ github.event.inputs.build_plugin || 'false' }}"
+            LOG_LEVEL="${{ github.event.inputs.log_level }}"
+          fi
+          # Set the defaults for schedule dispatch
+          if [[ ${{ github.event_name }} == 'schedule' ]]; then
+            DEPTH="schedule"
+            TEST_LEVEL="4"
+            FEATURE_TYPE=""
+            BUILD_PLUGIN="true"
+            LOG_LEVEL="info"
+          fi
+          echo "DEPTH=${DEPTH}" >> $GITHUB_ENV
+          echo "TEST_LEVEL=${TEST_LEVEL}" >> $GITHUB_ENV
+          echo "FEATURE_TYPE=${FEATURE_TYPE}" >> $GITHUB_ENV
+          echo "BUILD_PLUGIN=${BUILD_PLUGIN}" >> $GITHUB_ENV
+          echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
 
   evaluate_options:
     name: Evaluate workflow options
@@ -498,7 +514,7 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       # 'TEST_DEPTH' determines the matrix of E2E test cases that will be run.
-      TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
+      TEST_DEPTH: ${{ needs.evaluate_options.outputs.depth }}
       # 'TEST_LEVEL' determines the amount of tests that will be run on each job.
       TEST_LEVEL: ${{ needs.evaluate_options.outputs.test_level }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
