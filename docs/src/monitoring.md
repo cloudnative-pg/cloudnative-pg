@@ -88,7 +88,7 @@ spec:
 
 !!! Important
     Label `postgresql` in PostgreSQL instance is deprecated and will be removed
-    in the future. Please use Label `cnpg.io/cluster` instead for query the instance. 
+    in the future. Please use the label `cnpg.io/cluster` instead to query the instances. 
 
 ### Predefined set of metrics
 
