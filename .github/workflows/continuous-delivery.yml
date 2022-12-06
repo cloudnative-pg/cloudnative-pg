@@ -516,9 +516,7 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
-      TEST_DEPTH: ${{ needs.evaluate_options.outputs.depth }}
-      # TEST_LEVEL determines the amount of E2E tests that will be executed on each job
-      TEST_LEVEL: ${{ needs.evaluate_options.outputs.test_level }}
+      TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
 
