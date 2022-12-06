@@ -47,7 +47,9 @@ defaults:
 jobs:
   check_commenter:
     if: |
-      github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/test')
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/test')
     name: Retrieve command
     runs-on: ubuntu-20.04
     outputs:
