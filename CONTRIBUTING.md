@@ -27,7 +27,7 @@ We welcome many types of contributions including:
 * Builds, CI/CD
 * Bug fixes
 * [Documentation](docs/README.md)
-* Issue Triage
+* [Issue Triage](#issue-triage)
 * Answering questions on Slack or Github Discussions
 * Web design
 * Communications / Social Media / Blog Posts
@@ -71,3 +71,15 @@ specific aspects/subprojects (e.g. website).
 | ------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Developers meeting | First and third Wednesday of each month, 4PM CET/CEST | [Zoom](https://enterprisedb.zoom.us/j/95167522706?pwd=WTJxZFRVUUFBNHVrL3hSVDhuMXdQUT09) (Passcode: 278691) | [Agenda/minutes](https://docs.google.com/document/d/1Bmf2AZG5WLKAyESJbYk7MbsfiuD3jgdIDQrDkNuKT9w/edit?usp=sharing), [Calendar](https://calendar.google.com/calendar?cid=NTRuNzMxMjY5aDNhcDN1cGs4MzdyYW9naThAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ) |
 
+
+### Issue Triage
+
+1. [Create a fork](contribute/development_environment/README.md#forking-the-repository) of CloudNativePG.
+2. Self-assign the ticket and begin working on it in the forked project. Move the ticket to `Analysis` or `In Development`
+   phase of [CloudNativePG operator development](https://github.com/orgs/cloudnative-pg/projects/2)
+3. [Run the e2e tests in the forked repository](contribute/e2e_testing_environment/README.md#running-e2e-tests-on-a-fork-of-the-repository)
+4. Once development is finished, create a pull request from your forked project to the CloudNativePG project and move the ticket
+   to the `Waiting for First Review` phase. Please make sure the pull request title and message follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+5. The `maintainer` will first review the fork pull request and approve the ci workflow to run in CloudNativePG project.
+6. The second reviewer will run end-to-end test against the changes in fork pull request, if testing passes, the pull request
+   will be labeled with `ok-to-merge` and ready for merge.
