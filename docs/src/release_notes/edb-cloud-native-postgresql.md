@@ -276,7 +276,7 @@ Features:
   about the backup
 - Introduce a new annotation that reports the status of a PVC (being
   initialized or ready)
-- Set the cluster name in the `cnpg.io/cluster` label for every
+- Set the cluster name in the `k8s.enterprisedb.io/cluster` label for every
   object generated in a `Cluster`, including `Backup` objects
 - Drop support for deprecated API version
   `postgresql.cnpg.io/v1alpha1` on the `Cluster`, `Backup`, and

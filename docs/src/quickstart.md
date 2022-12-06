@@ -118,6 +118,21 @@ You can check that the pods are being created with the `get pods` command:
 kubectl get pods
 ```
 
+That will look for pods in the default namespace. To separate your cluster
+from other workloads on your Kubernetes installation, you could always create
+a new namespace to deploy clusters on.
+Alternatively, you can use labels. The operator will apply the `cnpg.io/cluster`
+label on all objects relevant to a particular cluster. For example:
+
+``` sh
+kubectl get pods -l cnpg.io/cluster=<CLUSTER>
+```
+
+!!! Important
+    Note that we are using `cnpg.io/cluster` as the label. In the past you may
+    have seen or used `postgresql` . This label is being deprecated, and
+    will be dropped in the future. Please use `cngp.io/cluster`.
+
 By default, the operator will install the latest available minor version
 of the latest major version of PostgreSQL when the operator was released.
 You can override this by setting the `imageName` key in the `spec` section of
