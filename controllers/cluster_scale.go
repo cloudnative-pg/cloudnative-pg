@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -75,7 +76,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 	// Let's drop the PVC too
 	pvc := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{utils.InstanceNameLabelName: sacrificialInstance.Name},
+			Name:      sacrificialInstance.Name,
 			Namespace: sacrificialInstance.Namespace,
 		},
 	}
@@ -86,6 +87,28 @@ func (r *ClusterReconciler) scaleDownCluster(
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialInstance.Name, err)
 		}
+	}
+
+	contextLogger.Info("Deleting pvc Data", "pvcData", pvc.Name)
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		// Let's drop the PVC Wal too
+		pvcWalName := specs.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
+		pvcWal := v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pvcWalName,
+				Namespace: sacrificialInstance.Namespace,
+			},
+		}
+
+		err := r.Delete(ctx, &pvcWal)
+		if err != nil {
+			// Ignore if NotFound, otherwise report the error
+			if !apierrs.IsNotFound(err) {
+				return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialInstance.Name, err)
+			}
+		}
+		contextLogger.Info("Deleting pvc Wal", "pvcWal", pvcWal.Name)
 	}
 
 	// And now also the Job
