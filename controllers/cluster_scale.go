@@ -66,6 +66,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 
 	contextLogger.Info("Too many nodes for cluster, deleting an instance",
 		"pod", sacrificialInstance.Name)
+
 	if err := r.Delete(ctx, sacrificialInstance); err != nil {
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
@@ -81,6 +82,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 		},
 	}
 
+	contextLogger.Info("Deleting pvc Data", "pvcData", pvc.Name)
 	err := r.Delete(ctx, &pvc)
 	if err != nil {
 		// Ignore if NotFound, otherwise report the error
@@ -88,8 +90,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 			return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialInstance.Name, err)
 		}
 	}
-
-	contextLogger.Info("Deleting pvc Data", "pvcData", pvc.Name)
 
 	if cluster.ShouldCreateWalArchiveVolume() {
 		// Let's drop the PVC Wal too
@@ -100,7 +100,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 				Namespace: sacrificialInstance.Namespace,
 			},
 		}
-
+		contextLogger.Info("Deleting pvc Wal", "pvcWal", pvcWal.Name)
 		err := r.Delete(ctx, &pvcWal)
 		if err != nil {
 			// Ignore if NotFound, otherwise report the error
@@ -108,7 +108,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 				return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialInstance.Name, err)
 			}
 		}
-		contextLogger.Info("Deleting pvc Wal", "pvcWal", pvcWal.Name)
 	}
 
 	// And now also the Job

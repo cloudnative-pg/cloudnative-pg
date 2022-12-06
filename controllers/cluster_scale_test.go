@@ -29,38 +29,76 @@ import (
 )
 
 var _ = Describe("cluster_scale unit tests", func() {
-	It("should make sure that scale down works correctly", func() {
-		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
+	Context("make sure scale down works correctly", func() {
+		It("pvc role with pgData", func() {
+			ctx := context.Background()
+			namespace := newFakeNamespace()
+			cluster := newFakeCNPGCluster(namespace)
 
-		resources := &managedResources{
-			pvcs:      corev1.PersistentVolumeClaimList{Items: generateFakePVCWithDefaultClient(cluster)},
-			jobs:      batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(cluster)},
-			instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
-		}
+			resources := &managedResources{
+				pvcs:      corev1.PersistentVolumeClaimList{Items: generateFakePVCWithDefaultClient(cluster)},
+				jobs:      batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(cluster)},
+				instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
+			}
 
-		sacrificialInstanceBefore := getSacrificialInstance(resources.instances.Items)
-		err := k8sClient.Get(
-			ctx,
-			types.NamespacedName{Name: sacrificialInstanceBefore.Name, Namespace: cluster.Namespace},
-			&corev1.Pod{},
-		)
-		Expect(err).To(BeNil())
+			sacrificialInstanceBefore := getSacrificialInstance(resources.instances.Items)
+			err := k8sClient.Get(
+				ctx,
+				types.NamespacedName{Name: sacrificialInstanceBefore.Name, Namespace: cluster.Namespace},
+				&corev1.Pod{},
+			)
+			Expect(err).To(BeNil())
 
-		err = clusterReconciler.scaleDownCluster(
-			ctx,
-			cluster,
-			resources,
-		)
-		Expect(err).To(BeNil())
+			err = clusterReconciler.scaleDownCluster(
+				ctx,
+				cluster,
+				resources,
+			)
+			Expect(err).To(BeNil())
 
-		sacrificialInstance := getSacrificialInstance(resources.instances.Items)
-		err = k8sClient.Get(
-			ctx,
-			types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
-			&corev1.Pod{},
-		)
-		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
+			err = k8sClient.Get(
+				ctx,
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				&corev1.Pod{},
+			)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("pvc role with pgData and pgWal", func() {
+			ctx := context.Background()
+			namespace := newFakeNamespace()
+			cluster := newFakeCNPGClusterWithPGWal(namespace)
+
+			resources := &managedResources{
+				pvcs:      corev1.PersistentVolumeClaimList{Items: generateFakePVCWithDefaultClient(cluster)},
+				jobs:      batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(cluster)},
+				instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
+			}
+
+			sacrificialInstanceBefore := getSacrificialInstance(resources.instances.Items)
+			err := k8sClient.Get(
+				ctx,
+				types.NamespacedName{Name: sacrificialInstanceBefore.Name, Namespace: cluster.Namespace},
+				&corev1.Pod{},
+			)
+			Expect(err).To(BeNil())
+
+			err = clusterReconciler.scaleDownCluster(
+				ctx,
+				cluster,
+				resources,
+			)
+			Expect(err).To(BeNil())
+
+			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
+			podL := corev1.Pod{}
+			err = k8sClient.Get(
+				ctx,
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				&podL,
+			)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
 	})
 })
