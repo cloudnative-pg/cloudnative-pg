@@ -347,16 +347,15 @@ This section filled out for search+bind could look as follows:
 
 ```yaml
 postgresql:
-  parameters:
-    ldap:
-      server: 'openldap.default.svc.cluster.local'
-      bindSearchAuth:
-        baseDN: 'ou=org,dc=example,dc=com'
-        bindDN: 'cn=admin,dc=example,dc=com'
-        bindPassword:
-          name: 'ldapBindPassword'
-          key: 'data'
-        searchAttribute: 'uid'
+  ldap:
+    server: 'openldap.default.svc.cluster.local'
+    bindSearchAuth:
+      baseDN: 'ou=org,dc=example,dc=com'
+      bindDN: 'cn=admin,dc=example,dc=com'
+      bindPassword:
+        name: 'ldapBindPassword'
+        key: 'data'
+      searchAttribute: 'uid'
 ```
 
 ## Changing configuration
