@@ -42,8 +42,6 @@ we use to organize the flow of items.
 TODO:
 
 - Add architecture diagrams in the "contribute" folder
-- Add https://github.com/istio/istio/wiki/Writing-Good-Pull-Requests
-- Ideas from https://github.com/istio/istio/wiki/Reviewing-Pull-Requests
 - ...
 
 -->
@@ -78,6 +76,38 @@ all the supported Kubernetes versions? You probably agree this is not feasible
 This is the reason why we have invested since day 1 of CloudNativePG in
 automated testing. Please refer to ["Running E2E tests on your environment"](./e2e_testing_environment/README.md)
 for detailed information.
+
+---
+
+## Submit a pull request
+
+> First and foremost: as a potential contributor, your changes and ideas are
+> welcome at any hour of the day or night, weekdays, weekends, and holidays.
+> Please do not ever hesitate to ask a question or send a PR.
+
+**IMPORTANT:** before you submit a pull request, please read this document from
+the Istio documentation which contains very good insights and best practices:
+["Writing Good Pull Requests"](https://github.com/istio/istio/wiki/Writing-Good-Pull-Requests).
+
+If you have written code for an improvement to CloudNativePG or a bug fix,
+please follow this procedure to submit a pull request:
+
+1. [Create a fork](contribute/development_environment/README.md#forking-the-repository) of CloudNativePG
+2. Self-assign the ticket and begin working on it in the forked project. Move
+   the ticket to `Analysis` or `In Development` phase of
+   [CloudNativePG operator development](https://github.com/orgs/cloudnative-pg/projects/2)
+3. [Run the e2e tests in the forked repository](e2e_testing_environment/README.md#running-e2e-tests-on-a-fork-of-the-repository)
+4. Once development is finished, create a pull request from your forked project
+   to the CloudNativePG project and move the ticket to the `Waiting for First Review`
+   phase. Please make sure the pull request title and message follow
+   [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+
+
+One of the maintainers will then proceed with the first review and approve the
+CI workflow to run in the CloudNativePG project.  The second reviewer will run
+end-to-end test against the changes in fork pull request. If testing passes,
+the pull request will be labeled with `ok-to-merge` and will be ready for
+merge.
 
 ---
 

@@ -210,3 +210,53 @@ the following ones can be defined:
 
 Both scripts use the `setup-cluster.sh` script, in order to initialize the cluster
 choosing between `kind` or K3d engine.
+
+### Running E2E tests on a fork of the repository
+
+Additionally, if you fork the repository and want to run the tests on your fork, you can do so with the `/test` command.
+
+`/test` is used to trigger a run of the end-to-end tests in the GitHub Actions. Only users who have `write` permission
+to the repository can use this command. The format of `/test`
+
+      `/test options`
+
+Options supported are:
+
+- test_level (level or tl for short)  
+  The priority of test to run, If test level is set, all tests with that priority and higher will
+  be triggered. Default value for the test level is 4. Available values are:
+  - 0: highest
+  - 1: high
+  - 2: medium
+  - 3: low
+  - 4: lowest
+
+- depth (d for short)   
+  The type of test to run. Default value is `main`, available values
+  are:
+  - push
+  - main
+  - pull_request
+  - schedule
+- feature_type (type or ft for short)  
+  The label for the end-to-end test to be run, empty value means all labels. Default value is empty, available
+  type are: [listed above in the feature types section](https://github.com/cloudnative-pg/cloudnative-pg/tree/main/contribute/e2e_testing_environment#using-feature-type-test-selectionfilter)
+- log_level (ll for short)    
+  Defines the log value for cloudNativePG operator, which will be specified as the value for `--log-value` in the 
+  operator command.
+  Default value is info and available values are: `error, warning, info, debug, trace`
+- build_plugin (plugin or bp for short)  
+  Whether to run the build cnpg plugin job in the end-to-end test. Available values are true and false and default value
+  is false.
+
+Example:
+1. Trigger an e2e test to run all test cases with `highest` test level, we want to cover most kubernetes and postgres 
+metrics
+
+  ```
+     /test -tl=0 d=schedule
+  ```
+2. Run smoke test for the pull request
+  ```
+     /test type=smoke
+  ```
