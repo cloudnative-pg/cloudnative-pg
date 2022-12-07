@@ -2591,7 +2591,7 @@ func AssertPvcDetails(namespace, clusterName string, pvcCount int) {
 			for _, items := range pvcList.Items {
 				pvcListClient = append(pvcListClient, strings.Trim(items.Name, " "))
 			}
-			g.Expect(clusterPvcList.Status.HealthyPVC).To(BeEquivalentTo(pvcListClient))
+			g.Expect(clusterPvcList.Status.PVCCount).To(BeEquivalentTo(len(pvcListClient)))
 		}, 60, 4).Should(Succeed())
 	})
 }
