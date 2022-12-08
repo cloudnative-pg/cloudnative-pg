@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -179,7 +180,7 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			postgresPassword)
 		SetClusterOwnerAnnotationsAndLabels(&postgresSecret.ObjectMeta, cluster)
 
-		if err := r.Create(ctx, postgresSecret); err != nil {
+		if err := resources.CreateIfNotFound(ctx, r.Client, postgresSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
 				return err
 			}
@@ -223,7 +224,7 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 			appPassword)
 
 		SetClusterOwnerAnnotationsAndLabels(&appSecret.ObjectMeta, cluster)
-		if err := r.Create(ctx, appSecret); err != nil {
+		if err := resources.CreateIfNotFound(ctx, r.Client, appSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
 				return err
 			}
@@ -273,7 +274,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	anyService := specs.CreateClusterAnyService(*cluster)
 	SetClusterOwnerAnnotationsAndLabels(&anyService.ObjectMeta, cluster)
 
-	if err := r.Create(ctx, anyService); err != nil {
+	if err := resources.CreateIfNotFound(ctx, r.Client, anyService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
 		}
@@ -282,7 +283,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	readService := specs.CreateClusterReadService(*cluster)
 	SetClusterOwnerAnnotationsAndLabels(&readService.ObjectMeta, cluster)
 
-	if err := r.Create(ctx, readService); err != nil {
+	if err := resources.CreateIfNotFound(ctx, r.Client, readService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
 		}
@@ -291,7 +292,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
 	SetClusterOwnerAnnotationsAndLabels(&readOnlyService.ObjectMeta, cluster)
 
-	if err := r.Create(ctx, readOnlyService); err != nil {
+	if err := resources.CreateIfNotFound(ctx, r.Client, readOnlyService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
 		}
@@ -300,7 +301,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
 	SetClusterOwnerAnnotationsAndLabels(&readWriteService.ObjectMeta, cluster)
 
-	if err := r.Create(ctx, readWriteService); err != nil {
+	if err := resources.CreateIfNotFound(ctx, r.Client, readWriteService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
 		}
