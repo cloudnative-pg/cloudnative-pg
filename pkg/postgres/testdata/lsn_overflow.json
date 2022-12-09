@@ -20,7 +20,6 @@
           "creationTimestamp": "2021-12-09T16:10:34Z",
           "labels": {
             "cnpg.io/cluster": "sandbox",
-            "postgresql": "sandbox",
             "role": "replica"
           },
           "annotations": {
@@ -681,7 +680,7 @@
                     "labelSelector": {
                       "matchExpressions": [
                         {
-                          "key": "postgresql",
+                          "key": "cnpg.io/cluster",
                           "operator": "In",
                           "values": [
                             "sandbox"
@@ -830,7 +829,6 @@
           "creationTimestamp": "2021-12-09T15:23:04Z",
           "labels": {
             "cnpg.io/cluster": "sandbox",
-            "postgresql": "sandbox",
             "role": "replica"
           },
           "annotations": {
@@ -1491,7 +1489,7 @@
                     "labelSelector": {
                       "matchExpressions": [
                         {
-                          "key": "postgresql",
+                          "key": "cnpg.io/cluster",
                           "operator": "In",
                           "values": [
                             "sandbox"

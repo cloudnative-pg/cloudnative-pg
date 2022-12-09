@@ -104,7 +104,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					err := env.Client.List(
 						env.Ctx, podList,
 						ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{"postgresql": clusterName},
+						ctrlclient.MatchingLabels{utils.ClusterLabelName: clusterName},
 					)
 					Expect(err).ToNot(HaveOccurred())
 					return int32(len(podList.Items))
@@ -116,7 +116,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					err := env.Client.List(
 						env.Ctx, podList,
 						ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{"postgresql": clusterName},
+						ctrlclient.MatchingLabels{utils.ClusterLabelName: clusterName},
 					)
 					Expect(err).ToNot(HaveOccurred())
 					return int32(len(podList.Items))
@@ -216,7 +216,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					podList := &corev1.PodList{}
 					err := env.Client.List(
 						env.Ctx, podList, ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{"postgresql": "operator-unavailable"},
+						ctrlclient.MatchingLabels{utils.ClusterLabelName: "operator-unavailable"},
 					)
 					Expect(err).ToNot(HaveOccurred())
 					return int32(len(podList.Items))

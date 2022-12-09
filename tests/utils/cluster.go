@@ -263,7 +263,7 @@ func (env TestingEnvironment) GetCluster(namespace string, name string) (*apiv1.
 func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName},
 	)
 	return podList, err
 }
@@ -272,7 +272,7 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName, "role": "primary"},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "primary"},
 	)
 	if err != nil {
 		return &corev1.Pod{}, err
@@ -288,7 +288,7 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 func (env TestingEnvironment) GetClusterReplicas(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName, "role": "replica"},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "replica"},
 	)
 	if err != nil {
 		return podList, err
