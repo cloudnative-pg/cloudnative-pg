@@ -164,13 +164,12 @@ func (env TestingEnvironment) ExecCommandWithPsqlClient(
 	namespace,
 	clusterName string,
 	pod *corev1.Pod,
-	prefix UserPrefix,
-	user string,
+	secretSuffix string,
 	dbname string,
 	query string,
 ) (string, string, error) {
 	timeout := time.Second * 2
-	pass, err := GetPassword(clusterName, namespace, prefix, &env)
+	username, password, err := GetCredentials(clusterName, namespace, secretSuffix, &env)
 	if err != nil {
 		return "", "", err
 	}
@@ -179,7 +178,7 @@ func (env TestingEnvironment) ExecCommandWithPsqlClient(
 		return "", "", err
 	}
 	host := CreateServiceFQDN(namespace, rwService.GetName())
-	dsn := CreateDSN(host, user, dbname, pass, Prefer, 5432)
+	dsn := CreateDSN(host, username, dbname, password, Prefer, 5432)
 	return utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig,
 		*pod, specs.PostgresContainerName, &timeout, "psql", dsn, "-tAc", query)
 }

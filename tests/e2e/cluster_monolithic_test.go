@@ -69,7 +69,8 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 
 	It("can import data from a cluster with a different major version", func() {
 		var err error
-		var sourceClusterHost, sourceClusterPass, targetClusterHost, targetClusterPass string
+		var sourceClusterHost, sourceClusterSuperUser, sourceClusterPass,
+			targetClusterHost, targetClusterSuperUser, targetClusterPass string
 		sourceDatabases := []string{databaseOne, databaseTwo}
 		sourceRoles := []string{databaseSuperUser, databaseUserTwo}
 
@@ -91,13 +92,14 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				databaseSuperUser)
 			sourceClusterHost, err = testsUtils.GetHostName(namespace, sourceClusterName, env)
 			Expect(err).ToNot(HaveOccurred())
-			sourceClusterPass, err = testsUtils.GetPassword(sourceClusterName, namespace, testsUtils.Superuser, env)
+			sourceClusterSuperUser, sourceClusterPass, err := testsUtils.GetCredentials(
+				sourceClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			_, _, err = testsUtils.RunQueryFromPod(
 				psqlClientPod,
 				sourceClusterHost,
 				testsUtils.PostgresDBName,
-				testsUtils.PostgresUser,
+				sourceClusterSuperUser,
 				sourceClusterPass,
 				createSuperUserQuery,
 				env,
@@ -110,7 +112,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				psqlClientPod,
 				sourceClusterHost,
 				testsUtils.PostgresDBName,
-				testsUtils.PostgresUser,
+				sourceClusterSuperUser,
 				sourceClusterPass,
 				createUserQuery,
 				env,
@@ -131,7 +133,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 					psqlClientPod,
 					sourceClusterHost,
 					testsUtils.PostgresDBName,
-					testsUtils.PostgresUser,
+					sourceClusterSuperUser,
 					sourceClusterPass,
 					query,
 					env,
@@ -146,7 +148,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 					psqlClientPod,
 					sourceClusterHost,
 					database,
-					testsUtils.PostgresUser,
+					sourceClusterSuperUser,
 					sourceClusterPass,
 					query,
 					env,
@@ -174,7 +176,8 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		By("verifying that the specified source databases were imported", func() {
 			targetClusterHost, err = testsUtils.GetHostName(namespace, targetClusterName, env)
 			Expect(err).ToNot(HaveOccurred())
-			targetClusterPass, err = testsUtils.GetPassword(targetClusterName, namespace, testsUtils.Superuser, env)
+			targetClusterSuperUser, targetClusterPass, err := testsUtils.GetCredentials(
+				targetClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			for _, database := range sourceDatabases {
 				databaseEntryQuery := fmt.Sprintf("SELECT datname FROM pg_database where datname='%v'", database)
@@ -182,7 +185,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 					psqlClientPod,
 					targetClusterHost,
 					testsUtils.PostgresDBName,
-					testsUtils.PostgresUser,
+					targetClusterSuperUser,
 					targetClusterPass,
 					databaseEntryQuery,
 					env,
@@ -199,7 +202,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				psqlClientPod,
 				targetClusterHost,
 				testsUtils.PostgresDBName,
-				testsUtils.PostgresUser,
+				targetClusterSuperUser,
 				targetClusterPass,
 				getSuperUserQuery,
 				env,
@@ -215,7 +218,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 					psqlClientPod,
 					targetClusterHost,
 					database,
-					testsUtils.PostgresUser,
+					targetClusterSuperUser,
 					targetClusterPass,
 					selectQuery,
 					env,

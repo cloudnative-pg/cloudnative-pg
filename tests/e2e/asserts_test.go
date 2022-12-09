@@ -364,8 +364,7 @@ func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.
 			namespace,
 			clusterName,
 			pod,
-			testsUtils.Superuser,
-			testsUtils.PostgresUser,
+			apiv1.SuperUserSecretSuffix,
 			testsUtils.AppDBName,
 			query,
 		)
@@ -378,7 +377,7 @@ func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, dat
 	By("creating large object", func() {
 		query := fmt.Sprintf("CREATE TABLE image (name text,raster oid); "+
 			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_from_bytea(%d, '%s'));", oid, data)
-		pass, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+		superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		host, err := testsUtils.GetHostName(namespace, clusterName, env)
 		Expect(err).ToNot(HaveOccurred())
@@ -386,8 +385,8 @@ func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, dat
 			pod,
 			host,
 			testsUtils.AppDBName,
-			testsUtils.PostgresUser,
-			pass,
+			superUser,
+			superUserPass,
 			query,
 			env)
 		Expect(err).ToNot(HaveOccurred())
@@ -404,7 +403,7 @@ func insertRecordIntoTableWithDatabaseName(
 	pod *corev1.Pod,
 ) {
 	query := fmt.Sprintf("INSERT INTO %v VALUES (%v);", tableName, value)
-	pass, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+	superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 	Expect(err).ToNot(HaveOccurred())
 	host, err := testsUtils.GetHostName(namespace, clusterName, env)
 	Expect(err).ToNot(HaveOccurred())
@@ -412,8 +411,8 @@ func insertRecordIntoTableWithDatabaseName(
 		pod,
 		host,
 		databaseName,
-		testsUtils.PostgresUser,
-		pass,
+		superUser,
+		superUserPass,
 		query,
 		env)
 	Expect(err).ToNot(HaveOccurred())
@@ -426,8 +425,7 @@ func insertRecordIntoTable(namespace, clusterName, tableName string, value int, 
 		namespace,
 		clusterName,
 		pod,
-		testsUtils.Superuser,
-		testsUtils.PostgresUser,
+		apiv1.SuperUserSecretSuffix,
 		testsUtils.AppDBName,
 		query,
 	)
@@ -488,8 +486,7 @@ func AssertDataExpectedCount(namespace, clusterName, tableName string, expectedV
 				namespace,
 				clusterName,
 				pod,
-				testsUtils.Superuser,
-				testsUtils.PostgresUser,
+				apiv1.SuperUserSecretSuffix,
 				testsUtils.AppDBName,
 				query)
 			if err != nil {
@@ -507,7 +504,7 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string,
 		query := fmt.Sprintf("SELECT encode(lo_get(%v), 'escape');", oid)
 		Eventually(func() (string, error) {
 			// We keep getting the pod, since there could be a new pod with the same name
-			pass, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+			superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			host, err := testsUtils.GetHostName(namespace, clusterName, env)
 			Expect(err).ToNot(HaveOccurred())
@@ -515,8 +512,8 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string,
 				pod,
 				host,
 				testsUtils.AppDBName,
-				testsUtils.PostgresUser,
-				pass,
+				superUser,
+				superUserPass,
 				query,
 				env)
 			if err != nil {
@@ -822,7 +819,8 @@ func AssertReplicaModeCluster(
 
 	By("creating test data in source cluster", func() {
 		cmd := "CREATE TABLE test_replica AS VALUES (1), (2);"
-		pass, err := testsUtils.GetPassword(srcClusterName, namespace, testsUtils.Superuser, env)
+		superUser, superUserPass, err := testsUtils.GetCredentials(srcClusterName, namespace,
+			apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		host, err := testsUtils.GetHostName(namespace, srcClusterName, env)
 		Expect(err).ToNot(HaveOccurred())
@@ -830,8 +828,8 @@ func AssertReplicaModeCluster(
 			pod,
 			host,
 			"appSrc",
-			testsUtils.PostgresUser,
-			pass,
+			superUser,
+			superUserPass,
 			cmd,
 			env)
 		Expect(err).ToNot(HaveOccurred())
@@ -1105,7 +1103,7 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 	By(fmt.Sprintf("creating target database '%v' and table '%v'", targetDBName, tableName), func() {
 		host, err := testsUtils.GetHostName(namespace, clusterName, env)
 		Expect(err).ToNot(HaveOccurred())
-		superUserPass, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+		superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		createDBQuery := fmt.Sprintf("create database %v;", targetDBName)
 		// Create database
@@ -1113,7 +1111,7 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 			pod,
 			host,
 			testsUtils.AppDBName,
-			testsUtils.PostgresUser,
+			superUser,
 			superUserPass,
 			createDBQuery,
 			env,
@@ -1333,13 +1331,14 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		Expect(err).ToNot(HaveOccurred())
 
 		// Use `source-cluster` read write service and `superuser` credentials for psql connection.
-		pass, err := testsUtils.GetPassword(sourceClusterName, namespace, testsUtils.Superuser, env)
+		superUser, superUserPass, err := testsUtils.GetCredentials(
+			sourceClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		rwService := testsUtils.CreateServiceFQDN(namespace, testsUtils.GetReadWriteServiceName(sourceClusterName))
 
 		query := "SELECT count(*) FROM " + tableName
 		out, _, err := testsUtils.RunQueryFromPod(
-			psqlClientPod, rwService, testsUtils.AppDBName, testsUtils.PostgresUser, pass, query, env)
+			psqlClientPod, rwService, testsUtils.AppDBName, superUser, superUserPass, query, env)
 		Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 
 		insertRecordIntoTable(namespace, sourceClusterName, tableName, 3, pod)
@@ -1574,13 +1573,13 @@ func AssertClusterRestorePITRWithApplicationDB(namespace, clusterName, tableName
 		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
 		host, err := testsUtils.GetHostName(namespace, clusterName, env)
 		Expect(err).ToNot(HaveOccurred())
-		superUserPass, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+		superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		stdOut, _, err := testsUtils.RunQueryFromPod(
 			pod,
 			host,
 			testsUtils.AppDBName,
-			testsUtils.PostgresUser,
+			superUser,
 			superUserPass,
 			query,
 			env,
@@ -1639,13 +1638,13 @@ func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string, pod
 		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
 		host, err := testsUtils.GetHostName(namespace, clusterName, env)
 		Expect(err).ToNot(HaveOccurred())
-		superUserPass, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+		superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		stdOut, _, err := testsUtils.RunQueryFromPod(
 			pod,
 			host,
 			testsUtils.AppDBName,
-			testsUtils.PostgresUser,
+			superUser,
 			superUserPass,
 			query,
 			env,
@@ -1966,17 +1965,18 @@ func assertReadWriteConnectionUsingPgBouncerService(
 	poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 	poolerService := testsUtils.CreateServiceFQDN(namespace, poolerName)
-	generatedAppUserPassword, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.App, env)
+	appUser, generatedAppUserPassword, err := testsUtils.GetCredentials(
+		clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 	Expect(err).ToNot(HaveOccurred())
-	AssertConnection(poolerService, "app", "app", generatedAppUserPassword, *psqlClientPod, 180, env)
+	AssertConnection(poolerService, appUser, "app", generatedAppUserPassword, *psqlClientPod, 180, env)
 
 	// verify that, if pooler type setup read write then it will allow both read and
 	// write operations or if pooler type setup read only then it will allow only read operations
 	if isPoolerRW {
-		AssertWritesToPrimarySucceeds(psqlClientPod, poolerService, "app", "app",
+		AssertWritesToPrimarySucceeds(psqlClientPod, poolerService, "app", appUser,
 			generatedAppUserPassword)
 	} else {
-		AssertWritesToReplicaFails(psqlClientPod, poolerService, "app", "app",
+		AssertWritesToReplicaFails(psqlClientPod, poolerService, "app", appUser,
 			generatedAppUserPassword)
 	}
 }
@@ -2307,12 +2307,13 @@ func DeleteTableUsingPgBouncerService(
 	poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 	poolerService := testsUtils.CreateServiceFQDN(namespace, poolerName)
-	generatedAppUserPassword, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.App, env)
+	appUser, generatedAppUserPassword, err := testsUtils.GetCredentials(
+		clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 	Expect(err).ToNot(HaveOccurred())
-	AssertConnection(poolerService, "app", "app", generatedAppUserPassword, *pod, 180, env)
+	AssertConnection(poolerService, appUser, "app", generatedAppUserPassword, *pod, 180, env)
 
 	_, _, err = testsUtils.RunQueryFromPod(
-		pod, poolerService, "app", "app", generatedAppUserPassword,
+		pod, poolerService, "app", appUser, generatedAppUserPassword,
 		"DROP TABLE table1",
 		env)
 	Expect(err).ToNot(HaveOccurred())

@@ -24,6 +24,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -188,7 +189,8 @@ func assertCreateTableWithDataOnSourceCluster(
 	clusterName string,
 ) {
 	By("generate super user password,rw service name on source cluster", func() {
-		generatedSuperuserPassword, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+		superUser, generatedSuperuserPassword, err := testsUtils.GetCredentials(
+			clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 		By("create user, insert record in new table, assign new user as owner "+
@@ -196,7 +198,7 @@ func assertCreateTableWithDataOnSourceCluster(
 			query := fmt.Sprintf("CREATE USER micro;CREATE TABLE %v AS VALUES (1), "+
 				"(2);ALTER TABLE %v OWNER TO micro;grant select on %v to app;", tableName, tableName, tableName)
 			_, _, err = testsUtils.RunQueryFromPod(
-				psqlClientPod, rwService, "app", "postgres", generatedSuperuserPassword, query, env)
+				psqlClientPod, rwService, "app", superUser, generatedSuperuserPassword, query, env)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -209,8 +211,8 @@ func assertTableAndDataOnImportedCluster(
 	importedClusterName string,
 ) {
 	By("verifying presence of table and data from source in imported cluster", func() {
-		generatedSuperuserPassword, err := testsUtils.GetPassword(importedClusterName,
-			namespace, testsUtils.Superuser, env)
+		superUser, generatedSuperuserPassword, err := testsUtils.GetCredentials(importedClusterName,
+			namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		importedrwService := fmt.Sprintf("%v-rw.%v.svc", importedClusterName, namespace)
 		By("Verifying imported table has owner app user", func() {
@@ -218,13 +220,13 @@ func assertTableAndDataOnImportedCluster(
 				"and tableowner = 'app';", tableName)
 
 			out, _, err := testsUtils.RunQueryFromPod(
-				psqlClientPod, importedrwService, "app", "postgres",
+				psqlClientPod, importedrwService, "app", superUser,
 				generatedSuperuserPassword, queryImported, env)
 			Expect(strings.Contains(out, tableName), err).Should(BeTrue())
 		})
 		By("verifying the user named 'micro' on source is not in imported database", func() {
 			outUser, _, err := testsUtils.RunQueryFromPod(
-				psqlClientPod, importedrwService, "app", "postgres",
+				psqlClientPod, importedrwService, "app", superUser,
 				generatedSuperuserPassword, "\\du", env)
 			Expect(strings.Contains(outUser, "micro"), err).Should(BeFalse())
 		})
@@ -250,7 +252,8 @@ func assertImportRenamesSelectedDatabase(
 
 	By("creating multiple dbs on source and set ownership to app", func() {
 		rwService := testsUtils.CreateServiceFQDN(namespace, testsUtils.GetReadWriteServiceName(clusterName))
-		getSuperUserPassword, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+		superUser, getSuperUserPassword, err := testsUtils.GetCredentials(
+			clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		for _, db := range dbList {
 			// Create database
@@ -259,7 +262,7 @@ func assertImportRenamesSelectedDatabase(
 				psqlClientPod,
 				rwService,
 				testsUtils.PostgresDBName,
-				testsUtils.PostgresUser,
+				superUser,
 				getSuperUserPassword,
 				createDBQuery,
 				env)
@@ -279,17 +282,18 @@ func assertImportRenamesSelectedDatabase(
 	})
 
 	By(fmt.Sprintf("creating table '%s' and insert records on selected db %v", tableName, dbToImport), func() {
-		getSuperUserPassword, err := testsUtils.GetPassword(clusterName, namespace, testsUtils.Superuser, env)
+		superUser, getSuperUserPassword, err := testsUtils.GetCredentials(
+			clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		rwService := testsUtils.CreateServiceFQDN(namespace, testsUtils.GetReadWriteServiceName(clusterName))
 		// set role app on db2
 		_, _, err = testsUtils.RunQueryFromPod(psqlClientPod, rwService,
-			dbToImport, "postgres", getSuperUserPassword,
+			dbToImport, superUser, getSuperUserPassword,
 			"set role app;", env)
 		Expect(err).ToNot(HaveOccurred())
 		// create test data and insert records
 		_, _, err = testsUtils.RunQueryFromPod(psqlClientPod, rwService,
-			dbToImport, "postgres", getSuperUserPassword,
+			dbToImport, superUser, getSuperUserPassword,
 			fmt.Sprintf("CREATE TABLE %s AS VALUES (1),(2);", tableName), env)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -306,11 +310,12 @@ func assertImportRenamesSelectedDatabase(
 	AssertDataExpectedCount(namespace, importedClusterName, tableName, 2, psqlClientPod)
 
 	By("verifying that only 'app' DB exists in the imported cluster", func() {
-		getSuperUserPassword, err := testsUtils.GetPassword(importedClusterName, namespace, testsUtils.Superuser, env)
+		superUser, getSuperUserPassword, err := testsUtils.GetCredentials(
+			importedClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		rwService := testsUtils.CreateServiceFQDN(namespace, testsUtils.GetReadWriteServiceName(importedClusterName))
 		dbList, _, err := testsUtils.RunQueryFromPod(psqlClientPod, rwService,
-			"postgres", "postgres", getSuperUserPassword, "\\l", env)
+			"postgres", superUser, getSuperUserPassword, "\\l", env)
 		Expect(err).ToNot(HaveOccurred(), err)
 		Expect(strings.Contains(dbList, "db2"), err).Should(BeFalse())
 		Expect(strings.Contains(dbList, "app"), err).Should(BeTrue())

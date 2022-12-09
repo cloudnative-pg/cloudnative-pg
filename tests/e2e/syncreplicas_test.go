@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	clusterv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -68,8 +68,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					namespace,
 					clusterName,
 					psqlClientPod,
-					utils.Superuser,
-					utils.PostgresUser,
+					apiv1.SuperUserSecretSuffix,
 					utils.AppDBName,
 					query,
 				)
@@ -84,7 +83,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			}
 			// Set MaxSyncReplicas to 1
 			Eventually(func(g Gomega) error {
-				cluster := &clusterv1.Cluster{}
+				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				g.Expect(err).ToNot(HaveOccurred())
 
@@ -104,7 +103,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			// Construct the expected synchronous_standby_names value
 			var podNames []string
-			cluster := &clusterv1.Cluster{}
+			cluster := &apiv1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -135,7 +134,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				Name:      clusterName,
 			}
 
-			cluster := &clusterv1.Cluster{}
+			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			// Expect an error. MaxSyncReplicas must be lower than the number of instances
@@ -143,7 +142,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			err = env.Client.Update(env.Ctx, cluster)
 			Expect(err).To(HaveOccurred())
 
-			cluster = &clusterv1.Cluster{}
+			cluster = &apiv1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas

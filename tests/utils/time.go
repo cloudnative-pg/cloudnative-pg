@@ -20,6 +20,8 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // GetCurrentTimestamp getting current time stamp from postgres server
@@ -28,7 +30,7 @@ func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment,
 	if err != nil {
 		return "", err
 	}
-	pass, err := GetPassword(clusterName, namespace, Superuser, env)
+	superUser, superUserPass, err := GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 	if err != nil {
 		return "", err
 	}
@@ -37,8 +39,8 @@ func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment,
 		podName,
 		host,
 		AppDBName,
-		PostgresUser,
-		pass,
+		superUser,
+		superUserPass,
 		query,
 		env,
 	)

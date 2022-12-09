@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -250,7 +251,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 		By("grant select permission for test_replica table to pg_monitor", func() {
 			cmd := "GRANT SELECT ON test_replica TO pg_monitor"
-			pass, err := utils.GetPassword(srcClusterName, namespace, utils.Superuser, env)
+			superUser, superUserPass, err := utils.GetCredentials(srcClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			host, err := utils.GetHostName(namespace, srcClusterName, env)
 			Expect(err).ToNot(HaveOccurred())
@@ -258,8 +259,8 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 				psqlClientPod,
 				host,
 				"appSrc",
-				utils.PostgresUser,
-				pass,
+				superUser,
+				superUserPass,
 				cmd,
 				env)
 			Expect(err).ToNot(HaveOccurred())
