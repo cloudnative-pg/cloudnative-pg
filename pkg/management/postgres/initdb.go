@@ -28,7 +28,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"

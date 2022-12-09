@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/blang/semver"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
 	"k8s.io/utils/strings/slices"
 
