@@ -19,9 +19,9 @@ package utils
 import (
 	"database/sql"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	// this is needed to correctly open the sql connection with the pgx driver. Do not remove this import.
-	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 // NewSimpleDBConnection creates a postgres connection with the simple protocol
@@ -34,7 +34,7 @@ func NewSimpleDBConnection(connectionString string) (*sql.DB, error) {
 	// The simple query protocol is needed since we're going to use
 	// this function to connect to the PgBouncer administrative
 	// interface, which doesn't support the extended one.
-	conf.PreferSimpleProtocol = true
+	conf.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	// This is required by pgx when using the simple protocol during
 	// the sanitization of the strings. Do not remove.
