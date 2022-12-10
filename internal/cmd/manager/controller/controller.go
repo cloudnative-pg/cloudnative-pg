@@ -213,11 +213,7 @@ func RunController(
 		return err
 	}
 
-	if err = (&controllers.BackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-backup"),
-	}).SetupWithManager(ctx, mgr); err != nil {
+	if err = controllers.NewBackupReconciler(mgr).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}

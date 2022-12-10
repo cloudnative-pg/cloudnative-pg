@@ -1229,6 +1229,17 @@ type RollingUpdateStatus struct {
 	StartedAt metav1.Time `json:"startedAt,omitempty"`
 }
 
+// BackupTarget describes the preferred targets for a backup
+type BackupTarget string
+
+const (
+	// BackupTargetPrimary means backups will be performed on the primary instance
+	BackupTargetPrimary = BackupTarget("primary")
+
+	// BackupTargetStandby means backups will be performed on a standby instance if available
+	BackupTargetStandby = BackupTarget("prefer-standby")
+)
+
 // CompressionType encapsulates the available types of compression
 type CompressionType string
 
@@ -1338,6 +1349,13 @@ type BackupConfiguration struct {
 	// +kubebuilder:validation:Pattern=^[1-9][0-9]*[dwm]$
 	// +optional
 	RetentionPolicy string `json:"retentionPolicy,omitempty"`
+
+	// The policy to decide which instance should perform backups. Available
+	// options are empty string, which will default to `primary` policy, `primary`
+	// to have backups run always on primary instances, `prefer-standby` to have
+	// backups run preferably on the most updated standby, if available.
+	// +kubebuilder:validation:Enum=primary;prefer-standby
+	Target BackupTarget `json:"target,omitempty"`
 }
 
 // WalBackupConfiguration is the configuration of the backup of the

@@ -307,7 +307,7 @@ func GetPodsNotOnPrimaryNode(
 // getStatusFromInstances gets the replication status from the PostgreSQL instances,
 // the returned list is sorted in order to have the primary as the first element
 // and the other instances in their election order
-func (r *ClusterReconciler) getStatusFromInstances(
+func (r *instanceStatusClient) getStatusFromInstances(
 	ctx context.Context,
 	pods corev1.PodList,
 ) postgres.PostgresqlStatusList {

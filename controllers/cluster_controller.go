@@ -71,14 +71,16 @@ type ClusterReconciler struct {
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 
-	timeoutHTTPClient *http.Client
+	*instanceStatusClient
 }
 
-// NewClusterReconciler creates a new ClusterReconciler initializing it
-func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
+type instanceStatusClient struct {
+	*http.Client
+}
+
+func newInstanceStatusClient() *instanceStatusClient {
 	const connectionTimeout = 2 * time.Second
 	const requestTimeout = 30 * time.Second
-
 	// We want a connection timeout to prevent waiting for the default
 	// TCP connection timeout (30 seconds) on lost SYN packets
 	timeoutClient := &http.Client{
@@ -89,9 +91,13 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 		},
 		Timeout: requestTimeout,
 	}
+	return &instanceStatusClient{timeoutClient}
+}
 
+// NewClusterReconciler creates a new ClusterReconciler initializing it
+func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
 	return &ClusterReconciler{
-		timeoutHTTPClient: timeoutClient,
+		instanceStatusClient: newInstanceStatusClient(),
 
 		DiscoveryClient: discoveryClient,
 		Client:          mgr.GetClient(),
@@ -235,7 +241,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Get the replication status
-	instancesStatus := r.getStatusFromInstances(ctx, resources.instances)
+	instancesStatus := r.instanceStatusClient.getStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {

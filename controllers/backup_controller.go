@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -55,6 +56,18 @@ type BackupReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+
+	instanceStatusClient *instanceStatusClient
+}
+
+// NewBackupReconciler properly initializes the BackupReconciler
+func NewBackupReconciler(mgr manager.Manager) *BackupReconciler {
+	return &BackupReconciler{
+		Client:               mgr.GetClient(),
+		Scheme:               mgr.GetScheme(),
+		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"),
+		instanceStatusClient: newInstanceStatusClient(),
+	}
 }
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
@@ -110,11 +123,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
 	// Detect the pod where a backup will be executed
-	var pod corev1.Pod
-	err := r.Get(ctx, client.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      cluster.Status.TargetPrimary,
-	}, &pod)
+	pod, err := r.GetBackupTargetPod(ctx, cluster)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
@@ -131,7 +140,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	contextLogger.Debug("Found pod for backup", "pod", pod.Name)
 
-	if !utils.IsPodReady(pod) {
+	if !utils.IsPodReady(*pod) {
 		contextLogger.Info("Not ready backup target, will retry in 30 seconds", "target", pod.Name)
 		backup.Status.Phase = apiv1.BackupPhasePending
 		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
@@ -185,13 +194,54 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, err
 }
 
+// GetBackupTargetPod returns the correct pod that should run the backup according to the current
+// cluster's target policy
+func (r *BackupReconciler) GetBackupTargetPod(ctx context.Context, cluster apiv1.Cluster) (*corev1.Pod, error) {
+	contextLogger := log.FromContext(ctx)
+	if cluster.Spec.Backup.Target == apiv1.BackupTargetStandby &&
+		cluster.Spec.Instances >= 1 {
+		pods, err := GetManagedInstances(ctx, &cluster, r.Client)
+		if err != nil {
+			return nil, err
+		}
+		posgresqlStatusList := r.instanceStatusClient.getStatusFromInstances(ctx, pods)
+		if len(posgresqlStatusList.Items) == 0 {
+			log.Debug("")
+			var pod corev1.Pod
+			err := r.Get(ctx, client.ObjectKey{
+				Namespace: cluster.Namespace,
+				Name:      cluster.Status.TargetPrimary,
+			}, &pod)
+			return &pod, err
+		}
+		if posgresqlStatusList.Len() == 1 {
+			contextLogger.Debug("Only one instance found, running backup on it")
+			return &posgresqlStatusList.Items[0].Pod, nil
+		}
+		for _, item := range posgresqlStatusList.Items[1:] {
+			if item.IsPodReady {
+				return &item.Pod, nil
+			}
+			contextLogger.Debug("Instance not ready, discarded as target for backup", "pod", item.Pod.Name)
+		}
+		contextLogger.Debug("No ready instances found as target for backup, defaulting to primary")
+	}
+	contextLogger.Debug("Picked primary as target for backup")
+	var pod corev1.Pod
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Status.TargetPrimary,
+	}, &pod)
+	return &pod, err
+}
+
 // StartBackup request a backup in a Pod and marks the backup started
 // or failed if needed
 func StartBackup(
 	ctx context.Context,
 	client client.Client,
 	backup *apiv1.Backup,
-	pod corev1.Pod,
+	pod *corev1.Pod,
 	cluster *apiv1.Cluster,
 ) error {
 	// This backup has been started
@@ -212,7 +262,7 @@ func StartBackup(
 			ctx,
 			clientInterface,
 			config,
-			pod,
+			*pod,
 			specs.PostgresContainerName,
 			nil,
 			"/controller/manager",

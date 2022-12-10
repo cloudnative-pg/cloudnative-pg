@@ -175,7 +175,7 @@ Specifically, the CloudNativePG cluster can directly point to a local
 MinIO Gateway as an endpoint, using previously created credentials and service.
 
 MinIO secrets will be used by both the PostgreSQL cluster and the MinIO instance.
-Therefore you must create them in the same namespace:
+Therefore, you must create them in the same namespace:
 
 ```sh
 kubectl create secret generic minio-creds \

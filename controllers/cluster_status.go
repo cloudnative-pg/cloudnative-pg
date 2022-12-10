@@ -168,6 +168,11 @@ func (r *ClusterReconciler) getManagedInstances(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (corev1.PodList, error) {
+	return GetManagedInstances(ctx, cluster, r.Client)
+}
+
+// GetManagedInstances gets all the instances associated with the given Cluster
+func GetManagedInstances(ctx context.Context, cluster *apiv1.Cluster, r client.Client) (corev1.PodList, error) {
 	var childPods corev1.PodList
 	if err := r.List(ctx, &childPods,
 		client.InNamespace(cluster.Namespace),
@@ -790,7 +795,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list
-func (r *ClusterReconciler) extractInstancesStatus(
+func (r *instanceStatusClient) extractInstancesStatus(
 	ctx context.Context,
 	activePods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
@@ -805,7 +810,7 @@ func (r *ClusterReconciler) extractInstancesStatus(
 
 // getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pod via HTTP, retrying
 // the request if some communication error is encountered
-func (r *ClusterReconciler) getReplicaStatusFromPodViaHTTP(
+func (r *instanceStatusClient) getReplicaStatusFromPodViaHTTP(
 	ctx context.Context,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
@@ -834,7 +839,7 @@ func (r *ClusterReconciler) getReplicaStatusFromPodViaHTTP(
 	// online upgrades. It is not intended to wait for recovering from any
 	// other remote failure.
 	_ = retry.OnError(StatusRequestRetry, isErrorRetryable, func() error {
-		result = rawInstanceStatusRequest(ctx, r.timeoutHTTPClient, pod)
+		result = rawInstanceStatusRequest(ctx, r.Client, pod)
 		return result.Error
 	})
 
