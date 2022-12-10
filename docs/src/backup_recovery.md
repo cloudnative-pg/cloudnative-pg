@@ -838,3 +838,25 @@ spec:
       historyTags:
         backupRetentionPolicy: "keep"
 ```
+
+## Backup Target Policy
+
+By defaults backups will run on the primary instance of a Cluster, this ensures
+the backup will contain the most recent data, but on the other hand might slow
+down the primary instance while the backup is running affecting its
+performance. In case you don't want to incur in such a decrease in performance,
+accepting to possibly have slightly outdated data, you can configure the
+ˆprefer-standbyˆ policy as shown in the following example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+  [...]
+spec:
+  backup:
+    target: "prefer-standby"
+```
+
+The `prefer-stadnby` policy will ensure backups are run on the most up-to-date
+available secondary instance, falling back to the primary instance if no other
+instance is available.
