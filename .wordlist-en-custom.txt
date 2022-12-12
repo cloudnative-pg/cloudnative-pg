@@ -8,6 +8,7 @@ AffinityConfiguration
 AntiAffinity
 AppArmor
 AppArmorProfile
+Armando
 AuthQuery
 AuthQuerySecret
 Autoscaler
