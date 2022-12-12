@@ -52,7 +52,9 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		databaseTwo       = "db2"
 	)
 
-	var namespace, sourceClusterName string
+	var namespace, sourceClusterName, sourceClusterHost,
+		sourceClusterSuperUser, sourceClusterPass,
+		targetClusterHost, targetClusterSuperUser, targetClusterPass string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -69,8 +71,6 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 
 	It("can import data from a cluster with a different major version", func() {
 		var err error
-		var sourceClusterHost, sourceClusterSuperUser, sourceClusterPass,
-			targetClusterHost, targetClusterSuperUser, targetClusterPass string
 		sourceDatabases := []string{databaseOne, databaseTwo}
 		sourceRoles := []string{databaseSuperUser, databaseUserTwo}
 
@@ -92,7 +92,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				databaseSuperUser)
 			sourceClusterHost, err = testsUtils.GetHostName(namespace, sourceClusterName, env)
 			Expect(err).ToNot(HaveOccurred())
-			sourceClusterSuperUser, sourceClusterPass, err := testsUtils.GetCredentials(
+			sourceClusterSuperUser, sourceClusterPass, err = testsUtils.GetCredentials(
 				sourceClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			_, _, err = testsUtils.RunQueryFromPod(
@@ -176,7 +176,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		By("verifying that the specified source databases were imported", func() {
 			targetClusterHost, err = testsUtils.GetHostName(namespace, targetClusterName, env)
 			Expect(err).ToNot(HaveOccurred())
-			targetClusterSuperUser, targetClusterPass, err := testsUtils.GetCredentials(
+			targetClusterSuperUser, targetClusterPass, err = testsUtils.GetCredentials(
 				targetClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			for _, database := range sourceDatabases {
