@@ -1725,7 +1725,7 @@ func prepareClusterForPITROnMinio(
 	const tableNamePitr = "for_restore"
 
 	By("backing up a cluster and verifying it exists on minio", func() {
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, env)
 		latestTar := minioPath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
@@ -1769,7 +1769,7 @@ func prepareClusterForPITROnAzureBlob(
 ) {
 	const tableNamePitr = "for_restore"
 	By("backing up a cluster and verifying it exists on Azure Blob", func() {
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, env)
 
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
@@ -1841,7 +1841,7 @@ func prepareClusterBackupOnAzurite(
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
-		testsUtils.ExecuteBackup(namespace, backupFile, env)
+		testsUtils.ExecuteBackup(namespace, backupFile, false, env)
 		// Verifying file called data.tar should be available on Azurite blob storage
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
@@ -1866,7 +1866,7 @@ func prepareClusterForPITROnAzurite(
 ) {
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, env)
 		// Verifying file called data.tar should be available on Azurite blob storage
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")

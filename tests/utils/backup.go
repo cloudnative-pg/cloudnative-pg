@@ -30,7 +30,7 @@ import (
 )
 
 // ExecuteBackup performs a backup and check the backup status
-func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment) {
+func ExecuteBackup(namespace string, backupFile string, onlyTargetStandbys bool, env *TestingEnvironment) {
 	backupName, err := env.GetResourceNameFromYAML(backupFile)
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() error {
@@ -62,7 +62,25 @@ func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment)
 		return backupStatus.BeginLSN, err
 	}, timeout).ShouldNot(BeEmpty())
 
+	cluster := apiv1.Cluster{}
+	Eventually(func() error {
+		return env.Client.Get(env.Ctx, types.NamespacedName{Name: backup.Spec.Cluster.Name, Namespace: namespace}, &cluster)
+	}, timeout).ShouldNot(HaveOccurred())
+
 	backupStatus := backup.GetStatus()
+
+	if cluster.Spec.Backup != nil {
+		switch cluster.Spec.Backup.Target {
+		case apiv1.BackupTargetPrimary:
+			Expect(backupStatus.InstanceID.PodName).To(BeEquivalentTo(cluster.Status.TargetPrimary))
+		case apiv1.BackupTargetStandby:
+			Expect(backupStatus.InstanceID.PodName).To(BeElementOf(cluster.Status.InstanceNames))
+			if onlyTargetStandbys {
+				Expect(backupStatus.InstanceID.PodName).NotTo(Equal(cluster.Status.TargetPrimary))
+			}
+		}
+	}
+
 	Expect(backupStatus.BeginWal).NotTo(BeEmpty())
 	Expect(backupStatus.EndLSN).NotTo(BeEmpty())
 	Expect(backupStatus.EndWal).NotTo(BeEmpty())
