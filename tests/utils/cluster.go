@@ -28,6 +28,8 @@ import (
 
 	"github.com/cheynewallace/tabby"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -259,11 +261,28 @@ func (env TestingEnvironment) GetCluster(namespace string, name string) (*apiv1.
 	return cluster, nil
 }
 
+// DoesNotHaveLabels filters the list/delete operation checking if the set of labels
+// do not exist without checking their values.
+type DoesNotHaveLabels []string
+
+// ApplyToList applies this configuration to the given list options.
+func (m DoesNotHaveLabels) ApplyToList(opts *client.ListOptions) {
+	sel := labels.NewSelector()
+	for _, label := range m {
+		r, err := labels.NewRequirement(label, selection.DoesNotExist, nil)
+		if err == nil {
+			sel = sel.Add(*r)
+		}
+	}
+	opts.LabelSelector = sel
+}
+
 // GetClusterPodList gathers the current list of pods for a cluster in a namespace
 func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName},
+		DoesNotHaveLabels{"job-name"},
 	)
 	return podList, err
 }
@@ -272,7 +291,8 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName, "role": "primary"},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "primary"},
+		DoesNotHaveLabels{"job-name"},
 	)
 	if err != nil {
 		return &corev1.Pod{}, err
@@ -288,7 +308,8 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 func (env TestingEnvironment) GetClusterReplicas(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName, "role": "replica"},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "replica"},
+		DoesNotHaveLabels{"job-name"},
 	)
 	if err != nil {
 		return podList, err

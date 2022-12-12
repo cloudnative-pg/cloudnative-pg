@@ -32,7 +32,7 @@ const (
 	// OldClusterLabelName label is applied to objects to link them to the owning
 	// cluster.
 	//
-	// Deprecated.
+	// Deprecated: please use ClusterLabelName instead
 	//
 	// TODO: delete as soon as possible. releases 1.16, 1.17 still
 	// have embedded logic relying on "postgresql" as the cluster label
@@ -41,7 +41,7 @@ const (
 	//
 	// IMPORTANT: Removing this is a breaking change and should be announced in Release Notes
 	// utils.ClusterLabelName should be used instead where possible.
-	OldClusterLabelName = "postgresql"
+	OldClusterLabelName = "postgresql" // Deprecated: use ClusterLabelName going forward
 
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
 	JobRoleLabelName = "cnpg.io/jobRole"
