@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup-minio
+  name: pg-backup-minio-standbys
 spec:
   instances: 2
 

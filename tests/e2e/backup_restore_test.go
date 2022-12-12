@@ -63,12 +63,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		// own namespace, they can share the configuration file
 
 		const (
-			backupFile                         = fixturesDir + "/backup/minio/backup-minio.yaml"
-			clusterWithMinioSampleFile         = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
-			clusterWithMinioStandbysSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-standbys.yaml.template"
-			customQueriesSampleFile            = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
-			minioCaSecName                     = "minio-server-ca-secret"
-			minioTLSSecName                    = "minio-server-tls-secret"
+			backupFile                 = fixturesDir + "/backup/minio/backup-minio.yaml"
+			clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
+			customQueriesSampleFile    = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+			minioCaSecName             = "minio-server-ca-secret"
+			minioTLSSecName            = "minio-server-tls-secret"
 		)
 		BeforeAll(func() {
 			isAKS, err := env.IsAKS()
@@ -227,47 +226,47 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		// be there
 		It("backs up and restore a cluster from standbys", func() {
 			const (
-				targetDBOne              = "test"
-				targetDBTwo              = "test1"
-				targetDBSecret           = "secret_test"
-				testTableName            = "test_table"
-				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml.template"
+				targetDBOne                        = "test"
+				targetDBTwo                        = "test1"
+				targetDBSecret                     = "secret_test"
+				testTableName                      = "test_table"
+				clusterWithMinioStandbysSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-standbys.yaml.template"
+				backupStandbysFile                 = fixturesDir + "/backup/minio/backup-minio.yaml"
 			)
 
-			restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioStandbysSampleFile)
+			targetClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioStandbysSampleFile)
 			Expect(err).ToNot(HaveOccurred())
+
+			// Create the cluster with custom serverName in the backup spec
+			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioStandbysSampleFile, env)
+
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBSecret, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBOne, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBTwo, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, tableName)
+			AssertCreateTestData(namespace, targetClusterName, tableName)
 
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
-			latestTar := minioPath(clusterName, "data.tar")
+			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
+			latestTar := minioPath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
 			By(fmt.Sprintf("backing up a cluster from standbys and verifying it exists on minio, backup path is %v",
 				latestTar), func() {
-				testUtils.ExecuteBackup(namespace, backupFile, true, env)
-				AssertBackupConditionInClusterStatus(namespace, clusterName)
+				testUtils.ExecuteBackup(namespace, backupStandbysFile, true, env)
+				AssertBackupConditionInClusterStatus(namespace, targetClusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster := &apiv1.Cluster{}
 					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						ctrlclient.ObjectKey{Namespace: namespace, Name: targetClusterName},
 						cluster)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
-
-			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
-
-			AssertMetricsData(namespace, restoredClusterName, curlPodName, targetDBOne, targetDBTwo, targetDBSecret)
 		})
 
 		// Test that the restore works if the source cluster has a custom
