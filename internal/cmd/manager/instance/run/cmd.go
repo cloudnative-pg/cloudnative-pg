@@ -22,10 +22,6 @@ import (
 	"os"
 	"path/filepath"
 
-
-	"github.com/cloudnative-pg/cloudnative-pg/internal/istio"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -39,11 +35,10 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
@@ -69,6 +64,12 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "run [flags]",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return istio.WaitKubernetesAPIServer(cmd.Context(), client.ObjectKey{
+				Name:      clusterName,
+				Namespace: namespace,
+			})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := log.IntoContext(cmd.Context(), log.GetLogger())
 			instance := postgres.NewInstance()
@@ -81,6 +82,9 @@ func NewCmd() *cobra.Command {
 			return retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
 				return runSubCommand(ctx, instance)
 			})
+		},
+		PostRunE: func(cmd *cobra.Command, args []string) error {
+			return istio.QuitIstioProxy()
 		},
 	}
 
@@ -102,25 +106,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	setupLog.Info("Starting CloudNativePG Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
-
-	apiClient, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		log.Error(err, "Error creating Kubernetes client")
-		return err
-	}
-
-	if err := istio.WaitKubernetesAPIServer(
-		ctx,
-		apiClient,
-		client.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
-	); err != nil {
-		return err
-	}
-	defer func() {
-		if err := istio.QuitIstioProxy(); err != nil {
-			log.Error(err, "Error while asking istio-proxy to finish")
-		}
-	}()
 
 	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
 		Scheme:    scheme,

@@ -22,7 +22,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -37,6 +39,12 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "restore [flags]",
 		SilenceErrors: true,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return istio.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+				Name:      clusterName,
+				Namespace: namespace,
+			})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
@@ -47,6 +55,9 @@ func NewCmd() *cobra.Command {
 			}
 
 			return restoreSubCommand(ctx, info)
+		},
+		PostRunE: func(cmd *cobra.Command, args []string) error {
+			return istio.QuitIstioProxy()
 		},
 	}
 

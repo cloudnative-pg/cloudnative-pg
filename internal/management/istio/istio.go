@@ -19,6 +19,7 @@ package istio
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"syscall"
@@ -28,24 +29,37 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v12 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
+// readinessCheckRetry is used to wait until the API server is reachable
+var readinessCheckRetry = wait.Backoff{
+	Steps:    5,
+	Duration: 10 * time.Millisecond,
+	Factor:   5.0,
+	Jitter:   0.1,
+}
+
 // WaitKubernetesAPIServer will return error in case Kubernetes API
 // is not reachable
-func WaitKubernetesAPIServer(ctx context.Context, client client.Client, clusterObjectKey client.ObjectKey) error {
-	var cluster v12.Cluster
-	readinessCheckRetry := wait.Backoff{
-		Steps:    5,
-		Duration: 10 * time.Millisecond,
-		Factor:   5.0,
-		Jitter:   0.1,
-	}
-	if err := retry.OnError(readinessCheckRetry, func(err error) bool { return true }, func() (err error) {
-		return client.Get(ctx, clusterObjectKey, &cluster)
-	}); err != nil {
+func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.ObjectKey) error {
+	var cluster apiv1.Cluster
+
+	logger := log.GetLogger()
+
+	cli, err := management.NewControllerRuntimeClient()
+	if err != nil {
+		logger.Error(err, "error while creating a standalone Kubernetes client")
 		return err
+	}
+
+	if err := retry.OnError(readinessCheckRetry, func(err error) bool { return true }, func() (err error) {
+		return cli.Get(ctx, clusterObjectKey, &cluster)
+	}); err != nil {
+		logger.Error(err, "Waiting for the API server to be reachable")
+		return fmt.Errorf("error waiting for the API server to be reachable: %w", err)
 	}
 
 	return nil

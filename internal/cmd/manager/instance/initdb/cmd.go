@@ -25,8 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/istio"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -49,6 +48,12 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "init [options]",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return istio.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+				Name:      clusterName,
+				Namespace: namespace,
+			})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
@@ -96,6 +101,9 @@ func NewCmd() *cobra.Command {
 
 			return initSubCommand(ctx, info)
 		},
+		PostRunE: func(cmd *cobra.Command, args []string) error {
+			return istio.QuitIstioProxy()
+		},
 	}
 
 	cmd.Flags().StringVar(&appDBName, "app-db-name", "app",
@@ -127,25 +135,7 @@ func NewCmd() *cobra.Command {
 }
 
 func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
-	apiClient, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		log.Error(err, "Error creating Kubernetes client")
-		return err
-	}
-	if err := istio.WaitKubernetesAPIServer(
-		ctx,
-		apiClient,
-		ctrl.ObjectKey{Namespace: info.Namespace, Name: info.ClusterName},
-	); err != nil {
-		return err
-	}
-	defer func() {
-		if err := istio.QuitIstioProxy(); err != nil {
-			log.Error(err, "Error while asking istio-proxy to finish")
-		}
-	}()
-
-	err = info.VerifyPGData()
+	err := info.VerifyPGData()
 	if err != nil {
 		return err
 	}
