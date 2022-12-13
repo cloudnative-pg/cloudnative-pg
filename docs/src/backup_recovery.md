@@ -841,7 +841,7 @@ spec:
 
 ## Backup Target Policy
 
-By defaults backups will run on the primary instance of a Cluster, this ensures
+By default, backups will run on the primary instance of a Cluster, this ensures
 the backup will contain the most recent data, but on the other hand might slow
 down the primary instance while the backup is running affecting its
 performance. In case you don't want to incur in such a decrease in performance,
