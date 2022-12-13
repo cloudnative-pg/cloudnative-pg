@@ -503,7 +503,7 @@ func AssertLargeObjectValue(namespace, podName string, oid int, data string) {
 // cluster have a wal receiver running.
 func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
 	Eventually(func() error {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := env.GetClusterInstanceList(namespace, clusterName)
 		if err != nil {
 			return err
 		}
