@@ -1,6 +1,6 @@
 # Benchmarking
 
-The kubectl plugin provides an easy way for benchmarking a PostgreSQL deployment in Kubernetes using CloudNativePG.
+The CNPG kubectl plugin provides an easy way for benchmarking a PostgreSQL deployment in Kubernetes using CloudNativePG.
 
 Benchmarking is focused on two aspects:
 
@@ -13,8 +13,8 @@ Benchmarking is focused on two aspects:
 
 ### pgbench
 
-The kubectl plugin command `pgbench` executes a user-defined pgbench job on an existing Postgres Cluster.
-The command also accepts the `--dry-run` command, this will output the job manifest without applying it.
+The kubectl CNPG plugin command `pgbench` executes a user-defined pgbench job on an existing Postgres Cluster.
+The command also accepts the `--dry-run` flag, this will output the job manifest without applying it.
 
 Example usage:
 ```shell
@@ -25,7 +25,7 @@ kubectl cnpg pgbench \
   -- --time 30 --client 1 --jobs 1
 ```
 
-Example of how to run it against a `Cluster` named `cluster-example` in the `pgbench` namespace:
+Example of how to run `pgbench` against a `Cluster` named `cluster-example` in the `pgbench` namespace:
 ```shell
 kubectl cnpg pgbench \
    -n pgbench cluster-example \
@@ -34,7 +34,7 @@ kubectl cnpg pgbench \
 
 ```
 
-Example of how to run it on an existing database by using the `--db-name` flag and
+Example of how to run `pgbench` on an existing database by using the `--db-name` flag and
 the `pgbench` namespace:
 ```shell
 kubectl cnpg pgbench \
@@ -59,12 +59,12 @@ kubectl logs job/pgbench-job -n <namespace>
 
 ### fio
 
-The kubectl plugin command `fio` executes a fio job with default values and read operation using deployment on StorageClass.
-The command also accepts the `--dry-run` command, this will output the fio manifest without applying it.
+The kubectl CNPG plugin command `fio` executes a fio job with default values and read operations.
+The command also accepts a `--dry-run` flag, this will output the fio manifest without applying it.
 !!! Note
-    The kubectl plugin command `fio` will create a deployment with predefined fio job values using configmap.
-    If you want to provide custom job values.We recommend generating manifest using `--dry-run` 
-    and provide your custom job values in configmap.
+    The kubectl plugin command `fio` will create a deployment with predefined fio job values using a ConfigMap.
+    If you want to provide custom job values, we recommend generating a manifest using the `--dry-run` flag
+    and providing your custom job values in the generated ConfigMap.
 
 Example usage:
 
@@ -80,7 +80,8 @@ kubectl cnpg fio <fio-name> \
   --pvcSize <size>
 ```
 
-Example of how to run it against a `StorageClass` named `standard` and `pvcSize: 2Gi` in the `fio` namespace:
+Example of how to run the `fio` command against a `StorageClass` named `standard` and `pvcSize: 2Gi` in the `fio` 
+namespace:
 ```shell
 kubectl cnpg fio fio-job \
   -n fio  \
@@ -101,14 +102,14 @@ After running kubectl plugin command `fio`.
 
 It will:
 
-1. Create a PVC;
-1. Create a ConfigMap representing the configuration of a fio job;
+1. Create a PVC
+1. Create a ConfigMap representing the configuration of a fio job
 1. Create a fio deployment composed by a single Pod, which will run fio on
    the PVC, create graphs after completing the benchmark and start serving the
    generated files with a webserver. We use the
    [`fio-tools`](https://github.com/wallnerryan/fio-tools`) image for that.
 
-The pod created by the deployment will be ready when it starts serving the
+The Pod created by the deployment will be ready when it starts serving the
 results. You can forward the port of the pod created by the deployment
 
 ```
@@ -119,10 +120,10 @@ and then use a browser and connect to `http://localhost:8000/` to get the data.
 
 The default 8k block size has been chosen to emulate a PostgreSQL workload.
 Disks that cap the amount of available IOPS can show very different throughput
-values changing this parameter.
+values when changing this parameter.
 
-Below is an example of diagram of sequential writes on a local disk
-mounted on a  dedicated Kubernetes node
+Below is an example diagram of sequential writes on a local disk
+mounted on a dedicated Kubernetes node
 (1 hour benchmark):
 
 ![Sequential writes bandwidth](images/write_bw.1-2Draw.png)

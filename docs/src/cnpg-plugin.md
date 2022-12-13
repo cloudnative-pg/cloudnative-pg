@@ -673,7 +673,7 @@ Pgbench can be ran on an existing PostgreSQL cluster with following command:
 kubectl cnpg pgbench <cluster-name> -- --time 30 --client 1 --jobs 1
 ```
 
-Refer to the [Benchmarking section](benchmarking.md#pgbench) for more details.
+Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more details.
 
 ### Benchmarking the storage with fio
 
@@ -683,5 +683,5 @@ fio can be run on an existing storage class with following command:
 kubectl cnpg fio <fio-job-name> -n <namespace>
 ```
 
-Refer to the [Benchmarking section](benchmarking.md#fio) for more details.
+Refer to the [Benchmarking fio section](benchmarking.md#fio) for more details.
 

@@ -19,10 +19,8 @@ package fio
 import (
 	"context"
 	"fmt"
-	"os"
-
-	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 // NewCmd initializes the fio command
@@ -45,21 +43,25 @@ func NewCmd() *cobra.Command {
 		},
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if !dryRun {
-				prompt := promptui.Prompt{
-					Label: "Running this directly to the cluster may produce a disruption in the service, " +
-						"are you sure you want to proceed?",
-					IsConfirm: true,
-				}
-				_, err := prompt.Run()
+				fmt.Println("Running this directly to the cluster may produce a disruption in the service, " +
+					"are you sure you want to proceed? (y/n)")
+				var input string
+				_, err := fmt.Scanln(&input)
 				if err != nil {
 					os.Exit(1)
 				}
+				if input != "y" {
+					os.Exit(0)
+				}
+
 			}
 		},
 		PostRun: func(cmd *cobra.Command, args []string) {
 			if !dryRun {
 				fmt.Printf("To remove this test you need to delete the Deployment, ConfigMap "+
-					"and PVC the three of them with the name %v\n", deploymentName)
+					"and PVC with the name %v\n\nThe most simple way to do this is to re-run the command that was run"+
+					"to generate the deployment with the --dry-run flag and pipe that output to kubectl delete, e.g.:\n\n"+
+					"kubectl cnpg fio <fio-job-name> --dry-run | kubectl delete -f -", deploymentName)
 			}
 		},
 	}
