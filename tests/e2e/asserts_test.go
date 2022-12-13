@@ -2572,3 +2572,22 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 	})
 	AssertClusterIsReady(namespace, clusterName, 300, env)
 }
+
+// AssertPVCCount matches count and pvc List.
+func AssertPVCCount(namespace, clusterName string, pvcCount int) {
+	By("verify cluster healthy pvc list", func() {
+		Eventually(func(g Gomega) {
+			cluster, _ := env.GetCluster(namespace, clusterName)
+			g.Expect(cluster.Status.PVCCount).To(BeEquivalentTo(pvcCount))
+
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			err := env.Client.List(
+				env.Ctx, pvcList, ctrlclient.MatchingLabels{utils.ClusterLabelName: clusterName},
+				ctrlclient.InNamespace(namespace),
+			)
+			g.Expect(err).To(BeNil())
+
+			g.Expect(cluster.Status.PVCCount).To(BeEquivalentTo(len(pvcList.Items)))
+		}, 60, 4).Should(Succeed())
+	})
+}

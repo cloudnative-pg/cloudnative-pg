@@ -33,6 +33,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 		sampleFileWithReplicationSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
 		clusterName                       = "postgresql-storage-class"
 		level                             = tests.Lowest
+		expectedPvcCount                  = 6
 	)
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -74,6 +75,10 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
 			AssertClusterReplicationSlots(clusterName, namespace)
+
+			By("verify pvc pgWal and pgData are deleted after scale down", func() {
+				AssertPVCCount(namespace, clusterName, expectedPvcCount)
+			})
 		})
 	})
 
@@ -107,6 +112,9 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 60
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
+			})
+			By("verify pvc pgWal and pgData are deleted after scale down", func() {
+				AssertPVCCount(namespace, clusterName, expectedPvcCount)
 			})
 		})
 	})

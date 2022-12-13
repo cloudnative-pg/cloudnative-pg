@@ -201,6 +201,57 @@ func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
 	return cluster
 }
 
+func newFakeCNPGClusterWithPGWal(namespace string) *apiv1.Cluster {
+	const instances int = 3
+	name := "cluster-" + rand.String(10)
+	caServer := fmt.Sprintf("%s-ca-server", name)
+	caClient := fmt.Sprintf("%s-ca-client", name)
+
+	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: apiv1.ClusterSpec{
+			Instances: instances,
+			Certificates: &apiv1.CertificatesConfiguration{
+				ServerCASecret: caServer,
+				ClientCASecret: caClient,
+			},
+			StorageConfiguration: apiv1.StorageConfiguration{
+				Size: "1G",
+			},
+			WalStorage: &apiv1.StorageConfiguration{
+				Size: "1G",
+			},
+		},
+		Status: apiv1.ClusterStatus{
+			Instances:                instances,
+			SecretsResourceVersion:   apiv1.SecretsResourceVersion{},
+			ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{},
+			Certificates: apiv1.CertificatesStatus{
+				CertificatesConfiguration: apiv1.CertificatesConfiguration{
+					ServerCASecret: caServer,
+					ClientCASecret: caClient,
+				},
+			},
+		},
+	}
+
+	cluster.SetDefaults()
+
+	err := k8sClient.Create(context.Background(), cluster)
+	Expect(err).To(BeNil())
+
+	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
+	cluster.TypeMeta = metav1.TypeMeta{
+		Kind:       apiv1.ClusterKind,
+		APIVersion: apiv1.GroupVersion.String(),
+	}
+
+	return cluster
+}
+
 func newFakeNamespace() string {
 	name := rand.String(10)
 
@@ -293,6 +344,14 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 		err = c.Create(context.Background(), pvc)
 		Expect(err).To(BeNil())
 		pvcs = append(pvcs, *pvc)
+		if cluster.ShouldCreateWalArchiveVolume() {
+			pvcWal, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, *cluster, idx, utils.PVCRolePgWal)
+			Expect(err).To(BeNil())
+			SetClusterOwnerAnnotationsAndLabels(&pvcWal.ObjectMeta, cluster)
+			err = c.Create(context.Background(), pvcWal)
+			Expect(err).To(BeNil())
+			pvcs = append(pvcs, *pvcWal)
+		}
 	}
 	return pvcs
 }
