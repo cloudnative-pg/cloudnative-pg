@@ -41,11 +41,11 @@ following plugins/utilities to be available in your system:
 
 ## Emergency backup
 
-In some emergency situations, you might need to take an extraordinary logical
+In some emergency situations, you might need to take an emergency logical
 backup of the main `app` database.
 
 !!! Important
-    The instructions you find below must be executed only on emergency situations
+    The instructions you find below must be executed only in emergency situations
     and the temporary backup files kept under the data protection policies
     that are effective in your organization. The dump file is indeed stored
     in the client machine that runs the `kubectl` command, so make sure that
@@ -90,7 +90,7 @@ kubectl exec -i new-cluster-example-1 -c postgres \
     we advise that you do these critical operations under the guidance of
     a professional support company.
 
-The above steps might be integrated in the `cnpg` plugin at some stage in the future.
+The above steps might be integrated into the `cnpg` plugin at some stage in the future.
 
 ### Logs
 
