@@ -302,7 +302,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser to build kubectl-cnpg plugin
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         if: |
           github.event_name == 'schedule' || needs.evaluate_options.outputs.build_plugin == 'true'
         with:
@@ -328,7 +328,7 @@ jobs:
           SLACK_MESSAGE: Building plugin `kubectl-cnpg` failed!
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser
           version: latest
