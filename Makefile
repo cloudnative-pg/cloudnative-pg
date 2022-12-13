@@ -35,7 +35,7 @@ DIST_PATH := $(shell pwd)/dist
 OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
 
 BUILD_IMAGE ?= true
-POSTGRES_IMAGE_NAME ?= ghcr.io/cloudnative-pg/postgresql:14
+POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
 KUSTOMIZE_VERSION ?= v4.5.2
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.25.0
