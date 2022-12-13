@@ -50,15 +50,16 @@ environment variable:
 In addition, check that the following packages are installed in your system:
 
 - `coreutils`,
+- `diffutils`,
 - `findutils`,
 - `git`,
-- `util-linux`,
-- `sed`,
-- `tar`,
 - `gpg`,
 - `jq`,
 - `make`,
 - `pandoc`,
+- `sed`,
+- `tar`,
+- `util-linux`,
 - `zlib1g`.
 
 The previous list assumes that you are using a Debian-based distribution. For
@@ -97,6 +98,7 @@ You can now proceed with installing the remaining required packages:
 brew install jq \
   make \
   coreutils \
+  diffutils \
   findutils \
   git \
   gpg \
