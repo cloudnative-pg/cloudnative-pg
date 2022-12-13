@@ -41,6 +41,7 @@ KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.25.0
 CONTROLLER_TOOLS_VERSION ?= v0.9.2
 GORELEASER_VERSION ?= v1.10.3
+ARCH ?= amd64
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -106,7 +107,7 @@ run: generate fmt vet manifests ## Run against the configured Kubernetes cluster
 	go run ./cmd/manager
 
 docker-build: go-releaser ## Build the docker image.
-	GOOS=linux GOARCH=amd64 DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
+	GOOS=linux GOARCH=${ARCH} DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
 	  $(GO_RELEASER) build --skip-validate --rm-dist --single-target
 	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
 

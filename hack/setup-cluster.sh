@@ -41,7 +41,8 @@ trap 'rm -fr ${TEMP_DIR}' EXIT
 
 # Operating System and Architecture
 OS=$(uname | tr '[:upper:]' '[:lower:]')
-case $(uname -m) in
+ARCH=$(uname -m)
+case $ARCH in
   x86_64) ARCH="amd64" ;;
   aarch64) ARCH="arm64" ;;
 esac
@@ -316,7 +317,7 @@ deploy_fluentd() {
   # Run the tests and destroy the cluster
   # Do not fail out if the tests fail. We want the logs anyway.
   ITER=0
-  NODE=$(kubectl get nodes --no-headers | wc -l)
+  NODE=$(kubectl get nodes --no-headers | wc -l | tr -d " ")
   while true; do
     if [[ $ITER -ge 300 ]]; then
       echo "Time out waiting for FluentD readiness"
@@ -485,7 +486,7 @@ load() {
   echo "${bright}Building operator from current worktree${reset}"
 
   CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
-  make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" docker-build
+  make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" ARCH="${ARCH}" docker-build
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 
