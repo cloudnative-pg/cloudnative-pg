@@ -23,6 +23,9 @@ Make sure you know:
   class and benchmarks you have done before going into production.
 - which relevant Kubernetes applications you are using in your cluster (i.e.
   Prometheus, Grafana, Istio, Certmanager, ...)
+- the situation of continuous backup, in particular if it's in place and working
+  correctly: in case it is not, make sure you take an [emergency backup](#emergency-backup)
+  before performing any potential disrupting operation
 
 ### Useful utilities
 
@@ -35,6 +38,59 @@ following plugins/utilities to be available in your system:
   for lines containing a match to a specified pattern. It is already available in most \*nix distros.
   If you are on Windows OS, you can use [`findstr`](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/findstr) as an alternative to `grep` or directly use [`wsl`](https://docs.microsoft.com/en-us/windows/wsl/)
   and install your preferred *nix distro and use the tools mentioned above.
+
+## Emergency backup
+
+In some emergency situations, you might need to take an emergency logical
+backup of the main `app` database.
+
+!!! Important
+    The instructions you find below must be executed only in emergency situations
+    and the temporary backup files kept under the data protection policies
+    that are effective in your organization. The dump file is indeed stored
+    in the client machine that runs the `kubectl` command, so make sure that
+    all protections are in place and you have enough space to store the
+    backup file.
+
+The following example shows how to take a logical backup of the `app` database
+in the `cluster-example` Postgres cluster, from the `cluster-example-1` pod:
+
+```sh
+kubectl exec cluster-example-1 -c postgres \
+  -- pg_dump -Fc -d app > app.dump
+```
+
+!!! Note
+    You can easily adapt the above command to backup your cluster, by providing
+    the names of the objects you have used in your environment.
+
+The above command issues a `pg_dump` command in custom format, which is the most
+versatile way to take [logical backups in PostgreSQL](https://www.postgresql.org/docs/current/app-pgdump.html).
+
+The next step is to restore the database. We assume that you are operating
+on a new PostgreSQL cluster that's been just initialized (so the `app` database
+is empty).
+
+The following example shows how to restore the above logical backup in the
+`app` database of the `new-cluster-example` Postgres cluster, by connecting to
+the primary (`new-cluster-example-1` pod):
+
+```sh
+kubectl exec -i new-cluster-example-1 -c postgres \
+  -- pg_restore --no-owner --role=app -d app --verbose < app.dump
+```
+
+!!! Important
+    The example in this section assumes that you have no other global objects
+    (databases and roles) to dump and restore, as per our recommendation. In case
+    you have multiple roles, make sure you have taken a backup using `pg_dumpall -g`
+    and you manually restore them in the new cluster. In case you have multiple
+    databases, you need to repeat the above operation one database at a time, making
+    sure you assign the right ownership. If you are not familiar with PostgreSQL,
+    we advise that you do these critical operations under the guidance of
+    a professional support company.
+
+The above steps might be integrated into the `cnpg` plugin at some stage in the future.
 
 ### Logs
 
