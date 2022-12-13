@@ -220,6 +220,11 @@ func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguratio
 			affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 			config.AdditionalPodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
 	}
+
+	if config.NodeAffinity != nil {
+		affinity.NodeAffinity = config.NodeAffinity
+	}
+
 	return affinity
 }
 
