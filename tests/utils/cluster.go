@@ -263,8 +263,10 @@ func (env TestingEnvironment) GetCluster(namespace string, name string) (*apiv1.
 func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName},
-		client.HasLabels{"role"}, // this ensures we are getting instance pods only
+		client.MatchingLabels{
+			utils.ClusterLabelName: clusterName,
+			utils.PodRoleLabelName: "instance", // this ensures we are getting instance pods only
+		},
 	)
 	return podList, err
 }

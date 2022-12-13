@@ -109,14 +109,6 @@ func LabelClusterName(object *metav1.ObjectMeta, name string) {
 	}
 
 	object.Labels[ClusterLabelName] = name
-
-	// TODO: delete as soon as possible. releases 1.16, 1.17 still
-	// have embedded logic relying on "postgresql" as the cluster label
-	// in controllers/cluster_controller.go mapNodeToClusters() at minimum.
-	// Release 1.18 does not have that logic
-	//
-	// IMPORTANT: Removing this is a breaking change and should be announced in Release Notes
-	object.Labels[OldClusterLabelName] = name
 }
 
 // LabelJobRole labels a job with its role
