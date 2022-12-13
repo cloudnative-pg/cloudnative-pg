@@ -28,10 +28,11 @@ import (
 
 var _ = Describe("Cluster scale up and down", func() {
 	const (
-		namespace   = "cluster-scale-e2e-storage-class"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		clusterName = "postgresql-storage-class"
-		level       = tests.Lowest
+		namespace        = "cluster-scale-e2e-storage-class"
+		sampleFile       = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		clusterName      = "postgresql-storage-class"
+		level            = tests.Lowest
+		expectedPvcCount = 6
 	)
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -71,6 +72,10 @@ var _ = Describe("Cluster scale up and down", func() {
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 60
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
+		})
+
+		By("verify pvc pgWal and pgData are deleted after scale down", func() {
+			AssertPVCCount(namespace, clusterName, expectedPvcCount)
 		})
 	})
 })
