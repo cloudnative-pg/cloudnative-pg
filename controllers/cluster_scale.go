@@ -66,7 +66,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 
 	contextLogger.Info("Too many nodes for cluster, deleting an instance",
 		"pod", sacrificialInstance.Name)
-
 	if err := r.Delete(ctx, sacrificialInstance); err != nil {
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
@@ -82,17 +81,16 @@ func (r *ClusterReconciler) scaleDownCluster(
 		},
 	}
 
-	contextLogger.Info("Deleting pvc Data", "pvcData", pvc.Name)
-	err := r.Delete(ctx, &pvc)
-	if err != nil {
+	contextLogger.Info("Deleting PGDATA PVC", "pvc", pvc.Name)
+	if err := r.Delete(ctx, &pvc); err != nil {
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialInstance.Name, err)
+			return fmt.Errorf("scaling down node (pgdata pvc) %v: %w", sacrificialInstance.Name, err)
 		}
 	}
 
 	if cluster.ShouldCreateWalArchiveVolume() {
-		// Let's drop the PVC Wal too
+		// Let's drop the WAL PVC too
 		pvcWalName := specs.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
 		pvcWal := v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -100,12 +98,11 @@ func (r *ClusterReconciler) scaleDownCluster(
 				Namespace: sacrificialInstance.Namespace,
 			},
 		}
-		contextLogger.Info("Deleting pvc Wal", "pvcWal", pvcWal.Name)
-		err := r.Delete(ctx, &pvcWal)
-		if err != nil {
+		contextLogger.Info("Deleting WAL PVC", "pvc", pvcWal.Name)
+		if err := r.Delete(ctx, &pvcWal); err != nil {
 			// Ignore if NotFound, otherwise report the error
 			if !apierrs.IsNotFound(err) {
-				return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialInstance.Name, err)
+				return fmt.Errorf("scaling down node (wal pvc) %v: %w", sacrificialInstance.Name, err)
 			}
 		}
 	}
@@ -116,17 +113,16 @@ func (r *ClusterReconciler) scaleDownCluster(
 			// This job was working against the PVC of this Pod,
 			// let's remove it
 			foreground := metav1.DeletePropagationForeground
-			err = r.Delete(
+			if err := r.Delete(
 				ctx,
 				&resources.jobs.Items[idx],
 				&client.DeleteOptions{
 					PropagationPolicy: &foreground,
 				},
-			)
-			if err != nil {
+			); err != nil {
 				// Ignore if NotFound, otherwise report the error
 				if !apierrs.IsNotFound(err) {
-					return fmt.Errorf("scaling down node (job) %v: %v", sacrificialInstance.Name, err)
+					return fmt.Errorf("scaling down node (job) %v: %w", sacrificialInstance.Name, err)
 				}
 			}
 		}

@@ -175,7 +175,6 @@ func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
 			},
 		},
 		Status: apiv1.ClusterStatus{
-			HealthyPVC:               []string{},
 			Instances:                instances,
 			SecretsResourceVersion:   apiv1.SecretsResourceVersion{},
 			ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{},
@@ -341,6 +340,7 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 		pvc, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, *cluster, idx, utils.PVCRolePgData)
 		Expect(err).To(BeNil())
 		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
+
 		err = c.Create(context.Background(), pvc)
 		Expect(err).To(BeNil())
 		pvcs = append(pvcs, *pvc)

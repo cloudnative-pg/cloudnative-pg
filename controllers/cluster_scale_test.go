@@ -23,14 +23,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("cluster_scale unit tests", func() {
-	Context("make sure scale down works correctly", func() {
-		It("pvc role with pgData", func() {
+var _ = Describe("scale down", func() {
+	When("there's no separate WAL storage", func() {
+		It("delete the PGDATA PVC", func() {
 			ctx := context.Background()
 			namespace := newFakeNamespace()
 			cluster := newFakeCNPGCluster(namespace)
@@ -41,31 +45,39 @@ var _ = Describe("cluster_scale unit tests", func() {
 				instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
 			}
 
-			sacrificialInstanceBefore := getSacrificialInstance(resources.instances.Items)
-			err := k8sClient.Get(
+			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
+			Expect(isResourceExisting(
 				ctx,
-				types.NamespacedName{Name: sacrificialInstanceBefore.Name, Namespace: cluster.Namespace},
 				&corev1.Pod{},
-			)
-			Expect(err).To(BeNil())
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+			)).To(BeTrue())
+			Expect(isResourceExisting(
+				ctx,
+				&corev1.PersistentVolumeClaim{},
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+			)).To(BeTrue())
 
-			err = clusterReconciler.scaleDownCluster(
+			Expect(clusterReconciler.scaleDownCluster(
 				ctx,
 				cluster,
 				resources,
-			)
-			Expect(err).To(BeNil())
+			)).To(Succeed())
 
-			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
-			err = k8sClient.Get(
+			Expect(isResourceExisting(
 				ctx,
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
 				&corev1.Pod{},
-			)
-			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+			)).To(BeFalse())
+			Expect(isResourceExisting(
+				ctx,
+				&corev1.PersistentVolumeClaim{},
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+			)).To(BeFalse())
 		})
+	})
 
-		It("pvc role with pgData and pgWal", func() {
+	When("WAL storage is separate", func() {
+		It("delete the PGDATA and WAL PVC", func() {
 			ctx := context.Background()
 			namespace := newFakeNamespace()
 			cluster := newFakeCNPGClusterWithPGWal(namespace)
@@ -76,29 +88,60 @@ var _ = Describe("cluster_scale unit tests", func() {
 				instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
 			}
 
-			sacrificialInstanceBefore := getSacrificialInstance(resources.instances.Items)
-			err := k8sClient.Get(
+			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
+			pvcWalName := specs.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
+			Expect(isResourceExisting(
 				ctx,
-				types.NamespacedName{Name: sacrificialInstanceBefore.Name, Namespace: cluster.Namespace},
 				&corev1.Pod{},
-			)
-			Expect(err).To(BeNil())
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+			)).To(BeTrue())
+			Expect(isResourceExisting(
+				ctx,
+				&corev1.PersistentVolumeClaim{},
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+			)).To(BeTrue())
+			Expect(isResourceExisting(
+				ctx,
+				&corev1.PersistentVolumeClaim{},
+				types.NamespacedName{Name: pvcWalName, Namespace: cluster.Namespace},
+			)).To(BeTrue())
 
-			err = clusterReconciler.scaleDownCluster(
+			Expect(clusterReconciler.scaleDownCluster(
 				ctx,
 				cluster,
 				resources,
-			)
-			Expect(err).To(BeNil())
+			)).To(Succeed())
 
-			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
-			podL := corev1.Pod{}
-			err = k8sClient.Get(
+			Expect(isResourceExisting(
 				ctx,
+				&corev1.Pod{},
 				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
-				&podL,
-			)
-			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			)).To(BeFalse())
+			Expect(isResourceExisting(
+				ctx,
+				&corev1.PersistentVolumeClaim{},
+				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+			)).To(BeFalse())
+			Expect(isResourceExisting(
+				ctx,
+				&corev1.PersistentVolumeClaim{},
+				types.NamespacedName{Name: pvcWalName, Namespace: cluster.Namespace},
+			)).To(BeFalse())
 		})
 	})
 })
+
+// isResourceExisting check is a certain resource exists in the Kubernetes space and has not been deleted
+func isResourceExisting(ctx context.Context, store ctrl.Object, key ctrl.ObjectKey) (bool, error) {
+	err := k8sClient.Get(ctx, key, store)
+	if err != nil && apierrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if store.GetDeletionTimestamp() != nil {
+		return false, nil
+	}
+	return true, nil
+}

@@ -77,7 +77,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			AssertClusterReplicationSlots(clusterName, namespace)
 
 			By("verify pvc pgWal and pgData are deleted after scale down", func() {
-				AssertPvcDetails(namespace, clusterName, expectedPvcCount)
+				AssertPVCCount(namespace, clusterName, expectedPvcCount)
 			})
 		})
 	})
@@ -114,7 +114,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
 			By("verify pvc pgWal and pgData are deleted after scale down", func() {
-				AssertPvcDetails(namespace, clusterName, expectedPvcCount)
+				AssertPVCCount(namespace, clusterName, expectedPvcCount)
 			})
 		})
 	})

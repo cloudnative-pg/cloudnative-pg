@@ -2573,25 +2573,21 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 	AssertClusterIsReady(namespace, clusterName, 300, env)
 }
 
-// AssertPvcDetails matches count and pvc List.
-func AssertPvcDetails(namespace, clusterName string, pvcCount int) {
+// AssertPVCCount matches count and pvc List.
+func AssertPVCCount(namespace, clusterName string, pvcCount int) {
 	By("verify cluster healthy pvc list", func() {
 		Eventually(func(g Gomega) {
-			clusterPvcList, _ := env.GetCluster(namespace, clusterName)
-			var pvcListClient []string
-			g.Expect(clusterPvcList.Status.PVCCount).To(BeNumerically("==", pvcCount))
+			cluster, _ := env.GetCluster(namespace, clusterName)
+			g.Expect(cluster.Status.PVCCount).To(BeEquivalentTo(pvcCount))
+
 			pvcList := &corev1.PersistentVolumeClaimList{}
 			err := env.Client.List(
 				env.Ctx, pvcList, ctrlclient.MatchingLabels{utils.ClusterLabelName: clusterName},
 				ctrlclient.InNamespace(namespace),
 			)
-			if err != nil {
-				return
-			}
-			for _, items := range pvcList.Items {
-				pvcListClient = append(pvcListClient, strings.Trim(items.Name, " "))
-			}
-			g.Expect(clusterPvcList.Status.PVCCount).To(BeEquivalentTo(len(pvcListClient)))
+			g.Expect(err).To(BeNil())
+
+			g.Expect(cluster.Status.PVCCount).To(BeEquivalentTo(len(pvcList.Items)))
 		}, 60, 4).Should(Succeed())
 	})
 }
