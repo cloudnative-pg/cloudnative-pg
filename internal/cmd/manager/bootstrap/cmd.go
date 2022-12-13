@@ -44,7 +44,7 @@ func NewCmd() *cobra.Command {
 				panic(err)
 			}
 
-			log.Info("Setting 0755 permissions")
+			log.Info("Setting 0750 permissions")
 			err = os.Chmod(dest, 0o750) // #nosec
 			if err != nil {
 				panic(err)
