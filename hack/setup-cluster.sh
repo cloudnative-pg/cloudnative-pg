@@ -486,7 +486,7 @@ load() {
   echo "${bright}Building operator from current worktree${reset}"
 
   CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
-  make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" ARCH=${ARCH} docker-build
+  make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" ARCH="${ARCH}" docker-build
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 
