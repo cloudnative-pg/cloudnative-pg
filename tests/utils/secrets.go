@@ -62,19 +62,25 @@ func CreateSecretCA(
 	return cluster, caPair, nil
 }
 
-// GetPassword generates password and return it as per user prefix
-func GetPassword(clusterName, namespace, userPrefix string, env *TestingEnvironment) (string, error) {
-	// Get the superuser password from the user prefix secret
-	superuserSecretName := clusterName + "-" + userPrefix
-	superuserSecret := &corev1.Secret{}
-	superuserSecretNamespacedName := types.NamespacedName{
+// GetCredentials retrieve username and password from secrets and return it as per user suffix
+func GetCredentials(
+	clusterName, namespace string,
+	secretSuffix string,
+	env *TestingEnvironment) (
+	string, string, error,
+) {
+	// Get the password as per user suffix in secret
+	secretName := clusterName + secretSuffix
+	secret := &corev1.Secret{}
+	secretNamespacedName := types.NamespacedName{
 		Namespace: namespace,
-		Name:      superuserSecretName,
+		Name:      secretName,
 	}
-	err := env.Client.Get(env.Ctx, superuserSecretNamespacedName, superuserSecret)
+	err := env.Client.Get(env.Ctx, secretNamespacedName, secret)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	generatedSuperuserPassword := string(superuserSecret.Data["password"])
-	return generatedSuperuserPassword, nil
+	username := string(secret.Data["username"])
+	password := string(secret.Data["password"])
+	return username, password, nil
 }

@@ -91,6 +91,9 @@ by the CloudNativePG maintainers).
 
 !!! Important
     Dates in the future are uncertain and might change. This applies to Kubernetes versions too.
+    Updates and changes on the release schedule will be communicated in the
+    ["Release updates"](https://github.com/cloudnative-pg/cloudnative-pg/discussions/categories/release-updates)
+    discussion in the main GitHub repository.
 
 ## Old releases
 

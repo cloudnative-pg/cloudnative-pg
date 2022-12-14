@@ -69,7 +69,7 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
-	if !utils.HaveSeccompSupport() {
+	if !utils.HaveSeccompSupport() || utils.HaveSecurityContextConstraints() {
 		seccompProfile = nil
 	}
 

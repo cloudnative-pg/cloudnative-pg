@@ -1141,6 +1141,11 @@ type AffinityConfiguration struct {
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
+	// NodeAffinity describes node affinity scheduling rules for the pod.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity
+	// +optional
+	NodeAffinity *corev1.NodeAffinity `json:"nodeAffinity,omitempty"`
+
 	// Tolerations is a list of Tolerations that should be set for all the pods, in order to allow them to run
 	// on tainted nodes.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
