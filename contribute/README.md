@@ -92,7 +92,7 @@ the Istio documentation which contains very good insights and best practices:
 If you have written code for an improvement to CloudNativePG or a bug fix,
 please follow this procedure to submit a pull request:
 
-1. [Create a fork](contribute/development_environment/README.md#forking-the-repository) of CloudNativePG
+1. [Create a fork](development_environment/README.md#forking-the-repository) of CloudNativePG
 2. Self-assign the ticket and begin working on it in the forked project. Move
    the ticket to `Analysis` or `In Development` phase of
    [CloudNativePG operator development](https://github.com/orgs/cloudnative-pg/projects/2)
