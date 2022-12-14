@@ -31,7 +31,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
 // NewCmd creates the new "join" command
@@ -46,7 +45,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "join [options]",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return resources.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})

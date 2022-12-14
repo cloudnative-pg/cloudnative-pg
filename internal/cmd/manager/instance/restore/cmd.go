@@ -25,9 +25,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
 // NewCmd creates the "restore" subcommand
@@ -41,7 +41,7 @@ func NewCmd() *cobra.Command {
 		Use:           "restore [flags]",
 		SilenceErrors: true,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return resources.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})

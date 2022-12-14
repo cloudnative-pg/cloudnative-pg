@@ -39,13 +39,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -66,7 +66,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run [flags]",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return resources.WaitKubernetesAPIServer(cmd.Context(), client.ObjectKey{
+			return management.WaitKubernetesAPIServer(cmd.Context(), client.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
