@@ -36,7 +36,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
@@ -62,6 +64,12 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "run [flags]",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return management.WaitKubernetesAPIServer(cmd.Context(), client.ObjectKey{
+				Name:      clusterName,
+				Namespace: namespace,
+			})
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := log.IntoContext(cmd.Context(), log.GetLogger())
 			instance := postgres.NewInstance()
@@ -74,6 +82,9 @@ func NewCmd() *cobra.Command {
 			return retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
 				return runSubCommand(ctx, instance)
 			})
+		},
+		PostRunE: func(cmd *cobra.Command, args []string) error {
+			return istio.TryInvokeQuitEndpoint(cmd.Context())
 		},
 	}
 

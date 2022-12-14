@@ -19,23 +19,41 @@ limitations under the License.
 package management
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
-// Scheme used for the instance manager
-var Scheme = runtime.NewScheme()
+var (
+	// Scheme used for the instance manager
+	Scheme = runtime.NewScheme()
+
+	// readinessCheckRetry is used to wait until the API server is reachable
+	readinessCheckRetry = wait.Backoff{
+		Steps:    5,
+		Duration: 10 * time.Millisecond,
+		Factor:   5.0,
+		Jitter:   0.1,
+	}
+)
 
 func init() {
 	_ = clientgoscheme.AddToScheme(Scheme)
@@ -109,4 +127,26 @@ func NewEventRecorder() (record.EventRecorder, error) {
 	)
 
 	return recorder, nil
+}
+
+// WaitKubernetesAPIServer will wait for the kubernetes API server to by ready.
+// Returns any error if it can't be reached.
+func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.ObjectKey) error {
+	logger := log.FromContext(ctx)
+
+	cli, err := NewControllerRuntimeClient()
+	if err != nil {
+		logger.Error(err, "error while creating a standalone Kubernetes client")
+		return err
+	}
+
+	if err := retry.OnError(readinessCheckRetry, resources.RetryAlways, func() (err error) {
+		return cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{})
+	}); err != nil {
+		const message = "error while waiting for the API server to be reachable"
+		logger.Error(err, message)
+		return fmt.Errorf("%s: %w", message, err)
+	}
+
+	return nil
 }

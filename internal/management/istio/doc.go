@@ -1,6 +1,3 @@
-//go:build tools
-// +build tools
-
 /*
 Copyright The CloudNativePG Contributors
 
@@ -17,12 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tools is used to track dependencies of tools
-package tools
-
-import (
-	_ "github.com/onsi/ginkgo/v2"
-	_ "github.com/onsi/ginkgo/v2/ginkgo/generators"
-	_ "github.com/onsi/ginkgo/v2/ginkgo/internal"
-	_ "github.com/onsi/ginkgo/v2/ginkgo/labels"
-)
+// Package istio implements functions needed to integrate with istio-proxy
+package istio
