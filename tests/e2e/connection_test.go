@@ -74,8 +74,8 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 			AssertConnection(service, appDBUser, appDBName, appPassword, *psqlClientPod, 10, env)
 		}
 
-		AssertWritesToReplicaFails(pod, roService, appDBName, appDBUser, appPassword)
-		AssertWritesToPrimarySucceeds(pod, rwService, appDBName, appDBUser, appPassword)
+		AssertWritesToReplicaFails(psqlClientPod, roService, appDBName, appDBUser, appPassword)
+		AssertWritesToPrimarySucceeds(psqlClientPod, rwService, appDBName, appDBUser, appPassword)
 	}
 
 	Context("Auto-generated passwords", func() {

@@ -209,7 +209,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			var beforeHibernationPgDataPvcUID types.UID
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, tableName)
+			AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
 			clusterManifest, beforeHibernationClusterInfo, currentPrimary := getPrimaryAndClusterManifest(namespace, clusterName)
 
 			By("collecting pgWal pvc details of current primary", func() {
@@ -258,7 +258,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 			AssertClusterIsReady(namespace, clusterName, 600, env)
 			// Test data should be present after hibernation off
-			AssertDataExpectedCount(namespace, currentPrimary, tableName, 2)
+			AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 		}
 
 		When("cluster setup with PG-WAL volume", func() {
@@ -297,7 +297,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
-				AssertCreateTestData(namespace, clusterName, tableName)
+				AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
 				clusterManifest, beforeHibernationClusterInfo, currentPrimary := getPrimaryAndClusterManifest(namespace,
 					clusterName)
 
@@ -336,7 +336,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 				AssertClusterIsReady(namespace, clusterName, 600, env)
 				// Test data should be present after hibernation off
-				AssertDataExpectedCount(namespace, currentPrimary, tableName, 2)
+				AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 			})
 		})
 		When("cluster hibernation after switchover", func() {
