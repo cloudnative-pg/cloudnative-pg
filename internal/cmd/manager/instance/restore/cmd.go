@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
 // NewCmd creates the "restore" subcommand
@@ -40,7 +41,7 @@ func NewCmd() *cobra.Command {
 		Use:           "restore [flags]",
 		SilenceErrors: true,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+			return resources.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
@@ -57,7 +58,7 @@ func NewCmd() *cobra.Command {
 			return restoreSubCommand(ctx, info)
 		},
 		PostRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.QuitIstioProxy()
+			return istio.TryInvokeQuitEndpoint(cmd.Context())
 		},
 	}
 

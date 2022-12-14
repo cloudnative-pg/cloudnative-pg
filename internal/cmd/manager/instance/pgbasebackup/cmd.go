@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
 // CloneInfo is the structure containing all the information needed
@@ -50,7 +51,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "pgbasebackup",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+			return resources.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
@@ -79,7 +80,7 @@ func NewCmd() *cobra.Command {
 			return err
 		},
 		PostRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.QuitIstioProxy()
+			return istio.TryInvokeQuitEndpoint(cmd.Context())
 		},
 	}
 

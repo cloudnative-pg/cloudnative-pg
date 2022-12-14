@@ -36,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	pkgres "github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -218,8 +219,7 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 // waitInstancesToBeFenced waits for all instances to be shut down
 func (on *onCommand) waitInstancesToBeFencedStep() error {
 	for _, instance := range on.managedInstances {
-		always := func(err error) bool { return true }
-		if err := retry.OnError(hibernationBackoff, always, func() error {
+		if err := retry.OnError(hibernationBackoff, pkgres.RetryAlways, func() error {
 			running, err := resources.IsInstanceRunning(on.ctx, instance)
 			if err != nil {
 				return fmt.Errorf("error checking instance status (%v): %w", instance.Name, err)
@@ -298,7 +298,7 @@ func annotatePVCs(
 	pgControlData string,
 ) error {
 	for _, pvc := range pvcs {
-		if err := retry.OnError(retry.DefaultBackoff, func(err error) bool { return true }, func() error {
+		if err := retry.OnError(retry.DefaultBackoff, pkgres.RetryAlways, func() error {
 			var currentPVC corev1.PersistentVolumeClaim
 			if err := plugin.Client.Get(
 				ctx,
@@ -341,7 +341,7 @@ func removePVCannotations(
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	for _, pvc := range pvcs {
-		if err := retry.OnError(retry.DefaultBackoff, func(err error) bool { return true }, func() error {
+		if err := retry.OnError(retry.DefaultBackoff, pkgres.RetryAlways, func() error {
 			var currentPVC corev1.PersistentVolumeClaim
 			if err := plugin.Client.Get(
 				ctx,

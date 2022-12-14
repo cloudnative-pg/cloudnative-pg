@@ -19,72 +19,31 @@ package istio
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"syscall"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-// readinessCheckRetry is used to wait until the API server is reachable
-var readinessCheckRetry = wait.Backoff{
-	Steps:    5,
-	Duration: 10 * time.Millisecond,
-	Factor:   5.0,
-	Jitter:   0.1,
-}
+// TryInvokeQuitEndpoint executes a post request on the /quitquitquit endpoint. Returns any errors encountered if
+// the service exists
+func TryInvokeQuitEndpoint(ctx context.Context) error {
+	const endpoint = "http://localhost:15000/quitquitquit"
+	logger := log.FromContext(ctx)
 
-// WaitKubernetesAPIServer will return error in case Kubernetes API
-// is not reachable
-func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.ObjectKey) error {
-	var cluster apiv1.Cluster
-
-	logger := log.GetLogger()
-
-	cli, err := management.NewControllerRuntimeClient()
+	clientHTTP := http.Client{Timeout: 5 * time.Second}
+	resp, err := clientHTTP.Post(endpoint, "", nil)
+	if errors.Is(err, syscall.ECONNREFUSED) || os.IsTimeout(err) {
+		return nil
+	}
 	if err != nil {
-		logger.Error(err, "error while creating a standalone Kubernetes client")
 		return err
 	}
-
-	if err := retry.OnError(readinessCheckRetry, func(err error) bool { return true }, func() (err error) {
-		return cli.Get(ctx, clusterObjectKey, &cluster)
-	}); err != nil {
-		logger.Error(err, "Waiting for the API server to be reachable")
-		return fmt.Errorf("error waiting for the API server to be reachable: %w", err)
+	if closeErr := resp.Body.Close(); closeErr != nil {
+		logger.Error(closeErr, "unable to close the response body", "endpoint", endpoint)
 	}
-
-	return nil
-}
-
-// QuitIstioProxy triggers the quitquitquit endpoint of Istio
-func QuitIstioProxy() error {
-	istioProxyQuitEndpoint := "http://localhost:15000/quitquitquit"
-	clientHTTP := http.Client{
-		Timeout: 5 * time.Second,
-	}
-	resp, err := clientHTTP.Post(istioProxyQuitEndpoint, "", nil)
-	switch {
-	case errors.Is(err, syscall.ECONNREFUSED):
-		return nil
-	case os.IsTimeout(err):
-		return nil
-	case err != nil:
-		return err
-	}
-	defer func() {
-		if err = resp.Body.Close(); err != nil {
-			log.Error(err, "Calling possible istio-proxy container quitquitquit endpoint")
-		}
-	}()
 
 	return nil
 }

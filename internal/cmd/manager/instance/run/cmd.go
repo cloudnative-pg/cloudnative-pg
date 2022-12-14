@@ -45,6 +45,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -65,7 +66,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run [flags]",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.WaitKubernetesAPIServer(cmd.Context(), client.ObjectKey{
+			return resources.WaitKubernetesAPIServer(cmd.Context(), client.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
@@ -84,7 +85,7 @@ func NewCmd() *cobra.Command {
 			})
 		},
 		PostRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.QuitIstioProxy()
+			return istio.TryInvokeQuitEndpoint(cmd.Context())
 		},
 	}
 
