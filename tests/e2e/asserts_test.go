@@ -356,7 +356,7 @@ func AssertOperatorIsReady() {
 	}, 120).Should(BeTrue(), "Operator pod is not ready")
 }
 
-// AssertCreateTestData create test data on primary pod
+// AssertCreateTestData create test data.
 func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.Pod) {
 	By("creating test data", func() {
 		query := fmt.Sprintf("CREATE TABLE %v AS VALUES (1), (2);", tableName)
@@ -372,7 +372,7 @@ func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.
 	})
 }
 
-// AssertCreateTestDataLargeObject create large objects on primary pod with oid and data
+// AssertCreateTestDataLargeObject create large objects with oid and data
 func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, data string, pod *corev1.Pod) {
 	By("creating large object", func() {
 		query := fmt.Sprintf("CREATE TABLE image (name text,raster oid); "+
