@@ -178,6 +178,7 @@ NOSUPERUSER
 Namespaces
 Nenciarini
 Niccolò
+NodeAffinity
 NodeMaintenanceWindow
 NodeSelector
 Noland
