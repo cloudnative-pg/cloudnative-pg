@@ -60,14 +60,6 @@ const (
 	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
 	WatchedLabelName = MetadataNamespace + "/reload"
 
-	// ClusterLabelName label is applied to Pods to link them to the owning
-	// cluster.
-	//
-	// Deprecated.
-	//
-	// utils.ClusterLabelName should be used instead where possible.
-	ClusterLabelName = "postgresql"
-
 	// PostgresContainerName is the name of the container executing PostgreSQL
 	// inside one Pod
 	PostgresContainerName = "postgres"
@@ -310,7 +302,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				ClusterLabelName:            cluster.Name,
+				utils.OldClusterLabelName:   cluster.Name, //nolint
 				utils.ClusterLabelName:      cluster.Name,
 				utils.InstanceNameLabelName: podName,
 				utils.PodRoleLabelName:      string(utils.PodRoleInstance),

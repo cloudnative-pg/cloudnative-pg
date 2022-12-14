@@ -528,22 +528,12 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string,
 // cluster have a wal receiver running.
 func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
 	Eventually(func() error {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		standbyPods, err := env.GetClusterReplicas(namespace, clusterName)
 		if err != nil {
 			return err
 		}
 
-		primary, err := env.GetClusterPrimary(namespace, clusterName)
-		if err != nil {
-			return err
-		}
-
-		for _, pod := range podList.Items {
-			// Primary should be ignored
-			if pod.GetName() == primary.GetName() {
-				continue
-			}
-
+		for _, pod := range standbyPods.Items {
 			timeout := time.Second
 			out, _, err := env.EventuallyExecCommand(env.Ctx, pod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", "SELECT count(*) FROM pg_stat_wal_receiver")
