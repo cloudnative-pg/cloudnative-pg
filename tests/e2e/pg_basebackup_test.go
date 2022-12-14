@@ -65,14 +65,21 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.La
 
 		By("checking the dst cluster with auto generated app password connectable", func() {
 			secretName := dstClusterName + "-app"
-			AssertApplicationDatabaseConnection(namespace, dstClusterName, "appuser", "app", "", secretName)
+			AssertApplicationDatabaseConnection(namespace, dstClusterName, "appuser", "app", "", secretName, psqlClientPod)
 		})
 
 		By("update user application password for dst cluster and verify connectivity", func() {
 			secretName := dstClusterName + "-app"
 			const newPassword = "eeh2Zahohx" //nolint:gosec
 			AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
-			AssertApplicationDatabaseConnection(namespace, dstClusterName, "appuser", "app", newPassword, secretName)
+			AssertApplicationDatabaseConnection(
+				namespace,
+				dstClusterName,
+				"appuser",
+				"app",
+				newPassword,
+				secretName,
+				psqlClientPod)
 		})
 
 		By("checking data have been copied correctly", func() {
@@ -86,7 +93,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.La
 		})
 
 		By("writing some new data to the dst cluster", func() {
-			insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3)
+			insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3, psqlClientPod)
 		})
 
 		By("checking the src cluster was not modified", func() {
@@ -153,7 +160,7 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.Labe
 		})
 
 		By("writing some new data to the dst cluster", func() {
-			insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3)
+			insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3, psqlClientPod)
 		})
 
 		By("checking the src cluster was not modified", func() {

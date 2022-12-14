@@ -64,7 +64,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			return env.DeleteNamespace(namespace)
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		AssertCreateTestData(namespace, clusterName, tableName)
+		AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
 		By("gather current primary pod and pvc info", func() {
 			oldPrimaryPodInfo, err = env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -183,12 +183,10 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				return strings.Trim(stdOut, "\n"), err
 			}, 60, 2).Should(BeEquivalentTo("t"))
 			// verify test data
-			AssertDataExpectedCount(namespace, newPodName, tableName, 2)
+			AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 		})
 		// verify test data on new primary
-		newPrimaryPodInfo, err = env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		AssertDataExpectedCount(namespace, newPrimaryPodInfo.GetName(), tableName, 2)
+		AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 		assertClusterStandbysAreStreaming(namespace, clusterName)
 	})
 })

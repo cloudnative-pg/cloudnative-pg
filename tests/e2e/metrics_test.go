@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -135,9 +134,9 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsDBFile, env)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName)
+		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName, psqlClientPod)
+		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName, psqlClientPod)
+		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName, psqlClientPod)
 		AssertMetricsData(namespace, metricsClusterName, curlPodName, targetDBOne, targetDBTwo, targetDBSecret)
 	})
 
@@ -241,16 +240,29 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			curlPodName = curlClient.GetName()
 		})
 
-		AssertReplicaModeCluster(namespace, srcClusterName, srcClusterSampleFile, replicaClusterName,
-			replicaClusterSampleFile, checkQuery)
+		AssertReplicaModeCluster(
+			namespace,
+			srcClusterName,
+			srcClusterSampleFile,
+			replicaClusterName,
+			replicaClusterSampleFile,
+			checkQuery,
+			psqlClientPod)
 
 		By("grant select permission for test_replica table to pg_monitor", func() {
-			primarySrcCluster, err := env.GetClusterPrimary(namespace, srcClusterName)
-			Expect(err).ToNot(HaveOccurred())
-			commandTimeout := time.Second * 5
 			cmd := "GRANT SELECT ON test_replica TO pg_monitor"
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *primarySrcCluster, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", cmd)
+			superUser, superUserPass, err := utils.GetCredentials(srcClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+			Expect(err).ToNot(HaveOccurred())
+			host, err := utils.GetHostName(namespace, srcClusterName, env)
+			Expect(err).ToNot(HaveOccurred())
+			_, _, err = utils.RunQueryFromPod(
+				psqlClientPod,
+				host,
+				"appSrc",
+				superUser,
+				superUserPass,
+				cmd,
+				env)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

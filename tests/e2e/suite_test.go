@@ -66,6 +66,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	var err error
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
+
 	pod, err := utils.GetPsqlClient(psqlClientNamespace, env)
 	Expect(err).ShouldNot(HaveOccurred())
 	// here we serialized psql client pod object info and will be
