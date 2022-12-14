@@ -438,7 +438,7 @@ Additionally, you can gather the list of nodes where the pods of a given
 cluster are running with:
 
 ```shell
-kubectl get pod -l cnpg.io/clusterName=<CLUSTER> \
+kubectl get pod -l cnpg.io/cluster=<CLUSTER> \
   -L role -n <NAMESPACE> -o wide
 ```
 

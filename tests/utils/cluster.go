@@ -259,11 +259,14 @@ func (env TestingEnvironment) GetCluster(namespace string, name string) (*apiv1.
 	return cluster, nil
 }
 
-// GetClusterPodList gathers the current list of pods for a cluster in a namespace
+// GetClusterPodList gathers the current list of instance pods for a cluster in a namespace
 func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName},
+		client.MatchingLabels{
+			utils.ClusterLabelName: clusterName,
+			utils.PodRoleLabelName: "instance", // this ensures we are getting instance pods only
+		},
 	)
 	return podList, err
 }
@@ -272,7 +275,7 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName, "role": "primary"},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "primary"},
 	)
 	if err != nil {
 		return &corev1.Pod{}, err
@@ -288,7 +291,7 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 func (env TestingEnvironment) GetClusterReplicas(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{"postgresql": clusterName, "role": "replica"},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "replica"},
 	)
 	if err != nil {
 		return podList, err
@@ -362,7 +365,7 @@ func PrintClusterResources(namespace, clusterName string, env *TestingEnvironmen
 				clusterInfo.AddLine("---", "---")
 			}
 		} else {
-			clusterInfo.AddLine("InstanceReportState not exit", "")
+			clusterInfo.AddLine("InstanceReportState not reported", "")
 		}
 	}
 

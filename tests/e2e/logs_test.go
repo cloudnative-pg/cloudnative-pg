@@ -148,7 +148,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 			podList := &corev1.PodList{}
 			listError := env.Client.List(
 				env.Ctx, podList, client.InNamespace(namespace),
-				client.MatchingLabels{"postgresql": clusterName, "role": "replica"},
+				client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "replica"},
 			)
 			Expect(listError).ToNot(HaveOccurred())
 

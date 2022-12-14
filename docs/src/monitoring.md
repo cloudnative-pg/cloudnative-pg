@@ -86,6 +86,11 @@ spec:
     Make sure you modify the example above with a unique name as well as the
     correct cluster's namespace and labels (we are using `cluster-example`).
 
+!!! Important
+    Label `postgresql`, used in previous versions of this document, is deprecated
+    and will be removed in the future. Please use the label `cnpg.io/cluster`
+    instead to select the instances.
+
 ### Predefined set of metrics
 
 Every PostgreSQL instance exporter automatically exposes a set of predefined
