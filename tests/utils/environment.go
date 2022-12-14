@@ -120,6 +120,11 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 		return nil, fmt.Errorf("could not detect SeccompProfile support: %w", err)
 	}
 
+	err = utils.DetectSecurityContextConstraints(clientDiscovery)
+	if err != nil {
+		return nil, fmt.Errorf("could not detect SeccompProfile support: %w", err)
+	}
+
 	return &env, nil
 }
 
