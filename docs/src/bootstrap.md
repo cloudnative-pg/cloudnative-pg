@@ -909,12 +909,3 @@ before migrating to the target database in Kubernetes.
     and the applications. In particular, it is fundamental that you run the migration
     procedure as many times as needed to systematically measure the downtime of your
     applications in production. Feel free to contact EDB for assistance.
-
-Future versions of CloudNativePG will enable users to control
-PostgreSQL's continuous recovery mechanism via Write-Ahead Log (WAL) shipping
-by creating a new cluster that is a replica of another PostgreSQL instance.
-This will open up two main use cases:
-
-- replication over different Kubernetes clusters in CloudNativePG
-- *0 cutover time* migrations to CloudNativePG with the `pg_basebackup`
-  bootstrap method
