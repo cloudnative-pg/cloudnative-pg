@@ -18,6 +18,10 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
+	"fmt"
+	"os"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -76,5 +80,26 @@ func createClient(cfg *rest.Config) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// CreateAndGenerateObjects creates provided k8s object or generate manifest collectively
+func CreateAndGenerateObjects(ctx context.Context, k8sObject []client.Object, option bool) error {
+	for _, item := range k8sObject {
+		switch option {
+		case true:
+			if err := Print(item, OutputFormatYAML, os.Stdout); err != nil {
+				return err
+			}
+			fmt.Println("---")
+		default:
+			objectType := item.GetObjectKind().GroupVersionKind().Kind
+			if err := Client.Create(ctx, item); err != nil {
+				return err
+			}
+			fmt.Printf("%v/%v created\n", objectType, item.GetName())
+		}
+	}
+
 	return nil
 }
