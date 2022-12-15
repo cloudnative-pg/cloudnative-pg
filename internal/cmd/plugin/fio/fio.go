@@ -216,6 +216,10 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 									Name:      "job",
 									MountPath: "/job",
 								},
+								{
+									Name:      "tmp",
+									MountPath: "/tmp/fio-data",
+								},
 							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
@@ -236,6 +240,7 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 								RunAsGroup:   &runAs,
 								RunAsNonRoot: pointer.Bool(true),
 								RunAsUser:    &runAs,
+
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{
 										"ALL",
@@ -276,6 +281,12 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 								},
 							},
 						},
+						{
+							Name: "tmp",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
 					},
 					Affinity: &corev1.Affinity{
 						PodAntiAffinity: &corev1.PodAntiAffinity{
@@ -296,6 +307,9 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 						},
 					},
 					NodeSelector: map[string]string{},
+					SecurityContext: &corev1.PodSecurityContext{
+						FSGroup: &runAs,
+					},
 				},
 			},
 		},
