@@ -82,6 +82,10 @@ const (
 	// get the name of the pull secret
 	ClusterSecretSuffix = "-pull-secret"
 
+	// WalArchiveVolumeSuffix is the suffix appended to the instance name to
+	// get the name of the PVC dedicated to WAL files.
+	WalArchiveVolumeSuffix = "-wal"
+
 	// StreamingReplicationUser is the name of the user we'll use for
 	// streaming replication purposes
 	StreamingReplicationUser = "streaming_replica"
@@ -1977,7 +1981,7 @@ func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 
 // GetWalArchiveVolumeSuffix gets the wal archive volume name suffix
 func (cluster *Cluster) GetWalArchiveVolumeSuffix() string {
-	return "-wal"
+	return WalArchiveVolumeSuffix
 }
 
 // GetPostgresUID returns the UID that is being used for the "postgres"

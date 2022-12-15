@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"reflect"
 	goruntime "runtime"
+	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -600,8 +601,22 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		return fmt.Errorf("while parsing PVC size %v: %w", cluster.Spec.StorageConfiguration.Size, err)
 	}
 
+	var walQuantity *resource.Quantity
+
+	if cluster.Spec.WalStorage != nil {
+		q, err := resource.ParseQuantity(cluster.Spec.WalStorage.Size)
+		if err != nil {
+			return fmt.Errorf("while parsing WAL PVC size %v: %w", cluster.Spec.WalStorage.Size, err)
+		}
+		walQuantity = &q
+	}
+
 	for idx := range resources.pvcs.Items {
 		oldPVC := resources.pvcs.Items[idx].DeepCopy()
+		q := quantity
+		if strings.HasSuffix(oldPVC.Name, apiv1.WalArchiveVolumeSuffix) && walQuantity != nil {
+			q = *walQuantity
+		}
 		oldQuantity, ok := resources.pvcs.Items[idx].Spec.Resources.Requests["storage"]
 
 		switch {
@@ -609,13 +624,13 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 			// Missing storage requirement for PVC
 			fallthrough
 
-		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == -1:
+		case oldQuantity.AsDec().Cmp(q.AsDec()) == -1:
 			// Increasing storage resources
-			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = quantity
+			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = q
 			if err = r.Patch(ctx, &resources.pvcs.Items[idx], client.MergeFrom(oldPVC)); err != nil {
 				// Decreasing resources is not possible
 				contextLogger.Error(err, "error while changing PVC storage requirement",
-					"from", oldQuantity, "to", quantity,
+					"from", oldQuantity, "to", q,
 					"pvcName", resources.pvcs.Items[idx].Name)
 
 				// We are reaching two errors in two different conditions:
@@ -625,10 +640,10 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 				//    about it
 			}
 
-		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == 1:
+		case oldQuantity.AsDec().Cmp(q.AsDec()) == 1:
 			// Decreasing resources is not possible
 			contextLogger.Info("cannot decrease storage requirement",
-				"from", oldQuantity, "to", quantity,
+				"from", oldQuantity, "to", q,
 				"pvcName", resources.pvcs.Items[idx].Name)
 		}
 	}
