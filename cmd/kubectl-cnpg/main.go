@@ -20,8 +20,6 @@ kubectl-cnp is a plugin to manage your CloudNativePG clusters
 package main
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -31,9 +29,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/install"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/report"

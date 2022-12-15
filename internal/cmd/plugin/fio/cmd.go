@@ -19,8 +19,9 @@ package fio
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/spf13/cobra"
 )
 
 // NewCmd initializes the fio command
@@ -53,7 +54,6 @@ func NewCmd() *cobra.Command {
 				if input != "y" {
 					os.Exit(0)
 				}
-
 			}
 		},
 		PostRun: func(cmd *cobra.Command, args []string) {
