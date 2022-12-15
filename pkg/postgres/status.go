@@ -124,7 +124,7 @@ func (status PostgresqlStatus) IsPostgresqlReady() bool {
 	//
 	// Otherwise, we didn't manage to collect the status of the PostgreSQL
 	// instance, and we'll have an error inside the Error field.
-	return status.Error != nil
+	return status.Error == nil
 }
 
 // PgStatReplicationList is a list of PgStatReplication reported by the primary instance
