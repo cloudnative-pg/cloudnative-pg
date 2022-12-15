@@ -76,6 +76,7 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, r *ht
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
 		log.Trace("Liveness probe skipped")
 		_, _ = fmt.Fprint(w, "Skipped")
+		return
 	}
 
 	err := ws.instance.IsServerHealthy()
