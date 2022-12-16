@@ -763,6 +763,10 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 
 // createOrPatchPodMonitor
 func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster *apiv1.Cluster) error {
+	// If the PodMonitor it's not enabled in the cluster, no need to continue
+	if !cluster.IsPodMonitorEnabled() {
+		return nil
+	}
 	contextLogger := log.FromContext(ctx)
 
 	// Checking for the PodMonitor resource in the cluster
