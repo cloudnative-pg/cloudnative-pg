@@ -88,7 +88,8 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 					`cnpg_pgbouncer_lists_pools 1|` +
 					`cnpg_pgbouncer_lists_used_servers 0|` +
 					`cnpg_pgbouncer_lists_users 2|` +
-					`cnpg_pgbouncer_pools_cl_cancel_req{database="pgbouncer",user="pgbouncer"} 0|` +
+					`cnpg_pgbouncer_pools_cl_active_cancel_req{database="pgbouncer",user="pgbouncer"} 0|` +
+					`cnpg_pgbouncer_pools_cl_waiting_cancel_req{database="pgbouncer",user="pgbouncer"} 0|` +
 					`cnpg_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} 3|` +
 					`cnpg_pgbouncer_stats_avg_query_time{database="pgbouncer"} [0-9e\+\.]+|` +
 					`cnpg_pgbouncer_stats_avg_recv{database="pgbouncer"} [0-9e\+\.]+|` +
