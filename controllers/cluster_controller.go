@@ -1104,8 +1104,10 @@ func (r *ClusterReconciler) mapNodeToClusters(ctx context.Context) handler.MapFu
 		// get all the pods handled by the operator on that node
 		err := r.List(ctx, &childPods,
 			client.MatchingFields{".spec.nodeName": node.Name},
-			client.MatchingLabels{specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
-			client.HasLabels{specs.ClusterLabelName},
+			client.MatchingLabels{
+				specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+				utils.PodRoleLabelName:     string(utils.PodRoleInstance),
+			},
 		)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "while getting primary instances for node")
