@@ -92,7 +92,7 @@ func ExecCommand(
 	}
 
 	var stdout, stderr bytes.Buffer
-	err = executor.Stream(remotecommand.StreamOptions{
+	err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdout: &stdout,
 		Stderr: &stderr,
 	})
