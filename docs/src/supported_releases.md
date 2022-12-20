@@ -81,9 +81,9 @@ by the CloudNativePG maintainers).
 
 | Version         | Release Date     | End of Life               | Supported Kubernetes Versions  |
 |-----------------|------------------|---------------------------|--------------------------------|
-| 1.19.0          | January 12, 2023 | June 15, 2023             | 1.23, 1.24, 1.25               |
-| 1.20.0          | March 13, 2023   | -                         | -                              |
-| 1.21.0          | May 15, 2023     | -                         | -                              |
+| 1.19.0          | January 26, 2023 | June 15, 2023             | 1.23, 1.24, 1.25               |
+| 1.20.0          | March 27, 2023   | -                         | -                              |
+| 1.21.0          | May 29, 2023     | -                         | -                              |
 
 !!! Note
     Feature freeze happens one week before the release
