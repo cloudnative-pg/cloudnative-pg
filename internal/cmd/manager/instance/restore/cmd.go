@@ -53,6 +53,7 @@ func NewCmd() *cobra.Command {
 				ClusterName: clusterName,
 				Namespace:   namespace,
 				PgData:      pgData,
+				PgWal:       pgWal,
 			}
 
 			return restoreSubCommand(ctx, info)
