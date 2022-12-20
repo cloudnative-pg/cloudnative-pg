@@ -60,6 +60,9 @@ if notinpath "${go_bin}"; then
 fi
 
 if ! which ginkgo &>/dev/null; then
+  go get github.com/onsi/ginkgo/v2/ginkgo/generators@v2.6.1
+  go get github.com/onsi/ginkgo/v2/ginkgo/internal@v2.6.1
+  go get github.com/onsi/ginkgo/v2/ginkgo/labels@v2.6.1
   go install github.com/onsi/ginkgo/v2/ginkgo
 fi
 
