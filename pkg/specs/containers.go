@@ -23,7 +23,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -55,7 +54,6 @@ func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container
 	if cluster.Spec.LogLevel != "" {
 		container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
 	}
-	container.Command = append(container.Command, log.GetFieldsRemapFlags()...)
 }
 
 // CreateContainerSecurityContext initializes container security context
