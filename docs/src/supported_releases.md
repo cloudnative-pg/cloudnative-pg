@@ -99,7 +99,7 @@ by the CloudNativePG maintainers).
 | Version         | Release Date      | End of Life              | Compatible Kubernetes Versions |
 |-----------------|-------------------|--------------------------|--------------------------------|
 | 1.15.x          | April 21, 2022    | October 6, 2022          | 1.21, 1.22, 1.23               |
-| 1.16.x          | July 7, 2022      | December 20, 2022      | 1.22, 1.23, 1.24              |
+| 1.16.x          | July 7, 2022      | December 21, 2022      | 1.22, 1.23, 1.24              |
 
 
 ## What we mean by support
