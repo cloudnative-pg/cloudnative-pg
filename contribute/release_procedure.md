@@ -74,6 +74,14 @@ activities:
   for each of the supported releases. (See the section **Documentation on the
   website** below)
 
+- **Feature freeze:** In the days prior to the release, new features
+  should not be coming in, or should do so only after validation by the team.
+
+- **Check backporting:** We should ensure that features are backported to
+  release branches as necessary. Note that backporting/cherry-picking should
+  be done as soon as possible. Delaying backporting increases the risk of
+  conflicts due to code drift.
+
 <!-- TODO: we should create an issue template with a checklist for the release process -->
 
 ## Updating release notes on the branches
