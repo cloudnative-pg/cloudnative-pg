@@ -763,17 +763,22 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 
 // createOrPatchPodMonitor
 func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster *apiv1.Cluster) error {
-	// If the PodMonitor it's not enabled in the cluster, no need to continue
-	if !cluster.IsPodMonitorEnabled() {
-		return nil
-	}
 	contextLogger := log.FromContext(ctx)
 
 	// Checking for the PodMonitor resource in the cluster
 	havePodMonitor, err := utils.PodMonitorExist(r.DiscoveryClient)
-	if err != nil || !havePodMonitor {
-		contextLogger.Debug("Kind PodMonitor not detected", "err", err)
+	if err != nil {
 		return err
+	}
+
+	// If the PodMonitor does not exist then check in cluster if it is present, log the  warning.
+	// If it is not enabled in the cluster then no need to continue.
+	if !havePodMonitor {
+		if cluster.IsPodMonitorEnabled() {
+			contextLogger.Warning("Kind PodMonitor not detected, " +
+				"Please create after enabling PodMonitor in cluster")
+		}
+		return nil
 	}
 
 	// We get the current pod monitor
