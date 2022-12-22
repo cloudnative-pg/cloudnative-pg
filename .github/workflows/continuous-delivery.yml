@@ -30,7 +30,7 @@ on:
         default: false
         description: Include kubectl-cnpg plugin building
   schedule:
-    - cron:  '12 4 * * *'
+    - cron:  '20 4 * * *'
 
 # set up environment variables to be used across all the jobs
 env:
