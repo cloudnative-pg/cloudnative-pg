@@ -772,10 +772,12 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 		return err
 	}
 
-	// If the PodMonitor CRD does not exist, but the cluster has monitoring enabled,
-	// the controller cannot do anything until the CRD is installed
-	if !havePodMonitorCRD && cluster.IsPodMonitorEnabled() {
-		contextLogger.Warning("PodMonitor CRD not present. Cannot create the PodMonitor object")
+	if !havePodMonitorCRD {
+		if cluster.IsPodMonitorEnabled() {
+			// If the PodMonitor CRD does not exist, but the cluster has monitoring enabled,
+			// the controller cannot do anything until the CRD is installed
+			contextLogger.Warning("PodMonitor CRD not present. Cannot create the PodMonitor object")
+		}
 		return nil
 	}
 
