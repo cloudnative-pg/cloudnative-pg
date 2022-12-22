@@ -259,7 +259,7 @@ kubectl port-forward svc/prometheus-community-kube-prometheus 9090
 
 Then access the Prometheus console locally at: [`http://localhost:9090/`](http://localhost:9090/)
 
-Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitoring: true` 
+Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitor: true`
 you should find a series of metrics relating to CloudNativePG clusters. Again, please
 refer to the [*monitoring section*](monitoring.md) for more information.
 
