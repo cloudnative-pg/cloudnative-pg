@@ -9,6 +9,7 @@ spec:
     size: 1Gi
 
   monitoring:
+    enablePodMonitor: true
     customQueriesConfigMap:
       - name: example-monitoring
         key: custom-queries

@@ -765,18 +765,17 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
-	// Checking for the PodMonitor resource in the cluster
-	havePodMonitor, err := utils.PodMonitorExist(r.DiscoveryClient)
+	// Checking for the PodMonitor Custom Resource Definition in the Kubernetes cluster
+	havePodMonitorCRD, err := utils.PodMonitorExist(r.DiscoveryClient)
 	if err != nil {
 		return err
 	}
 
-	// If the PodMonitor does not exist then check in cluster if it is present, log the  warning.
-	// If it is not enabled in the cluster then no need to continue.
-	if !havePodMonitor {
+	// If the PodMonitor CRD does not exist, and the cluster has monitoring enabled,
+	// the controller cannot do anything until the CRD is installed
+	if !havePodMonitorCRD {
 		if cluster.IsPodMonitorEnabled() {
-			contextLogger.Warning("Kind PodMonitor not detected, " +
-				"Please create after enabling PodMonitor in cluster")
+			contextLogger.Warning("PodMonitor CRD not present. Cannot create the PodMonitor object")
 		}
 		return nil
 	}
