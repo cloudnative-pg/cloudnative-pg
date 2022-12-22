@@ -50,14 +50,17 @@ activities:
 
 - **Feature freeze:** Get a clear idea of what tickets are going into the
   release and what tickets we are waiting on (hopefully a few), and make sure to
-  put the focus on finishing those in time.
+  put the focus on finishing those in time. No new features should land in the
+  last few days without previous validation from the team.
 
 - **Supported releases:** Make sure that you update the supported releases page
   in `docs/src/supported_releases.md`, and that the maintainers approve the changes.
 
 - **Check on backporting:** Make sure to cherry-pick any code that requires
   backporting to the various release branches ahead of time. Doing that will
-  also help you to compile the release notes.
+  also help you to compile the release notes. Note that
+  backporting/cherry-picking should be done as soon as possible. Delaying
+  backporting increases the risk of conflicts due to code drift.
 
 - **Release notes:** You should create/update the release note documents in
   `docs/src/release_notes/` for each version to release. Remember to
@@ -73,14 +76,6 @@ activities:
   [website project](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
   for each of the supported releases. (See the section **Documentation on the
   website** below)
-
-- **Feature freeze:** In the days prior to the release, new features
-  should not be coming in, or should do so only after validation by the team.
-
-- **Check backporting:** We should ensure that features are backported to
-  release branches as necessary. Note that backporting/cherry-picking should
-  be done as soon as possible. Delaying backporting increases the risk of
-  conflicts due to code drift.
 
 <!-- TODO: we should create an issue template with a checklist for the release process -->
 
