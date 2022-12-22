@@ -30,7 +30,7 @@ on:
         default: false
         description: Include kubectl-cnpg plugin building
   schedule:
-    - cron:  '0 4 * * *'
+    - cron:  '9 4 * * *'
 
 # set up environment variables to be used across all the jobs
 env:
@@ -64,7 +64,7 @@ jobs:
         with:
           workflow: continuous-delivery
           ref: ${{ matrix.branch }}
-          inputs: '{ "DEPTH": "schedule", "TEST_LEVEL": "4", "BUILD_PLUGIN": "true", "LOG_LEVEL": "debug" }'
+          inputs: '{ "DEPTH": "schedule", "TEST_LEVEL": "4", "BUILD_PLUGIN": true, "LOG_LEVEL": "debug" }'
 
   check_commenter:
     if: |
