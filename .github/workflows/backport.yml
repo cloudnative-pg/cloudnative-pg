@@ -26,7 +26,6 @@ jobs:
           number:  ${{ github.event.pull_request.number }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.16
             release-1.17
             release-1.18
       -
@@ -58,7 +57,6 @@ jobs:
       fail-fast: false
       matrix:
         branch:
-          -  release-1.16
           -  release-1.17
           -  release-1.18
     env:
