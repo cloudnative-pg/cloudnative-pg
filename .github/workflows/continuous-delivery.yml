@@ -64,7 +64,7 @@ jobs:
         with:
           workflow: continuous-delivery
           ref: ${{ matrix.branch }}
-          inputs: '{ "depth": "schedule", "test_level": "4", "build_plugin": "true", "log_level": "debug" }'
+          inputs: '{ "depth": "push", "test_level": "4", "build_plugin": "true", "log_level": "debug" }'
 
   check_commenter:
     if: |
