@@ -231,7 +231,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				targetDBSecret                     = "secret_test"
 				testTableName                      = "test_table"
 				clusterWithMinioStandbysSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-standbys.yaml.template"
-				backupStandbysFile                 = fixturesDir + "/backup/minio/backup-minio.yaml"
+				backupStandbysFile                 = fixturesDir + "/backup/minio/backup-minio-standbys.yaml"
 			)
 
 			targetClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioStandbysSampleFile)
