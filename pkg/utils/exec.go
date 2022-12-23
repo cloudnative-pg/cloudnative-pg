@@ -86,6 +86,9 @@ func ExecCommand(
 		Stderr:    true,
 	}, scheme.ParameterCodec)
 
+	if timeout != nil {
+		config.Timeout = *timeout
+	}
 	executor, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
 		return "", "", err
