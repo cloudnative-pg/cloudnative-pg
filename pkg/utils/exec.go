@@ -75,8 +75,10 @@ func ExecCommand(
 		SubResource("exec").
 		Param("container", pod.Spec.Containers[targetContainer].Name)
 
+	newConfig := *config // local copy avoids modifying the passed config arg
 	if timeout != nil {
 		req.Timeout(*timeout)
+		newConfig.Timeout = *timeout
 	}
 
 	req.VersionedParams(&corev1.PodExecOptions{
@@ -86,10 +88,7 @@ func ExecCommand(
 		Stderr:    true,
 	}, scheme.ParameterCodec)
 
-	if timeout != nil {
-		config.Timeout = *timeout
-	}
-	executor, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	executor, err := remotecommand.NewSPDYExecutor(&newConfig, "POST", req.URL())
 	if err != nil {
 		return "", "", err
 	}
