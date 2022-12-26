@@ -107,7 +107,7 @@ var _ = SynchronizedAfterSuite(func() {
 //
 // along the way it parses the timestamps for convenience, BUT the lines
 // of output are not legal JSON
-func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer) {
+func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer, capLines int) {
 	scanner := bufio.NewScanner(&buf)
 	filename := "out/operator_logs_" + specName + ".log"
 	f, err := os.Create(filepath.Clean(filename))
@@ -125,8 +125,11 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer) {
 			fmt.Fprintln(output, "ERROR while closing file:", err)
 		}
 	}()
-	for scanner.Scan() {
+
+	lineIdx := 0
+	for scanner.Scan() && lineIdx < capLines {
 		lg := scanner.Text()
+		lineIdx++
 		var js map[string]interface{}
 		err = json.Unmarshal([]byte(lg), &js)
 		if err != nil {
@@ -172,9 +175,12 @@ var _ = BeforeEach(func() {
 	DeferCleanup(func(ctx SpecContext) {
 		if CurrentSpecReport().Failed() {
 			specName := CurrentSpecReport().FullText()
-			GinkgoWriter.Println("DUMPING tailed Operator Logs. Failed Spec:",
-				specName)
-			saveOperatorLogs(buf, strings.ReplaceAll(specName, " ", "_"), GinkgoWriter)
+			capLines := 200
+			GinkgoWriter.Printf("DUMPING tailed Operator Logs (at most %v lines). Failed Spec: %v\n",
+				capLines, specName)
+			GinkgoWriter.Println("================================================================================")
+			saveOperatorLogs(buf, strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
+			GinkgoWriter.Println("================================================================================")
 		}
 	})
 
