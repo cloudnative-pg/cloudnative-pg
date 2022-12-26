@@ -17,7 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -48,24 +47,6 @@ func GetPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, erro
 
 // createPsqlClient creates a psql client
 func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, error) {
-	name := "psql-client-secret"
-	pass, err := password.Generate(64, 10, 0, false, true)
-	if err != nil {
-		return &corev1.Pod{}, err
-	}
-	postgresSecret := specs.CreateSecret(
-		name,
-		namespace,
-		"*",
-		"postgres",
-		"postgres",
-		pass,
-	)
-	err = env.Client.Create(env.Ctx, postgresSecret)
-	if err != nil {
-		return &corev1.Pod{}, err
-	}
-
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
@@ -84,19 +65,8 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 				{
 					Name:  specs.PostgresContainerName,
 					Image: versions.DefaultImageName,
-					Env: []corev1.EnvVar{
-						{
-							Name: "POSTGRES_PASSWORD",
-							ValueFrom: &corev1.EnvVarSource{
-								SecretKeyRef: &corev1.SecretKeySelector{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: name,
-									},
-									Key: "password",
-								},
-							},
-						},
-					},
+					// sleep long enough to avoid starting the postgres server until we finish the testing
+					Command: []string{"bash", "-c", "sleep 7200"},
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: pointer.Bool(false),
 						SeccompProfile:           seccompProfile,
@@ -111,7 +81,7 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 		},
 	}
 
-	err = env.Client.Create(env.Ctx, psqlPod)
+	err := env.Client.Create(env.Ctx, psqlPod)
 	if err != nil {
 		return &corev1.Pod{}, err
 	}
