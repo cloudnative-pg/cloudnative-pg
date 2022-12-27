@@ -17,12 +17,11 @@ limitations under the License.
 package specs
 
 import (
-	policyv1 "k8s.io/api/policy/v1"
+	policyv1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // BuildReplicasPodDisruptionBudget creates a pod disruption budget telling
@@ -44,8 +43,8 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.ClusterLabelName: cluster.Name,
-					ClusterRoleLabelName:   ClusterRoleLabelReplica,
+					ClusterLabelName:     cluster.Name,
+					ClusterRoleLabelName: ClusterRoleLabelReplica,
 				},
 			},
 			MinAvailable: &allReplicasButOne,
@@ -69,8 +68,8 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.ClusterLabelName: cluster.Name,
-					ClusterRoleLabelName:   ClusterRoleLabelPrimary,
+					ClusterLabelName:     cluster.Name,
+					ClusterRoleLabelName: ClusterRoleLabelPrimary,
 				},
 			},
 			MinAvailable: &one,

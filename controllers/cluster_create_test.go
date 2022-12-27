@@ -20,7 +20,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
+	policyv1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -234,42 +234,5 @@ var _ = Describe("cluster_create unit tests", func() {
 				&policyv1.PodDisruptionBudget{},
 			)
 		})
-	})
-})
-
-var _ = Describe("Set cluster metadata of service account", func() {
-	It("must be idempotent, if metadata are not defined", func() {
-		sa := &corev1.ServiceAccount{}
-
-		cluster := &apiv1.Cluster{}
-
-		cluster.Spec.ServiceAccountTemplate.MergeMetadata(sa)
-		Expect(sa.Annotations).To(BeEmpty())
-		Expect(sa.Labels).To(BeEmpty())
-	})
-
-	It("must set metadata, if they are defined", func() {
-		sa := &corev1.ServiceAccount{}
-
-		annotations := map[string]string{
-			"testProvider": "testAnnotation",
-		}
-		labels := map[string]string{
-			"testProvider": "testLabel",
-		}
-		cluster := &apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ServiceAccountTemplate: &apiv1.ServiceAccountTemplate{
-					Metadata: apiv1.Metadata{
-						Labels:      labels,
-						Annotations: annotations,
-					},
-				},
-			},
-		}
-
-		cluster.Spec.ServiceAccountTemplate.MergeMetadata(sa)
-		Expect(sa.Annotations).To(BeEquivalentTo(cluster.Spec.ServiceAccountTemplate.Metadata.Annotations))
-		Expect(sa.Labels).To(BeEquivalentTo(cluster.Spec.ServiceAccountTemplate.Metadata.Labels))
 	})
 })
