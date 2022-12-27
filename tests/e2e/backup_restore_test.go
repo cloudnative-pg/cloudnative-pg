@@ -241,12 +241,12 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioStandbysSampleFile, env)
 
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBSecret, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBOne, testTableName, psqlClientPod)
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBTwo, testTableName, psqlClientPod)
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBSecret, testTableName, psqlClientPod)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, targetClusterName, tableName)
+			AssertCreateTestData(namespace, targetClusterName, tableName, psqlClientPod)
 
 			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
 			latestTar := minioPath(targetClusterName, "data.tar")
