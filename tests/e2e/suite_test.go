@@ -196,7 +196,7 @@ var _ = BeforeEach(func() {
 	DeferCleanup(func(ctx SpecContext) {
 		if CurrentSpecReport().Failed() {
 			specName := CurrentSpecReport().FullText()
-			capLines := 200
+			capLines := 50
 			GinkgoWriter.Printf("DUMPING tailed Operator Logs (at most %v lines). Failed Spec: %v\n",
 				capLines, specName)
 			GinkgoWriter.Println("================================================================================")
