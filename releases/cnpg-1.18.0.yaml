@@ -11448,11 +11448,11 @@ spec:
             scheme: HTTPS
         resources:
           limits:
-            cpu: 100m
-            memory: 200Mi
+            cpu: 200m
+            memory: 400Mi
           requests:
-            cpu: 100m
-            memory: 100Mi
+            cpu: 200m
+            memory: 400Mi
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
