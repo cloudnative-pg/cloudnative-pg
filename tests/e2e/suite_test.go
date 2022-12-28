@@ -63,6 +63,11 @@ var (
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
+	// skipping creating psqlClient pod for upgrade tests
+	if isUpgradeTestSuite() {
+		return nil
+	}
+
 	var err error
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
@@ -77,6 +82,11 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 	return psqlPodJSONObj
 }, func(data []byte) {
+	// skipping retrieving psqlClient pod for upgrade tests
+	if isUpgradeTestSuite() {
+		return
+	}
+
 	var err error
 	// We are creating new testing env object again because above testing env can not serialize and
 	// accessible to all nodes (specs)
@@ -97,6 +107,11 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 var _ = SynchronizedAfterSuite(func() {
 }, func() {
+	// skipping cleaning up psqlClient pod for upgrade tests
+	if isUpgradeTestSuite() {
+		return
+	}
+
 	err := env.DeleteNamespace(psqlClientNamespace)
 	Expect(err).ToNot(HaveOccurred())
 })
@@ -146,6 +161,13 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer) {
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(output, "ERROR while scanning:", err)
 	}
+}
+
+// isUpgradeTestSuite tells if current test suite is an upgrade test suite or not basing on
+// the label filter specified in the Ginkgo CLI with the option "--label-filter"
+func isUpgradeTestSuite() bool {
+	suiteConfig, _ := GinkgoConfiguration()
+	return suiteConfig.LabelFilter == tests.LabelUpgrade
 }
 
 var _ = BeforeEach(func() {
