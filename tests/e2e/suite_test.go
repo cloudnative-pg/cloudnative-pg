@@ -102,7 +102,7 @@ var _ = SynchronizedAfterSuite(func() {
 })
 
 // saveOperatorLogs does 2 things:
-//   - displays the non-DEBUG operator logs on the `output` io.Writer (likely GinkgoWriter)
+//   - displays the last `capLines` of non-DEBUG operator logs on the `output` io.Writer (likely GinkgoWriter)
 //   - saves the full logs to a file
 //
 // along the way it parses the timestamps for convenience, BUT the lines
@@ -126,10 +126,16 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer, capLi
 		}
 	}()
 
-	lineIdx := 0
-	for scanner.Scan() && lineIdx < capLines {
+	// slice to hold the last `capLines` lines of non-DEBUG operator logs
+	lines := make([]string, capLines)
+	// index of the current line of the non-DEBUG operator log (starting from zero)
+	i := 0
+	// index in the slice that holds the current line of non-DEBUG operator log
+	curIdx := 0
+
+	for scanner.Scan() {
 		lg := scanner.Text()
-		lineIdx++
+
 		var js map[string]interface{}
 		err = json.Unmarshal([]byte(lg), &js)
 		if err != nil {
@@ -141,11 +147,26 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer, capLi
 			lg = ts.Format(time.Stamp) + " - " + lg
 		}
 
+		// store the latest line of non-DEBUG operator logs to the slice
 		if js["level"] != "debug" {
-			fmt.Fprintln(output, lg)
+			lines[curIdx] = lg
+			i++
+			// `curIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
+			curIdx = i % capLines
 		}
+		// write every line to the file stream
 		fmt.Fprintln(f, lg)
 	}
+
+	// print the last `capLines` lines of logs to the `output`
+	if i > capLines && curIdx < (capLines-1) {
+		// if `curIdx` walks to in the middle of 0 and `capLines-1`, assemble the last `capLines`
+		// lines of logs
+		fmt.Fprintln(output, append(lines[curIdx+1:], lines[:curIdx+1]...))
+	} else {
+		fmt.Fprintln(output, lines)
+	}
+
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(output, "ERROR while scanning:", err)
 	}
