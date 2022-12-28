@@ -272,7 +272,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
 		}
 
-		err := env.DeleteNamespaceAndWait(namespace, 120)
+		err := env.DeleteNamespace(namespace)
 		if err != nil {
 			return fmt.Errorf("could not cleanup. Failed to delete namespace: %v", err)
 		}
