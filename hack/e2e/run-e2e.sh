@@ -63,6 +63,12 @@ if ! which ginkgo &>/dev/null; then
   go install github.com/onsi/ginkgo/v2/ginkgo
 fi
 
+# Skip upgrade tests on Kubernetes 1.25
+# TODO: remove when CNPG 1.18 will be released
+if [[ "${K8S_VERSION}" =~ ^v1\.25 ]]; then
+  TEST_UPGRADE_TO_V1=false
+fi
+
 # The RC return code will be non-zero iff either the two `jq` calls has a non-zero exit
 # NOTE: the ginkgo calls may have non-zero exits, with E2E tests that fail but could be 'ignore-fail'
 RC=0

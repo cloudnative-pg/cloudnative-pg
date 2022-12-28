@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"reflect"
 	goruntime "runtime"
+	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -105,8 +106,8 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 var ErrNextLoop = errors.New("stop this loop and return the associated Result object")
 
 // Alphabetical order to not repeat or miss permissions
-// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list;patch
-// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;list;patch
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;list
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;update;list
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;create;update
@@ -600,8 +601,22 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		return fmt.Errorf("while parsing PVC size %v: %w", cluster.Spec.StorageConfiguration.Size, err)
 	}
 
+	var walQuantity *resource.Quantity
+
+	if cluster.Spec.WalStorage != nil {
+		q, err := resource.ParseQuantity(cluster.Spec.WalStorage.Size)
+		if err != nil {
+			return fmt.Errorf("while parsing WAL PVC size %v: %w", cluster.Spec.WalStorage.Size, err)
+		}
+		walQuantity = &q
+	}
+
 	for idx := range resources.pvcs.Items {
 		oldPVC := resources.pvcs.Items[idx].DeepCopy()
+		q := quantity
+		if strings.HasSuffix(oldPVC.Name, apiv1.WalArchiveVolumeSuffix) && walQuantity != nil {
+			q = *walQuantity
+		}
 		oldQuantity, ok := resources.pvcs.Items[idx].Spec.Resources.Requests["storage"]
 
 		switch {
@@ -609,13 +624,13 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 			// Missing storage requirement for PVC
 			fallthrough
 
-		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == -1:
+		case oldQuantity.AsDec().Cmp(q.AsDec()) == -1:
 			// Increasing storage resources
-			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = quantity
+			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = q
 			if err = r.Patch(ctx, &resources.pvcs.Items[idx], client.MergeFrom(oldPVC)); err != nil {
 				// Decreasing resources is not possible
 				contextLogger.Error(err, "error while changing PVC storage requirement",
-					"from", oldQuantity, "to", quantity,
+					"from", oldQuantity, "to", q,
 					"pvcName", resources.pvcs.Items[idx].Name)
 
 				// We are reaching two errors in two different conditions:
@@ -625,10 +640,10 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 				//    about it
 			}
 
-		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == 1:
+		case oldQuantity.AsDec().Cmp(q.AsDec()) == 1:
 			// Decreasing resources is not possible
 			contextLogger.Info("cannot decrease storage requirement",
-				"from", oldQuantity, "to", quantity,
+				"from", oldQuantity, "to", q,
 				"pvcName", resources.pvcs.Items[idx].Name)
 		}
 	}
@@ -1098,8 +1113,10 @@ func (r *ClusterReconciler) mapNodeToClusters(ctx context.Context) handler.MapFu
 		// get all the pods handled by the operator on that node
 		err := r.List(ctx, &childPods,
 			client.MatchingFields{".spec.nodeName": node.Name},
-			client.MatchingLabels{specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
-			client.HasLabels{utils.ClusterLabelName},
+			client.MatchingLabels{
+				specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+				utils.PodRoleLabelName:     string(utils.PodRoleInstance),
+			},
 		)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "while getting primary instances for node")

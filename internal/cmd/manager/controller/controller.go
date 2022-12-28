@@ -25,16 +25,19 @@ import (
 	"net/http/pprof"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
@@ -45,8 +48,17 @@ import (
 )
 
 var (
-	scheme   = schemeBuilder.BuildWithAllKnownScheme()
+	scheme   = runtime.NewScheme()
 	setupLog = log.WithName("setup")
+
+	// clientSet is the kubernetes client used during
+	// the initialization of the operator
+	clientSet *kubernetes.Clientset
+
+	// apiClientSet is the kubernetes client set with
+	// support for the apiextensions that is used
+	// during the initialization of the operator
+	apiClientSet *apiextensionsclientset.Clientset
 )
 
 const (
@@ -74,6 +86,13 @@ const (
 	CaSecretName = "cnpg-ca-secret" // #nosec
 
 )
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+	_ = apiv1.AddToScheme(scheme)
+	_ = monitoringv1.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
+}
 
 // leaderElectionConfiguration contains the leader parameters that will be passed to controllerruntime.Options.
 type leaderElectionConfiguration struct {
@@ -159,17 +178,13 @@ func RunController(
 		mgr.GetWebhookServer().KeyName = "tls.key"
 	}
 
-	// kubeClient is the kubernetes client set with
-	// support for the apiextensions that is used
-	// during the initialization of the operator
-	// kubeClient client.Client
-	kubeClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: scheme})
+	err = createKubernetesClient(mgr.GetConfig())
 	if err != nil {
-		setupLog.Error(err, "unable to create Kubernetes client")
+		setupLog.Error(err, "unable to create Kubernetes clients")
 		return err
 	}
 
-	err = loadConfiguration(ctx, kubeClient, configMapName, secretName)
+	err = loadConfiguration(ctx, configMapName, secretName)
 	if err != nil {
 		return err
 	}
@@ -194,7 +209,7 @@ func RunController(
 	}
 
 	// Retrieve the Kubernetes cluster system UID
-	if err = utils.DetectKubeSystemUID(ctx, kubeClient); err != nil {
+	if err = utils.DetectKubeSystemUID(ctx, clientSet); err != nil {
 		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
 		return err
 	}
@@ -204,7 +219,7 @@ func RunController(
 		"haveSCC", utils.HaveSecurityContextConstraints(),
 		"haveSeccompProfile", utils.HaveSeccompSupport())
 
-	if err := ensurePKI(ctx, kubeClient, mgr.GetWebhookServer().CertDir); err != nil {
+	if err := ensurePKI(ctx, mgr.GetWebhookServer().CertDir); err != nil {
 		return err
 	}
 
@@ -285,17 +300,12 @@ func RunController(
 }
 
 // loadConfiguration reads the configuration from the provided configmap and secret
-func loadConfiguration(
-	ctx context.Context,
-	kubeClient client.Client,
-	configMapName string,
-	secretName string,
-) error {
+func loadConfiguration(ctx context.Context, configMapName string, secretName string) error {
 	configData := make(map[string]string)
 
 	// First read the configmap if provided and store it in configData
 	if configMapName != "" {
-		configMapData, err := readConfigMap(ctx, kubeClient, configuration.Current.OperatorNamespace, configMapName)
+		configMapData, err := readConfigMap(ctx, configuration.Current.OperatorNamespace, configMapName)
 		if err != nil {
 			setupLog.Error(err, "unable to read ConfigMap",
 				"namespace", configuration.Current.OperatorNamespace,
@@ -309,7 +319,7 @@ func loadConfiguration(
 
 	// Then read the secret if provided and store it in configData, overwriting configmap's values
 	if secretName != "" {
-		secretData, err := readSecret(ctx, kubeClient, configuration.Current.OperatorNamespace, secretName)
+		secretData, err := readSecret(ctx, configuration.Current.OperatorNamespace, secretName)
 		if err != nil {
 			setupLog.Error(err, "unable to read Secret",
 				"namespace", configuration.Current.OperatorNamespace,
@@ -334,13 +344,26 @@ func readinessProbeHandler(w http.ResponseWriter, _r *http.Request) {
 	_, _ = fmt.Fprint(w, "OK")
 }
 
+// createKubernetesClient creates the Kubernetes client that will be used during
+// the operator initialization
+func createKubernetesClient(config *rest.Config) error {
+	var err error
+	clientSet, err = kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("cannot create a K8s client: %w", err)
+	}
+
+	apiClientSet, err = apiextensionsclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("cannot create a K8s API extension client: %w", err)
+	}
+
+	return nil
+}
+
 // ensurePKI ensures that we have the required PKI infrastructure to make
 // the operator and the clusters working
-func ensurePKI(
-	ctx context.Context,
-	kubeClient client.Client,
-	mgrCertDir string,
-) error {
+func ensurePKI(ctx context.Context, mgrCertDir string) error {
 	if configuration.Current.WebhookCertDir != "" {
 		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
 		return nil
@@ -363,7 +386,7 @@ func ensurePKI(
 		},
 		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
 	}
-	err := pkiConfig.Setup(ctx, kubeClient)
+	err := pkiConfig.Setup(ctx, clientSet, apiClientSet)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 	}
@@ -371,12 +394,7 @@ func ensurePKI(
 }
 
 // readConfigMap reads the configMap and returns its content as map
-func readConfigMap(
-	ctx context.Context,
-	kubeClient client.Client,
-	namespace string,
-	name string,
-) (map[string]string, error) {
+func readConfigMap(ctx context.Context, namespace, name string) (map[string]string, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -389,8 +407,7 @@ func readConfigMap(
 		"namespace", namespace,
 		"name", name)
 
-	configMap := &corev1.ConfigMap{}
-	err := kubeClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, configMap)
+	configMap, err := clientSet.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 	if apierrs.IsNotFound(err) {
 		return nil, nil
 	}
@@ -402,12 +419,7 @@ func readConfigMap(
 }
 
 // readSecret reads the secret and returns its content as map
-func readSecret(
-	ctx context.Context,
-	kubeClient client.Client,
-	namespace,
-	name string,
-) (map[string]string, error) {
+func readSecret(ctx context.Context, namespace, name string) (map[string]string, error) {
 	if name == "" {
 		return nil, nil
 	}
@@ -420,8 +432,7 @@ func readSecret(
 		"namespace", namespace,
 		"name", name)
 
-	secret := &corev1.Secret{}
-	err := kubeClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret)
+	secret, err := clientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if apierrs.IsNotFound(err) {
 		return nil, nil
 	}

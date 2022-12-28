@@ -2543,6 +2543,12 @@ func AssertReplicationSlotsOnPod(
 	clusterName string,
 	pod corev1.Pod,
 ) {
+	// Replication slot high availability requires PostgreSQL 11 or above
+	if env.PostgresVersion == 10 {
+		Skip("Ignoring replication slots verification for postgres 10")
+		return
+	}
+
 	expectedSlots, err := testsUtils.GetExpectedReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -2582,6 +2588,11 @@ func AssertClusterReplicationSlotsAligned(
 	namespace,
 	clusterName string,
 ) {
+	// Replication slot high availability requires PostgreSQL 11 or above
+	if env.PostgresVersion == 10 {
+		Skip("Ignoring replication slots verification for postgres 10")
+	}
+
 	podList, err := env.GetClusterPodList(namespace, clusterName)
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() bool {

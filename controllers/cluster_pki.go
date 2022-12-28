@@ -347,13 +347,12 @@ func (r *ClusterReconciler) renewAndUpdateCertificate(
 	caSecret *v1.Secret,
 	secret *v1.Secret,
 ) error {
-	origSecret := secret.DeepCopy()
 	hasBeenRenewed, err := certs.RenewLeafCertificate(caSecret, secret)
 	if err != nil {
 		return err
 	}
 	if hasBeenRenewed {
-		return r.Patch(ctx, secret, client.MergeFrom(origSecret))
+		return r.Update(ctx, secret)
 	}
 
 	return nil
