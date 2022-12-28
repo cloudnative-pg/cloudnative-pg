@@ -65,8 +65,11 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 				{
 					Name:  specs.PostgresContainerName,
 					Image: versions.DefaultImageName,
-					// sleep long enough to avoid starting the postgres server until we finish the testing
-					Command: []string{"bash", "-c", "sleep 7200"},
+					// override the default Entrypoint ("docker-entrypoint.sh") of the image
+					Command: []string{"bash", "-c"},
+					// override the default Cmd ("postgres") of the image
+					// sleep enough time to keep the pod running until we finish the E2E tests
+					Args: []string{"sleep 7200"},
 					SecurityContext: &corev1.SecurityContext{
 						AllowPrivilegeEscalation: pointer.Bool(false),
 						SeccompProfile:           seccompProfile,
