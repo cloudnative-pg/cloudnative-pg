@@ -223,7 +223,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	assertManagerRollout := func() {
+	assertInstanceManagerRollout := func(namespace string) {
+		By("verifying in-place instance manager upgrades")
 		retryCheckingEvents := wait.Backoff{
 			Duration: 10 * time.Second,
 			Steps:    5,
@@ -235,6 +236,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			eventList := corev1.EventList{}
 			err := env.Client.List(env.Ctx,
 				&eventList,
+				ctrlclient.InNamespace(namespace),
 				ctrlclient.MatchingFields{
 					"involvedObject.kind": "Cluster",
 					"involvedObject.name": clusterName1,
@@ -270,7 +272,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
 		}
 
-		err := env.DeleteNamespace(namespace)
+		err := env.DeleteNamespaceAndWait(namespace, 120)
 		if err != nil {
 			return fmt.Errorf("could not cleanup. Failed to delete namespace: %v", err)
 		}
@@ -301,7 +303,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	applyUpgrade := func(upgradeNamespace string) {
+	assertApplyUpgrade := func(upgradeNamespace string) {
 		// Create the secrets used by the clusters and minio
 		By("creating the postgres secrets", func() {
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
@@ -496,7 +498,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		} else {
 			GinkgoWriter.Printf("online upgrade\n")
 			// Pods shouldn't change and there should be an event
-			assertManagerRollout()
+			assertInstanceManagerRollout(upgradeNamespace)
 			GinkgoWriter.Printf("assertManagerRollout is done\n")
 			Eventually(func() (int, error) {
 				var currentUIDs []types.UID
@@ -576,7 +578,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
 		assertCreateNamespace(upgradeNamespace)
 		DeferCleanup(cleanupNamespace, upgradeNamespace)
-		applyUpgrade(upgradeNamespace)
+		assertApplyUpgrade(upgradeNamespace)
 	})
 
 	It("works after an upgrade with online upgrade", func() {
@@ -594,8 +596,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		assertCreateNamespace(upgradeNamespace)
 		DeferCleanup(cleanupNamespace, upgradeNamespace)
-		applyUpgrade(upgradeNamespace)
-
-		assertManagerRollout()
+		assertApplyUpgrade(upgradeNamespace)
 	})
 })
