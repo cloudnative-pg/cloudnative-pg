@@ -80,8 +80,8 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			promMetrics := []string{
-				`cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} |`,
-				`cnpg_pgbouncer_collections_total \d|`,
+				`cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} [0-9e\.]+|`,
+				`cnpg_pgbouncer_collections_total \d+|`,
 				`cnpg_pgbouncer_last_collection_error 0|`,
 				`cnpg_pgbouncer_lists_dns_pending \d+|`,
 				`cnpg_pgbouncer_lists_dns_queries \d+|`,
