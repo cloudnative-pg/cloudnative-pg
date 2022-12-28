@@ -18,7 +18,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -178,13 +177,8 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 }
 
 // waitForWalArchiveWorking retry until the wal archiving is working or the timeout occur
-func waitForWalArchiveWorking() error {
-	db, err := sql.Open(
-		"pgx",
-		fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
-			GetSocketDir(),
-			GetServerPort()),
-	)
+func waitForWalArchiveWorking(instance *Instance) error {
+	db, err := instance.PrimaryConnectionPool().Connection("postgres")
 	if err != nil {
 		log.Error(err, "can not open postgres database")
 		return err
@@ -256,7 +250,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		return fmt.Errorf("can't set backup as running: %v", err)
 	}
 
-	err = waitForWalArchiveWorking()
+	err = waitForWalArchiveWorking(b.Instance)
 	if err != nil {
 		log.Info("WAL archiving is not working")
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
