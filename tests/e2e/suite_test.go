@@ -126,12 +126,12 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer, capLi
 		}
 	}()
 
-	// slice to hold the last `capLines` lines of non-DEBUG operator logs
-	lines := make([]string, capLines)
-	// index of the current line of the non-DEBUG operator log (starting from zero)
-	i := 0
-	// index in the slice that holds the current line of non-DEBUG operator log
-	curIdx := 0
+	// circular buffer to hold the last `capLines` of non-DEBUG operator logs
+	lineBuffer := make([]string, capLines)
+	// count of non-DEBUG operator log lines read
+	nonDebugLines := 0
+	// insertion point in the lineBuffer: values 0 to capLines - 1 (i.e. modulo capLines)
+	bufferIdx := 0
 
 	for scanner.Scan() {
 		lg := scanner.Text()
@@ -149,22 +149,22 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer, capLi
 
 		// store the latest line of non-DEBUG operator logs to the slice
 		if js["level"] != "debug" {
-			lines[curIdx] = lg
-			i++
-			// `curIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
-			curIdx = i % capLines
+			lineBuffer[bufferIdx] = lg
+			nonDebugLines++
+			// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
+			bufferIdx = nonDebugLines % capLines
 		}
 		// write every line to the file stream
 		fmt.Fprintln(f, lg)
 	}
 
 	// print the last `capLines` lines of logs to the `output`
-	if i > capLines && curIdx < (capLines-1) {
-		// if `curIdx` walks to in the middle of 0 and `capLines-1`, assemble the last `capLines`
-		// lines of logs
-		fmt.Fprintln(output, append(lines[curIdx+1:], lines[:curIdx+1]...))
+	if nonDebugLines <= capLines || bufferIdx == 0 {
+		// if bufferIdx == 0, the buffer just finished filling and is in order
+		fmt.Fprintln(output, strings.Join(lineBuffer, "\n"))
 	} else {
-		fmt.Fprintln(output, lines)
+		// the line buffer cycled back and the items 0 to bufferIdx - 1 are newer than the rest
+		fmt.Fprintln(output, strings.Join(append(lineBuffer[bufferIdx:], lineBuffer[:bufferIdx]...), "\n"))
 	}
 
 	if err := scanner.Err(); err != nil {
