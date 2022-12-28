@@ -254,7 +254,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			eventList := corev1.EventList{}
 			err := env.Client.List(env.Ctx,
 				&eventList,
-				ctrlclient.InNamespace(upgradeNamespace),
 				ctrlclient.MatchingFields{
 					"involvedObject.kind": "Cluster",
 					"involvedObject.name": clusterName1,
@@ -266,7 +265,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			var count int
 			for _, event := range eventList.Items {
-				GinkgoWriter.Println("XXXX event:", event.Reason, event.Message, time.Now().UTC().Format(time.RFC3339))
 				if event.Reason == "InstanceManagerUpgraded" {
 					count++
 					GinkgoWriter.Printf("%d: %s\n", count, event.Message)
