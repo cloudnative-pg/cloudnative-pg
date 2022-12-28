@@ -63,14 +63,14 @@ var (
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
+	var err error
+	env, err = utils.NewTestingEnvironment()
+	Expect(err).ShouldNot(HaveOccurred())
+
 	// skipping creating psqlClient pod for upgrade tests
 	if isUpgradeTestSuite() {
 		return nil
 	}
-
-	var err error
-	env, err = utils.NewTestingEnvironment()
-	Expect(err).ShouldNot(HaveOccurred())
 
 	pod, err := utils.GetPsqlClient(psqlClientNamespace, env)
 	Expect(err).ShouldNot(HaveOccurred())
@@ -82,11 +82,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 	return psqlPodJSONObj
 }, func(data []byte) {
-	// skipping retrieving psqlClient pod for upgrade tests
-	if isUpgradeTestSuite() {
-		return
-	}
-
 	var err error
 	// We are creating new testing env object again because above testing env can not serialize and
 	// accessible to all nodes (specs)
@@ -99,6 +94,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	testLevelEnv, err = tests.TestLevel()
 	if err != nil {
 		panic(err)
+	}
+	// skipping retrieving psqlClient pod for upgrade tests
+	if isUpgradeTestSuite() {
+		return
 	}
 	if err := json.Unmarshal(data, &psqlClientPod); err != nil {
 		panic(err)
