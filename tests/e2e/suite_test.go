@@ -67,11 +67,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	// skipping creating psqlClient pod for upgrade tests
-	if isUpgradeTestSuite() {
-		return nil
-	}
-
 	pod, err := utils.GetPsqlClient(psqlClientNamespace, env)
 	Expect(err).ShouldNot(HaveOccurred())
 	// here we serialized psql client pod object info and will be
@@ -95,10 +90,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	if err != nil {
 		panic(err)
 	}
-	// skipping retrieving psqlClient pod for upgrade tests
-	if isUpgradeTestSuite() {
-		return
-	}
 	if err := json.Unmarshal(data, &psqlClientPod); err != nil {
 		panic(err)
 	}
@@ -106,12 +97,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 var _ = SynchronizedAfterSuite(func() {
 }, func() {
-	// skipping cleaning up psqlClient pod for upgrade tests
-	if isUpgradeTestSuite() {
-		return
-	}
-
-	err := env.DeleteNamespace(psqlClientNamespace)
+	err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
 	Expect(err).ToNot(HaveOccurred())
 })
 
@@ -160,13 +146,6 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer) {
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(output, "ERROR while scanning:", err)
 	}
-}
-
-// isUpgradeTestSuite tells if current test suite is an upgrade test suite or not basing on
-// the label filter specified in the Ginkgo CLI with the option "--label-filter"
-func isUpgradeTestSuite() bool {
-	suiteConfig, _ := GinkgoConfiguration()
-	return suiteConfig.LabelFilter == tests.LabelUpgrade
 }
 
 var _ = BeforeEach(func() {
