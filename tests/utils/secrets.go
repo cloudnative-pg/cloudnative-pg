@@ -17,8 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -64,39 +62,19 @@ func CreateSecretCA(
 	return cluster, caPair, nil
 }
 
-// GetPassword retrieve password from secrets and return it as per user suffix
-func GetPassword(
-	clusterName, namespace string,
-	secretSuffix string,
-	env *TestingEnvironment) (
-	string, error,
-) {
-	// Get the cluster
-	cluster, err := env.GetCluster(namespace, clusterName)
-	if err != nil {
-		return "", err
-	}
-
-	var secretName string
-	switch secretSuffix {
-	case apiv1.SuperUserSecretSuffix:
-		secretName = cluster.GetSuperuserSecretName()
-	case apiv1.ApplicationUserSecretSuffix:
-		secretName = cluster.GetApplicationSecretName()
-	default:
-		return "", fmt.Errorf("unexpected secretSuffix %s", secretSuffix)
-	}
-
-	// Get the password as per user suffix in secret
-	secret := &corev1.Secret{}
-	secretNamespacedName := types.NamespacedName{
+// GetPassword generates password and return it as per user prefix
+func GetPassword(clusterName, namespace, userPrefix string, env *TestingEnvironment) (string, error) {
+	// Get the superuser password from the user prefix secret
+	superuserSecretName := clusterName + "-" + userPrefix
+	superuserSecret := &corev1.Secret{}
+	superuserSecretNamespacedName := types.NamespacedName{
 		Namespace: namespace,
-		Name:      secretName,
+		Name:      superuserSecretName,
 	}
-	err = env.Client.Get(env.Ctx, secretNamespacedName, secret)
+	err := env.Client.Get(env.Ctx, superuserSecretNamespacedName, superuserSecret)
 	if err != nil {
 		return "", err
 	}
-	password := string(secret.Data["password"])
-	return password, nil
+	generatedSuperuserPassword := string(superuserSecret.Data["password"])
+	return generatedSuperuserPassword, nil
 }
