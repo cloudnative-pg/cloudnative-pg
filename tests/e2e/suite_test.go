@@ -97,7 +97,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 var _ = SynchronizedAfterSuite(func() {
 }, func() {
-	err := env.DeleteNamespace(psqlClientNamespace)
+	err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
 	Expect(err).ToNot(HaveOccurred())
 })
 
