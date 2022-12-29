@@ -100,7 +100,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 	})
 	AfterEach(func() {
-		err := env.DeleteNamespace(upgradeNamespace)
+		err := env.DeleteNamespaceAndWait(upgradeNamespace, 300)
 		Expect(err).ToNot(HaveOccurred())
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
 		// the operator's namespace so that affects subsequent test
