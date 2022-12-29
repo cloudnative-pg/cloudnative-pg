@@ -74,11 +74,7 @@ func TestDirectoryEmpty(namespace, podName, directoryPath string) bool {
 func CreateObject(env *TestingEnvironment, object client.Object, opts ...client.CreateOption) error {
 	err := retry.Do(
 		func() error {
-			err := env.Client.Create(env.Ctx, object, opts...)
-			if err != nil {
-				return err
-			}
-			return nil
+			return env.Client.Create(env.Ctx, object, opts...)
 		},
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),

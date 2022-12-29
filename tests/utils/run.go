@@ -58,11 +58,7 @@ func RunUncheckedRetry(command string) (stdout string, stderr string, err error)
 		func() error {
 			cmd := exec.Command(tokens[0], tokens[1:]...) // #nosec G204
 			cmd.Stdout, cmd.Stderr = &outBuffer, &errBuffer
-			err = cmd.Run()
-			if err != nil {
-				return err
-			}
-			return nil
+			return cmd.Run()
 		},
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryAttempts),
