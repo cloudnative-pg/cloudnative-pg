@@ -36,7 +36,6 @@ jobs:
       fail-fast: false
       matrix:
         branch:
-          - release-1.16
           - release-1.17
           - release-1.18
     steps:
