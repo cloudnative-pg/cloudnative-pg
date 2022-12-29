@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,14 +71,29 @@ func GetCredentials(
 	env *TestingEnvironment) (
 	string, string, error,
 ) {
+	// Get the cluster
+	cluster, err := env.GetCluster(namespace, clusterName)
+	if err != nil {
+		return "", "", err
+	}
+
+	var secretName string
+	switch secretSuffix {
+	case apiv1.SuperUserSecretSuffix:
+		secretName = cluster.GetSuperuserSecretName()
+	case apiv1.ApplicationUserSecretSuffix:
+		secretName = cluster.GetApplicationSecretName()
+	default:
+		return "", "", fmt.Errorf("unexpected secretSuffix %s", secretSuffix)
+	}
+
 	// Get the password as per user suffix in secret
-	secretName := clusterName + secretSuffix
 	secret := &corev1.Secret{}
 	secretNamespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      secretName,
 	}
-	err := env.Client.Get(env.Ctx, secretNamespacedName, secret)
+	err = env.Client.Get(env.Ctx, secretNamespacedName, secret)
 	if err != nil {
 		return "", "", err
 	}
