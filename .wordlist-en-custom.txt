@@ -102,6 +102,9 @@ EncryptionType
 EndpointCA
 EnterpriseDB
 EnterpriseDB's
+EnvFrom
+EnvFromSource
+EnvVar
 ExternalCluster
 Fei
 Filesystem

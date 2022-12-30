@@ -109,6 +109,10 @@ func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []core
 		},
 	}
 
+	if len(cluster.Spec.Env) != 0 {
+		envVar = utils.MergeEnvVarSlices(envVar, cluster.Spec.Env)
+	}
+
 	return envVar
 }
 
@@ -124,6 +128,7 @@ func createPostgresContainers(
 			Image:           cluster.GetImageName(),
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             createEnvVarPostgresContainer(cluster, podName),
+			EnvFrom:         cluster.Spec.EnvFrom,
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
