@@ -92,6 +92,17 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 			})
 	}
 
+	if cluster.ShouldCreateProjectedVolume() {
+		result = append(result, corev1.Volume{
+			Name: "projected",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources:     cluster.Spec.ProjectedVolumeTemplate.Sources,
+					DefaultMode: cluster.Spec.ProjectedVolumeTemplate.DefaultMode,
+				},
+			},
+		})
+	}
 	return result
 }
 
@@ -199,6 +210,15 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 			corev1.VolumeMount{
 				Name:      "pg-wal",
 				MountPath: pgWalVolumePath,
+			},
+		)
+	}
+
+	if cluster.ShouldCreateProjectedVolume() {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      "projected",
+				MountPath: postgres.ProjectedVolumeDirectory,
 			},
 		)
 	}

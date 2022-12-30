@@ -264,6 +264,11 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=info
 	// +kubebuilder:validation:Enum:=error;warning;info;debug;trace
 	LogLevel string `json:"logLevel,omitempty"`
+
+	// Template to be used to define projected volumes, projected volumes will be mounted
+	// under `/projected` base folder
+	// +optional
+	ProjectedVolumeTemplate *corev1.ProjectedVolumeSource `json:"projectedVolumeTemplate,omitempty"`
 }
 
 const (
@@ -1972,6 +1977,11 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 
 	recoveryParameters := cluster.Spec.Bootstrap.Recovery
 	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
+}
+
+// ShouldCreateProjectedVolume returns whether we should create the projected all in one volume
+func (cluster *Cluster) ShouldCreateProjectedVolume() bool {
+	return cluster.Spec.ProjectedVolumeTemplate != nil
 }
 
 // ShouldCreateWalArchiveVolume returns whether we should create the wal archive volume
