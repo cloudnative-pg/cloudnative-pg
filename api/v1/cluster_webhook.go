@@ -293,6 +293,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateConfiguration,
 		r.validateLDAP,
 		r.validateReplicationSlots,
+		r.validateEnv,
 	}
 
 	for _, validate := range validations {
@@ -375,6 +376,46 @@ func (r *Cluster) validateLDAP() field.ErrorList {
 	}
 
 	return result
+}
+
+// validateEnv validate the environment variables settings proposed by the user
+func (r *Cluster) validateEnv() field.ErrorList {
+	var result field.ErrorList
+
+	for i := range r.Spec.Env {
+		if isReservedEnvironmentVariable(r.Spec.Env[i].Name) {
+			result = append(
+				result,
+				field.Invalid(field.NewPath("spec", "postgresql", "env").Index(i).Child("name"),
+					r.Spec.Env[i].Name,
+					"the usage of this environment variable is reserved for the operator",
+				))
+		}
+	}
+
+	return result
+}
+
+// isReservedEnvironmentVariable detects if a certain environment variable
+// is reserved for the usage of the operator
+func isReservedEnvironmentVariable(name string) bool {
+	name = strings.ToUpper(name)
+
+	switch {
+	case strings.HasPrefix(name, "PG"):
+		return true
+
+	case name == "POD_NAME":
+		return true
+
+	case name == "NAMESPACE":
+		return true
+
+	case name == "CLUSTER_NAME":
+		return true
+	}
+
+	return false
 }
 
 // validateInitDB validate the bootstrapping options when initdb

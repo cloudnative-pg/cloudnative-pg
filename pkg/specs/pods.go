@@ -81,7 +81,12 @@ const (
 	ReadinessProbePeriod = 10
 )
 
-func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []corev1.EnvVar {
+// CreateEnvVarPostgresContainer creates the set of environment variables that will be used
+// in the PostgreSQL Pods
+func CreateEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []corev1.EnvVar {
+	// When adding an environment variable here, remember to change the `isReservedEnvironmentVariable`
+	// function in `cluster_webhook.go` too.
+
 	envVar := []corev1.EnvVar{
 		{
 			Name:  "PGDATA",
@@ -109,11 +114,7 @@ func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []core
 		},
 	}
 
-	if len(cluster.Spec.Env) != 0 {
-		envVar = utils.MergeEnvVarSlices(envVar, cluster.Spec.Env)
-	}
-
-	return envVar
+	return append(cluster.Spec.Env, envVar...)
 }
 
 // createPostgresContainers create the PostgreSQL containers that are
@@ -127,7 +128,7 @@ func createPostgresContainers(
 			Name:            PostgresContainerName,
 			Image:           cluster.GetImageName(),
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-			Env:             createEnvVarPostgresContainer(cluster, podName),
+			Env:             CreateEnvVarPostgresContainer(cluster, podName),
 			EnvFrom:         cluster.Spec.EnvFrom,
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
 			ReadinessProbe: &corev1.Probe{

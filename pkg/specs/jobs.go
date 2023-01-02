@@ -243,7 +243,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 							Name:            role,
 							Image:           cluster.GetImageName(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             createEnvVarPostgresContainer(cluster, instanceName),
+							Env:             CreateEnvVarPostgresContainer(cluster, instanceName),
 							EnvFrom:         cluster.Spec.EnvFrom,
 							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
