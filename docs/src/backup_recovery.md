@@ -140,9 +140,9 @@ spec:
         [...]
 ```
 
-In case you're using **Digital Ocean Spaces**, you will have to use the Path-style syntax. 
+In case you're using **Digital Ocean Spaces**, you will have to use the Path-style syntax.
 
-In this example, it will use the `bucket` of **Digital Ocean Spaces** in the region `sfo3`.
+In this example, it will use the `bucket` from **Digital Ocean Spaces** in the region `SFO3`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
