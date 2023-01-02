@@ -120,11 +120,11 @@ spec:
 
 ### Other S3-compatible Object Storages providers
 
-In case you're using S3-compatible object storage, like MinIO or
-Linode Object Storage, you can specify an endpoint instead of using the
+In case you're using S3-compatible object storage, like **MinIO** or
+**Linode Object Storage**, you can specify an endpoint instead of using the
 default S3 one.
 
-In this example, it will use the `bucket` bucket of Linode in the region
+In this example, it will use the `bucket` of **Linode** in the region
 `us-east1`.
 
 ```yaml
@@ -136,6 +136,23 @@ spec:
     barmanObjectStore:
       destinationPath: "<destination path here>"
       endpointURL: bucket.us-east1.linodeobjects.com
+      s3Credentials:
+        [...]
+```
+
+In case you're using **Digital Ocean Spaces**, you will have to use the Path-style syntax.
+
+In this example, it will use the `bucket` from **Digital Ocean Spaces** in the region `SFO3`.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://[your-bucket-name]/[your-backup-folder]/"
+      endpointURL: "https://sfo3.digitaloceanspaces.com"
       s3Credentials:
         [...]
 ```
