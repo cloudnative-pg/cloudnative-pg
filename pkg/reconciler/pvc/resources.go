@@ -14,45 +14,43 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package specs
+package pvc
 
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
-	// PVCStatusAnnotationName is an annotation that shows the current status of the PVC.
+	// StatusAnnotationName is an annotation that shows the current status of the PVC.
 	// The status can be "initializing" or "ready"
-	PVCStatusAnnotationName = MetadataNamespace + "/pvcStatus"
+	StatusAnnotationName = specs.MetadataNamespace + "/pvcStatus"
 
-	// PVCStatusInitializing is the annotation value for PVC initializing status
-	PVCStatusInitializing = "initializing"
+	// StatusInitializing is the annotation value for PVC initializing status
+	StatusInitializing = "initializing"
 
-	// PVCStatusReady is the annotation value for PVC ready status
-	PVCStatusReady = "ready"
+	// StatusReady is the annotation value for PVC ready status
+	StatusReady = "ready"
 
-	// PVCStatusDetached is the annotation value for PVC detached status
-	PVCStatusDetached = "detached"
+	// StatusDetached is the annotation value for PVC detached status
+	StatusDetached = "detached"
 )
 
 // ErrorInvalidSize is raised when the size specified by the
 // user is not valid and can't be specified in a PVC declaration
 var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 
-// PVCUsageStatus is the status of the PVC we generated
-type PVCUsageStatus struct {
+// UsageStatus is the status of the PVC we generated
+type UsageStatus struct {
 	// List of available instances detected from pvcs
 	InstanceNames []string
 
@@ -72,68 +70,6 @@ type PVCUsageStatus struct {
 
 	// List of PVCs that are unusable (they are part of an incomplete group)
 	Unusable []string
-}
-
-// CreatePVC create spec of a PVC, given its name and the storage configuration
-func CreatePVC(
-	storageConfiguration apiv1.StorageConfiguration,
-	cluster apiv1.Cluster,
-	nodeSerial int,
-	role utils.PVCRole,
-) (*corev1.PersistentVolumeClaim, error) {
-	instanceName := GetInstanceName(cluster.Name, nodeSerial)
-	pvcName := GetPVCName(cluster, instanceName, role)
-
-	result := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
-			Namespace: cluster.Namespace,
-			Labels: map[string]string{
-				utils.InstanceNameLabelName: instanceName,
-				utils.PvcRoleLabelName:      string(role),
-			},
-			Annotations: map[string]string{
-				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
-				PVCStatusAnnotationName:     PVCStatusInitializing,
-			},
-		},
-	}
-
-	// If the customer supplied a spec, let's use it
-	if storageConfiguration.PersistentVolumeClaimTemplate != nil {
-		storageConfiguration.PersistentVolumeClaimTemplate.DeepCopyInto(&result.Spec)
-	}
-
-	// If the customer specified a storage class, let's use it
-	if storageConfiguration.StorageClass != nil {
-		result.Spec.StorageClassName = storageConfiguration.StorageClass
-	}
-
-	if storageConfiguration.Size != "" {
-		// Insert the storage requirement
-		parsedSize, err := resource.ParseQuantity(storageConfiguration.Size)
-		if err != nil {
-			return nil, ErrorInvalidSize
-		}
-
-		result.Spec.Resources = corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				"storage": parsedSize,
-			},
-		}
-	}
-
-	if len(result.Spec.AccessModes) == 0 {
-		result.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
-			corev1.ReadWriteOnce,
-		}
-	}
-
-	if result.Spec.Resources.Requests.Storage().IsZero() {
-		return nil, ErrorInvalidSize
-	}
-
-	return result, nil
 }
 
 // GetPVCName builds the name for a given PVC of the instance
@@ -175,7 +111,7 @@ func DetectPVCs(
 	podList []corev1.Pod,
 	jobList []batchv1.Job,
 	pvcList []corev1.PersistentVolumeClaim,
-) (result PVCUsageStatus) {
+) (result UsageStatus) {
 	contextLogger := log.FromContext(ctx)
 
 	// First we iterate over all the PVCs building the instances map.
@@ -195,7 +131,7 @@ func DetectPVCs(
 
 		// Detect the instance serial number.
 		// If it returns an error the PVC is ill-formed and we ignore it
-		serial, err := GetNodeSerial(pvc.ObjectMeta)
+		serial, err := specs.GetNodeSerial(pvc.ObjectMeta)
 		if err != nil {
 			continue
 		}
@@ -253,7 +189,7 @@ instancesLoop:
 			if !slices.Contains(expectedPVCs, pvc.Name) {
 				continue
 			}
-			if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
+			if pvc.Annotations[StatusAnnotationName] != StatusReady {
 				isAnyPvcUnusable = true
 			}
 		}
@@ -284,7 +220,7 @@ instancesLoop:
 		}
 
 		if isAnyPvcUnusable {
-			// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
+			// This PVC has not a Job nor a Pod using it, but it is not marked as StatusReady
 			// we need to ignore this instance and treat all the instance PVCs as unusable
 			result.Unusable = append(result.Unusable, pvcNames...)
 			contextLogger.Warning("found PVC that is not annotated as ready",

@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -1152,8 +1153,8 @@ func (r *ClusterReconciler) reconcilePVCs(
 
 	// This should not happen. However, we put this guard here
 	// as an assertion to catch unexpected events.
-	pvcStatus := pvc.Annotations[specs.PVCStatusAnnotationName]
-	if pvcStatus != specs.PVCStatusReady {
+	pvcStatus := pvc.Annotations[pvcReconciler.StatusAnnotationName]
+	if pvcStatus != pvcReconciler.StatusReady {
 		contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
 			"pvc", pvc.Name,
 			"status", pvcStatus)
@@ -1218,20 +1219,20 @@ func (r *ClusterReconciler) reconcilePVCs(
 // to the cluster, giving precedence to the target primary if existing in the set. If the target primary is fine,
 // let's start using the PVC we have initialized. After that we use the PVC that are initializing or dangling
 func electPvcToReattach(cluster *apiv1.Cluster) string {
-	pvcs := make([]string, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.DanglingPVC))
-	pvcs = append(pvcs, cluster.Status.InitializingPVC...)
-	pvcs = append(pvcs, cluster.Status.DanglingPVC...)
-	if len(pvcs) == 0 {
+	pvcsToReattach := make([]string, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.DanglingPVC))
+	pvcsToReattach = append(pvcsToReattach, cluster.Status.InitializingPVC...)
+	pvcsToReattach = append(pvcsToReattach, cluster.Status.DanglingPVC...)
+	if len(pvcsToReattach) == 0 {
 		return ""
 	}
 
-	for _, pvc := range pvcs {
-		if specs.DoesPVCBelongToInstance(cluster, cluster.Status.TargetPrimary, pvc) {
+	for _, pvc := range pvcsToReattach {
+		if pvcReconciler.DoesPVCBelongToInstance(cluster, cluster.Status.TargetPrimary, pvc) {
 			return pvc
 		}
 	}
 
-	return pvcs[0]
+	return pvcsToReattach[0]
 }
 
 // removeDanglingPVCs will remove dangling PVCs
@@ -1270,9 +1271,9 @@ func (r *ClusterReconciler) createPVC(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvc, err := specs.CreatePVC(storageConfiguration, *cluster, nodeSerial, role)
+	pvc, err := pvcReconciler.Create(storageConfiguration, *cluster, nodeSerial, role)
 	if err != nil {
-		if err == specs.ErrorInvalidSize {
+		if err == pvcReconciler.ErrorInvalidSize {
 			// This error should have been caught by the validating
 			// webhook, but since we are here the user must have disabled server-side
 			// validation, and we must react.

@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -156,7 +157,7 @@ func restoreOrphanPVCs(
 
 		pvcOrig := pvc.DeepCopy()
 		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
-		pvc.Annotations[specs.PVCStatusAnnotationName] = specs.PVCStatusReady
+		pvc.Annotations[pvcReconciler.StatusAnnotationName] = pvcReconciler.StatusReady
 		// we clean hibernation metadata if it exists
 		delete(pvc.Annotations, utils.HibernateClusterManifestAnnotationName)
 		delete(pvc.Annotations, utils.HibernatePgControlDataAnnotationName)

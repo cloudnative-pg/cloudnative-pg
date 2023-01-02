@@ -45,7 +45,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -233,7 +233,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+	if pvc.Annotations[pvcReconciler.StatusAnnotationName] == pvcReconciler.StatusReady {
 		return nil
 	}
 
@@ -244,7 +244,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 	if pvc.Annotations == nil {
 		pvc.Annotations = make(map[string]string, 1)
 	}
-	pvc.Annotations[specs.PVCStatusAnnotationName] = specs.PVCStatusReady
+	pvc.Annotations[pvcReconciler.StatusAnnotationName] = pvcReconciler.StatusReady
 
 	return r.Patch(ctx, pvc, client.MergeFrom(oldPvc))
 }
@@ -260,7 +260,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	newPVCCount := int32(len(resources.pvcs.Items))
 	cluster.Status.PVCCount = newPVCCount
-	pvcClassification := specs.DetectPVCs(
+	pvcClassification := pvcReconciler.DetectPVCs(
 		ctx,
 		cluster,
 		resources.instances.Items,

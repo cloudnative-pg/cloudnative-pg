@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -89,7 +89,7 @@ var _ = Describe("scale down", func() {
 			}
 
 			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
-			pvcWalName := specs.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
+			pvcWalName := pvc.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.Pod{},

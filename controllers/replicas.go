@@ -28,6 +28,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -595,7 +596,7 @@ func (r *ClusterReconciler) updateOperatorLabelsOnPVC(
 	for _, pod := range instances.Items {
 		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
 
-		instancePVCs := specs.FilterInstancePVCs(pvcs.Items, pod.Spec)
+		instancePVCs := pvcReconciler.FilterInstancePVCs(pvcs.Items, pod.Spec)
 		for i := range instancePVCs {
 			pvc := &instancePVCs[i]
 			var modified bool

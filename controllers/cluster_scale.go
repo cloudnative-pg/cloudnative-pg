@@ -28,7 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -91,7 +91,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 
 	if cluster.ShouldCreateWalArchiveVolume() {
 		// Let's drop the WAL PVC too
-		pvcWalName := specs.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
+		pvcWalName := pvcReconciler.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
 		pvcWal := v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvcWalName,

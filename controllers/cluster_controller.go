@@ -25,14 +25,12 @@ import (
 	"net/http"
 	"reflect"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,6 +48,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -484,12 +483,8 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Reconcile PVC resource requirements
-	if err := r.ReconcilePVCs(ctx, cluster, resources); err != nil {
-		if apierrs.IsConflict(err) {
-			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
-			return ctrl.Result{Requeue: true}, nil
-		}
-		return ctrl.Result{}, err
+	if res, err := pvcReconciler.Reconcile(ctx, r.Client, cluster, resources.pvcs.Items); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	// Reconcile Pods
@@ -581,71 +576,6 @@ func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *p
 	}
 
 	return isConsistent
-}
-
-// ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
-func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cluster,
-	resources *managedResources,
-) error {
-	contextLogger := log.FromContext(ctx)
-	if !cluster.ShouldResizeInUseVolumes() {
-		return nil
-	}
-
-	// Size is empty would due to size is defined through request and not changed yet
-	if cluster.Spec.StorageConfiguration.Size == "" {
-		return nil
-	}
-
-	quantity := cluster.Spec.StorageConfiguration.TryParseQuantity()
-	if quantity == nil {
-		return fmt.Errorf("while parsing PVC size %v", cluster.Spec.StorageConfiguration.Size)
-	}
-	walQuantity := cluster.Spec.WalStorage.TryParseQuantity()
-
-	for idx := range resources.pvcs.Items {
-		pvc := &resources.pvcs.Items[idx]
-		var patchError error
-		if !strings.HasSuffix(pvc.Name, apiv1.WalArchiveVolumeSuffix) {
-			patchError = patchPVCQuantity(ctx, r.Client, pvc, *quantity)
-		} else {
-			if walQuantity == nil {
-				return fmt.Errorf("wal storage required but no wal storage details provided")
-			}
-			patchError = patchPVCQuantity(ctx, r.Client, pvc, *walQuantity)
-		}
-
-		if patchError != nil {
-			contextLogger.Error(patchError,
-				"encountered an error while patching the quantity of a PVC",
-				"pvcName", pvc.Name,
-				"quantity", quantity,
-				"oldQuantity", pvc.Spec.Resources.Requests["storage"],
-			)
-		}
-
-	}
-
-	return nil
-}
-
-func patchPVCQuantity(
-	ctx context.Context,
-	c client.Client,
-	pvc *corev1.PersistentVolumeClaim,
-	q resource.Quantity,
-) error {
-	oldPVC := pvc.DeepCopy()
-	oldQuantity, ok := oldPVC.Spec.Resources.Requests["storage"]
-
-	if !ok || oldQuantity.AsDec().Cmp(q.AsDec()) == -1 {
-		// Increasing storage resources
-		oldPVC.Spec.Resources.Requests["storage"] = q
-		return c.Patch(ctx, pvc, client.MergeFrom(oldPVC))
-	}
-
-	// Decreasing resources is not possible
-	return fmt.Errorf("cannot decrease storage requirement")
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
@@ -747,7 +677,7 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 			)
 		}
 
-		if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+		if pvc.Annotations[pvcReconciler.StatusAnnotationName] == pvcReconciler.StatusReady {
 			continue
 		}
 
@@ -1151,7 +1081,7 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	for _, job := range completeJobs {
 		for _, pvc := range resources.pvcs.Items {
 			pvc := pvc
-			if !specs.IsPodSpecUsingPVCs(job.Spec.Template.Spec, pvc.Name) {
+			if !pvcReconciler.IsPodSpecUsingPVCs(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
 
