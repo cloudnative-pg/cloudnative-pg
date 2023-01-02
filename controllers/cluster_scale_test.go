@@ -89,7 +89,7 @@ var _ = Describe("scale down", func() {
 			}
 
 			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
-			pvcWalName := pvc.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
+			pvcWalName := pvc.GetPVCName(cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.Pod{},

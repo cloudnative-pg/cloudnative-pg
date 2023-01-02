@@ -179,7 +179,7 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			"*",
 			"postgres",
 			postgresPassword)
-		SetClusterOwnerAnnotationsAndLabels(&postgresSecret.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&postgresSecret.ObjectMeta)
 
 		if err := resources.CreateIfNotFound(ctx, r.Client, postgresSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
@@ -224,7 +224,7 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 			cluster.GetApplicationDatabaseOwner(),
 			appPassword)
 
-		SetClusterOwnerAnnotationsAndLabels(&appSecret.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta)
 		if err := resources.CreateIfNotFound(ctx, r.Client, appSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
 				return err
@@ -273,7 +273,7 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 
 func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
 	anyService := specs.CreateClusterAnyService(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&anyService.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
 
 	if err := resources.CreateIfNotFound(ctx, r.Client, anyService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -282,7 +282,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	}
 
 	readService := specs.CreateClusterReadService(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&readService.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
 
 	if err := resources.CreateIfNotFound(ctx, r.Client, readService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -291,7 +291,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	}
 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&readOnlyService.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
 
 	if err := resources.CreateIfNotFound(ctx, r.Client, readOnlyService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -300,7 +300,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	}
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&readWriteService.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
 
 	if err := resources.CreateIfNotFound(ctx, r.Client, readWriteService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -327,7 +327,7 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("while getting PodDisruptionBudget: %w", err)
 		}
-		SetClusterOwnerAnnotationsAndLabels(&pdb.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
 
 		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBudget",
 			fmt.Sprintf("Creating PodDisruptionBudget %s", pdb.Name))
@@ -423,7 +423,7 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 		return fmt.Errorf("while generating service account: %w", err)
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&sa.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&sa.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
 
 	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
@@ -456,7 +456,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		return fmt.Errorf("while creating new ServiceAccount: %w", err)
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&serviceAccount.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&serviceAccount.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(serviceAccount)
 
 	err = r.Create(ctx, serviceAccount)
@@ -525,7 +525,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 		Data: operatorSecret.Data,
 		Type: operatorSecret.Type,
 	}
-	SetClusterOwnerAnnotationsAndLabels(&secret.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&secret.ObjectMeta)
 
 	// Another sync loop may have already created the service. Let's check that
 	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
@@ -814,7 +814,7 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 	case cluster.IsPodMonitorEnabled() && podMonitor == nil:
 		contextLogger.Debug("Creating PodMonitor")
 		newPodMonitor := specs.CreatePodMonitor(cluster)
-		SetClusterOwnerAnnotationsAndLabels(&newPodMonitor.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&newPodMonitor.ObjectMeta)
 		return r.Create(ctx, newPodMonitor)
 	// Pod monitor enabled and pod monitor present - update it
 	default:
@@ -835,7 +835,7 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 // createRole creates the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
 	role := specs.CreateRole(*cluster, backupOrigin)
-	SetClusterOwnerAnnotationsAndLabels(&role.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&role.ObjectMeta)
 
 	err := r.Create(ctx, &role)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -849,7 +849,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 // createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
 	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
-	SetClusterOwnerAnnotationsAndLabels(&roleBinding.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&roleBinding.ObjectMeta)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -1281,7 +1281,7 @@ func (r *ClusterReconciler) createPVC(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvc, err := pvcReconciler.Create(*cluster, configuration)
+	pvc, err := pvcReconciler.Create(cluster, configuration)
 	if err != nil {
 		if err == pvcReconciler.ErrorInvalidSize {
 			// This error should have been caught by the validating
@@ -1298,8 +1298,6 @@ func (r *ClusterReconciler) createPVC(
 			err,
 		)
 	}
-
-	SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
 
 	if err = r.Create(ctx, pvc); err != nil && !apierrs.IsAlreadyExists(err) {
 		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",

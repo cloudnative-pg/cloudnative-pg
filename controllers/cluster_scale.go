@@ -91,7 +91,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 
 	if cluster.ShouldCreateWalArchiveVolume() {
 		// Let's drop the WAL PVC too
-		pvcWalName := pvcReconciler.GetPVCName(*cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
+		pvcWalName := pvcReconciler.GetPVCName(cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
 		pvcWal := v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvcWalName,

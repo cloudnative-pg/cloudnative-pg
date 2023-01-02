@@ -19,6 +19,7 @@ package pvc
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -83,12 +84,12 @@ func reconcilePVC(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvcRole := utils.PVCRole(pvc.Annotations[utils.PvcRoleLabelName])
+	pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
 	storageConfiguration, err := getStorageConfiguration(pvcRole, cluster)
 	if err != nil {
 		contextLogger.Error(err,
 			"encountered an error while trying to obtain the storage configuration",
-			"role", pvc.Annotations[utils.PvcRoleLabelName],
+			"role", pvc.Labels[utils.PvcRoleLabelName],
 			"pvcName", pvc.Name,
 		)
 		return err
@@ -108,8 +109,8 @@ func reconcilePVC(
 		return err
 	}
 
-	pvc, err = Create(
-		*cluster,
+	newPVC, err := Create(
+		cluster,
 		&CreateConfiguration{
 			Status:     oldPVC.Annotations[StatusAnnotationName],
 			NodeSerial: serial,
@@ -119,9 +120,20 @@ func reconcilePVC(
 	if err != nil {
 		return err
 	}
+	// right now we reconcile the metadata in a different set of functions, so it's not needed to do it here
+	pvc.Spec.Resources.Requests = newPVC.Spec.Resources.Requests
+
+	if reflect.DeepEqual(pvc.Spec.Resources.Requests, oldPVC.Spec.Resources.Requests) {
+		return nil
+	}
 
 	if err := c.Patch(ctx, pvc, client.MergeFrom(oldPVC)); err != nil {
-		contextLogger.Error(err, "error while changing PVC storage requirement", "pvcName", pvc.Name)
+		contextLogger.Error(err, "error while changing PVC storage requirement",
+			"pvcName", newPVC.Name,
+			"pvc", newPVC,
+			"spec", newPVC.Spec,
+			"oldPVC", oldPVC,
+			"oldSPEC", oldPVC.Spec)
 		return err
 	}
 

@@ -39,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -415,16 +414,6 @@ func (r *ClusterReconciler) updateOnlineUpdateEnabled(
 
 	cluster.Status.OnlineUpdateEnabled = onlineUpdateEnabled
 	return r.Status().Update(ctx, cluster)
-}
-
-// SetClusterOwnerAnnotationsAndLabels sets the cluster as owner of the passed object and then
-// sets all the needed annotations and labels
-func SetClusterOwnerAnnotationsAndLabels(obj *metav1.ObjectMeta, cluster *apiv1.Cluster) {
-	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.LabelClusterName(obj, cluster.GetName())
-	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
-	utils.SetOperatorVersion(obj, versions.Version)
 }
 
 // getPoolerIntegrationsNeeded returns a struct with all the pooler integrations needed

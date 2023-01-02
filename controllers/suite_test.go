@@ -287,7 +287,7 @@ func generateFakeClusterPods(c client.Client, cluster *apiv1.Cluster, markAsRead
 	for idx < cluster.Spec.Instances {
 		idx++
 		pod := specs.PodWithExistingStorage(*cluster, idx)
-		SetClusterOwnerAnnotationsAndLabels(&pod.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
 
 		err := c.Create(context.Background(), pod)
 		Expect(err).To(BeNil())
@@ -319,7 +319,7 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	for idx < cluster.Spec.Instances {
 		idx++
 		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
-		SetClusterOwnerAnnotationsAndLabels(&job.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 
 		err := c.Create(context.Background(), job)
 		Expect(err).To(BeNil())
@@ -339,7 +339,7 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 		idx++
 
 		pvc, err := pvcReconciler.Create(
-			*cluster,
+			cluster,
 			&pvcReconciler.CreateConfiguration{
 				Status:     pvcReconciler.StatusInitializing,
 				NodeSerial: idx,
@@ -347,14 +347,14 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 				Storage:    cluster.Spec.StorageConfiguration,
 			})
 		Expect(err).To(BeNil())
-		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
 
 		err = c.Create(context.Background(), pvc)
 		Expect(err).To(BeNil())
 		pvcs = append(pvcs, *pvc)
 		if cluster.ShouldCreateWalArchiveVolume() {
 			pvcWal, err := pvcReconciler.Create(
-				*cluster,
+				cluster,
 				&pvcReconciler.CreateConfiguration{
 					Status:     pvcReconciler.StatusInitializing,
 					NodeSerial: idx,
@@ -363,7 +363,7 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 				},
 			)
 			Expect(err).To(BeNil())
-			SetClusterOwnerAnnotationsAndLabels(&pvcWal.ObjectMeta, cluster)
+			cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta)
 			err = c.Create(context.Background(), pvcWal)
 			Expect(err).To(BeNil())
 			pvcs = append(pvcs, *pvcWal)

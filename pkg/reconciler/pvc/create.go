@@ -39,7 +39,7 @@ type CreateConfiguration struct {
 // Create spec of a PVC, given its name and the storage configuration
 // TODO: this logic eventually should be moved inside reconcile
 func Create(
-	cluster apiv1.Cluster,
+	cluster *apiv1.Cluster,
 	configuration *CreateConfiguration,
 ) (*corev1.PersistentVolumeClaim, error) {
 	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
@@ -93,6 +93,8 @@ func Create(
 	if pvc.Spec.Resources.Requests.Storage().IsZero() {
 		return nil, ErrorInvalidSize
 	}
+
+	cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
 
 	return pvc, nil
 }

@@ -76,7 +76,7 @@ type UsageStatus struct {
 }
 
 // GetPVCName builds the name for a given PVC of the instance
-func GetPVCName(cluster apiv1.Cluster, instanceName string, role utils.PVCRole) string {
+func GetPVCName(cluster *apiv1.Cluster, instanceName string, role utils.PVCRole) string {
 	pvcName := instanceName
 	if role == utils.PVCRolePgWal {
 		pvcName += cluster.GetWalArchiveVolumeSuffix()

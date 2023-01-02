@@ -156,7 +156,7 @@ func restoreOrphanPVCs(
 		}
 
 		pvcOrig := pvc.DeepCopy()
-		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
 		pvc.Annotations[pvcReconciler.StatusAnnotationName] = pvcReconciler.StatusReady
 		// we clean hibernation metadata if it exists
 		delete(pvc.Annotations, utils.HibernateClusterManifestAnnotationName)

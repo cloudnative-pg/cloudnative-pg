@@ -31,7 +31,7 @@ var _ = Describe("PVC Creation", func() {
 	storageClass := "default"
 	It("handles size properly only with size specified", func() {
 		pvc, err := Create(
-			apiv1.Cluster{},
+			&apiv1.Cluster{},
 			&CreateConfiguration{
 				Status:     StatusInitializing,
 				NodeSerial: 0,
@@ -47,7 +47,7 @@ var _ = Describe("PVC Creation", func() {
 	})
 	It("handles size properly with only template specified", func() {
 		pvc, err := Create(
-			apiv1.Cluster{},
+			&apiv1.Cluster{},
 			&CreateConfiguration{
 				Status: StatusInitializing,
 				Storage: apiv1.StorageConfiguration{
@@ -66,7 +66,7 @@ var _ = Describe("PVC Creation", func() {
 	})
 	It("handles size properly with both template and size specified, size taking precedence", func() {
 		pvc, err := Create(
-			apiv1.Cluster{},
+			&apiv1.Cluster{},
 			&CreateConfiguration{
 				Status:     StatusInitializing,
 				NodeSerial: 0,

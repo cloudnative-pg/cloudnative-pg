@@ -207,7 +207,7 @@ func createBackup(
 		); err != nil {
 			return ctrl.Result{}, err
 		}
-		SetClusterOwnerAnnotationsAndLabels(&backup.ObjectMeta, &cluster)
+		cluster.SetInheritedDataAndOwnership(&backup.ObjectMeta)
 	case "self":
 		utils.SetAsOwnedBy(&backup.ObjectMeta, scheduledBackup.ObjectMeta, scheduledBackup.TypeMeta)
 	default:
