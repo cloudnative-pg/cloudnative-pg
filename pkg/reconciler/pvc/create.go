@@ -28,65 +28,76 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// CreateConfiguration specifies how a PVC should be created
+type CreateConfiguration struct {
+	// Ready when set to true marks the PVC as ready without requiring a init job to run
+	Ready      bool
+	NodeSerial int
+	Role       utils.PVCRole
+	Storage    apiv1.StorageConfiguration
+}
+
 // Create create spec of a PVC, given its name and the storage configuration
 // TODO: this logic eventually should be moved inside reconcile
 func Create(
-	storageConfiguration apiv1.StorageConfiguration,
 	cluster apiv1.Cluster,
-	nodeSerial int,
-	role utils.PVCRole,
+	configuration *CreateConfiguration,
 ) (*corev1.PersistentVolumeClaim, error) {
-	instanceName := specs.GetInstanceName(cluster.Name, nodeSerial)
-	pvcName := GetPVCName(cluster, instanceName, role)
+	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
+	pvcName := GetPVCName(cluster, instanceName, configuration.Role)
 
-	result := &corev1.PersistentVolumeClaim{
+	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
 				utils.InstanceNameLabelName: instanceName,
-				utils.PvcRoleLabelName:      string(role),
+				utils.PvcRoleLabelName:      string(configuration.Role),
 			},
 			Annotations: map[string]string{
-				specs.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
+				specs.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
 				StatusAnnotationName:              StatusInitializing,
 			},
 		},
 	}
 
+	if configuration.Ready {
+		pvc.Annotations[StatusAnnotationName] = StatusReady
+	}
+
 	// If the customer supplied a spec, let's use it
-	if storageConfiguration.PersistentVolumeClaimTemplate != nil {
-		storageConfiguration.PersistentVolumeClaimTemplate.DeepCopyInto(&result.Spec)
+	if configuration.Storage.PersistentVolumeClaimTemplate != nil {
+		configuration.Storage.PersistentVolumeClaimTemplate.DeepCopyInto(&pvc.Spec)
 	}
 
 	// If the customer specified a storage class, let's use it
-	if storageConfiguration.StorageClass != nil {
-		result.Spec.StorageClassName = storageConfiguration.StorageClass
+	if configuration.Storage.StorageClass != nil {
+		pvc.Spec.StorageClassName = configuration.Storage.StorageClass
 	}
 
-	if storageConfiguration.Size != "" {
+	if configuration.Storage.Size != "" {
 		// Insert the storage requirement
-		parsedSize, err := resource.ParseQuantity(storageConfiguration.Size)
+		parsedSize, err := resource.ParseQuantity(configuration.Storage.Size)
 		if err != nil {
 			return nil, ErrorInvalidSize
 		}
 
-		result.Spec.Resources = corev1.ResourceRequirements{
+		pvc.Spec.Resources = corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				"storage": parsedSize,
 			},
 		}
 	}
 
-	if len(result.Spec.AccessModes) == 0 {
-		result.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
+	if len(pvc.Spec.AccessModes) == 0 {
+		pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
 			corev1.ReadWriteOnce,
 		}
 	}
 
-	if result.Spec.Resources.Requests.Storage().IsZero() {
+	if pvc.Spec.Resources.Requests.Storage().IsZero() {
 		return nil, ErrorInvalidSize
 	}
 
-	return result, nil
+	return pvc, nil
 }

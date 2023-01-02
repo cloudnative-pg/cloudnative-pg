@@ -31,48 +31,55 @@ var _ = Describe("PVC Creation", func() {
 	storageClass := "default"
 	It("handles size properly only with size specified", func() {
 		pvc, err := Create(
-			apiv1.StorageConfiguration{
-				Size:         "1Gi",
-				StorageClass: &storageClass,
-			},
 			apiv1.Cluster{},
-			0,
-			utils.PVCRolePgData,
+			&CreateConfiguration{
+				Ready:      false,
+				NodeSerial: 0,
+				Role:       utils.PVCRolePgData,
+				Storage: apiv1.StorageConfiguration{
+					Size:         "1Gi",
+					StorageClass: &storageClass,
+				},
+			},
 		)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("1Gi"))
 	})
 	It("handles size properly with only template specified", func() {
 		pvc, err := Create(
-			apiv1.StorageConfiguration{
-				StorageClass: &storageClass,
-				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+			apiv1.Cluster{},
+			&CreateConfiguration{
+				Storage: apiv1.StorageConfiguration{
+					StorageClass: &storageClass,
+					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+						},
 					},
 				},
+				Role: utils.PVCRolePgData,
 			},
-			apiv1.Cluster{},
-			0,
-			utils.PVCRolePgData,
 		)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("1Gi"))
 	})
 	It("handles size properly with both template and size specified, size taking precedence", func() {
 		pvc, err := Create(
-			apiv1.StorageConfiguration{
-				Size:         "2Gi",
-				StorageClass: &storageClass,
-				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+			apiv1.Cluster{},
+			&CreateConfiguration{
+				Ready:      false,
+				NodeSerial: 0,
+				Role:       utils.PVCRolePgData,
+				Storage: apiv1.StorageConfiguration{
+					Size:         "2Gi",
+					StorageClass: &storageClass,
+					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+						},
 					},
 				},
 			},
-			apiv1.Cluster{},
-			0,
-			utils.PVCRolePgData,
 		)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))

@@ -338,7 +338,14 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 	for idx < cluster.Spec.Instances {
 		idx++
 
-		pvc, err := pvcReconciler.Create(cluster.Spec.StorageConfiguration, *cluster, idx, utils.PVCRolePgData)
+		pvc, err := pvcReconciler.Create(
+			*cluster,
+			&pvcReconciler.CreateConfiguration{
+				Ready:      false,
+				NodeSerial: idx,
+				Role:       utils.PVCRolePgData,
+				Storage:    cluster.Spec.StorageConfiguration,
+			})
 		Expect(err).To(BeNil())
 		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
 
@@ -346,7 +353,15 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 		Expect(err).To(BeNil())
 		pvcs = append(pvcs, *pvc)
 		if cluster.ShouldCreateWalArchiveVolume() {
-			pvcWal, err := pvcReconciler.Create(cluster.Spec.StorageConfiguration, *cluster, idx, utils.PVCRolePgWal)
+			pvcWal, err := pvcReconciler.Create(
+				*cluster,
+				&pvcReconciler.CreateConfiguration{
+					Ready:      false,
+					NodeSerial: idx,
+					Role:       utils.PVCRolePgWal,
+					Storage:    cluster.Spec.StorageConfiguration,
+				},
+			)
 			Expect(err).To(BeNil())
 			SetClusterOwnerAnnotationsAndLabels(&pvcWal.ObjectMeta, cluster)
 			err = c.Create(context.Background(), pvcWal)

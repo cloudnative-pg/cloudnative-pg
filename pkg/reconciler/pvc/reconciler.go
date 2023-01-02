@@ -98,15 +98,11 @@ func reconcilePVC(
 
 	contextLogger := log.FromContext(ctx)
 
-	if storageConfiguration.PersistentVolumeClaimTemplate != nil {
-		contextLogger.Debug(
-			"found a pvcTemplate, skipping pvc reconciliation",
-			"pvcName", pvc.Name,
-			"template", storageConfiguration.PersistentVolumeClaimTemplate,
-		)
+	if storageConfiguration.Size == "" {
 		return nil
 	}
 
+	// we reconcile everytime the size is passed given that it has priority over the pvcTemplate if it is passed.
 	quantity, err := resource.ParseQuantity(storageConfiguration.Size)
 	if err != nil {
 		return err

@@ -905,9 +905,12 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if err := r.createPVC(
 		ctx,
 		cluster,
-		cluster.Spec.StorageConfiguration,
-		nodeSerial,
-		utils.PVCRolePgData,
+		&pvcReconciler.CreateConfiguration{
+			Ready:      false,
+			NodeSerial: nodeSerial,
+			Role:       utils.PVCRolePgData,
+			Storage:    cluster.Spec.StorageConfiguration,
+		},
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
@@ -916,9 +919,12 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		if err := r.createPVC(
 			ctx,
 			cluster,
-			*cluster.Spec.WalStorage,
-			nodeSerial,
-			utils.PVCRolePgWal,
+			&pvcReconciler.CreateConfiguration{
+				Ready:      false,
+				NodeSerial: nodeSerial,
+				Role:       utils.PVCRolePgWal,
+				Storage:    *cluster.Spec.WalStorage,
+			},
 		); err != nil {
 			return ctrl.Result{RequeueAfter: time.Minute}, err
 		}
@@ -1082,9 +1088,12 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	if err := r.createPVC(
 		ctx,
 		cluster,
-		cluster.Spec.StorageConfiguration,
-		nodeSerial,
-		utils.PVCRolePgData,
+		&pvcReconciler.CreateConfiguration{
+			Ready:      false,
+			NodeSerial: nodeSerial,
+			Role:       utils.PVCRolePgData,
+			Storage:    cluster.Spec.StorageConfiguration,
+		},
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
@@ -1093,9 +1102,11 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		if err := r.createPVC(
 			ctx,
 			cluster,
-			*cluster.Spec.WalStorage,
-			nodeSerial,
-			utils.PVCRolePgWal,
+			&pvcReconciler.CreateConfiguration{
+				NodeSerial: nodeSerial,
+				Role:       utils.PVCRolePgWal,
+				Storage:    *cluster.Spec.WalStorage,
+			},
 		); err != nil {
 			return ctrl.Result{RequeueAfter: time.Minute}, err
 		}
@@ -1265,13 +1276,11 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *api
 func (r *ClusterReconciler) createPVC(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	storageConfiguration apiv1.StorageConfiguration,
-	nodeSerial int,
-	role utils.PVCRole,
+	configuration *pvcReconciler.CreateConfiguration,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvc, err := pvcReconciler.Create(storageConfiguration, *cluster, nodeSerial, role)
+	pvc, err := pvcReconciler.Create(*cluster, configuration)
 	if err != nil {
 		if err == pvcReconciler.ErrorInvalidSize {
 			// This error should have been caught by the validating
@@ -1279,10 +1288,14 @@ func (r *ClusterReconciler) createPVC(
 			// validation, and we must react.
 			contextLogger.Info("The size specified for the cluster is not valid",
 				"size",
-				storageConfiguration.Size)
+				configuration.Storage.Size)
 			return ErrNextLoop
 		}
-		return fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
+		return fmt.Errorf(
+			"unable to create a PVC spec for node with serial %v: %w",
+			configuration.NodeSerial,
+			err,
+		)
 	}
 
 	SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
@@ -1290,7 +1303,7 @@ func (r *ClusterReconciler) createPVC(
 	if err = r.Create(ctx, pvc); err != nil && !apierrs.IsAlreadyExists(err) {
 		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
 			pvc.Name,
-			nodeSerial,
+			configuration.NodeSerial,
 			err,
 		)
 	}
