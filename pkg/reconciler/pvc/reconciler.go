@@ -22,12 +22,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -46,18 +46,7 @@ func Reconcile(
 	contextLogger := log.FromContext(ctx)
 
 	for idx := range pvcs {
-		pvc := &pvcs[idx]
-		pvcRole := utils.PVCRole(pvc.Annotations[utils.PvcRoleLabelName])
-		storageConfiguration, err := getStorageConfiguration(pvcRole, cluster)
-		if err != nil {
-			contextLogger.Error(err,
-				"encountered an error while trying to obtain the storage configuration",
-				"role", pvc.Annotations[utils.PvcRoleLabelName],
-				"pvcName", pvc.Name,
-			)
-		}
-
-		if err := reconcilePVC(ctx, c, pvc, storageConfiguration); err != nil {
+		if err := reconcilePVC(ctx, c, cluster, &pvcs[idx]); err != nil {
 			if apierrs.IsConflict(err) {
 				contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
 				return ctrl.Result{Requeue: true}, nil
@@ -89,44 +78,52 @@ func getStorageConfiguration(
 func reconcilePVC(
 	ctx context.Context,
 	c client.Client,
+	cluster *apiv1.Cluster,
 	pvc *corev1.PersistentVolumeClaim,
-	storageConfiguration *apiv1.StorageConfiguration,
 ) error {
+	contextLogger := log.FromContext(ctx)
+
+	pvcRole := utils.PVCRole(pvc.Annotations[utils.PvcRoleLabelName])
+	storageConfiguration, err := getStorageConfiguration(pvcRole, cluster)
+	if err != nil {
+		contextLogger.Error(err,
+			"encountered an error while trying to obtain the storage configuration",
+			"role", pvc.Annotations[utils.PvcRoleLabelName],
+			"pvcName", pvc.Name,
+		)
+		return err
+	}
+
 	if storageConfiguration == nil {
 		return fmt.Errorf("tried to reconcile a PVC without storageConfiguration")
 	}
-
-	contextLogger := log.FromContext(ctx)
 
 	if storageConfiguration.Size == "" {
 		return nil
 	}
 
-	// we reconcile everytime the size is passed given that it has priority over the pvcTemplate if it is passed.
-	quantity, err := resource.ParseQuantity(storageConfiguration.Size)
+	oldPVC := pvc.DeepCopy()
+	serial, err := specs.GetNodeSerial(oldPVC.ObjectMeta)
 	if err != nil {
 		return err
 	}
 
-	oldPVC := pvc.DeepCopy()
-	oldQuantity, ok := oldPVC.Spec.Resources.Requests["storage"]
-
-	if !ok || oldQuantity.AsDec().Cmp(quantity.AsDec()) == -1 {
-		// Increasing storage resources
-		oldPVC.Spec.Resources.Requests["storage"] = quantity
-		if err := c.Patch(ctx, pvc, client.MergeFrom(oldPVC)); err != nil {
-			contextLogger.Error(err, "error while changing PVC storage requirement",
-				"from", oldQuantity, "to", quantity,
-				"pvcName", pvc.Name)
-			return err
-		}
+	pvc, err = Create(
+		*cluster,
+		&CreateConfiguration{
+			Status:     oldPVC.Annotations[StatusAnnotationName],
+			NodeSerial: serial,
+			Role:       pvcRole,
+			Storage:    *storageConfiguration,
+		})
+	if err != nil {
+		return err
 	}
 
-	// Decreasing resources is not possible
-	contextLogger.Warning("cannot decrease storage requirement",
-		"from", oldQuantity,
-		"to", quantity,
-		"pvcName", pvc.Name,
-	)
-	return fmt.Errorf("cannot decrease storage requirement")
+	if err := c.Patch(ctx, pvc, client.MergeFrom(oldPVC)); err != nil {
+		contextLogger.Error(err, "error while changing PVC storage requirement", "pvcName", pvc.Name)
+		return err
+	}
+
+	return nil
 }

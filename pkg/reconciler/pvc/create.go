@@ -30,14 +30,13 @@ import (
 
 // CreateConfiguration specifies how a PVC should be created
 type CreateConfiguration struct {
-	// Ready when set to true marks the PVC as ready without requiring a init job to run
-	Ready      bool
+	Status     Status
 	NodeSerial int
 	Role       utils.PVCRole
 	Storage    apiv1.StorageConfiguration
 }
 
-// Create create spec of a PVC, given its name and the storage configuration
+// Create spec of a PVC, given its name and the storage configuration
 // TODO: this logic eventually should be moved inside reconcile
 func Create(
 	cluster apiv1.Cluster,
@@ -56,13 +55,9 @@ func Create(
 			},
 			Annotations: map[string]string{
 				specs.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
-				StatusAnnotationName:              StatusInitializing,
+				StatusAnnotationName:              configuration.Status,
 			},
 		},
-	}
-
-	if configuration.Ready {
-		pvc.Annotations[StatusAnnotationName] = StatusReady
 	}
 
 	// If the customer supplied a spec, let's use it

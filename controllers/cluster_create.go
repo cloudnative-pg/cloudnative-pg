@@ -906,7 +906,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		ctx,
 		cluster,
 		&pvcReconciler.CreateConfiguration{
-			Ready:      false,
+			Status:     pvcReconciler.StatusInitializing,
 			NodeSerial: nodeSerial,
 			Role:       utils.PVCRolePgData,
 			Storage:    cluster.Spec.StorageConfiguration,
@@ -920,7 +920,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			ctx,
 			cluster,
 			&pvcReconciler.CreateConfiguration{
-				Ready:      false,
+				Status:     pvcReconciler.StatusInitializing,
 				NodeSerial: nodeSerial,
 				Role:       utils.PVCRolePgWal,
 				Storage:    *cluster.Spec.WalStorage,
@@ -1089,7 +1089,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		ctx,
 		cluster,
 		&pvcReconciler.CreateConfiguration{
-			Ready:      false,
+			Status:     pvcReconciler.StatusInitializing,
 			NodeSerial: nodeSerial,
 			Role:       utils.PVCRolePgData,
 			Storage:    cluster.Spec.StorageConfiguration,
@@ -1103,6 +1103,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			ctx,
 			cluster,
 			&pvcReconciler.CreateConfiguration{
+				Status:     pvcReconciler.StatusInitializing,
 				NodeSerial: nodeSerial,
 				Role:       utils.PVCRolePgWal,
 				Storage:    *cluster.Spec.WalStorage,

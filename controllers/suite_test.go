@@ -341,7 +341,7 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 		pvc, err := pvcReconciler.Create(
 			*cluster,
 			&pvcReconciler.CreateConfiguration{
-				Ready:      false,
+				Status:     pvcReconciler.StatusInitializing,
 				NodeSerial: idx,
 				Role:       utils.PVCRolePgData,
 				Storage:    cluster.Spec.StorageConfiguration,
@@ -356,7 +356,7 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 			pvcWal, err := pvcReconciler.Create(
 				*cluster,
 				&pvcReconciler.CreateConfiguration{
-					Ready:      false,
+					Status:     pvcReconciler.StatusInitializing,
 					NodeSerial: idx,
 					Role:       utils.PVCRolePgWal,
 					Storage:    cluster.Spec.StorageConfiguration,

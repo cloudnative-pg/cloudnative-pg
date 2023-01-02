@@ -33,7 +33,7 @@ var _ = Describe("PVC Creation", func() {
 		pvc, err := Create(
 			apiv1.Cluster{},
 			&CreateConfiguration{
-				Ready:      false,
+				Status:     StatusInitializing,
 				NodeSerial: 0,
 				Role:       utils.PVCRolePgData,
 				Storage: apiv1.StorageConfiguration{
@@ -49,6 +49,7 @@ var _ = Describe("PVC Creation", func() {
 		pvc, err := Create(
 			apiv1.Cluster{},
 			&CreateConfiguration{
+				Status: StatusInitializing,
 				Storage: apiv1.StorageConfiguration{
 					StorageClass: &storageClass,
 					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
@@ -67,7 +68,7 @@ var _ = Describe("PVC Creation", func() {
 		pvc, err := Create(
 			apiv1.Cluster{},
 			&CreateConfiguration{
-				Ready:      false,
+				Status:     StatusInitializing,
 				NodeSerial: 0,
 				Role:       utils.PVCRolePgData,
 				Storage: apiv1.StorageConfiguration{

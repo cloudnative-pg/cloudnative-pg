@@ -30,19 +30,22 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// Status describes the PVC phase
+type Status = string
+
 const (
 	// StatusAnnotationName is an annotation that shows the current status of the PVC.
 	// The status can be "initializing" or "ready"
 	StatusAnnotationName = specs.MetadataNamespace + "/pvcStatus"
 
 	// StatusInitializing is the annotation value for PVC initializing status
-	StatusInitializing = "initializing"
+	StatusInitializing Status = "initializing"
 
 	// StatusReady is the annotation value for PVC ready status
-	StatusReady = "ready"
+	StatusReady Status = "ready"
 
 	// StatusDetached is the annotation value for PVC detached status
-	StatusDetached = "detached"
+	StatusDetached Status = "detached"
 )
 
 // ErrorInvalidSize is raised when the size specified by the
@@ -189,6 +192,7 @@ instancesLoop:
 			if !slices.Contains(expectedPVCs, pvc.Name) {
 				continue
 			}
+
 			if pvc.Annotations[StatusAnnotationName] != StatusReady {
 				isAnyPvcUnusable = true
 			}
