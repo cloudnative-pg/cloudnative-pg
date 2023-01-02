@@ -596,59 +596,56 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 	if cluster.Spec.StorageConfiguration.Size == "" {
 		return nil
 	}
-	quantity, err := resource.ParseQuantity(cluster.Spec.StorageConfiguration.Size)
-	if err != nil {
-		return fmt.Errorf("while parsing PVC size %v: %w", cluster.Spec.StorageConfiguration.Size, err)
-	}
 
-	var walQuantity *resource.Quantity
-
-	if cluster.Spec.WalStorage != nil {
-		q, err := resource.ParseQuantity(cluster.Spec.WalStorage.Size)
-		if err != nil {
-			return fmt.Errorf("while parsing WAL PVC size %v: %w", cluster.Spec.WalStorage.Size, err)
-		}
-		walQuantity = &q
+	quantity := cluster.Spec.StorageConfiguration.TryParseQuantity()
+	if quantity == nil {
+		return fmt.Errorf("while parsing PVC size %v", cluster.Spec.StorageConfiguration.Size)
 	}
+	walQuantity := cluster.Spec.WalStorage.TryParseQuantity()
 
 	for idx := range resources.pvcs.Items {
-		oldPVC := resources.pvcs.Items[idx].DeepCopy()
-		q := quantity
-		if strings.HasSuffix(oldPVC.Name, apiv1.WalArchiveVolumeSuffix) && walQuantity != nil {
-			q = *walQuantity
-		}
-		oldQuantity, ok := resources.pvcs.Items[idx].Spec.Resources.Requests["storage"]
-
-		switch {
-		case !ok:
-			// Missing storage requirement for PVC
-			fallthrough
-
-		case oldQuantity.AsDec().Cmp(q.AsDec()) == -1:
-			// Increasing storage resources
-			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = q
-			if err = r.Patch(ctx, &resources.pvcs.Items[idx], client.MergeFrom(oldPVC)); err != nil {
-				// Decreasing resources is not possible
-				contextLogger.Error(err, "error while changing PVC storage requirement",
-					"from", oldQuantity, "to", q,
-					"pvcName", resources.pvcs.Items[idx].Name)
-
-				// We are reaching two errors in two different conditions:
-				//
-				// 1. we hit a Conflict => a successive reconciliation loop will fix it
-				// 2. the StorageClass we used don't support PVC resizing => there's nothing we can do
-				//    about it
+		pvc := &resources.pvcs.Items[idx]
+		var patchError error
+		if !strings.HasSuffix(pvc.Name, apiv1.WalArchiveVolumeSuffix) {
+			patchError = patchPVCQuantity(ctx, r.Client, pvc, *quantity)
+		} else {
+			if walQuantity == nil {
+				return fmt.Errorf("wal storage required but no wal storage details provided")
 			}
-
-		case oldQuantity.AsDec().Cmp(q.AsDec()) == 1:
-			// Decreasing resources is not possible
-			contextLogger.Info("cannot decrease storage requirement",
-				"from", oldQuantity, "to", q,
-				"pvcName", resources.pvcs.Items[idx].Name)
+			patchError = patchPVCQuantity(ctx, r.Client, pvc, *walQuantity)
 		}
+
+		if patchError != nil {
+			contextLogger.Error(patchError,
+				"encountered an error while patching the quantity of a PVC",
+				"pvcName", pvc.Name,
+				"quantity", quantity,
+				"oldQuantity", pvc.Spec.Resources.Requests["storage"],
+			)
+		}
+
 	}
 
 	return nil
+}
+
+func patchPVCQuantity(
+	ctx context.Context,
+	c client.Client,
+	pvc *corev1.PersistentVolumeClaim,
+	q resource.Quantity,
+) error {
+	oldPVC := pvc.DeepCopy()
+	oldQuantity, ok := oldPVC.Spec.Resources.Requests["storage"]
+
+	if !ok || oldQuantity.AsDec().Cmp(q.AsDec()) == -1 {
+		// Increasing storage resources
+		oldPVC.Spec.Resources.Requests["storage"] = q
+		return c.Patch(ctx, pvc, client.MergeFrom(oldPVC))
+	}
+
+	// Decreasing resources is not possible
+	return fmt.Errorf("cannot decrease storage requirement")
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
