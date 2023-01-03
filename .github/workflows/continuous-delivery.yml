@@ -749,7 +749,6 @@ jobs:
       - evaluate_options
     if: |
       success() && !cancelled() &&
-      github.event_name == 'issue_comment' &&
       needs.evaluate_options.outputs.test_level == '4'
     runs-on: ubuntu-20.04
     steps:
@@ -777,8 +776,7 @@ jobs:
       - e2e-local
       - evaluate_options
     if: |
-      needs.e2e-local.result == 'failure' &&
-      github.event_name == 'issue_comment'
+      needs.e2e-local.result == 'failure'
     runs-on: ubuntu-20.04
     steps:
       - name: Check preconditions
