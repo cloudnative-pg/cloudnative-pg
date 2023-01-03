@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-example-projected-volumes
+  name: cluster-example-projected-volume
 spec:
   instances: 3
   projectedVolumeTemplate:
