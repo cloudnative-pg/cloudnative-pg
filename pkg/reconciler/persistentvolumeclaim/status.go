@@ -51,27 +51,27 @@ const (
 // user is not valid and can't be specified in a PVC declaration
 var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 
-// Status is the status of the PVC we generated
-type Status struct {
+// status is the status of the PVC we generated
+type status struct {
 	// List of available instances detected from pvcs
-	InstanceNames []string
+	instanceNames []string
 
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
-	Initializing []string
+	initializing []string
 
-	// List of PVCs with Resizing condition. Requires a pod restart.
+	// List of PVCs with resizing condition. Requires a pod restart.
 	//
 	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
-	Resizing []string
+	resizing []string
 
 	// List of PVCs that are dangling (they don't have a corresponding Job nor a corresponding Pod)
-	Dangling []string
+	dangling []string
 
 	// List of PVCs that are used (they have a corresponding Pod)
-	Healthy []string
+	healthy []string
 
 	// List of PVCs that are unusable (they are part of an incomplete group)
-	Unusable []string
+	unusable []string
 }
 
 // EnrichStatus obtains and classifies the current status of each managed PVC
@@ -85,7 +85,7 @@ func EnrichStatus(
 ) {
 	contextLogger := log.FromContext(ctx)
 
-	var result Status
+	var result status
 
 	// First we iterate over all the PVCs building the instances map.
 	// It contains the PVCSs grouped by instance serial
@@ -113,7 +113,7 @@ func EnrichStatus(
 		// Given that we are iterating over the PVCs
 		// we take the chance to build the list of resizing PVCs
 		if isResizing(pvc) {
-			result.Resizing = append(result.Resizing, pvc.Name)
+			result.resizing = append(result.resizing, pvc.Name)
 		}
 	}
 
@@ -127,14 +127,14 @@ instancesLoop:
 
 		// If we have less PVCs that the expected number, all the instance PVCs are unusable
 		if len(expectedPVCs) > len(pvcNames) {
-			result.Unusable = append(result.Unusable, pvcNames...)
+			result.unusable = append(result.unusable, pvcNames...)
 			continue instancesLoop
 		}
 
 		// If some PVC is missing, all the instance PVCs are unusable
 		for _, expectedPVC := range expectedPVCs {
 			if !slices.Contains(pvcNames, expectedPVC) {
-				result.Unusable = append(result.Unusable, pvcNames...)
+				result.unusable = append(result.unusable, pvcNames...)
 				continue instancesLoop
 			}
 		}
@@ -143,7 +143,7 @@ instancesLoop:
 		// be classified as unusable
 		for _, pvcName := range pvcNames {
 			if !slices.Contains(expectedPVCs, pvcName) {
-				result.Unusable = append(result.Unusable, pvcName)
+				result.unusable = append(result.unusable, pvcName)
 				contextLogger.Warning("found more PVC than those expected",
 					"instance", instanceName,
 					"expectedPVCs", expectedPVCs,
@@ -169,7 +169,7 @@ instancesLoop:
 		}
 
 		if !isAnyPvcUnusable {
-			result.InstanceNames = append(result.InstanceNames, instanceName)
+			result.instanceNames = append(result.instanceNames, instanceName)
 		}
 		// Search for a Pod corresponding to this instance.
 		// If found, all the PVCs are Healthy
@@ -177,18 +177,18 @@ instancesLoop:
 			if IsUsedByPodSpec(podList[idx].Spec, pvcNames...) {
 				// We found a Pod using this PVCs so this
 				// PVCs are not dangling
-				result.Healthy = append(result.Healthy, pvcNames...)
+				result.healthy = append(result.healthy, pvcNames...)
 				continue instancesLoop
 			}
 		}
 
 		// Search for a Job corresponding to this instance.
-		// If found, all the PVCs are Initializing
+		// If found, all the PVCs are initializing
 		for idx := range jobList {
 			if IsUsedByPodSpec(jobList[idx].Spec.Template.Spec, pvcNames...) {
 				// We have found a Job corresponding to this PVCs, so we
 				// are initializing them or the initialization has just completed
-				result.Initializing = append(result.Initializing, pvcNames...)
+				result.initializing = append(result.initializing, pvcNames...)
 				continue instancesLoop
 			}
 		}
@@ -196,7 +196,7 @@ instancesLoop:
 		if isAnyPvcUnusable {
 			// This PVC has not a Job nor a Pod using it, but it is not marked as StatusReady
 			// we need to ignore this instance and treat all the instance PVCs as unusable
-			result.Unusable = append(result.Unusable, pvcNames...)
+			result.unusable = append(result.unusable, pvcNames...)
 			contextLogger.Warning("found PVC that is not annotated as ready",
 				"pvcNames", pvcNames,
 				"instance", instanceName,
@@ -207,14 +207,14 @@ instancesLoop:
 		}
 
 		// These PVCs have not a Job nor a Pod using them, they are dangling
-		result.Dangling = append(result.Dangling, pvcNames...)
+		result.dangling = append(result.dangling, pvcNames...)
 	}
 
 	cluster.Status.PVCCount = int32(len(pvcs))
-	cluster.Status.InstanceNames = result.InstanceNames
-	cluster.Status.DanglingPVC = result.Dangling
-	cluster.Status.HealthyPVC = result.Healthy
-	cluster.Status.InitializingPVC = result.Initializing
-	cluster.Status.ResizingPVC = result.Resizing
-	cluster.Status.UnusablePVC = result.Unusable
+	cluster.Status.InstanceNames = result.instanceNames
+	cluster.Status.DanglingPVC = result.dangling
+	cluster.Status.HealthyPVC = result.healthy
+	cluster.Status.InitializingPVC = result.initializing
+	cluster.Status.ResizingPVC = result.resizing
+	cluster.Status.UnusablePVC = result.unusable
 }
