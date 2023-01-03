@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pvc
+package persistentvolumeclaim
 
 import (
 	"context"
@@ -75,8 +75,8 @@ type UsageStatus struct {
 	Unusable []string
 }
 
-// GetPVCName builds the name for a given PVC of the instance
-func GetPVCName(cluster *apiv1.Cluster, instanceName string, role utils.PVCRole) string {
+// GetName builds the name for a given PVC of the instance
+func GetName(cluster *apiv1.Cluster, instanceName string, role utils.PVCRole) string {
 	pvcName := instanceName
 	if role == utils.PVCRolePgWal {
 		pvcName += cluster.GetWalArchiveVolumeSuffix()
@@ -84,8 +84,8 @@ func GetPVCName(cluster *apiv1.Cluster, instanceName string, role utils.PVCRole)
 	return pvcName
 }
 
-// FilterInstancePVCs returns all the corev1.PersistentVolumeClaim that are used inside the podSpec
-func FilterInstancePVCs(
+// FilterByInstance returns all the corev1.PersistentVolumeClaim that are used inside the podSpec
+func FilterByInstance(
 	pvcs []corev1.PersistentVolumeClaim,
 	instanceSpec corev1.PodSpec,
 ) []corev1.PersistentVolumeClaim {
@@ -105,10 +105,10 @@ func FilterInstancePVCs(
 	return instancePVCs
 }
 
-// DetectPVCs fill the list with the PVCs which are dangling, given that
+// CalculateUsageStatus fill the list with the PVCs which are dangling, given that
 // PVC are usually named after Pods
 // nolint: gocognit
-func DetectPVCs(
+func CalculateUsageStatus(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	podList []corev1.Pod,
@@ -204,7 +204,7 @@ instancesLoop:
 		// Search for a Pod corresponding to this instance.
 		// If found, all the PVCs are Healthy
 		for idx := range podList {
-			if IsPodSpecUsingPVCs(podList[idx].Spec, pvcNames...) {
+			if IsUsedByPod(podList[idx].Spec, pvcNames...) {
 				// We found a Pod using this PVCs so this
 				// PVCs are not dangling
 				result.Healthy = append(result.Healthy, pvcNames...)
@@ -215,7 +215,7 @@ instancesLoop:
 		// Search for a Job corresponding to this instance.
 		// If found, all the PVCs are Initializing
 		for idx := range jobList {
-			if IsPodSpecUsingPVCs(jobList[idx].Spec.Template.Spec, pvcNames...) {
+			if IsUsedByPod(jobList[idx].Spec.Template.Spec, pvcNames...) {
 				// We have found a Job corresponding to this PVCs, so we
 				// are initializing them or the initialization has just completed
 				result.Initializing = append(result.Initializing, pvcNames...)
@@ -243,8 +243,8 @@ instancesLoop:
 	return result
 }
 
-// IsPodSpecUsingPVCs checks if the given pod spec is using the PVCs
-func IsPodSpecUsingPVCs(podSpec corev1.PodSpec, pvcNames ...string) bool {
+// IsUsedByPod checks if the given pod spec is using the PVCs
+func IsUsedByPod(podSpec corev1.PodSpec, pvcNames ...string) bool {
 external:
 	for _, pvcName := range pvcNames {
 		for _, volume := range podSpec.Volumes {
@@ -268,8 +268,8 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return false
 }
 
-// DoesPVCBelongToInstance returns a boolean indicating if that given PVC belongs to an instance
-func DoesPVCBelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
+// BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
+func BelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
 	expectedInstancePVCs := getExpectedInstancePVCNames(cluster, instanceName)
 	return slices.Contains(expectedInstancePVCs, resourceName)
 }

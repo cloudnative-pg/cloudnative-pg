@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pvc
+package persistentvolumeclaim
 
 import (
 	"context"
@@ -136,9 +136,9 @@ func reconcilePVCQuantity(
 	return nil
 }
 
-// UpdateClusterAnnotationsOnPVCs we check if we need to add or modify existing annotations specified in the cluster but
+// ReconcileClusterAnnotations we check if we need to add or modify existing annotations specified in the cluster but
 // not existing in the PVCs. We do not support the case of removed annotations from the cluster resource.
-func UpdateClusterAnnotationsOnPVCs(
+func ReconcileClusterAnnotations(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
@@ -180,9 +180,9 @@ func UpdateClusterAnnotationsOnPVCs(
 	return nil
 }
 
-// UpdateClusterLabelsOnPVCs we check if we need to add or modify existing labels specified in the cluster but
+// ReconcileClusterLabels we check if we need to add or modify existing labels specified in the cluster but
 // not existing in the PVCs. We do not support the case of removed labels from the cluster resource.
-func UpdateClusterLabelsOnPVCs(
+func ReconcileClusterLabels(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
@@ -222,8 +222,8 @@ func UpdateClusterLabelsOnPVCs(
 	return nil
 }
 
-// UpdateOperatorLabelsOnPVC ensures that the PVCs have the correct labels
-func UpdateOperatorLabelsOnPVC(
+// ReconcileOperatorLabels ensures that the PVCs have the correct labels
+func ReconcileOperatorLabels(
 	ctx context.Context,
 	c client.Client,
 	instances corev1.PodList,
@@ -232,7 +232,7 @@ func UpdateOperatorLabelsOnPVC(
 	for _, pod := range instances.Items {
 		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
 
-		instancePVCs := FilterInstancePVCs(pvcs.Items, pod.Spec)
+		instancePVCs := FilterByInstance(pvcs.Items, pod.Spec)
 		for i := range instancePVCs {
 			pvc := &instancePVCs[i]
 			var modified bool

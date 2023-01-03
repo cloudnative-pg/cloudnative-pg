@@ -35,7 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -142,7 +142,7 @@ func GetInstancePVCs(
 
 	var pvcs []v1.PersistentVolumeClaim
 
-	pgDataName := pvcReconciler.GetPVCName(cluster, instanceName, utils.PVCRolePgData)
+	pgDataName := persistentvolumeclaim.GetName(cluster, instanceName, utils.PVCRolePgData)
 	pgData, err := getPVC(ctx, pgDataName)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func GetInstancePVCs(
 		pvcs = append(pvcs, *pgData)
 	}
 
-	pgWalName := pvcReconciler.GetPVCName(cluster, instanceName, utils.PVCRolePgWal)
+	pgWalName := persistentvolumeclaim.GetName(cluster, instanceName, utils.PVCRolePgWal)
 	pgWal, err := getPVC(ctx, pgWalName)
 	if err != nil {
 		return nil, err

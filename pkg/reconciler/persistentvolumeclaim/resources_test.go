@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pvc
+package persistentvolumeclaim
 
 import (
 	"context"
@@ -41,7 +41,7 @@ var _ = Describe("PVC detection", func() {
 			makeClusterPVC("3", false), // orphaned
 			makeClusterPVC("4", true),  // ready
 		}
-		pvcUsage := DetectPVCs(
+		pvcUsage := CalculateUsageStatus(
 			context.TODO(),
 			&apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{

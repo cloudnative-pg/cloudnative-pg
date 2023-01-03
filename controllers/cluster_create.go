@@ -39,7 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -905,8 +905,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if err := r.createPVC(
 		ctx,
 		cluster,
-		&pvcReconciler.CreateConfiguration{
-			Status:     pvcReconciler.StatusInitializing,
+		&persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
 			NodeSerial: nodeSerial,
 			Role:       utils.PVCRolePgData,
 			Storage:    cluster.Spec.StorageConfiguration,
@@ -919,8 +919,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		if err := r.createPVC(
 			ctx,
 			cluster,
-			&pvcReconciler.CreateConfiguration{
-				Status:     pvcReconciler.StatusInitializing,
+			&persistentvolumeclaim.CreateConfiguration{
+				Status:     persistentvolumeclaim.StatusInitializing,
 				NodeSerial: nodeSerial,
 				Role:       utils.PVCRolePgWal,
 				Storage:    *cluster.Spec.WalStorage,
@@ -1088,8 +1088,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	if err := r.createPVC(
 		ctx,
 		cluster,
-		&pvcReconciler.CreateConfiguration{
-			Status:     pvcReconciler.StatusInitializing,
+		&persistentvolumeclaim.CreateConfiguration{
+			Status:     persistentvolumeclaim.StatusInitializing,
 			NodeSerial: nodeSerial,
 			Role:       utils.PVCRolePgData,
 			Storage:    cluster.Spec.StorageConfiguration,
@@ -1102,8 +1102,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		if err := r.createPVC(
 			ctx,
 			cluster,
-			&pvcReconciler.CreateConfiguration{
-				Status:     pvcReconciler.StatusInitializing,
+			&persistentvolumeclaim.CreateConfiguration{
+				Status:     persistentvolumeclaim.StatusInitializing,
 				NodeSerial: nodeSerial,
 				Role:       utils.PVCRolePgWal,
 				Storage:    *cluster.Spec.WalStorage,
@@ -1165,8 +1165,8 @@ func (r *ClusterReconciler) reconcilePVCs(
 
 	// This should not happen. However, we put this guard here
 	// as an assertion to catch unexpected events.
-	pvcStatus := pvc.Annotations[pvcReconciler.StatusAnnotationName]
-	if pvcStatus != pvcReconciler.StatusReady {
+	pvcStatus := pvc.Annotations[persistentvolumeclaim.StatusAnnotationName]
+	if pvcStatus != persistentvolumeclaim.StatusReady {
 		contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
 			"pvc", pvc.Name,
 			"status", pvcStatus)
@@ -1239,7 +1239,7 @@ func electPvcToReattach(cluster *apiv1.Cluster) string {
 	}
 
 	for _, pvc := range pvcsToReattach {
-		if pvcReconciler.DoesPVCBelongToInstance(cluster, cluster.Status.TargetPrimary, pvc) {
+		if persistentvolumeclaim.BelongToInstance(cluster, cluster.Status.TargetPrimary, pvc) {
 			return pvc
 		}
 	}
@@ -1277,13 +1277,13 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *api
 func (r *ClusterReconciler) createPVC(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	configuration *pvcReconciler.CreateConfiguration,
+	configuration *persistentvolumeclaim.CreateConfiguration,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvc, err := pvcReconciler.Create(cluster, configuration)
+	pvc, err := persistentvolumeclaim.Create(cluster, configuration)
 	if err != nil {
-		if err == pvcReconciler.ErrorInvalidSize {
+		if err == persistentvolumeclaim.ErrorInvalidSize {
 			// This error should have been caught by the validating
 			// webhook, but since we are here the user must have disabled server-side
 			// validation, and we must react.

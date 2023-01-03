@@ -48,7 +48,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -437,7 +437,12 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// updated any labels that are coming from the operator
-	if err := pvcReconciler.UpdateOperatorLabelsOnPVC(ctx, r.Client, resources.instances, resources.pvcs); err != nil {
+	if err := persistentvolumeclaim.ReconcileOperatorLabels(
+		ctx,
+		r.Client,
+		resources.instances,
+		resources.pvcs,
+	); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 
@@ -452,12 +457,12 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Update any modified/new labels coming from the cluster resource
-	if err := pvcReconciler.UpdateClusterLabelsOnPVCs(ctx, r.Client, cluster, resources.pvcs); err != nil {
+	if err := persistentvolumeclaim.ReconcileClusterLabels(ctx, r.Client, cluster, resources.pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
 	}
 
 	// Update any modified/new annotations coming from the cluster resource
-	if err := pvcReconciler.UpdateClusterAnnotationsOnPVCs(ctx, r.Client, cluster, resources.pvcs); err != nil {
+	if err := persistentvolumeclaim.ReconcileClusterAnnotations(ctx, r.Client, cluster, resources.pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pvcs: %w", err)
 	}
 
@@ -483,7 +488,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// UpdateQuantity PVC resource requirements
-	if res, err := pvcReconciler.ReconcileResourceRequests(
+	if res, err := persistentvolumeclaim.ReconcileResourceRequests(
 		ctx,
 		r.Client,
 		cluster,
@@ -682,7 +687,7 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 			)
 		}
 
-		if pvc.Annotations[pvcReconciler.StatusAnnotationName] == pvcReconciler.StatusReady {
+		if pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusReady {
 			continue
 		}
 
@@ -1086,7 +1091,7 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	for _, job := range completeJobs {
 		for _, pvc := range resources.pvcs.Items {
 			pvc := pvc
-			if !pvcReconciler.IsPodSpecUsingPVCs(job.Spec.Template.Spec, pvc.Name) {
+			if !persistentvolumeclaim.IsUsedByPod(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
 

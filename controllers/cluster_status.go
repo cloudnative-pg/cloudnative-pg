@@ -44,7 +44,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	pvcReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -232,7 +232,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if pvc.Annotations[pvcReconciler.StatusAnnotationName] == pvcReconciler.StatusReady {
+	if pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusReady {
 		return nil
 	}
 
@@ -243,7 +243,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 	if pvc.Annotations == nil {
 		pvc.Annotations = make(map[string]string, 1)
 	}
-	pvc.Annotations[pvcReconciler.StatusAnnotationName] = pvcReconciler.StatusReady
+	pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] = persistentvolumeclaim.StatusReady
 
 	return r.Patch(ctx, pvc, client.MergeFrom(oldPvc))
 }
@@ -259,19 +259,19 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	newPVCCount := int32(len(resources.pvcs.Items))
 	cluster.Status.PVCCount = newPVCCount
-	pvcClassification := pvcReconciler.DetectPVCs(
+	pvcUsageStatus := persistentvolumeclaim.CalculateUsageStatus(
 		ctx,
 		cluster,
 		resources.instances.Items,
 		resources.jobs.Items,
 		resources.pvcs.Items,
 	)
-	cluster.Status.InstanceNames = pvcClassification.InstanceNames
-	cluster.Status.DanglingPVC = pvcClassification.Dangling
-	cluster.Status.HealthyPVC = pvcClassification.Healthy
-	cluster.Status.InitializingPVC = pvcClassification.Initializing
-	cluster.Status.ResizingPVC = pvcClassification.Resizing
-	cluster.Status.UnusablePVC = pvcClassification.Unusable
+	cluster.Status.InstanceNames = pvcUsageStatus.InstanceNames
+	cluster.Status.DanglingPVC = pvcUsageStatus.Dangling
+	cluster.Status.HealthyPVC = pvcUsageStatus.Healthy
+	cluster.Status.InitializingPVC = pvcUsageStatus.Initializing
+	cluster.Status.ResizingPVC = pvcUsageStatus.Resizing
+	cluster.Status.UnusablePVC = pvcUsageStatus.Unusable
 
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones

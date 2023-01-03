@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package pvc contains all the logic to reconcile and build PVCS
-package pvc
+// Package persistentvolumeclaim contains all the logic to reconcile and build PVCS
+package persistentvolumeclaim

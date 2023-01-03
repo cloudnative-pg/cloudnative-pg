@@ -36,7 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/pvc"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -243,7 +243,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, pvcName := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC begins with the name of the pod using it.
-			if pvc.DoesPVCBelongToInstance(cluster, status.Pod.Name, pvcName) {
+			if persistentvolumeclaim.BelongToInstance(cluster, status.Pod.Name, pvcName) {
 				return true, false, fmt.Sprintf("rebooting pod to complete resizing %s", pvcName)
 			}
 		}

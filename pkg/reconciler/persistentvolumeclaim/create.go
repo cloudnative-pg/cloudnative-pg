@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pvc
+package persistentvolumeclaim
 
 import (
 	"strconv"
@@ -43,7 +43,7 @@ func Create(
 	configuration *CreateConfiguration,
 ) (*corev1.PersistentVolumeClaim, error) {
 	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
-	pvcName := GetPVCName(cluster, instanceName, configuration.Role)
+	pvcName := GetName(cluster, instanceName, configuration.Role)
 
 	builder := resources.NewPersistentVolumeClaimBuilder().
 		BeginMetadata().
