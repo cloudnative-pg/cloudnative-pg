@@ -21,9 +21,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -45,29 +45,25 @@ func Create(
 	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
 	pvcName := GetPVCName(cluster, instanceName, configuration.Role)
 
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
-			Namespace: cluster.Namespace,
-			Labels: map[string]string{
-				utils.InstanceNameLabelName: instanceName,
-				utils.PvcRoleLabelName:      string(configuration.Role),
-			},
-			Annotations: map[string]string{
-				specs.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
-				StatusAnnotationName:              configuration.Status,
-			},
-		},
-	}
-
-	// If the customer supplied a spec, let's use it
-	if configuration.Storage.PersistentVolumeClaimTemplate != nil {
-		configuration.Storage.PersistentVolumeClaimTemplate.DeepCopyInto(&pvc.Spec)
-	}
+	builder := resources.NewPersistentVolumeClaimBuilder().
+		BeginMetadata().
+		WithNamespacedName(pvcName, cluster.Namespace).
+		WithAnnotations(map[string]string{
+			specs.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
+			StatusAnnotationName:              configuration.Status,
+		}).
+		WithLabels(map[string]string{
+			utils.InstanceNameLabelName: instanceName,
+			utils.PvcRoleLabelName:      string(configuration.Role),
+		}).
+		WithClusterInheritance(cluster).
+		EndMetadata().
+		WithSpec(configuration.Storage.PersistentVolumeClaimTemplate).
+		WithAccessModes(corev1.ReadWriteOnce)
 
 	// If the customer specified a storage class, let's use it
 	if configuration.Storage.StorageClass != nil {
-		pvc.Spec.StorageClassName = configuration.Storage.StorageClass
+		builder = builder.WithStorageClass(configuration.Storage.StorageClass)
 	}
 
 	if configuration.Storage.Size != "" {
@@ -76,25 +72,16 @@ func Create(
 		if err != nil {
 			return nil, ErrorInvalidSize
 		}
-
-		pvc.Spec.Resources = corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				"storage": parsedSize,
-			},
-		}
+		builder = builder.WithRequests(corev1.ResourceList{
+			"storage": parsedSize,
+		})
 	}
 
-	if len(pvc.Spec.AccessModes) == 0 {
-		pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
-			corev1.ReadWriteOnce,
-		}
-	}
+	pvc := builder.Build()
 
 	if pvc.Spec.Resources.Requests.Storage().IsZero() {
 		return nil, ErrorInvalidSize
 	}
-
-	cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
 
 	return pvc, nil
 }

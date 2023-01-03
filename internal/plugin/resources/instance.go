@@ -128,7 +128,7 @@ func GetInstancePVCs(
 	clusterName string,
 	instanceName string,
 ) ([]v1.PersistentVolumeClaim, error) {
-	var cluster *corev1.Cluster
+	cluster := &corev1.Cluster{}
 	if err := plugin.Client.Get(
 		ctx,
 		types.NamespacedName{

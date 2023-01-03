@@ -19,16 +19,17 @@ package pvc
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -82,8 +83,8 @@ func reconcilePVCQuantity(
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
-
 	pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+
 	storageConfiguration, err := getStorageConfiguration(pvcRole, cluster)
 	if err != nil {
 		contextLogger.Error(err,
@@ -93,44 +94,40 @@ func reconcilePVCQuantity(
 		)
 		return err
 	}
-
 	if storageConfiguration == nil {
 		return fmt.Errorf("tried to reconcile a PVC without storageConfiguration")
 	}
-
 	if storageConfiguration.Size == "" {
 		return nil
 	}
 
-	oldPVC := pvc.DeepCopy()
-	serial, err := specs.GetNodeSerial(oldPVC.ObjectMeta)
+	parsedSize, err := resource.ParseQuantity(storageConfiguration.Size)
 	if err != nil {
-		return err
+		return ErrorInvalidSize
 	}
+	currentSize := pvc.Spec.Resources.Requests["storage"]
 
-	newPVC, err := Create(
-		cluster,
-		&CreateConfiguration{
-			Status:     oldPVC.Annotations[StatusAnnotationName],
-			NodeSerial: serial,
-			Role:       pvcRole,
-			Storage:    *storageConfiguration,
-		})
-	if err != nil {
-		return err
-	}
-	// right now we reconcile the metadata in a different set of functions, so it's not needed to do it here
-	pvc.Spec.Resources.Requests = newPVC.Spec.Resources.Requests
-
-	if reflect.DeepEqual(pvc.Spec.Resources.Requests, oldPVC.Spec.Resources.Requests) {
+	switch currentSize.AsDec().Cmp(parsedSize.AsDec()) {
+	case 0:
+		return nil
+	case 1:
+		contextLogger.Warning("cannot decrease storage requirement",
+			"from", currentSize, "to", parsedSize,
+			"pvcName", pvc.Name)
 		return nil
 	}
 
+	oldPVC := pvc.DeepCopy()
+	// right now we reconcile the metadata in a different set of functions, so it's not needed to do it here
+	pvc = resources.NewPersistentVolumeClaimBuilderFromPVC(pvc).
+		WithRequests(corev1.ResourceList{"storage": parsedSize}).
+		Build()
+
 	if err := c.Patch(ctx, pvc, client.MergeFrom(oldPVC)); err != nil {
 		contextLogger.Error(err, "error while changing PVC storage requirement",
-			"pvcName", newPVC.Name,
-			"pvc", newPVC,
-			"spec", newPVC.Spec,
+			"pvcName", pvc.Name,
+			"pvc", pvc,
+			"spec", pvc.Spec,
 			"oldPVC", oldPVC,
 			"oldSPEC", oldPVC.Spec)
 		return err

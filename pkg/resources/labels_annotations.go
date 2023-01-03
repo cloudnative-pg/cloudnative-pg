@@ -1,0 +1,61 @@
+/*
+Copyright The CloudNativePG Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package resources
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// AnnotationCNPGHash contains the hash of the used by CNPG expect the pooler that uses PgbouncerPoolerSpecHash
+	AnnotationCNPGHash = "cnpg.io/hash"
+)
+
+// MergeMap transfers the content of a giver map to a receiver
+func MergeMap(receiver, giver map[string]string) {
+	for key, value := range giver {
+		receiver[key] = value
+	}
+}
+
+// inheritLabels puts into the object metadata the passed labels
+func inheritLabels(
+	object *metav1.ObjectMeta,
+	labels map[string]string,
+) {
+	if object.Labels == nil {
+		object.Labels = make(map[string]string)
+	}
+
+	MergeMap(object.Labels, labels)
+}
+
+// inheritAnnotations puts into the object metadata the passed annotations
+func inheritAnnotations(
+	object *metav1.ObjectMeta,
+	annotations map[string]string,
+) {
+	if object.Annotations == nil {
+		object.Annotations = make(map[string]string)
+	}
+
+	MergeMap(object.Annotations, annotations)
+}
+
+func setHash(meta *metav1.ObjectMeta, hashValue string) {
+	meta.Annotations[AnnotationCNPGHash] = hashValue
+}
