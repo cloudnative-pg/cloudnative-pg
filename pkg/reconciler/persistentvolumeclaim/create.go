@@ -30,7 +30,7 @@ import (
 
 // CreateConfiguration specifies how a PVC should be created
 type CreateConfiguration struct {
-	Status     Status
+	Status     PVCStatus
 	NodeSerial int
 	Role       utils.PVCRole
 	Storage    apiv1.StorageConfiguration

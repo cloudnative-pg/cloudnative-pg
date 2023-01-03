@@ -257,21 +257,13 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	existingClusterStatus := cluster.Status
 
-	newPVCCount := int32(len(resources.pvcs.Items))
-	cluster.Status.PVCCount = newPVCCount
-	pvcUsageStatus := persistentvolumeclaim.CalculateUsageStatus(
+	persistentvolumeclaim.EnrichStatus(
 		ctx,
 		cluster,
 		resources.instances.Items,
 		resources.jobs.Items,
 		resources.pvcs.Items,
 	)
-	cluster.Status.InstanceNames = pvcUsageStatus.InstanceNames
-	cluster.Status.DanglingPVC = pvcUsageStatus.Dangling
-	cluster.Status.HealthyPVC = pvcUsageStatus.Healthy
-	cluster.Status.InitializingPVC = pvcUsageStatus.Initializing
-	cluster.Status.ResizingPVC = pvcUsageStatus.Resizing
-	cluster.Status.UnusablePVC = pvcUsageStatus.Unusable
 
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones

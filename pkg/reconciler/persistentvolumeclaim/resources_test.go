@@ -41,20 +41,21 @@ var _ = Describe("PVC detection", func() {
 			makeClusterPVC("3", false), // orphaned
 			makeClusterPVC("4", true),  // ready
 		}
-		pvcUsage := CalculateUsageStatus(
-			context.TODO(),
-			&apiv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterName,
-				},
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clusterName,
 			},
+		}
+		EnrichStatus(
+			context.TODO(),
+			cluster,
 			[]corev1.Pod{makePod(clusterName, "1")},
 			[]batchv1.Job{makeJob(clusterName, "2")},
 			pvcs,
 		)
-		Expect(pvcUsage.InstanceNames).ShouldNot(BeEmpty())
-		Expect(pvcUsage.InstanceNames).Should(HaveLen(3))
+		Expect(cluster.Status.InstanceNames).ShouldNot(BeEmpty())
+		Expect(cluster.Status.InstanceNames).Should(HaveLen(3))
 		// the PVC clusterName+"-3" is not ready, and has no Job nor Pod
-		Expect(pvcUsage.InstanceNames).Should(ConsistOf(clusterName+"-1", clusterName+"-2", clusterName+"-4"))
+		Expect(cluster.Status.InstanceNames).Should(ConsistOf(clusterName+"-1", clusterName+"-2", clusterName+"-4"))
 	})
 })
