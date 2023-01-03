@@ -34,32 +34,60 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// ReconcileResourceRequests align the resource requests
-func ReconcileResourceRequests(
+// ReconcileExistingResources reconciles the PVC already created
+// TODO: in future it should also create the PVCs
+func ReconcileExistingResources(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
+	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (ctrl.Result, error) {
-	if !cluster.ShouldResizeInUseVolumes() {
-		return ctrl.Result{}, nil
-	}
-
 	contextLogger := log.FromContext(ctx)
 
-	for idx := range pvcs {
-		if err := reconcilePVCQuantity(ctx, c, cluster, &pvcs[idx]); err != nil {
-			if apierrs.IsConflict(err) {
-				contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
-				return ctrl.Result{Requeue: true}, nil
-			}
-			if err != nil {
-				return ctrl.Result{}, err
-			}
+	if err := reconcileOperatorLabels(ctx, c, instances, pvcs); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
+	}
+
+	if err := reconcileClusterLabels(ctx, c, cluster, pvcs); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
+	}
+
+	if err := reconcileClusterAnnotations(ctx, c, cluster, pvcs); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pvcs: %w", err)
+	}
+
+	if err := reconcileResourceRequests(ctx, c, cluster, pvcs); err != nil {
+		if apierrs.IsConflict(err) {
+			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
+			return ctrl.Result{Requeue: true}, nil
+		}
+		if err != nil {
+			return ctrl.Result{}, err
 		}
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// reconcileResourceRequests align the resource requests
+func reconcileResourceRequests(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	pvcs []corev1.PersistentVolumeClaim,
+) error {
+	if !cluster.ShouldResizeInUseVolumes() {
+		return nil
+	}
+
+	for idx := range pvcs {
+		if err := reconcilePVCQuantity(ctx, c, cluster, &pvcs[idx]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func getStorageConfiguration(
@@ -94,9 +122,11 @@ func reconcilePVCQuantity(
 		)
 		return err
 	}
+
 	if storageConfiguration == nil {
 		return fmt.Errorf("tried to reconcile a PVC without storageConfiguration")
 	}
+
 	if storageConfiguration.Size == "" {
 		return nil
 	}
@@ -136,18 +166,18 @@ func reconcilePVCQuantity(
 	return nil
 }
 
-// ReconcileClusterAnnotations we check if we need to add or modify existing annotations specified in the cluster but
+// reconcileClusterAnnotations we check if we need to add or modify existing annotations specified in the cluster but
 // not existing in the PVCs. We do not support the case of removed annotations from the cluster resource.
-func ReconcileClusterAnnotations(
+func reconcileClusterAnnotations(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	pvcs corev1.PersistentVolumeClaimList,
+	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	for i := range pvcs.Items {
-		pvc := &pvcs.Items[i]
+	for i := range pvcs {
+		pvc := &pvcs[i]
 
 		// if all the required annotations are already set and with the correct value,
 		// we proceed to the next item
@@ -180,18 +210,18 @@ func ReconcileClusterAnnotations(
 	return nil
 }
 
-// ReconcileClusterLabels we check if we need to add or modify existing labels specified in the cluster but
+// reconcileClusterLabels we check if we need to add or modify existing labels specified in the cluster but
 // not existing in the PVCs. We do not support the case of removed labels from the cluster resource.
-func ReconcileClusterLabels(
+func reconcileClusterLabels(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	pvcs corev1.PersistentVolumeClaimList,
+	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	for i := range pvcs.Items {
-		pvc := &pvcs.Items[i]
+	for i := range pvcs {
+		pvc := &pvcs[i]
 
 		// if all the required labels are already set and with the correct value,
 		// we proceed to the next item
@@ -222,17 +252,17 @@ func ReconcileClusterLabels(
 	return nil
 }
 
-// ReconcileOperatorLabels ensures that the PVCs have the correct labels
-func ReconcileOperatorLabels(
+// reconcileOperatorLabels ensures that the PVCs have the correct labels
+func reconcileOperatorLabels(
 	ctx context.Context,
 	c client.Client,
-	instances corev1.PodList,
-	pvcs corev1.PersistentVolumeClaimList,
+	instances []corev1.Pod,
+	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	for _, pod := range instances.Items {
+	for _, pod := range instances {
 		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
 
-		instancePVCs := FilterByInstance(pvcs.Items, pod.Spec)
+		instancePVCs := FilterByInstance(pvcs, pod.Spec)
 		for i := range instancePVCs {
 			pvc := &instancePVCs[i]
 			var modified bool

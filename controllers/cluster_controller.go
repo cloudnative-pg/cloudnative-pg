@@ -436,16 +436,6 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{}, fmt.Errorf("cannot update instance labels on pods: %w", err)
 	}
 
-	// updated any labels that are coming from the operator
-	if err := persistentvolumeclaim.ReconcileOperatorLabels(
-		ctx,
-		r.Client,
-		resources.instances,
-		resources.pvcs,
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
-	}
-
 	// Update any modified/new labels coming from the cluster resource
 	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pods: %w", err)
@@ -454,16 +444,6 @@ func (r *ClusterReconciler) reconcileResources(
 	// Update any modified/new annotations coming from the cluster resource
 	if err := r.updateClusterAnnotationsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pods: %w", err)
-	}
-
-	// Update any modified/new labels coming from the cluster resource
-	if err := persistentvolumeclaim.ReconcileClusterLabels(ctx, r.Client, cluster, resources.pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
-	}
-
-	// Update any modified/new annotations coming from the cluster resource
-	if err := persistentvolumeclaim.ReconcileClusterAnnotations(ctx, r.Client, cluster, resources.pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pvcs: %w", err)
 	}
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
@@ -487,11 +467,11 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// UpdateQuantity PVC resource requirements
-	if res, err := persistentvolumeclaim.ReconcileResourceRequests(
+	if res, err := persistentvolumeclaim.ReconcileExistingResources(
 		ctx,
 		r.Client,
 		cluster,
+		resources.instances.Items,
 		resources.pvcs.Items,
 	); !res.IsZero() || err != nil {
 		return res, err
