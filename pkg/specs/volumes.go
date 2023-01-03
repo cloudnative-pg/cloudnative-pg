@@ -222,10 +222,7 @@ func createProjectedVolume(cluster apiv1.Cluster) corev1.Volume {
 	return corev1.Volume{
 		Name: "projected",
 		VolumeSource: corev1.VolumeSource{
-			Projected: &corev1.ProjectedVolumeSource{
-				Sources:     cluster.Spec.ProjectedVolumeTemplate.Sources,
-				DefaultMode: cluster.Spec.ProjectedVolumeTemplate.DefaultMode,
-			},
+			Projected: cluster.Spec.ProjectedVolumeTemplate.DeepCopy(),
 		},
 	}
 }
