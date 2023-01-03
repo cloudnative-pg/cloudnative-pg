@@ -25,8 +25,8 @@ const (
 	AnnotationCNPGHash = "cnpg.io/hash"
 )
 
-// MergeMap transfers the content of a giver map to a receiver
-func MergeMap(receiver, giver map[string]string) {
+// mergeMap transfers the content of a giver map to a receiver
+func mergeMap(receiver, giver map[string]string) {
 	for key, value := range giver {
 		receiver[key] = value
 	}
@@ -41,7 +41,7 @@ func inheritLabels(
 		object.Labels = make(map[string]string)
 	}
 
-	MergeMap(object.Labels, labels)
+	mergeMap(object.Labels, labels)
 }
 
 // inheritAnnotations puts into the object metadata the passed annotations
@@ -53,7 +53,7 @@ func inheritAnnotations(
 		object.Annotations = make(map[string]string)
 	}
 
-	MergeMap(object.Annotations, annotations)
+	mergeMap(object.Annotations, annotations)
 }
 
 func setHash(meta *metav1.ObjectMeta, hashValue string) {

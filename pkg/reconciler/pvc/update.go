@@ -34,8 +34,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// UpdateQuantity align the PVCs that are backing our cluster with the user specifications
-func UpdateQuantity(
+// ReconcileResourceRequests align the resource requests
+func ReconcileResourceRequests(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,

@@ -483,7 +483,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// UpdateQuantity PVC resource requirements
-	if res, err := pvcReconciler.UpdateQuantity(
+	if res, err := pvcReconciler.ReconcileResourceRequests(
 		ctx,
 		r.Client,
 		cluster,
