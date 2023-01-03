@@ -437,7 +437,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// updated any labels that are coming from the operator
-	if err := r.updateOperatorLabelsOnPVC(ctx, resources.instances, resources.pvcs); err != nil {
+	if err := pvcReconciler.UpdateOperatorLabelsOnPVC(ctx, r.Client, resources.instances, resources.pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 
@@ -452,12 +452,12 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Update any modified/new labels coming from the cluster resource
-	if err := r.updateClusterLabelsOnPVCs(ctx, cluster, resources.pvcs); err != nil {
+	if err := pvcReconciler.UpdateClusterLabelsOnPVCs(ctx, r.Client, cluster, resources.pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
 	}
 
 	// Update any modified/new annotations coming from the cluster resource
-	if err := r.updateClusterAnnotationsOnPVCs(ctx, cluster, resources.pvcs); err != nil {
+	if err := pvcReconciler.UpdateClusterAnnotationsOnPVCs(ctx, r.Client, cluster, resources.pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pvcs: %w", err)
 	}
 
@@ -482,12 +482,17 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Reconcile PVC resource requirements
-	if res, err := pvcReconciler.Reconcile(ctx, r.Client, cluster, resources.pvcs.Items); !res.IsZero() || err != nil {
+	// UpdateQuantity PVC resource requirements
+	if res, err := pvcReconciler.UpdateQuantity(
+		ctx,
+		r.Client,
+		cluster,
+		resources.pvcs.Items,
+	); !res.IsZero() || err != nil {
 		return res, err
 	}
 
-	// Reconcile Pods
+	// UpdateQuantity Pods
 	if res, err := r.ReconcilePods(ctx, cluster, resources, instancesStatus); err != nil {
 		return res, err
 	}
