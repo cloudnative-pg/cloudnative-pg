@@ -11,7 +11,6 @@ Here is a simple example about how to mount an existing tls Secret (named sample
 into Postgres pods. The values for the Secret keys `tls.crt` and `tls.key` in sample-secret will be mounted 
 as files into path `/projected/certificate/tls.crt` and `/projected/certificate/tls.key` in Postgres pod. 
 
-
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -32,12 +31,5 @@ spec:
     size: 1Gi
 ```
 
-
 You can find a complete example using projected volume template to mount Secret and Configmap in
 the [cluster-example-projected-volume.yaml](samples/cluster-example-projected-volume.yaml) deployment manifest.
-
-
-
-
-
-
