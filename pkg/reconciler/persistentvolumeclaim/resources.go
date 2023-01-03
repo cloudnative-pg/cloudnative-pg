@@ -204,7 +204,7 @@ instancesLoop:
 		// Search for a Pod corresponding to this instance.
 		// If found, all the PVCs are Healthy
 		for idx := range podList {
-			if IsUsedByPod(podList[idx].Spec, pvcNames...) {
+			if IsUsedByPodSpec(podList[idx].Spec, pvcNames...) {
 				// We found a Pod using this PVCs so this
 				// PVCs are not dangling
 				result.Healthy = append(result.Healthy, pvcNames...)
@@ -215,7 +215,7 @@ instancesLoop:
 		// Search for a Job corresponding to this instance.
 		// If found, all the PVCs are Initializing
 		for idx := range jobList {
-			if IsUsedByPod(jobList[idx].Spec.Template.Spec, pvcNames...) {
+			if IsUsedByPodSpec(jobList[idx].Spec.Template.Spec, pvcNames...) {
 				// We have found a Job corresponding to this PVCs, so we
 				// are initializing them or the initialization has just completed
 				result.Initializing = append(result.Initializing, pvcNames...)
@@ -243,8 +243,8 @@ instancesLoop:
 	return result
 }
 
-// IsUsedByPod checks if the given pod spec is using the PVCs
-func IsUsedByPod(podSpec corev1.PodSpec, pvcNames ...string) bool {
+// IsUsedByPodSpec checks if the given pod spec is using the PVCs
+func IsUsedByPodSpec(podSpec corev1.PodSpec, pvcNames ...string) bool {
 external:
 	for _, pvcName := range pvcNames {
 		for _, volume := range podSpec.Volumes {
@@ -268,8 +268,8 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return false
 }
 
-// BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
-func BelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
+// IsUsedByInstance returns a boolean indicating if that given PVC belongs to an instance
+func IsUsedByInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
 	expectedInstancePVCs := getExpectedInstancePVCNames(cluster, instanceName)
 	return slices.Contains(expectedInstancePVCs, resourceName)
 }

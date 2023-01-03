@@ -243,7 +243,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, pvcName := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC begins with the name of the pod using it.
-			if persistentvolumeclaim.BelongToInstance(cluster, status.Pod.Name, pvcName) {
+			if persistentvolumeclaim.IsUsedByInstance(cluster, status.Pod.Name, pvcName) {
 				return true, false, fmt.Sprintf("rebooting pod to complete resizing %s", pvcName)
 			}
 		}
