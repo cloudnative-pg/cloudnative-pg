@@ -62,9 +62,8 @@ func ReconcileExistingResources(
 			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
 			return ctrl.Result{Requeue: true}, nil
 		}
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -100,7 +99,7 @@ func getStorageConfiguration(
 	case utils.PVCRolePgWal:
 		return cluster.Spec.WalStorage, nil
 	default:
-		return nil, fmt.Errorf("unknown pvcRole")
+		return nil, fmt.Errorf("unknown pvcRole: %s", string(role))
 	}
 }
 
@@ -204,7 +203,6 @@ func reconcileClusterAnnotations(
 		if err := c.Patch(ctx, pvc, patch); err != nil {
 			return err
 		}
-		continue
 	}
 
 	return nil

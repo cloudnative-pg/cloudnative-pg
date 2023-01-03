@@ -128,7 +128,7 @@ func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cl
 		)
 	}
 
-	// UpdateQuantity the primary PDB
+	// Reconcile the primary PDB
 	err := r.createOrPatchOwnedPodDisruptionBudget(ctx,
 		cluster,
 		specs.BuildPrimaryPodDisruptionBudget(cluster),
