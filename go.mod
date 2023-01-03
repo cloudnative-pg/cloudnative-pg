@@ -3,8 +3,8 @@ module github.com/cloudnative-pg/cloudnative-pg
 go 1.19
 
 require (
-	github.com/Masterminds/semver/v3 v3.1.1
-	github.com/avast/retry-go/v4 v4.1.0
+	github.com/Masterminds/semver/v3 v3.2.0
+	github.com/avast/retry-go/v4 v4.3.2
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/davecgh/go-spew v1.1.1
@@ -93,7 +93,7 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
-	github.com/stretchr/testify v1.8.0 // indirect
+	github.com/stretchr/testify v1.8.1 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
