@@ -79,6 +79,9 @@ func ExecCommand(
 	if timeout != nil {
 		req.Timeout(*timeout)
 		newConfig.Timeout = *timeout
+		timedCtx, cancelFunc := context.WithTimeout(ctx, *timeout)
+		defer cancelFunc()
+		ctx = timedCtx
 	}
 
 	req.VersionedParams(&corev1.PodExecOptions{
