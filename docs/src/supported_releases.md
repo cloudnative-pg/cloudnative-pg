@@ -65,7 +65,7 @@ Git tags for versions are prepended with `v`.
 
 | Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported |
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|
-| 1.18.x          | Yes                  | November 10, 2022 | ~ April 13, 2023         | 1.23, 1.24, 1.25              | 1.22                      |
+| 1.18.x          | Yes                  | November 10, 2022 | ~ April 13, 2023         | 1.23, 1.24, 1.25, 1.26        | 1.22                      |
 | 1.17.x          | Yes                  | September 6, 2022 | ~ February 12, 2023      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
 | main            | No, development only |                   |                          |                               |                           |
 
@@ -79,11 +79,11 @@ by the CloudNativePG maintainers).
 
 ## Upcoming releases
 
-| Version         | Release Date     | End of Life               | Supported Kubernetes Versions  |
-|-----------------|------------------|---------------------------|--------------------------------|
-| 1.19.0          | January 26, 2023 | June 15, 2023             | 1.23, 1.24, 1.25               |
-| 1.20.0          | March 27, 2023   | -                         | -                              |
-| 1.21.0          | May 29, 2023     | -                         | -                              |
+| Version         | Release Date     | End of Life               | Supported Kubernetes Versions |
+|-----------------|------------------|---------------------------|-------------------------------|
+| 1.19.0          | January 26, 2023 | June 15, 2023             | 1.23, 1.24, 1.25, 1.26        |
+| 1.20.0          | March 27, 2023   | -                         | -                             |
+| 1.21.0          | May 29, 2023     | -                         | -                             |
 
 !!! Note
     Feature freeze happens one week before the release
