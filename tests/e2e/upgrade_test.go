@@ -197,7 +197,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			primary, err := env.GetClusterPrimary(upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			commandTimeout := time.Second * 2
+			commandTimeout := time.Second * 5
 			_, _, err = env.EventuallyExecCommand(env.Ctx, *primary, specs.PostgresContainerName, &commandTimeout,
 				"psql", "-U", "postgres", "appdb", "-tAc", "CREATE TABLE postswitch(i int)")
 			Expect(err).ToNot(HaveOccurred())

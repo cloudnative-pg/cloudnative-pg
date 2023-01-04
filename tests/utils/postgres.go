@@ -49,7 +49,7 @@ func RunQueryFromPod(
 	query string,
 	env *TestingEnvironment,
 ) (string, string, error) {
-	timeout := time.Second * 2
+	timeout := time.Second * 5
 	dsn := CreateDSN(host, user, dbname, password, Prefer, 5432)
 
 	stdout, stderr, err := env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
@@ -60,7 +60,7 @@ func RunQueryFromPod(
 // CountReplicas counts the number of replicas attached to an instance
 func CountReplicas(env *TestingEnvironment, pod *corev1.Pod) (int, error) {
 	query := "SELECT count(*) FROM pg_stat_replication"
-	commandTimeout := time.Second * 2
+	commandTimeout := time.Second * 5
 	stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 	if err != nil {

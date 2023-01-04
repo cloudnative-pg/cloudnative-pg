@@ -522,7 +522,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			})
 
 			By("verifying that old primary was actually restarted", func() {
-				commandTimeout := time.Second * 2
+				commandTimeout := time.Second * 5
 				pod := corev1.Pod{}
 				err := env.Client.Get(env.Ctx, types.NamespacedName{
 					Namespace: namespace,
