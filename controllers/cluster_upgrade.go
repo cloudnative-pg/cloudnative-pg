@@ -25,6 +25,7 @@ import (
 	neturl "net/url"
 	"reflect"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -290,6 +291,13 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 				cluster.Spec.Resources,
 				container.Resources)
 		}
+
+		// Check if there is a change in the environment section
+		if isPostgresContainerNeedingUpdatedEnvironment(cluster, container) {
+			return true, false, fmt.Sprintf("environment variable configuration changed, old: %+v, new: %+v",
+				cluster.Spec.Env,
+				container.Env)
+		}
 	}
 
 	// check if pod needs to be restarted because of some config requiring it
@@ -390,6 +398,31 @@ func isPodNeedingRestart(
 	}
 
 	return instanceStatus.PendingRestart
+}
+
+// isPostgresContainerNeedingUpdatedEnvironment detects if a Pod is needing an updated environment
+func isPostgresContainerNeedingUpdatedEnvironment(
+	cluster *apiv1.Cluster,
+	container corev1.Container,
+) bool {
+	// Step 1: detect changes in the envFrom section
+	if !slices.Equal(container.EnvFrom, cluster.Spec.EnvFrom) {
+		return true
+	}
+
+	// Step 2: detect changes in the env section
+	generatedEnvironment := specs.CreateEnvVarPostgresContainer(*cluster, "unused")
+	return !slices.EqualFunc(container.Env, generatedEnvironment, func(e1, e2 corev1.EnvVar) bool {
+		if e1.Name == "POD_NAME" && e2.Name == "POD_NAME" {
+			// We don't consider a change in the POD_NAME environment variable
+			// value as meaningful.
+			// The POD_NAME environment variable is automatically managed by the
+			// operator and won't be changed by the user
+			return true
+		}
+
+		return e1 == e2
+	})
 }
 
 // upgradePod updates an instance to a newer image version

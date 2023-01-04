@@ -2684,6 +2684,54 @@ var _ = Describe("validation of replication slots configuration", func() {
 	})
 })
 
+var _ = Describe("Environment variables validation", func() {
+	When("an environment variable is given", func() {
+		It("detects if it is valid", func() {
+			Expect(isReservedEnvironmentVariable("PGDATA")).To(BeTrue())
+		})
+
+		It("detects if it is not valid", func() {
+			Expect(isReservedEnvironmentVariable("LC_ALL")).To(BeFalse())
+		})
+	})
+
+	When("a ClusterSpec is given", func() {
+		It("detects if the environment variable list is correct", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TZ",
+							Value: "Europe/Rome",
+						},
+					},
+				},
+			}
+
+			Expect(cluster.validateEnv()).To(BeEmpty())
+		})
+
+		It("detects if the environment variable list contains a reserved variable", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TZ",
+							Value: "Europe/Rome",
+						},
+						{
+							Name:  "PGDATA",
+							Value: "/tmp",
+						},
+					},
+				},
+			}
+
+			Expect(cluster.validateEnv()).To(HaveLen(1))
+		})
+	})
+})
+
 var _ = Describe("Storage configuration validation", func() {
 	When("a ClusterSpec is given", func() {
 		It("produces one error if storage is not set at all", func() {

@@ -271,6 +271,18 @@ type ClusterSpec struct {
 	// under `/projected` base folder
 	// +optional
 	ProjectedVolumeTemplate *corev1.ProjectedVolumeSource `json:"projectedVolumeTemplate,omitempty"`
+
+	// Env follows the Env format to pass environment variables
+	// to the pods created in the cluster
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// EnvFrom follows the EnvFrom format to pass environment variables
+	// sources to the pods to be used by Env
+	// +optional
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 }
 
 const (
