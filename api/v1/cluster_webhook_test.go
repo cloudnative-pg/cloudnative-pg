@@ -19,7 +19,7 @@ package v1
 import (
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
@@ -1531,7 +1531,7 @@ var _ = Describe("toleration validation", func() {
 		recoveryCluster := &Cluster{
 			Spec: ClusterSpec{
 				Affinity: AffinityConfiguration{
-					Tolerations: []v1.Toleration{
+					Tolerations: []corev1.Toleration{
 						{
 							Key:      "test",
 							Operator: "Exists",
@@ -1549,7 +1549,7 @@ var _ = Describe("toleration validation", func() {
 		recoveryCluster := &Cluster{
 			Spec: ClusterSpec{
 				Affinity: AffinityConfiguration{
-					Tolerations: []v1.Toleration{
+					Tolerations: []corev1.Toleration{
 						{
 							Key:      "",
 							Operator: "Equal",
@@ -2385,5 +2385,53 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster := oldCluster.DeepCopy()
 		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = false
 		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
+	})
+})
+
+var _ = Describe("Environment variables validation", func() {
+	When("an environment variable is given", func() {
+		It("detects if it is valid", func() {
+			Expect(isReservedEnvironmentVariable("PGDATA")).To(BeTrue())
+		})
+
+		It("detects if it is not valid", func() {
+			Expect(isReservedEnvironmentVariable("LC_ALL")).To(BeFalse())
+		})
+	})
+
+	When("a ClusterSpec is given", func() {
+		It("detects if the environment variable list is correct", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TZ",
+							Value: "Europe/Rome",
+						},
+					},
+				},
+			}
+
+			Expect(cluster.validateEnv()).To(BeEmpty())
+		})
+
+		It("detects if the environment variable list contains a reserved variable", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TZ",
+							Value: "Europe/Rome",
+						},
+						{
+							Name:  "PGDATA",
+							Value: "/tmp",
+						},
+					},
+				},
+			}
+
+			Expect(cluster.validateEnv()).To(HaveLen(1))
+		})
 	})
 })
