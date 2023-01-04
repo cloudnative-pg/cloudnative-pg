@@ -73,4 +73,8 @@ Sample cluster with customized `pg_hba` configuration
 : [`cluster-example-pg-hba.yaml`](samples/cluster-example-pg-hba.yaml):
   a basic cluster that enables user `app` to authenticate using certificates.
 
+Sample cluster with Secret and Configmap mounted using projected volume template
+: [`cluster-example-projected-volume.yaml`](samples/cluster-example-projected-volume.yaml)
+  a basic cluster with existing Secret and Configmap mounted into Postgres pod using projected volume mount.  
+
 For a list of available options, please refer to the ["API Reference" page](api_reference.md).

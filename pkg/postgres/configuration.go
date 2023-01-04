@@ -66,6 +66,9 @@ host all all all {{.DefaultAuthenticationMethod}}
 	// CertificatesDir location to store the certificates
 	CertificatesDir = ScratchDataDirectory + "/certificates/"
 
+	// ProjectedVolumeDirectory is the base directory to store ProjectedVolumeSource
+	ProjectedVolumeDirectory = "/projected"
+
 	// ServerCertificateLocation is the location where the server certificate
 	// is stored
 	ServerCertificateLocation = CertificatesDir + "server.crt"
