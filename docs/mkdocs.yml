@@ -27,6 +27,7 @@ nav:
   - backup_recovery.md
   - postgresql_conf.md
   - operator_conf.md
+  - cluster_conf.md
   - storage.md
   - labels_annotations.md
   - monitoring.md

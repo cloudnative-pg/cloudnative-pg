@@ -238,6 +238,7 @@ Postgres
 PostgresConfiguration
 PrimaryUpdateMethod
 PrimaryUpdateStrategy
+ProjectedVolumeSource
 PullPolicy
 QoS
 Quaresima

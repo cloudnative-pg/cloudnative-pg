@@ -1,0 +1,43 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-projected-volume
+spec:
+  instances: 3
+  projectedVolumeTemplate:
+    sources:
+      - secret:
+          name: sample-secret
+          items:
+            - key: tls.crt
+              path: certificate/tls.crt
+            - key: tls.key
+              path: certificate/tls.key
+      - configMap:
+          name: sample-configmap
+          items:
+            - key: key1
+              path: config/key1
+            - key: key2
+              path: config/key2
+  storage:
+    size: 1Gi
+
+---
+apiVersion: v1
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNQekNDQWVXZ0F3SUJBZ0lRSHVDY2lKcDVkZis0dHZBcDBrTk9rekFLQmdncWhrak9QUVFEQWpCTk1TTXcKSVFZRFZRUUxFeHB3YjNOMFozSmxjM0ZzTFc5d1pYSmhkRzl5TFhONWMzUmxiVEVtTUNRR0ExVUVBeE1kY0c5egpkR2R5WlhOeGJDMXZjR1Z5WVhSdmNpMWpZUzF6WldOeVpYUXdIaGNOTWpJd09USTVNRGMxTVRBNVdoY05Nakl4Ck1qSTRNRGMxTVRBNVdqQk5NVXN3U1FZRFZRUURFMEp3YjNOMFozSmxjM0ZzTFc5d1pYSmhkRzl5TFhkbFltaHYKYjJzdGMyVnlkbWxqWlM1d2IzTjBaM0psYzNGc0xXOXdaWEpoZEc5eUxYTjVjM1JsYlM1emRtTXdXVEFUQmdjcQpoa2pPUFFJQkJnZ3Foa2pPUFFNQkJ3TkNBQVJRd2lhUm0wSmN4TzlBVlE0MVlqVlRqNUhDSVVFblFQOXNZRXFKCmYvNE1mVm53NkdDOThjNDNmQTVuS2UwSnQ5ZEV3QXREYktkdkRoeDlUTmIzdVY0K280R21NSUdqTUE0R0ExVWQKRHdFQi93UUVBd0lEcURBVEJnTlZIU1VFRERBS0JnZ3JCZ0VGQlFjREFUQU1CZ05WSFJNQkFmOEVBakFBTUI4RwpBMVVkSXdRWU1CYUFGQjN6cUVKbWFORENoRDdkWGptSWRlNEhUY0pFTUUwR0ExVWRFUVJHTUVTQ1FuQnZjM1JuCmNtVnpjV3d0YjNCbGNtRjBiM0l0ZDJWaWFHOXZheTF6WlhKMmFXTmxMbkJ2YzNSbmNtVnpjV3d0YjNCbGNtRjAKYjNJdGMzbHpkR1Z0TG5OMll6QUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQkMwS2M5WWxYelBpL0lhTkRnWHkwawpYTDJpNlZzSHRORTFxN3MzWXh6Mm53SWhBS2IxUW5EVTlqRnNVK0l5a292TitVU1ZpVm5vU2MvZ2RXWkxmMnhoCjZ2WUsKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  tls.key: LS0tLS1CRUdJTiBFQyBQUklWQVRFIEtFWS0tLS0tCk1IY0NBUUVFSUtucWxVQjFqU2sxWW5VZzAyb0tGbXlRdDJLUEZwaFc0K1lmQUFmUFdRenVvQW9HQ0NxR1NNNDkKQXdFSG9VUURRZ0FFVU1JbWtadENYTVR2UUZVT05XSTFVNCtSd2lGQkowRC9iR0JLaVgvK0RIMVo4T2hndmZITwpOM3dPWnludENiZlhSTUFMUTJ5bmJ3NGNmVXpXOTdsZVBnPT0KLS0tLS1FTkQgRUMgUFJJVkFURSBLRVktLS0tLQo=
+kind: Secret
+metadata:
+  name: sample-secret
+type: kubernetes.io/tls
+---
+apiVersion: v1
+data:
+  key1: value1
+  key2: value2
+  key3: value3
+kind: ConfigMap
+metadata:
+  name: sample-configmap
