@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -155,8 +156,8 @@ func restoreOrphanPVCs(
 		}
 
 		pvcOrig := pvc.DeepCopy()
-		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
-		pvc.Annotations[specs.PVCStatusAnnotationName] = specs.PVCStatusReady
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] = persistentvolumeclaim.StatusReady
 		// we clean hibernation metadata if it exists
 		delete(pvc.Annotations, utils.HibernateClusterManifestAnnotationName)
 		delete(pvc.Annotations, utils.HibernatePgControlDataAnnotationName)

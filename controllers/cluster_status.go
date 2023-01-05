@@ -39,13 +39,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -233,7 +232,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+	if pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusReady {
 		return nil
 	}
 
@@ -244,7 +243,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 	if pvc.Annotations == nil {
 		pvc.Annotations = make(map[string]string, 1)
 	}
-	pvc.Annotations[specs.PVCStatusAnnotationName] = specs.PVCStatusReady
+	pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] = persistentvolumeclaim.StatusReady
 
 	return r.Patch(ctx, pvc, client.MergeFrom(oldPvc))
 }
@@ -258,21 +257,13 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	existingClusterStatus := cluster.Status
 
-	newPVCCount := int32(len(resources.pvcs.Items))
-	cluster.Status.PVCCount = newPVCCount
-	pvcClassification := specs.DetectPVCs(
+	persistentvolumeclaim.EnrichStatus(
 		ctx,
 		cluster,
 		resources.instances.Items,
 		resources.jobs.Items,
 		resources.pvcs.Items,
 	)
-	cluster.Status.InstanceNames = pvcClassification.InstanceNames
-	cluster.Status.DanglingPVC = pvcClassification.Dangling
-	cluster.Status.HealthyPVC = pvcClassification.Healthy
-	cluster.Status.InitializingPVC = pvcClassification.Initializing
-	cluster.Status.ResizingPVC = pvcClassification.Resizing
-	cluster.Status.UnusablePVC = pvcClassification.Unusable
 
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones
@@ -415,16 +406,6 @@ func (r *ClusterReconciler) updateOnlineUpdateEnabled(
 
 	cluster.Status.OnlineUpdateEnabled = onlineUpdateEnabled
 	return r.Status().Update(ctx, cluster)
-}
-
-// SetClusterOwnerAnnotationsAndLabels sets the cluster as owner of the passed object and then
-// sets all the needed annotations and labels
-func SetClusterOwnerAnnotationsAndLabels(obj *metav1.ObjectMeta, cluster *apiv1.Cluster) {
-	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.LabelClusterName(obj, cluster.GetName())
-	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
-	utils.SetOperatorVersion(obj, versions.Version)
 }
 
 // getPoolerIntegrationsNeeded returns a struct with all the pooler integrations needed

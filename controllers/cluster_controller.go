@@ -25,14 +25,12 @@ import (
 	"net/http"
 	"reflect"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,6 +48,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -437,11 +436,6 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{}, fmt.Errorf("cannot update instance labels on pods: %w", err)
 	}
 
-	// updated any labels that are coming from the operator
-	if err := r.updateOperatorLabelsOnPVC(ctx, resources.instances, resources.pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
-	}
-
 	// Update any modified/new labels coming from the cluster resource
 	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pods: %w", err)
@@ -450,16 +444,6 @@ func (r *ClusterReconciler) reconcileResources(
 	// Update any modified/new annotations coming from the cluster resource
 	if err := r.updateClusterAnnotationsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pods: %w", err)
-	}
-
-	// Update any modified/new labels coming from the cluster resource
-	if err := r.updateClusterLabelsOnPVCs(ctx, cluster, resources.pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
-	}
-
-	// Update any modified/new annotations coming from the cluster resource
-	if err := r.updateClusterAnnotationsOnPVCs(ctx, cluster, resources.pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pvcs: %w", err)
 	}
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
@@ -483,13 +467,14 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Reconcile PVC resource requirements
-	if err := r.ReconcilePVCs(ctx, cluster, resources); err != nil {
-		if apierrs.IsConflict(err) {
-			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
-			return ctrl.Result{Requeue: true}, nil
-		}
-		return ctrl.Result{}, err
+	if res, err := persistentvolumeclaim.ReconcileExistingResources(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+		resources.pvcs.Items,
+	); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	// Reconcile Pods
@@ -581,74 +566,6 @@ func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *p
 	}
 
 	return isConsistent
-}
-
-// ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
-func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cluster,
-	resources *managedResources,
-) error {
-	contextLogger := log.FromContext(ctx)
-	if !cluster.ShouldResizeInUseVolumes() {
-		return nil
-	}
-
-	// Size is empty would due to size is defined through request and not changed yet
-	if cluster.Spec.StorageConfiguration.Size == "" {
-		return nil
-	}
-	quantity, err := resource.ParseQuantity(cluster.Spec.StorageConfiguration.Size)
-	if err != nil {
-		return fmt.Errorf("while parsing PVC size %v: %w", cluster.Spec.StorageConfiguration.Size, err)
-	}
-
-	var walQuantity *resource.Quantity
-
-	if cluster.Spec.WalStorage != nil {
-		q, err := resource.ParseQuantity(cluster.Spec.WalStorage.Size)
-		if err != nil {
-			return fmt.Errorf("while parsing WAL PVC size %v: %w", cluster.Spec.WalStorage.Size, err)
-		}
-		walQuantity = &q
-	}
-
-	for idx := range resources.pvcs.Items {
-		oldPVC := resources.pvcs.Items[idx].DeepCopy()
-		q := quantity
-		if strings.HasSuffix(oldPVC.Name, apiv1.WalArchiveVolumeSuffix) && walQuantity != nil {
-			q = *walQuantity
-		}
-		oldQuantity, ok := resources.pvcs.Items[idx].Spec.Resources.Requests["storage"]
-
-		switch {
-		case !ok:
-			// Missing storage requirement for PVC
-			fallthrough
-
-		case oldQuantity.AsDec().Cmp(q.AsDec()) == -1:
-			// Increasing storage resources
-			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = q
-			if err = r.Patch(ctx, &resources.pvcs.Items[idx], client.MergeFrom(oldPVC)); err != nil {
-				// Decreasing resources is not possible
-				contextLogger.Error(err, "error while changing PVC storage requirement",
-					"from", oldQuantity, "to", q,
-					"pvcName", resources.pvcs.Items[idx].Name)
-
-				// We are reaching two errors in two different conditions:
-				//
-				// 1. we hit a Conflict => a successive reconciliation loop will fix it
-				// 2. the StorageClass we used don't support PVC resizing => there's nothing we can do
-				//    about it
-			}
-
-		case oldQuantity.AsDec().Cmp(q.AsDec()) == 1:
-			// Decreasing resources is not possible
-			contextLogger.Info("cannot decrease storage requirement",
-				"from", oldQuantity, "to", q,
-				"pvcName", resources.pvcs.Items[idx].Name)
-		}
-	}
-
-	return nil
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
@@ -750,7 +667,7 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 			)
 		}
 
-		if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+		if pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusReady {
 			continue
 		}
 
@@ -1154,7 +1071,7 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	for _, job := range completeJobs {
 		for _, pvc := range resources.pvcs.Items {
 			pvc := pvc
-			if !specs.IsPodSpecUsingPVCs(job.Spec.Template.Spec, pvc.Name) {
+			if !persistentvolumeclaim.IsUsedByPodSpec(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
 

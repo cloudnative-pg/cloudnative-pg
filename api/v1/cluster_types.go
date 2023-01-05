@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 const (
@@ -2186,6 +2187,16 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	}
 
 	contextLogger.Info(logMessage, keysAndValues...)
+}
+
+// SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
+// sets all the needed annotations and labels
+func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
+	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.LabelClusterName(obj, cluster.GetName())
+	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
+	utils.SetOperatorVersion(obj, versions.Version)
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

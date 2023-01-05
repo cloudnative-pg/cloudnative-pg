@@ -11,7 +11,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -72,7 +72,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			return clusterManifest, beforeHibernationClusterInfo, beforeHibernationCurrentPrimary
 		}
 		getPvc := func(role utils.PVCRole, clusterInfo *apiv1.Cluster, instanceName string) corev1.PersistentVolumeClaim {
-			pvcName := specs.GetPVCName(*clusterInfo, instanceName, role)
+			pvcName := persistentvolumeclaim.GetName(clusterInfo, instanceName, role)
 			pvcInfo := corev1.PersistentVolumeClaim{}
 			err = testsUtils.GetObject(env, ctrlclient.ObjectKey{Namespace: namespace, Name: pvcName}, &pvcInfo)
 			Expect(err).ToNot(HaveOccurred())
