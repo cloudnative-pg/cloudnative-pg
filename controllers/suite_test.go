@@ -45,6 +45,7 @@ import (
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -286,7 +287,7 @@ func generateFakeClusterPods(c client.Client, cluster *apiv1.Cluster, markAsRead
 	for idx < cluster.Spec.Instances {
 		idx++
 		pod := specs.PodWithExistingStorage(*cluster, idx)
-		SetClusterOwnerAnnotationsAndLabels(&pod.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
 
 		err := c.Create(context.Background(), pod)
 		Expect(err).To(BeNil())
@@ -318,7 +319,7 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	for idx < cluster.Spec.Instances {
 		idx++
 		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
-		SetClusterOwnerAnnotationsAndLabels(&job.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 
 		err := c.Create(context.Background(), job)
 		Expect(err).To(BeNil())
@@ -337,17 +338,32 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 	for idx < cluster.Spec.Instances {
 		idx++
 
-		pvc, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, *cluster, idx, utils.PVCRolePgData)
+		pvc, err := persistentvolumeclaim.Build(
+			cluster,
+			&persistentvolumeclaim.CreateConfiguration{
+				Status:     persistentvolumeclaim.StatusInitializing,
+				NodeSerial: idx,
+				Role:       utils.PVCRolePgData,
+				Storage:    cluster.Spec.StorageConfiguration,
+			})
 		Expect(err).To(BeNil())
-		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
 
 		err = c.Create(context.Background(), pvc)
 		Expect(err).To(BeNil())
 		pvcs = append(pvcs, *pvc)
 		if cluster.ShouldCreateWalArchiveVolume() {
-			pvcWal, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, *cluster, idx, utils.PVCRolePgWal)
+			pvcWal, err := persistentvolumeclaim.Build(
+				cluster,
+				&persistentvolumeclaim.CreateConfiguration{
+					Status:     persistentvolumeclaim.StatusInitializing,
+					NodeSerial: idx,
+					Role:       utils.PVCRolePgWal,
+					Storage:    cluster.Spec.StorageConfiguration,
+				},
+			)
 			Expect(err).To(BeNil())
-			SetClusterOwnerAnnotationsAndLabels(&pvcWal.ObjectMeta, cluster)
+			cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta)
 			err = c.Create(context.Background(), pvcWal)
 			Expect(err).To(BeNil())
 			pvcs = append(pvcs, *pvcWal)
