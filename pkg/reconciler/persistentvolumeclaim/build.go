@@ -36,9 +36,9 @@ type CreateConfiguration struct {
 	Storage    apiv1.StorageConfiguration
 }
 
-// Create spec of a PVC, given its name and the storage configuration
+// Build spec of a PVC, given its name and the storage configuration
 // TODO: this logic eventually should be moved inside reconcile
-func Create(
+func Build(
 	cluster *apiv1.Cluster,
 	configuration *CreateConfiguration,
 ) (*corev1.PersistentVolumeClaim, error) {

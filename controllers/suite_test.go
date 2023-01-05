@@ -338,7 +338,7 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 	for idx < cluster.Spec.Instances {
 		idx++
 
-		pvc, err := persistentvolumeclaim.Create(
+		pvc, err := persistentvolumeclaim.Build(
 			cluster,
 			&persistentvolumeclaim.CreateConfiguration{
 				Status:     persistentvolumeclaim.StatusInitializing,
@@ -353,7 +353,7 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 		Expect(err).To(BeNil())
 		pvcs = append(pvcs, *pvc)
 		if cluster.ShouldCreateWalArchiveVolume() {
-			pvcWal, err := persistentvolumeclaim.Create(
+			pvcWal, err := persistentvolumeclaim.Build(
 				cluster,
 				&persistentvolumeclaim.CreateConfiguration{
 					Status:     persistentvolumeclaim.StatusInitializing,

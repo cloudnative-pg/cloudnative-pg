@@ -30,7 +30,7 @@ import (
 var _ = Describe("PVC Creation", func() {
 	storageClass := "default"
 	It("handles size properly only with size specified", func() {
-		pvc, err := Create(
+		pvc, err := Build(
 			&apiv1.Cluster{},
 			&CreateConfiguration{
 				Status:     StatusInitializing,
@@ -46,7 +46,7 @@ var _ = Describe("PVC Creation", func() {
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("1Gi"))
 	})
 	It("handles size properly with only template specified", func() {
-		pvc, err := Create(
+		pvc, err := Build(
 			&apiv1.Cluster{},
 			&CreateConfiguration{
 				Status: StatusInitializing,
@@ -65,7 +65,7 @@ var _ = Describe("PVC Creation", func() {
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("1Gi"))
 	})
 	It("handles size properly with both template and size specified, size taking precedence", func() {
-		pvc, err := Create(
+		pvc, err := Build(
 			&apiv1.Cluster{},
 			&CreateConfiguration{
 				Status:     StatusInitializing,

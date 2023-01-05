@@ -1281,7 +1281,7 @@ func (r *ClusterReconciler) createPVC(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvc, err := persistentvolumeclaim.Create(cluster, configuration)
+	pvc, err := persistentvolumeclaim.Build(cluster, configuration)
 	if err != nil {
 		if err == persistentvolumeclaim.ErrorInvalidSize {
 			// This error should have been caught by the validating
