@@ -573,6 +573,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+	log.Debug("reconciling pods")
 
 	// If we are joining a node, we should wait for the process to finish
 	if resources.countRunningJobs() > 0 {
@@ -688,6 +689,7 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+	contextLogger.Debug("handling rolling update")
 
 	// If we need to roll out a restart of any instance, this is the right moment
 	// Do I have to roll out a new image?

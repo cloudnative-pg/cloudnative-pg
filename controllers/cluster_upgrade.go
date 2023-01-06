@@ -229,6 +229,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	inPlacePossible bool,
 	reason string,
 ) {
+	log.Debug("is pod needing rollout")
 	if !status.IsPodReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
 		return false, false, ""
 	}
@@ -278,6 +279,11 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		}
 	}
 
+	if isPodNeedingWalAttached(cluster, status.Pod) {
+		log.Debug("yes pod is needing a rollout")
+		return true, false, fmt.Sprintf("the instance has unattached wal volumes")
+	}
+
 	// Detect changes in the postgres container configuration
 	for _, container := range status.Pod.Spec.Containers {
 		// we go to the next array element if it isn't the postgres container
@@ -303,6 +309,18 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	// check if pod needs to be restarted because of some config requiring it
 	return isPodNeedingRestart(cluster, status),
 		true, "configuration needs a restart to apply some configuration changes"
+}
+
+func isPodNeedingWalAttached(cluster *apiv1.Cluster, pod corev1.Pod) bool {
+	log.Debug("is pod needing wal attached")
+	if cluster.Spec.WalStorage == nil {
+		return false
+	}
+
+	walPVCName := persistentvolumeclaim.GetName(cluster, pod.Name, utils.PVCRolePgWal)
+	log.Debug("the walpvc name is", "walname", walPVCName)
+
+	return !persistentvolumeclaim.IsUsedByPodSpec(pod.Spec, walPVCName)
 }
 
 func isPodNeedingUpdateOfProjectedVolume(cluster *apiv1.Cluster, pod corev1.Pod) (needsUpdate bool, reason string) {
