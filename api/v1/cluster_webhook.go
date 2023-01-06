@@ -864,6 +864,13 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		// validateImageName function
 		return result
 	}
+	if psqlVersion <= 100000 {
+		result = append(result,
+			field.Invalid(
+				field.NewPath("spec", "imageName"),
+				r.Spec.ImageName,
+				"Invalid postgresql version. Versions 11 or above are supported"))
+	}
 	info := postgres.ConfigurationInfo{
 		Settings:         postgres.CnpgConfigurationSettings,
 		MajorVersion:     psqlVersion,
