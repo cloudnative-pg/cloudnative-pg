@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -178,7 +179,10 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 
 // waitForWalArchiveWorking retry until the wal archiving is working or the timeout occur
 func waitForWalArchiveWorking(instance *Instance) error {
-	db, err := instance.PrimaryConnectionPool().Connection("postgres")
+	db, err := sql.Open(
+		"pgx",
+		fmt.Sprintf("%s dbname=%s", instance.GetPrimaryConnInfo(), "postgres"),
+	)
 	if err != nil {
 		log.Error(err, "can not open postgres database")
 		return err
@@ -252,7 +256,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 
 	err = waitForWalArchiveWorking(b.Instance)
 	if err != nil {
-		log.Info("WAL archiving is not working")
+		log.Error(err, "WAL archiving is not working")
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
 		return UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
 	}

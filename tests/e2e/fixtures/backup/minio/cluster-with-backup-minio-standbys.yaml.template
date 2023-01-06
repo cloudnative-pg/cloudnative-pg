@@ -46,7 +46,7 @@ spec:
   backup:
     target: prefer-standby
     barmanObjectStore:
-        destinationPath: s3://cluster-backups/
+        destinationPath: s3://cluster-backups-standbys/
         endpointURL: https://minio-service:9000
         endpointCA:
           key: ca.crt
