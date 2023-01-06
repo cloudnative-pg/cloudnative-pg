@@ -623,6 +623,8 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	// Are there missing nodes? Let's create one
 	if cluster.Status.Instances < cluster.Spec.Instances &&
 		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
+		log.Debug("creating new instance", "cluster.spec.instancees", cluster.Spec.Instances,
+			"cluster.status.instances", cluster.Status.Instances)
 		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
@@ -689,7 +691,6 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Debug("handling rolling update")
 
 	// If we need to roll out a restart of any instance, this is the right moment
 	// Do I have to roll out a new image?

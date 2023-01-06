@@ -20,16 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	neturl "net/url"
-	"reflect"
-
-	"golang.org/x/exp/slices"
-	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
@@ -39,6 +29,18 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"golang.org/x/exp/slices"
+	"io"
+	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"net/http"
+	neturl "net/url"
+	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	newWalReason = "the instance has unattached wal volumes"
 )
 
 func (r *ClusterReconciler) rolloutDueToCondition(
@@ -68,6 +70,26 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		shouldRestart, _, reason := conditionFunc(postgresqlStatus, cluster)
 		if !shouldRestart {
 			continue
+		}
+
+		nodeserial, err := specs.GetNodeSerial(postgresqlStatus.Pod.ObjectMeta)
+		if err != nil {
+			return false, err
+		}
+
+		if reason == newWalReason {
+			if err := r.createPVC(
+				ctx,
+				cluster,
+				&persistentvolumeclaim.CreateConfiguration{
+					Status:     persistentvolumeclaim.StatusReady,
+					NodeSerial: nodeserial,
+					Role:       utils.PVCRolePgWal,
+					Storage:    *cluster.Spec.WalStorage,
+				},
+			); err != nil {
+				return false, err
+			}
 		}
 
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
@@ -280,8 +302,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	}
 
 	if isPodNeedingWalAttached(cluster, status.Pod) {
-		log.Debug("yes pod is needing a rollout")
-		return true, false, fmt.Sprintf("the instance has unattached wal volumes")
+		return true, false, newWalReason
 	}
 
 	// Detect changes in the postgres container configuration
@@ -312,13 +333,11 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 }
 
 func isPodNeedingWalAttached(cluster *apiv1.Cluster, pod corev1.Pod) bool {
-	log.Debug("is pod needing wal attached")
-	if cluster.Spec.WalStorage == nil {
+	if !cluster.ShouldCreateWalArchiveVolume() {
 		return false
 	}
 
 	walPVCName := persistentvolumeclaim.GetName(cluster, pod.Name, utils.PVCRolePgWal)
-	log.Debug("the walpvc name is", "walname", walPVCName)
 
 	return !persistentvolumeclaim.IsUsedByPodSpec(pod.Spec, walPVCName)
 }
