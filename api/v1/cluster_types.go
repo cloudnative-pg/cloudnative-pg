@@ -112,6 +112,9 @@ const (
 
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
+
+	// NewWalReason is the reason that is set when we do a rolling upgrade to add WAL volumes to a cluster
+	NewWalReason = "the instance has unattached wal volumes"
 )
 
 // ClusterSpec defines the desired state of Cluster

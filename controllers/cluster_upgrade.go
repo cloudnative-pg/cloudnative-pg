@@ -41,10 +41,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-const (
-	newWalReason = "the instance has unattached wal volumes"
-)
-
 func (r *ClusterReconciler) rolloutDueToCondition(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -74,12 +70,11 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			continue
 		}
 
-		nodeserial, err := specs.GetNodeSerial(postgresqlStatus.Pod.ObjectMeta)
-		if err != nil {
-			return false, err
-		}
-
-		if reason == newWalReason {
+		if reason == apiv1.NewWalReason {
+			nodeserial, err := specs.GetNodeSerial(postgresqlStatus.Pod.ObjectMeta)
+			if err != nil {
+				return false, err
+			}
 			if err := r.createPVC(
 				ctx,
 				cluster,
@@ -302,8 +297,11 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		}
 	}
 
-	if isPodNeedingWalAttached(cluster, status.Pod) {
-		return true, false, newWalReason
+	// If the cluster should have a wal but a wal is not being used by this pod we need to roll out to create and attach
+	// the new wal
+	if cluster.ShouldCreateWalArchiveVolume() && !persistentvolumeclaim.IsUsedByPodSpec(status.Pod.Spec,
+		persistentvolumeclaim.GetName(cluster, status.Pod.Name, utils.PVCRolePgWal)) {
+		return true, false, apiv1.NewWalReason
 	}
 
 	// Detect changes in the postgres container configuration
@@ -331,16 +329,6 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	// check if pod needs to be restarted because of some config requiring it
 	return isPodNeedingRestart(cluster, status),
 		true, "configuration needs a restart to apply some configuration changes"
-}
-
-func isPodNeedingWalAttached(cluster *apiv1.Cluster, pod corev1.Pod) bool {
-	if !cluster.ShouldCreateWalArchiveVolume() {
-		return false
-	}
-
-	walPVCName := persistentvolumeclaim.GetName(cluster, pod.Name, utils.PVCRolePgWal)
-
-	return !persistentvolumeclaim.IsUsedByPodSpec(pod.Spec, walPVCName)
 }
 
 func isPodNeedingUpdateOfProjectedVolume(cluster *apiv1.Cluster, pod corev1.Pod) (needsUpdate bool, reason string) {
