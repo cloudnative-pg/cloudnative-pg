@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -35,36 +37,16 @@ import (
 
 var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func() {
 	const (
-		namespace   = "pg-wal-volume-e2e"
-		sampleFile  = fixturesDir + "/pg_wal_volume/cluster-pg-wal-volume.yaml.template"
-		clusterName = "cluster-pg-wal-volume"
-		level       = tests.High
+		sampleFileWithPgWal    = fixturesDir + "/pg_wal_volume/cluster-pg-wal-volume.yaml.template"
+		sampleFileWithoutPgWal = fixturesDir + "/pg_wal_volume/cluster-without-pg-wal.yaml.template"
+		clusterName            = "cluster-pg-wal-volume"
+		level                  = tests.High
+		expectedPvcCount       = 6
 	)
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
 
-	// This test checks for separate and dedicated pg_wal volume well behaving, by
-	// ensuring WAL files are archived to the correct location and a symlink
-	// to the PATH is present inside the PGDATA.
-	It("having a dedicated WAL volume", func() {
-		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
-
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-
+	verifyPgWal := func(namespace string) {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(len(podList.Items), err).To(BeEquivalentTo(3))
-
 		By("checking that pg_wal PVC has been created", func() {
 			for _, pod := range podList.Items {
 				pvcName := pod.GetName() + "-wal"
@@ -73,7 +55,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 					Namespace: namespace,
 					Name:      pvcName,
 				}
-				err = env.Client.Get(env.Ctx, namespacedPVCName, pvc)
+				err := env.Client.Get(env.Ctx, namespacedPVCName, pvc)
 				Expect(pvc.GetName(), err).To(BeEquivalentTo(pvcName))
 			}
 			AssertPvcHasLabels(namespace, clusterName)
@@ -105,5 +87,67 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 				}, timeout).Should(BeNumerically(">=", 1))
 			}
 		})
+	}
+	// Inline function to patch walStorage in existing cluster
+	patchWalStorage := func(namespace, clusterName string) {
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
+		// Update the configuration
+		cluster := v1.Cluster{}
+		err := testsUtils.GetObject(env, namespacedName, &cluster)
+		Expect(err).NotTo(HaveOccurred())
+		WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		cluster.Spec.WalStorage = &v1.StorageConfiguration{
+			Size:         "1G",
+			StorageClass: &WalStorageClass,
+		}
+		err = env.Client.Update(env.Ctx, &cluster)
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
+	// This test checks for separate and dedicated pg_wal volume well behaving, by
+	// ensuring WAL files are archived to the correct location and a symlink
+	// to the PATH is present inside the PGDATA.
+	It("having a dedicated WAL volume", func() {
+		namespace := "pg-wal-volume-e2e"
+		// Create a cluster in a namespace we'll delete after the test
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
+		AssertCreateCluster(namespace, clusterName, sampleFileWithPgWal, env)
+		verifyPgWal(namespace)
+	})
+
+	It("adding a dedicated WAL volume after cluster is created", func() {
+		namespace := "add-pg-wal-volume-e2e"
+		// Create a cluster in a namespace we'll delete after the test
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
+		AssertCreateCluster(namespace, clusterName, sampleFileWithoutPgWal, env)
+		By(fmt.Sprintf("adding pg_wal volume in existing cluster: %v", clusterName), func() {
+			patchWalStorage(namespace, clusterName)
+		})
+		AssertPVCCount(namespace, clusterName, expectedPvcCount, 120)
+		AssertClusterPhase(namespace, clusterName, v1.PhaseHealthy, 10)
+		verifyPgWal(namespace)
 	})
 })
