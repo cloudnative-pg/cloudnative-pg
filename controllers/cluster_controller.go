@@ -573,7 +573,6 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
-	log.Debug("reconciling pods")
 
 	// If we are joining a node, we should wait for the process to finish
 	if resources.countRunningJobs() > 0 {
@@ -623,8 +622,6 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	// Are there missing nodes? Let's create one
 	if cluster.Status.Instances < cluster.Spec.Instances &&
 		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
-		log.Debug("creating new instance", "cluster.spec.instancees", cluster.Spec.Instances,
-			"cluster.status.instances", cluster.Status.Instances)
 		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)

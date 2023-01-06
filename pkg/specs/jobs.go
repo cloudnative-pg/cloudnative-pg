@@ -203,7 +203,7 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 	var flags []string
 
 	if cluster.ShouldCreateWalArchiveVolume() {
-		flags = append(flags, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
+		flags = append(flags, "--pg-wal", path.Join(PgWalVolumePath, "/pg_wal"))
 	}
 
 	return flags

@@ -25,8 +25,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
-// pgWalVolumePath its the path used by the WAL volume when present
-const pgWalVolumePath = "/var/lib/postgresql/wal"
+// PgWalVolumePath its the path used by the WAL volume when present
+const PgWalVolumePath = "/var/lib/postgresql/wal"
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
@@ -201,7 +201,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
 				Name:      "pg-wal",
-				MountPath: pgWalVolumePath,
+				MountPath: PgWalVolumePath,
 			},
 		)
 	}
