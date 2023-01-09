@@ -152,7 +152,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, 60).ShouldNot(HaveOccurred())
 
 			timeout := 300
-			commandTimeout := time.Second * 2
+			commandTimeout := time.Second * 5
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
@@ -197,7 +197,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			primary, err := env.GetClusterPrimary(upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			commandTimeout := time.Second * 2
+			commandTimeout := time.Second * 5
 			_, _, err = env.EventuallyExecCommand(env.Ctx, *primary, specs.PostgresContainerName, &commandTimeout,
 				"psql", "-U", "postgres", "appdb", "-tAc", "CREATE TABLE postswitch(i int)")
 			Expect(err).ToNot(HaveOccurred())

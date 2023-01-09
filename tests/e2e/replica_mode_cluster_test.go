@@ -51,7 +51,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 	// Setting variables
 	var replicaClusterName, replicaNamespace string
-	replicaCommandTimeout := time.Second * 2
+	replicaCommandTimeout := time.Second * 5
 
 	Context("can bootstrap a replica cluster using TLS auth", func() {
 		const replicaClusterSampleTLS = fixturesDir + replicaModeClusterDir + "cluster-replica-tls.yaml.template"

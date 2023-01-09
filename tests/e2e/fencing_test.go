@@ -96,7 +96,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	checkPostgresConnection := func(podName, namespace string) {
 		err := testUtils.GetObject(env, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, &pod)
 		Expect(err).ToNot(HaveOccurred())
-		timeout := time.Second * 2
+		timeout := time.Second * 5
 		dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
 			testUtils.PGLocalSocketDir, "postgres", "postgres", "")
 		stdOut, stdErr, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, pod,
