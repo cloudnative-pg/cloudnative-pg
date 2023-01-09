@@ -332,7 +332,7 @@ func AssertConnection(host string, user string, dbname string,
 	By(fmt.Sprintf("connecting to the %v service as %v", host, user), func() {
 		Eventually(func() string {
 			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require", host, user, dbname, password)
-			timeout := time.Second * 2
+			timeout := time.Second * 5
 			stdout, _, err := env.ExecCommand(env.Ctx, queryingPod, specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "SELECT 1")
 			if err != nil {
@@ -567,7 +567,7 @@ func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout
 		// and are following the promotion, we should find those
 		// records on each of them.
 
-		commandTimeout := time.Second * 2
+		commandTimeout := time.Second * 5
 		for i := 1; i < 4; i++ {
 			podName := fmt.Sprintf("%v-%v", clusterName, i)
 			podNamespacedName := types.NamespacedName{
@@ -882,7 +882,7 @@ func AssertWritesToReplicaFails(
 ) {
 	By(fmt.Sprintf("Verifying %v service doesn't allow writes", service),
 		func() {
-			timeout := time.Second * 2
+			timeout := time.Second * 5
 			dsn := testsUtils.CreateDSN(service, appDBUser, appDBName, appDBPass, testsUtils.Require, 5432)
 
 			// Expect to be connected to a replica
@@ -910,7 +910,7 @@ func AssertWritesToPrimarySucceeds(
 ) {
 	By(fmt.Sprintf("Verifying %v service correctly manages writes", service),
 		func() {
-			timeout := time.Second * 2
+			timeout := time.Second * 5
 			dsn := testsUtils.CreateDSN(service, appDBUser, appDBName, appDBPass, testsUtils.Require, 5432)
 
 			// Expect to be connected to a primary
@@ -1025,7 +1025,7 @@ func AssertFastFailOver(
 			" -f " + webTestJob)
 		Expect(err).ToNot(HaveOccurred())
 
-		commandTimeout := time.Second * 2
+		commandTimeout := time.Second * 5
 		timeout := 60
 		primaryPodName := clusterName + "-1"
 		primaryPodNamespacedName := types.NamespacedName{
@@ -1233,7 +1233,7 @@ func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName str
 				"sslcert=/etc/secrets/tls/tls.crt "+
 				"sslrootcert=/etc/secrets/ca/ca.crt "+
 				"dbname=app user=app sslmode=verify-full", clusterName, namespace)
-			timeout := time.Second * 2
+			timeout := time.Second * 5
 			stdout, stderr, err := env.ExecCommand(env.Ctx, appPod, appPod.Spec.Containers[0].Name, &timeout,
 				"psql", dsn, "-tAc", "SELECT 1")
 			return stdout, stderr, err
