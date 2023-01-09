@@ -37,8 +37,8 @@ import (
 
 var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func() {
 	const (
-		sampleFileWithPgWal    = fixturesDir + "/pg_wal_volume/cluster-pg-wal-volume.yaml.template"
-		sampleFileWithoutPgWal = fixturesDir + "/pg_wal_volume/cluster-without-pg-wal.yaml.template"
+		sampleFileWithPgWal    = fixturesDir + "/pg_wal_volume/cluster-with-pg-wal-volume.yaml.template"
+		sampleFileWithoutPgWal = fixturesDir + "/pg_wal_volume/cluster-without-pg-wal-volume.yaml.template"
 		clusterName            = "cluster-pg-wal-volume"
 		level                  = tests.High
 		expectedPvcCount       = 6
