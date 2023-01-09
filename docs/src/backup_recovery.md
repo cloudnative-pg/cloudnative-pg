@@ -857,6 +857,6 @@ spec:
     target: "prefer-standby"
 ```
 
-The `prefer-stadnby` policy will ensure backups are run on the most up-to-date
+The `prefer-standby` policy will ensure backups are run on the most up-to-date
 available secondary instance, falling back to the primary instance if no other
 instance is available.
