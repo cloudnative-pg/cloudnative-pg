@@ -114,7 +114,7 @@ const (
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 
 	// NewWalReason is the reason that is set when we do a rolling upgrade to add WAL volumes to a cluster
-	NewWalReason = "the instance has unattached wal volumes"
+	NewWalReason = "the instance has unattached WAL volumes"
 )
 
 // ClusterSpec defines the desired state of Cluster
