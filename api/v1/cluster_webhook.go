@@ -858,22 +858,22 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 func (r *Cluster) validateConfiguration() field.ErrorList {
 	var result field.ErrorList
 
-	psqlVersion, err := r.GetPostgresqlVersion()
+	pgVersion, err := r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
-	if psqlVersion <= 100000 {
+	if pgVersion < 110000 {
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "imageName"),
 				r.Spec.ImageName,
-				"Invalid postgresql version. Versions 11 or above are supported"))
+				"Unsupported PostgreSQL version. Versions 11 or newer are supported"))
 	}
 	info := postgres.ConfigurationInfo{
 		Settings:         postgres.CnpgConfigurationSettings,
-		MajorVersion:     psqlVersion,
+		MajorVersion:     pgVersion,
 		UserSettings:     r.Spec.PostgresConfiguration.Parameters,
 		IsReplicaCluster: r.IsReplica(),
 	}
