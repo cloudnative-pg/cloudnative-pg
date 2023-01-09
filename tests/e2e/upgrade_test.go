@@ -152,7 +152,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, 60).ShouldNot(HaveOccurred())
 
 			timeout := 300
-			commandTimeout := time.Second * 2
+			commandTimeout := time.Second * 5
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable

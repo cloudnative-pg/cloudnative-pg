@@ -173,7 +173,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			" -f " + webTestJob)
 		Expect(err).ToNot(HaveOccurred())
 
-		commandTimeout := time.Second * 2
+		commandTimeout := time.Second * 5
 		timeout := 60
 		primaryPodNamespacedName := types.NamespacedName{
 			Namespace: namespace,

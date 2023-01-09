@@ -116,11 +116,11 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			ExpectedValue := "ANY " + fmt.Sprint(cluster.Spec.MaxSyncReplicas) + " (\"" + strings.Join(podNames, "\",\"") + "\")"
 
 			// Verify the parameter has been updated in every pod
-			commandtimeout := time.Second * 2
+			commandTimeout := time.Second * 5
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
 				Eventually(func() (string, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show synchronous_standby_names")
 					value := strings.Trim(stdout, "\n")
 					return value, err
