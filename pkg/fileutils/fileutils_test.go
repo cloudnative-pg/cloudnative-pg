@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -142,5 +143,60 @@ var _ = Describe("function GetDirectoryContent", func() {
 		files, err := GetDirectoryContent(tempDir3)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(files).Should(ConsistOf(testFiles))
+	})
+})
+
+var _ = Describe("function MoveDirectoryContent", func() {
+	It("returns error if directory doesn't exist", func() {
+		err := MoveDirectoryContent(filepath.Join(tempDir3, "not-exists"), filepath.Join(tempDir3, "not-exists"))
+		Expect(err).Should(HaveOccurred())
+	})
+	It("moves files to a new directory recursively", func() {
+		testFiles := make([]string, 10)
+		sourceDir, err := os.MkdirTemp(os.TempDir(), "fileutils4_")
+		Expect(err).ShouldNot(HaveOccurred())
+		sourceSubDir, err := os.MkdirTemp(sourceDir, "fileutils44_")
+		Expect(err).ShouldNot(HaveOccurred())
+		diff := strings.TrimPrefix(sourceSubDir, sourceDir)
+		Expect(diff).ShouldNot(BeEmpty())
+		for i := 0; i < 10; i++ {
+			testFiles[i] = fmt.Sprintf("test_file_%v", i)
+			file := filepath.Join(sourceDir, testFiles[i])
+			err := os.WriteFile(file, []byte("fake_content"), 0o400)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+		// put files in subdirectory
+		subTestFiles := make([]string, 4)
+		for i := 0; i < 4; i++ {
+			subTestFiles[i] = fmt.Sprintf("sub_test_file_%v", i)
+			file := filepath.Join(sourceSubDir, subTestFiles[i])
+			err := os.WriteFile(file, []byte("fake_content"), 0o400)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+		files, err := GetDirectoryContent(sourceDir)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(files).Should(ContainElements(testFiles))
+		subFiles, err := GetDirectoryContent(sourceSubDir)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(subFiles).Should(ConsistOf(subTestFiles))
+
+		// move to a new location
+		newDir, err := os.MkdirTemp(os.TempDir(), "fileutils5_")
+		Expect(err).ShouldNot(HaveOccurred())
+		err = MoveDirectoryContent(sourceDir, newDir)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		// check contents in new location
+		movedFiles, err := GetDirectoryContent(newDir)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(movedFiles).Should(ContainElements(testFiles))
+		movedSubFiles, err := GetDirectoryContent(newDir + diff)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(movedSubFiles).Should(ConsistOf(subTestFiles))
+
+		// check the original directory is empty
+		files, err = GetDirectoryContent(sourceDir)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(files).Should(BeEmpty())
 	})
 })
