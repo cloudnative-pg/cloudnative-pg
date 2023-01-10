@@ -42,7 +42,7 @@ type WALSpool struct {
 
 // New create new WAL spool
 func New(spoolDirectory string) (*WALSpool, error) {
-	if err := fileutils.EnsureDirectoryExist(spoolDirectory); err != nil {
+	if err := fileutils.EnsureDirectoryExists(spoolDirectory); err != nil {
 		log.Warning("Cannot create the spool directory", "spoolDirectory", spoolDirectory)
 		return nil, fmt.Errorf("while creating spool directory: %w", err)
 	}

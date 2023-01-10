@@ -105,7 +105,7 @@ func (p *LineLogPipe) Start(ctx context.Context) error {
 			}
 
 			// check if the directory exists
-			if err := fileutils.EnsureDirectoryExist(filepath.Dir(p.fileName)); err != nil {
+			if err := fileutils.EnsureDirectoryExists(filepath.Dir(p.fileName)); err != nil {
 				filenameLog.Error(err, "Error checking if the directory exists")
 				continue
 			}

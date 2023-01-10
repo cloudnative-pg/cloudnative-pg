@@ -263,7 +263,7 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	kubeClient client.Client,
 	caSecret *v1.Secret,
 ) (*v1.Secret, error) {
-	if err := fileutils.EnsureDirectoryExist(pki.CertDir); err != nil {
+	if err := fileutils.EnsureDirectoryExists(pki.CertDir); err != nil {
 		return nil, err
 	}
 

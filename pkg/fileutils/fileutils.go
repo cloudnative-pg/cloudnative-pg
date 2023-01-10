@@ -220,12 +220,12 @@ func CreateEmptyFile(fileName string) error {
 // 0700 as permissions bits
 func EnsureParentDirectoryExist(fileName string) error {
 	destinationDir := filepath.Dir(fileName)
-	return EnsureDirectoryExist(destinationDir)
+	return EnsureDirectoryExists(destinationDir)
 }
 
-// EnsureDirectoryExist check if the passed directory exist or not, and if
-// it doesn't exist will create it using 0700 as permissions bits
-func EnsureDirectoryExist(destinationDir string) error {
+// EnsureDirectoryExists check if the passed directory exists or not, and if
+// it doesn't exist, create it using 0700 as permissions bits
+func EnsureDirectoryExists(destinationDir string) error {
 	if _, err := os.Stat(destinationDir); os.IsNotExist(err) {
 		err = os.MkdirAll(destinationDir, 0o700)
 		if err != nil {
@@ -325,7 +325,7 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 // Once this is done it deletes the files from the original location.
 func MoveDirectoryContent(sourceDirectory, destinationDirectory string) error {
 	var err error
-	var names []string
+	var fileNames []string
 
 	// if something fails we remove any copied files if they exist
 	defer func() {
@@ -334,29 +334,29 @@ func MoveDirectoryContent(sourceDirectory, destinationDirectory string) error {
 		}
 	}()
 
-	names, err = GetDirectoryContent(sourceDirectory)
+	fileNames, err = GetDirectoryContent(sourceDirectory)
 	if err != nil {
 		return err
 	}
 	// we first copy the files without deleting them, this is to avoid inconsistent states
-	for _, name := range names {
+	for _, fileName := range fileNames {
 		// We check if the file is a directory, if it is we need to recursively copy it
-		fi, err := os.Stat(filepath.Join(sourceDirectory, name))
+		fileInfo, err := os.Stat(filepath.Join(sourceDirectory, fileName))
 		if err != nil {
 			return err
 		}
 
-		if fi.IsDir() {
-			err := EnsureDirectoryExist(filepath.Join(destinationDirectory, name))
+		if fileInfo.IsDir() {
+			err := EnsureDirectoryExists(filepath.Join(destinationDirectory, fileName))
 			if err != nil {
 				return err
 			}
-			err = MoveDirectoryContent(filepath.Join(sourceDirectory, name), filepath.Join(destinationDirectory, name))
+			err = MoveDirectoryContent(filepath.Join(sourceDirectory, fileName), filepath.Join(destinationDirectory, fileName))
 			if err != nil {
 				return err
 			}
 		} else {
-			err = CopyFile(filepath.Join(sourceDirectory, name), filepath.Join(destinationDirectory, name))
+			err = CopyFile(filepath.Join(sourceDirectory, fileName), filepath.Join(destinationDirectory, fileName))
 			if err != nil {
 				return err
 			}
