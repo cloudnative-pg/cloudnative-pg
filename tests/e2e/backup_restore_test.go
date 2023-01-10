@@ -224,21 +224,21 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		// We backup and restore a cluster from a standby, and verify some expected data to
 		// be there
-		It("backs up and restore a cluster from standbys", func() {
+		It("backs up and restore a cluster from standby", func() {
 			const (
-				targetDBOne                        = "test"
-				targetDBTwo                        = "test1"
-				targetDBSecret                     = "secret_test"
-				testTableName                      = "test_table"
-				clusterWithMinioStandbysSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-standbys.yaml.template"
-				backupStandbysFile                 = fixturesDir + "/backup/minio/backup-minio-standbys.yaml"
+				targetDBOne                       = "test"
+				targetDBTwo                       = "test1"
+				targetDBSecret                    = "secret_test"
+				testTableName                     = "test_table"
+				clusterWithMinioStandbySampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-standby.yaml.template"
+				backupStandbyFile                 = fixturesDir + "/backup/minio/backup-minio-standby.yaml"
 			)
 
-			targetClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioStandbysSampleFile)
+			targetClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioStandbySampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster with custom serverName in the backup spec
-			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioStandbysSampleFile, env)
+			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioStandbySampleFile, env)
 
 			// Create required test data
 			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBOne, testTableName, psqlClientPod)
@@ -252,9 +252,9 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			latestTar := minioPath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
-			By(fmt.Sprintf("backing up a cluster from standbys and verifying it exists on minio, backup path is %v",
+			By(fmt.Sprintf("backing up a cluster from standby and verifying it exists on minio, backup path is %v",
 				latestTar), func() {
-				testUtils.ExecuteBackup(namespace, backupStandbysFile, true, env)
+				testUtils.ExecuteBackup(namespace, backupStandbyFile, true, env)
 				AssertBackupConditionInClusterStatus(namespace, targetClusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
