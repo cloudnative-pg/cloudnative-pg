@@ -1314,6 +1314,10 @@ func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 		return nil
 	}
 
+	if old.Spec.WalStorage == nil && r.Spec.WalStorage != nil {
+		return nil
+	}
+
 	if old.Spec.WalStorage != nil && r.Spec.WalStorage == nil {
 		return field.ErrorList{
 			field.Invalid(

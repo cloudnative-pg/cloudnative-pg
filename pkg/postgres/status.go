@@ -204,6 +204,16 @@ type PostgresqlStatusList struct {
 	Items []PostgresqlStatus `json:"items"`
 }
 
+// GetNames returns a list of names of all the instances
+func (list *PostgresqlStatusList) GetNames() []string {
+	names := make([]string, len(list.Items))
+	for idx, item := range list.Items {
+		names[idx] = item.Pod.Name
+	}
+
+	return names
+}
+
 // LogStatus logs the current status of the instances
 func (list *PostgresqlStatusList) LogStatus(ctx context.Context) {
 	contextLogger := log.FromContext(ctx)

@@ -112,9 +112,6 @@ const (
 
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
-
-	// NewWalReason is the reason that is set when we do a rolling upgrade to add WAL volumes to a cluster
-	NewWalReason = "the instance has unattached WAL volumes"
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -435,6 +432,9 @@ type ClusterStatus struct {
 	// List of all the PVCs that are unusable because another PVC is missing
 	UnusablePVC []string `json:"unusablePVC,omitempty"`
 
+	// List of all the PVCs that need to be attached to instances
+	NeedsAttachPVC []string `json:"needsReattachPVC,omitempty"`
+
 	// Current write pod
 	WriteService string `json:"writeService,omitempty"`
 
@@ -568,6 +568,9 @@ const (
 
 	// ClusterIsNotReady means that the condition changed because the cluster is not ready
 	ClusterIsNotReady ConditionReason = "ClusterIsNotReady"
+
+	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
+	DetachedVolume ConditionReason = "DetachedVolume"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster

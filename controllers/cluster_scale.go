@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,7 +28,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.
@@ -74,39 +72,9 @@ func (r *ClusterReconciler) scaleDownCluster(
 	}
 
 	// Let's drop the PVC too
-	pvc := v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      sacrificialInstance.Name,
-			Namespace: sacrificialInstance.Namespace,
-		},
+	if err := persistentvolumeclaim.DeleteInstancePVCs(ctx, r.Client, cluster, sacrificialInstance); err != nil {
+		return err
 	}
-
-	contextLogger.Info("Deleting PGDATA PVC", "pvc", pvc.Name)
-	if err := r.Delete(ctx, &pvc); err != nil {
-		// Ignore if NotFound, otherwise report the error
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("scaling down node (pgdata pvc) %v: %w", sacrificialInstance.Name, err)
-		}
-	}
-
-	if cluster.ShouldCreateWalArchiveVolume() {
-		// Let's drop the WAL PVC too
-		pvcWalName := persistentvolumeclaim.GetName(cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
-		pvcWal := v1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      pvcWalName,
-				Namespace: sacrificialInstance.Namespace,
-			},
-		}
-		contextLogger.Info("Deleting WAL PVC", "pvc", pvcWal.Name)
-		if err := r.Delete(ctx, &pvcWal); err != nil {
-			// Ignore if NotFound, otherwise report the error
-			if !apierrs.IsNotFound(err) {
-				return fmt.Errorf("scaling down node (wal pvc) %v: %w", sacrificialInstance.Name, err)
-			}
-		}
-	}
-
 	// And now also the Job
 	for idx := range resources.jobs.Items {
 		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialInstance.Name+"-") {
