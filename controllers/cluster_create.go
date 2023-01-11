@@ -870,6 +870,7 @@ func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *api
 	return cluster.Status.LatestGeneratedNode, nil
 }
 
+// nolint: gocognit
 func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -902,32 +903,13 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	if err := r.createPVC(
+	if err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
+		r.Client,
 		cluster,
-		&persistentvolumeclaim.CreateConfiguration{
-			Status:     persistentvolumeclaim.StatusInitializing,
-			NodeSerial: nodeSerial,
-			Role:       utils.PVCRolePgData,
-			Storage:    cluster.Spec.StorageConfiguration,
-		},
+		nodeSerial,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
-	}
-
-	if cluster.ShouldCreateWalArchiveVolume() {
-		if err := r.createPVC(
-			ctx,
-			cluster,
-			&persistentvolumeclaim.CreateConfiguration{
-				Status:     persistentvolumeclaim.StatusInitializing,
-				NodeSerial: nodeSerial,
-				Role:       utils.PVCRolePgWal,
-				Storage:    *cluster.Spec.WalStorage,
-			},
-		); err != nil {
-			return ctrl.Result{RequeueAfter: time.Minute}, err
-		}
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
@@ -1085,32 +1067,13 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createPVC(
+	if err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
+		r.Client,
 		cluster,
-		&persistentvolumeclaim.CreateConfiguration{
-			Status:     persistentvolumeclaim.StatusInitializing,
-			NodeSerial: nodeSerial,
-			Role:       utils.PVCRolePgData,
-			Storage:    cluster.Spec.StorageConfiguration,
-		},
+		nodeSerial,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
-	}
-
-	if cluster.ShouldCreateWalArchiveVolume() {
-		if err := r.createPVC(
-			ctx,
-			cluster,
-			&persistentvolumeclaim.CreateConfiguration{
-				Status:     persistentvolumeclaim.StatusInitializing,
-				NodeSerial: nodeSerial,
-				Role:       utils.PVCRolePgWal,
-				Storage:    *cluster.Spec.WalStorage,
-			},
-		); err != nil {
-			return ctrl.Result{RequeueAfter: time.Minute}, err
-		}
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
@@ -1132,27 +1095,10 @@ func (r *ClusterReconciler) reconcilePVCs(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	pvcToReattach := electPvcToReattach(cluster)
+	pvcToReattach := electPvcToReattach(ctx, cluster, instancesStatus)
 	if pvcToReattach == "" {
-		// This should never happen. This function should be invoked
-		// only when there is something to reattach.
-		contextLogger.Debug("Impossible to elect a PVC to reattach",
-			"danglingPVCs", cluster.Status.DanglingPVC,
-			"initializingPVCs", cluster.Status.InitializingPVC)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
-	if len(cluster.Status.DanglingPVC) > 0 {
-		if (cluster.IsNodeMaintenanceWindowInProgress() && !cluster.IsReusePVCEnabled()) ||
-			cluster.Spec.Instances <= cluster.Status.Instances {
-			contextLogger.Info(
-				"Detected unneeded PVCs, removing them",
-				"statusInstances", cluster.Status.Instances,
-				"specInstances", cluster.Spec.Instances,
-				"maintenanceWindow", cluster.Spec.NodeMaintenanceWindow,
-				"danglingPVCs", cluster.Status.DanglingPVC)
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.removeDanglingPVCs(ctx, cluster)
-		}
+		contextLogger.Debug("no instance ready to be reattached yet")
+		return ctrl.Result{}, nil
 	}
 
 	pvc := resources.getPVC(pvcToReattach)
@@ -1216,7 +1162,10 @@ func (r *ClusterReconciler) reconcilePVCs(
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			contextLogger.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
+			contextLogger.Info("Pod already exist, maybe the cache is stale",
+				"pod", pod.Name,
+				"instanceStatus", instancesStatus.GetNames(),
+			)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 		}
 
@@ -1230,21 +1179,39 @@ func (r *ClusterReconciler) reconcilePVCs(
 // electPvcToReattach chooses a PVC between the initializing and the dangling ones that should be reattached
 // to the cluster, giving precedence to the target primary if existing in the set. If the target primary is fine,
 // let's start using the PVC we have initialized. After that we use the PVC that are initializing or dangling
-func electPvcToReattach(cluster *apiv1.Cluster) string {
-	pvcs := make([]string, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.DanglingPVC))
+func electPvcToReattach(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instancesStatus postgres.PostgresqlStatusList,
+) string {
+	contextLogger := log.FromContext(ctx)
+
+	pvcs := make([]string, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.NeedsAttachPVC))
 	pvcs = append(pvcs, cluster.Status.InitializingPVC...)
-	pvcs = append(pvcs, cluster.Status.DanglingPVC...)
+	pvcs = append(pvcs, cluster.Status.NeedsAttachPVC...)
 	if len(pvcs) == 0 {
 		return ""
 	}
 
-	for _, pvc := range pvcs {
-		if persistentvolumeclaim.IsUsedByInstance(cluster, cluster.Status.TargetPrimary, pvc) {
-			return pvc
+	// we can reattach only pvc for instances that are not yet created
+pvcLoop:
+	for idx := range pvcs {
+		pvc := pvcs[idx]
+		for _, item := range instancesStatus.Items {
+			if persistentvolumeclaim.DoesBelongToInstance(cluster, item.Pod.Name, pvc) {
+				continue pvcLoop
+			}
 		}
+		// TODO: review message
+		contextLogger.Info(
+			"pvc belongs to a instance that isn't created, electing to reattach",
+			"pvc", pvc,
+			"instanceNames", instancesStatus.GetNames(),
+		)
+		return pvc
 	}
 
-	return pvcs[0]
+	return ""
 }
 
 // removeDanglingPVCs will remove dangling PVCs
@@ -1269,42 +1236,6 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *api
 			}
 			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
 		}
-	}
-
-	return nil
-}
-
-func (r *ClusterReconciler) createPVC(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	configuration *persistentvolumeclaim.CreateConfiguration,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	pvc, err := persistentvolumeclaim.Build(cluster, configuration)
-	if err != nil {
-		if err == persistentvolumeclaim.ErrorInvalidSize {
-			// This error should have been caught by the validating
-			// webhook, but since we are here the user must have disabled server-side
-			// validation, and we must react.
-			contextLogger.Info("The size specified for the cluster is not valid",
-				"size",
-				configuration.Storage.Size)
-			return ErrNextLoop
-		}
-		return fmt.Errorf(
-			"unable to create a PVC spec for node with serial %v: %w",
-			configuration.NodeSerial,
-			err,
-		)
-	}
-
-	if err = r.Create(ctx, pvc); err != nil && !apierrs.IsAlreadyExists(err) {
-		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
-			pvc.Name,
-			configuration.NodeSerial,
-			err,
-		)
 	}
 
 	return nil

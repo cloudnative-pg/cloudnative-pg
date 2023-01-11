@@ -100,9 +100,8 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 	}
 }
 
-// ErrNextLoop is not a real error. It forces the current reconciliation loop to stop
-// and return the associated Result object
-var ErrNextLoop = errors.New("stop this loop and return the associated Result object")
+// ErrNextLoop see utils.ErrNextLoop
+var ErrNextLoop = utils.ErrNextLoop
 
 // Alphabetical order to not repeat or miss permissions
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list;patch
@@ -467,7 +466,7 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	if res, err := persistentvolumeclaim.ReconcileExistingResources(
+	if res, err := persistentvolumeclaim.Reconcile(
 		ctx,
 		r.Client,
 		cluster,
@@ -569,6 +568,7 @@ func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *p
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
+// nolint: gocognit
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
@@ -588,9 +588,24 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	}
 
 	// Work on the PVCs we currently have
-	pvcNeedingMaintenance := len(cluster.Status.DanglingPVC) + len(cluster.Status.InitializingPVC)
+	pvcNeedingMaintenance := len(cluster.Status.NeedsAttachPVC) + len(cluster.Status.InitializingPVC)
 	if pvcNeedingMaintenance > 0 {
-		return r.reconcilePVCs(ctx, cluster, resources, instancesStatus)
+		if res, err := r.reconcilePVCs(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+			return res, err
+		}
+	}
+
+	if len(cluster.Status.DanglingPVC) > 0 {
+		if (cluster.IsNodeMaintenanceWindowInProgress() && !cluster.IsReusePVCEnabled()) ||
+			cluster.Spec.Instances <= cluster.Status.Instances {
+			contextLogger.Info(
+				"Detected unneeded PVCs, removing them",
+				"statusInstances", cluster.Status.Instances,
+				"specInstances", cluster.Spec.Instances,
+				"maintenanceWindow", cluster.Spec.NodeMaintenanceWindow,
+				"danglingPVCs", cluster.Status.DanglingPVC)
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.removeDanglingPVCs(ctx, cluster)
+		}
 	}
 
 	if err := r.ensureHealthyPVCsAnnotation(ctx, cluster, resources); err != nil {
