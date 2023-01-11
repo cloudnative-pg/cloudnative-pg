@@ -335,7 +335,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		b.Log.Error(condErr, "Error changing backup condition (backup started)")
 	}
 
-	if err := fileutils.EnsureDirectoryExist(postgres.BackupTemporaryDirectory); err != nil {
+	if err := fileutils.EnsureDirectoryExists(postgres.BackupTemporaryDirectory); err != nil {
 		b.Log.Error(err, "Cannot create backup temporary directory", "err", err)
 		return
 	}

@@ -281,7 +281,7 @@ func GetServerPort() int {
 // started
 func (instance *Instance) Startup() error {
 	socketDir := GetSocketDir()
-	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
+	if err := fileutils.EnsureDirectoryExists(socketDir); err != nil {
 		return fmt.Errorf("while creating socket directory: %w", err)
 	}
 
@@ -418,7 +418,7 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 	// one.
 
 	socketDir := GetSocketDir()
-	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
+	if err := fileutils.EnsureDirectoryExists(socketDir); err != nil {
 		return nil, fmt.Errorf("while creating socket directory: %w", err)
 	}
 

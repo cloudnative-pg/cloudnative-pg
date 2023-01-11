@@ -29,7 +29,7 @@ var tempDir1, tempDir2, tempDir3 string
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-func TestConfigFile(t *testing.T) {
+func TestFileUtils(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "File Utilities Suite")

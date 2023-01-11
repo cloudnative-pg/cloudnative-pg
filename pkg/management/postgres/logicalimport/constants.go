@@ -35,7 +35,7 @@ const (
 )
 
 func createDumpsDirectory() error {
-	return fileutils.EnsureDirectoryExist(dumpDirectory)
+	return fileutils.EnsureDirectoryExists(dumpDirectory)
 }
 
 func generateFileNameForDatabase(database string) string {
