@@ -228,7 +228,7 @@ func (r *PgBouncerReconciler) Init(ctx context.Context) error {
 	}
 
 	// Ensure we have the directory to store the controlling socket
-	if err := fileutils.EnsureDirectoryExist(config.PgBouncerSocketDir); err != nil {
+	if err := fileutils.EnsureDirectoryExists(config.PgBouncerSocketDir); err != nil {
 		log.Error(err, "while checking socket directory existed", "dir", config.PgBouncerSocketDir)
 		return err
 	}

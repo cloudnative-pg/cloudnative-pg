@@ -73,7 +73,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		}
 
 		By("creating and seeding the pg_wal directory", func() {
-			err := fileutils.EnsureDirectoryExist(pgWal)
+			err := fileutils.EnsureDirectoryExists(pgWal)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		By("seeding the directory with random content", func() {
@@ -125,10 +125,10 @@ var _ = Describe("testing restore InitInfo methods", func() {
 			PgWal:  newPgWal,
 		}
 
-		err := fileutils.EnsureDirectoryExist(newPgWal)
+		err := fileutils.EnsureDirectoryExists(newPgWal)
 		Expect(err).ToNot(HaveOccurred())
 
-		err = fileutils.EnsureDirectoryExist(pgData)
+		err = fileutils.EnsureDirectoryExists(pgData)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = os.Symlink(newPgWal, pgWal)
