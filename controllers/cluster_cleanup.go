@@ -38,14 +38,13 @@ func (r *ClusterReconciler) cleanupCompletedJobs(
 	if len(completeJobs) == 0 {
 		return
 	}
-
+	foreground := metav1.DeletePropagationForeground
 	for i, job := range completeJobs {
 		contextLogger.Debug("Removing job", "job", job.Name)
 
-		foreground := metav1.DeletePropagationForeground
 		if err := r.Delete(ctx, &completeJobs[i], &client.DeleteOptions{
 			PropagationPolicy: &foreground,
-		}); err != nil {
+		}); err != nil && completeJobs[i].GetDeletionTimestamp() == nil {
 			contextLogger.Error(err, "cannot delete job", "job", job.Name)
 			continue
 		}
