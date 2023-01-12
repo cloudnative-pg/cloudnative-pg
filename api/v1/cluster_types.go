@@ -500,7 +500,8 @@ type ClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// List of instance names in the cluster
-	InstanceNames []string `json:"instanceNames,omitempty"`
+	InstanceNames     []string `json:"instanceNames,omitempty"`
+	DanglingInstances []string `json:"danglingInstances,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop

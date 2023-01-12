@@ -55,6 +55,19 @@ func IsPodReady(pod corev1.Pod) bool {
 	return false
 }
 
+// IsPodUnschedulable check if a Pod is unschedulable or not
+func IsPodUnschedulable(pod corev1.Pod) bool {
+	for _, c := range pod.Status.Conditions {
+		if c.Type == corev1.PodScheduled &&
+			c.Status == corev1.ConditionFalse &&
+			c.Reason == corev1.PodReasonUnschedulable {
+			return true
+		}
+	}
+
+	return false
+}
+
 // IsPodActive checks if a pod is active, copied from:
 // https://github.com/kubernetes/kubernetes/blob/1bd0077/test/e2e/framework/pod/resource.go#L664
 func IsPodActive(p corev1.Pod) bool {
