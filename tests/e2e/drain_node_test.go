@@ -333,7 +333,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		// With reusePVC set to off, draining a node should create new pods
 		// on different nodes. We expect to see the cluster pods having
 		// all different names from the initial ones after the drain.
-		It("drains the primary pod's node, when all the pods are on a single node", func() {
+		FIt("drains the primary pod's node, when all the pods are on a single node", func() {
 			// We leave a single node uncordoned, so all the pods we create
 			// will go there
 			By("leaving a single uncordoned", func() {

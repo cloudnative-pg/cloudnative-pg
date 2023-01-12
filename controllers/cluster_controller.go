@@ -461,6 +461,10 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
+	if res, err := deleteDanglingResources(ctx, r.Client, cluster); !res.IsZero() || err != nil {
+		return res, err
+	}
+
 	if !resources.allInstancesAreActive() {
 		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
@@ -1161,4 +1165,50 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 			"err", err,
 			"configmap", configuration.Current.MonitoringQueriesConfigmap)
 	}
+}
+
+// deleteDanglingResources will remove dangling resources
+func deleteDanglingResources(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {
+	var shouldReconcile bool
+	for _, pvcName := range cluster.Status.DanglingPVC {
+		var pvc corev1.PersistentVolumeClaim
+
+		objectKey := client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}
+		err := c.Get(ctx, objectKey, &pvc)
+		if apierrs.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("while fetching unneeded PVC %v: %v", pvc.Name, err)
+		}
+
+		if err := c.Delete(ctx, &pvc); err != nil && !apierrs.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
+		}
+		shouldReconcile = true
+	}
+
+	for _, instanceName := range cluster.Status.DanglingInstances {
+		var pod corev1.Pod
+
+		objectKey := client.ObjectKey{Namespace: cluster.Namespace, Name: instanceName}
+		err := c.Get(ctx, objectKey, &pod)
+		if apierrs.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("while fetching unneeded Instance %v: %v", pod.Name, err)
+		}
+
+		if err := c.Delete(ctx, &pod); err != nil && !apierrs.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("removing unneeded Instance %v: %v", pod.Name, err)
+		}
+		shouldReconcile = true
+	}
+
+	if shouldReconcile {
+		return ctrl.Result{RequeueAfter: time.Second}, nil
+	}
+
+	return ctrl.Result{}, nil
 }

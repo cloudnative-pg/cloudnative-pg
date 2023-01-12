@@ -3389,6 +3389,10 @@ spec:
                 description: The timestamp when the last actual promotion to primary
                   has occurred
                 type: string
+              danglingInstances:
+                items:
+                  type: string
+                type: array
               danglingPVC:
                 description: List of all the PVCs created by this cluster and still
                   available which are not attached to a Pod

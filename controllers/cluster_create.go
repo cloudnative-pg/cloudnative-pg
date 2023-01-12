@@ -1096,7 +1096,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	}
 	if instanceToCreate == nil {
 		contextLogger.Debug(
-			"haven't found any instance to recreate",
+			"haven't found any instance to create",
 			"instances",
 			instancesStatus.GetNames(),
 			"reattach", cluster.Status.InstancesThatNeedPVCReattached,

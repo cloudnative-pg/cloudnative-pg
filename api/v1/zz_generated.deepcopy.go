@@ -735,6 +735,21 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.InstancesThatNeedPVCReattached != nil {
+		in, out := &in.InstancesThatNeedPVCReattached, &out.InstancesThatNeedPVCReattached
+		*out = make(map[string][]string, len(*in))
+		for key, val := range *in {
+			var outVal []string
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make([]string, len(*in))
+				copy(*out, *in)
+			}
+			(*out)[key] = outVal
+		}
+	}
 	in.SecretsResourceVersion.DeepCopyInto(&out.SecretsResourceVersion)
 	in.ConfigMapResourceVersion.DeepCopyInto(&out.ConfigMapResourceVersion)
 	in.Certificates.DeepCopyInto(&out.Certificates)
@@ -752,6 +767,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	}
 	if in.InstanceNames != nil {
 		in, out := &in.InstanceNames, &out.InstanceNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.DanglingInstances != nil {
+		in, out := &in.DanglingInstances, &out.DanglingInstances
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
