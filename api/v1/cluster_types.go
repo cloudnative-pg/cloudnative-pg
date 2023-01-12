@@ -433,7 +433,7 @@ type ClusterStatus struct {
 	UnusablePVC []string `json:"unusablePVC,omitempty"`
 
 	// List of all the PVCs that need to be attached to instances
-	NeedsAttachPVC []string `json:"needsReattachPVC,omitempty"`
+	InstancesThatNeedPVCReattached map[string][]string `json:"instancesThatNeedPVCReattached,omitempty"`
 
 	// Current write pod
 	WriteService string `json:"writeService,omitempty"`

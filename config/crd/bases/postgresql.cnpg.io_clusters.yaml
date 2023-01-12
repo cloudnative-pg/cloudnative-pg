@@ -3468,6 +3468,13 @@ spec:
                 description: InstancesStatus indicates in which status the instances
                   are
                 type: object
+              instancesThatNeedPVCReattached:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                description: List of all the PVCs that need to be attached to instances
+                type: object
               jobCount:
                 description: How many Jobs have been created by this cluster
                 format: int32
@@ -3482,11 +3489,6 @@ spec:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)
                 type: integer
-              needsReattachPVC:
-                description: List of all the PVCs that need to be attached to instances
-                items:
-                  type: string
-                type: array
               onlineUpdateEnabled:
                 description: OnlineUpdateEnabled shows if the online upgrade is enabled
                   inside the cluster
