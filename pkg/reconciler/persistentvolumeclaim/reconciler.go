@@ -19,6 +19,7 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +39,10 @@ func Reconcile(
 	pvcs []corev1.PersistentVolumeClaim,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	if res, err := deleteDanglingPVCs(ctx, c, cluster); !res.IsZero() || err != nil {
+		return res, err
+	}
 
 	if err := reconcileOperatorLabels(ctx, c, instances, pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
@@ -65,4 +70,34 @@ func Reconcile(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// deleteDanglingPVCs will remove dangling PVCs
+func deleteDanglingPVCs(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {
+	if len(cluster.Status.DanglingPVC) == 0 {
+		return ctrl.Result{}, nil
+	}
+
+	if cluster.Spec.Instances > cluster.Status.Instances {
+		return ctrl.Result{}, nil
+	}
+
+	if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
+		return ctrl.Result{}, nil
+	}
+
+	for _, pvcName := range cluster.Status.DanglingPVC {
+		var pvc corev1.PersistentVolumeClaim
+
+		objectKey := client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}
+		if err := c.Get(ctx, objectKey, &pvc); err != nil && !apierrs.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
+		}
+
+		if err := c.Delete(ctx, &pvc); err != nil && !apierrs.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
+		}
+	}
+
+	return ctrl.Result{RequeueAfter: time.Second}, nil
 }

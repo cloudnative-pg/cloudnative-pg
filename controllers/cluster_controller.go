@@ -587,25 +587,8 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 		return ctrl.Result{}, err
 	}
 
-	// Work on the PVCs we currently have
-	pvcNeedingMaintenance := len(cluster.Status.NeedsAttachPVC) + len(cluster.Status.InitializingPVC)
-	if pvcNeedingMaintenance > 0 {
-		if res, err := r.reconcilePVCs(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
-			return res, err
-		}
-	}
-
-	if len(cluster.Status.DanglingPVC) > 0 {
-		if (cluster.IsNodeMaintenanceWindowInProgress() && !cluster.IsReusePVCEnabled()) ||
-			cluster.Spec.Instances <= cluster.Status.Instances {
-			contextLogger.Info(
-				"Detected unneeded PVCs, removing them",
-				"statusInstances", cluster.Status.Instances,
-				"specInstances", cluster.Spec.Instances,
-				"maintenanceWindow", cluster.Spec.NodeMaintenanceWindow,
-				"danglingPVCs", cluster.Status.DanglingPVC)
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.removeDanglingPVCs(ctx, cluster)
-		}
+	if res, err := r.ensureInstancesAreCreated(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	if err := r.ensureHealthyPVCsAnnotation(ctx, cluster, resources); err != nil {

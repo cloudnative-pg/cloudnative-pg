@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -31,6 +32,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -1079,14 +1081,28 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
 }
 
-// reconcilePVCs reattaches a dangling PVC
-func (r *ClusterReconciler) reconcilePVCs(
+// ensureInstancesAreCreated recreates any missing instance
+func (r *ClusterReconciler) ensureInstancesAreCreated(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	resources *managedResources,
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	instanceToCreate, err := electInstanceToCreate(cluster, instancesStatus)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if instanceToCreate == nil {
+		contextLogger.Debug(
+			"haven't found any instance to recreate",
+			"instances",
+			instancesStatus.GetNames(),
+			"reattach", cluster.Status.InstancesThatNeedPVCReattached,
+		)
+		return ctrl.Result{}, nil
+	}
 
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&
 		instancesStatus.InstancesReportingStatus() != cluster.Status.Instances {
@@ -1095,75 +1111,62 @@ func (r *ClusterReconciler) reconcilePVCs(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	pvcToReattach := electPvcToReattach(ctx, cluster, instancesStatus)
-	if pvcToReattach == "" {
-		contextLogger.Debug("no instance ready to be reattached yet")
-		return ctrl.Result{}, nil
-	}
+	instancePVCs := persistentvolumeclaim.FilterByInstance(resources.pvcs.Items, instanceToCreate.Spec)
+	for _, instancePVC := range instancePVCs {
+		// This should not happen. However, we put this guard here
+		// as an assertion to catch unexpected events.
+		pvcStatus := instancePVC.Annotations[persistentvolumeclaim.StatusAnnotationName]
+		if pvcStatus != persistentvolumeclaim.StatusReady {
+			contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
+				"pvc", instancePVC.Name,
+				"status", pvcStatus,
+				"instance", instanceToCreate.Name,
+			)
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+		}
 
-	pvc := resources.getPVC(pvcToReattach)
-	if pvc == nil {
-		return ctrl.Result{}, fmt.Errorf(
-			"the pvc: %s was nominated to be reattached but it could not be found from the pvc list",
-			pvcToReattach,
-		)
-	}
-
-	// This should not happen. However, we put this guard here
-	// as an assertion to catch unexpected events.
-	pvcStatus := pvc.Annotations[persistentvolumeclaim.StatusAnnotationName]
-	if pvcStatus != persistentvolumeclaim.StatusReady {
-		contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
-			"pvc", pvc.Name,
-			"status", pvcStatus)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
-	nodeSerial, err := specs.GetNodeSerial(pvc.ObjectMeta)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot detect serial from PVC %v: %v", pvc.Name, err)
-	}
-
-	pod := specs.PodWithExistingStorage(*cluster, nodeSerial)
-
-	if configuration.Current.EnableAzurePVCUpdates {
-		for _, pvcName := range cluster.Status.ResizingPVC {
-			// if the pvc is in resizing state we requeue and wait
-			if pvcName == pvc.Name {
-				contextLogger.Info("PVC is in resizing status, retrying in 5 seconds", "pod", pod.Name)
-				return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
+		if configuration.Current.EnableAzurePVCUpdates {
+			for _, resizingPVC := range cluster.Status.ResizingPVC {
+				// if the pvc is in resizing state we requeue and wait
+				if resizingPVC == instancePVC.Name {
+					contextLogger.Info(
+						"PVC is in resizing status, retrying in 5 seconds",
+						"instance", instanceToCreate.Name,
+					)
+					return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
+				}
 			}
 		}
 	}
 
 	// If this cluster has been restarted, mark the Pod with the latest restart time
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
+		if instanceToCreate.Annotations == nil {
+			instanceToCreate.Annotations = make(map[string]string)
 		}
-		pod.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
+		instanceToCreate.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
 	}
 
 	contextLogger.Info("Creating new Pod to reattach a PVC",
-		"pod", pod.Name,
-		"pvc", pvc.Name)
+		"pod", instanceToCreate.Name,
+		"pvc", instanceToCreate.Name)
 
-	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(cluster, instanceToCreate, r.Scheme); err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to set the owner reference for the Pod: %w", err)
 	}
 
-	utils.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
-	utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations,
+	utils.SetOperatorVersion(&instanceToCreate.ObjectMeta, versions.Version)
+	utils.InheritAnnotations(&instanceToCreate.ObjectMeta, cluster.Annotations,
 		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&pod.ObjectMeta, cluster.Labels,
+	utils.InheritLabels(&instanceToCreate.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
-	if err := r.Create(ctx, pod); err != nil {
+	if err := r.Create(ctx, instanceToCreate); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			contextLogger.Info("Pod already exist, maybe the cache is stale",
-				"pod", pod.Name,
+			contextLogger.Info("Instance already exist, maybe the cache is stale",
+				"instance", instanceToCreate.Name,
 				"instanceStatus", instancesStatus.GetNames(),
 			)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
@@ -1176,67 +1179,26 @@ func (r *ClusterReconciler) reconcilePVCs(
 	return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 }
 
-// electPvcToReattach chooses a PVC between the initializing and the dangling ones that should be reattached
-// to the cluster, giving precedence to the target primary if existing in the set. If the target primary is fine,
-// let's start using the PVC we have initialized. After that we use the PVC that are initializing or dangling
-func electPvcToReattach(
-	ctx context.Context,
+// we elect a current instance that doesn't exist for re-creation
+func electInstanceToCreate(
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
-) string {
-	contextLogger := log.FromContext(ctx)
+) (*corev1.Pod, error) {
+	aliveInstances := instancesStatus.GetNames()
 
-	pvcs := make([]string, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.NeedsAttachPVC))
-	pvcs = append(pvcs, cluster.Status.InitializingPVC...)
-	pvcs = append(pvcs, cluster.Status.NeedsAttachPVC...)
-	if len(pvcs) == 0 {
-		return ""
-	}
-
-	// we can reattach only pvc for instances that are not yet created
-pvcLoop:
-	for idx := range pvcs {
-		pvc := pvcs[idx]
-		for _, item := range instancesStatus.Items {
-			if persistentvolumeclaim.DoesBelongToInstance(cluster, item.Pod.Name, pvc) {
-				continue pvcLoop
-			}
-		}
-		// TODO: review message
-		contextLogger.Info(
-			"pvc belongs to a instance that isn't created, electing to reattach",
-			"pvc", pvc,
-			"instanceNames", instancesStatus.GetNames(),
-		)
-		return pvc
-	}
-
-	return ""
-}
-
-// removeDanglingPVCs will remove dangling PVCs
-func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *apiv1.Cluster) error {
-	for _, pvcName := range cluster.Status.DanglingPVC {
-		var pvc corev1.PersistentVolumeClaim
-
-		err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}, &pvc)
+	for serial := range cluster.Status.InstancesThatNeedPVCReattached {
+		s, err := strconv.Atoi(serial)
 		if err != nil {
-			// Ignore if NotFound, otherwise report the error
-			if apierrs.IsNotFound(err) {
-				return nil
-			}
-			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
+			return nil, err
 		}
 
-		err = r.Delete(ctx, &pvc)
-		if err != nil {
-			// Ignore if NotFound, otherwise report the error
-			if apierrs.IsNotFound(err) {
-				return nil
-			}
-			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
+		pod := specs.PodWithExistingStorage(*cluster, s)
+		if slices.Contains(aliveInstances, pod.Name) {
+			continue
 		}
+
+		return pod, nil
 	}
 
-	return nil
+	return nil, nil
 }
