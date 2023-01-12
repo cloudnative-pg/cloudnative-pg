@@ -24,6 +24,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -1111,6 +1112,28 @@ type StorageConfiguration struct {
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
 	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
+}
+
+// GetSizeOrNil returns the requests storage size
+func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
+	if s == nil {
+		return nil
+	}
+
+	if s.Size != "" {
+		quantity, err := resource.ParseQuantity(s.Size)
+		if err != nil {
+			return nil
+		}
+
+		return &quantity
+	}
+
+	if s.PersistentVolumeClaimTemplate != nil {
+		return s.PersistentVolumeClaimTemplate.Resources.Requests.Storage()
+	}
+
+	return nil
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.

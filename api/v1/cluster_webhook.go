@@ -19,7 +19,6 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -1125,20 +1124,16 @@ func validateStorageConfigurationSize(structPath string, storageConfiguration St
 			storageConfiguration.Size,
 			"Size not configured. Please add it, or a storage request in the pvcTemplate."))
 	}
+
 	return result
 }
 
 // Validate a change in the storage
 func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
-	var result field.ErrorList
-
-	return append(
-		result,
-		validateStorageConfigurationChange(
-			"storage",
-			old.Spec.StorageConfiguration,
-			r.Spec.StorageConfiguration,
-		)...,
+	return validateStorageConfigurationChange(
+		"storage",
+		old.Spec.StorageConfiguration,
+		r.Spec.StorageConfiguration,
 	)
 }
 
@@ -1147,44 +1142,25 @@ func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 		return nil
 	}
 
-	var result field.ErrorList
-
 	if old.Spec.WalStorage == nil && r.Spec.WalStorage != nil {
-		return append(result,
+		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "walStorage"),
 				r.Spec.WalStorage,
 				"walStorage can only be set at cluster creation"),
-		)
+		}
 	}
 
 	if old.Spec.WalStorage != nil && r.Spec.WalStorage == nil {
-		return append(result,
+		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "walStorage"),
 				r.Spec.WalStorage,
 				"walStorage cannot be disabled once the cluster is created"),
-		)
+		}
 	}
 
-	// We need to make sure that only the size of the volume can change
-	oldNormalized := old.Spec.WalStorage.DeepCopy()
-	oldNormalized.Size = ""
-	newNormalized := r.Spec.WalStorage.DeepCopy()
-	newNormalized.Size = ""
-
-	if !reflect.DeepEqual(oldNormalized, newNormalized) {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "walStorage"),
-			r.Spec.WalStorage,
-			"cannot change walStorage parameter after initialization"),
-		)
-	}
-
-	// we validate the size change
-	storageErrs := validateStorageConfigurationChange("walStorage", *old.Spec.WalStorage, *r.Spec.WalStorage)
-
-	return append(result, storageErrs...)
+	return validateStorageConfigurationChange("walStorage", *old.Spec.WalStorage, *r.Spec.WalStorage)
 }
 
 // validateStorageConfigurationChange generates an error list by comparing two StorageConfiguration
@@ -1193,33 +1169,29 @@ func validateStorageConfigurationChange(
 	oldStorage StorageConfiguration,
 	newStorage StorageConfiguration,
 ) field.ErrorList {
-	var result field.ErrorList
-
-	oldSize, err := resource.ParseQuantity(oldStorage.Size)
-	if err != nil {
+	oldSize := oldStorage.GetSizeOrNil()
+	if oldSize == nil {
 		// Can't read the old size, so can't tell if the new size is greater
 		// or less
-		return result
+		return nil
 	}
 
-	result = append(result, validateStorageConfigurationSize(structPath, newStorage)...)
-	if len(result) != 0 {
-		return result
+	newSize := newStorage.GetSizeOrNil()
+	if newSize == nil {
+		// Can't read the new size, so can't tell if it is increasing
+		return nil
 	}
 
-	newSize, _ := resource.ParseQuantity(newStorage.Size)
-
-	if oldSize.AsDec().Cmp(newSize.AsDec()) == 1 {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", structPath, "size"),
-			newStorage.Size,
-			fmt.Sprintf(
-				"can't shrink existing storage from %v to %v",
-				oldStorage.Size,
-				newStorage.Size)))
+	if oldSize.AsDec().Cmp(newSize.AsDec()) < 1 {
+		return nil
 	}
 
-	return result
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("spec", structPath),
+			newSize,
+			fmt.Sprintf("can't shrink existing storage from %v to %v", oldSize, newSize)),
+	}
 }
 
 // Validate the cluster name. This is important to avoid issues
