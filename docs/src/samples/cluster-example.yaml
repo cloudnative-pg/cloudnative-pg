@@ -4,7 +4,6 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  walStorage:
-    size: 1Gi
+
   storage:
     size: 1Gi
