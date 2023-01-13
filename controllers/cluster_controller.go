@@ -459,13 +459,28 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	if res, err := deleteDanglingResources(ctx, r.Client, cluster); !res.IsZero() || err != nil {
-		return res, err
+	// TODO: move into a central waiting phase
+	// If we are joining a node, we should wait for the process to finish
+	if resources.countRunningJobs() > 0 {
+		contextLogger.Debug("Waiting for jobs to finish",
+			"clusterName", cluster.Name,
+			"namespace", cluster.Namespace,
+			"jobs", len(resources.jobs.Items))
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	if !resources.allInstancesAreActive() {
 		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	if res, err := deleteDanglingResources(ctx, r.Client, cluster); !res.IsZero() || err != nil {
+		return res, err
+	}
+
+	// Reconcile Pods
+	if res, err := r.ReconcilePods(ctx, cluster, resources, instancesStatus); err != nil {
+		return res, err
 	}
 
 	if res, err := persistentvolumeclaim.Reconcile(
@@ -475,11 +490,6 @@ func (r *ClusterReconciler) reconcileResources(
 		resources.instances.Items,
 		resources.pvcs.Items,
 	); !res.IsZero() || err != nil {
-		return res, err
-	}
-
-	// Reconcile Pods
-	if res, err := r.ReconcilePods(ctx, cluster, resources, instancesStatus); err != nil {
 		return res, err
 	}
 
@@ -511,21 +521,25 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 	deletedPods := false
 
 	for idx := range resources.instances.Items {
-		if utils.IsPodEvicted(resources.instances.Items[idx]) {
+		instance := resources.instances.Items[idx]
+		if utils.IsPodEvicted(instance) {
 			contextLogger.Warning("Deleting evicted pod",
-				"pod", resources.instances.Items[idx].Name,
-				"podStatus", resources.instances.Items[idx].Status)
-			if err := r.Delete(ctx, &resources.instances.Items[idx]); err != nil {
+				"pod", instance.Name,
+				"podStatus", instance.Status)
+			if err := r.Delete(ctx, &instance); err != nil {
 				if apierrs.IsConflict(err) {
 					contextLogger.Debug("Conflict error while deleting instances item", "error", err)
 					return &ctrl.Result{Requeue: true}, nil
 				}
 				return nil, err
 			}
+			if err := persistentvolumeclaim.DeleteInstancePVCs(ctx, r.Client, cluster, &instance); err != nil {
+				return nil, err
+			}
 			deletedPods = true
 			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
 				"Deleted evicted Pod %v",
-				resources.instances.Items[idx].Name)
+				instance.Name)
 		}
 	}
 	if deletedPods {
@@ -575,15 +589,6 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
-
-	// If we are joining a node, we should wait for the process to finish
-	if resources.countRunningJobs() > 0 {
-		contextLogger.Debug("Waiting for jobs to finish",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"jobs", len(resources.jobs.Items))
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
 
 	if err := r.markPVCReadyForCompletedJobs(ctx, resources); err != nil {
 		return ctrl.Result{}, err

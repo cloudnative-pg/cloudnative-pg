@@ -1175,7 +1175,6 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{}, fmt.Errorf("unable to create Pod: %w", err)
 	}
 
-	// Do another reconcile cycle after handling a dangling PVC
 	return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 }
 
@@ -1192,12 +1191,12 @@ func electInstanceToCreate(
 			return nil, err
 		}
 
-		pod := specs.PodWithExistingStorage(*cluster, s)
-		if slices.Contains(aliveInstances, pod.Name) {
+		instanceName := specs.GetInstanceName(cluster.Name, s)
+		if slices.Contains(aliveInstances, instanceName) {
 			continue
 		}
 
-		return pod, nil
+		return specs.PodWithExistingStorage(*cluster, s), nil
 	}
 
 	return nil, nil
