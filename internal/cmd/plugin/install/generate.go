@@ -102,7 +102,7 @@ func newGenerateCmd() *cobra.Command {
 	cmd.Flags().Int32Var(
 		&replicas,
 		"replicas",
-		1,
+		0,
 		"Number of replicas in the deployment. Default is zero, meaning that no override is applied on the "+
 			"installation manifest (normally it is a single replica deployment)",
 	)
@@ -272,13 +272,16 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 }
 
 func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment) error {
-	dep.Spec.Replicas = &cmd.replicas
-
 	args := dep.Spec.Template.Spec.Containers[0].Args
 	args = append(args, fmt.Sprintf("--log-field-level=%s", cmd.logFieldLevel))
 	args = append(args, fmt.Sprintf("--log-field-timestamp=%s", cmd.logFieldTimestamp))
 
 	dep.Spec.Template.Spec.Containers[0].Args = args
+
+	if cmd.replicas == 0 {
+		return nil
+	}
+	dep.Spec.Replicas = &cmd.replicas
 
 	return nil
 }
