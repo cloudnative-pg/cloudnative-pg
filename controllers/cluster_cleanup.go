@@ -29,7 +29,8 @@ import (
 
 func filterOutDeletedJobs(jobList []batchv1.Job) []batchv1.Job {
 	var result []batchv1.Job
-	for _, job := range jobList {
+	jobs := utils.FilterCompleteJobs(jobList)
+	for _, job := range jobs {
 		if job.GetDeletionTimestamp() == nil {
 			result = append(result, job)
 		}
@@ -43,15 +44,7 @@ func (r *ClusterReconciler) cleanupCompletedJobs(
 	jobs batchv1.JobList,
 ) {
 	contextLogger := log.FromContext(ctx)
-
-	completeJobs := utils.FilterCompleteJobs(jobs.Items)
-	if len(completeJobs) == 0 {
-		return
-	}
-	jobsToDelete := filterOutDeletedJobs(completeJobs)
-	if len(jobsToDelete) == 0 {
-		return
-	}
+	jobsToDelete := filterOutDeletedJobs(jobs.Items)
 
 	foreground := metav1.DeletePropagationForeground
 	for i, job := range jobsToDelete {
