@@ -28,6 +28,9 @@ import (
 // PgWalVolumePath its the path used by the WAL volume when present
 const PgWalVolumePath = "/var/lib/postgresql/wal"
 
+// PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
+const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
+
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
 		{

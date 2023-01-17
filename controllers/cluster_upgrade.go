@@ -71,7 +71,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		}
 
 		if reason == apiv1.NewWalReason {
-			nodeserial, err := specs.GetNodeSerial(postgresqlStatus.Pod.ObjectMeta)
+			nodeSerial, err := specs.GetNodeSerial(postgresqlStatus.Pod.ObjectMeta)
 			if err != nil {
 				return false, err
 			}
@@ -80,7 +80,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 				cluster,
 				&persistentvolumeclaim.CreateConfiguration{
 					Status:     persistentvolumeclaim.StatusReady,
-					NodeSerial: nodeserial,
+					NodeSerial: nodeSerial,
 					Role:       utils.PVCRolePgWal,
 					Storage:    *cluster.Spec.WalStorage,
 				},

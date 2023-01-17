@@ -20,7 +20,6 @@ import (
 	"context"
 	"io/fs"
 	"os"
-	"path"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/retry"
@@ -282,11 +281,10 @@ func (r *InstanceReconciler) ReconcileWalStorage(ctx context.Context) error {
 
 	// We discarded every possibility that this has been done, let's move the current file to their
 	// new location
-	contextLogger.Debug("Moving data", "from", specs.PgWalPath, "to",
-		path.Join(specs.PgWalVolumePath, "pg_wal"))
-	if err := fileutils.MoveDirectoryContent(specs.PgWalPath, path.Join(specs.PgWalVolumePath, "pg_wal")); err != nil {
+	contextLogger.Info("Moving data", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
+	if err := fileutils.MoveDirectoryContent(specs.PgWalPath, specs.PgWalVolumePgWalPath); err != nil {
 		contextLogger.Error(err, "Moving data", "from", specs.PgWalPath, "to",
-			path.Join(specs.PgWalVolumePath, "pg_wal"))
+			specs.PgWalVolumePgWalPath)
 		return err
 	}
 
@@ -297,9 +295,8 @@ func (r *InstanceReconciler) ReconcileWalStorage(ctx context.Context) error {
 	}
 
 	// We moved all the files now we should create the proper symlink
-	contextLogger.Debug("Creating symlink", "from", specs.PgWalPath, "to",
-		path.Join(specs.PgWalVolumePath, "pg_wal"))
-	if err := os.Symlink(path.Join(specs.PgWalVolumePath, "pg_wal"), specs.PgWalPath); err != nil {
+	contextLogger.Debug("Creating symlink", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
+	if err := os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath); err != nil {
 		return err
 	}
 
