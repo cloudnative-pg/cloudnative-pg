@@ -190,7 +190,8 @@ spec:
 ```
 
 !!! Important
-    `walStorage` initialization is only supported during cluster creation.
+    Removing `walStorage` is not supported: once added, a separate volume for
+    WALs cannot be removed from an existing Postgres cluster.
 
 ## Volume expansion
 
