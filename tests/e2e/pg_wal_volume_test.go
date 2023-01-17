@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -88,22 +89,19 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 			}
 		})
 	}
+
 	// Inline function to patch walStorage in existing cluster
-	patchWalStorage := func(namespace, clusterName string) {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		// Update the configuration
-		cluster := v1.Cluster{}
-		err := testsUtils.GetObject(env, namespacedName, &cluster)
-		Expect(err).NotTo(HaveOccurred())
-		WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-		cluster.Spec.WalStorage = &v1.StorageConfiguration{
-			Size:         "1G",
-			StorageClass: &WalStorageClass,
-		}
-		err = env.Client.Update(env.Ctx, &cluster)
+	updateWalStorage := func(namespace, clusterName string) {
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).NotTo(HaveOccurred())
+			WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+			cluster.Spec.WalStorage = &v1.StorageConfiguration{
+				Size:         "1G",
+				StorageClass: &WalStorageClass,
+			}
+			return env.Client.Update(env.Ctx, cluster)
+		})
 		Expect(err).ToNot(HaveOccurred())
 	}
 
@@ -144,10 +142,10 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFileWithoutPgWal, env)
 		By(fmt.Sprintf("adding pg_wal volume in existing cluster: %v", clusterName), func() {
-			patchWalStorage(namespace, clusterName)
+			updateWalStorage(namespace, clusterName)
 		})
 		AssertPVCCount(namespace, clusterName, expectedPvcCount, 120)
-		AssertClusterIsReady(namespace, clusterName, 30, env)
+		AssertClusterIsReady(namespace, clusterName, 60, env)
 		AssertClusterPhase(namespace, clusterName, v1.PhaseHealthy, 10)
 		verifyPgWal(namespace)
 	})
