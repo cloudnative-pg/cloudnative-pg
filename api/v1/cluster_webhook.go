@@ -1186,7 +1186,7 @@ func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
 }
 
 func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
-	if old.Spec.WalStorage == nil && r.Spec.WalStorage == nil {
+	if old.Spec.WalStorage == nil {
 		return nil
 	}
 
@@ -1197,10 +1197,6 @@ func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 				r.Spec.WalStorage,
 				"walStorage cannot be disabled once the cluster is created"),
 		}
-	}
-
-	if old.Spec.WalStorage == nil && r.Spec.WalStorage != nil {
-		return validateStorageConfigurationSize("walStorage", *r.Spec.WalStorage)
 	}
 
 	return validateStorageConfigurationChange("walStorage", *old.Spec.WalStorage, *r.Spec.WalStorage)
