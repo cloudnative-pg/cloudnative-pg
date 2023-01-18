@@ -2648,8 +2648,8 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 }
 
 // AssertPVCCount matches count and pvc List.
-func AssertPVCCount(namespace, clusterName string, pvcCount int) {
-	By("verify cluster healthy pvc list", func() {
+func AssertPVCCount(namespace, clusterName string, pvcCount, timeout int) {
+	By(fmt.Sprintf("verify cluster %v healthy pvc list", clusterName), func() {
 		Eventually(func(g Gomega) {
 			cluster, _ := env.GetCluster(namespace, clusterName)
 			g.Expect(cluster.Status.PVCCount).To(BeEquivalentTo(pvcCount))
@@ -2662,6 +2662,21 @@ func AssertPVCCount(namespace, clusterName string, pvcCount int) {
 			g.Expect(err).To(BeNil())
 
 			g.Expect(cluster.Status.PVCCount).To(BeEquivalentTo(len(pvcList.Items)))
-		}, 60, 4).Should(Succeed())
+		}, timeout, 4).Should(Succeed())
+	})
+}
+
+// AssertClusterPhase checks phase of a cluster asserted by user. It checks for cluster
+// phase consistently for certain time to phase out any error in between. Very useful in case
+// we are upgrading cluster.
+func AssertClusterPhase(namespace, clusterName, phase string, timeout int) {
+	By(fmt.Sprintf("verifying cluster '%v' phase '%v' consistency", clusterName, phase), func() {
+		Consistently(func() (string, error) {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			if err != nil {
+				return "", err
+			}
+			return cluster.Status.Phase, nil
+		}, timeout, 2).Should(BeEquivalentTo(phase))
 	})
 }
