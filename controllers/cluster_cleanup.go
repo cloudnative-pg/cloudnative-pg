@@ -27,30 +27,25 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-func filterOutDeletedJobs(jobList []batchv1.Job) []batchv1.Job {
-	var result []batchv1.Job
-	jobs := utils.FilterCompleteJobs(jobList)
-	for _, job := range jobs {
-		if job.GetDeletionTimestamp() == nil {
-			result = append(result, job)
-		}
-	}
-	return result
-}
-
 // cleanupCompletedJobs remove all the Jobs which are completed
 func (r *ClusterReconciler) cleanupCompletedJobs(
 	ctx context.Context,
 	jobs batchv1.JobList,
 ) {
 	contextLogger := log.FromContext(ctx)
-	jobsToDelete := filterOutDeletedJobs(jobs.Items)
 
 	foreground := metav1.DeletePropagationForeground
-	for i, job := range jobsToDelete {
-		contextLogger.Debug("Removing job", "job", job.Name)
+	completedJobs := utils.FilterJobsWithOneCompletion(jobs.Items)
+	for idx := range completedJobs {
+		job := &completedJobs[idx]
+		if !job.DeletionTimestamp.IsZero() {
+			contextLogger.Debug("skipping job because it has deletion timestamp populated",
+				"job", job.Name)
+			continue
+		}
 
-		if err := r.Delete(ctx, &jobsToDelete[i], &client.DeleteOptions{
+		contextLogger.Debug("Removing job", "job", job.Name)
+		if err := r.Delete(ctx, job, &client.DeleteOptions{
 			PropagationPolicy: &foreground,
 		}); err != nil {
 			contextLogger.Error(err, "cannot delete job", "job", job.Name)
