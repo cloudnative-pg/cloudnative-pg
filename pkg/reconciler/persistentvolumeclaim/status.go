@@ -149,7 +149,7 @@ func classifyPVC(
 	pvc corev1.PersistentVolumeClaim,
 	podList []corev1.Pod,
 	jobList []batchv1.Job,
-	pvcs []corev1.PersistentVolumeClaim,
+	pvcList []corev1.PersistentVolumeClaim,
 	cluster *apiv1.Cluster,
 	instanceName string,
 ) status {
@@ -159,7 +159,7 @@ func classifyPVC(
 	}
 
 	expectedPVCs := getExpectedInstancePVCNames(cluster, instanceName)
-	pvcNames := getNamesFromPVCList(pvcs)
+	pvcNames := getNamesFromPVCList(pvcList)
 
 	// PVC is part of an incomplete group
 	if len(expectedPVCs) > len(pvcNames) || !slices.Contains(expectedPVCs, pvc.Name) {
