@@ -32,14 +32,14 @@ import (
 var _ = Describe("PVC detection", func() {
 	It("will list PVCs with Jobs or Pods or which are Ready", func() {
 		clusterName := "myCluster"
-		makeClusterPVC := func(serial string, isReady bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, isReady)
+		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
+			return makePVC(clusterName, serial, isResizing)
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
-			makeClusterPVC("1", true),  // has a Pod
-			makeClusterPVC("2", true),  // has a Job
-			makeClusterPVC("3", false), // orphaned
-			makeClusterPVC("4", true),  // ready
+			makeClusterPVC("1", false), // has a Pod
+			makeClusterPVC("2", false), // has a Job
+			makeClusterPVC("3", true),  // resizing
+			makeClusterPVC("4", false), // dangling
 		}
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -49,13 +49,27 @@ var _ = Describe("PVC detection", func() {
 		EnrichStatus(
 			context.TODO(),
 			cluster,
-			[]corev1.Pod{makePod(clusterName, "1")},
+			[]corev1.Pod{
+				makePod(clusterName, "1"),
+				makePod(clusterName, "3"),
+			},
 			[]batchv1.Job{makeJob(clusterName, "2")},
 			pvcs,
 		)
-		Expect(cluster.Status.HealthyPVC).Should(HaveLen(1))
-		Expect(cluster.Status.InitializingPVC).Should(HaveLen(1))
-		Expect(cluster.Status.UnusablePVC).Should(HaveLen(1))
-		Expect(cluster.Status.DanglingPVC).Should(HaveLen(1))
+
+		Expect(cluster.Status.PVCCount).Should(BeEquivalentTo(4))
+		Expect(cluster.Status.InitializingPVC).Should(Equal([]string{
+			clusterName + "-2",
+		}))
+		Expect(cluster.Status.ResizingPVC).Should(Equal([]string{
+			clusterName + "-3",
+		}))
+		Expect(cluster.Status.DanglingPVC).Should(Equal([]string{
+			clusterName + "-4",
+		}))
+		Expect(cluster.Status.HealthyPVC).Should(Equal([]string{
+			clusterName + "-1",
+		}))
+		Expect(cluster.Status.UnusablePVC).Should(BeEmpty())
 	})
 })

@@ -19,6 +19,7 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,7 +35,7 @@ type PVCStatus = string
 
 const (
 	// StatusAnnotationName is an annotation that shows the current status of the PVC.
-	// The status can be "initializing" or "ready"
+	// The status can be "initializing", "ready" or "detached"
 	StatusAnnotationName = specs.MetadataNamespace + "/pvcStatus"
 
 	// StatusInitializing is the annotation value for PVC initializing status
@@ -51,53 +52,64 @@ const (
 // user is not valid and can't be specified in a PVC declaration
 var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 
-// status is the status of the PVC we generated
-type status struct {
-	// List of available instances detected from pvcs
-	instanceNames []string
+type status string
+
+const (
+	// List of available instances detected from PVCs
+	instanceNames status = "instanceNames"
 
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
-	initializing []string
+	initializing status = "initializing"
 
 	// List of PVCs with resizing condition. Requires a pod restart.
 	//
 	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
-	resizing []string
+	resizing status = "resizing"
 
 	// List of PVCs that are dangling (they don't have a corresponding Job nor a corresponding Pod)
-	dangling []string
+	dangling status = "dangling"
 
 	// List of PVCs that are used (they have a corresponding Pod)
-	healthy []string
+	healthy status = "healthy"
 
 	// List of PVCs that are unusable (they are part of an incomplete group)
-	unusable []string
+	unusable status = "unusable"
+
+	// List of PVCs that we should ignore
+	ignored status = "ignored"
+)
+
+type statuses map[status][]string
+
+func (s statuses) add(label status, name string) {
+	s[label] = append(s[label], name)
+}
+
+func (s statuses) getSorted(label status) []string {
+	sort.Strings(s[label])
+
+	return s[label]
 }
 
 // EnrichStatus obtains and classifies the current status of each managed PVC
-// nolint: gocognit
 func EnrichStatus(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	podList []corev1.Pod,
 	jobList []batchv1.Job,
-	pvcs []corev1.PersistentVolumeClaim,
+	pvcList []corev1.PersistentVolumeClaim,
 ) {
-	contextLogger := log.FromContext(ctx)
-
-	var result status
-
 	// First we iterate over all the PVCs building the instances map.
 	// It contains the PVCSs grouped by instance serial
-	instances := make(map[int][]corev1.PersistentVolumeClaim)
-	for _, pvc := range pvcs {
+	instances := make(map[string][]corev1.PersistentVolumeClaim)
+	for _, pvc := range pvcList {
 		// Ignore PVCs that is in the wrong state
 		if pvc.Status.Phase != corev1.ClaimPending &&
 			pvc.Status.Phase != corev1.ClaimBound {
 			continue
 		}
 
-		// There's no point in reattaching deleted PVCs
+		// There's no point in reattaching ignored PVCs
 		if pvc.ObjectMeta.DeletionTimestamp != nil {
 			continue
 		}
@@ -108,112 +120,124 @@ func EnrichStatus(
 		if err != nil {
 			continue
 		}
-		instances[serial] = append(instances[serial], pvc)
-
-		// Given that we are iterating over the PVCs
-		// we take the chance to build the list of resizing PVCs
-		if isResizing(pvc) {
-			result.resizing = append(result.resizing, pvc.Name)
-		}
+		instanceName := fmt.Sprintf("%s-%v", cluster.Name, serial)
+		instances[instanceName] = append(instances[instanceName], pvc)
 	}
 
 	// For every instance we have we validate the list of PVCs
 	// and detect if there is an attached Pod or Job
-instancesLoop:
-	for serial, pvcs := range instances {
-		instanceName := fmt.Sprintf("%s-%v", cluster.Name, serial)
-		expectedPVCs := getExpectedInstancePVCNames(cluster, instanceName)
-		pvcNames := getNamesFromPVCList(pvcs)
-
-		// If we have less PVCs that the expected number, all the instance PVCs are unusable
-		if len(expectedPVCs) > len(pvcNames) {
-			result.unusable = append(result.unusable, pvcNames...)
-			continue instancesLoop
-		}
-
-		// If some PVC is missing, all the instance PVCs are unusable
-		for _, expectedPVC := range expectedPVCs {
-			if !slices.Contains(pvcNames, expectedPVC) {
-				result.unusable = append(result.unusable, pvcNames...)
-				continue instancesLoop
-			}
-		}
-
-		// If we have PVCs that we don't expect, these PVCs need to
-		// be classified as unusable
-		for _, pvcName := range pvcNames {
-			if !slices.Contains(expectedPVCs, pvcName) {
-				result.unusable = append(result.unusable, pvcName)
-				contextLogger.Warning("found more PVC than those expected",
-					"instance", instanceName,
-					"expectedPVCs", expectedPVCs,
-					"foundPVCs", pvcNames,
-				)
-			}
-		}
-
-		// From this point we only consider expected PVCs.
-		// Any extra PVC is already in the Unusable list
-		pvcNames = expectedPVCs
-
-		isAnyPvcUnusable := false
+	result := make(statuses)
+	for instanceName, pvcs := range instances {
 		for _, pvc := range pvcs {
-			// We ignore any PVC that is not expected
-			if !slices.Contains(expectedPVCs, pvc.Name) {
-				continue
-			}
-
-			if pvc.Annotations[StatusAnnotationName] != StatusReady {
-				isAnyPvcUnusable = true
-			}
+			pvcStatus := classifyPVC(ctx, pvc, podList, jobList, pvcs, cluster, instanceName)
+			result.add(pvcStatus, pvc.Name)
 		}
-
-		if !isAnyPvcUnusable {
-			result.instanceNames = append(result.instanceNames, instanceName)
-		}
-		// Search for a Pod corresponding to this instance.
-		// If found, all the PVCs are Healthy
-		for idx := range podList {
-			if IsUsedByPodSpec(podList[idx].Spec, pvcNames...) {
-				// We found a Pod using this PVCs so this
-				// PVCs are not dangling
-				result.healthy = append(result.healthy, pvcNames...)
-				continue instancesLoop
-			}
-		}
-
-		// Search for a Job corresponding to this instance.
-		// If found, all the PVCs are initializing
-		for idx := range jobList {
-			if IsUsedByPodSpec(jobList[idx].Spec.Template.Spec, pvcNames...) {
-				// We have found a Job corresponding to this PVCs, so we
-				// are initializing them or the initialization has just completed
-				result.initializing = append(result.initializing, pvcNames...)
-				continue instancesLoop
-			}
-		}
-
-		if isAnyPvcUnusable {
-			// This PVC has not a Job nor a Pod using it, but it is not marked as StatusReady
-			// we need to ignore this instance and treat all the instance PVCs as unusable
-			result.unusable = append(result.unusable, pvcNames...)
-			contextLogger.Warning("found PVC that is not annotated as ready",
-				"pvcNames", pvcNames,
-				"instance", instanceName,
-				"expectedPVCs", expectedPVCs,
-				"foundPVCs", pvcNames,
-			)
-			continue instancesLoop
-		}
-
-		// These PVCs have not a Job nor a Pod using them, they are dangling
-		result.dangling = append(result.dangling, pvcNames...)
+		result.add(instanceNames, instanceName)
 	}
 
-	cluster.Status.PVCCount = int32(len(pvcs))
-	cluster.Status.DanglingPVC = result.dangling
-	cluster.Status.HealthyPVC = result.healthy
-	cluster.Status.InitializingPVC = result.initializing
-	cluster.Status.ResizingPVC = result.resizing
-	cluster.Status.UnusablePVC = result.unusable
+	cluster.Status.PVCCount = int32(len(pvcList))
+	cluster.Status.InitializingPVC = result.getSorted(initializing)
+	cluster.Status.ResizingPVC = result.getSorted(resizing)
+	cluster.Status.DanglingPVC = result.getSorted(dangling)
+	cluster.Status.HealthyPVC = result.getSorted(healthy)
+	cluster.Status.UnusablePVC = result.getSorted(unusable)
+}
+
+func classifyPVC(
+	ctx context.Context,
+	pvc corev1.PersistentVolumeClaim,
+	podList []corev1.Pod,
+	jobList []batchv1.Job,
+	pvcs []corev1.PersistentVolumeClaim,
+	cluster *apiv1.Cluster,
+	instanceName string,
+) status {
+	// PVC to ignore
+	if pvc.ObjectMeta.DeletionTimestamp != nil || hasUnknownStatus(ctx, pvc) {
+		return ignored
+	}
+
+	expectedPVCs := getExpectedInstancePVCNames(cluster, instanceName)
+	pvcNames := getNamesFromPVCList(pvcs)
+
+	// PVC is part of an incomplete group
+	if len(expectedPVCs) > len(pvcNames) || !slices.Contains(expectedPVCs, pvc.Name) {
+		return unusable
+	}
+
+	// PVC is resizing
+	if isResizing(pvc) {
+		return resizing
+	}
+
+	// PVC has a corresponding Pod
+	if hasPod(pvc, podList) {
+		return healthy
+	}
+
+	// PVC has a corresponding Job but not a corresponding Pod
+	if hasJob(pvc, jobList) {
+		return initializing
+	}
+
+	// PVC does not have a corresponding Job nor a corresponding Pod
+	return dangling
+}
+
+// hasJob checks if the PVC has a corresponding Job
+func hasJob(pvc corev1.PersistentVolumeClaim, jobList []batchv1.Job) bool {
+	// check if the PVC has a corresponding Job
+	for _, job := range jobList {
+		if jobUsesPVC(job, pvc) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasPod checks if the PVC has a corresponding Pod
+func hasPod(pvc corev1.PersistentVolumeClaim, podList []corev1.Pod) bool {
+	for _, pod := range podList {
+		if podUsesPVC(pod, pvc) {
+			return true
+		}
+	}
+	return false
+}
+
+// jobUsesPVC checks if the given Job uses the given PVC
+func jobUsesPVC(job batchv1.Job, pvc corev1.PersistentVolumeClaim) bool {
+	for _, vol := range job.Spec.Template.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil && vol.PersistentVolumeClaim.ClaimName == pvc.Name {
+			return true
+		}
+	}
+	return false
+}
+
+// podUsesPVC checks if the given Pod uses the given PVC
+func podUsesPVC(pod corev1.Pod, pvc corev1.PersistentVolumeClaim) bool {
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil && vol.PersistentVolumeClaim.ClaimName == pvc.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUnknownStatus(ctx context.Context, pvc corev1.PersistentVolumeClaim) bool {
+	// Expected statuses are: Ready, Initializing or empty (that means initializing)
+	if pvc.Annotations[StatusAnnotationName] == StatusReady ||
+		pvc.Annotations[StatusAnnotationName] == StatusInitializing ||
+		pvc.Annotations[StatusAnnotationName] == "" {
+		return false
+	}
+
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Warning("Unknown PVC status",
+		"namespace", pvc.Namespace,
+		"name", pvc.Name,
+		"status", pvc.Annotations[StatusAnnotationName])
+
+	return true
 }

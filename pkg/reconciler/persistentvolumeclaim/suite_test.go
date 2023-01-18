@@ -35,13 +35,20 @@ func TestSpecs(t *testing.T) {
 	RunSpecs(t, "Specification properties")
 }
 
-func makePVC(clusterName, serial string, isReady bool) corev1.PersistentVolumeClaim {
+func makePVC(clusterName, serial string, isResizing bool) corev1.PersistentVolumeClaim {
 	annotations := map[string]string{
 		specs.ClusterSerialAnnotationName: serial,
+		StatusAnnotationName:              StatusReady,
 	}
-	if isReady {
-		annotations[StatusAnnotationName] = StatusReady
+
+	var conditions []corev1.PersistentVolumeClaimCondition
+	if isResizing {
+		conditions = append(conditions, corev1.PersistentVolumeClaimCondition{
+			Type:   corev1.PersistentVolumeClaimResizing,
+			Status: corev1.ConditionTrue,
+		})
 	}
+
 	return corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName + "-" + serial,
@@ -52,7 +59,8 @@ func makePVC(clusterName, serial string, isReady bool) corev1.PersistentVolumeCl
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{},
 		Status: corev1.PersistentVolumeClaimStatus{
-			Phase: corev1.ClaimBound,
+			Phase:      corev1.ClaimBound,
+			Conditions: conditions,
 		},
 	}
 }
