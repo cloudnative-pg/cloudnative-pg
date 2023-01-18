@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -96,7 +96,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-			cluster.Spec.WalStorage = &v1.StorageConfiguration{
+			cluster.Spec.WalStorage = &apiv1.StorageConfiguration{
 				Size:         "1G",
 				StorageClass: &WalStorageClass,
 			}
@@ -146,7 +146,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 		})
 		AssertPVCCount(namespace, clusterName, expectedPvcCount, 120)
 		AssertClusterIsReady(namespace, clusterName, 60, env)
-		AssertClusterPhase(namespace, clusterName, v1.PhaseHealthy, 10)
+		AssertClusterPhase(namespace, clusterName, apiv1.PhaseHealthy, 10)
 		verifyPgWal(namespace)
 	})
 })
