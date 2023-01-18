@@ -71,7 +71,7 @@ type managedResources struct {
 // Count the number of jobs that are still running
 func (resources *managedResources) countRunningJobs() int {
 	jobCount := len(resources.jobs.Items)
-	completeJobs := utils.CountCompleteJobs(resources.jobs.Items)
+	completeJobs := utils.CountJobsWithOneCompletion(resources.jobs.Items)
 	return jobCount - completeJobs
 }
 
