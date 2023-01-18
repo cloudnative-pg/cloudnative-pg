@@ -70,6 +70,25 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			continue
 		}
 
+		if reason == apiv1.NewWalReason {
+			nodeSerial, err := specs.GetNodeSerial(postgresqlStatus.Pod.ObjectMeta)
+			if err != nil {
+				return false, err
+			}
+			if err := r.createPVC(
+				ctx,
+				cluster,
+				&persistentvolumeclaim.CreateConfiguration{
+					Status:     persistentvolumeclaim.StatusReady,
+					NodeSerial: nodeSerial,
+					Role:       utils.PVCRolePgWal,
+					Storage:    *cluster.Spec.WalStorage,
+				},
+			); err != nil {
+				return false, err
+			}
+		}
+
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 			fmt.Sprintf("Restarting instance %s, because: %s", postgresqlStatus.Pod.Name, reason),
 		); err != nil {
@@ -276,6 +295,13 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 			return true, false, fmt.Sprintf("the instance is using an old init container image: %s -> %s",
 				oldImage, newImage)
 		}
+	}
+
+	// If the cluster should have a wal but a wal is not being used by this pod we need to roll out to create and attach
+	// the new wal
+	if cluster.ShouldCreateWalArchiveVolume() && !persistentvolumeclaim.IsUsedByPodSpec(status.Pod.Spec,
+		persistentvolumeclaim.GetName(cluster, status.Pod.Name, utils.PVCRolePgWal)) {
+		return true, false, apiv1.NewWalReason
 	}
 
 	// Detect changes in the postgres container configuration

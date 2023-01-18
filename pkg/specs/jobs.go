@@ -18,7 +18,6 @@ package specs
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/kballard/go-shellquote"
 	batchv1 "k8s.io/api/batch/v1"
@@ -203,7 +202,7 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 	var flags []string
 
 	if cluster.ShouldCreateWalArchiveVolume() {
-		flags = append(flags, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
+		flags = append(flags, "--pg-wal", PgWalVolumePgWalPath)
 	}
 
 	return flags

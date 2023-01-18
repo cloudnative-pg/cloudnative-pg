@@ -174,6 +174,10 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
 	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
 
+	if err := reconciler.ReconcileWalStorage(ctx); err != nil {
+		return err
+	}
+
 	postgresLifecycleManager := lifecycle.NewPostgres(ctx, instance, postgresStartConditions)
 	if err = mgr.Add(postgresLifecycleManager); err != nil {
 		setupLog.Error(err, "unable to create instance runnable")

@@ -62,8 +62,6 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
-		PgWalDir := "/var/lib/postgresql/wal/pg_wal"
-
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(len(podList.Items), err).To(BeEquivalentTo(3))
 
@@ -85,14 +83,14 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 				commandTimeout := time.Second * 5
 				out, _, err := env.EventuallyExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 					"readlink", "-f", specs.PgWalPath)
-				Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo(PgWalDir))
+				Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo(specs.PgWalVolumePgWalPath))
 			}
 		})
 		By("checking WALs are archived in the dedicated volume", func() {
 			for _, pod := range podList.Items {
 				cmd := fmt.Sprintf(
 					"sh -c 'find %v -maxdepth 1 -type f -regextype sed -regex %v -print | wc -l'",
-					PgWalDir,
+					specs.PgWalVolumePgWalPath,
 					".*[0-9]$")
 				timeout := 300
 				Eventually(func() (int, error, error) {

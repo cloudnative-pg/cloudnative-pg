@@ -1299,17 +1299,8 @@ func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
 }
 
 func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
-	if old.Spec.WalStorage == nil && r.Spec.WalStorage == nil {
+	if old.Spec.WalStorage == nil {
 		return nil
-	}
-
-	if old.Spec.WalStorage == nil && r.Spec.WalStorage != nil {
-		return field.ErrorList{
-			field.Invalid(
-				field.NewPath("spec", "walStorage"),
-				r.Spec.WalStorage,
-				"walStorage can only be set at cluster creation"),
-		}
 	}
 
 	if old.Spec.WalStorage != nil && r.Spec.WalStorage == nil {
