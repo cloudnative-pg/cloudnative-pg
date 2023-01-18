@@ -1063,7 +1063,7 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	completeJobs := utils.FilterCompleteJobs(resources.jobs.Items)
+	completeJobs := utils.FilterJobsWithOneCompletion(resources.jobs.Items)
 	if len(completeJobs) == 0 {
 		return nil
 	}
