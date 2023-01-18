@@ -743,10 +743,12 @@ jobs:
   ok-to-merge:
     name: Label the PR as "ok to merge :ok_hand:"
     needs:
-      - e2e-local
       - evaluate_options
+      - e2e-local
     if: |
-      success() && !cancelled() &&
+      always() && 
+      needs.e2e-local.result == 'success' && 
+      github.event_name == 'issue_comment' && 
       needs.evaluate_options.outputs.test_level == '4'
     runs-on: ubuntu-20.04
     steps:
@@ -771,10 +773,12 @@ jobs:
   unlabel-ok-to-merge:
     name: Remove the "ok to merge :ok_hand:" label from the PR
     needs:
-      - e2e-local
       - evaluate_options
+      - e2e-local
     if: |
-      needs.e2e-local.result == 'failure'
+      always() && 
+      needs.e2e-local.result == 'failure' && 
+      github.event_name == 'issue_comment'
     runs-on: ubuntu-20.04
     steps:
       - name: Check preconditions
