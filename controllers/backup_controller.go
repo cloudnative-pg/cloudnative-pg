@@ -123,7 +123,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
 	// Detect the pod where a backup will be executed
-	pod, err := r.GetBackupTargetPod(ctx, cluster)
+	pod, err := r.getBackupTargetPod(ctx, cluster)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
@@ -194,44 +194,42 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, err
 }
 
-// GetBackupTargetPod returns the correct pod that should run the backup according to the current
+// getBackupTargetPod returns the correct pod that should run the backup according to the current
 // cluster's target policy
-func (r *BackupReconciler) GetBackupTargetPod(ctx context.Context, cluster apiv1.Cluster) (*corev1.Pod, error) {
+func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, cluster apiv1.Cluster) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx)
-	if cluster.Spec.Backup.Target == apiv1.BackupTargetStandby &&
-		cluster.Spec.Instances >= 1 {
-		pods, err := GetManagedInstances(ctx, &cluster, r.Client)
-		if err != nil {
-			return nil, err
-		}
-		posgresqlStatusList := r.instanceStatusClient.getStatusFromInstances(ctx, pods)
-		if len(posgresqlStatusList.Items) == 0 {
-			log.Debug("")
-			var pod corev1.Pod
-			err := r.Get(ctx, client.ObjectKey{
-				Namespace: cluster.Namespace,
-				Name:      cluster.Status.TargetPrimary,
-			}, &pod)
-			return &pod, err
-		}
-		if posgresqlStatusList.Len() == 1 {
-			contextLogger.Debug("Only one instance found, running backup on it")
-			return &posgresqlStatusList.Items[0].Pod, nil
-		}
-		for _, item := range posgresqlStatusList.Items[1:] {
-			if item.IsPodReady {
-				return &item.Pod, nil
-			}
-			contextLogger.Debug("Instance not ready, discarded as target for backup", "pod", item.Pod.Name)
-		}
-		contextLogger.Debug("No ready instances found as target for backup, defaulting to primary")
+	pods, err := GetManagedInstances(ctx, &cluster, r.Client)
+	if err != nil {
+		return nil, err
 	}
-	contextLogger.Debug("Picked primary as target for backup")
+
+	posgresqlStatusList := r.instanceStatusClient.getStatusFromInstances(ctx, pods)
+	for _, item := range posgresqlStatusList.Items {
+		if !item.IsPodReady {
+			contextLogger.Debug("Instance not ready, discarded as target for backup",
+				"pod", item.Pod.Name)
+			continue
+		}
+		if item.IsPrimary && cluster.Spec.Backup.Target == apiv1.BackupTargetPrimary {
+			contextLogger.Debug("Primary Instance is elected as backup target",
+				"instance", item.Pod.Name)
+			return &item.Pod, nil
+		}
+		if !item.IsPrimary && cluster.Spec.Backup.Target == apiv1.BackupTargetStandby {
+			contextLogger.Debug("Standby Instance is elected as backup target",
+				"instance", item.Pod.Name)
+			return &item.Pod, nil
+		}
+	}
+
+	contextLogger.Debug("No ready instances found as target for backup, defaulting to primary")
+
 	var pod corev1.Pod
-	err := r.Get(ctx, client.ObjectKey{
+	err = r.Get(ctx, client.ObjectKey{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Status.TargetPrimary,
 	}, &pod)
+
 	return &pod, err
 }
 
