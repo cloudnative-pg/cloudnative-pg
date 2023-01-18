@@ -20,8 +20,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 )
 
-// IsJobComplete check if a certain job is complete
-func IsJobComplete(job batchv1.Job) bool {
+// jobHasOne Completion check if a certain job is complete
+func jobHasOneCompletion(job batchv1.Job) bool {
 	requestedCompletions := int32(1)
 	if job.Spec.Completions != nil {
 		requestedCompletions = *job.Spec.Completions
@@ -29,23 +29,23 @@ func IsJobComplete(job batchv1.Job) bool {
 	return job.Status.Succeeded == requestedCompletions
 }
 
-// FilterCompleteJobs returns jobs that are complete
-func FilterCompleteJobs(jobList []batchv1.Job) []batchv1.Job {
+// FilterJobsWithOneCompletion returns jobs that have one completion
+func FilterJobsWithOneCompletion(jobList []batchv1.Job) []batchv1.Job {
 	var result []batchv1.Job
 	for _, job := range jobList {
-		if IsJobComplete(job) {
+		if jobHasOneCompletion(job) {
 			result = append(result, job)
 		}
 	}
 	return result
 }
 
-// CountCompleteJobs count the number complete jobs
-func CountCompleteJobs(jobList []batchv1.Job) int {
+// CountJobsWithOneCompletion count the number complete jobs
+func CountJobsWithOneCompletion(jobList []batchv1.Job) int {
 	result := 0
 
 	for _, job := range jobList {
-		if IsJobComplete(job) {
+		if jobHasOneCompletion(job) {
 			result++
 		}
 	}
