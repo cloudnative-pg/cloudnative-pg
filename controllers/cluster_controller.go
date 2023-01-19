@@ -529,6 +529,11 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 				}
 				return nil, err
 			}
+			deletedPods = true
+
+			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
+				"Deleted evicted Pod %v",
+				instance.Name)
 
 			if cluster.IsReusePVCEnabled() || cluster.IsNodeMaintenanceWindowInProgress() {
 				continue
@@ -543,9 +548,8 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 			); err != nil {
 				return nil, err
 			}
-			deletedPods = true
-			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
-				"Deleted evicted Pod %v",
+			r.Recorder.Eventf(cluster, "Normal", "DeletePVCs",
+				"Deleted evicted Pod %v PVCs",
 				instance.Name)
 		}
 	}
