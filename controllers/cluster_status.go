@@ -265,21 +265,9 @@ func (r *ClusterReconciler) updateResourceStatus(
 		resources.pvcs.Items,
 	)
 
-	// From now on, we'll consider only Active pods: those Pods
-	// that will possibly work. Let's forget about the failed ones
-	filteredPods := utils.FilterActivePods(resources.instances.Items)
-
-	// Count pods
-	newInstances := len(filteredPods)
-	cluster.Status.Instances = newInstances
-	cluster.Status.ReadyInstances = utils.CountReadyPods(filteredPods)
-
 	// Count jobs
 	newJobs := int32(len(resources.jobs.Items))
 	cluster.Status.JobCount = newJobs
-
-	// Instances status
-	cluster.Status.InstancesStatus = utils.ListStatusPods(resources.instances.Items)
 
 	cluster.Status.Topology = getPodsTopology(
 		ctx,

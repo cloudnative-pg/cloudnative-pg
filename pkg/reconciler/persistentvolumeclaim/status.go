@@ -28,6 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PVCStatus describes the PVC phase
@@ -95,14 +96,14 @@ func (s statuses) getSorted(label status) []string {
 func EnrichStatus(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	podList []corev1.Pod,
-	jobList []batchv1.Job,
-	pvcList []corev1.PersistentVolumeClaim,
+	instances []corev1.Pod,
+	jobs []batchv1.Job,
+	managedPVCs []corev1.PersistentVolumeClaim,
 ) {
 	// First we iterate over all the PVCs building the instances map.
 	// It contains the PVCSs grouped by instance serial
-	instances := make(map[string][]corev1.PersistentVolumeClaim)
-	for _, pvc := range pvcList {
+	instancesPVCs := make(map[string][]corev1.PersistentVolumeClaim)
+	for _, pvc := range managedPVCs {
 		// Ignore PVCs that is in the wrong state
 		if pvc.Status.Phase != corev1.ClaimPending &&
 			pvc.Status.Phase != corev1.ClaimBound {
@@ -121,22 +122,30 @@ func EnrichStatus(
 			continue
 		}
 		instanceName := specs.GetInstanceName(cluster.Name, serial)
-		instances[instanceName] = append(instances[instanceName], pvc)
+		instancesPVCs[instanceName] = append(instancesPVCs[instanceName], pvc)
 	}
 
 	// For every instance we have we validate the list of PVCs
 	// and detect if there is an attached Pod or Job
 	result := make(statuses)
-	for instanceName, pvcs := range instances {
+	for instanceName, pvcs := range instancesPVCs {
 		for _, pvc := range pvcs {
-			pvcStatus := classifyPVC(ctx, pvc, podList, jobList, pvcs, cluster, instanceName)
+			pvcStatus := classifyPVC(ctx, pvc, instances, jobs, pvcs, cluster, instanceName)
 			result.add(pvcStatus, pvc.Name)
 		}
 		result.add(instanceNames, instanceName)
 	}
 
-	cluster.Status.PVCCount = int32(len(pvcList))
-	cluster.Status.InstanceNames = result.getSorted(instanceNames)
+	// an instance has no identity of its own, is a reflection of the available PVCs
+	sortedInstances := result.getSorted(instanceNames)
+	cluster.Status.Instances = len(sortedInstances)
+	cluster.Status.InstanceNames = sortedInstances
+
+	filteredPods := utils.FilterActivePods(instances)
+	cluster.Status.ReadyInstances = utils.CountReadyPods(filteredPods)
+	cluster.Status.InstancesStatus = utils.ListStatusPods(instances)
+
+	cluster.Status.PVCCount = int32(len(managedPVCs))
 	cluster.Status.InitializingPVC = result.getSorted(initializing)
 	cluster.Status.ResizingPVC = result.getSorted(resizing)
 	cluster.Status.DanglingPVC = result.getSorted(dangling)
@@ -190,7 +199,8 @@ func hasJob(pvc corev1.PersistentVolumeClaim, jobList []batchv1.Job) bool {
 	// check if the PVC has a corresponding Job
 	for _, job := range jobList {
 		if jobUsesPVC(job, pvc) {
-			return true
+			// if the job doesn't use the PVC it should report as not used
+			return !utils.JobHasOneCompletion(job)
 		}
 	}
 	return false

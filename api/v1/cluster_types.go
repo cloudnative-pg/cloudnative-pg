@@ -426,9 +426,6 @@ type ClusterStatus struct {
 	// List of all the PVCs that are unusable because another PVC is missing
 	UnusablePVC []string `json:"unusablePVC,omitempty"`
 
-	// List of all the PVCs that need to be attached to instances
-	InstancesThatNeedPVCReattached map[string][]string `json:"instancesThatNeedPVCReattached,omitempty"`
-
 	// Current write pod
 	WriteService string `json:"writeService,omitempty"`
 
@@ -484,8 +481,7 @@ type ClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// List of instance names in the cluster
-	InstanceNames     []string `json:"instanceNames,omitempty"`
-	DanglingInstances []string `json:"danglingInstances,omitempty"`
+	InstanceNames []string `json:"instanceNames,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop

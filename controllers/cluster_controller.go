@@ -476,10 +476,6 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	if res, err := deleteDanglingResources(ctx, r.Client, cluster); !res.IsZero() || err != nil {
-		return res, err
-	}
-
 	// Reconcile Pods
 	if res, err := r.ReconcilePods(ctx, cluster, resources, instancesStatus); err != nil {
 		return res, err
@@ -535,7 +531,13 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 				}
 				return nil, err
 			}
-			if err := persistentvolumeclaim.DeleteInstancePVCs(ctx, r.Client, cluster, &instance); err != nil {
+			if err := persistentvolumeclaim.DeleteInstancePVCs(
+				ctx,
+				r.Client,
+				cluster,
+				instance.Name,
+				instance.Namespace,
+			); err != nil {
 				return nil, err
 			}
 			deletedPods = true
@@ -1170,50 +1172,4 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 			"err", err,
 			"configmap", configuration.Current.MonitoringQueriesConfigmap)
 	}
-}
-
-// deleteDanglingResources will remove dangling resources
-func deleteDanglingResources(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {
-	var shouldReconcile bool
-	for _, pvcName := range cluster.Status.DanglingPVC {
-		var pvc corev1.PersistentVolumeClaim
-
-		objectKey := client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}
-		err := c.Get(ctx, objectKey, &pvc)
-		if apierrs.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("while fetching unneeded PVC %v: %v", pvc.Name, err)
-		}
-
-		if err := c.Delete(ctx, &pvc); err != nil && !apierrs.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
-		}
-		shouldReconcile = true
-	}
-
-	for _, instanceName := range cluster.Status.DanglingInstances {
-		var pod corev1.Pod
-
-		objectKey := client.ObjectKey{Namespace: cluster.Namespace, Name: instanceName}
-		err := c.Get(ctx, objectKey, &pod)
-		if apierrs.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("while fetching unneeded Instance %v: %v", pod.Name, err)
-		}
-
-		if err := c.Delete(ctx, &pod); err != nil && !apierrs.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("removing unneeded Instance %v: %v", pod.Name, err)
-		}
-		shouldReconcile = true
-	}
-
-	if shouldReconcile {
-		return ctrl.Result{RequeueAfter: time.Second}, nil
-	}
-
-	return ctrl.Result{}, nil
 }
