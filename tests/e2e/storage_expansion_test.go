@@ -86,7 +86,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 			}
 		})
 
-		FIt("expands PVCs via offline resize", func() {
+		It("expands PVCs via offline resize", func() {
 			// Creating namespace
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())

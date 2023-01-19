@@ -199,7 +199,7 @@ func hasJob(pvc corev1.PersistentVolumeClaim, jobList []batchv1.Job) bool {
 	// check if the PVC has a corresponding Job
 	for _, job := range jobList {
 		if jobUsesPVC(job, pvc) {
-			// if the job doesn't use the PVC it should report as not used
+			// if the job is completed the PVC should be reported as not used
 			return !utils.JobHasOneCompletion(job)
 		}
 	}
