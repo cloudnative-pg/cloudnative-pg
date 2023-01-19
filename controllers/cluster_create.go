@@ -20,11 +20,11 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -32,7 +32,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/strings/slices"
+	k8slices "k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -1088,9 +1088,13 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	resources *managedResources,
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
+	if cluster.Status.Instances > cluster.Spec.Instances {
+		return ctrl.Result{}, nil
+	}
+
 	contextLogger := log.FromContext(ctx)
 
-	instanceToCreate, err := electInstanceToCreate(cluster, instancesStatus)
+	instanceToCreate, err := electInstanceToCreate(cluster, instancesStatus, resources.pvcs.Items)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1099,13 +1103,14 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 			"haven't found any instance to create",
 			"instances",
 			instancesStatus.GetNames(),
-			"reattach", cluster.Status.InstancesThatNeedPVCReattached,
+			"dangling", cluster.Status.DanglingPVC,
+			"unusable", cluster.Status.UnusablePVC,
 		)
 		return ctrl.Result{}, nil
 	}
 
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&
-		instancesStatus.InstancesReportingStatus() != cluster.Status.Instances {
+		instancesStatus.InstancesReportingStatus() != cluster.Status.ReadyInstances {
 		// A pod is not ready, let's retry
 		contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
@@ -1182,21 +1187,31 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 func electInstanceToCreate(
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
+	pvcs []corev1.PersistentVolumeClaim,
 ) (*corev1.Pod, error) {
 	aliveInstances := instancesStatus.GetNames()
 
-	for serial := range cluster.Status.InstancesThatNeedPVCReattached {
-		s, err := strconv.Atoi(serial)
+	iterablePVCs := cluster.Status.DanglingPVC
+	iterablePVCs = append(iterablePVCs, cluster.Status.UnusablePVC...)
+	for _, name := range iterablePVCs {
+		idx := slices.IndexFunc(pvcs, func(claim corev1.PersistentVolumeClaim) bool {
+			return claim.Name == name
+		})
+		if idx == -1 {
+			return nil, fmt.Errorf("programmatic error, pvc not found")
+		}
+
+		serial, err := specs.GetNodeSerial(pvcs[idx].ObjectMeta)
 		if err != nil {
 			return nil, err
 		}
 
-		instanceName := specs.GetInstanceName(cluster.Name, s)
-		if slices.Contains(aliveInstances, instanceName) {
+		instanceName := specs.GetInstanceName(cluster.Name, serial)
+		if k8slices.Contains(aliveInstances, instanceName) {
 			continue
 		}
 
-		return specs.PodWithExistingStorage(*cluster, s), nil
+		return specs.PodWithExistingStorage(*cluster, serial), nil
 	}
 
 	return nil, nil

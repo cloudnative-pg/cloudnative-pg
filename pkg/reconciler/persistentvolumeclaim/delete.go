@@ -34,17 +34,18 @@ func DeleteInstancePVCs(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	instance *corev1.Pod,
+	name string,
+	namespace string,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	expectedPVCs := getExpectedPVCs(cluster, instance.Name)
+	expectedPVCs := getExpectedPVCs(cluster, name)
 
 	for _, expectedPVC := range expectedPVCs {
 		pvc := corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      expectedPVC.name,
-				Namespace: instance.Namespace,
+				Namespace: namespace,
 			},
 		}
 		contextLogger.Info("Deleting PVC", "pvc", pvc.Name)
@@ -52,7 +53,7 @@ func DeleteInstancePVCs(
 		if err := c.Delete(ctx, &pvc); err != nil {
 			// Ignore if NotFound, otherwise report the error
 			if !apierrs.IsNotFound(err) {
-				return fmt.Errorf("scaling down node (%s pvc) %v: %w", expectedPVC.name, instance.Name, err)
+				return fmt.Errorf("scaling down node (%s pvc) %v: %w", expectedPVC.name, name, err)
 			}
 		}
 	}

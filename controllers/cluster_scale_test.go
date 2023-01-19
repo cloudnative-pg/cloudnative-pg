@@ -45,16 +45,16 @@ var _ = Describe("scale down", func() {
 				instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
 			}
 
-			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
+			sacrificialInstanceName := getSacrificialInstanceName(cluster, resources.instances.Items)
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.Pod{},
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: sacrificialInstanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.PersistentVolumeClaim{},
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: sacrificialInstanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 
 			Expect(clusterReconciler.scaleDownCluster(
@@ -66,12 +66,12 @@ var _ = Describe("scale down", func() {
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.Pod{},
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: sacrificialInstanceName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.PersistentVolumeClaim{},
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: sacrificialInstanceName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
 		})
 	})
@@ -88,17 +88,17 @@ var _ = Describe("scale down", func() {
 				instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
 			}
 
-			sacrificialInstance := getSacrificialInstance(resources.instances.Items)
-			pvcWalName := persistentvolumeclaim.GetName(cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
+			sacrificialInstanceName := getSacrificialInstanceName(cluster, resources.instances.Items)
+			pvcWalName := persistentvolumeclaim.GetName(cluster, sacrificialInstanceName, utils.PVCRolePgWal)
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.Pod{},
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: sacrificialInstanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.PersistentVolumeClaim{},
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: sacrificialInstanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 			Expect(isResourceExisting(
 				ctx,
@@ -115,12 +115,12 @@ var _ = Describe("scale down", func() {
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.Pod{},
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: sacrificialInstanceName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.PersistentVolumeClaim{},
-				types.NamespacedName{Name: sacrificialInstance.Name, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: sacrificialInstanceName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
 			Expect(isResourceExisting(
 				ctx,

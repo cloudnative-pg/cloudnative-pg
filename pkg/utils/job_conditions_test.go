@@ -37,8 +37,8 @@ var _ = Describe("Job conditions", func() {
 	}
 
 	It("detects if a certain job is completed", func() {
-		Expect(jobHasOneCompletion(nonCompleteJob)).To(BeFalse())
-		Expect(jobHasOneCompletion(completeJob)).To(BeTrue())
+		Expect(JobHasOneCompletion(nonCompleteJob)).To(BeFalse())
+		Expect(JobHasOneCompletion(completeJob)).To(BeTrue())
 	})
 
 	It("can count the number of complete jobs", func() {

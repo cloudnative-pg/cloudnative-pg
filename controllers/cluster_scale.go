@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -52,32 +54,33 @@ func (r *ClusterReconciler) scaleDownCluster(
 		return nil
 	}
 
-	// Is there one pod to be deleted?
-	sacrificialInstance := getSacrificialInstance(resources.instances.Items)
-	if sacrificialInstance == nil {
+	// Is there is an instance to be deleted?
+	sacrificialInstanceName := getSacrificialInstanceName(cluster, resources.instances.Items)
+	if sacrificialInstanceName == "" {
 		contextLogger.Info("There are no instances to be sacrificed. Wait for the next sync loop")
 		return nil
 	}
 
 	r.Recorder.Eventf(cluster, "Normal", "ScaleDown",
-		"Scaling down: removing instance %v", sacrificialInstance.Name)
+		"Scaling down: removing instance %v", sacrificialInstanceName)
 
-	contextLogger.Info("Too many nodes for cluster, deleting an instance",
-		"pod", sacrificialInstance.Name)
-	if err := r.Delete(ctx, sacrificialInstance); err != nil {
-		// Ignore if NotFound, otherwise report the error
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
-		}
+	if err := r.deleteInstance(ctx, cluster, sacrificialInstanceName); err != nil {
+		return err
 	}
 
-	// Let's drop the PVC too
-	if err := persistentvolumeclaim.DeleteInstancePVCs(ctx, r.Client, cluster, sacrificialInstance); err != nil {
+	// Let's drop the PVCs too
+	if err := persistentvolumeclaim.DeleteInstancePVCs(
+		ctx,
+		r.Client,
+		cluster,
+		sacrificialInstanceName,
+		cluster.Namespace,
+	); err != nil {
 		return err
 	}
 	// And now also the Job
 	for idx := range resources.jobs.Items {
-		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialInstance.Name+"-") {
+		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialInstanceName+"-") {
 			// This job was working against the PVC of this Pod,
 			// let's remove it
 			foreground := metav1.DeletePropagationForeground
@@ -90,10 +93,44 @@ func (r *ClusterReconciler) scaleDownCluster(
 			); err != nil {
 				// Ignore if NotFound, otherwise report the error
 				if !apierrs.IsNotFound(err) {
-					return fmt.Errorf("scaling down node (job) %v: %w", sacrificialInstance.Name, err)
+					return fmt.Errorf("scaling down node (job) %v: %w", sacrificialInstanceName, err)
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) deleteInstance(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	sacrificialInstanceName string,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	nominatedInstance := &corev1.Pod{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      sacrificialInstanceName,
+		Namespace: cluster.Namespace,
+	}, nominatedInstance)
+
+	if apierrs.IsNotFound(err) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	contextLogger.Info("Too many nodes for cluster, deleting an instance",
+		"pod", nominatedInstance.Name)
+	err = r.Delete(ctx, nominatedInstance)
+	if apierrs.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
 	}
 
 	return nil

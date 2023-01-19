@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -516,11 +517,17 @@ func (r *ClusterReconciler) updateOperatorLabelsOnInstances(
 
 // getSacrificialPod get the Pod who is supposed to be deleted
 // when the cluster is scaled down
-func getSacrificialInstance(podList []corev1.Pod) *corev1.Pod {
+func getSacrificialInstanceName(cluster *apiv1.Cluster, instances []corev1.Pod) string {
 	resultIdx := -1
 	var lastFoundSerial int
 
-	for idx, pod := range podList {
+	instancesWithOnlyPVCs := cluster.Status.InstanceNames
+
+	for idx, pod := range instances {
+		if nameIndex := slices.Index(instancesWithOnlyPVCs, pod.Name); nameIndex != -1 {
+			instancesWithOnlyPVCs = slices.Delete(instancesWithOnlyPVCs, nameIndex, nameIndex+1)
+		}
+
 		// Avoid parting non ready nodes, non active nodes, or primary nodes
 		if !utils.IsPodReady(pod) || !utils.IsPodActive(pod) || specs.IsPodPrimary(pod) {
 			continue
@@ -538,8 +545,13 @@ func getSacrificialInstance(podList []corev1.Pod) *corev1.Pod {
 		}
 	}
 
-	if resultIdx == -1 {
-		return nil
+	if len(instancesWithOnlyPVCs) > 0 {
+		return instancesWithOnlyPVCs[len(instancesWithOnlyPVCs)-1]
 	}
-	return &podList[resultIdx]
+
+	if resultIdx == -1 {
+		return ""
+	}
+
+	return instances[resultIdx].Name
 }

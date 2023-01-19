@@ -291,7 +291,11 @@ func getPoolerDeployment(ctx context.Context, pooler *apiv1.Pooler) *appsv1.Depl
 	return deployment
 }
 
-func generateFakeClusterPods(c client.Client, cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
+func generateFakeClusterPods(
+	c client.Client,
+	cluster *apiv1.Cluster,
+	markAsReady bool,
+) []corev1.Pod {
 	var idx int
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {
