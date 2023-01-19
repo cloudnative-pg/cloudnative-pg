@@ -529,6 +529,11 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 				}
 				return nil, err
 			}
+
+			if cluster.IsReusePVCEnabled() || cluster.IsNodeMaintenanceWindowInProgress() {
+				continue
+			}
+
 			if err := persistentvolumeclaim.DeleteInstancePVCs(
 				ctx,
 				r.Client,
