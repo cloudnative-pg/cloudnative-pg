@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,7 +76,7 @@ func reconcileInstanceMissingPVCs(
 	expectedPVCs := getExpectedPVCs(cluster, instanceName)
 
 	for _, expectedPVC := range expectedPVCs {
-		if hasPVC(pvcs, expectedPVC.name) {
+		if slices.ContainsFunc(pvcs, func(pvc corev1.PersistentVolumeClaim) bool { return expectedPVC.name == pvc.Name }) {
 			continue
 		}
 

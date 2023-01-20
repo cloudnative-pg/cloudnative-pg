@@ -535,7 +535,7 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 				"Deleted evicted Pod %v",
 				instance.Name)
 
-			if cluster.IsReusePVCEnabled() || cluster.IsNodeMaintenanceWindowInProgress() {
+			if cluster.IsReusePVCEnabled() {
 				continue
 			}
 

@@ -174,12 +174,3 @@ func getStorageConfiguration(
 
 	return *storageConfiguration, nil
 }
-
-func hasPVC(pvcs []corev1.PersistentVolumeClaim, name string) bool {
-	for _, pvc := range pvcs {
-		if pvc.Name == name {
-			return true
-		}
-	}
-	return false
-}
