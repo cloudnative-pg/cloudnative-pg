@@ -210,7 +210,7 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, cluster apiv1
 				"pod", item.Pod.Name)
 			continue
 		}
-		if item.IsPrimary && cluster.Spec.Backup.Target == apiv1.BackupTargetPrimary {
+		if item.IsPrimary && cluster.Spec.Backup.Target != apiv1.BackupTargetStandby {
 			contextLogger.Debug("Primary Instance is elected as backup target",
 				"instance", item.Pod.Name)
 			return &item.Pod, nil
