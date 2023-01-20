@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.
@@ -65,14 +65,13 @@ func (r *ClusterReconciler) scaleDownCluster(
 	r.Recorder.Event(cluster, "Normal", "ScaleDown", message)
 	contextLogger.Info(message)
 
-	return r.ensureInstanceIsDeleted(ctx, cluster, instanceName, resources.jobs.Items)
+	return r.ensureInstanceIsDeleted(ctx, cluster, instanceName)
 }
 
 func (r *ClusterReconciler) ensureInstanceIsDeleted(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instanceName string,
-	jobs []batchv1.Job,
 ) error {
 	if err := r.ensureInstancePodIsDeleted(ctx, cluster, instanceName); err != nil {
 		return err
@@ -88,23 +87,25 @@ func (r *ClusterReconciler) ensureInstanceIsDeleted(
 		return err
 	}
 
-	return r.ensureInstanceJobAreDeleted(ctx, instanceName, jobs)
+	return r.ensureInstanceJobAreDeleted(ctx, cluster, instanceName)
 }
 
 func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 	ctx context.Context,
+	cluster *apiv1.Cluster,
 	instanceName string,
-	jobs []batchv1.Job,
 ) error {
-	// TODO: this should be a get expected jobs and delete
-	for idx := range jobs {
-		if !strings.HasPrefix(jobs[idx].Name, instanceName+"-") {
-			continue
+	for _, jobName := range specs.GetPossibleJobNames(instanceName) {
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      jobName,
+				Namespace: cluster.Namespace,
+			},
 		}
 		// This job was working against the PVC of this Pod,
 		// let's remove it
 		foreground := metav1.DeletePropagationForeground
-		if err := r.Delete(ctx, &jobs[idx], &client.DeleteOptions{PropagationPolicy: &foreground}); err != nil {
+		if err := r.Delete(ctx, job, &client.DeleteOptions{PropagationPolicy: &foreground}); err != nil {
 			// Ignore if NotFound, otherwise report the error
 			if !apierrs.IsNotFound(err) {
 				return fmt.Errorf("scaling down node (job) %v: %w", instanceName, err)
