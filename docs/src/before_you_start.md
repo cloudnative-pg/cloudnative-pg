@@ -20,7 +20,8 @@ specific to Kubernetes and PostgreSQL.
 | [Operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)                                       | An *operator* is a custom resource that automates those steps that are normally performed by a human operator when managing one or more applications or given services. An operator assists Kubernetes in making sure that the resource's defined state always matches the observed one.                                                                                                                                                                                                                                                                                                                       |
 | [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/)                                                 | `kubectl` is the command-line tool used to manage a Kubernetes cluster.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
-CloudNativePG requires Kubernetes 1.19 or higher.
+CloudNativePG requires a Kubernetes version supported by the community. Please refer to the
+["Supported releases"](supported_releases.md) page for details.
 
 ## PostgreSQL terminology
 
@@ -34,6 +35,9 @@ CloudNativePG requires Kubernetes 1.19 or higher.
 | Replica Cluster | A CloudNativePG `Cluster` that is in continuous recovery mode from a selected PostgreSQL cluster, normally residing outside the Kubernetes cluster. It is a feature that enables multi-cluster deployments in private, public, hybrid, and multi-cloud contexts. |
 | Designated Primary | A PostgreSQL standby instance in a replica cluster that is in continuous recovery from another PostgreSQL cluster and that is designated to become primary in case the replica cluster becomes primary. |
 | Superuser | In PostgreSQL a *superuser* is any role with both `LOGIN` and `SUPERUSER` privileges. For security reasons, CloudNativePG performs administrative tasks by connecting to the `postgres` database as the `postgres` user via `peer` authentication over the local Unix Domain Socket. |
+| [WAL](https://www.postgresql.org/docs/current/wal-intro.html) | Write-Ahead Logging (WAL) is a standard method for ensuring data integrity in database management systems. |
+| PVC group | A PVC group in CloudNativePG's terminology is a group of related PVCs belonging to the same PostgreSQL instance, namely the main volume containing the PGDATA (`storage`) and the volume for WALs (`walStorage`).|
+
 
 ## Cloud terminology
 
