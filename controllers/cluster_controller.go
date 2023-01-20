@@ -520,41 +520,43 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Cont
 		instance := &resources.instances.Items[idx]
 		// evicted would still end up being unscheduled, but to preserve some pre-existing behavior is still needed
 		// TODO: do an E2E test with and without is pod evicted and see the result
-		if utils.IsPodEvicted(instance) || utils.IsPodUnscheduled(instance) {
-			contextLogger.Warning("Deleting evicted/unscheduled pod",
-				"pod", instance.Name,
-				"podStatus", instance.Status)
-			if err := r.Delete(ctx, instance); err != nil {
-				if apierrs.IsConflict(err) {
-					contextLogger.Debug("Conflict error while deleting instances item", "error", err)
-					return &ctrl.Result{Requeue: true}, nil
-				}
-				return nil, err
-			}
-			deletedPods = true
-
-			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
-				"Deleted evicted/unscheduled Pod %v",
-				instance.Name)
-
-			if cluster.IsReusePVCEnabled() {
-				continue
-			}
-
-			if err := persistentvolumeclaim.DeleteInstancePVCs(
-				ctx,
-				r.Client,
-				cluster,
-				instance.Name,
-				instance.Namespace,
-			); err != nil {
-				return nil, err
-			}
-			r.Recorder.Eventf(cluster, "Normal", "DeletePVCs",
-				"Deleted evicted/unscheduled Pod %v PVCs",
-				instance.Name)
+		if !utils.IsPodEvicted(instance) && !utils.IsPodUnscheduled(instance) {
+			continue
 		}
+		contextLogger.Warning("Deleting evicted/unscheduled pod",
+			"pod", instance.Name,
+			"podStatus", instance.Status)
+		if err := r.Delete(ctx, instance); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Debug("Conflict error while deleting instances item", "error", err)
+				return &ctrl.Result{Requeue: true}, nil
+			}
+			return nil, err
+		}
+		deletedPods = true
+
+		r.Recorder.Eventf(cluster, "Normal", "DeletePod",
+			"Deleted evicted/unscheduled Pod %v",
+			instance.Name)
+
+		if cluster.IsReusePVCEnabled() {
+			continue
+		}
+
+		if err := persistentvolumeclaim.DeleteInstancePVCs(
+			ctx,
+			r.Client,
+			cluster,
+			instance.Name,
+			instance.Namespace,
+		); err != nil {
+			return nil, err
+		}
+		r.Recorder.Eventf(cluster, "Normal", "DeletePVCs",
+			"Deleted evicted/unscheduled Pod %v PVCs",
+			instance.Name)
 	}
+
 	if deletedPods {
 		// We cleaned up Pods which were evicted.
 		// Let's wait for the informer cache to notice that
