@@ -98,8 +98,7 @@ func getNamesFromPVCList(pvcs []corev1.PersistentVolumeClaim) []string {
 
 // InstanceHasMissingMounts returns true if the instance has expected PVCs that are not mounted
 func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool {
-	expectedPVCs := getExpectedInstancePVCNames(cluster, instance.Name)
-	for _, pvcName := range expectedPVCs {
+	for _, pvcName := range getExpectedInstancePVCNames(cluster, instance.Name) {
 		if !IsUsedByPodSpec(instance.Spec, pvcName) {
 			return true
 		}

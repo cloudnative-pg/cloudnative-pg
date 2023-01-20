@@ -450,7 +450,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Delete Pods which have been evicted by the Kubelet
-	result, err := r.deleteEvictedPods(ctx, cluster, resources)
+	result, err := r.deleteEvictedOrUnscheduledInstances(ctx, cluster, resources)
 	if err != nil {
 		contextLogger.Error(err, "While deleting evicted pods")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -509,20 +509,22 @@ func (r *ClusterReconciler) reconcileResources(
 	return ctrl.Result{}, nil
 }
 
-// deleteEvictedPods will delete the Pods that the Kubelet has evicted
-func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv1.Cluster,
+// deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
+func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 	deletedPods := false
 
 	for idx := range resources.instances.Items {
-		instance := resources.instances.Items[idx]
-		if utils.IsPodEvicted(instance) {
-			contextLogger.Warning("Deleting evicted pod",
+		instance := &resources.instances.Items[idx]
+		// evicted would still end up being unscheduled, but to preserve some pre-existing behavior is still needed
+		// TODO: do an E2E test with and without is pod evicted and see the result
+		if utils.IsPodEvicted(instance) || utils.IsPodUnscheduled(instance) {
+			contextLogger.Warning("Deleting evicted/unscheduled pod",
 				"pod", instance.Name,
 				"podStatus", instance.Status)
-			if err := r.Delete(ctx, &instance); err != nil {
+			if err := r.Delete(ctx, instance); err != nil {
 				if apierrs.IsConflict(err) {
 					contextLogger.Debug("Conflict error while deleting instances item", "error", err)
 					return &ctrl.Result{Requeue: true}, nil
@@ -532,7 +534,7 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 			deletedPods = true
 
 			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
-				"Deleted evicted Pod %v",
+				"Deleted evicted/unscheduled Pod %v",
 				instance.Name)
 
 			if cluster.IsReusePVCEnabled() {
@@ -549,7 +551,7 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 				return nil, err
 			}
 			r.Recorder.Eventf(cluster, "Normal", "DeletePVCs",
-				"Deleted evicted Pod %v PVCs",
+				"Deleted evicted/unscheduled Pod %v PVCs",
 				instance.Name)
 		}
 	}
