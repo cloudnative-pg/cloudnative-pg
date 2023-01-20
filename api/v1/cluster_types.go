@@ -382,10 +382,10 @@ type Topology struct {
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
-	// Total number of instances in the cluster
+	// Total number of PVC Groups detected in the cluster. This doesn't equal to the number of instance pod created.
 	Instances int `json:"instances,omitempty"`
 
-	// Total number of ready instances in the cluster
+	// Total number of ready instances in the cluster. This equals to the number of ready instances pods.
 	ReadyInstances int `json:"readyInstances,omitempty"`
 
 	// InstancesStatus indicates in which status the instances are

@@ -872,7 +872,6 @@ func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *api
 	return cluster.Status.LatestGeneratedNode, nil
 }
 
-// nolint: gocognit
 func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -1088,13 +1087,14 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	resources *managedResources,
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
+	// The cluster is over provisioned, no action to be taken here.
 	if cluster.Status.Instances > cluster.Spec.Instances {
 		return ctrl.Result{}, nil
 	}
 
 	contextLogger := log.FromContext(ctx)
 
-	instanceToCreate, err := electInstanceToCreate(cluster, instancesStatus, resources.pvcs.Items)
+	instanceToCreate, err := findInstancePodToCreate(cluster, instancesStatus, resources.pvcs.Items)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1116,6 +1116,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
+	// TODO: this logic eventually should be moved elsewhere
 	instancePVCs := persistentvolumeclaim.FilterByInstance(resources.pvcs.Items, instanceToCreate.Spec)
 	for _, instancePVC := range instancePVCs {
 		// This should not happen. However, we put this guard here
@@ -1170,10 +1171,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			contextLogger.Info("Instance already exist, maybe the cache is stale",
-				"instance", instanceToCreate.Name,
-				"instanceStatus", instancesStatus.GetNames(),
-			)
+			contextLogger.Info("Instance already exist, maybe the cache is stale", "instance", instanceToCreate.Name)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 		}
 
@@ -1183,8 +1181,8 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 }
 
-// we elect a current instance that doesn't exist for re-creation
-func electInstanceToCreate(
+// we elect a current instance that doesn't exist for creation
+func findInstancePodToCreate(
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
 	pvcs []corev1.PersistentVolumeClaim,
@@ -1192,6 +1190,7 @@ func electInstanceToCreate(
 	aliveInstances := instancesStatus.GetNames()
 
 	iterablePVCs := cluster.Status.DanglingPVC
+	// TODO: this should  be removed when E2E tests are all green, an instance with unusuablePVC should not be electable
 	iterablePVCs = append(iterablePVCs, cluster.Status.UnusablePVC...)
 	for _, name := range iterablePVCs {
 		idx := slices.IndexFunc(pvcs, func(claim corev1.PersistentVolumeClaim) bool {

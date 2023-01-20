@@ -29,8 +29,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-// DeleteInstancePVCs ensures that all the expected pvc for a given instance are deleted
-func DeleteInstancePVCs(
+// EnsureInstancePVCGroupIsDeleted ensures that all the expected pvc for a given instance are deleted
+func EnsureInstancePVCGroupIsDeleted(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,

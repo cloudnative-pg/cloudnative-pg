@@ -73,9 +73,7 @@ func reconcileInstanceMissingPVCs(
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	instanceName := specs.GetInstanceName(cluster.Name, serial)
-	expectedPVCs := getExpectedPVCs(cluster, instanceName)
-
-	for _, expectedPVC := range expectedPVCs {
+	for _, expectedPVC := range getExpectedPVCs(cluster, instanceName) {
 		if slices.ContainsFunc(pvcs, func(pvc corev1.PersistentVolumeClaim) bool { return expectedPVC.name == pvc.Name }) {
 			continue
 		}
@@ -85,17 +83,13 @@ func reconcileInstanceMissingPVCs(
 			return err
 		}
 
-		if err := create(
-			ctx,
-			c,
-			cluster,
-			&CreateConfiguration{
-				Status:     expectedPVC.expectedStatus,
-				NodeSerial: serial,
-				Role:       expectedPVC.role,
-				Storage:    conf,
-			},
-		); err != nil {
+		configuration := &CreateConfiguration{
+			Status:     expectedPVC.expectedStatus,
+			NodeSerial: serial,
+			Role:       expectedPVC.role,
+			Storage:    conf,
+		}
+		if err := create(ctx, c, cluster, configuration); err != nil {
 			return err
 		}
 	}

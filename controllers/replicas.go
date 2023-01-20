@@ -515,9 +515,8 @@ func (r *ClusterReconciler) updateOperatorLabelsOnInstances(
 	return nil
 }
 
-// getSacrificialPod get the Pod who is supposed to be deleted
-// when the cluster is scaled down
-func getSacrificialInstanceName(cluster *apiv1.Cluster, instances []corev1.Pod) string {
+// findDeletableInstance get the Pod who is supposed to be deleted when the cluster is scaled down
+func findDeletableInstance(cluster *apiv1.Cluster, instances []corev1.Pod) string {
 	resultIdx := -1
 	var lastFoundSerial int
 

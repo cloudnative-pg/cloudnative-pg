@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"strings"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -55,83 +55,83 @@ func (r *ClusterReconciler) scaleDownCluster(
 	}
 
 	// Is there is an instance to be deleted?
-	sacrificialInstanceName := getSacrificialInstanceName(cluster, resources.instances.Items)
-	if sacrificialInstanceName == "" {
+	instanceName := findDeletableInstance(cluster, resources.instances.Items)
+	if instanceName == "" {
 		contextLogger.Info("There are no instances to be sacrificed. Wait for the next sync loop")
 		return nil
 	}
 
-	r.Recorder.Eventf(cluster, "Normal", "ScaleDown",
-		"Scaling down: removing instance %v", sacrificialInstanceName)
+	message := fmt.Sprintf("Scaling down - removing instance: %v", instanceName)
+	r.Recorder.Event(cluster, "Normal", "ScaleDown", message)
+	contextLogger.Info(message)
 
-	if err := r.deleteInstance(ctx, cluster, sacrificialInstanceName); err != nil {
+	return r.ensureInstanceIsDeleted(ctx, cluster, instanceName, resources.jobs.Items)
+}
+
+func (r *ClusterReconciler) ensureInstanceIsDeleted(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instanceName string,
+	jobs []batchv1.Job,
+) error {
+	if err := r.ensureInstancePodIsDeleted(ctx, cluster, instanceName); err != nil {
 		return err
 	}
 
-	// Let's drop the PVCs too
-	if err := persistentvolumeclaim.DeleteInstancePVCs(
+	if err := persistentvolumeclaim.EnsureInstancePVCGroupIsDeleted(
 		ctx,
 		r.Client,
 		cluster,
-		sacrificialInstanceName,
+		instanceName,
 		cluster.Namespace,
 	); err != nil {
 		return err
 	}
-	// And now also the Job
-	for idx := range resources.jobs.Items {
-		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialInstanceName+"-") {
-			// This job was working against the PVC of this Pod,
-			// let's remove it
-			foreground := metav1.DeletePropagationForeground
-			if err := r.Delete(
-				ctx,
-				&resources.jobs.Items[idx],
-				&client.DeleteOptions{
-					PropagationPolicy: &foreground,
-				},
-			); err != nil {
-				// Ignore if NotFound, otherwise report the error
-				if !apierrs.IsNotFound(err) {
-					return fmt.Errorf("scaling down node (job) %v: %w", sacrificialInstanceName, err)
-				}
+
+	return r.ensureInstanceJobAreDeleted(ctx, instanceName, jobs)
+}
+
+func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
+	ctx context.Context,
+	instanceName string,
+	jobs []batchv1.Job,
+) error {
+	// TODO: this should be a get expected jobs and delete
+	for idx := range jobs {
+		if !strings.HasPrefix(jobs[idx].Name, instanceName+"-") {
+			continue
+		}
+		// This job was working against the PVC of this Pod,
+		// let's remove it
+		foreground := metav1.DeletePropagationForeground
+		if err := r.Delete(ctx, &jobs[idx], &client.DeleteOptions{PropagationPolicy: &foreground}); err != nil {
+			// Ignore if NotFound, otherwise report the error
+			if !apierrs.IsNotFound(err) {
+				return fmt.Errorf("scaling down node (job) %v: %w", instanceName, err)
 			}
 		}
 	}
-
 	return nil
 }
 
-func (r *ClusterReconciler) deleteInstance(
+func (r *ClusterReconciler) ensureInstancePodIsDeleted(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	sacrificialInstanceName string,
+	instanceName string,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	nominatedInstance := &corev1.Pod{}
-	err := r.Get(ctx, types.NamespacedName{
-		Name:      sacrificialInstanceName,
-		Namespace: cluster.Namespace,
-	}, nominatedInstance)
+	nominatedInstance := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instanceName,
+			Namespace: cluster.Namespace,
+		},
+	}
 
-	if apierrs.IsNotFound(err) {
+	contextLogger.Info("ensuring an instance is deleted", "pod", nominatedInstance.Name)
+	err := r.Delete(ctx, nominatedInstance)
+	if apierrs.IsNotFound(err) || err == nil {
 		return nil
 	}
-
-	if err != nil {
-		return err
-	}
-
-	contextLogger.Info("Too many nodes for cluster, deleting an instance",
-		"pod", nominatedInstance.Name)
-	err = r.Delete(ctx, nominatedInstance)
-	if apierrs.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
-	}
-
-	return nil
+	return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
 }

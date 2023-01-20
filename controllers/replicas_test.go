@@ -103,24 +103,24 @@ var _ = Describe("Sacrificial Pod detection", func() {
 
 	It("detects if the list of Pods is empty", func() {
 		var podList []corev1.Pod
-		Expect(getSacrificialInstanceName(&v1.Cluster{}, podList)).To(BeEmpty())
+		Expect(findDeletableInstance(&v1.Cluster{}, podList)).To(BeEmpty())
 	})
 
 	It("detects if we have not a ready Pod", func() {
 		podList := []corev1.Pod{foo, bar}
-		Expect(getSacrificialInstanceName(&v1.Cluster{}, podList)).To(BeEmpty())
+		Expect(findDeletableInstance(&v1.Cluster{}, podList)).To(BeEmpty())
 	})
 
 	It("detects it if is the first available", func() {
 		podList := []corev1.Pod{foo, bar, car1, car2}
-		resultName := getSacrificialInstanceName(&v1.Cluster{}, podList)
+		resultName := findDeletableInstance(&v1.Cluster{}, podList)
 		Expect(resultName).ToNot(BeEmpty())
 		Expect(resultName).To(Equal("car-2"))
 	})
 
 	It("detects it if is not the first one", func() {
 		podList := []corev1.Pod{car2, foo, bar, car1}
-		resultName := getSacrificialInstanceName(&v1.Cluster{}, podList)
+		resultName := findDeletableInstance(&v1.Cluster{}, podList)
 		Expect(resultName).ToNot(BeEmpty())
 		Expect(resultName).To(Equal("car-2"))
 	})
