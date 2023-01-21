@@ -59,7 +59,7 @@ jobs:
           - release-1.18
     steps:
       - name: Invoke workflow with inputs
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@v121
         with:
           workflow: continuous-delivery
           ref: ${{ matrix.branch }}
