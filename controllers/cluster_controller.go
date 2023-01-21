@@ -519,7 +519,6 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Cont
 	for idx := range resources.instances.Items {
 		instance := &resources.instances.Items[idx]
 		// evicted would still end up being unscheduled, but to preserve some pre-existing behavior is still needed
-		// TODO: do an E2E test with and without is pod evicted and see the result
 		if !utils.IsPodEvicted(instance) && !utils.IsPodUnscheduled(instance) {
 			continue
 		}

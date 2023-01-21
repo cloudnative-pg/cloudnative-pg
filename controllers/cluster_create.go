@@ -1190,7 +1190,8 @@ func findInstancePodToCreate(
 	aliveInstances := instancesStatus.GetNames()
 
 	iterablePVCs := cluster.Status.DanglingPVC
-	// TODO: this should  be removed when E2E tests are all green, an instance with unusuablePVC should not be electable
+	// appending unusablePVC ensures that some corner cases are covered. (EX: an instance is deleted manually while
+	// new type of PVCs were enabled)
 	iterablePVCs = append(iterablePVCs, cluster.Status.UnusablePVC...)
 	for _, name := range iterablePVCs {
 		idx := slices.IndexFunc(pvcs, func(claim corev1.PersistentVolumeClaim) bool {
