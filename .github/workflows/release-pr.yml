@@ -24,7 +24,7 @@ jobs:
       -
         name: Pull Request
         id: open-pr
-        uses: repo-sync/pull-request@v2.11
+        uses: repo-sync/pull-request@v2.12
         with:
           destination_branch: ${{ env.DEST }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
