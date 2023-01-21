@@ -685,12 +685,12 @@ kubectl cnpg fio <fio-job-name> -n <namespace>
 
 Refer to the [Benchmarking fio section](benchmarking.md#fio) for more details.
 
-### Requesting a new backup
+### Requesting a new base backup
 
-The `kubectl cnpg backup` request a new backup for an existing CloudNativePG
-cluster by creating a Backup resource.
+The `kubectl cnpg backup` command requests a new physical base backup for
+an existing Postgres cluster by creating a new `Backup` resource.
 
-The following command will request a backup for a given cluster:
+The following example requests an on-demand backup for a given cluster:
 
 ```shell
 kubectl cnpg backup [cluster_name]
@@ -699,6 +699,6 @@ kubectl cnpg backup [cluster_name]
 The created backup will be named after the request time:
 
 ```shell
-kubectl-cnpg backup cluster-example
+kubectl cnpg backup cluster-example
 backup/cluster-example-20230121002300 created
 ```
