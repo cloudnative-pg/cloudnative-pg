@@ -296,7 +296,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 	}
 
 	utils.LabelJobRole(&job.ObjectMeta, string(role))
-	utils.LabelClusterName(&job.ObjectMeta, cluster.Name)
+	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
