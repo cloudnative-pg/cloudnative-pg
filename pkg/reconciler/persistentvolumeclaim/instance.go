@@ -80,7 +80,7 @@ func reconcileInstanceMissingPVCs(
 			continue
 		}
 
-		conf, err := getStorageConfiguration(expectedPVC.role, cluster)
+		conf, err := getStorageConfiguration(cluster, expectedPVC.role)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

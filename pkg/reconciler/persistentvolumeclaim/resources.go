@@ -162,8 +162,8 @@ func getExpectedInstancePVCNames(cluster *apiv1.Cluster, instanceName string) []
 }
 
 func getStorageConfiguration(
-	role utils.PVCRole,
 	cluster *apiv1.Cluster,
+	role utils.PVCRole,
 ) (apiv1.StorageConfiguration, error) {
 	var storageConfiguration *apiv1.StorageConfiguration
 	switch role {
