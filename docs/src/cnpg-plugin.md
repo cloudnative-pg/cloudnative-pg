@@ -116,6 +116,49 @@ Once the plugin was installed and deployed, you can start using it like this:
 kubectl cnpg <command> <args...>
 ```
 
+### Generation of installation manifests
+
+The `cnpg` plugin can be used to generate the YAML manifest for the
+installation of the operator. This option would typically be used if you want
+to override some default configurations such as number of replicas,
+installation namespace, namespaces to watch, and so on.
+
+For details and available options, run:
+
+```shell
+kubectl cnpg install generate --help
+```
+
+The main options are:
+
+- `-n`: the namespace in which to install the operator (by default: `cnpg-system`)
+- `--replicas`: number of replicas in the deployment
+- `--version`: minor version of the operator to be installed, such as `1.17`.
+  If a minor version is specified, the plugin will install the latest patch
+  version of that minor version. If no version is supplied the plugin will
+  install the latest `MAJOR.MINOR.PATCH` version of the operator.
+- `--watch-namespace`: comma separated string containing the namespaces to
+  watch (by default all namespaces)
+
+An example of the `generate` command, which will generate a YAML manifest that
+will install the operator, is as follows:
+
+```shell
+kubectl cnpg install generate \
+  -n king \
+  --version 1.17 \
+  --replicas 3 \
+  --watch-namespace "albert, bb, freddie" \
+  > operator.yaml
+```
+
+The flags in the above command have the following meaning:
+- `-n king` install the CNPG operator into the `king` namespace
+- `--version 1.17` install the latest patch version for minor version 1.17
+- `--replicas 3` install the operator with 3 replicas
+- `--watch-namespaces "albert, bb, freddie"` have the operator watch for
+  changes in the `albert`, `bb` and `freddie` namespaces only
+
 ### Status
 
 The `status` command provides an overview of the current status of your
@@ -634,4 +677,42 @@ PVCs:
 
 ```
 kubectl cnpg destroy cluster-example 2
+```
+
+### Benchmarking the database with pgbench
+
+Pgbench can be ran on an existing PostgreSQL cluster with following command:
+
+```
+kubectl cnpg pgbench <cluster-name> -- --time 30 --client 1 --jobs 1
+```
+
+Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more details.
+
+### Benchmarking the storage with fio
+
+fio can be run on an existing storage class with following command:
+
+```
+kubectl cnpg fio <fio-job-name> -n <namespace>
+```
+
+Refer to the [Benchmarking fio section](benchmarking.md#fio) for more details.
+
+### Requesting a new base backup
+
+The `kubectl cnpg backup` command requests a new physical base backup for
+an existing Postgres cluster by creating a new `Backup` resource.
+
+The following example requests an on-demand backup for a given cluster:
+
+```shell
+kubectl cnpg backup [cluster_name]
+```
+
+The created backup will be named after the request time:
+
+```shell
+kubectl cnpg backup cluster-example
+backup/cluster-example-20230121002300 created
 ```
