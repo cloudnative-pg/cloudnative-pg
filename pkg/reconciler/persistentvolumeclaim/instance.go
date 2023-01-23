@@ -36,7 +36,8 @@ func CreateInstancePVCs(
 	cluster *apiv1.Cluster,
 	serial int,
 ) error {
-	return reconcileInstanceMissingPVCs(ctx, c, cluster, serial, nil)
+	_, err := reconcileInstanceMissingPVCs(ctx, c, cluster, serial, nil)
+	return err
 }
 
 func reconcileInstancesMissingPVCs(
@@ -46,22 +47,22 @@ func reconcileInstancesMissingPVCs(
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (ctrl.Result, error) {
-	var shouldReconcile bool
+	var result ctrl.Result
 	for idx := range instances {
-		instance := instances[idx]
-		serial, err := specs.GetNodeSerial(instance.ObjectMeta)
+		serial, err := specs.GetNodeSerial(instances[idx].ObjectMeta)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if err := reconcileInstanceMissingPVCs(ctx, c, cluster, serial, pvcs); err != nil {
-			return ctrl.Result{}, err
+		res, err := reconcileInstanceMissingPVCs(ctx, c, cluster, serial, pvcs)
+		if err != nil {
+			return res, err
+		}
+		if !res.IsZero() {
+			result = res
 		}
 	}
-	if shouldReconcile {
-		return ctrl.Result{RequeueAfter: time.Second}, nil
-	}
 
-	return ctrl.Result{}, nil
+	return result, nil
 }
 
 // reconcileInstanceMissingPVCs reconcile an instance missing PVCs
@@ -71,7 +72,8 @@ func reconcileInstanceMissingPVCs(
 	cluster *apiv1.Cluster,
 	serial int,
 	pvcs []corev1.PersistentVolumeClaim,
-) error {
+) (ctrl.Result, error) {
+	var shouldReconcile bool
 	instanceName := specs.GetInstanceName(cluster.Name, serial)
 	for _, expectedPVC := range getExpectedPVCs(cluster, instanceName) {
 		if slices.ContainsFunc(pvcs, func(pvc corev1.PersistentVolumeClaim) bool { return expectedPVC.name == pvc.Name }) {
@@ -80,19 +82,20 @@ func reconcileInstanceMissingPVCs(
 
 		conf, err := getStorageConfiguration(expectedPVC.role, cluster)
 		if err != nil {
-			return err
+			return ctrl.Result{}, err
 		}
 
-		configuration := &CreateConfiguration{
-			Status:     expectedPVC.expectedStatus,
-			NodeSerial: serial,
-			Role:       expectedPVC.role,
-			Storage:    conf,
+		createConfiguration := expectedPVC.toCreateConfiguration(serial, conf)
+
+		if err := create(ctx, c, cluster, createConfiguration); err != nil {
+			return ctrl.Result{}, err
 		}
-		if err := create(ctx, c, cluster, configuration); err != nil {
-			return err
-		}
+		shouldReconcile = true
 	}
 
-	return nil
+	if shouldReconcile {
+		return ctrl.Result{RequeueAfter: time.Second}, nil
+	}
+
+	return ctrl.Result{}, nil
 }

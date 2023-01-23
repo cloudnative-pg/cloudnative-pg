@@ -107,9 +107,18 @@ func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool
 }
 
 type expectedPVC struct {
-	role           utils.PVCRole
-	name           string
-	expectedStatus PVCStatus
+	role          utils.PVCRole
+	name          string
+	initialStatus PVCStatus
+}
+
+func (e *expectedPVC) toCreateConfiguration(serial int, storage apiv1.StorageConfiguration) *CreateConfiguration {
+	return &CreateConfiguration{
+		Status:     e.initialStatus,
+		NodeSerial: serial,
+		Role:       e.role,
+		Storage:    storage,
+	}
 }
 
 // here we should register any new PVC for the instance
@@ -124,7 +133,7 @@ func getExpectedPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC 
 			role: utils.PVCRolePgData,
 			// This requires a init, ideally we should move to a design where each pvc can be init separately
 			// and then  attached
-			expectedStatus: StatusInitializing,
+			initialStatus: StatusInitializing,
 		},
 	)
 
@@ -132,9 +141,9 @@ func getExpectedPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC 
 	if cluster.ShouldCreateWalArchiveVolume() {
 		expectedMounts = append(expectedMounts,
 			expectedPVC{
-				name:           walPVCName,
-				role:           utils.PVCRolePgWal,
-				expectedStatus: StatusReady,
+				name:          walPVCName,
+				role:          utils.PVCRolePgWal,
+				initialStatus: StatusReady,
 			},
 		)
 	}
