@@ -18,6 +18,7 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,12 +30,15 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// reconcileClusterAnnotations we check if we need to add or modify existing annotations specified in the cluster but
-// not existing in the PVCs. We do not support the case of removed annotations from the cluster resource.
-func reconcileClusterAnnotations(
+type metadataReconciler struct {
+	name       string
+	isUpToDate func(pvc *corev1.PersistentVolumeClaim) bool
+	update     func(pvc *corev1.PersistentVolumeClaim)
+}
+
+func (m metadataReconciler) reconcile(
 	ctx context.Context,
 	c client.Client,
-	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
@@ -42,28 +46,19 @@ func reconcileClusterAnnotations(
 	for i := range pvcs {
 		pvc := &pvcs[i]
 
-		// if all the required annotations are already set and with the correct value,
-		// we proceed to the next item
-		if utils.IsAnnotationSubset(pvc.Annotations,
-			cluster.Annotations,
-			cluster.GetFixedInheritedLabels(),
-			configuration.Current) &&
-			utils.IsAnnotationAppArmorPresentInObject(&pvc.ObjectMeta, cluster.Annotations) {
+		if m.isUpToDate(pvc) {
 			contextLogger.Trace(
-				"Skipping cluster annotations reconciliation, because they are already present on pvc",
+				"Skipping reconciliation, no changes to be done",
 				"pvc", pvc.Name,
-				"pvcAnnotations", pvc.Annotations,
-				"clusterAnnotations", cluster.Annotations,
+				"reconciler", m.name,
 			)
 			continue
 		}
 
-		// otherwise, we add the modified/new annotations to the pvc
 		patch := client.MergeFrom(pvc.DeepCopy())
-		utils.InheritAnnotations(&pvc.ObjectMeta, cluster.Annotations,
-			cluster.GetFixedInheritedAnnotations(), configuration.Current)
+		m.update(pvc)
 
-		contextLogger.Info("Updating cluster annotations on pvc", "pvc", pvc.Name)
+		contextLogger.Info("Updating pvc metadata", "pvc", pvc.Name, "reconciler", m.name)
 		if err := c.Patch(ctx, pvc, patch); err != nil {
 			return err
 		}
@@ -72,50 +67,8 @@ func reconcileClusterAnnotations(
 	return nil
 }
 
-// reconcileClusterLabels we check if we need to add or modify existing labels specified in the cluster but
-// not existing in the PVCs. We do not support the case of removed labels from the cluster resource.
-func reconcileClusterLabels(
-	ctx context.Context,
-	c client.Client,
-	cluster *apiv1.Cluster,
-	pvcs []corev1.PersistentVolumeClaim,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	for i := range pvcs {
-		pvc := &pvcs[i]
-
-		// if all the required labels are already set and with the correct value,
-		// we proceed to the next item
-		if utils.IsLabelSubset(pvc.Labels,
-			cluster.Labels,
-			cluster.GetFixedInheritedAnnotations(),
-			configuration.Current) {
-			contextLogger.Trace(
-				"Skipping cluster label reconciliation, because they are already present on pvc",
-				"pvc", pvc.Name,
-				"pvcLabels", pvc.Labels,
-				"clusterLabels", cluster.Labels,
-			)
-			continue
-		}
-
-		// otherwise, we add the modified/new labels to the pvc
-		patch := client.MergeFrom(pvc.DeepCopy())
-		utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
-
-		contextLogger.Debug("Updating cluster labels on pvc", "pvc", pvc.Name)
-		if err := c.Patch(ctx, pvc, patch); err != nil {
-			return err
-		}
-		contextLogger.Info("Updated cluster label on pvc", "pvc", pvc.Name)
-	}
-
-	return nil
-}
-
-// reconcileOperatorLabels ensures that the PVCs have the correct labels
-func reconcileOperatorLabels(
+// reconcileMetadataComingFromInstance ensures that the PVCs have the correct metadata that is inherited by the instance
+func reconcileMetadataComingFromInstance(
 	ctx context.Context,
 	c client.Client,
 	instances []corev1.Pod,
@@ -123,32 +76,76 @@ func reconcileOperatorLabels(
 ) error {
 	for _, pod := range instances {
 		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+		instanceReconciler := metadataReconciler{
+			name: "instance-inheritance",
+			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
+				return (podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole) &&
+					pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] != pod.Name
+			},
+			update: func(pvc *corev1.PersistentVolumeClaim) {
+				// this is needed, because on older versions pvc.labels could be nil
+				if pvc.Labels == nil {
+					pvc.Labels = map[string]string{}
+				}
+				pvc.Labels[specs.ClusterRoleLabelName] = podRole
+				pvc.Labels[utils.InstanceNameLabelName] = pod.Name
+			},
+		}
 
 		instancePVCs := FilterByInstance(pvcs, pod.Spec)
-		for i := range instancePVCs {
-			pvc := &instancePVCs[i]
-			var modified bool
-			// this is needed, because on older versions pvc.labels could be nil
-			if pvc.Labels == nil {
-				pvc.Labels = map[string]string{}
-			}
-
-			origPvc := pvc.DeepCopy()
-			if podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole {
-				pvc.Labels[specs.ClusterRoleLabelName] = podRole
-				modified = true
-			}
-			if pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] != pod.Name {
-				pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] = pod.Name
-				modified = true
-			}
-			if !modified {
-				continue
-			}
-			if err := c.Patch(ctx, pvc, client.MergeFrom(origPvc)); err != nil {
-				return err
-			}
+		if err := instanceReconciler.reconcile(ctx, c, instancePVCs); err != nil {
+			return err
 		}
+	}
+
+	return nil
+}
+
+func reconcileMetadata(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	instances []corev1.Pod,
+	pvcs []corev1.PersistentVolumeClaim,
+) error {
+	annotationReconciler := metadataReconciler{
+		name: "annotations",
+		isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
+			return utils.IsAnnotationSubset(pvc.Annotations,
+				cluster.Annotations,
+				cluster.GetFixedInheritedAnnotations(),
+				configuration.Current) &&
+				utils.IsAnnotationAppArmorPresentInObject(&pvc.ObjectMeta, cluster.Annotations)
+		},
+		update: func(pvc *corev1.PersistentVolumeClaim) {
+			utils.InheritAnnotations(&pvc.ObjectMeta, cluster.Annotations,
+				cluster.GetFixedInheritedAnnotations(), configuration.Current)
+		},
+	}
+
+	labelReconciler := metadataReconciler{
+		name: "labels",
+		isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
+			return utils.IsLabelSubset(pvc.Labels,
+				cluster.Labels,
+				cluster.GetFixedInheritedLabels(),
+				configuration.Current)
+		},
+		update: func(pvc *corev1.PersistentVolumeClaim) {
+			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+		},
+	}
+
+	if err := reconcileMetadataComingFromInstance(ctx, c, instances, pvcs); err != nil {
+		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
+	}
+
+	if err := annotationReconciler.reconcile(ctx, c, pvcs); err != nil {
+		return fmt.Errorf("cannot update annotations on pvcs: %w", err)
+	}
+
+	if err := labelReconciler.reconcile(ctx, c, pvcs); err != nil {
+		return fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
 	}
 
 	return nil

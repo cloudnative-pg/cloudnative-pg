@@ -18,7 +18,6 @@ package persistentvolumeclaim
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -39,16 +38,8 @@ func Reconcile(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if err := reconcileOperatorLabels(ctx, c, instances, pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
-	}
-
-	if err := reconcileClusterLabels(ctx, c, cluster, pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
-	}
-
-	if err := reconcileClusterAnnotations(ctx, c, cluster, pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pvcs: %w", err)
+	if err := reconcileMetadata(ctx, c, cluster, instances, pvcs); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if res, err := reconcileInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
