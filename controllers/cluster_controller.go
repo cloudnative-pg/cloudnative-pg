@@ -598,7 +598,6 @@ func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *p
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
-// nolint: gocognit
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
