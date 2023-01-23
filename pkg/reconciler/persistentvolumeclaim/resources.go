@@ -81,8 +81,8 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return false
 }
 
-// DoesBelongToInstance returns a boolean indicating if that given PVC belongs to an instance
-func DoesBelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
+// BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
+func BelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
 	expectedInstancePVCs := getExpectedInstancePVCNames(cluster, instanceName)
 	return slices.Contains(expectedInstancePVCs, resourceName)
 }
