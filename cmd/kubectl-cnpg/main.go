@@ -26,6 +26,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/backup"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
@@ -76,6 +77,7 @@ func main() {
 	rootCmd.AddCommand(restart.NewCmd())
 	rootCmd.AddCommand(status.NewCmd())
 	rootCmd.AddCommand(versions.NewCmd())
+	rootCmd.AddCommand(backup.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
