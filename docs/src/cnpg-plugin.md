@@ -4,7 +4,13 @@ CloudNativePG provides a plugin for `kubectl` to manage a cluster in Kubernetes.
 
 ## Install
 
-You can install the cnpg plugin system either running the provided install script:
+You can install the `cnpg` plugin using a variety of methods.
+
+!!! Note
+    For air-gapped systems, installation via package managers, using previously
+    downloaded files, may be a good option.
+
+### Via the installation script
 
 ```sh
 curl -sSfL \
@@ -12,7 +18,71 @@ curl -sSfL \
   sudo sh -s -- -b /usr/local/bin
 ```
 
-Or, if you already have [Krew](https://krew.sigs.k8s.io/) installed, you can simply run:
+### Using the Debian or RedHat packages
+
+In the
+[releases section of the GitHub repository](https://github.com/cloudnative-pg/cloudnative-pg/releases),
+you can navigate to any release of interest (pick the same or newer release
+than your CloudNativePG operator), and in it you will find an **Assets**
+section. In that section are pre-built packages for a variety of systems.
+As a result, you can follow standard practices and instructions to install
+them in your systems.
+
+#### Debian packages
+
+For example, let's install the 1.18.1 release of the plugin, for an Intel based
+64 bit server. First, we download the right `.deb` file.
+
+``` sh
+$ wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.18.1/kubectl-cnpg_1.18.1_linux_x86_64.deb
+```
+
+Then, install from the local file using `dpkg`:
+
+``` sh
+$ dpkg -i kubectl-cnpg_1.18.1_linux_x86_64.deb 
+(Reading database ... 16102 files and directories currently installed.)
+Preparing to unpack kubectl-cnpg_1.18.1_linux_x86_64.deb ...
+Unpacking cnpg (1.18.1) over (1.18.1) ...
+Setting up cnpg (1.18.1) ...
+```
+
+#### RPM packages
+
+As in the example for `.deb` packages, let's install the 1.18.1 release for an
+Intel 64 bit machine. Note the `--output` flag to provide a file name.
+
+``` sh
+curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.18.1/kubectl-cnpg_1.18.1_linux_x86_64.rpm \
+  --output kube-plugin.rpm
+```
+
+Then install with `yum`, and you're ready to use:
+
+``` sh
+$ yum --disablerepo=* localinstall kube-plugin.rpm
+yum --disablerepo=* localinstall kube-plugin.rpm    
+Failed to set locale, defaulting to C.UTF-8
+Dependencies resolved.
+====================================================================================================
+ Package            Architecture         Version                   Repository                  Size
+====================================================================================================
+Installing:
+ cnpg               x86_64               1.18.1-1                  @commandline                14 M
+
+Transaction Summary
+====================================================================================================
+Install  1 Package
+
+Total size: 14 M
+Installed size: 43 M
+Is this ok [y/N]: y
+```
+
+### Using Krew
+
+If you already have [Krew](https://krew.sigs.k8s.io/) installed, you can simply
+run:
 
 ```sh
 kubectl krew install cnpg
@@ -20,7 +90,7 @@ kubectl krew install cnpg
 
 ### Supported Architectures
 
-CloudNativePG Plugin is currently build for the following
+CloudNativePG Plugin is currently built for the following
 operating system and architectures:
 
 * Linux
