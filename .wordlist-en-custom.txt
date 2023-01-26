@@ -518,6 +518,7 @@ findstr
 fio
 freddie
 fuzzystrmatch
+gapped
 gc
 gcc
 gce
