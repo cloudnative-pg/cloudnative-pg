@@ -1232,6 +1232,7 @@ spec:
                     pattern: ^[1-9][0-9]*[dwm]$
                     type: string
                   target:
+                    default: primary
                     description: The policy to decide which instance should perform
                       backups. Available options are empty string, which will default
                       to `primary` policy, `primary` to have backups run always on
