@@ -256,7 +256,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 
 	err = waitForWalArchiveWorking(b.Instance)
 	if err != nil {
-		log.Error(err, "WAL archiving is not working")
+		log.Warning("WAL archiving is not working", "err", err)
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
 		return UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
 	}
