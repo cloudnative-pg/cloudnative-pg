@@ -31,7 +31,7 @@ them in your systems.
 #### Debian packages
 
 For example, let's install the 1.18.1 release of the plugin, for an Intel based
-64 bit server. First we download the right `.deb` file.
+64 bit server. First, we download the right `.deb` file.
 
 ``` sh
 $ wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.18.1/kubectl-cnpg_1.18.1_linux_x86_64.deb
@@ -90,7 +90,7 @@ kubectl krew install cnpg
 
 ### Supported Architectures
 
-CloudNativePG Plugin is currently build for the following
+CloudNativePG Plugin is currently built for the following
 operating system and architectures:
 
 * Linux
