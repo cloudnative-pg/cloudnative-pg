@@ -1355,6 +1355,7 @@ type BackupConfiguration struct {
 	// to have backups run always on primary instances, `prefer-standby` to have
 	// backups run preferably on the most updated standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
+	// +kubebuilder:default:=primary
 	Target BackupTarget `json:"target,omitempty"`
 }
 

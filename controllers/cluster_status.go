@@ -19,10 +19,8 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"reflect"
 	"sort"
@@ -34,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -790,62 +787,6 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		return r.Status().Update(ctx, cluster)
 	}
 	return nil
-}
-
-// extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
-// the requested Pod, via the instance manager. In case of failure, errors are passed
-// in the result list
-func (r *instanceStatusClient) extractInstancesStatus(
-	ctx context.Context,
-	activePods []corev1.Pod,
-) postgres.PostgresqlStatusList {
-	var result postgres.PostgresqlStatusList
-
-	for idx := range activePods {
-		instanceStatus := r.getReplicaStatusFromPodViaHTTP(ctx, activePods[idx])
-		result.Items = append(result.Items, instanceStatus)
-	}
-	return result
-}
-
-// getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pod via HTTP, retrying
-// the request if some communication error is encountered
-func (r *instanceStatusClient) getReplicaStatusFromPodViaHTTP(
-	ctx context.Context,
-	pod corev1.Pod,
-) (result postgres.PostgresqlStatus) {
-	isErrorRetryable := func(err error) bool {
-		contextLog := log.FromContext(ctx)
-
-		// If it's a timeout, we do not want to retry
-		var netError net.Error
-		if errors.As(err, &netError) && netError.Timeout() {
-			return false
-		}
-
-		// If the pod answered with a not ok status, it is pointless to retry
-		var instanceStatusError InstanceStatusError
-		if errors.As(err, &instanceStatusError) {
-			return false
-		}
-
-		contextLog.Debug("Error while requesting the status of an instance, retrying",
-			"pod", pod.Name,
-			"error", err)
-		return true
-	}
-
-	// The retry here is to support restarting the instance manager during
-	// online upgrades. It is not intended to wait for recovering from any
-	// other remote failure.
-	_ = retry.OnError(StatusRequestRetry, isErrorRetryable, func() error {
-		result = rawInstanceStatusRequest(ctx, r.Client, pod)
-		return result.Error
-	})
-
-	result.AddPod(pod)
-
-	return result
 }
 
 // rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.

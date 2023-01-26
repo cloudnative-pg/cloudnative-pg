@@ -21,8 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"reflect"
 	goruntime "runtime"
 	"time"
@@ -72,26 +70,6 @@ type ClusterReconciler struct {
 	Recorder        record.EventRecorder
 
 	*instanceStatusClient
-}
-
-type instanceStatusClient struct {
-	*http.Client
-}
-
-func newInstanceStatusClient() *instanceStatusClient {
-	const connectionTimeout = 2 * time.Second
-	const requestTimeout = 30 * time.Second
-	// We want a connection timeout to prevent waiting for the default
-	// TCP connection timeout (30 seconds) on lost SYN packets
-	timeoutClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: connectionTimeout,
-			}).DialContext,
-		},
-		Timeout: requestTimeout,
-	}
-	return &instanceStatusClient{timeoutClient}
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
