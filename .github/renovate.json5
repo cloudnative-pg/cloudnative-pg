@@ -17,6 +17,18 @@
   "labels": ["automated"],
   "regexManagers": [
     {
+      // We want a PR to bump Default Container Images versions.
+      "fileMatch": [
+        "^pkg\\/versions\\/versions\\.go$",
+        "^pkg\\/specs\\/pgbouncer\\/deployments\\.go$"
+      ],
+      "matchStrings": [
+        "DefaultImageName = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
+        "DefaultPgbouncerImage = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose"
+    }, {
 // We want a PR to bump Go versions used through env variables in any Github
 // Actions, taking it from the official Github repository.
       "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
