@@ -10,13 +10,42 @@
   "baseBranches": ["main","release-1.17","release-1.18"],
   "ignorePaths": ["docs/**"],
   "postUpdateOptions": ["gomodTidy"],
-// By default renovate will auto detect whether semantic commits have been used
-// in the recent history and comply with that, we explicitly disable it
   "semanticCommits": "enabled",
 // All PRs should have a label
   "labels": ["automated"],
   "regexManagers": [
     {
+      // We want a PR to bump Kustomize version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "KUSTOMIZE_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "go",
+      "depNameTemplate": "sigs.k8s.io/kustomize/kustomize/v4",
+    }, {
+      // We want a PR to bump controller-gen version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "CONTROLLER_TOOLS_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "go",
+      "depNameTemplate": "sigs.k8s.io/controller-tools",
+    }, {
+      // We want a PR to bump goreleaser version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "GORELEASER_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "go",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "github.com/goreleaser/goreleaser",
+    }, {
       // We want a PR to bump Default Container Images versions.
       "fileMatch": [
         "^pkg\\/versions\\/versions\\.go$",
@@ -27,7 +56,7 @@
         "DefaultPgbouncerImage = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
       ],
       "datasourceTemplate": "docker",
-      "versioningTemplate": "loose"
+      "versioningTemplate": "loose",
     }, {
 // We want a PR to bump Go versions used through env variables in any Github
 // Actions, taking it from the official Github repository.
