@@ -349,11 +349,27 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		})
 
 		It("backs up and restore a cluster with PITR MinIO", func() {
-			restoredClusterName := "restore-cluster-pitr-minio"
+			const (
+				restoredClusterName = "restore-cluster-pitr-minio"
+				backupFilePITR      = fixturesDir + "/backup/minio/backup-minio-pitr.yaml"
+			)
 
-			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 2, currentTimestamp, psqlClientPod)
+			prepareClusterForPITROnMinio(
+				namespace,
+				clusterName,
+				backupFilePITR,
+				3,
+				currentTimestamp,
+				psqlClientPod,
+			)
 
-			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			err := testUtils.CreateClusterFromBackupUsingPITR(
+				namespace,
+				restoredClusterName,
+				backupFilePITR,
+				*currentTimestamp,
+				env,
+			)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Restore backup in a new cluster, also cover if no application database is configured
@@ -598,11 +614,14 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		})
 
 		It("backs up and restore a cluster with PITR Azurite", func() {
-			restoredClusterName := "restore-cluster-pitr-azurite"
+			const (
+				restoredClusterName = "restore-cluster-pitr-azurite"
+				backupFilePITR      = fixturesDir + "/backup/azurite/backup-pitr.yaml"
+			)
 
-			prepareClusterForPITROnAzurite(namespace, clusterName, backupFile, currentTimestamp, psqlClientPod)
+			prepareClusterForPITROnAzurite(namespace, clusterName, backupFilePITR, currentTimestamp, psqlClientPod)
 
-			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFilePITR, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Restore backup in a new cluster, also cover if no application database is configured
@@ -1058,9 +1077,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
 			" option in 'externalClusters' section", func() {
-			externalClusterRestoreName := "restore-external-cluster-pitr"
+			const (
+				externalClusterRestoreName = "restore-external-cluster-pitr"
+				backupFileAzuritePITR      = fixturesBackupDir + "backup-azurite-pitr.yaml"
+			)
 
-			prepareClusterForPITROnAzurite(namespace, clusterName, backupFileAzurite, currentTimestamp, psqlClientPod)
+			prepareClusterForPITROnAzurite(namespace, clusterName, backupFileAzuritePITR, currentTimestamp, psqlClientPod)
 
 			//  Create a cluster from a particular time using external backup.
 			err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzurite(

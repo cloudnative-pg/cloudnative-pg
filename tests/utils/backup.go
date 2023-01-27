@@ -34,7 +34,7 @@ func ExecuteBackup(namespace string, backupFile string, onlyTargetStandbys bool,
 	backupName, err := env.GetResourceNameFromYAML(backupFile)
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() error {
-		_, _, err := RunUnchecked("kubectl apply -n " + namespace + " -f " + backupFile)
+		_, _, err := RunUnchecked("kubectl create -n " + namespace + " -f " + backupFile)
 		if err != nil {
 			return err
 		}

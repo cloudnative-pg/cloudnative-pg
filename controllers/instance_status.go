@@ -24,7 +24,7 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/retry"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -59,7 +59,7 @@ func newInstanceStatusClient() *instanceStatusClient {
 // in the result list
 func (r *instanceStatusClient) extractInstancesStatus(
 	ctx context.Context,
-	activePods []v1.Pod,
+	activePods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
 	var result postgres.PostgresqlStatusList
 
@@ -74,7 +74,7 @@ func (r *instanceStatusClient) extractInstancesStatus(
 // the request if some communication error is encountered
 func (r *instanceStatusClient) getReplicaStatusFromPodViaHTTP(
 	ctx context.Context,
-	pod v1.Pod,
+	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
 	isErrorRetryable := func(err error) bool {
 		contextLog := log.FromContext(ctx)
@@ -115,7 +115,7 @@ func (r *instanceStatusClient) getReplicaStatusFromPodViaHTTP(
 // and the other instances in their election order
 func (r *instanceStatusClient) getStatusFromInstances(
 	ctx context.Context,
-	pods v1.PodList,
+	pods corev1.PodList,
 ) postgres.PostgresqlStatusList {
 	// Only work on Pods which can still become active in the future
 	filteredPods := utils.FilterActivePods(pods.Items)
