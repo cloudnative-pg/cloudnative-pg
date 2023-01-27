@@ -89,7 +89,7 @@ var _ = Describe("Updating target primary", func() {
 				managedResources, statusList, err = getManagedResourcesAndStatusList(ctx, crReconciler, cluster)
 				Expect(err).To(BeNil())
 
-				cluster.Status.TargetPrimary = managedResources.pods.Items[0].Name
+				cluster.Status.TargetPrimary = managedResources.instances.Items[0].Name
 			})
 
 			By("updating target primary pods for the cluster", func() {
@@ -140,7 +140,7 @@ var _ = Describe("Updating target primary", func() {
 				managedResources, statusList, err = getManagedResourcesAndStatusList(ctx, crReconciler, cluster)
 				Expect(err).To(BeNil())
 
-				cluster.Status.TargetPrimary = managedResources.pods.Items[0].Name
+				cluster.Status.TargetPrimary = managedResources.instances.Items[0].Name
 			})
 
 			By("updating target primary pods for the cluster three times with a 1 second interval", func() {
@@ -201,22 +201,22 @@ func getManagedResourcesAndStatusList(
 				CurrentLsn:  postgres.LSN("0/0"),
 				ReceivedLsn: postgres.LSN("0/0"),
 				ReplayLsn:   postgres.LSN("0/0"),
-				IsReady:     true,
-				Pod:         managedResources.pods.Items[1],
+				IsPodReady:  true,
+				Pod:         managedResources.instances.Items[1],
 			},
 			{
 				CurrentLsn:  postgres.LSN("0/0"),
 				ReceivedLsn: postgres.LSN("0/0"),
 				ReplayLsn:   postgres.LSN("0/0"),
-				IsReady:     true,
-				Pod:         managedResources.pods.Items[2],
+				IsPodReady:  true,
+				Pod:         managedResources.instances.Items[2],
 			},
 			{
 				CurrentLsn:  postgres.LSN("0/0"),
 				ReceivedLsn: postgres.LSN("0/0"),
 				ReplayLsn:   postgres.LSN("0/0"),
-				IsReady:     false,
-				Pod:         managedResources.pods.Items[0],
+				IsPodReady:  false,
+				Pod:         managedResources.instances.Items[0],
 			},
 		},
 	}
