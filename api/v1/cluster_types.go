@@ -1233,6 +1233,9 @@ type RollingUpdateStatus struct {
 type BackupTarget string
 
 const (
+	// BackupTargetDefault is the default BackupTarget
+	BackupTargetDefault = BackupTargetPrimary
+
 	// BackupTargetPrimary means backups will be performed on the primary instance
 	BackupTargetPrimary = BackupTarget("primary")
 

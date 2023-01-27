@@ -109,6 +109,10 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.Spec.Affinity.PodAntiAffinityType = PodAntiAffinityTypePreferred
 	}
 
+	if r.Spec.Backup != nil && r.Spec.Backup.Target == "" {
+		r.Spec.Backup.Target = BackupTargetDefault
+	}
+
 	psqlVersion, err := r.GetPostgresqlVersion()
 	if err == nil {
 		// The validation error will be already raised by the
