@@ -8,7 +8,7 @@
 // The branches renovate should target
 // PLEASE UPDATE THIS WHEN RELEASING.
   "baseBranches": ["main","release-1.17","release-1.18"],
-  "ignorePaths": ["docs/**"],
+  "ignorePaths": ["docs/**", "config/**", "releases/**", "contribute/**", "config/**", "licenses/**"],
   "postUpdateOptions": ["gomodTidy"],
   "semanticCommits": "enabled",
 // All PRs should have a label
@@ -103,6 +103,10 @@
       "matchPackagePrefixes": [
         "k8s.io",
         "sigs.k8s.io"
+      ],
+      "excludeDepNames": [
+        "sigs.k8s.io/kustomize/kustomize/v4",
+        "sigs.k8s.io/controller-tools"
       ]
     }, {
 // We want dedicated PRs for each minor and major bumps to kubernetes related
