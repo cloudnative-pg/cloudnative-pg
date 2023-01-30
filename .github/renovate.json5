@@ -12,7 +12,7 @@
   "postUpdateOptions": ["gomodTidy"],
   "semanticCommits": "enabled",
 // All PRs should have a label
-  "labels": ["automated"],
+  "labels": ["automated", "do not backport"],
   "regexManagers": [
     {
       // We want a PR to bump Kustomize version in the Makefile
