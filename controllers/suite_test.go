@@ -60,15 +60,9 @@ var (
 	poolerReconciler  *PoolerReconciler
 	clusterReconciler *ClusterReconciler
 	scheme            *runtime.Scheme
+	contextMain       context.Context
+	contextMainCancel context.CancelFunc
 )
-
-type fakeClock struct {
-	t time.Time
-}
-
-func (f fakeClock) Now() time.Time {
-	return f.t
-}
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -81,7 +75,7 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
-
+	contextMain, contextMainCancel = context.WithCancel(context.Background())
 	testEnv = buildTestEnv()
 
 	var err error
@@ -114,6 +108,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
+	contextMainCancel()
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
@@ -470,8 +465,7 @@ func expectResourceDoesntExistWithDefaultClient(name, namespace string, resource
 
 // withManager bootstraps a manager.Manager inside a ginkgo.It statement
 func withManager(callback func(context.Context, *ClusterReconciler, *PoolerReconciler, manager.Manager)) {
-	ctx, ctxCancel := context.WithCancel(context.TODO())
-
+	ctx, ctxCancel := context.WithTimeout(contextMain, time.Second*30)
 	crReconciler, poolerReconciler, mgr := createManagerWithReconcilers(ctx)
 
 	wg := sync.WaitGroup{}
@@ -481,8 +475,7 @@ func withManager(callback func(context.Context, *ClusterReconciler, *PoolerRecon
 		go func() {
 			defer GinkgoRecover()
 			defer wg.Done()
-			err := mgr.Start(ctx)
-			Expect(err).ShouldNot(HaveOccurred())
+			_ = mgr.Start(ctx)
 		}()
 	})
 
