@@ -709,6 +709,7 @@ func (r *ClusterReconciler) setPrimaryInstance(
 ) error {
 	cluster.Status.TargetPrimary = podName
 	cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
+	cluster.Status.CurrentPrimaryFailingSinceTimestamp = ""
 	return r.Status().Update(ctx, cluster)
 }
 
