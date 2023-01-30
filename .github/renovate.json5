@@ -46,6 +46,39 @@
       "versioningTemplate": "loose",
       "depNameTemplate": "github.com/goreleaser/goreleaser",
     }, {
+      // We want a PR to bump kind version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "KIND_CLUSTER_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kindest/node",
+    }, {
+      // We want a PR to bump kind version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "SPELLCHECK_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "jonasbn/github-action-spellcheck",
+    }, {
+      // We want a PR to bump kind version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "WOKE_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "getwoke/woke",
+    }, {
       // We want a PR to bump Default Container Images versions.
       "fileMatch": [
         "^pkg\\/versions\\/versions\\.go$",
