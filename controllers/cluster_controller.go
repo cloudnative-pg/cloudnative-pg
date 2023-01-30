@@ -65,7 +65,7 @@ var apiGVString = apiv1.GroupVersion.String()
 type ClusterReconciler struct {
 	client.Client
 
-	DiscoveryClient *discovery.DiscoveryClient
+	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 
@@ -81,7 +81,7 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
-		}
+	}
 }
 
 // ErrNextLoop is not a real error. It forces the current reconciliation loop to stop
@@ -352,6 +352,16 @@ func (r *ClusterReconciler) handleSwitchover(
 			"newPrimary", selectedPrimary)
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
+
+	// no switchover will be triggered, primary is healthy, if we had a set
+	// currentPrimaryFailingSince timestamp, let's unset it
+	if cluster.Status.CurrentPrimaryFailingSinceTimestamp != "" {
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp = ""
+		if err := r.Status().Update(ctx, cluster); err != nil {
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }
 

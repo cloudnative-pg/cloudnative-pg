@@ -55,7 +55,7 @@ func GetDiscoveryClient() (*discovery.DiscoveryClient, error) {
 	return discoveryClient, nil
 }
 
-func resourceExist(client *discovery.DiscoveryClient, groupVersion, kind string) (bool, error) {
+func resourceExist(client discovery.DiscoveryInterface, groupVersion, kind string) (bool, error) {
 	apiResourceList, err := client.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -93,7 +93,7 @@ func HaveSecurityContextConstraints() bool {
 }
 
 // PodMonitorExist tries to find the PodMonitor resource in the current cluster
-func PodMonitorExist(client *discovery.DiscoveryClient) (bool, error) {
+func PodMonitorExist(client discovery.DiscoveryInterface) (bool, error) {
 	exist, err := resourceExist(client, "monitoring.coreos.com/v1", "podmonitors")
 	if err != nil {
 		return false, err

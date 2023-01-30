@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -104,7 +103,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 		return "", nil
 	}
 
-	if err := r.reconcileFailoverDelay(ctx, cluster); err != nil {
+	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
 		return "", err
 	}
 
@@ -273,7 +272,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 		}
 	}
 
-	if err := r.reconcileFailoverDelay(ctx, cluster); err != nil {
+	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
 		return "", err
 	}
 
@@ -317,7 +316,7 @@ func GetPodsNotOnPrimaryNode(
 	return podsOnOtherNodes
 }
 
-func (r *ClusterReconciler) reconcileFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) enforceFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
 	if cluster.Status.CurrentPrimaryFailingSinceTimestamp == "" {
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp = utils.GetCurrentTimestamp()
 		if err := r.Status().Update(ctx, cluster); err != nil {
@@ -331,37 +330,12 @@ func (r *ClusterReconciler) reconcileFailoverDelay(ctx context.Context, cluster 
 	if err != nil {
 		return err
 	}
-	if primaryFailingSince < time.Duration(cluster.Spec.FailoverDelay)*time.Second {
+	delay := time.Duration(cluster.Spec.FailoverDelay) * time.Second
+	if delay > primaryFailingSince {
 		return ErrWaitingOnFailOverDelay
 	}
 
 	return nil
-}
-
-// getStatusFromInstances gets the replication status from the PostgreSQL instances,
-// the returned list is sorted in order to have the primary as the first element
-// and the other instances in their election order
-func (r *ClusterReconciler) getStatusFromInstances(
-	ctx context.Context,
-	pods corev1.PodList,
-) postgres.PostgresqlStatusList {
-	// Only work on Pods which can still become active in the future
-	filteredPods := utils.FilterActivePods(pods.Items)
-	if len(filteredPods) == 0 {
-		// No instances to control
-		return postgres.PostgresqlStatusList{}
-	}
-
-	status := r.extractInstancesStatus(ctx, filteredPods)
-	sort.Sort(&status)
-	for idx := range status.Items {
-		if status.Items[idx].Error != nil {
-			log.FromContext(ctx).Info("Cannot extract Pod status",
-				"name", status.Items[idx].Pod.Name,
-				"error", status.Items[idx].Error.Error())
-		}
-	}
-	return status
 }
 
 // updateClusterAnnotationsOnPods we check if we need to add or modify existing annotations specified in the cluster but
