@@ -621,6 +621,12 @@ requested).
 For details and instructions on the `recovery` bootstrap method, please refer
 to the ["Bootstrap from a backup" section](bootstrap.md#bootstrap-from-a-backup-recovery).
 
+!!! Important
+    If you are not familiar with how [PostgreSQL PITR](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-PITR-RECOVERY)
+    works, we suggest that you configure the recovery cluster as the original
+    one when it comes to `.spec.postgresql.parameters`. Once the new cluster is
+    restored, you can then change the settings as desired.
+
 Under the hood, the operator will inject an init container in the first
 instance of the new cluster, and the init container will start recovering the
 backup from the object storage.
