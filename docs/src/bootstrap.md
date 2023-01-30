@@ -344,7 +344,9 @@ There are two ways to achieve this result in CloudNativePG:
 Both recovery methods enable either full recovery (up to the last
 available WAL) or up to a [point in time](#point-in-time-recovery).
 When performing a full recovery, the cluster can also be started
-in replica mode.
+in replica mode. Also, make sure that the PostgreSQL configuration
+(`.spec.postgresql.parameters`) of the recovered cluster is
+compatible, from a physical replication standpoint, with the original one.
 
 !!! Note
     You can find more information about backup and recovery of a running cluster
