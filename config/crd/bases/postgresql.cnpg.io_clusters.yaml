@@ -3405,9 +3405,8 @@ spec:
               currentPrimary:
                 description: Current primary instance
                 type: string
-              currentPrimaryFailingSince:
+              currentPrimaryFailingSinceTimestamp:
                 description: The timestamp when the current primary was deemed unhealthy
-                format: date-time
                 type: string
               currentPrimaryTimestamp:
                 description: The timestamp when the last actual promotion to primary

@@ -81,7 +81,7 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
-	}
+		}
 }
 
 // ErrNextLoop is not a real error. It forces the current reconciliation loop to stop
@@ -333,10 +333,9 @@ func (r *ClusterReconciler) handleSwitchover(
 	// This means issuing a failover or switchover when needed.
 	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
 	if err != nil {
-		var errWaitingOnFailoverDelay *ErrWaitingOnFailoverDelay
-		if errors.As(err, &errWaitingOnFailoverDelay) {
-			contextLogger.Info(err.Error())
-			return nil, nil
+		if err == ErrWaitingOnFailOverDelay {
+			contextLogger.Info("Waiting for the failover delay to expire")
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		if err == ErrWalReceiversRunning {
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
@@ -353,16 +352,6 @@ func (r *ClusterReconciler) handleSwitchover(
 			"newPrimary", selectedPrimary)
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
-
-	// no switchover will be triggered, primary is healthy, if we had a set
-	// currentPrimaryFailingSince timestamp, let's unset it
-	if cluster.Status.CurrentPrimaryFailingSince != nil {
-		cluster.Status.CurrentPrimaryFailingSince = nil
-		if err := r.Status().Update(ctx, cluster); err != nil {
-			return nil, err
-		}
-	}
-
 	return nil, nil
 }
 

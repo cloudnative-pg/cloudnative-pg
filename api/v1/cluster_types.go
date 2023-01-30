@@ -408,9 +408,6 @@ type ClusterStatus struct {
 	// Current primary instance
 	CurrentPrimary string `json:"currentPrimary,omitempty"`
 
-	// The timestamp when the current primary was deemed unhealthy
-	CurrentPrimaryFailingSince *metav1.Time `json:"currentPrimaryFailingSince,omitempty"`
-
 	// Target primary instance, this is different from the previous one
 	// during a switchover or a failover
 	TargetPrimary string `json:"targetPrimary,omitempty"`
@@ -472,6 +469,9 @@ type ClusterStatus struct {
 
 	// The timestamp when the last actual promotion to primary has occurred
 	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
+
+	// The timestamp when the current primary was deemed unhealthy
+	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 
 	// The timestamp when the last request for a new primary has occurred
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`

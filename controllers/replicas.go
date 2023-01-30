@@ -23,7 +23,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -38,16 +37,9 @@ import (
 // because there is a WAL receiver running in our Pod list
 var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 
-// ErrWaitingOnFailoverDelay is an error type returned when we have new primary
-// but are waiting on the failover delay to trigger a failover
-type ErrWaitingOnFailoverDelay struct {
-	TimeLeft time.Duration
-}
-
-// Error implements error interface
-func (e ErrWaitingOnFailoverDelay) Error() string {
-	return fmt.Sprintf("Current primary isn't healthy, waiting %s before triggering a failover", e.TimeLeft)
-}
+// ErrWaitingOnFailOverDelay is raised when the primary server can't be elected because the .spec.failoverDelay hasn't
+// elapsed yet
+var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
 
 // updateTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion
@@ -112,7 +104,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 		return "", nil
 	}
 
-	if err := r.checkFailoverDelay(ctx, cluster); err != nil {
+	if err := r.reconcileFailoverDelay(ctx, cluster); err != nil {
 		return "", err
 	}
 
@@ -281,7 +273,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 		}
 	}
 
-	if err := r.checkFailoverDelay(ctx, cluster); err != nil {
+	if err := r.reconcileFailoverDelay(ctx, cluster); err != nil {
 		return "", err
 	}
 
@@ -325,23 +317,22 @@ func GetPodsNotOnPrimaryNode(
 	return podsOnOtherNodes
 }
 
-// checkFailoverDelay is called when the primary is unhealthy and we need to check
-// if it's been unhealthy for longer than the failover delay parameter
-// set on the cluster resource. It returns a non nil error of type ErrWaitingOnFailoverDelay
-// if still waiting for failover delay.
-func (r *ClusterReconciler) checkFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
-	now := r.clock.Now()
-	if cluster.Status.CurrentPrimaryFailingSince == nil || cluster.Status.CurrentPrimaryFailingSince.Time.IsZero() {
-		cluster.Status.CurrentPrimaryFailingSince = &metav1.Time{Time: now}
+func (r *ClusterReconciler) reconcileFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Status.CurrentPrimaryFailingSinceTimestamp == "" {
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp = utils.GetCurrentTimestamp()
 		if err := r.Status().Update(ctx, cluster); err != nil {
 			return err
 		}
 	}
-	primaryFailingSince := now.Sub(cluster.Status.CurrentPrimaryFailingSince.Time)
+	primaryFailingSince, err := utils.DifferenceBetweenTimestamps(
+		utils.GetCurrentTimestamp(),
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp,
+	)
+	if err != nil {
+		return err
+	}
 	if primaryFailingSince < time.Duration(cluster.Spec.FailoverDelay)*time.Second {
-		return &ErrWaitingOnFailoverDelay{
-			TimeLeft: time.Duration(cluster.Spec.FailoverDelay)*time.Second - primaryFailingSince,
-		}
+		return ErrWaitingOnFailOverDelay
 	}
 
 	return nil

@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -70,8 +69,6 @@ var _ = Describe("Updating target primary", func() {
 		) {
 			var err error
 
-			now := time.Now()
-			crReconciler.clock = fakeClock{t: now}
 			namespace := newFakeNamespace()
 			cluster := newFakeCNPGCluster(namespace)
 
@@ -111,11 +108,6 @@ var _ = Describe("Updating target primary", func() {
 			manager manager.Manager,
 		) {
 			var err error
-
-			now := time.Now()
-			clock := &fakeClock{t: now}
-			crReconciler.clock = clock
-
 			namespace := newFakeNamespace()
 			cluster := newFakeCNPGCluster(namespace)
 
@@ -123,6 +115,7 @@ var _ = Describe("Updating target primary", func() {
 				cluster.Spec.FailoverDelay = 2
 				err := crReconciler.Client.Update(ctx, cluster)
 				Expect(err).To(BeNil())
+				assertRefreshManagerCache(ctx, manager)
 			})
 
 			By("creating the cluster resources", func() {
@@ -152,11 +145,10 @@ var _ = Describe("Updating target primary", func() {
 				)
 
 				Expect(err).NotTo(BeNil())
-				var errWaitingOnFailoverDelay *ErrWaitingOnFailoverDelay
-				Expect(errors.As(err, &errWaitingOnFailoverDelay)).To(BeTrue())
+				Expect(err).To(Equal(ErrWaitingOnFailOverDelay))
 				Expect(selectedPrimary).To(Equal(""))
 
-				clock.t = clock.t.Add(time.Second)
+				time.Sleep(time.Second)
 
 				selectedPrimary, err = crReconciler.updateTargetPrimaryFromPods(
 					ctx,
@@ -166,10 +158,10 @@ var _ = Describe("Updating target primary", func() {
 				)
 
 				Expect(err).NotTo(BeNil())
-				Expect(errors.As(err, &errWaitingOnFailoverDelay)).To(BeTrue())
+				Expect(err).To(Equal(ErrWaitingOnFailOverDelay))
 				Expect(selectedPrimary).To(Equal(""))
 
-				clock.t = clock.t.Add(time.Second)
+				time.Sleep(time.Second)
 
 				selectedPrimary, err = crReconciler.updateTargetPrimaryFromPods(
 					ctx,

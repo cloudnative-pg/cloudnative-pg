@@ -396,7 +396,7 @@ func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *Poo
 		Recorder: record.NewFakeRecorder(120),
 	}
 
-	err = clusterRec.SetupWithManager(ctx, mgr)
+	err = controllerruntime.NewControllerManagedBy(mgr).Complete(clusterRec)
 	Expect(err).To(BeNil())
 
 	poolerRec := &PoolerReconciler{
@@ -405,7 +405,7 @@ func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *Poo
 		Recorder: record.NewFakeRecorder(120),
 	}
 
-	err = poolerRec.SetupWithManager(ctx, mgr)
+	err = controllerruntime.NewControllerManagedBy(mgr).Complete(poolerRec)
 	Expect(err).To(BeNil())
 
 	return clusterRec, poolerRec, mgr
