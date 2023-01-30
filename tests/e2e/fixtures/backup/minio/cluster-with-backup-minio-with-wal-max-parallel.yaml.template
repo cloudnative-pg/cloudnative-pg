@@ -37,20 +37,22 @@ spec:
 
   backup:
     barmanObjectStore:
-        destinationPath: s3://cluster-backups/
-        endpointURL: http://minio-service:9000
-        s3Credentials:
-          accessKeyId:
-            name: backup-storage-creds
-            key: ID
-          secretAccessKey:
-            name: backup-storage-creds
-            key: KEY
-        wal:
-          maxParallel: 3
-          compression: gzip
-        tags:
-          retention: "30days"
-        historyTags:
-          retention: "30days"
+      destinationPath: s3://cluster-backups/
+      endpointURL: http://minio-service:9000
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
+      wal:
+        maxParallel: 3
+        compression: gzip
+      data:
+        immediateCheckpoint: true
+      tags:
+        retention: "30days"
+      historyTags:
+        retention: "30days"
     retentionPolicy: "30d"

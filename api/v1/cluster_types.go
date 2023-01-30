@@ -1233,14 +1233,14 @@ type RollingUpdateStatus struct {
 type BackupTarget string
 
 const (
-	// BackupTargetDefault is the default BackupTarget
-	BackupTargetDefault = BackupTargetPrimary
-
 	// BackupTargetPrimary means backups will be performed on the primary instance
 	BackupTargetPrimary = BackupTarget("primary")
 
 	// BackupTargetStandby means backups will be performed on a standby instance if available
 	BackupTargetStandby = BackupTarget("prefer-standby")
+
+	// DefaultBackupTarget is the default BackupTarget
+	DefaultBackupTarget = BackupTargetPrimary
 )
 
 // CompressionType encapsulates the available types of compression

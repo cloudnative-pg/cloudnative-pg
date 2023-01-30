@@ -110,7 +110,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	}
 
 	if r.Spec.Backup != nil && r.Spec.Backup.Target == "" {
-		r.Spec.Backup.Target = BackupTargetDefault
+		r.Spec.Backup.Target = DefaultBackupTarget
 	}
 
 	psqlVersion, err := r.GetPostgresqlVersion()
