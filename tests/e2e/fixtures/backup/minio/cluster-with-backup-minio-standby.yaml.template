@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-backup-minio-wal-max-parallel
+  name: pg-backup-minio-standby
 spec:
   instances: 2
 
@@ -35,24 +35,35 @@ spec:
       database: app
       owner: app
 
+  monitoring:
+    customQueriesConfigMap:
+      - name: monitoring-01
+        key: additional-queries
+    customQueriesSecret:
+      - name: monitoring-01
+        key: additional-queries
+
   backup:
+    target: prefer-standby
     barmanObjectStore:
-      destinationPath: s3://cluster-backups/
-      endpointURL: http://minio-service:9000
-      s3Credentials:
-        accessKeyId:
-          name: backup-storage-creds
-          key: ID
-        secretAccessKey:
-          name: backup-storage-creds
-          key: KEY
-      wal:
-        maxParallel: 3
-        compression: gzip
-      data:
-        immediateCheckpoint: true
-      tags:
-        retention: "30days"
-      historyTags:
-        retention: "30days"
+        destinationPath: s3://cluster-backups-standby/
+        endpointURL: https://minio-service:9000
+        endpointCA:
+          key: ca.crt
+          name: minio-server-ca-secret
+        s3Credentials:
+          accessKeyId:
+            name: backup-storage-creds
+            key: ID
+          secretAccessKey:
+            name: backup-storage-creds
+            key: KEY
+        wal:
+          compression: gzip
+        data:
+          immediateCheckpoint: true
+        tags:
+          retention: "30days"
+        historyTags:
+          retention: "30days"
     retentionPolicy: "30d"

@@ -1,5 +1,12 @@
 # Backup and Recovery
 
+CloudNativePG natively supports **online/hot backup** of PostgreSQL
+clusters through continuous physical backup and WAL archiving.
+This means that the database is always up (no downtime required)
+and that you can recover at any point in time from the first
+available base backup in your system. The latter is normally
+referred to as "Point In Time Recovery" (PITR).
+
 The operator can orchestrate a continuous backup infrastructure
 that is based on the [Barman](https://pgbarman.org) tool. Instead
 of using the classical architecture with a Barman server, which
@@ -23,7 +30,8 @@ as it is composed of a community PostgreSQL image and the latest
 A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
 [replica clusters](replica_cluster.md)
-for more information about designated primary instances).
+for more information about designated primary instances), or alternatively
+on a [standby](#backup-from-a-standby).
 
 ## Cloud provider support
 
@@ -175,7 +183,7 @@ Specifically, the CloudNativePG cluster can directly point to a local
 MinIO Gateway as an endpoint, using previously created credentials and service.
 
 MinIO secrets will be used by both the PostgreSQL cluster and the MinIO instance.
-Therefore you must create them in the same namespace:
+Therefore, you must create them in the same namespace:
 
 ```sh
 kubectl create secret generic minio-creds \
@@ -644,6 +652,43 @@ WALs, including the one requested by PostgreSQL.
 When PostgreSQL will request the archiving of a WAL that has
 already been archived by the instance manager as an optimization,
 that archival request will be just dismissed with a positive status.
+
+## Backup from a standby
+
+By default, backups will run on the primary instance of a `Cluster`.
+
+Taking a base backup requires to scrape the whole data content of the
+PostgreSQL instance on disk, possibly resulting in I/O contention with the
+actual workload of the database.
+
+For this reason, CloudNativePG allows you to take advantage of a
+feature which is directly available in PostgreSQL: **backup from a standby**.
+
+!!! Info
+    Although the standby might not always be up to date with the primary,
+    in the time continuum from the first available backup to the last
+    archived WAL this is normally irrelevant. The base backup indeed
+    represents the starting point from which to begin a recovery operation,
+    including PITR.
+
+You can use set backup target to `prefer-standby` as outlined in the
+example below:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+  [...]
+spec:
+  backup:
+    target: "prefer-standby"
+```
+
+The `prefer-standby` policy will ensure backups are run on the most up-to-date
+available secondary instance, falling back to the primary instance if no other
+instance is available.
+
+By default, when not specified, target is automatically set to take backups
+from a primary.
 
 ## Recovery
 

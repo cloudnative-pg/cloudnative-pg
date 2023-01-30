@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -302,32 +301,6 @@ func GetPodsNotOnPrimaryNode(
 		}
 	}
 	return podsOnOtherNodes
-}
-
-// getStatusFromInstances gets the replication status from the PostgreSQL instances,
-// the returned list is sorted in order to have the primary as the first element
-// and the other instances in their election order
-func (r *ClusterReconciler) getStatusFromInstances(
-	ctx context.Context,
-	pods corev1.PodList,
-) postgres.PostgresqlStatusList {
-	// Only work on Pods which can still become active in the future
-	filteredPods := utils.FilterActivePods(pods.Items)
-	if len(filteredPods) == 0 {
-		// No instances to control
-		return postgres.PostgresqlStatusList{}
-	}
-
-	status := r.extractInstancesStatus(ctx, filteredPods)
-	sort.Sort(&status)
-	for idx := range status.Items {
-		if status.Items[idx].Error != nil {
-			log.FromContext(ctx).Info("Cannot extract Pod status",
-				"name", status.Items[idx].Pod.Name,
-				"error", status.Items[idx].Error.Error())
-		}
-	}
-	return status
 }
 
 // updateClusterAnnotationsOnPods we check if we need to add or modify existing annotations specified in the cluster but

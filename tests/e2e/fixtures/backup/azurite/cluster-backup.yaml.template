@@ -23,3 +23,5 @@ spec:
           key: AZURE_CONNECTION_STRING
       wal:
         compression: gzip
+      data:
+        immediateCheckpoint: true

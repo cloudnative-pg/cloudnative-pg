@@ -33,15 +33,15 @@ spec:
 
   backup:
     barmanObjectStore:
-        destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/pg-backup-azure-blob/
-        azureCredentials:
-          storageAccount:
-            name: backup-storage-creds
-            key: ID
-          storageKey:
-            name: backup-storage-creds
-            key: KEY
-        wal:
-          compression: gzip
-        data:
-          immediateCheckpoint: true
+      destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/pg-backup-azure-blob/
+      azureCredentials:
+        storageAccount:
+          name: backup-storage-creds
+          key: ID
+        storageKey:
+          name: backup-storage-creds
+          key: KEY
+      wal:
+        compression: gzip
+      data:
+        immediateCheckpoint: true

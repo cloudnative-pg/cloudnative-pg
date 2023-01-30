@@ -1231,6 +1231,17 @@ spec:
                       is in `[dwm]` - days, weeks, months.
                     pattern: ^[1-9][0-9]*[dwm]$
                     type: string
+                  target:
+                    default: primary
+                    description: The policy to decide which instance should perform
+                      backups. Available options are empty string, which will default
+                      to `primary` policy, `primary` to have backups run always on
+                      primary instances, `prefer-standby` to have backups run preferably
+                      on the most updated standby, if available.
+                    enum:
+                    - primary
+                    - prefer-standby
+                    type: string
                 type: object
               bootstrap:
                 description: Instructions to bootstrap this cluster

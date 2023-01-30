@@ -186,7 +186,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// There should be a backup resource and
 			By(fmt.Sprintf("backing up a cluster and verifying it exists on minio, backup path is %v", latestTar), func() {
-				testUtils.ExecuteBackup(namespace, backupFile, env)
+				testUtils.ExecuteBackup(namespace, backupFile, false, env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
@@ -219,6 +219,53 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestGZ)
 				}, 60).Should(BeNumerically(">", previous))
+			})
+		})
+
+		// We backup and restore a cluster from a standby, and verify some expected data to
+		// be there
+		It("backs up and restore a cluster from standby", func() {
+			const (
+				targetDBOne                       = "test"
+				targetDBTwo                       = "test1"
+				targetDBSecret                    = "secret_test"
+				testTableName                     = "test_table"
+				clusterWithMinioStandbySampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-standby.yaml.template"
+				backupStandbyFile                 = fixturesDir + "/backup/minio/backup-minio-standby.yaml"
+			)
+
+			targetClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioStandbySampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create the cluster with custom serverName in the backup spec
+			AssertCreateCluster(namespace, targetClusterName, clusterWithMinioStandbySampleFile, env)
+
+			// Create required test data
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBOne, testTableName, psqlClientPod)
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBTwo, testTableName, psqlClientPod)
+			AssertCreationOfTestDataForTargetDB(namespace, targetClusterName, targetDBSecret, testTableName, psqlClientPod)
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, targetClusterName, tableName, psqlClientPod)
+
+			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
+			latestTar := minioPath(targetClusterName, "data.tar")
+
+			// There should be a backup resource and
+			By(fmt.Sprintf("backing up a cluster from standby and verifying it exists on minio, backup path is %v",
+				latestTar), func() {
+				testUtils.ExecuteBackup(namespace, backupStandbyFile, true, env)
+				AssertBackupConditionInClusterStatus(namespace, targetClusterName)
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+				}, 60).Should(BeEquivalentTo(1))
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: targetClusterName},
+						cluster)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
 			})
 		})
 
@@ -263,7 +310,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
-				testUtils.ExecuteBackup(namespace, backupFileCustom, env)
+				testUtils.ExecuteBackup(namespace, backupFileCustom, false, env)
 				AssertBackupConditionInClusterStatus(namespace, customClusterName)
 				latestBaseTar := minioPath(clusterServerName, "data.tar")
 				Eventually(func() (int, error) {
@@ -302,11 +349,27 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		})
 
 		It("backs up and restore a cluster with PITR MinIO", func() {
-			restoredClusterName := "restore-cluster-pitr-minio"
+			const (
+				restoredClusterName = "restore-cluster-pitr-minio"
+				backupFilePITR      = fixturesDir + "/backup/minio/backup-minio-pitr.yaml"
+			)
 
-			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 2, currentTimestamp, psqlClientPod)
+			prepareClusterForPITROnMinio(
+				namespace,
+				clusterName,
+				backupFilePITR,
+				3,
+				currentTimestamp,
+				psqlClientPod,
+			)
 
-			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			err := testUtils.CreateClusterFromBackupUsingPITR(
+				namespace,
+				restoredClusterName,
+				backupFilePITR,
+				*currentTimestamp,
+				env,
+			)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Restore backup in a new cluster, also cover if no application database is configured
@@ -407,7 +470,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 			By("uploading a backup", func() {
 				// We create a backup
-				testUtils.ExecuteBackup(namespace, backupFile, env)
+				testUtils.ExecuteBackup(namespace, backupFile, false, env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 
 				// Verifying file called data.tar should be available on Azure blob storage
@@ -551,11 +614,20 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		})
 
 		It("backs up and restore a cluster with PITR Azurite", func() {
-			restoredClusterName := "restore-cluster-pitr-azurite"
+			const (
+				restoredClusterName = "restore-cluster-pitr-azurite"
+				backupFilePITR      = fixturesDir + "/backup/azurite/backup-pitr.yaml"
+			)
 
-			prepareClusterForPITROnAzurite(namespace, clusterName, backupFile, currentTimestamp, psqlClientPod)
+			prepareClusterForPITROnAzurite(namespace, clusterName, backupFilePITR, currentTimestamp, psqlClientPod)
 
-			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			err := testUtils.CreateClusterFromBackupUsingPITR(
+				namespace,
+				restoredClusterName,
+				backupFilePITR,
+				*currentTimestamp,
+				env,
+			)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Restore backup in a new cluster, also cover if no application database is configured
@@ -719,7 +791,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
-				testUtils.ExecuteBackup(namespace, sourceTakeFirstBackupFileMinio, env)
+				testUtils.ExecuteBackup(namespace, sourceTakeFirstBackupFileMinio, false, env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				latestTar := minioPath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
@@ -760,7 +832,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				insertRecordIntoTable(namespace, clusterName, tableName, 4, psqlClientPod)
 			})
 			By("creating second backup and verifying it exists on minio", func() {
-				testUtils.ExecuteBackup(namespace, sourceTakeSecondBackupFileMinio, env)
+				testUtils.ExecuteBackup(namespace, sourceTakeSecondBackupFileMinio, false, env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				latestTar := minioPath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
@@ -789,7 +861,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
-				testUtils.ExecuteBackup(namespace, sourceTakeThirdBackupFileMinio, env)
+				testUtils.ExecuteBackup(namespace, sourceTakeThirdBackupFileMinio, false, env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				latestTar := minioPath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
@@ -848,7 +920,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
 					// Create the backup
-					testUtils.ExecuteBackup(namespace, sourceBackupFileAzure, env)
+					testUtils.ExecuteBackup(namespace, sourceBackupFileAzure, false, env)
 					AssertBackupConditionInClusterStatus(namespace, clusterName)
 					// Verifying file called data.tar should be available on Azure blob storage
 					Eventually(func() (int, error) {
@@ -926,7 +998,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
 					// We create a Backup
-					testUtils.ExecuteBackup(namespace, sourceBackupFileAzureSAS, env)
+					testUtils.ExecuteBackup(namespace, sourceBackupFileAzureSAS, false, env)
 					AssertBackupConditionInClusterStatus(namespace, clusterName)
 					// Verifying file called data.tar should be available on Azure blob storage
 					Eventually(func() (int, error) {
@@ -1011,9 +1083,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
 			" option in 'externalClusters' section", func() {
-			externalClusterRestoreName := "restore-external-cluster-pitr"
+			const (
+				externalClusterRestoreName = "restore-external-cluster-pitr"
+				backupFileAzuritePITR      = fixturesBackupDir + "backup-azurite-pitr.yaml"
+			)
 
-			prepareClusterForPITROnAzurite(namespace, clusterName, backupFileAzurite, currentTimestamp, psqlClientPod)
+			prepareClusterForPITROnAzurite(namespace, clusterName, backupFileAzuritePITR, currentTimestamp, psqlClientPod)
 
 			//  Create a cluster from a particular time using external backup.
 			err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzurite(
@@ -1126,7 +1201,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
 
 			// Taking backup of source cluster
-			testUtils.ExecuteBackup(namespace, sourceBackup, env)
+			testUtils.ExecuteBackup(namespace, sourceBackup, false, env)
 		})
 
 		It("restore a cluster with different backup destination and creates another cluster with same path as "+
@@ -1145,7 +1220,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 
 			// Taking backup of restore cluster which will be used to create another cluster further
 			By("taking backup of the restore cluster", func() {
-				testUtils.ExecuteBackup(namespace, restoreBackup, env)
+				testUtils.ExecuteBackup(namespace, restoreBackup, false, env)
 			})
 
 			// Restoring cluster from second backup
