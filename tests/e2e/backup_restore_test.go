@@ -621,7 +621,13 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			prepareClusterForPITROnAzurite(namespace, clusterName, backupFilePITR, currentTimestamp, psqlClientPod)
 
-			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFilePITR, *currentTimestamp, env)
+			err := testUtils.CreateClusterFromBackupUsingPITR(
+				namespace,
+				restoredClusterName,
+				backupFilePITR,
+				*currentTimestamp,
+				env,
+			)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Restore backup in a new cluster, also cover if no application database is configured
