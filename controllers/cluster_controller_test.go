@@ -122,7 +122,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 	})
 
-	FIt("it should wait the failover delay to select the new target primary", func() {
+	It("it should wait the failover delay to select the new target primary", func() {
 		ctx := context.TODO()
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace, func(cluster *apiv1.Cluster) {

@@ -519,6 +519,7 @@ externalClusters
 externalclusters
 facto
 failover
+failoverDelay
 failovers
 faq
 fastpath

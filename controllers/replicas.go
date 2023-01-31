@@ -317,6 +317,10 @@ func GetPodsNotOnPrimaryNode(
 }
 
 func (r *ClusterReconciler) enforceFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Spec.FailoverDelay == 0 {
+		return nil
+	}
+
 	if cluster.Status.CurrentPrimaryFailingSinceTimestamp == "" {
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp = utils.GetCurrentTimestamp()
 		if err := r.Status().Update(ctx, cluster); err != nil {

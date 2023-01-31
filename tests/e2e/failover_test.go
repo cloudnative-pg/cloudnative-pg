@@ -36,42 +36,9 @@ import (
 )
 
 var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
-	const (
-		namespace   = "failover-e2e"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		clusterName = "postgresql-storage-class"
-		level       = tests.Medium
-	)
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
-	// This tests only checks that after the failure of a primary the instance
-	// that has received/applied more WALs is promoted.
-	// To make sure that we know which instance is promoted, we pause the
-	// second instance walreceiver via a SIGSTOP signal, create WALs and then
-	// delete the primary pod. We need to make sure to SIGCONT the walreceiver,
-	// otherwise the operator will wait forever for the walreceiver to die
-	// before deciding which instance to promote (which should be the third).
-	It("reacts to primary failure", func() {
-		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
-
+	failoverTest := func(namespace, clusterName string, hasDelay bool) {
 		var pods []string
 		var currentPrimary, targetPrimary, pausedReplica, pid string
-
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		// We check that the currentPrimary is the -1 instance as expected,
 		// and we define the targetPrimary (-3) and pausedReplica (-2).
@@ -244,6 +211,17 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				&commandTimeout, "sh", "-c", fmt.Sprintf("kill -CONT %v", pid))
 			Expect(err).ToNot(HaveOccurred())
 
+			if hasDelay {
+				By("making sure that the operator is enforcing the switchover delay")
+				timeout = 120
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx, namespacedName, cluster)
+					return cluster.Status.CurrentPrimaryFailingSinceTimestamp, err
+				}, timeout).Should(Not(Equal("")))
+			}
+
+			By("making sure that the the targetPrimary because the new currentPrimary")
 			// The operator should eventually set the cluster target primary to
 			// the instance we expect to take that role (-3).
 			timeout = 120
@@ -272,5 +250,61 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				return cluster.Status.CurrentPrimary, err
 			}, timeout).Should(BeEquivalentTo(targetPrimary))
 		})
+	}
+
+	const (
+		namespace = "failover-e2e"
+		level     = tests.Medium
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
+
+	// This tests only checks that after the failure of a primary the instance
+	// that has received/applied more WALs is promoted.
+	// To make sure that we know which instance is promoted, we pause the
+	// second instance walreceiver via a SIGSTOP signal, create WALs and then
+	// delete the primary pod. We need to make sure to SIGCONT the walreceiver,
+	// otherwise the operator will wait forever for the walreceiver to die
+	// before deciding which instance to promote (which should be the third).
+	It("reacts to primary failure", func() {
+		const (
+			sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
+			clusterName = "postgresql-storage-class"
+		)
+
+		// Create a cluster in a namespace we'll delete after the test
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
+
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+		failoverTest(namespace, clusterName, false)
+	})
+
+	It("reacts to primary failure while respecting the delay", func() {
+		const (
+			sampleFile  = fixturesDir + "/failover/cluster-failover-delay.yaml.template"
+			clusterName = "failover-delay"
+		)
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
+
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+		failoverTest(namespace, clusterName, true)
 	})
 })

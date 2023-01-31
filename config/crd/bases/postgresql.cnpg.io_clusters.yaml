@@ -3406,7 +3406,10 @@ spec:
                 description: Current primary instance
                 type: string
               currentPrimaryFailingSinceTimestamp:
-                description: The timestamp when the current primary was deemed unhealthy
+                description: The amount of time (in seconds) to wait before triggering
+                  a failover after the primary PostgreSQL instance in the cluster
+                  was detected to be unhealthy. This field is reported only when spec.failoverDelay
+                  is populated
                 type: string
               currentPrimaryTimestamp:
                 description: The timestamp when the last actual promotion to primary
