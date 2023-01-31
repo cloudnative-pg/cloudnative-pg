@@ -253,17 +253,11 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 	}
 
 	const (
-		namespace = "failover-e2e"
-		level     = tests.Medium
+		level = tests.Medium
 	)
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
@@ -278,12 +272,16 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		const (
 			sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
 			clusterName = "postgresql-storage-class"
+			namespace   = "failover-e2e"
 		)
 
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
 			return env.DeleteNamespace(namespace)
 		})
 
@@ -296,10 +294,14 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		const (
 			sampleFile  = fixturesDir + "/failover/cluster-failover-delay.yaml.template"
 			clusterName = "failover-delay"
+			namespace   = "failover-e2e-delay"
 		)
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
 			return env.DeleteNamespace(namespace)
 		})
 
