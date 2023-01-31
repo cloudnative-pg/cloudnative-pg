@@ -44,7 +44,7 @@ func ReconcileExistingResources(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if err := reconcileOperatorLabels(ctx, c, instances, pvcs); err != nil {
+	if err := reconcileOperatorLabels(ctx, c, cluster, instances, pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 
@@ -245,9 +245,11 @@ func reconcileClusterLabels(
 }
 
 // reconcileOperatorLabels ensures that the PVCs have the correct labels
+// nolint: gocognit
 func reconcileOperatorLabels(
 	ctx context.Context,
 	c client.Client,
+	cluster *apiv1.Cluster,
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
@@ -272,9 +274,21 @@ func reconcileOperatorLabels(
 				pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] = pod.Name
 				modified = true
 			}
+
+			role := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+			if pvc.Name == GetName(cluster, pod.Name, utils.PVCRolePgData) && role != utils.PVCRolePgData {
+				pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgData)
+				modified = true
+			}
+			if pvc.Name == GetName(cluster, pod.Name, utils.PVCRolePgWal) && role != utils.PVCRolePgWal {
+				pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgWal)
+				modified = true
+			}
+
 			if !modified {
 				continue
 			}
+
 			if err := c.Patch(ctx, pvc, client.MergeFrom(origPvc)); err != nil {
 				return err
 			}
