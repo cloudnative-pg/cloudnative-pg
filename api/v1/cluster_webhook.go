@@ -895,6 +895,18 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	// verify the postgres setting min_wal_size < max_wal_size < volume size
+	var walVolumeSize *resource.Quantity
+	if r.ShouldCreateWalArchiveVolume() {
+		walVolumeSize = r.Spec.WalStorage.GetSizeOrNil()
+	} else {
+		walVolumeSize = r.Spec.StorageConfiguration.GetSizeOrNil()
+	}
+
+	result = append(result, validateWalSizeConfiguration(
+		r.Spec.PostgresConfiguration.Parameters, walVolumeSize,
+	)...)
+
 	if err := validateSyncReplicaElectionConstraint(
 		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
 	); err != nil {
@@ -902,6 +914,89 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	}
 
 	return result
+}
+
+// verify that min_wal_size < max_wal_size < wal volume size
+func validateWalSizeConfiguration(params map[string]string, walVolumeSize *resource.Quantity) field.ErrorList {
+	var result field.ErrorList
+	const (
+		minWalSizeKey = "min_wal_size"
+		maxWalSizeKey = "max_wal_size"
+	)
+	minWalSize := params[minWalSizeKey]
+	maxWalSize := params[maxWalSizeKey]
+	if walVolumeSize == nil {
+		return nil
+	}
+	// get default value
+	if minWalSize == "" {
+		minWalSize = "80M"
+	}
+	if maxWalSize == "" {
+		maxWalSize = "1G"
+	}
+	minWalSizeValue, err := parseWalSettingValue(minWalSize)
+	if err != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid value for configuration parameter %s", minWalSizeKey)))
+	}
+	maxWalSizeValue, err := parseWalSettingValue(maxWalSize)
+	if err != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", maxWalSizeKey),
+				maxWalSize,
+				fmt.Sprintf("Invalid value for configuration parameter %s", maxWalSizeKey)))
+	}
+
+	if !minWalSizeValue.IsZero() &&
+		minWalSizeValue.Cmp(*walVolumeSize) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid configuration, parameter %s (default 80MB) should be smaller than storage size",
+					minWalSizeKey)))
+	}
+	if !maxWalSizeValue.IsZero() &&
+		maxWalSizeValue.Cmp(*walVolumeSize) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", maxWalSizeKey),
+				maxWalSize,
+				fmt.Sprintf("Invalid configuration, parameter %s (default 1GB) should be smaller than storage size",
+					maxWalSizeKey)))
+	}
+	if !minWalSizeValue.IsZero() &&
+		!maxWalSizeValue.IsZero() &&
+		minWalSizeValue.Cmp(maxWalSizeValue) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid configuration, parameter %s (default 80MB) should be smaller than parameter %s (default 1GB)",
+					minWalSizeKey, maxWalSizeKey)))
+	}
+
+	return result
+}
+
+func parseWalSettingValue(value string) (resource.Quantity, error) {
+	// if no suffix, default is MB
+	if _, err := strconv.Atoi(value); err == nil {
+		value += "M"
+	}
+	value = strings.TrimSuffix(value, "B")
+
+	return resource.ParseQuantity(value)
 }
 
 // validateConfigurationChange determines whether a PostgreSQL configuration

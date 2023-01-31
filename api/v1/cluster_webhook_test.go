@@ -755,6 +755,303 @@ var _ = Describe("configuration change validation", func() {
 		}
 		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(1))
 	})
+
+	It("doesn't complains when setting is correct", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "80",
+						"max_wal_size": "1G",
+					},
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "1500",
+						"max_wal_size": "2GB",
+					},
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "2Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "1500",
+						"max_wal_size": "2GB",
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "2Gi",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_wal_size": "1G",
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "1Gi",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "100M",
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "1Gi",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{},
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
+	})
+
+	It("one complain when min_wal_size is bigger than max_wal_size", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "1500",
+						"max_wal_size": "1G",
+					},
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "2Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "2G",
+						"max_wal_size": "1GB",
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "2Gi",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+	})
+
+	It("one complain when max_wal_size is bigger than storage", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_wal_size": "2G",
+					},
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_wal_size": "2GB",
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "1G",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "80MB",
+						"max_wal_size": "1500",
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "1G",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+	})
+
+	It("two complains when min_wal_size is bigger than storage", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "1500",
+						"max_wal_size": "1G",
+					},
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(2))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "1500",
+						"max_wal_size": "1G",
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "1Gi",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(2))
+	})
+
+	It("complains about invalid value for min_wal_size and max_wal_size", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "xxx",
+						"max_wal_size": "1G",
+					},
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "80",
+						"max_wal_size": "1Gb",
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "1Gi",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+	})
+
+	It("complains when default value for min_wal_size and max_wal_size is bigger than storageSize", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{},
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "100Mi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"min_wal_size": "2G", // default for max_wal_size is 1G
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "2Gi",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+
+		clusterNew = Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_wal_size": "70M", // default for min_wal_size is 80M
+					},
+				},
+				WalStorage: &StorageConfiguration{
+					Size: "2Gi",
+				},
+				StorageConfiguration: StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+	})
 })
 
 var _ = Describe("validate image name change", func() {
