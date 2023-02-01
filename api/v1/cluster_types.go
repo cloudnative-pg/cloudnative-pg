@@ -229,8 +229,9 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=40000000
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
-	// The time in seconds a primary PostgreSQL instance
-	// should be deemed unhealthy before triggering a failover
+	// The amount of time (in seconds) to wait before triggering a failover,
+	// after the primary PostgreSQL instance in the cluster was detected to
+	// be unhealthy
 	// +kubebuilder:default:=0
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
 
@@ -470,8 +471,7 @@ type ClusterStatus struct {
 	// The timestamp when the last actual promotion to primary has occurred
 	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
 
-	// The amount of time (in seconds) to wait before triggering a failover after the primary PostgreSQL instance in
-	// the cluster was detected to be unhealthy.
+	// The timestamp when the primary was detected to be unhealthy
 	// This field is reported only when spec.failoverDelay is populated
 	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 
