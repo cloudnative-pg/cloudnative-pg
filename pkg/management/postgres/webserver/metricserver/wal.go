@@ -59,17 +59,85 @@ func collectPGWALStat(e *Exporter) error {
 
 type walSettings struct {
 	// expressed in bytes
-	walSegmentSize int
+	walSegmentSize float64
 	// expressed in megabytes
-	minWalSize int
+	minWalSize float64
 	// expressed in megabytes
-	maxWalSize  int
-	walKeepSize int
+	maxWalSize float64
+	// normalized to obtain the same result of wal_keep_segments
+	walKeepSizeNormalized float64
+	maxSlotWalKeepSize    float64
+	configSha256          string
+}
+
+func (s walSettings) synchronizeWALSettings(db *sql.DB, configSha256 string) (walSettings, error) {
+	if s.configSha256 == configSha256 {
+		return s, nil
+	}
+
+	settings := walSettings{
+		configSha256: configSha256,
+	}
+	rows, err := db.Query(`
+SELECT name, setting FROM pg_settings 
+WHERE pg_settings.name
+IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_keep_segments', 'max_slot_wal_keep_size')`) // nolint: lll
+	if err != nil {
+		log.Error(err, "while fetching rows")
+		return settings, err
+	}
+	if err := rows.Err(); err != nil {
+		log.Error(err, "while iterating over rows")
+		return settings, err
+	}
+
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error(err, "while closing rows for synchronizeWalSettings")
+		}
+	}()
+
+	var needsKeepSizeNormalization bool
+	for rows.Next() {
+		var name string
+		var setting *int
+		if err := rows.Scan(&name, &setting); err != nil {
+			log.Error(err, "while scanning values from the database")
+			return settings, err
+		}
+
+		normalizedSetting := float64(0)
+		if setting != nil {
+			normalizedSetting = float64(*setting)
+		}
+
+		switch name {
+		case "wal_segment_size":
+			settings.walSegmentSize = normalizedSetting
+		case "min_wal_size":
+			settings.minWalSize = normalizedSetting
+		case "max_wal_size":
+			settings.maxWalSize = normalizedSetting
+		case "wal_keep_size":
+			needsKeepSizeNormalization = true
+			settings.walKeepSizeNormalized = normalizedSetting
+		case "wal_keep_segments":
+			settings.walKeepSizeNormalized = normalizedSetting
+		case "max_slot_wal_keep_size":
+			settings.maxSlotWalKeepSize = normalizedSetting
+		}
+	}
+
+	if needsKeepSizeNormalization {
+		settings.walKeepSizeNormalized = (settings.walKeepSizeNormalized * 1024 * 1024) / settings.walSegmentSize
+	}
+
+	return settings, nil
 }
 
 var (
 	regexPGWalFileName   = regexp.MustCompile("^[0-9A-F]{24}")
-	lastKnownConfSHA     string
 	lastKnownWalSettings walSettings
 )
 
@@ -93,11 +161,9 @@ func collectPGWalSettings(exporter *Exporter, db *sql.DB) error {
 		count++
 	}
 
-	if lastKnownConfSHA != exporter.instance.ConfigSha256 {
-		lastKnownWalSettings, err = getWALSettings(db)
-		if err != nil {
-			return err
-		}
+	lastKnownWalSettings, err = lastKnownWalSettings.synchronizeWALSettings(db, exporter.instance.ConfigSha256)
+	if err != nil {
+		return err
 	}
 
 	exporter.Metrics.PgWALDirectory.
@@ -106,19 +172,29 @@ func collectPGWalSettings(exporter *Exporter, db *sql.DB) error {
 
 	exporter.Metrics.PgWALDirectory.
 		WithLabelValues("size").
-		Set(float64(count * lastKnownWalSettings.walSegmentSize))
+		Set(float64(count) * lastKnownWalSettings.walSegmentSize)
 
 	exporter.Metrics.PgWALDirectory.
 		WithLabelValues("min").
-		Set(float64(lastKnownWalSettings.minWalSize*1024*1024) / float64(lastKnownWalSettings.walSegmentSize))
+		Set(lastKnownWalSettings.minWalSize * 1024 * 1024 / lastKnownWalSettings.walSegmentSize)
 
 	exporter.Metrics.PgWALDirectory.
 		WithLabelValues("max").
-		Set(float64(lastKnownWalSettings.maxWalSize*1024*1024) / float64(lastKnownWalSettings.walSegmentSize))
+		Set(lastKnownWalSettings.maxWalSize * 1024 * 1024 / lastKnownWalSettings.walSegmentSize)
 
 	exporter.Metrics.PgWALDirectory.
 		WithLabelValues("keep").
-		Set(float64(lastKnownWalSettings.walKeepSize))
+		Set(lastKnownWalSettings.walKeepSizeNormalized)
+
+	if lastKnownWalSettings.maxSlotWalKeepSize == -1 || lastKnownWalSettings.maxSlotWalKeepSize == 0 {
+		exporter.Metrics.PgWALDirectory.
+			WithLabelValues("slots_max").
+			Set(math.NaN())
+	} else {
+		exporter.Metrics.PgWALDirectory.
+			WithLabelValues("slots_max").
+			Set(lastKnownWalSettings.maxSlotWalKeepSize * 1024 * 1024 / lastKnownWalSettings.walSegmentSize)
+	}
 
 	walVolumeSize := getWalVolumeSize()
 	if walVolumeSize == 0 {
@@ -134,60 +210,10 @@ func collectPGWalSettings(exporter *Exporter, db *sql.DB) error {
 			Set(walVolumeSize)
 		exporter.Metrics.PgWALDirectory.
 			WithLabelValues("volume_max").
-			Set(walVolumeSize / float64(lastKnownWalSettings.walSegmentSize))
+			Set(walVolumeSize / lastKnownWalSettings.walSegmentSize)
 	}
 
-	lastKnownConfSHA = exporter.instance.ConfigSha256
 	return nil
-}
-
-func getWALSettings(db *sql.DB) (walSettings, error) {
-	settings := walSettings{}
-	rows, err := db.Query(`
-SELECT name, setting FROM pg_settings 
-WHERE pg_settings.name
-IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_keep_segments')`)
-	if err != nil {
-		return settings, err
-	}
-	if err := rows.Err(); err != nil {
-		log.Error(err, "while iterating over rows")
-		return settings, err
-	}
-
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			log.Error(err, "while closing rows for SHOW LISTS")
-		}
-	}()
-
-	for rows.Next() {
-		var name string
-		var setting *int
-		if err := rows.Scan(&name, &setting); err != nil {
-			log.Error(err, "while scanning values from the database")
-			return settings, err
-		}
-
-		var normalizedSetting int
-		if setting != nil {
-			normalizedSetting = *setting
-		}
-
-		switch name {
-		case "wal_segment_size":
-			settings.walSegmentSize = normalizedSetting
-		case "min_wal_size":
-			settings.minWalSize = normalizedSetting
-		case "max_wal_size":
-			settings.maxWalSize = normalizedSetting
-		case "wal_keep_size", "wal_keep_segments":
-			settings.walKeepSize = normalizedSetting
-		}
-	}
-
-	return settings, nil
 }
 
 func getWalVolumeSize() float64 {

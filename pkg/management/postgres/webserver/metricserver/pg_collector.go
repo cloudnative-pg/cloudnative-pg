@@ -363,9 +363,9 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	}
 
 	if err := collectPGWalSettings(e, db); err != nil {
-		log.Error(err, "while collecting WAL metrics", "path", specs.PgWalPath)
+		log.Error(err, "while collecting WAL settings", "path", specs.PgWalPath)
 		e.Metrics.Error.Set(1)
-		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PgWALStats").Inc()
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGWalSettings").Inc()
 		e.Metrics.PgWALDirectory.Reset()
 	}
 
