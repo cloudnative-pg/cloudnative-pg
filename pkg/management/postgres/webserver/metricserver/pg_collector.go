@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"regexp"
 	"strconv"
@@ -41,8 +42,10 @@ const PrometheusNamespace = "cnpg"
 
 var synchronousStandbyNamesRegex = regexp.MustCompile(`ANY ([0-9]+) \(.*\)`)
 
-// The wal_segment_size value in bytes
-var walSegmentSize *int
+// The wal_segment_size value in bytes and min_wal_size, max_wal_size value in megabytes
+var walSegmentSize, minWalSize, maxWalSize *int
+
+var walKeepSize, walVolumeSize *float64
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
@@ -520,10 +523,39 @@ func collectPGWalMetric(exporter *Exporter, db *sql.DB) error {
 		return err
 	}
 	exporter.Metrics.PgWALDirectory.WithLabelValues("size").Set(float64(count * WALSegmentSize))
+
+	MINWalSize, err := getMinWalSize(db)
+	if err != nil {
+		return err
+	}
+	exporter.Metrics.PgWALDirectory.WithLabelValues("min").Set(float64(MINWalSize*1024*1024) / float64(WALSegmentSize))
+
+	MAXWalSize, err := getMaxWalSize(db)
+	if err != nil {
+		return err
+	}
+	exporter.Metrics.PgWALDirectory.WithLabelValues("max").Set(float64(MAXWalSize*1024*1024) / float64(WALSegmentSize))
+
+	version, _ := exporter.instance.GetPgVersion()
+	WALKeepSize, err := getWalKeepSize(db, version.Major, WALSegmentSize)
+	if err != nil {
+		return err
+	}
+	exporter.Metrics.PgWALDirectory.WithLabelValues("keep").Set(WALKeepSize)
+
+	WALVolumeSize := getWalVolumeSize()
+	if WALVolumeSize == 0 {
+		exporter.Metrics.PgWALDirectory.WithLabelValues("volume_size").Set(math.NaN())
+		exporter.Metrics.PgWALDirectory.WithLabelValues("volume_max").Set(math.NaN())
+	} else {
+		exporter.Metrics.PgWALDirectory.WithLabelValues("volume_size").Set(WALVolumeSize)
+		exporter.Metrics.PgWALDirectory.WithLabelValues("volume_max").Set(WALVolumeSize / float64(WALSegmentSize))
+	}
 	return nil
 }
 
 // We cache the value of wal_segment_size the first time we retrieve it from the database
+// The unit for the value is byte
 func getWALSegmentSize(db *sql.DB) (int, error) {
 	if walSegmentSize != nil {
 		return *walSegmentSize, nil
@@ -537,6 +569,91 @@ func getWALSegmentSize(db *sql.DB) (int, error) {
 	}
 	walSegmentSize = &size
 	return *walSegmentSize, nil
+}
+
+// We cache the value of min_wal_size the first time we retrieve it from the database
+// The unit for the value is MB
+func getMinWalSize(db *sql.DB) (int, error) {
+	if minWalSize != nil {
+		return *minWalSize, nil
+	}
+	var size int
+	err := db.QueryRow("SELECT setting FROM pg_settings WHERE name='min_wal_size'").
+		Scan(&size)
+	if err != nil {
+		log.Error(err, "while getting the min_wal_size value from the database")
+		return 0, err
+	}
+	minWalSize = &size
+	return *minWalSize, nil
+}
+
+// We cache the value of max_wal_size the first time we retrieve it from the database
+// The unit for the value is MB
+func getMaxWalSize(db *sql.DB) (int, error) {
+	if maxWalSize != nil {
+		return *maxWalSize, nil
+	}
+	var size int
+	err := db.QueryRow("SELECT setting FROM pg_settings WHERE name='max_wal_size'").
+		Scan(&size)
+	if err != nil {
+		log.Error(err, "while getting the max_wal_size value from the database")
+		return 0, err
+	}
+	maxWalSize = &size
+	return *maxWalSize, nil
+}
+
+// retrieve and cache value for wal_keep_size / wal_segment_size (pg version >=13)
+// or wal_keep_segments (pg version 11&12)
+func getWalKeepSize(db *sql.DB, pgMajor uint64, walSegmentSize int) (float64, error) {
+	if walKeepSize != nil {
+		return *walKeepSize, nil
+	}
+	var size int
+	var result float64
+	if pgMajor >= 13 {
+		err := db.QueryRow("SELECT setting FROM pg_settings WHERE name='wal_keep_size'").
+			Scan(&size)
+		if err != nil {
+			log.Error(err, "while getting the wal_keep_size value from the database")
+			return 0, err
+		}
+		// wal_keep_size is in megabyte unit
+		result = float64(size*1024*1024) / float64(walSegmentSize)
+	} else {
+		err := db.QueryRow("SELECT setting FROM pg_settings WHERE name='wal_keep_segments'").
+			Scan(&size)
+		if err != nil {
+			log.Error(err, "while getting the wal_keep_segments value from the database")
+			return 0, err
+		}
+		result = float64(size)
+	}
+	walKeepSize = &result
+	return *walKeepSize, nil
+}
+
+func getWalVolumeSize() float64 {
+	if walVolumeSize != nil {
+		return *walVolumeSize
+	}
+	cluster, err := cache.LoadCluster()
+	// there isn't a cached object yet
+	if errors.Is(err, cache.ErrCacheMiss) {
+		return 0
+	}
+	var size float64
+	if cluster.ShouldCreateWalArchiveVolume() {
+		walSize := cluster.Spec.WalStorage.GetSizeOrNil()
+		if walSize != nil {
+			size = walSize.AsApproximateFloat64()
+			walVolumeSize = &size
+			return *walVolumeSize
+		}
+	}
+	return 0
 }
 
 func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
