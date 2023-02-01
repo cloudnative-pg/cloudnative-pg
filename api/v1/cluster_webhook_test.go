@@ -756,7 +756,7 @@ var _ = Describe("configuration change validation", func() {
 		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(1))
 	})
 
-	It("doesn't complains when setting is correct", func() {
+	It("produces no error when WAL size settings are correct", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
@@ -849,7 +849,7 @@ var _ = Describe("configuration change validation", func() {
 		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 	})
 
-	It("one complain when min_wal_size is bigger than max_wal_size", func() {
+	It("produces one complaint when min_wal_size is bigger than max_wal_size", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
@@ -884,7 +884,7 @@ var _ = Describe("configuration change validation", func() {
 		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 	})
 
-	It("one complain when max_wal_size is bigger than storage", func() {
+	It("produces one complaint when max_wal_size is bigger than WAL storage", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
@@ -935,7 +935,7 @@ var _ = Describe("configuration change validation", func() {
 		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 	})
 
-	It("two complains when min_wal_size is bigger than storage", func() {
+	It("produces two complaints when min_wal_size is bigger than WAL storage and max_wal_size", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
