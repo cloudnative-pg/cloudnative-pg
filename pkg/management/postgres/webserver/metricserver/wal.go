@@ -18,7 +18,6 @@ package metricserver
 
 import (
 	"database/sql"
-	"errors"
 	"math"
 	"os"
 	"regexp"
@@ -193,15 +192,14 @@ IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_ke
 
 func getWalVolumeSize() float64 {
 	cluster, err := cache.LoadCluster()
-	// there isn't a cached object yet
-	if errors.Is(err, cache.ErrCacheMiss) {
+	if err != nil || !cluster.ShouldCreateWalArchiveVolume() {
 		return 0
 	}
-	if cluster.ShouldCreateWalArchiveVolume() {
-		walSize := cluster.Spec.WalStorage.GetSizeOrNil()
-		if walSize != nil {
-			return walSize.AsApproximateFloat64()
-		}
+
+	walSize := cluster.Spec.WalStorage.GetSizeOrNil()
+	if walSize == nil {
+		return 0
 	}
-	return 0
+
+	return walSize.AsApproximateFloat64()
 }
