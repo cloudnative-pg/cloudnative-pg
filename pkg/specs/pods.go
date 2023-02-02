@@ -97,11 +97,11 @@ func (c EnvConfig) IsEnvEqual(container corev1.Container) bool {
 	if !slices.EqualFunc(container.EnvFrom, c.EnvFrom, func(e1, e2 corev1.EnvFromSource) bool {
 		return reflect.DeepEqual(e1, e2)
 	}) {
-		return true
+		return false
 	}
 
 	// Step 2: detect changes in the env section
-	return !slices.EqualFunc(container.Env, c.EnvVars, func(e1, e2 corev1.EnvVar) bool {
+	return slices.EqualFunc(container.Env, c.EnvVars, func(e1, e2 corev1.EnvVar) bool {
 		return reflect.DeepEqual(e1, e2)
 	})
 }
