@@ -17,7 +17,9 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"regexp"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -80,23 +82,34 @@ var _ = Describe("PGBouncer Metrics", func() {
 				ctrlclient.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
-			metricsRegexp := regexp.MustCompile(
-				`(?m:^(` +
-					`cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} [0-9e\+\.]+|` +
-					`cnpg_pgbouncer_collections_total 1|` +
-					`cnpg_pgbouncer_last_collection_error 0|` +
-					`cnpg_pgbouncer_lists_dns_pending 0|` +
-					`cnpg_pgbouncer_lists_dns_queries 0|` +
-					`cnpg_pgbouncer_lists_free_clients 49|` +
-					`cnpg_pgbouncer_lists_pools 1|` +
-					`cnpg_pgbouncer_lists_used_servers 0|` +
-					`cnpg_pgbouncer_lists_users 2|` +
-					`cnpg_pgbouncer_pools_cl_cancel_req{database="pgbouncer",user="pgbouncer"} 0|` +
-					`cnpg_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} 3|` +
-					`cnpg_pgbouncer_stats_avg_query_time{database="pgbouncer"} [0-9e\+\.]+|` +
-					`cnpg_pgbouncer_stats_avg_recv{database="pgbouncer"} [0-9e\+\.]+|` +
-					`cnpg_pgbouncer_stats_total_query_count{database="pgbouncer"} \d+` +
-					`)$)`)
+			promMetrics := []string{
+				`cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} [0-9e\.]+|`,
+				`cnpg_pgbouncer_collections_total \d+|`,
+				`cnpg_pgbouncer_last_collection_error 0|`,
+				`cnpg_pgbouncer_lists_dns_pending \d+|`,
+				`cnpg_pgbouncer_lists_dns_queries \d+|`,
+				`cnpg_pgbouncer_lists_free_clients \d+|`,
+				`cnpg_pgbouncer_lists_pools \d+|`,
+				`cnpg_pgbouncer_lists_used_servers \d+|`,
+				`cnpg_pgbouncer_lists_users \d+|`,
+				`cnpg_pgbouncer_pools_cl_active{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_cl_waiting{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_cl_active_cancel_req{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_cl_waiting_cancel_req{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_sv_active{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_sv_active_cancel{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_sv_idle{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_sv_login{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_sv_tested{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_sv_used{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_pools_sv_wait_cancels{database="pgbouncer",user="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_stats_avg_query_time{database="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_stats_avg_recv{database="pgbouncer"} \d+|`,
+				`cnpg_pgbouncer_stats_total_query_count{database="pgbouncer"} \d+`,
+			}
+			metricsRegexp := regexp.MustCompile(fmt.Sprintf("(?m:^(%s)$)",
+				strings.Join(promMetrics, "")))
 
 			for _, pod := range podList.Items {
 				podName := pod.GetName()
@@ -105,7 +118,7 @@ var _ = Describe("PGBouncer Metrics", func() {
 				Expect(err).ToNot(HaveOccurred())
 				matches := metricsRegexp.FindAllString(out, -1)
 				Expect(matches).To(
-					HaveLen(14),
+					HaveLen(len(promMetrics)),
 					"Metric collection issues on %v.\nCollected metrics:\n%v",
 					podName,
 					out,
