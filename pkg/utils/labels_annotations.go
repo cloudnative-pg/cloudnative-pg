@@ -73,6 +73,9 @@ const (
 	// HibernatePgControlDataAnnotationName contains the pg_controldata output of the hibernated cluster
 	HibernatePgControlDataAnnotationName = "cnpg.io/hibernatePgControlData"
 
+	// PodEnvHashAnnotationName is the name of the annotation containing the podEnvHash value
+	PodEnvHashAnnotationName = "cnpg.io/podEnvHash"
+
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"
 )

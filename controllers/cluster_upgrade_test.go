@@ -105,7 +105,7 @@ var _ = Describe("Pod upgrade", func() {
 				},
 			}
 
-			needRollout := isPostgresContainerNeedingUpdatedEnvironment(cluster, pod.Spec.Containers[0])
+			needRollout, _ := isPodNeedingUpdatedEnvironment(*cluster, *pod)
 			Expect(needRollout).To(BeTrue())
 		})
 	})
