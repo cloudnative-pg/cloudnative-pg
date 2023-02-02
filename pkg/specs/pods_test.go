@@ -17,10 +17,13 @@ limitations under the License.
 package specs
 
 import (
+	"strconv"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -244,6 +247,180 @@ var _ = Describe("Create affinity section", func() {
 				Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
 					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
 			})
+		})
+	})
+})
+
+var _ = Describe("EnvConfig", func() {
+	Context("IsEnvEqual function", func() {
+		It("returns true if the Env are equal", func() {
+			cluster := v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test-ns",
+				},
+				Spec: v1.ClusterSpec{
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TEST_ENV",
+							Value: "EXPECTED",
+						},
+					},
+				},
+			}
+			envConfig := CreatePodEnvConfig(cluster, "test-1")
+
+			container := corev1.Container{
+				Env: []corev1.EnvVar{
+					{
+						Name:  "PGDATA",
+						Value: PgDataPath,
+					},
+					{
+						Name:  "POD_NAME",
+						Value: "test-1",
+					},
+					{
+						Name:  "NAMESPACE",
+						Value: cluster.Namespace,
+					},
+					{
+						Name:  "CLUSTER_NAME",
+						Value: cluster.Name,
+					},
+					{
+						Name:  "PGPORT",
+						Value: strconv.Itoa(postgres.ServerPort),
+					},
+					{
+						Name:  "PGHOST",
+						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TEST_ENV",
+						Value: "EXPECTED",
+					},
+				},
+			}
+
+			Expect(envConfig.IsEnvEqual(container)).To(BeTrue())
+		})
+
+		It("returns false if the Env are different", func() {
+			cluster := v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test-ns",
+				},
+			}
+			envConfig := CreatePodEnvConfig(cluster, "test-1")
+
+			container := corev1.Container{
+				Env: []corev1.EnvVar{
+					{
+						Name:  "PGDATA",
+						Value: PgDataPath,
+					},
+					{
+						Name:  "POD_NAME",
+						Value: "test-1",
+					},
+					{
+						Name:  "NAMESPACE",
+						Value: cluster.Namespace,
+					},
+					{
+						Name:  "CLUSTER_NAME",
+						Value: cluster.Name,
+					},
+					{
+						Name:  "PGPORT",
+						Value: strconv.Itoa(postgres.ServerPort),
+					},
+					{
+						Name:  "PGHOST",
+						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TEST_ENV",
+						Value: "UNEXPECTED",
+					},
+				},
+			}
+
+			Expect(envConfig.IsEnvEqual(container)).To(BeFalse())
+		})
+
+		It("returns true if the EnvFrom are equal", func() {
+			cluster := v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test-ns",
+				},
+				Spec: v1.ClusterSpec{
+					EnvFrom: []corev1.EnvFromSource{
+						{
+							ConfigMapRef: &corev1.ConfigMapEnvSource{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "sourceConfigMap",
+								},
+							},
+						},
+					},
+				},
+			}
+			envConfig := CreatePodEnvConfig(cluster, "test-1")
+
+			container := corev1.Container{
+				Env: envConfig.EnvVars,
+				EnvFrom: []corev1.EnvFromSource{
+					{
+						ConfigMapRef: &corev1.ConfigMapEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "sourceConfigMap",
+							},
+						},
+					},
+				},
+			}
+
+			Expect(envConfig.IsEnvEqual(container)).To(BeTrue())
+		})
+
+		It("returns false if the EnvFrom are different", func() {
+			cluster := v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test-ns",
+				},
+				Spec: v1.ClusterSpec{
+					EnvFrom: []corev1.EnvFromSource{
+						{
+							SecretRef: &corev1.SecretEnvSource{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "sourceConfigMap",
+								},
+							},
+						},
+					},
+				},
+			}
+			envConfig := CreatePodEnvConfig(cluster, "test-1")
+
+			container := corev1.Container{
+				Env: envConfig.EnvVars,
+				EnvFrom: []corev1.EnvFromSource{
+					{
+						ConfigMapRef: &corev1.ConfigMapEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "sourceConfigMap",
+							},
+						},
+					},
+				},
+			}
+
+			Expect(envConfig.IsEnvEqual(container)).To(BeFalse())
 		})
 	})
 })

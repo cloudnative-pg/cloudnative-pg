@@ -20,8 +20,10 @@ package specs
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -30,6 +32,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
 const (
@@ -81,55 +84,78 @@ const (
 	ReadinessProbePeriod = 10
 )
 
-// CreateEnvVarPostgresContainer creates the set of environment variables that will be used
-// in the PostgreSQL Pods
-func CreateEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []corev1.EnvVar {
-	// When adding an environment variable here, remember to change the `isReservedEnvironmentVariable`
-	// function in `cluster_webhook.go` too.
+// EnvConfig carries the environment configuration of a container
+type EnvConfig struct {
+	EnvVars []corev1.EnvVar
+	EnvFrom []corev1.EnvFromSource
+	Hash    string
+}
 
-	envVar := []corev1.EnvVar{
-		{
-			Name:  "PGDATA",
-			Value: PgDataPath,
-		},
-		{
-			Name:  "POD_NAME",
-			Value: podName,
-		},
-		{
-			Name:  "NAMESPACE",
-			Value: cluster.Namespace,
-		},
-		{
-			Name:  "CLUSTER_NAME",
-			Value: cluster.Name,
-		},
-		{
-			Name:  "PGPORT",
-			Value: strconv.Itoa(postgres.ServerPort),
-		},
-		{
-			Name:  "PGHOST",
-			Value: postgres.SocketDirectory,
-		},
+// IsEnvEqual detects if the environment of a container matches
+func (c EnvConfig) IsEnvEqual(container corev1.Container) bool {
+	// Step 1: detect changes in the envFrom section
+	if !slices.EqualFunc(container.EnvFrom, c.EnvFrom, func(e1, e2 corev1.EnvFromSource) bool {
+		return reflect.DeepEqual(e1, e2)
+	}) {
+		return false
 	}
 
-	return append(cluster.Spec.Env, envVar...)
+	// Step 2: detect changes in the env section
+	return slices.EqualFunc(container.Env, c.EnvVars, func(e1, e2 corev1.EnvVar) bool {
+		return reflect.DeepEqual(e1, e2)
+	})
+}
+
+// CreatePodEnvConfig returns the hash of pod env configuration
+func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
+	// When adding an environment variable here, remember to change the `isReservedEnvironmentVariable`
+	// function in `cluster_webhook.go` too.
+	config := EnvConfig{
+		EnvVars: []corev1.EnvVar{
+			{
+				Name:  "PGDATA",
+				Value: PgDataPath,
+			},
+			{
+				Name:  "POD_NAME",
+				Value: podName,
+			},
+			{
+				Name:  "NAMESPACE",
+				Value: cluster.Namespace,
+			},
+			{
+				Name:  "CLUSTER_NAME",
+				Value: cluster.Name,
+			},
+			{
+				Name:  "PGPORT",
+				Value: strconv.Itoa(postgres.ServerPort),
+			},
+			{
+				Name:  "PGHOST",
+				Value: postgres.SocketDirectory,
+			},
+		},
+		EnvFrom: cluster.Spec.EnvFrom,
+	}
+	config.EnvVars = append(config.EnvVars, cluster.Spec.Env...)
+
+	hashValue, _ := hash.ComputeHash(config)
+	config.Hash = hashValue
+	return config
 }
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
-func createPostgresContainers(
-	cluster apiv1.Cluster,
-	podName string,
-) []corev1.Container {
+func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []corev1.Container {
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
 			Image:           cluster.GetImageName(),
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-			Env:             CreateEnvVarPostgresContainer(cluster, podName),
-			EnvFrom:         cluster.Spec.EnvFrom,
+			Env:             envConfig.EnvVars,
+			EnvFrom:         envConfig.EnvFrom,
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
@@ -305,6 +331,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 
+	envConfig := CreatePodEnvConfig(cluster, podName)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -314,7 +342,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
 			},
 			Annotations: map[string]string{
-				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
+				ClusterSerialAnnotationName:    strconv.Itoa(nodeSerial),
+				utils.PodEnvHashAnnotationName: envConfig.Hash,
 			},
 			Name:      podName,
 			Namespace: cluster.Namespace,
@@ -325,7 +354,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 			InitContainers: []corev1.Container{
 				createBootstrapContainer(cluster),
 			},
-			Containers:                    createPostgresContainers(cluster, podName),
+			Containers:                    createPostgresContainers(cluster, envConfig),
 			Volumes:                       createPostgresVolumes(cluster, podName),
 			SecurityContext:               CreatePodSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 			Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
