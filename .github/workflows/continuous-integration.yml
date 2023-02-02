@@ -440,7 +440,7 @@ jobs:
             image=moby/buildkit:v0.10.6
 
       - name: Build and load
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
