@@ -214,6 +214,8 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := GetJobName(cluster.Name, nodeSerial, role)
 
+	envConfig := CreatePodEnvConfig(cluster, jobName)
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -242,8 +244,8 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 							Name:            role,
 							Image:           cluster.GetImageName(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             CreateEnvVarPostgresContainer(cluster, instanceName),
-							EnvFrom:         cluster.Spec.EnvFrom,
+							Env:             envConfig.EnvVars,
+							EnvFrom:         envConfig.EnvFrom,
 							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,
