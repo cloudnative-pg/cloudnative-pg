@@ -29,7 +29,11 @@ type ShowPoolsMetrics struct {
 	ClActive,
 	ClWaiting,
 	ClCancelReq,
+	ClActiveCancelReq,
+	ClWaitingCancelReq,
 	SvActive,
+	SvActiveCancel,
+	SvBeingCanceled,
 	SvIdle,
 	SvUsed,
 	SvTested,
@@ -44,7 +48,11 @@ func (r *ShowPoolsMetrics) Describe(ch chan<- *prometheus.Desc) {
 	r.ClActive.Describe(ch)
 	r.ClWaiting.Describe(ch)
 	r.ClCancelReq.Describe(ch)
+	r.ClActiveCancelReq.Describe(ch)
+	r.ClWaitingCancelReq.Describe(ch)
 	r.SvActive.Describe(ch)
+	r.SvActiveCancel.Describe(ch)
+	r.SvBeingCanceled.Describe(ch)
 	r.SvIdle.Describe(ch)
 	r.SvUsed.Describe(ch)
 	r.SvTested.Describe(ch)
@@ -59,7 +67,11 @@ func (r *ShowPoolsMetrics) Reset() {
 	r.ClActive.Reset()
 	r.ClWaiting.Reset()
 	r.ClCancelReq.Reset()
+	r.ClActiveCancelReq.Reset()
+	r.ClWaitingCancelReq.Reset()
 	r.SvActive.Reset()
+	r.SvActiveCancel.Reset()
+	r.SvBeingCanceled.Reset()
 	r.SvIdle.Reset()
 	r.SvUsed.Reset()
 	r.SvTested.Reset()
@@ -91,11 +103,37 @@ func NewShowPoolsMetrics(subsystem string) *ShowPoolsMetrics {
 			Name:      "cl_cancel_req",
 			Help:      "Client connections that have not forwarded query cancellations to the server yet.",
 		}, []string{"database", "user"}),
+		ClActiveCancelReq: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "cl_active_cancel_req",
+			Help: "Client connections that have forwarded query cancellations to the server and " +
+				"are waiting for the server response.",
+		}, []string{"database", "user"}),
+		ClWaitingCancelReq: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "cl_waiting_cancel_req",
+			Help:      "Client connections that have not forwarded query cancellations to the server yet.",
+		}, []string{"database", "user"}),
 		SvActive: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sv_active",
 			Help:      "Server connections that are linked to a client.",
+		}, []string{"database", "user"}),
+		SvActiveCancel: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "sv_active_cancel",
+			Help:      "Server connections that are currently forwarding a cancel request",
+		}, []string{"database", "user"}),
+		SvBeingCanceled: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "sv_wait_cancels",
+			Help: "Servers that normally could become idle, but are waiting to do so until all in-flight cancel " +
+				"requests have completed that were sent to cancel a query on this server.",
 		}, []string{"database", "user"}),
 		SvIdle: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
@@ -167,43 +205,82 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 	}()
 
 	var (
-		database    string
-		user        string
-		clActive    int
-		clWaiting   int
-		clCancelReq int
-		svActive    int
-		svIdle      int
-		svUsed      int
-		svTested    int
-		svLogin     int
-		maxWait     int
-		maxWaitUs   int
-		poolMode    string
+		database           string
+		user               string
+		clActive           int
+		clWaiting          int
+		clCancelReq        int
+		clActiveCancelReq  int
+		clWaitingCancelReq int
+		svActive           int
+		svActiveCancel     int
+		svBeingCanceled    int
+		svIdle             int
+		svUsed             int
+		svTested           int
+		svLogin            int
+		maxWait            int
+		maxWaitUs          int
+		poolMode           string
 	)
 
+	cols, err := rows.Columns()
+	if err != nil {
+		log.Error(err, "Error while getting number of columns")
+		e.Metrics.PgbouncerUp.Set(0)
+		e.Metrics.Error.Set(1)
+		return
+	}
 	for rows.Next() {
-		if err = rows.Scan(&database, &user,
-			&clActive,
-			&clWaiting,
-			&clCancelReq,
-			&svActive,
-			&svIdle,
-			&svUsed,
-			&svTested,
-			&svLogin,
-			&maxWait,
-			&maxWaitUs,
-			&poolMode,
-		); err != nil {
-			log.Error(err, "Error while executing SHOW POOLS")
-			e.Metrics.Error.Set(1)
-			e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
+		switch len(cols) {
+		case 16:
+			if err = rows.Scan(&database, &user,
+				&clActive,
+				&clWaiting,
+				&clActiveCancelReq,
+				&clWaitingCancelReq,
+				&svActive,
+				&svActiveCancel,
+				&svBeingCanceled,
+				&svIdle,
+				&svUsed,
+				&svTested,
+				&svLogin,
+				&maxWait,
+				&maxWaitUs,
+				&poolMode,
+			); err != nil {
+				log.Error(err, "Error while executing SHOW POOLS")
+				e.Metrics.Error.Set(1)
+				e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
+			}
+		default:
+			if err = rows.Scan(&database, &user,
+				&clActive,
+				&clWaiting,
+				&clCancelReq,
+				&svActive,
+				&svIdle,
+				&svUsed,
+				&svTested,
+				&svLogin,
+				&maxWait,
+				&maxWaitUs,
+				&poolMode,
+			); err != nil {
+				log.Error(err, "Error while executing SHOW POOLS")
+				e.Metrics.Error.Set(1)
+				e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
+			}
 		}
 		e.Metrics.ShowPools.ClActive.WithLabelValues(database, user).Set(float64(clActive))
 		e.Metrics.ShowPools.ClWaiting.WithLabelValues(database, user).Set(float64(clWaiting))
 		e.Metrics.ShowPools.ClCancelReq.WithLabelValues(database, user).Set(float64(clCancelReq))
+		e.Metrics.ShowPools.ClActiveCancelReq.WithLabelValues(database, user).Set(float64(clActiveCancelReq))
+		e.Metrics.ShowPools.ClWaitingCancelReq.WithLabelValues(database, user).Set(float64(clWaitingCancelReq))
 		e.Metrics.ShowPools.SvActive.WithLabelValues(database, user).Set(float64(svActive))
+		e.Metrics.ShowPools.SvActiveCancel.WithLabelValues(database, user).Set(float64(svActiveCancel))
+		e.Metrics.ShowPools.SvBeingCanceled.WithLabelValues(database, user).Set(float64(svBeingCanceled))
 		e.Metrics.ShowPools.SvIdle.WithLabelValues(database, user).Set(float64(svIdle))
 		e.Metrics.ShowPools.SvUsed.WithLabelValues(database, user).Set(float64(svUsed))
 		e.Metrics.ShowPools.SvTested.WithLabelValues(database, user).Set(float64(svTested))
@@ -216,7 +293,11 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 	e.Metrics.ShowPools.ClActive.Collect(ch)
 	e.Metrics.ShowPools.ClWaiting.Collect(ch)
 	e.Metrics.ShowPools.ClCancelReq.Collect(ch)
+	e.Metrics.ShowPools.ClActiveCancelReq.Collect(ch)
+	e.Metrics.ShowPools.ClWaitingCancelReq.Collect(ch)
 	e.Metrics.ShowPools.SvActive.Collect(ch)
+	e.Metrics.ShowPools.SvActiveCancel.Collect(ch)
+	e.Metrics.ShowPools.SvBeingCanceled.Collect(ch)
 	e.Metrics.ShowPools.SvIdle.Collect(ch)
 	e.Metrics.ShowPools.SvUsed.Collect(ch)
 	e.Metrics.ShowPools.SvTested.Collect(ch)
