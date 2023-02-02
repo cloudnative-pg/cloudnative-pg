@@ -131,6 +131,7 @@ cnpg_collector_manual_switchover_required 0
 # HELP cnpg_collector_pg_wal Total size in bytes of WAL segments in the '/var/lib/postgresql/data/pgdata/pg_wal' directory  computed as (wal_segment_size * count)
 # TYPE cnpg_collector_pg_wal gauge
 cnpg_collector_pg_wal{value="count"} 9
+cnpg_collector_pg_wal{value="slots_max"} NaN
 cnpg_collector_pg_wal{value="keep"} 32
 cnpg_collector_pg_wal{value="max"} 64
 cnpg_collector_pg_wal{value="min"} 5

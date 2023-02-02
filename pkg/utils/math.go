@@ -16,9 +16,21 @@ limitations under the License.
 
 package utils
 
+import (
+	"golang.org/x/exp/constraints"
+)
+
 // IsPowerOfTwo calculates if a number is power of two or not
 // reference: https://github.com/golang/go/blob/master/src/strconv/itoa.go#L204 #wokeignore:rule=master
 // This function will return false if the number is zero
 func IsPowerOfTwo(n int) bool {
 	return (n != 0) && (n&(n-1) == 0)
+}
+
+// ToBytes converts an input value in MB to bytes
+// Input: value - an integer representing size in MB
+// Output: the size in bytes, calculated by multiplying the input value by 1024 * 1024
+func ToBytes[T constraints.Signed | constraints.Float](mb T) float64 {
+	multiplier := float64(1024)
+	return float64(mb) * multiplier * multiplier
 }
