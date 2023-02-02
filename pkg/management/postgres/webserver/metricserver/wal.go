@@ -72,6 +72,10 @@ type walSettings struct {
 }
 
 func (s *walSettings) synchronize(db *sql.DB, configSha256 string) error {
+	if s.configSha256 == configSha256 {
+		return nil
+	}
+
 	rows, err := db.Query(`
 SELECT name, setting FROM pg_settings 
 WHERE pg_settings.name
