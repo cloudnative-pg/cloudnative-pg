@@ -79,14 +79,14 @@ Failover may result in the service being impacted and/or data being lost:
 
 As anticipated above, the `spec.failoverDelay` option allows you to delay the start
 of the failover procedure by a number of seconds after the primary has been
-detected to be unhealthy. By default this setting is set to `0`, triggering the
+detected to be unhealthy. By default, this setting is set to `0`, triggering the
 failover procedure immediately.
 
 Sometimes failing over to a new primary can be more disruptive than waiting
-for the the primary to come back online. This is especially true of network
-disruptions where multiple tiers are affected (i.e. downstream logical
+for the primary to come back online. This is especially true of network
+disruptions where multiple tiers are affected (i.e., downstream logical
 subscribers) or when the time to perform the failover is longer than the
 expected outage.
 
-By enabling a new configuration option to delay failover provides a mechanism to
-prevent premature failover for short lived network or node instability.
+Enabling a new configuration option to delay failover provides a mechanism to
+prevent premature failover for short-lived network or node instability.

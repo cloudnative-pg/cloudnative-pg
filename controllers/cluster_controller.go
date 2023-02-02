@@ -353,8 +353,8 @@ func (r *ClusterReconciler) handleSwitchover(
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// no switchover will be triggered, primary is healthy, if we had a set
-	// currentPrimaryFailingSince timestamp, let's unset it
+	// Primary is healthy, No switchover in progress.
+	// If we have a currentPrimaryFailingSince timestamp, let's unset it.
 	if cluster.Status.CurrentPrimaryFailingSinceTimestamp != "" {
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp = ""
 		if err := r.Status().Update(ctx, cluster); err != nil {

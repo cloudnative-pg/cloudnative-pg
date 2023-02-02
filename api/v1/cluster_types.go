@@ -229,9 +229,9 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=40000000
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
-	// The amount of time (in seconds) to wait before triggering a failover,
-	// after the primary PostgreSQL instance in the cluster was detected to
-	// be unhealthy
+	// The amount of time (in seconds) to wait before triggering a failover
+	// after the primary PostgreSQL instance in the cluster was detected
+	// to be unhealthy
 	// +kubebuilder:default:=0
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
 
