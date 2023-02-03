@@ -646,3 +646,29 @@ spec:
 In the [networking page](networking.md) you can find a network policy file
 that you can customize to create a `NetworkPolicy` explicitly allowing the
 operator to connect cross-namespace to cluster pods.
+
+### Error while bootstrapping data directory
+
+If you encounter the issue that your database cannot be initialized because it crashes during the bootstraping process, it is likely that your hugepage settings are set wrong.
+
+To check whether hugepages are enabled, run `cat /proc/meminfo` and check if huge pages are configured, their size and how many are free. If they are not enabled, you can adjust your cluster configuration as follows:
+```
+  postgresql:
+    parameters:
+      huge_pages: off
+```
+If they are enabled, you need to define how much memory should be allocated on them.
+Example:
+```
+  postgresql:
+    parameters:
+      shared_buffers: "128MB"
+
+  resources:
+    requests:
+      memory: "512Mi"
+    limits:
+      hugepages-2Mi: "512Mi"
+``` 
+
+Please keep in mind that you have sufficient huge-page memory allocated (in the example above at least 512MiB need to be free) - check that in the meminfo.
