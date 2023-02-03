@@ -84,10 +84,6 @@ IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_ke
 		log.Error(err, "while fetching rows")
 		return err
 	}
-	if err := rows.Err(); err != nil {
-		log.Error(err, "while iterating over rows")
-		return err
-	}
 
 	defer func() {
 		err = rows.Close()
@@ -125,6 +121,11 @@ IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_ke
 		case "max_slot_wal_keep_size":
 			s.maxSlotWalKeepSize = normalizedSetting
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Error(err, "while iterating over rows")
+		return err
 	}
 
 	if needsKeepSizeNormalization {
