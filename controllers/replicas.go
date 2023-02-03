@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +35,10 @@ import (
 // ErrWalReceiversRunning is raised when a new primary server can't be elected
 // because there is a WAL receiver running in our Pod list
 var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
+
+// ErrWaitingOnFailOverDelay is raised when the primary server can't be elected because the .spec.failoverDelay hasn't
+// elapsed yet
+var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
 
 // updateTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion
@@ -96,6 +101,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	// we have nothing to do here.
 	if cluster.Status.TargetPrimary == status.Items[0].Pod.Name {
 		return "", nil
+	}
+
+	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
+		return "", err
 	}
 
 	// The current primary is not correctly working, and we need to elect a new one
@@ -263,6 +272,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 		}
 	}
 
+	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
+		return "", err
+	}
+
 	// The designated primary is not correctly working, and we need to elect a new one
 	// but before doing that we need to wait for all the WAL receivers to be
 	// terminated. This is needed to avoid losing the WAL data that is being received
@@ -301,6 +314,32 @@ func GetPodsNotOnPrimaryNode(
 		}
 	}
 	return podsOnOtherNodes
+}
+
+func (r *ClusterReconciler) enforceFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Spec.FailoverDelay == 0 {
+		return nil
+	}
+
+	if cluster.Status.CurrentPrimaryFailingSinceTimestamp == "" {
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp = utils.GetCurrentTimestamp()
+		if err := r.Status().Update(ctx, cluster); err != nil {
+			return err
+		}
+	}
+	primaryFailingSince, err := utils.DifferenceBetweenTimestamps(
+		utils.GetCurrentTimestamp(),
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp,
+	)
+	if err != nil {
+		return err
+	}
+	delay := time.Duration(cluster.Spec.FailoverDelay) * time.Second
+	if delay > primaryFailingSince {
+		return ErrWaitingOnFailOverDelay
+	}
+
+	return nil
 }
 
 // updateClusterAnnotationsOnPods we check if we need to add or modify existing annotations specified in the cluster but

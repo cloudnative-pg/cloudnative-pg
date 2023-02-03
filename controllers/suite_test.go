@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -60,6 +61,9 @@ var (
 	poolerReconciler  *PoolerReconciler
 	clusterReconciler *ClusterReconciler
 	scheme            *runtime.Scheme
+	contextMain       context.Context
+	contextMainCancel context.CancelFunc
+	discoveryClient   discovery.DiscoveryInterface
 )
 
 func init() {
@@ -73,9 +77,8 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
-
+	contextMain, contextMainCancel = context.WithCancel(context.Background())
 	testEnv = buildTestEnv()
-
 	var err error
 	cfg, err = testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
@@ -88,13 +91,16 @@ var _ = BeforeSuite(func() {
 	utilruntime.Must(apiv1.AddToScheme(scheme))
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	Expect(err).To(BeNil())
 
+	discoveryClient, err = discovery.NewDiscoveryClientForConfig(cfg)
 	Expect(err).To(BeNil())
 
 	clusterReconciler = &ClusterReconciler{
-		Client:   k8sClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
+		Client:          k8sClient,
+		Scheme:          scheme,
+		Recorder:        record.NewFakeRecorder(120),
+		DiscoveryClient: discoveryClient,
 	}
 
 	poolerReconciler = &PoolerReconciler{
@@ -106,6 +112,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
+	contextMainCancel()
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
@@ -154,7 +161,7 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	return pooler
 }
 
-func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
+func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluster)) *apiv1.Cluster {
 	const instances int = 3
 	name := "cluster-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
@@ -190,6 +197,9 @@ func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
 
 	cluster.SetDefaults()
 
+	for _, mutator := range mutators {
+		mutator(cluster)
+	}
 	err := k8sClient.Create(context.Background(), cluster)
 	Expect(err).To(BeNil())
 
@@ -386,11 +396,11 @@ func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *Poo
 		CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
 	})
 	Expect(err).To(BeNil())
-
 	clusterRec := &ClusterReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
+		Client:          mgr.GetClient(),
+		Scheme:          scheme,
+		Recorder:        record.NewFakeRecorder(120),
+		DiscoveryClient: discoveryClient,
 	}
 
 	err = clusterRec.SetupWithManager(ctx, mgr)
@@ -462,8 +472,7 @@ func expectResourceDoesntExistWithDefaultClient(name, namespace string, resource
 
 // withManager bootstraps a manager.Manager inside a ginkgo.It statement
 func withManager(callback func(context.Context, *ClusterReconciler, *PoolerReconciler, manager.Manager)) {
-	ctx, ctxCancel := context.WithCancel(context.TODO())
-
+	ctx, ctxCancel := context.WithTimeout(contextMain, time.Second*150)
 	crReconciler, poolerReconciler, mgr := createManagerWithReconcilers(ctx)
 
 	wg := sync.WaitGroup{}

@@ -1,6 +1,7 @@
 # Automated failover
 
-In the case of unexpected errors on the primary, the cluster will go into
+In the case of unexpected errors on the primary for longer than the
+`spec.failoverDelay` (by default `0` seconds), the cluster will go into
 **failover mode**. This may happen, for example, when:
 
 - The primary pod has a disk failure
@@ -73,3 +74,19 @@ Failover may result in the service being impacted and/or data being lost:
     level. On the contrary, setting it to a high value, might remove the risk of
     data loss while leaving the cluster without an active primary for a longer time
     during the switchover.
+
+## Delayed failover
+
+As anticipated above, the `spec.failoverDelay` option allows you to delay the start
+of the failover procedure by a number of seconds after the primary has been
+detected to be unhealthy. By default, this setting is set to `0`, triggering the
+failover procedure immediately.
+
+Sometimes failing over to a new primary can be more disruptive than waiting
+for the primary to come back online. This is especially true of network
+disruptions where multiple tiers are affected (i.e., downstream logical
+subscribers) or when the time to perform the failover is longer than the
+expected outage.
+
+Enabling a new configuration option to delay failover provides a mechanism to
+prevent premature failover for short-lived network or node instability.

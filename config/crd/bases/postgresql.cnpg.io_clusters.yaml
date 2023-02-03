@@ -2115,6 +2115,13 @@ spec:
                   - name
                   type: object
                 type: array
+              failoverDelay:
+                default: 0
+                description: The amount of time (in seconds) to wait before triggering
+                  a failover after the primary PostgreSQL instance in the cluster
+                  was detected to be unhealthy
+                format: int32
+                type: integer
               imageName:
                 description: Name of the container image, supporting both tags (`<image>:<tag>`)
                   and digests for deterministic and repeatable deployments (`<image>:<tag>@sha256:<digestValue>`)
@@ -3398,6 +3405,10 @@ spec:
                 type: object
               currentPrimary:
                 description: Current primary instance
+                type: string
+              currentPrimaryFailingSinceTimestamp:
+                description: The timestamp when the primary was detected to be unhealthy
+                  This field is reported only when spec.failoverDelay is populated
                 type: string
               currentPrimaryTimestamp:
                 description: The timestamp when the last actual promotion to primary

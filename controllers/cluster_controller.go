@@ -65,7 +65,7 @@ var apiGVString = apiv1.GroupVersion.String()
 type ClusterReconciler struct {
 	client.Client
 
-	DiscoveryClient *discovery.DiscoveryClient
+	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 
@@ -333,6 +333,10 @@ func (r *ClusterReconciler) handleSwitchover(
 	// This means issuing a failover or switchover when needed.
 	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
 	if err != nil {
+		if err == ErrWaitingOnFailOverDelay {
+			contextLogger.Info("Waiting for the failover delay to expire")
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 		if err == ErrWalReceiversRunning {
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
@@ -348,6 +352,16 @@ func (r *ClusterReconciler) handleSwitchover(
 			"newPrimary", selectedPrimary)
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
+
+	// Primary is healthy, No switchover in progress.
+	// If we have a currentPrimaryFailingSince timestamp, let's unset it.
+	if cluster.Status.CurrentPrimaryFailingSinceTimestamp != "" {
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp = ""
+		if err := r.Status().Update(ctx, cluster); err != nil {
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }
 

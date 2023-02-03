@@ -17,9 +17,14 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
+	"time"
+
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -54,5 +59,144 @@ var _ = Describe("Filtering cluster", func() {
 		configMap.Name = "a-secret"
 		req := filterClustersUsingConfigMap(clusterList, &configMap)
 		Expect(req).ToNot(BeNil())
+	})
+})
+
+var _ = Describe("Updating target primary", func() {
+	It("selects the new target primary right away", func() {
+		ctx := context.TODO()
+		namespace := newFakeNamespace()
+		cluster := newFakeCNPGCluster(namespace)
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(clusterReconciler.Client, cluster)
+		instances := generateFakeClusterPods(clusterReconciler.Client, cluster, true)
+		pvc := generateFakePVC(clusterReconciler.Client, cluster)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:  postgres.LSN("0/0"),
+					ReceivedLsn: postgres.LSN("0/0"),
+					ReplayLsn:   postgres.LSN("0/0"),
+					IsPodReady:  true,
+					Pod:         instances[1],
+				},
+				{
+					CurrentLsn:  postgres.LSN("0/0"),
+					ReceivedLsn: postgres.LSN("0/0"),
+					ReplayLsn:   postgres.LSN("0/0"),
+					IsPodReady:  true,
+					Pod:         instances[2],
+				},
+				{
+					CurrentLsn:  postgres.LSN("0/0"),
+					ReceivedLsn: postgres.LSN("0/0"),
+					ReplayLsn:   postgres.LSN("0/0"),
+					IsPodReady:  false,
+					Pod:         instances[0],
+				},
+			},
+		}
+
+		By("creating the status list from the cluster pods", func() {
+			cluster.Status.TargetPrimary = instances[0].Name
+		})
+
+		By("updating target primary pods for the cluster", func() {
+			selectedPrimary, err := clusterReconciler.updateTargetPrimaryFromPods(
+				ctx,
+				cluster,
+				statusList,
+				managedResources,
+			)
+
+			Expect(err).To(BeNil())
+			Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
+		})
+	})
+
+	It("it should wait the failover delay to select the new target primary", func() {
+		ctx := context.TODO()
+		namespace := newFakeNamespace()
+		cluster := newFakeCNPGCluster(namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.FailoverDelay = 2
+		})
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(clusterReconciler.Client, cluster)
+		instances := generateFakeClusterPods(clusterReconciler.Client, cluster, true)
+		pvc := generateFakePVC(clusterReconciler.Client, cluster)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvc},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:  postgres.LSN("0/0"),
+					ReceivedLsn: postgres.LSN("0/0"),
+					ReplayLsn:   postgres.LSN("0/0"),
+					IsPodReady:  false,
+					IsPrimary:   false,
+					Pod:         instances[0],
+				},
+				{
+					CurrentLsn:  postgres.LSN("0/0"),
+					ReceivedLsn: postgres.LSN("0/0"),
+					ReplayLsn:   postgres.LSN("0/0"),
+					IsPodReady:  false,
+					IsPrimary:   true,
+					Pod:         instances[1],
+				},
+				{
+					CurrentLsn:  postgres.LSN("0/0"),
+					ReceivedLsn: postgres.LSN("0/0"),
+					ReplayLsn:   postgres.LSN("0/0"),
+					IsPodReady:  true,
+					Pod:         instances[2],
+				},
+			},
+		}
+
+		By("creating the status list from the cluster pods", func() {
+			cluster.Status.TargetPrimary = instances[1].Name
+			cluster.Status.CurrentPrimary = instances[1].Name
+		})
+
+		By("returning the ErrWaitingOnFailOverDelay when first detecting the failure", func() {
+			selectedPrimary, err := clusterReconciler.updateTargetPrimaryFromPodsPrimaryCluster(
+				ctx,
+				cluster,
+				statusList,
+				managedResources,
+			)
+
+			Expect(err).NotTo(BeNil())
+			Expect(err).To(Equal(ErrWaitingOnFailOverDelay))
+			Expect(selectedPrimary).To(Equal(""))
+		})
+
+		By("eventually updating the primary pod once the delay is elapsed", func() {
+			Eventually(func(g Gomega) {
+				selectedPrimary, err := clusterReconciler.updateTargetPrimaryFromPodsPrimaryCluster(
+					ctx,
+					cluster,
+					statusList,
+					managedResources,
+				)
+				g.Expect(err).To(BeNil())
+				g.Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
+			}).WithTimeout(5 * time.Second).Should(Succeed())
+		})
 	})
 })
