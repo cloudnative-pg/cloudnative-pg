@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
@@ -2432,6 +2433,45 @@ var _ = Describe("Environment variables validation", func() {
 			}
 
 			Expect(cluster.validateEnv()).To(HaveLen(1))
+		})
+	})
+})
+
+var _ = Describe("Valid Storage configuration", func() {
+	When("a ClusterSpec is given", func() {
+		It("detects if storage is not set at all", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					StorageConfiguration: StorageConfiguration{},
+				},
+			}
+			Expect(cluster.validateStorageSize()).To(HaveLen(1))
+		})
+
+		It("does not complain if storage size is set", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					StorageConfiguration: StorageConfiguration{
+						Size: "1G",
+					},
+				},
+			}
+			Expect(cluster.validateStorageSize()).To(BeEmpty())
+		})
+
+		It("does not complain if a pvc template is set", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					StorageConfiguration: StorageConfiguration{
+						PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+			}
+			Expect(cluster.validateStorageSize()).To(BeEmpty())
 		})
 	})
 })
