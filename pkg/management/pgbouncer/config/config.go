@@ -80,7 +80,12 @@ auth_query = {{ .AuthQuery }}
 `
 	pgbouncerHBAFileTemplateString = `
 local pgbouncer pgbouncer peer
-host all all 0.0.0.0/0 md5
+
+{{ range $rule := .PgHba }}
+{{ $rule -}}
+{{ end }}
+
+host all all all md5
 `
 
 	pgBouncerUserListTemplateString = `
@@ -180,6 +185,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		AuthQueryUser     string
 		AuthQueryPassword string
 		Parameters        string
+		PgHba             []string
 	}{
 		Pooler:            pooler,
 		AuthQuery:         pooler.GetAuthQuery(),
@@ -193,6 +199,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		// Also, we want the list of parameters inside the PgBouncer configuration
 		// to be stable.
 		Parameters: stringifyPgBouncerParameters(parameters),
+		PgHba:      pooler.Spec.PgBouncer.PgHBA,
 	}
 
 	err = pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData)
