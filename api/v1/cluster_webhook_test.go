@@ -707,6 +707,30 @@ var _ = Describe("Image name validation", func() {
 	})
 })
 
+var _ = DescribeTable("parseWalSettingValue",
+	func(value string, parsedValue resource.Quantity, expectError bool) {
+		quantity, err := parseWalSettingValue(value)
+		if !expectError {
+			Expect(quantity, err).Should(BeComparableTo(parsedValue))
+		} else {
+			Expect(err).Should(HaveOccurred())
+		}
+	},
+	Entry("bare", "1", resource.MustParse("1Mi"), false),
+	Entry("B", "1B", resource.MustParse("1"), false),
+	Entry("kB", "1kB", resource.MustParse("1Ki"), false),
+	Entry("MB", "1MB", resource.MustParse("1Mi"), false),
+	Entry("GB", "1GB", resource.MustParse("1Gi"), false),
+	Entry("TB", "1TB", resource.MustParse("1Ti"), false),
+	Entry("spaceB", "1 B", resource.MustParse("1"), false),
+	Entry("spaceMB", "1 MB", resource.MustParse("1Mi"), false),
+	Entry("reject kb", "1kb", resource.Quantity{}, true),
+	Entry("reject Mb", "1Mb", resource.Quantity{}, true),
+	Entry("reject G", "1G", resource.Quantity{}, true),
+	Entry("reject random unit", "1random", resource.Quantity{}, true),
+	Entry("reject non-numeric", "non-numeric", resource.Quantity{}, true),
+)
+
 var _ = Describe("configuration change validation", func() {
 	It("doesn't complain when the configuration is exactly the same", func() {
 		clusterOld := Cluster{
@@ -977,27 +1001,9 @@ var _ = Describe("configuration change validation", func() {
 			},
 		}
 		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
-
-		clusterNew = Cluster{
-			Spec: ClusterSpec{
-				PostgresConfiguration: PostgresConfiguration{
-					Parameters: map[string]string{
-						"min_wal_size": "80",
-						"max_wal_size": "1G",
-					},
-				},
-				WalStorage: &StorageConfiguration{
-					Size: "2Gi",
-				},
-				StorageConfiguration: StorageConfiguration{
-					Size: "10Gi",
-				},
-			},
-		}
-		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 	})
 
-	It("considers default values for min_wal_size and max_wal_size", func() {
+	It("doesn't compare default values for min_wal_size and max_wal_size with WalStorage", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
@@ -1008,20 +1014,20 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"min_wal_size": "2G", // default for max_wal_size is 1G
+						"min_wal_size": "1.5GB", // default for max_wal_size is 1GB
 					},
 				},
 				WalStorage: &StorageConfiguration{
 					Size: "2Gi",
 				},
 				StorageConfiguration: StorageConfiguration{
-					Size: "4Gi",
+					Size: "10Gi",
 				},
 			},
 		}

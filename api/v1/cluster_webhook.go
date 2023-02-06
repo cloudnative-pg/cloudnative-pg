@@ -921,9 +921,10 @@ func validateWalSizeConfiguration(
 
 	var result field.ErrorList
 
-	minWalSize := postgresConfig.Parameters[minWalSizeKey]
+	minWalSize, hasMinWalSize := postgresConfig.Parameters[minWalSizeKey]
 	if minWalSize == "" {
 		minWalSize = minWalSizeDefault
+		hasMinWalSize = false
 	}
 	minWalSizeValue, err := parseWalSettingValue(minWalSize)
 	if err != nil {
@@ -935,9 +936,10 @@ func validateWalSizeConfiguration(
 				fmt.Sprintf("Invalid value for configuration parameter %s", minWalSizeKey)))
 	}
 
-	maxWalSize := postgresConfig.Parameters[maxWalSizeKey]
+	maxWalSize, hasMaxWalSize := postgresConfig.Parameters[maxWalSizeKey]
 	if maxWalSize == "" {
 		maxWalSize = maxWalSizeDefault
+		hasMaxWalSize = false
 	}
 	maxWalSizeValue, err := parseWalSettingValue(maxWalSize)
 	if err != nil {
@@ -964,7 +966,8 @@ func validateWalSizeConfiguration(
 		return result
 	}
 
-	if !minWalSizeValue.IsZero() &&
+	if hasMinWalSize &&
+		!minWalSizeValue.IsZero() &&
 		minWalSizeValue.Cmp(*walVolumeSize) >= 0 {
 		result = append(
 			result,
@@ -975,7 +978,8 @@ func validateWalSizeConfiguration(
 					minWalSizeKey, minWalSizeDefault)))
 	}
 
-	if !maxWalSizeValue.IsZero() &&
+	if hasMaxWalSize &&
+		!maxWalSizeValue.IsZero() &&
 		maxWalSizeValue.Cmp(*walVolumeSize) >= 0 {
 		result = append(
 			result,
@@ -1012,6 +1016,9 @@ func parseWalSettingValue(value string) (resource.Quantity, error) {
 	// Add the 'i' suffix unless it is a bare number (it was 'B' before)
 	if _, err := strconv.Atoi(value); err != nil {
 		value += "i"
+
+		// 'kB' must translate to 'Ki'
+		value = strings.ReplaceAll(value, "ki", "Ki")
 	}
 
 	return resource.ParseQuantity(value)
