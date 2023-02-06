@@ -178,9 +178,11 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	return options, nil
 }
 
-var errFirstWalArchiveTriggered = errors.New("first wal-archive triggered")
+type walArchiveDetector struct {
+	firstWalArchiveTriggered bool
+}
 
-func isWalArchiveWorking(db *sql.DB, firstWalArchiveTriggered bool) error {
+func (w *walArchiveDetector) isWalArchiveWorking(db *sql.DB) error {
 	row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
 		"COALESCE(last_failed_time, '-infinity') AS is_archiving, last_failed_time IS NOT NULL " +
 		"FROM pg_stat_archiver")
@@ -202,7 +204,7 @@ func isWalArchiveWorking(db *sql.DB, firstWalArchiveTriggered bool) error {
 		return errors.New("wal-archive not working")
 	}
 
-	if firstWalArchiveTriggered {
+	if w.firstWalArchiveTriggered {
 		log.Info("Waiting for the first WAL file to be archived")
 		return errors.New("waiting for first wal-archive")
 	}
@@ -216,12 +218,13 @@ func isWalArchiveWorking(db *sql.DB, firstWalArchiveTriggered bool) error {
 		return fmt.Errorf("error while switching to a new WAL: %w", err)
 	}
 
-	return errFirstWalArchiveTriggered
+	w.firstWalArchiveTriggered = true
+	return errors.New("first wal-archive triggered")
 }
 
 // waitForInstanceWalArchiveToWork retry until the wal archiving is working or the timeout occur
 func waitForInstanceWalArchiveToWork(wait wait.Backoff, instance *Instance) error {
-	firstWalArchiveTriggered := false
+	var detector walArchiveDetector
 	return retry.OnError(wait, resources.RetryAlways, func() error {
 		db, openErr := sql.Open(
 			"pgx",
@@ -237,12 +240,7 @@ func waitForInstanceWalArchiveToWork(wait wait.Backoff, instance *Instance) erro
 			}
 		}()
 
-		archiveWorkingErr := isWalArchiveWorking(db, firstWalArchiveTriggered)
-		if errors.Is(archiveWorkingErr, errFirstWalArchiveTriggered) {
-			firstWalArchiveTriggered = true
-		}
-
-		return archiveWorkingErr
+		return detector.isWalArchiveWorking(db)
 	})
 }
 
