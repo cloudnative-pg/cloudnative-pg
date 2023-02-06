@@ -18,8 +18,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -177,69 +175,6 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	return options, nil
 }
 
-// waitForWalArchiveWorking retry until the wal archiving is working or the timeout occur
-func waitForWalArchiveWorking(instance *Instance) error {
-	db, err := sql.Open(
-		"pgx",
-		fmt.Sprintf("%s dbname=%s", instance.GetPrimaryConnInfo(), "postgres"),
-	)
-	if err != nil {
-		log.Error(err, "can not open postgres database")
-		return err
-	}
-	defer func() {
-		err = db.Close()
-		if err != nil {
-			log.Error(err, "Error while closing connection")
-		}
-	}()
-
-	walError := errors.New("wal-archive not working")
-
-	firstWalArchiveTriggered := false
-
-	return retry.OnError(retryUntilWalArchiveWorking, func(err error) bool {
-		return errors.Is(err, walError)
-	}, func() error {
-		row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
-			"COALESCE(last_failed_time, '-infinity') AS is_archiving, last_failed_time IS NOT NULL " +
-			"FROM pg_stat_archiver")
-
-		var walArchivingWorking, lastFailedTimePresent bool
-
-		if err := row.Scan(&walArchivingWorking, &lastFailedTimePresent); err != nil {
-			log.Error(err, "can't get WAL archiving status")
-			return err
-		}
-
-		if walArchivingWorking {
-			log.Info("WAL archiving is working, proceeding with the backup")
-			return nil
-		}
-
-		if lastFailedTimePresent {
-			log.Info("WAL archiving is not working, will retry in one minute")
-			return walError
-		}
-
-		if firstWalArchiveTriggered {
-			log.Info("Waiting for the first WAL file to be archived")
-			return walError
-		}
-
-		log.Info("Triggering the first WAL file to be archived")
-		if _, err := db.Exec("CHECKPOINT"); err != nil {
-			return fmt.Errorf("error while requiring a checkpoint: %w", err)
-		}
-
-		if _, err := db.Exec("SELECT pg_switch_wal()"); err != nil {
-			return fmt.Errorf("error while switching to a new WAL: %w", err)
-		}
-		firstWalArchiveTriggered = true
-		return walError
-	})
-}
-
 // Start initiates a backup for this instance using
 // barman-cloud-backup
 func (b *BackupCommand) Start(ctx context.Context) error {
@@ -254,8 +189,10 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		return fmt.Errorf("can't set backup as running: %v", err)
 	}
 
-	err = waitForWalArchiveWorking(b.Instance)
-	if err != nil {
+	if err := newWalArchiveBootstrapper().
+		withTimeout(&retryUntilWalArchiveWorking).
+		withInstanceDBProvider(b.Instance).
+		execute(); err != nil {
 		log.Warning("WAL archiving is not working", "err", err)
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
 		return UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
