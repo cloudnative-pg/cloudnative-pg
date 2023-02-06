@@ -18,8 +18,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -43,7 +41,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	// this is needed to correctly open the sql connection with the pgx driver
@@ -178,72 +175,6 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	return options, nil
 }
 
-type walArchiveBootstrapper struct {
-	firstWalArchiveTriggered bool
-}
-
-func (w *walArchiveBootstrapper) ensureWalArchiveIsBootstrapped(db *sql.DB) error {
-	row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
-		"COALESCE(last_failed_time, '-infinity') AS is_archiving, last_failed_time IS NOT NULL " +
-		"FROM pg_stat_archiver")
-
-	var walArchivingWorking, lastFailedTimePresent bool
-
-	if err := row.Scan(&walArchivingWorking, &lastFailedTimePresent); err != nil {
-		log.Error(err, "can't get WAL archiving status")
-		return err
-	}
-
-	if walArchivingWorking {
-		log.Info("WAL archiving is working, proceeding with the backup")
-		return nil
-	}
-
-	if lastFailedTimePresent {
-		log.Info("WAL archiving is not working, will retry in one minute")
-		return errors.New("wal-archive not working")
-	}
-
-	if w.firstWalArchiveTriggered {
-		log.Info("Waiting for the first WAL file to be archived")
-		return errors.New("waiting for first wal-archive")
-	}
-
-	log.Info("Triggering the first WAL file to be archived")
-	if _, err := db.Exec("CHECKPOINT"); err != nil {
-		return fmt.Errorf("error while requiring a checkpoint: %w", err)
-	}
-
-	if _, err := db.Exec("SELECT pg_switch_wal()"); err != nil {
-		return fmt.Errorf("error while switching to a new WAL: %w", err)
-	}
-
-	w.firstWalArchiveTriggered = true
-	return errors.New("first wal-archive triggered")
-}
-
-// waitForInstanceWalArchiveToWork retry until the wal archiving is working or the timeout occur
-func waitForInstanceWalArchiveToWork(wait wait.Backoff, instance *Instance) error {
-	var detector walArchiveBootstrapper
-	return retry.OnError(wait, resources.RetryAlways, func() error {
-		db, openErr := sql.Open(
-			"pgx",
-			fmt.Sprintf("%s dbname=%s", instance.GetPrimaryConnInfo(), "postgres"),
-		)
-		if openErr != nil {
-			log.Error(openErr, "can not open postgres database")
-			return openErr
-		}
-		defer func() {
-			if closeErr := db.Close(); closeErr != nil {
-				log.Error(closeErr, "Error while closing connection")
-			}
-		}()
-
-		return detector.ensureWalArchiveIsBootstrapped(db)
-	})
-}
-
 // Start initiates a backup for this instance using
 // barman-cloud-backup
 func (b *BackupCommand) Start(ctx context.Context) error {
@@ -258,7 +189,10 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		return fmt.Errorf("can't set backup as running: %v", err)
 	}
 
-	if err = waitForInstanceWalArchiveToWork(retryUntilWalArchiveWorking, b.Instance); err != nil {
+	if err := newWalArchiveBootstrapper().
+		withTimeout(&retryUntilWalArchiveWorking).
+		withInstanceDBProvider(b.Instance).
+		execute(); err != nil {
 		log.Warning("WAL archiving is not working", "err", err)
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
 		return UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
