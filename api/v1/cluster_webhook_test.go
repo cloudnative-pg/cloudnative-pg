@@ -19,7 +19,8 @@ package v1
 import (
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
@@ -1531,7 +1532,7 @@ var _ = Describe("toleration validation", func() {
 		recoveryCluster := &Cluster{
 			Spec: ClusterSpec{
 				Affinity: AffinityConfiguration{
-					Tolerations: []v1.Toleration{
+					Tolerations: []corev1.Toleration{
 						{
 							Key:      "test",
 							Operator: "Exists",
@@ -1549,7 +1550,7 @@ var _ = Describe("toleration validation", func() {
 		recoveryCluster := &Cluster{
 			Spec: ClusterSpec{
 				Affinity: AffinityConfiguration{
-					Tolerations: []v1.Toleration{
+					Tolerations: []corev1.Toleration{
 						{
 							Key:      "",
 							Operator: "Equal",
@@ -2385,5 +2386,44 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster := oldCluster.DeepCopy()
 		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = false
 		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
+	})
+})
+
+var _ = Describe("Storage configuration validation", func() {
+	When("a ClusterSpec is given", func() {
+		It("produces one error if storage is not set at all", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					StorageConfiguration: StorageConfiguration{},
+				},
+			}
+			Expect(cluster.validateStorageSize()).To(HaveLen(1))
+		})
+
+		It("succeeds if storage size is set", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					StorageConfiguration: StorageConfiguration{
+						Size: "1G",
+					},
+				},
+			}
+			Expect(cluster.validateStorageSize()).To(BeEmpty())
+		})
+
+		It("succeeds if storage is not set but a pvc template specifies storage", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					StorageConfiguration: StorageConfiguration{
+						PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+			}
+			Expect(cluster.validateStorageSize()).To(BeEmpty())
+		})
 	})
 })
