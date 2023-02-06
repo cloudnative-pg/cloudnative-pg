@@ -25,29 +25,29 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 	})
 
 	It("returns nil if WAL archiving is working", func() {
-		detector := walArchiveDetector{firstWalArchiveTriggered: true}
+		detector := walArchiveBootstrapper{firstWalArchiveTriggered: true}
 		rows := sqlmock.NewRows([]string{"is_archiving", "last_failed_time_present"}).
 			AddRow(true, false)
 		mock.ExpectQuery(flexibleCoalescenceQuery).WillReturnRows(rows)
 
-		err := detector.isWalArchiveWorking(db)
+		err := detector.ensureWalArchiveIsBootstrapped(db)
 		Expect(err).To(BeNil())
 		Expect(mock.ExpectationsWereMet()).To(BeNil())
 	})
 
 	It("returns an error if WAL archiving is not working and last_failed_time is present", func() {
-		detector := walArchiveDetector{}
+		detector := walArchiveBootstrapper{}
 		rows := sqlmock.NewRows([]string{"is_archiving", "last_failed_time_present"}).
 			AddRow(false, true)
 		mock.ExpectQuery(flexibleCoalescenceQuery).WillReturnRows(rows)
 
-		err := detector.isWalArchiveWorking(db)
+		err := detector.ensureWalArchiveIsBootstrapped(db)
 		Expect(err).To(Equal(errors.New("wal-archive not working")))
 		Expect(mock.ExpectationsWereMet()).To(BeNil())
 	})
 
 	It("triggers the first WAL archive if it has not been triggered", func() {
-		detector := walArchiveDetector{}
+		detector := walArchiveBootstrapper{}
 		// set up mock expectations
 		rows := sqlmock.NewRows([]string{"is_archiving", "last_failed_time_present"}).AddRow(false, false)
 		mock.ExpectQuery(flexibleCoalescenceQuery).WillReturnRows(rows)
@@ -55,7 +55,7 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 		mock.ExpectExec("SELECT pg_switch_wal()").WillReturnResult(fakeResult)
 
 		// Call the function
-		err := detector.isWalArchiveWorking(db)
+		err := detector.ensureWalArchiveIsBootstrapped(db)
 		Expect(err).To(Equal(errors.New("first wal-archive triggered")))
 
 		// Ensure the mock expectations are met

@@ -178,11 +178,11 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	return options, nil
 }
 
-type walArchiveDetector struct {
+type walArchiveBootstrapper struct {
 	firstWalArchiveTriggered bool
 }
 
-func (w *walArchiveDetector) isWalArchiveWorking(db *sql.DB) error {
+func (w *walArchiveBootstrapper) ensureWalArchiveIsBootstrapped(db *sql.DB) error {
 	row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
 		"COALESCE(last_failed_time, '-infinity') AS is_archiving, last_failed_time IS NOT NULL " +
 		"FROM pg_stat_archiver")
@@ -224,7 +224,7 @@ func (w *walArchiveDetector) isWalArchiveWorking(db *sql.DB) error {
 
 // waitForInstanceWalArchiveToWork retry until the wal archiving is working or the timeout occur
 func waitForInstanceWalArchiveToWork(wait wait.Backoff, instance *Instance) error {
-	var detector walArchiveDetector
+	var detector walArchiveBootstrapper
 	return retry.OnError(wait, resources.RetryAlways, func() error {
 		db, openErr := sql.Open(
 			"pgx",
@@ -240,7 +240,7 @@ func waitForInstanceWalArchiveToWork(wait wait.Backoff, instance *Instance) erro
 			}
 		}()
 
-		return detector.isWalArchiveWorking(db)
+		return detector.ensureWalArchiveIsBootstrapped(db)
 	})
 }
 
