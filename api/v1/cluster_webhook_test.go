@@ -2437,9 +2437,9 @@ var _ = Describe("Environment variables validation", func() {
 	})
 })
 
-var _ = Describe("Valid Storage configuration", func() {
+var _ = Describe("Storage configuration validation", func() {
 	When("a ClusterSpec is given", func() {
-		It("detects if storage is not set at all", func() {
+		It("produces one error if storage is not set at all", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					StorageConfiguration: StorageConfiguration{},
@@ -2448,7 +2448,7 @@ var _ = Describe("Valid Storage configuration", func() {
 			Expect(cluster.validateStorageSize()).To(HaveLen(1))
 		})
 
-		It("does not complain if storage size is set", func() {
+		It("succeeds if storage size is set", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					StorageConfiguration: StorageConfiguration{
@@ -2459,7 +2459,7 @@ var _ = Describe("Valid Storage configuration", func() {
 			Expect(cluster.validateStorageSize()).To(BeEmpty())
 		})
 
-		It("does not complain if a pvc template is set", func() {
+		It("succeeds if storage is not set but a pvc template specifies storage", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					StorageConfiguration: StorageConfiguration{
