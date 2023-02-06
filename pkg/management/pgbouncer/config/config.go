@@ -85,7 +85,8 @@ local pgbouncer pgbouncer peer
 {{ $rule -}}
 {{ end }}
 
-host all all all md5
+host all all 0.0.0.0/0 md5
+host all all ::/0 md5
 `
 
 	pgBouncerUserListTemplateString = `
