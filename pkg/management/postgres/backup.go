@@ -43,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	// this is needed to correctly open the sql connection with the pgx driver
@@ -179,28 +180,23 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 
 // waitForWalArchiveWorking retry until the wal archiving is working or the timeout occur
 func waitForWalArchiveWorking(instance *Instance) error {
-	db, err := sql.Open(
-		"pgx",
-		fmt.Sprintf("%s dbname=%s", instance.GetPrimaryConnInfo(), "postgres"),
-	)
-	if err != nil {
-		log.Error(err, "can not open postgres database")
-		return err
-	}
-	defer func() {
-		err = db.Close()
-		if err != nil {
-			log.Error(err, "Error while closing connection")
-		}
-	}()
-
-	walError := errors.New("wal-archive not working")
-
 	firstWalArchiveTriggered := false
+	return retry.OnError(retryUntilWalArchiveWorking, resources.RetryAlways, func() error {
+		db, err := sql.Open(
+			"pgx",
+			fmt.Sprintf("%s dbname=%s", instance.GetPrimaryConnInfo(), "postgres"),
+		)
+		if err != nil {
+			log.Error(err, "can not open postgres database")
+			return err
+		}
+		defer func() {
+			err = db.Close()
+			if err != nil {
+				log.Error(err, "Error while closing connection")
+			}
+		}()
 
-	return retry.OnError(retryUntilWalArchiveWorking, func(err error) bool {
-		return errors.Is(err, walError)
-	}, func() error {
 		row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
 			"COALESCE(last_failed_time, '-infinity') AS is_archiving, last_failed_time IS NOT NULL " +
 			"FROM pg_stat_archiver")
@@ -219,12 +215,12 @@ func waitForWalArchiveWorking(instance *Instance) error {
 
 		if lastFailedTimePresent {
 			log.Info("WAL archiving is not working, will retry in one minute")
-			return walError
+			return errors.New("wal-archive not working")
 		}
 
 		if firstWalArchiveTriggered {
 			log.Info("Waiting for the first WAL file to be archived")
-			return walError
+			return errors.New("waiting for first wal-archive")
 		}
 
 		log.Info("Triggering the first WAL file to be archived")
@@ -236,7 +232,7 @@ func waitForWalArchiveWorking(instance *Instance) error {
 			return fmt.Errorf("error while switching to a new WAL: %w", err)
 		}
 		firstWalArchiveTriggered = true
-		return walError
+		return errors.New("first wal-archive triggered")
 	})
 }
 
