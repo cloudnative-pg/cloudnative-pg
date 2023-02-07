@@ -31,6 +31,7 @@ import (
 type dbProvider func() (*sql.DB, error)
 
 type walArchiveBootstrapper struct {
+	isPrimary                bool
 	firstWalArchiveTriggered bool
 	backoff                  *wait.Backoff
 	dbProviderFunc           dbProvider
@@ -51,17 +52,37 @@ func (w *walArchiveBootstrapper) withDBProvider(provider dbProvider) *walArchive
 }
 
 func (w *walArchiveBootstrapper) withInstanceDBProvider(instance *Instance) *walArchiveBootstrapper {
-	return w.withDBProvider(func() (*sql.DB, error) {
-		db, openErr := sql.Open(
-			"pgx",
-			fmt.Sprintf("%s dbname=%s", instance.GetPrimaryConnInfo(), "postgres"),
-		)
-		if openErr != nil {
-			log.Error(openErr, "can not open postgres database")
-			return nil, openErr
-		}
-		return db, nil
-	})
+	isPrimary, _ := instance.IsPrimary()
+	w.isPrimary = isPrimary
+
+	if isPrimary {
+		return w.withDBProvider(func() (*sql.DB, error) {
+			db, openErr := sql.Open(
+				"pgx",
+				fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
+					GetSocketDir(),
+					GetServerPort(),
+				),
+			)
+			if openErr != nil {
+				log.Error(openErr, "can not open postgres database")
+				return nil, openErr
+			}
+			return db, nil
+		})
+	} else {
+		return w.withDBProvider(func() (*sql.DB, error) {
+			db, openErr := sql.Open(
+				"pgx",
+				fmt.Sprintf("%s dbname=%s", instance.GetPrimaryConnInfo(), "postgres"),
+			)
+			if openErr != nil {
+				log.Error(openErr, "can not open postgres database")
+				return nil, openErr
+			}
+			return db, nil
+		})
+	}
 }
 
 func (w *walArchiveBootstrapper) execute() error {
@@ -106,7 +127,7 @@ func (w *walArchiveBootstrapper) tryBootstrapWal() error {
 		return errors.New("wal-archive not working")
 	}
 
-	if w.firstWalArchiveTriggered {
+	if !w.isPrimary || w.firstWalArchiveTriggered {
 		log.Info("Waiting for the first WAL file to be archived")
 		return errors.New("waiting for first wal-archive")
 	}

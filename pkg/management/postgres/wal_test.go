@@ -75,6 +75,8 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 		mock.ExpectExec("CHECKPOINT").WillReturnResult(fakeResult)
 		mock.ExpectExec("SELECT pg_switch_wal()").WillReturnResult(fakeResult)
 
+		bootstrapper.isPrimary = true
+
 		// Call the function
 		err := bootstrapper.tryBootstrapWal()
 		Expect(err).To(Equal(errors.New("first wal-archive triggered")))
