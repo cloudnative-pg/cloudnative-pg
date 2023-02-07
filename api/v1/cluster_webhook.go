@@ -958,7 +958,7 @@ func validateWalSizeConfiguration(
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
 				minWalSize,
-				fmt.Sprintf("Invalid configuration. Parameter %s (default %s) should be smaller than parameter %s (default %s)",
+				fmt.Sprintf("Invalid vale. Parameter %s (default %s) should be smaller than parameter %s (default %s)",
 					minWalSizeKey, minWalSizeDefault, maxWalSizeKey, maxWalSizeDefault)))
 	}
 
@@ -974,7 +974,7 @@ func validateWalSizeConfiguration(
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
 				minWalSize,
-				fmt.Sprintf("Invalid configuration. Parameter %s (default %s) should be smaller than WAL volume size",
+				fmt.Sprintf("Invalid value. Parameter %s (default %s) should be smaller than WAL volume size",
 					minWalSizeKey, minWalSizeDefault)))
 	}
 
@@ -986,7 +986,7 @@ func validateWalSizeConfiguration(
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", maxWalSizeKey),
 				maxWalSize,
-				fmt.Sprintf("Invalid configuration. Parameter %s (default %s) should be smaller than WAL volume size",
+				fmt.Sprintf("Invalid value. Parameter %s (default %s) should be smaller than WAL volume size",
 					maxWalSizeKey, maxWalSizeDefault)))
 	}
 
