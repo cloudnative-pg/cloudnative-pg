@@ -843,6 +843,10 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	// verify the postgres setting min_wal_size < max_wal_size < volume size
+	result = append(result, validateWalSizeConfiguration(
+		r.Spec.PostgresConfiguration, r.Spec.WalStorage.GetSizeOrNil())...)
+
 	if err := validateSyncReplicaElectionConstraint(
 		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
 	); err != nil {
@@ -850,6 +854,122 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	}
 
 	return result
+}
+
+// validateWalSizeConfiguration verifies that min_wal_size < max_wal_size < wal volume size
+func validateWalSizeConfiguration(
+	postgresConfig PostgresConfiguration, walVolumeSize *resource.Quantity,
+) field.ErrorList {
+	const (
+		minWalSizeKey     = "min_wal_size"
+		minWalSizeDefault = "80MB"
+		maxWalSizeKey     = "max_wal_size"
+		maxWalSizeDefault = "1GB"
+	)
+
+	var result field.ErrorList
+
+	minWalSize, hasMinWalSize := postgresConfig.Parameters[minWalSizeKey]
+	if minWalSize == "" {
+		minWalSize = minWalSizeDefault
+		hasMinWalSize = false
+	}
+	minWalSizeValue, err := parseWalSettingValue(minWalSize)
+	if err != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid value for configuration parameter %s", minWalSizeKey)))
+	}
+
+	maxWalSize, hasMaxWalSize := postgresConfig.Parameters[maxWalSizeKey]
+	if maxWalSize == "" {
+		maxWalSize = maxWalSizeDefault
+		hasMaxWalSize = false
+	}
+	maxWalSizeValue, err := parseWalSettingValue(maxWalSize)
+	if err != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", maxWalSizeKey),
+				maxWalSize,
+				fmt.Sprintf("Invalid value for configuration parameter %s", maxWalSizeKey)))
+	}
+
+	if !minWalSizeValue.IsZero() && !maxWalSizeValue.IsZero() &&
+		minWalSizeValue.Cmp(maxWalSizeValue) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid vale. Parameter %s (default %s) should be smaller than parameter %s (default %s)",
+					minWalSizeKey, minWalSizeDefault, maxWalSizeKey, maxWalSizeDefault)))
+	}
+
+	if walVolumeSize == nil {
+		return result
+	}
+
+	if hasMinWalSize &&
+		!minWalSizeValue.IsZero() &&
+		minWalSizeValue.Cmp(*walVolumeSize) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid value. Parameter %s (default %s) should be smaller than WAL volume size",
+					minWalSizeKey, minWalSizeDefault)))
+	}
+
+	if hasMaxWalSize &&
+		!maxWalSizeValue.IsZero() &&
+		maxWalSizeValue.Cmp(*walVolumeSize) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", maxWalSizeKey),
+				maxWalSize,
+				fmt.Sprintf("Invalid value. Parameter %s (default %s) should be smaller than WAL volume size",
+					maxWalSizeKey, maxWalSizeDefault)))
+	}
+
+	return result
+}
+
+// parseWalSettingValue converts the WAL sizes in the PostgreSQL configuration
+// into kubernetes resource.Quantity values
+// Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
+func parseWalSettingValue(value string) (resource.Quantity, error) {
+	// If no suffix, default is MB
+	if _, err := strconv.Atoi(value); err == nil {
+		value += "MB"
+	}
+
+	// If there is a suffix it must be "B"
+	if value[len(value)-1:] != "B" {
+		return resource.Quantity{}, resource.ErrFormatWrong
+	}
+
+	// Kubernetes uses Mi rather than MB, Gi rather than GB. Drop the "B"
+	value = strings.TrimSuffix(value, "B")
+
+	// Spaces are allowed in postgres between number and unit in Postgres, but not in Kubernetes
+	value = strings.ReplaceAll(value, " ", "")
+
+	// Add the 'i' suffix unless it is a bare number (it was 'B' before)
+	if _, err := strconv.Atoi(value); err != nil {
+		value += "i"
+
+		// 'kB' must translate to 'Ki'
+		value = strings.ReplaceAll(value, "ki", "Ki")
+	}
+
+	return resource.ParseQuantity(value)
 }
 
 // validateConfigurationChange determines whether a PostgreSQL configuration
