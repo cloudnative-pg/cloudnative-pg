@@ -189,10 +189,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		return fmt.Errorf("can't set backup as running: %v", err)
 	}
 
-	if err := newWalArchiveBootstrapper().
-		withTimeout(&retryUntilWalArchiveWorking).
-		withInstanceDBProvider(b.Instance).
-		execute(); err != nil {
+	if err := ensureWalArchiveIsWorking(b.Instance); err != nil {
 		log.Warning("WAL archiving is not working", "err", err)
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
 		return UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
