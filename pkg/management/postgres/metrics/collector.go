@@ -339,10 +339,6 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 			log.Warning("Error while closing metrics extraction",
 				"err", err.Error())
 		}
-		if err := rows.Err(); err != nil {
-			log.Warning("Error while loading metrics",
-				"err", err.Error())
-		}
 	}()
 
 	columns, err := rows.Columns()
@@ -373,6 +369,11 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 		if done {
 			c.collectColumns(columns, columnData, labels, ch)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Warning("Error while loading metrics",
+			"err", err.Error())
+		return err
 	}
 	return nil
 }
