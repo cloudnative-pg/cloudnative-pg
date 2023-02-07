@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"time"
@@ -40,9 +39,6 @@ import (
 const PrometheusNamespace = "cnpg"
 
 var synchronousStandbyNamesRegex = regexp.MustCompile(`ANY ([0-9]+) \(.*\)`)
-
-// The wal_segment_size value in bytes
-var walSegmentSize *int
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
@@ -366,10 +362,10 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		e.Metrics.PgWALArchiveStatus.Reset()
 	}
 
-	if err := collectPGWalMetric(e, db); err != nil {
-		log.Error(err, "while collecting WAL metrics", "path", specs.PgWalPath)
+	if err := collectPGWalSettings(e, db); err != nil {
+		log.Error(err, "while collecting WAL settings", "path", specs.PgWalPath)
 		e.Metrics.Error.Set(1)
-		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PgWALStats").Inc()
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGWalSettings").Inc()
 		e.Metrics.PgWALDirectory.Reset()
 	}
 
@@ -461,82 +457,6 @@ func collectPGVersion(e *Exporter) error {
 	e.Metrics.PgVersion.WithLabelValues(majorMinorPatch, e.instance.ClusterName).Set(version)
 
 	return nil
-}
-
-func collectPGWalArchiveMetric(exporter *Exporter) error {
-	ready, done, err := postgres.GetWALArchiveCounters()
-	if err != nil {
-		return err
-	}
-
-	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("ready").Set(float64(ready))
-	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("done").Set(float64(done))
-	return nil
-}
-
-func collectPGWALStat(e *Exporter) error {
-	walStat, err := e.instance.TryGetPgStatWAL()
-	if walStat == nil || err != nil {
-		return err
-	}
-	walMetrics := e.Metrics.PgStatWalMetrics
-	walMetrics.WalSync.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSync))
-	walMetrics.WalSyncTime.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSyncTime))
-	walMetrics.WALBuffersFull.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WALBuffersFull))
-	walMetrics.WalFpi.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalFpi))
-	walMetrics.WalWrite.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWrite))
-	walMetrics.WalBytes.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalBytes))
-	walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWriteTime))
-	walMetrics.WalRecords.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalRecords))
-
-	return nil
-}
-
-var regexPGWalFileName = regexp.MustCompile("^[0-9A-F]{24}")
-
-func collectPGWalMetric(exporter *Exporter, db *sql.DB) error {
-	pgWalDir, err := os.Open(specs.PgWalPath)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = pgWalDir.Close()
-	}()
-	files, err := pgWalDir.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
-	var count int
-	for _, file := range files {
-		if !regexPGWalFileName.MatchString(file) {
-			continue
-		}
-		count++
-	}
-
-	exporter.Metrics.PgWALDirectory.WithLabelValues("count").Set(float64(count))
-	WALSegmentSize, err := getWALSegmentSize(db)
-	if err != nil {
-		return err
-	}
-	exporter.Metrics.PgWALDirectory.WithLabelValues("size").Set(float64(count * WALSegmentSize))
-	return nil
-}
-
-// We cache the value of wal_segment_size the first time we retrieve it from the database
-func getWALSegmentSize(db *sql.DB) (int, error) {
-	if walSegmentSize != nil {
-		return *walSegmentSize, nil
-	}
-	var size int
-	err := db.QueryRow("SELECT setting FROM pg_settings WHERE name='wal_segment_size'").
-		Scan(&size)
-	if err != nil {
-		log.Error(err, "while getting the wal_segment_size value from the database")
-		return 0, err
-	}
-	walSegmentSize = &size
-	return *walSegmentSize, nil
 }
 
 func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
