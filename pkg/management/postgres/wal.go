@@ -28,63 +28,67 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
-type dbProvider func() (*sql.DB, error)
+var errNoWalArchivePresent = errors.New("no wal-archive present")
 
-type walArchiveBootstrapper struct {
-	firstWalArchiveTriggered bool
-	backoff                  *wait.Backoff
-	dbProviderFunc           dbProvider
-}
-
-func newWalArchiveBootstrapper() *walArchiveBootstrapper {
-	return &walArchiveBootstrapper{}
-}
-
-func (w *walArchiveBootstrapper) withTimeout(backoff *wait.Backoff) *walArchiveBootstrapper {
-	w.backoff = backoff
-	return w
-}
-
-func (w *walArchiveBootstrapper) withDBProvider(provider dbProvider) *walArchiveBootstrapper {
-	w.dbProviderFunc = provider
-	return w
-}
-
-func (w *walArchiveBootstrapper) withInstanceDBProvider(instance *Instance) *walArchiveBootstrapper {
-	return w.withDBProvider(func() (*sql.DB, error) {
-		db, openErr := sql.Open(
-			"pgx",
-			fmt.Sprintf("%s dbname=%s", instance.GetPrimaryConnInfo(), "postgres"),
-		)
-		if openErr != nil {
-			log.Error(openErr, "can not open postgres database")
-			return nil, openErr
-		}
-		return db, nil
-	})
-}
-
-func (w *walArchiveBootstrapper) execute() error {
-	if w.backoff == nil {
-		return w.tryBootstrapWal()
-	}
-
-	return retry.OnError(*w.backoff, resources.RetryAlways, func() error {
-		return w.tryBootstrapWal()
-	})
-}
-
-func (w *walArchiveBootstrapper) tryBootstrapWal() error {
-	db, err := w.dbProviderFunc()
+// ensureWalArchiveIsWorking behaves slightly differently when executed on primary or a standby.
+// On primary, it could run even before the first WAL has completed. For this reason it
+// could require a WAL switch, to quicken the check.
+// On standby, the mere existence of the standby guarantees that a WAL file has already been generated
+// by the pg_basebakup used to prime the standby data directory, so we check only if the WAL
+// archive process is not failing.
+func ensureWalArchiveIsWorking(instance *Instance) error {
+	isPrimary, err := instance.IsPrimary()
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			log.Error(closeErr, "Error while closing connection")
-		}
-	}()
 
+	if isPrimary {
+		return newWalArchiveBootstrapperForPrimary().ensureFirstWalArchived(retryUntilWalArchiveWorking)
+	}
+
+	return newWalArchiveAnalyzerForReplicaInstance(instance.GetPrimaryConnInfo()).
+		mustHaveFirstWalArchivedWithBackoff(retryUntilWalArchiveWorking)
+}
+
+// walArchiveAnalyzer represents an object that can check for the status of
+// WAL archiving, in primary or replicas
+// Depending on primary vs. replicas, the DB connection needed is different
+type walArchiveAnalyzer struct {
+	dbFactory func() (*sql.DB, error)
+}
+
+func newWalArchiveAnalyzerForReplicaInstance(primaryConnInfo string) *walArchiveAnalyzer {
+	return &walArchiveAnalyzer{
+		dbFactory: func() (*sql.DB, error) {
+			db, openErr := sql.Open(
+				"pgx",
+				fmt.Sprintf("%s dbname=%s", primaryConnInfo, "postgres"),
+			)
+			if openErr != nil {
+				log.Error(openErr, "can not open postgres database")
+				return nil, openErr
+			}
+			return db, nil
+		},
+	}
+}
+
+func (w *walArchiveAnalyzer) mustHaveFirstWalArchivedWithBackoff(backoff wait.Backoff) error {
+	return retry.OnError(backoff, resources.RetryAlways, func() error {
+		db, err := w.dbFactory()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if closeErr := db.Close(); closeErr != nil {
+				log.Debug("Error while closing connection", "err", closeErr.Error())
+			}
+		}()
+		return w.mustHaveFirstWalArchived(db)
+	})
+}
+
+func (w *walArchiveAnalyzer) mustHaveFirstWalArchived(db *sql.DB) error {
 	row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
 		"COALESCE(last_failed_time, '-infinity') AS is_archiving, last_failed_time IS NOT NULL " +
 		"FROM pg_stat_archiver")
@@ -97,21 +101,84 @@ func (w *walArchiveBootstrapper) tryBootstrapWal() error {
 	}
 
 	if walArchivingWorking {
-		log.Info("WAL archiving is working, proceeding with the backup")
+		log.Info("WAL archiving is working")
 		return nil
 	}
 
 	if lastFailedTimePresent {
-		log.Info("WAL archiving is not working, will retry in one minute")
+		log.Info("WAL archiving is not working")
 		return errors.New("wal-archive not working")
 	}
 
-	if w.firstWalArchiveTriggered {
-		log.Info("Waiting for the first WAL file to be archived")
-		return errors.New("waiting for first wal-archive")
-	}
+	return errNoWalArchivePresent
+}
 
-	log.Info("Triggering the first WAL file to be archived")
+// walArchiveBootstrapper is a walArchiveAnalyzer that may create the first
+// WAL, in case it is not there yet
+// NOTE: this requires that the underlying walArchiveAnalyzer have a DB connection
+// pointing to the primary, with privileges to issue a CHECKPOINT
+type walArchiveBootstrapper struct {
+	walArchiveAnalyzer
+	firstWalShipped bool
+}
+
+func newWalArchiveBootstrapperForPrimary() *walArchiveBootstrapper {
+	return &walArchiveBootstrapper{
+		walArchiveAnalyzer: walArchiveAnalyzer{
+			dbFactory: func() (*sql.DB, error) {
+				db, openErr := sql.Open(
+					"pgx",
+					fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
+						GetSocketDir(),
+						GetServerPort(),
+					),
+				)
+				if openErr != nil {
+					log.Error(openErr, "can not open postgres database")
+					return nil, openErr
+				}
+				return db, nil
+			},
+		},
+	}
+}
+
+func (w *walArchiveBootstrapper) ensureFirstWalArchived(backoff wait.Backoff) error {
+	return retry.OnError(backoff, resources.RetryAlways, func() error {
+		db, err := w.dbFactory()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if closeErr := db.Close(); closeErr != nil {
+				log.Debug("Error while closing connection", "err", closeErr.Error())
+			}
+		}()
+
+		err = w.mustHaveFirstWalArchived(db)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, errNoWalArchivePresent) {
+			return err
+		}
+
+		if w.firstWalShipped {
+			return errors.New("waiting for first wal-archive")
+		}
+
+		log.Info("Triggering the first WAL file to be archived")
+		if err := w.shipWalFile(db); err != nil {
+			return err
+		}
+
+		w.firstWalShipped = true
+
+		return errors.New("first wal-archive triggered")
+	})
+}
+
+func (w *walArchiveBootstrapper) shipWalFile(db *sql.DB) error {
 	if _, err := db.Exec("CHECKPOINT"); err != nil {
 		return fmt.Errorf("error while requiring a checkpoint: %w", err)
 	}
@@ -120,6 +187,5 @@ func (w *walArchiveBootstrapper) tryBootstrapWal() error {
 		return fmt.Errorf("error while switching to a new WAL: %w", err)
 	}
 
-	w.firstWalArchiveTriggered = true
-	return errors.New("first wal-archive triggered")
+	return nil
 }
