@@ -8,7 +8,7 @@ custom resources:
 -   [Pooler](#pooler)
 -   [ScheduledBackup](#scheduledbackup)
 
-All the resources are defined in the `postgresql.cnpg.io/v1`
+All the resources are defined in the `postgresqlx.cnpg.io/v1`
 API.
 
 Please refer to the ["Configuration Samples" page](samples.md)" of the

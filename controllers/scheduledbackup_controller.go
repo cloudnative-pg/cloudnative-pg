@@ -56,9 +56,9 @@ type ScheduledBackupReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=scheduledbackups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=scheduledbackups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups,verbs=get;list;create
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=scheduledbackups,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=scheduledbackups/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=backups,verbs=get;list;create
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is the main reconciler logic

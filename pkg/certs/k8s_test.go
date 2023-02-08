@@ -50,8 +50,8 @@ var (
 		MutatingWebhookConfigurationName:   "mutating-webhook",
 		ValidatingWebhookConfigurationName: "validating-webhook",
 		CustomResourceDefinitionsName: []string{
-			"clusters.postgresql.cnpg.io",
-			"backups.postgresql.cnpg.io",
+			"clusters.postgresqlx.cnpg.io",
+			"backups.postgresqlx.cnpg.io",
 		},
 	}
 

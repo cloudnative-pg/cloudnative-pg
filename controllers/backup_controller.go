@@ -70,9 +70,9 @@ func NewBackupReconciler(mgr manager.Manager) *BackupReconciler {
 	}
 }
 
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=backups/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=clusters,verbs=get
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get

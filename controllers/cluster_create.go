@@ -901,32 +901,34 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
-
-	if err := r.createPVC(
-		ctx,
-		cluster,
-		&persistentvolumeclaim.CreateConfiguration{
-			Status:     persistentvolumeclaim.StatusInitializing,
-			NodeSerial: nodeSerial,
-			Role:       utils.PVCRolePgData,
-			Storage:    cluster.Spec.StorageConfiguration,
-		},
-	); err != nil {
-		return ctrl.Result{RequeueAfter: time.Minute}, err
-	}
-
-	if cluster.ShouldCreateWalArchiveVolume() {
+	if !cluster.Spec.ExistingPVCClaim {
 		if err := r.createPVC(
 			ctx,
 			cluster,
 			&persistentvolumeclaim.CreateConfiguration{
 				Status:     persistentvolumeclaim.StatusInitializing,
 				NodeSerial: nodeSerial,
-				Role:       utils.PVCRolePgWal,
-				Storage:    *cluster.Spec.WalStorage,
+				Role:       utils.PVCRolePgData,
+				Storage:    cluster.Spec.StorageConfiguration,
 			},
 		); err != nil {
 			return ctrl.Result{RequeueAfter: time.Minute}, err
+		}
+	}
+	if !cluster.Spec.ExistingWalPVCClaim {
+		if cluster.ShouldCreateWalArchiveVolume() {
+			if err := r.createPVC(
+				ctx,
+				cluster,
+				&persistentvolumeclaim.CreateConfiguration{
+					Status:     persistentvolumeclaim.StatusInitializing,
+					NodeSerial: nodeSerial,
+					Role:       utils.PVCRolePgWal,
+					Storage:    *cluster.Spec.WalStorage,
+				},
+			); err != nil {
+				return ctrl.Result{RequeueAfter: time.Minute}, err
+			}
 		}
 	}
 

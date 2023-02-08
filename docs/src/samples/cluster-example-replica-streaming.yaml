@@ -1,4 +1,4 @@
-apiVersion: postgresql.cnpg.io/v1
+apiVersion: postgresqlx.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-replica-example

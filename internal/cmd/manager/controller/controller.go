@@ -353,9 +353,9 @@ func ensurePKI(
 		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
 		CustomResourceDefinitionsName: []string{
-			"backups.postgresql.cnpg.io",
-			"clusters.postgresql.cnpg.io",
-			"scheduledbackups.postgresql.cnpg.io",
+			"backups.postgresqlx.cnpg.io",
+			"clusters.postgresqlx.cnpg.io",
+			"scheduledbackups.postgresqlx.cnpg.io",
 		},
 		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
 	}

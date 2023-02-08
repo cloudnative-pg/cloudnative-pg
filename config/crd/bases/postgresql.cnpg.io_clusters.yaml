@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
-  name: clusters.postgresql.cnpg.io
+  name: clusters.postgresqlx.cnpg.io
 spec:
-  group: postgresql.cnpg.io
+  group: postgresqlx.cnpg.io
   names:
     kind: Cluster
     listKind: ClusterList
@@ -1745,6 +1745,12 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
+              existingPvcClaim:
+                default: false
+                type: boolean
+              existingWalPvcClaim:
+                default: false
+                type: boolean
               externalClusters:
                 description: The list of external clusters which are used in the configuration
                 items:
@@ -3420,6 +3426,11 @@ spec:
                 items:
                   type: string
                 type: array
+              existingPvcClaim:
+                description: Cluster is Using Existing PVC Claim
+                type: boolean
+              existingWalPvcClaim:
+                type: boolean
               firstRecoverabilityPoint:
                 description: The first recoverability point, stored as a date in RFC3339
                   format

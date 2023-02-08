@@ -1,5 +1,5 @@
 ---
-apiVersion: postgresql.cnpg.io/v1
+apiVersion: postgresqlx.cnpg.io/v1
 kind: Cluster
 metadata:
   name: pg-backup-retention-30d

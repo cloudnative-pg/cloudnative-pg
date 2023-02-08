@@ -28,7 +28,7 @@
           },
           "ownerReferences": [
             {
-              "apiVersion": "postgresql.cnpg.io/v1",
+              "apiVersion": "postgresqlx.cnpg.io/v1",
               "kind": "Cluster",
               "name": "sandbox",
               "uid": "b1ec3b05-27e3-408b-b66d-43b2a3608fcf",
@@ -837,7 +837,7 @@
           },
           "ownerReferences": [
             {
-              "apiVersion": "postgresql.cnpg.io/v1",
+              "apiVersion": "postgresqlx.cnpg.io/v1",
               "kind": "Cluster",
               "name": "sandbox",
               "uid": "b1ec3b05-27e3-408b-b66d-43b2a3608fcf",

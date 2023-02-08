@@ -47,9 +47,9 @@ type PoolerReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=poolers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=poolers/status,verbs=get;update;patch;watch
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=poolers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=poolers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=poolers/status,verbs=get;update;patch;watch
+// +kubebuilder:rbac:groups=postgresqlx.cnpg.io,resources=poolers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=secrets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch

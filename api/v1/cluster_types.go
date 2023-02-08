@@ -141,7 +141,11 @@ type ClusterSpec struct {
 	// The UID of the `postgres` user inside the image, defaults to `26`
 	// +kubebuilder:default:=26
 	PostgresUID int64 `json:"postgresUID,omitempty"`
+	// +kubebuilder:default:=false
+	ExistingPVCClaim bool `json:"existingPvcClaim,omitempty"`
 
+	// +kubebuilder:default:=false
+	ExistingWalPVCClaim bool `json:"existingWalPvcClaim,omitempty"`
 	// The GID of the `postgres` user inside the image, defaults to `26`
 	// +kubebuilder:default:=26
 	PostgresGID int64 `json:"postgresGID,omitempty"`
@@ -388,6 +392,10 @@ type ClusterStatus struct {
 	// Total number of instances in the cluster
 	Instances int `json:"instances,omitempty"`
 
+	// Cluster is Using Existing PVC Claim
+	ExistingPVCClaim bool `json:"existingPvcClaim,omitempty"`
+
+	ExistingWalPVCClaim bool `json:"existingWalPvcClaim,omitempty"`
 	// Total number of ready instances in the cluster
 	ReadyInstances int `json:"readyInstances,omitempty"`
 

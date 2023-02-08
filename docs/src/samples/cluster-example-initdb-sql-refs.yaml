@@ -16,7 +16,7 @@ stringData:
     create table secrets (i integer);
     insert into secrets (select generate_series(1,10000));
 ---
-apiVersion: postgresql.cnpg.io/v1
+apiVersion: postgresqlx.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb

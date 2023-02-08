@@ -54,7 +54,7 @@ func Role(pooler *apiv1.Pooler) *v1.Role {
 	}, Rules: []v1.PolicyRule{
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				"postgresqlx.cnpg.io",
 			},
 			Resources: []string{
 				"poolers",
@@ -69,7 +69,7 @@ func Role(pooler *apiv1.Pooler) *v1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.cnpg.io",
+				"postgresqlx.cnpg.io",
 			},
 			Resources: []string{
 				"poolers/status",

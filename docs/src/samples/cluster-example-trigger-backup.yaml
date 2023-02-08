@@ -1,4 +1,4 @@
-apiVersion: postgresql.cnpg.io/v1
+apiVersion: postgresqlx.cnpg.io/v1
 kind: Backup
 metadata:
   name: cluster-example-trigger-backup

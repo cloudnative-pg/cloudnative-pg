@@ -11,9 +11,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: backups.postgresql.cnpg.io
+  name: backups.postgresqlx.cnpg.io
 spec:
-  group: postgresql.cnpg.io
+  group: postgresqlx.cnpg.io
   names:
     kind: Backup
     listKind: BackupList
@@ -307,9 +307,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: clusters.postgresql.cnpg.io
+  name: clusters.postgresqlx.cnpg.io
 spec:
-  group: postgresql.cnpg.io
+  group: postgresqlx.cnpg.io
   names:
     kind: Cluster
     listKind: ClusterList
@@ -3167,9 +3167,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: poolers.postgresql.cnpg.io
+  name: poolers.postgresqlx.cnpg.io
 spec:
-  group: postgresql.cnpg.io
+  group: postgresqlx.cnpg.io
   names:
     kind: Pooler
     listKind: PoolerList
@@ -10552,9 +10552,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: scheduledbackups.postgresql.cnpg.io
+  name: scheduledbackups.postgresqlx.cnpg.io
 spec:
-  group: postgresql.cnpg.io
+  group: postgresqlx.cnpg.io
   names:
     kind: ScheduledBackup
     listKind: ScheduledBackupList
@@ -10870,7 +10870,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - backups
   verbs:
@@ -10882,7 +10882,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - backups/status
   verbs:
@@ -10890,7 +10890,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - clusters
   verbs:
@@ -10902,13 +10902,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - clusters/finalizers
   verbs:
   - update
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - clusters/status
   verbs:
@@ -10917,7 +10917,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - poolers
   verbs:
@@ -10929,13 +10929,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - poolers/finalizers
   verbs:
   - update
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - poolers/status
   verbs:
@@ -10944,7 +10944,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - scheduledbackups
   verbs:
@@ -10956,7 +10956,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.cnpg.io
+  - postgresqlx.cnpg.io
   resources:
   - scheduledbackups/status
   verbs:
@@ -11493,12 +11493,12 @@ webhooks:
     service:
       name: cnpg-webhook-service
       namespace: cnpg-system
-      path: /mutate-postgresql-cnpg-io-v1-backup
+      path: /mutate-postgresqlx.cnpg.io-v1-backup
   failurePolicy: Fail
   name: mbackup.kb.io
   rules:
   - apiGroups:
-    - postgresql.cnpg.io
+    - postgresqlx.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -11513,12 +11513,12 @@ webhooks:
     service:
       name: cnpg-webhook-service
       namespace: cnpg-system
-      path: /mutate-postgresql-cnpg-io-v1-cluster
+      path: /mutate-postgresqlx.cnpg.io-v1-cluster
   failurePolicy: Fail
   name: mcluster.kb.io
   rules:
   - apiGroups:
-    - postgresql.cnpg.io
+    - postgresqlx.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -11533,12 +11533,12 @@ webhooks:
     service:
       name: cnpg-webhook-service
       namespace: cnpg-system
-      path: /mutate-postgresql-cnpg-io-v1-scheduledbackup
+      path: /mutate-postgresqlx.cnpg.io-v1-scheduledbackup
   failurePolicy: Fail
   name: mscheduledbackup.kb.io
   rules:
   - apiGroups:
-    - postgresql.cnpg.io
+    - postgresqlx.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -11560,12 +11560,12 @@ webhooks:
     service:
       name: cnpg-webhook-service
       namespace: cnpg-system
-      path: /validate-postgresql-cnpg-io-v1-backup
+      path: /validate-postgresqlx.cnpg.io-v1-backup
   failurePolicy: Fail
   name: vbackup.kb.io
   rules:
   - apiGroups:
-    - postgresql.cnpg.io
+    - postgresqlx.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -11580,12 +11580,12 @@ webhooks:
     service:
       name: cnpg-webhook-service
       namespace: cnpg-system
-      path: /validate-postgresql-cnpg-io-v1-cluster
+      path: /validate-postgresqlx.cnpg.io-v1-cluster
   failurePolicy: Fail
   name: vcluster.kb.io
   rules:
   - apiGroups:
-    - postgresql.cnpg.io
+    - postgresqlx.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -11600,12 +11600,12 @@ webhooks:
     service:
       name: cnpg-webhook-service
       namespace: cnpg-system
-      path: /validate-postgresql-cnpg-io-v1-pooler
+      path: /validate-postgresqlx.cnpg.io-v1-pooler
   failurePolicy: Fail
   name: vpooler.kb.io
   rules:
   - apiGroups:
-    - postgresql.cnpg.io
+    - postgresqlx.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -11620,12 +11620,12 @@ webhooks:
     service:
       name: cnpg-webhook-service
       namespace: cnpg-system
-      path: /validate-postgresql-cnpg-io-v1-scheduledbackup
+      path: /validate-postgresqlx.cnpg.io-v1-scheduledbackup
   failurePolicy: Fail
   name: vscheduledbackup.kb.io
   rules:
   - apiGroups:
-    - postgresql.cnpg.io
+    - postgresqlx.cnpg.io
     apiVersions:
     - v1
     operations:

@@ -10,7 +10,7 @@
 # You can generate the required TLS certificate with
 #
 # ./bin/kubectl-cnp  certificate cluster-example-superuser-tls --cnp-cluster cluster-example --cnp-user postgres
-apiVersion: postgresql.cnpg.io/v1
+apiVersion: postgresqlx.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-pgdump

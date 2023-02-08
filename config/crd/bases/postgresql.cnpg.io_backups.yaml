@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
-  name: backups.postgresql.cnpg.io
+  name: backups.postgresqlx.cnpg.io
 spec:
-  group: postgresql.cnpg.io
+  group: postgresqlx.cnpg.io
   names:
     kind: Backup
     listKind: BackupList
