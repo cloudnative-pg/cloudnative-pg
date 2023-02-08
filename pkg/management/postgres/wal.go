@@ -34,6 +34,26 @@ type walArchiveAnalyzer struct {
 	dbFactory func() (*sql.DB, error)
 }
 
+// ensureWalArchiveIsWorking behave slightly differently when executed on primary or a standby.
+// On primary, it could run very early, when the first WAL has never completed. For this reason it
+// could require a WAL switch, to quicken the check.
+// On standby, the mere existence of the standby guarantee that a WAL file has already been generated
+// by the pg_basebakup used to prime the standby data directory, so we check only if the WAL
+// archive process is not failing.
+func ensureWalArchiveIsWorking(instance *Instance) error {
+	isPrimary, err := instance.IsPrimary()
+	if err != nil {
+		return err
+	}
+
+	if isPrimary {
+		return newWalArchiveBootstrapperForPrimary().ensureFirstWalArchived(retryUntilWalArchiveWorking)
+	}
+
+	return newWalArchiveAnalyzerForReplicaInstance(instance.GetPrimaryConnInfo()).
+		mustHaveFirstWalArchivedWithBackoff(retryUntilWalArchiveWorking)
+}
+
 func newWalArchiveAnalyzerForReplicaInstance(primaryConnInfo string) *walArchiveAnalyzer {
 	return &walArchiveAnalyzer{
 		dbFactory: func() (*sql.DB, error) {
@@ -132,6 +152,7 @@ func (w *walArchiveBootstrapper) ensureFirstWalArchived(backoff wait.Backoff) er
 		if !errors.Is(err, errNoWalArchivePresent) {
 			return err
 		}
+
 		if w.createdFirstWal {
 			return errors.New("waiting for first wal-archive")
 		}
@@ -155,18 +176,4 @@ func (w *walArchiveBootstrapper) triggerFirstWalArchive(db *sql.DB) error {
 	}
 
 	return nil
-}
-
-func ensureWalArchiveIsWorking(instance *Instance) error {
-	isPrimary, err := instance.IsPrimary()
-	if err != nil {
-		return err
-	}
-
-	if isPrimary {
-		return newWalArchiveBootstrapperForPrimary().ensureFirstWalArchived(retryUntilWalArchiveWorking)
-	}
-
-	return newWalArchiveAnalyzerForReplicaInstance(instance.GetPrimaryConnInfo()).
-		mustHaveFirstWalArchivedWithBackoff(retryUntilWalArchiveWorking)
 }
