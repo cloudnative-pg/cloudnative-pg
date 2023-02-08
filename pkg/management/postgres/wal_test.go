@@ -50,7 +50,7 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 	})
 
 	It("returns nil if WAL archiving is working", func() {
-		bootstrapper.createdFirstWal = true
+		bootstrapper.firstWalShipped = true
 		rows := sqlmock.NewRows([]string{"is_archiving", "last_failed_time_present"}).
 			AddRow(true, false)
 		mock.ExpectQuery(flexibleCoalescenceQuery).WillReturnRows(rows)

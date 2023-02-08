@@ -30,14 +30,10 @@ import (
 
 var errNoWalArchivePresent = errors.New("no wal-archive present")
 
-type walArchiveAnalyzer struct {
-	dbFactory func() (*sql.DB, error)
-}
-
-// ensureWalArchiveIsWorking behave slightly differently when executed on primary or a standby.
-// On primary, it could run very early, when the first WAL has never completed. For this reason it
+// ensureWalArchiveIsWorking behaves slightly differently when executed on primary or a standby.
+// On primary, it could run even before the first WAL has completed. For this reason it
 // could require a WAL switch, to quicken the check.
-// On standby, the mere existence of the standby guarantee that a WAL file has already been generated
+// On standby, the mere existence of the standby guarantees that a WAL file has already been generated
 // by the pg_basebakup used to prime the standby data directory, so we check only if the WAL
 // archive process is not failing.
 func ensureWalArchiveIsWorking(instance *Instance) error {
@@ -52,6 +48,13 @@ func ensureWalArchiveIsWorking(instance *Instance) error {
 
 	return newWalArchiveAnalyzerForReplicaInstance(instance.GetPrimaryConnInfo()).
 		mustHaveFirstWalArchivedWithBackoff(retryUntilWalArchiveWorking)
+}
+
+// walArchiveAnalyzer represents an object that can check for the status of
+// WAL archiving, in primary or replicas
+// Depending on primary vs. replicas, the DB connection needed is different
+type walArchiveAnalyzer struct {
+	dbFactory func() (*sql.DB, error)
 }
 
 func newWalArchiveAnalyzerForReplicaInstance(primaryConnInfo string) *walArchiveAnalyzer {
@@ -110,9 +113,13 @@ func (w *walArchiveAnalyzer) mustHaveFirstWalArchived(db *sql.DB) error {
 	return errNoWalArchivePresent
 }
 
+// walArchiveBootstrapper is a walArchiveAnalyzer that may create the first
+// WAL, in case it is not there yet
+// NOTE: this requires that the underlying walArchiveAnalyzer have a DB connection
+// pointing to the primary, with privileges to issue a CHECKPOINT
 type walArchiveBootstrapper struct {
 	walArchiveAnalyzer
-	createdFirstWal bool
+	firstWalShipped bool
 }
 
 func newWalArchiveBootstrapperForPrimary() *walArchiveBootstrapper {
@@ -149,12 +156,14 @@ func (w *walArchiveBootstrapper) ensureFirstWalArchived(backoff wait.Backoff) er
 		}()
 
 		err = w.mustHaveFirstWalArchived(db)
+		if err == nil {
+			return nil
+		}
 		if !errors.Is(err, errNoWalArchivePresent) {
-			// This could be nil
 			return err
 		}
 
-		if w.createdFirstWal {
+		if w.firstWalShipped {
 			return errors.New("waiting for first wal-archive")
 		}
 
@@ -162,6 +171,8 @@ func (w *walArchiveBootstrapper) ensureFirstWalArchived(backoff wait.Backoff) er
 		if err := w.shipWalFile(db); err != nil {
 			return err
 		}
+
+		w.firstWalShipped = true
 
 		return errors.New("first wal-archive triggered")
 	})
