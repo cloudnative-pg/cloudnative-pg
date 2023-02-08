@@ -19,7 +19,7 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo/v2 v2.8.0
 	github.com/onsi/gomega v1.26.0
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.62.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.2.0
@@ -38,8 +38,8 @@ require (
 	k8s.io/cli-runtime v0.26.1
 	k8s.io/client-go v0.26.1
 	k8s.io/klog/v2 v2.90.0
-	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
-	sigs.k8s.io/controller-runtime v0.14.2
+	k8s.io/utils v0.0.0-20230202215443-34013725500c
+	sigs.k8s.io/controller-runtime v0.14.4
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -101,7 +101,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/component-base v0.26.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
-	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
+	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.13.9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
