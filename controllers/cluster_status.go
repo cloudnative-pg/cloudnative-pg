@@ -202,7 +202,9 @@ func (r *ClusterReconciler) getManagedPVCs(
 	sort.Slice(childPVCs.Items, func(i, j int) bool {
 		return childPVCs.Items[i].Name < childPVCs.Items[j].Name
 	})
-
+	for _, pvc := range childPVCs.Items {
+		log.FromContext(ctx).Info("Listing Managed PVCs", pvc.Name)
+	}
 	return childPVCs, nil
 }
 
