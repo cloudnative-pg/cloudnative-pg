@@ -150,6 +150,7 @@ func (w *walArchiveBootstrapper) ensureFirstWalArchived(backoff wait.Backoff) er
 
 		err = w.mustHaveFirstWalArchived(db)
 		if !errors.Is(err, errNoWalArchivePresent) {
+			// This could be nil
 			return err
 		}
 
@@ -157,16 +158,16 @@ func (w *walArchiveBootstrapper) ensureFirstWalArchived(backoff wait.Backoff) er
 			return errors.New("waiting for first wal-archive")
 		}
 
-		if walArchiveErr := w.triggerFirstWalArchive(db); walArchiveErr != nil {
-			return walArchiveErr
+		log.Info("Triggering the first WAL file to be archived")
+		if err := w.shipWalFile(db); err != nil {
+			return err
 		}
 
 		return errors.New("first wal-archive triggered")
 	})
 }
 
-func (w *walArchiveBootstrapper) triggerFirstWalArchive(db *sql.DB) error {
-	log.Info("Triggering the first WAL file to be archived")
+func (w *walArchiveBootstrapper) shipWalFile(db *sql.DB) error {
 	if _, err := db.Exec("CHECKPOINT"); err != nil {
 		return fmt.Errorf("error while requiring a checkpoint: %w", err)
 	}

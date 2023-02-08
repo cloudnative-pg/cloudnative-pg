@@ -80,7 +80,7 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 		// Call the function
 		err := bootstrapper.mustHaveFirstWalArchived(db)
 		Expect(err).To(Equal(errors.New("no wal-archive present")))
-		err = bootstrapper.triggerFirstWalArchive(db)
+		err = bootstrapper.shipWalFile(db)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Ensure the mock expectations are met
