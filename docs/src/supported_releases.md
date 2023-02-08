@@ -65,9 +65,9 @@ Git tags for versions are prepended with `v`.
 
 | Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported | Supported Postgres Versions |
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.19.x          | Yes                  | February 9, 2023 | ~ June 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
+| 1.19.x          | Yes                  | February 9, 2023  | ~ June 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
 | 1.18.x          | Yes                  | November 10, 2022 | ~ April 13, 2023         | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 10 - 15                     |
-| 1.17.x          | Yes                  | September 6, 2022 | ~ March 9, 2023      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          | 10 - 15                     |
+| 1.17.x          | Yes                  | September 6, 2022 | ~ March 9, 2023          | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          | 10 - 15                     |
 | main            | No, development only |                   |                          |                               |                           | 11 - 15                     |
 
 The list of supported Kubernetes versions in the above table depends on what
@@ -103,7 +103,7 @@ version was released.
 | Version         | Release Date      | End of Life              | Compatible Kubernetes Versions |
 |-----------------|-------------------|--------------------------|--------------------------------|
 | 1.15.x          | April 21, 2022    | October 6, 2022          | 1.21, 1.22, 1.23               |
-| 1.16.x          | July 7, 2022      | December 21, 2022      | 1.22, 1.23, 1.24              |
+| 1.16.x          | July 7, 2022      | December 21, 2022        | 1.22, 1.23, 1.24              |
 
 
 ## What we mean by support
