@@ -63,6 +63,11 @@ if ! which ginkgo &>/dev/null; then
   go install github.com/onsi/ginkgo/v2/ginkgo
 fi
 
+LABEL_FILTERS=""
+if [ "${FEATURE_TYPE-}" ]; then
+  LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
+fi
+echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 # The RC return code will be non-zero iff either the two `jq` calls has a non-zero exit
 # NOTE: the ginkgo calls may have non-zero exits, with E2E tests that fail but could be 'ignore-fail'
 RC=0
@@ -88,8 +93,8 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
-  ginkgo --nodes=1 --poll-progress-after=300s --poll-progress-interval=30s --label-filter "upgrade" \
-   --output-dir "${ROOT_DIR}/tests/e2e/out" \
+  ginkgo --nodes=1 --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
+   --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
    --json-report  "upgrade_report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO1=$?
 
   # Report if there are any tests that failed and did NOT have an "ignore-fails" label
@@ -114,16 +119,10 @@ mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
 RC_GINKGO2=0
-LABEL_FILTERS="!(upgrade)"
-if [ "${FEATURE_TYPE-}" ]; then
-  ADDITIONAL_FILTERS="${FEATURE_TYPE//,/ || }"
-  LABEL_FILTERS="!(upgrade) && ${ADDITIONAL_FILTERS}"
-fi
 
-echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
-ginkgo --nodes=4 --timeout 3h --slow-spec-threshold 5m --label-filter "${LABEL_FILTERS}" \
-       --output-dir "${ROOT_DIR}/tests/e2e/out/"  --json-report  "report.json" \
-       -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
+ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
+       --skip-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out/" \
+       --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
 
 # Report if there are any tests that failed and did NOT have an "ignore-fails" label
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?

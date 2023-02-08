@@ -256,7 +256,7 @@ metrics
   ```
      /test -tl=0 d=schedule
   ```
-2. Run smoke test for the pull request
+2. Run smoke and upgrade test for the pull request
   ```
-     /test type=smoke
+     /test type=smoke,upgrade
   ```
