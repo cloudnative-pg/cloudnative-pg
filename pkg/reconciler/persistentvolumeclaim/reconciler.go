@@ -19,6 +19,7 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -253,45 +254,49 @@ func reconcileOperatorLabels(
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	for _, pod := range instances {
-		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+	for i := range pvcs {
+		pvc := &pvcs[i]
+		origPvc := pvc.DeepCopy()
 
-		instancePVCs := FilterByInstance(pvcs, pod.Spec)
-		for i := range instancePVCs {
-			pvc := &instancePVCs[i]
-			var modified bool
-			// this is needed, because on older versions pvc.labels could be nil
-			if pvc.Labels == nil {
-				pvc.Labels = map[string]string{}
-			}
+		// this is needed, because on older versions pvc.labels could be nil
+		if pvc.Labels == nil {
+			pvc.Labels = map[string]string{}
+		}
 
-			origPvc := pvc.DeepCopy()
-			if podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole {
-				pvc.Labels[specs.ClusterRoleLabelName] = podRole
-				modified = true
-			}
-			if pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] != pod.Name {
-				pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] = pod.Name
-				modified = true
-			}
-
-			role := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
-			if pvc.Name == GetName(cluster, pod.Name, utils.PVCRolePgData) && role != utils.PVCRolePgData {
+		pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+		for _, instanceName := range cluster.Status.InstanceNames {
+			if pvc.Name == GetName(cluster, instanceName, utils.PVCRolePgData) && pvcRole != utils.PVCRolePgData {
 				pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgData)
-				modified = true
+				break
 			}
-			if pvc.Name == GetName(cluster, pod.Name, utils.PVCRolePgWal) && role != utils.PVCRolePgWal {
+			if pvc.Name == GetName(cluster, instanceName, utils.PVCRolePgWal) && pvcRole != utils.PVCRolePgWal {
 				pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgWal)
-				modified = true
+				break
 			}
+		}
 
-			if !modified {
-				continue
-			}
+		for _, pod := range instances {
+			if IsUsedByPodSpec(pod.Spec, pvc.Name) {
+				podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
 
-			if err := c.Patch(ctx, pvc, client.MergeFrom(origPvc)); err != nil {
-				return err
+				if podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole {
+					pvc.Labels[specs.ClusterRoleLabelName] = podRole
+				}
+
+				if pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] != pod.Name {
+					pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] = pod.Name
+				}
+
+				break
 			}
+		}
+
+		if reflect.DeepEqual(origPvc.Labels, pvc.Labels) {
+			continue
+		}
+
+		if err := c.Patch(ctx, pvc, client.MergeFrom(origPvc)); err != nil {
+			return err
 		}
 	}
 
