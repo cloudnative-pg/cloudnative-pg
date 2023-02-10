@@ -177,7 +177,7 @@ func reconcileClusterAnnotations(
 		// we proceed to the next item
 		if utils.IsAnnotationSubset(pvc.Annotations,
 			cluster.Annotations,
-			cluster.GetFixedInheritedLabels(),
+			cluster.GetFixedInheritedAnnotations(),
 			configuration.Current) &&
 			utils.IsAnnotationAppArmorPresentInObject(&pvc.ObjectMeta, cluster.Annotations) {
 			contextLogger.Debug(
@@ -220,7 +220,7 @@ func reconcileClusterLabels(
 		// we proceed to the next item
 		if utils.IsLabelSubset(pvc.Labels,
 			cluster.Labels,
-			cluster.GetFixedInheritedAnnotations(),
+			cluster.GetFixedInheritedLabels(),
 			configuration.Current) {
 			contextLogger.Debug(
 				"Skipping cluster label reconciliation, because they are already present on pvc",

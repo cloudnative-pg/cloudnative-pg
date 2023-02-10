@@ -49,12 +49,18 @@ func makePVC(clusterName, serial string, role utils.PVCRole, isResizing bool) co
 		})
 	}
 
+	labels := map[string]string{
+		utils.PvcRoleLabelName: string(role),
+	}
+
+	if role == "" {
+		labels = nil
+	}
+
 	return corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: clusterName + "-" + serial,
-			Labels: map[string]string{
-				utils.PvcRoleLabelName: string(role),
-			},
+			Name:        clusterName + "-" + serial,
+			Labels:      labels,
 			Annotations: annotations,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{},

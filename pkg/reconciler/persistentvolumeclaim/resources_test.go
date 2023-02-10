@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +34,7 @@ var _ = Describe("PVC detection", func() {
 	It("will list PVCs with Jobs or Pods or which are Ready", func() {
 		clusterName := "myCluster"
 		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, utils2.PVCRolePgData, isResizing)
+			return makePVC(clusterName, serial, utils.PVCRolePgData, isResizing)
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			makeClusterPVC("1", false), // has a Pod
@@ -78,5 +78,32 @@ var _ = Describe("PVC detection", func() {
 			clusterName + "-1",
 		}))
 		Expect(cluster.Status.UnusablePVC).Should(BeEmpty())
+	})
+})
+
+var _ = Describe("PVCs used by instance", func() {
+	clusterName := "cluster-pvc-instance"
+	instanceName := clusterName + "-1"
+
+	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterName,
+		},
+		Spec: apiv1.ClusterSpec{
+			WalStorage: &apiv1.StorageConfiguration{},
+		},
+	}
+
+	It("true if the pvc belongs to the instance name", func() {
+		res := IsUsedByInstance(cluster, instanceName, instanceName)
+		Expect(res).To(BeTrue())
+
+		res = IsUsedByInstance(cluster, instanceName, instanceName+"-wal")
+		Expect(res).To(BeTrue())
+	})
+
+	It("fails when trying to get a pvc that doesn't belong to the instance", func() {
+		res := IsUsedByInstance(cluster, instanceName, instanceName+"-nil")
+		Expect(res).To(BeFalse())
 	})
 })

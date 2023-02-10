@@ -85,4 +85,36 @@ var _ = Describe("PVC Creation", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))
 	})
+
+	It("fail with the a zero size", func() {
+		_, err := Build(
+			&apiv1.Cluster{},
+			&CreateConfiguration{
+				Status:     StatusInitializing,
+				NodeSerial: 0,
+				Role:       utils.PVCRolePgData,
+				Storage: apiv1.StorageConfiguration{
+					Size:         "0Gi",
+					StorageClass: &storageClass,
+				},
+			},
+		)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("fail with the a wrong size", func() {
+		_, err := Build(
+			&apiv1.Cluster{},
+			&CreateConfiguration{
+				Status:     StatusInitializing,
+				NodeSerial: 0,
+				Role:       utils.PVCRolePgData,
+				Storage: apiv1.StorageConfiguration{
+					Size:         "nil",
+					StorageClass: &storageClass,
+				},
+			},
+		)
+		Expect(err).To(HaveOccurred())
+	})
 })
