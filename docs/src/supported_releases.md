@@ -65,8 +65,8 @@ Git tags for versions are prepended with `v`.
 
 | Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported | Supported Postgres Versions |
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.19.x          | Yes                  | February 9, 2023  | ~ June 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
-| 1.18.x          | Yes                  | November 10, 2022 | ~ April 13, 2023         | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 10 - 15                     |
+| 1.19.x          | Yes                  | February 9, 2023  | ~ July 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
+| 1.18.x          | Yes                  | November 10, 2022 | ~ May 13, 2023           | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 10 - 15                     |
 | 1.17.x          | Yes                  | September 6, 2022 | ~ March 9, 2023          | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          | 10 - 15                     |
 | main            | No, development only |                   |                          |                               |                           | 11 - 15                     |
 
@@ -86,8 +86,8 @@ version was released.
 
 | Version         | Release Date     | End of Life               | Supported Kubernetes Versions |
 |-----------------|------------------|---------------------------|-------------------------------|
-| 1.20.0          | March 27, 2023   | -                         | -                             |
-| 1.21.0          | May 29, 2023     | -                         | -                             |
+| 1.20.0          | April 13, 2023   | -                         | -                             |
+| 1.21.0          | June 15, 2023    | -                         | -                             |
 
 !!! Note
     Feature freeze happens one week before the release
