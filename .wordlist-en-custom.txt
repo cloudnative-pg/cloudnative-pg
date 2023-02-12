@@ -147,6 +147,7 @@ JSON
 Jihyuk
 Jitendra
 Krew
+KubeCon
 Kumar
 LDAP
 LDAPBindAsAuth
@@ -170,6 +171,7 @@ MetricDescription
 MetricName
 MetricType
 MiB
+Milsted
 MinIO
 Minikube
 MonitoringConfiguration
@@ -275,6 +277,7 @@ SDK
 SELinux
 SHA
 SLA
+SPoF
 SQLQuery
 SSL
 SSZ
