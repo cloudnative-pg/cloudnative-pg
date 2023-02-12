@@ -65,6 +65,8 @@ The multi-availability zone Kubernetes architecture, having three (3) or more
 zones, is the one that we recommend for PostgreSQL usage.
 This scenario is typical of Kubernetes services managed by Cloud Providers.
 
+![Kubernetes cluster spanning over 3 independent data centers](./images/k8s-architecture-3-az.png)
+
 Such an architecture enables the CloudNativePG operator to control the full
 lifecycle of a `Cluster` resource within a single Kubernetes cluster, by
 treating all the availability zones as active: this includes, among the others,
@@ -82,6 +84,8 @@ by using them to host "passive" PostgreSQL replica clusters. This is to be
 intended primarily for DR, read-only operations, or cross-region availability -
 even though failovers and promotions in this case must be done manually.
 
+![Example of a multiple Kubernetes cluster architecture distributed over 3 regions each with 3 independent data centers](./images/k8s-architecture-multi.png)
+
 ### Single availability zone Kubernetes clusters
 
 In case your Kubernetes cluster has only one availability zone, CloudNativePG
@@ -93,11 +97,14 @@ This scenario is typical of self-managed on-premise Kubernetes clusters, where
 only one data center is available.
 
 Single availability zone Kubernetes is unfortunately the only viable option
-where two data centers are available within reach of a low latency connection
-(normally in the same metropolitan area): this prevents users from creating a
-multi-availability zone Kubernetes cluster (as the minimum number of 3 zones is
-not reached) and forces them to create two different Kubernetes clusters in an
-active/passive scenario, where the second is used primarily for DR.
+where just **two (2) data centers** are available within reach of a low latency
+connection (normally in the same metropolitan area): this prevents users from
+creating a multi-availability zone Kubernetes cluster (as the minimum number of
+3 zones is not reached) and forces them to create two different Kubernetes
+clusters in an active/passive scenario, where the second is used primarily for
+Disaster Recovery.
+
+![Example of a Kubernetes architecture with only 2 data centers](./images/k8s-architecture-2-az.png)
 
 !!! Hint
     If you are at en early stage of your Kubernetes journey, please share this
@@ -144,6 +151,12 @@ Kubernetes cluster, with the following specifications:
       availability zones in the same region
     * All nodes of a PostgreSQL cluster should reside in the same region
 
+CloudNativePG automatically takes care of updating the above services in case
+of change in the topology of cluster. For example, in case of failover, it
+automatically updates the `-rw` service to point to the promoted primary,
+making sure that traffic from the applications is seamlessly redirected
+underneath.
+
 !!! Seealso "Replication"
     Please refer to the ["Replication" section](replication.md) for more
     information about how CloudNativePG relies on PostgreSQL replication,
@@ -169,9 +182,9 @@ diagram:
 
 Applications can use the `-rw` suffix service.
 
-In case of temporary or permanent unavailability of the primary, Kubernetes
-will move the `-rw` service to another instance of the cluster for high availability
-purposes.
+In case of temporary or permanent unavailability of the primary, for High
+Availability purposes Kubernetes will trigger a failover, pointing the `-rw`
+service to another instance of the cluster.
 
 ### Read-only workloads
 
