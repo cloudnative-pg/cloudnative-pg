@@ -21,7 +21,7 @@ either of the following two strategies:
 * *application-level replication*, in this specific case PostgreSQL
 
 CloudNativePG relies on application-level replication, for a simple reason: the
-PostgreSQL database management system comes with robust and battle-tested
+PostgreSQL database management system comes with robust and reliable
 built-in **physical replication** capabilities based on **Write Ahead Log (WAL)
 shipping**, and used in production by millions of users all over the world for
 over a decade.
@@ -35,7 +35,7 @@ read-only workloads, thanks to the *Hot Standby* feature.
 !!! Important
     **We recommend against storage-level replication with PostgreSQL**, although
     CloudNativePG allows you to adopt that strategy. For more information, please refer
-    to talk given by Chris Milsted and Gabriele Bartolini at KubeCon NA 2022 entitled
+    to the talk given by Chris Milsted and Gabriele Bartolini at KubeCon NA 2022 entitled
     ["Data On Kubernetes, Deploying And Running PostgreSQL And Patterns For Databases In a Kubernetes Cluster"](https://www.youtube.com/watch?v=99uSJXkKpeI&ab_channel=CNCF%5BCloudNativeComputingFoundation%5D)
     where this topic was covered in an exhaustive manner.
 
@@ -87,7 +87,7 @@ even though failovers and promotions in this case must be done manually.
 In case your Kubernetes cluster has only one availability zone, CloudNativePG
 still provides you with a lot of features to improve HA and DR results for your
 PostgreSQL databases, by pushing out the single point of failure (SPoF) to the
-level of the zone as mush as possible.
+level of the zone as much as possible.
 
 This scenario is typical of self-managed on-premise Kubernetes clusters, where
 only one data center is available.
@@ -207,9 +207,9 @@ However, for business continuity objectives it is fundamental to:
 
 - reduce global **recovery point objectives** (RPO) by storing PostgreSQL backup data
   in multiple locations, regions and possibly using different providers
-  (DR)
+  (Disaster Recovery)
 - reduce global **recovery time objectives** (RTO) by taking advantage of PostgreSQL
-  replication beyond the primary Kubernetes cluster (HA)
+  replication beyond the primary Kubernetes cluster (High Availability)
 
 In order to address the above concerns, CloudNativePG introduces the
 concept of a *PostgreSQL Replica Cluster*. Replica clusters are the
