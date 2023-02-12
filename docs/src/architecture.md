@@ -152,6 +152,10 @@ Kubernetes cluster, with the following specifications:
     * PostgreSQL instances should reside in different availability zones
       within the same Kubernetes cluster / region
 
+The below diagram provides a simplistic view of the recommended shared-nothing architecture for a PostgreSQL cluster spanning across 3 different availability zones, running on separate nodes, each with dedicated local storage for PostgreSQL data.
+
+![Bird-eye view of the recommended shared nothing architecture for PostgreSQL in Kubernetes](./images/k8s-pg-architecture.png)
+
 CloudNativePG automatically takes care of updating the above services in case
 of change in the topology of cluster. For example, in case of failover, it
 automatically updates the `-rw` service to point to the promoted primary,
