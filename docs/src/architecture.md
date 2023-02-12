@@ -146,10 +146,11 @@ Kubernetes cluster, with the following specifications:
     * `-r`: applications connect to any of the instances for read-only workloads
 * Shared-nothing architecture recommended for better resilience of the PostgreSQL cluster:
     * PostgreSQL instances should reside on different Kubernetes worker nodes
-      and share only the network
-    * PostgreSQL instances can reside in different
-      availability zones in the same region
-    * All nodes of a PostgreSQL cluster should reside in the same region
+      and share only the network - as a result, instances should not share
+      the storage and preferably use local volumes attached to the node they
+      run on
+    * PostgreSQL instances should reside in different availability zones
+      within the same Kubernetes cluster / region
 
 CloudNativePG automatically takes care of updating the above services in case
 of change in the topology of cluster. For example, in case of failover, it
