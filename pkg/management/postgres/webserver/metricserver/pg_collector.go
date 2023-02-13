@@ -33,7 +33,6 @@ import (
 	m "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
 	postgresconf "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances
@@ -438,7 +437,7 @@ func (e *Exporter) setTimestampMetric(
 		return
 	}
 
-	parsedTS, err := utils.ParseTargetTime(nil, ts)
+	parsedTS, err := time.Parse(time.RFC3339, ts)
 	if err != nil {
 		log.Error(err, "while collecting timestamp", "errorLabel", errorLabel)
 		e.Metrics.Error.Set(1)

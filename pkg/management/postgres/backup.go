@@ -270,7 +270,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		}
 		if failErr := b.retryWithLatestCluster(ctx, func(cluster *apiv1.Cluster) error {
 			origCluster := b.Cluster.DeepCopy()
-			b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestamp()
+			b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
 			return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 		}); failErr != nil {
 			b.Log.Error(failErr, "while setting last failed backup")
