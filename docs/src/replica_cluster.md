@@ -8,7 +8,7 @@ and they can solely rely on object stores for replication of the data from
 the source, as described further down.
 
 The diagram below - taken from the ["Architecture"
-section](architecture.md#multi-cluster-deployments) containing more
+section](architecture.md#deployments-across-kubernetes-clusters) containing more
 information about this capability - shows just an example of architecture
 that you can implement with replica clusters.
 
@@ -19,7 +19,7 @@ that you can implement with replica clusters.
 CloudNativePG relies on the foundations of the PostgreSQL replication
 framework even when a PostgreSQL cluster is created from an existing one (source)
 and kept synchronized through the
-[replica cluster](architecture.md#multi-cluster-deployments) feature. The source
+[replica cluster](architecture.md#deployments-across-kubernetes-clusters) feature. The source
 can be a primary cluster or another replica cluster (cascading replica cluster).
 
 The available options in terms of replication, both at bootstrap and continuous
