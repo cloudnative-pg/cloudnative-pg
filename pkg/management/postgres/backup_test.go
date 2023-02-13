@@ -91,7 +91,7 @@ var _ = Describe("testing backup command", func() {
 				},
 				Spec: apiv1.BackupSpec{
 					Cluster: apiv1.LocalObjectReference{
-						Name: "test",
+						Name: "test-cluster",
 					},
 				},
 			},
