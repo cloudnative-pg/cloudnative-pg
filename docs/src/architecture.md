@@ -89,11 +89,11 @@ even though failovers and promotions in this case must be done manually.
 
 ### Single availability zone Kubernetes clusters
 
-If your Kubernetes cluster has only one availability zone, CloudNativePG
-still provides you with a lot of features to improve HA and DR outcomes for your
-PostgreSQL databases, pushing the single point of failure (SPoF) to the level of
-the zone as much as possible. I.e. the zone has to have an outage before
-your CloudNativePG clusters suffer an outage.
+If your Kubernetes cluster has only one availability zone, CloudNativePG still
+provides you with a lot of features to improve HA and DR outcomes for your
+PostgreSQL databases, pushing the single point of failure (SPoF) to the level
+of the zone as much as possible - i.e. the zone must have an outage before your
+CloudNativePG clusters suffer a failure.
 
 This scenario is typical of self-managed on-premise Kubernetes clusters, where
 only one data center is available.
