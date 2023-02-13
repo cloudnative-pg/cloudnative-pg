@@ -128,6 +128,10 @@ The current maintainers of the CloudNativePG project are:
 
 They are listed in the [CODEOWNERS](CODEOWNERS) file.
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=cloudnative-pg/cloudnative-pg&type=Date)](https://star-history.com/#cloudnative-pg/cloudnative-pg&Date)
+
 ## Trademarks
 
 *[Postgres, PostgreSQL and the Slonik Logo](https://www.postgresql.org/about/policies/trademarks/)
