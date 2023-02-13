@@ -35,7 +35,7 @@ func TestSpecs(t *testing.T) {
 	RunSpecs(t, "Specification properties")
 }
 
-func makePVC(clusterName, serial string, isResizing bool) corev1.PersistentVolumeClaim {
+func makePVC(clusterName, serial string, role utils.PVCRole, isResizing bool) corev1.PersistentVolumeClaim {
 	annotations := map[string]string{
 		specs.ClusterSerialAnnotationName: serial,
 		StatusAnnotationName:              StatusReady,
@@ -49,12 +49,18 @@ func makePVC(clusterName, serial string, isResizing bool) corev1.PersistentVolum
 		})
 	}
 
+	labels := map[string]string{
+		utils.PvcRoleLabelName: string(role),
+	}
+
+	if role == "" {
+		labels = nil
+	}
+
 	return corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: clusterName + "-" + serial,
-			Labels: map[string]string{
-				utils.PvcRoleLabelName: string(utils.PVCRolePgData),
-			},
+			Name:        clusterName + "-" + serial,
+			Labels:      labels,
 			Annotations: annotations,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{},
@@ -67,6 +73,9 @@ func makePVC(clusterName, serial string, isResizing bool) corev1.PersistentVolum
 
 func makePod(clusterName, serial string) corev1.Pod {
 	return corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterName + "-" + serial,
+		},
 		Spec: corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
