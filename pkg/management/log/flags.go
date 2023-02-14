@@ -19,6 +19,7 @@ package log
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/spf13/pflag"
@@ -89,6 +90,7 @@ func (l *Flags) ConfigureLogging() {
 	controllerruntime.SetLogger(logger)
 	klog.SetLogger(logger)
 	SetLogger(logger)
+	http.DefaultTransport = &httpLogger{logger: GetLogger()}
 }
 
 func getLogLevel(l string) zapcore.Level {
@@ -156,4 +158,25 @@ func customDestination(in *zap.Options) {
 	}
 
 	in.DestWriter = logStream
+}
+
+type httpLogger struct {
+	logger Logger
+}
+
+func (t *httpLogger) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		t.logger.
+			WithValues(
+				"method", req.Method, "url",
+				req.URL.String(),
+				"source", "net/http",
+				"error", err.Error(),
+			).
+			Debug("error while sending an HTTP request")
+		return nil, err
+	}
+
+	return resp, nil
 }
