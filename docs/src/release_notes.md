@@ -16,4 +16,3 @@ Older releases:
 We also keep record of all the
 [release notes from 1.0.0 to 1.14.0 of Cloud Native PostgreSQL by EDB](release_notes/edb-cloud-native-postgresql.md),
 the predecessor of CloudNativePG.
-
