@@ -135,16 +135,15 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
-      # Check if there's any dirty change for go mod tidy
-      - name: Check go mod
-        run: |
-          make go-mod-check
-
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout 4m
+
+      - name: Check go mod tidy has no pending changes
+        run: |
+          make go-mod-check
 
   shellcheck:
     name: Run shellcheck linter
