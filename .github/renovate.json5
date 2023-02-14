@@ -105,9 +105,9 @@
 // repository tags.
       "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
       "matchStrings": [
-        "GOLANGCI_VERSION: '(?<currentValue>.*?)'\\n",
+        "GOLANGCI_LINT_VERSION: \"(?<currentValue>.*?)\"\\n",
       ],
-      "datasourceTemplate": "github-tags",
+      "datasourceTemplate": "github-releases",
       "depNameTemplate": "golangci/golangci-lint",
     }
   ],
