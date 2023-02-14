@@ -106,7 +106,7 @@ spec:
   backup:
     barmanObjectStore:
       destinationPath: "<destination path here>"
-      endpointURL: bucket.us-east1.linodeobjects.com
+      endpointURL: "https://bucket.us-east1.linodeobjects.com"
       s3Credentials:
         [...]
 ```
