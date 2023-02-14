@@ -242,3 +242,12 @@ func SetupLogger(ctx context.Context) (Logger, context.Context) {
 
 	return FromContext(ctx), IntoContext(ctx, &logger{Logger: newLogger})
 }
+
+type logWriter struct {
+	logger logr.Logger
+}
+
+func (l logWriter) Write(b []byte) (int, error) {
+	l.logger.Info(string(b))
+	return len(b), nil
+}

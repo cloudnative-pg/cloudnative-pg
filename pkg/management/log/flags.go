@@ -20,10 +20,8 @@ import (
 	"flag"
 	"fmt"
 	stdLog "log"
-	"net/http"
 	"os"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/klog/v2"
@@ -73,15 +71,6 @@ func GetFieldsRemapFlags() (res []string) {
 	return res
 }
 
-type logWriter struct {
-	logger logr.Logger
-}
-
-func (l logWriter) Write(b []byte) (int, error) {
-	l.logger.Info(string(b))
-	return len(b), nil
-}
-
 // ConfigureLogging configure the logging honoring the flags
 // passed from the user
 // This is executed after args were already parsed.
@@ -105,8 +94,6 @@ func (l *Flags) ConfigureLogging() {
 	controllerruntime.SetLogger(logger)
 	klog.SetLogger(logger)
 	SetLogger(logger)
-
-	http.DefaultTransport = &httpLogger{logger: GetLogger()}
 }
 
 func getLogLevel(l string) zapcore.Level {
@@ -174,25 +161,4 @@ func customDestination(in *zap.Options) {
 	}
 
 	in.DestWriter = logStream
-}
-
-type httpLogger struct {
-	logger Logger
-}
-
-func (t *httpLogger) RoundTrip(req *http.Request) (*http.Response, error) {
-	resp, err := http.DefaultTransport.RoundTrip(req)
-	if err != nil {
-		t.logger.
-			WithValues(
-				"method", req.Method, "url",
-				req.URL.String(),
-				"source", "net/http",
-				"error", err.Error(),
-			).
-			Debug("error while sending an HTTP request")
-		return nil, err
-	}
-
-	return resp, nil
 }
