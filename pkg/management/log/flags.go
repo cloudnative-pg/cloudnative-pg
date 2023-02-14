@@ -19,9 +19,11 @@ package log
 import (
 	"flag"
 	"fmt"
+	stdLog "log"
 	"net/http"
 	"os"
 
+	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/klog/v2"
@@ -71,6 +73,15 @@ func GetFieldsRemapFlags() (res []string) {
 	return res
 }
 
+type logWriter struct {
+	logger logr.Logger
+}
+
+func (l logWriter) Write(b []byte) (int, error) {
+	l.logger.Info(string(b))
+	return len(b), nil
+}
+
 // ConfigureLogging configure the logging honoring the flags
 // passed from the user
 // This is executed after args were already parsed.
@@ -87,9 +98,14 @@ func (l *Flags) ConfigureLogging() {
 		logger.Info("Invalid log level, defaulting", "level", logLevel, "default", DefaultLevel)
 	}
 
+	stdLog.SetPrefix("")
+	stdLog.SetFlags(0)
+	stdLog.SetOutput(logWriter{logger: logger})
+
 	controllerruntime.SetLogger(logger)
 	klog.SetLogger(logger)
 	SetLogger(logger)
+
 	http.DefaultTransport = &httpLogger{logger: GetLogger()}
 }
 
