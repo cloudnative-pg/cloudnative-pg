@@ -67,10 +67,6 @@ func reconcilePVCQuantity(
 		return err
 	}
 
-	if storageConfiguration.Size == "" {
-		return nil
-	}
-
 	parsedSize := storageConfiguration.GetSizeOrNil()
 	if parsedSize == nil {
 		return ErrorInvalidSize

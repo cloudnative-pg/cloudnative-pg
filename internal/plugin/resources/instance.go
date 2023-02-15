@@ -142,7 +142,7 @@ func GetInstancePVCs(
 
 	var pvcs []v1.PersistentVolumeClaim
 
-	pgDataName := persistentvolumeclaim.GetName(cluster, instanceName, utils.PVCRolePgData)
+	pgDataName := persistentvolumeclaim.GetName(instanceName, utils.PVCRolePgData)
 	pgData, err := getPVC(ctx, pgDataName)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func GetInstancePVCs(
 		pvcs = append(pvcs, *pgData)
 	}
 
-	pgWalName := persistentvolumeclaim.GetName(cluster, instanceName, utils.PVCRolePgWal)
+	pgWalName := persistentvolumeclaim.GetName(instanceName, utils.PVCRolePgWal)
 	pgWal, err := getPVC(ctx, pgWalName)
 	if err != nil {
 		return nil, err

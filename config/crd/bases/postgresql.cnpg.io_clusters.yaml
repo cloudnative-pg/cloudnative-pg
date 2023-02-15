@@ -3441,7 +3441,8 @@ spec:
                   type: string
                 type: array
               instances:
-                description: Total number of instances in the cluster
+                description: Total number of PVC Groups detected in the cluster. This
+                  doesn't equal to the number of instance pod created.
                 type: integer
               instancesReportedState:
                 additionalProperties:
@@ -3513,7 +3514,8 @@ spec:
                 description: Current list of read pods
                 type: string
               readyInstances:
-                description: Total number of ready instances in the cluster
+                description: Total number of ready instances in the cluster. This
+                  equals to the number of ready instances pods.
                 type: integer
               resizingPVC:
                 description: List of all the PVCs that have ResizingPVC condition.

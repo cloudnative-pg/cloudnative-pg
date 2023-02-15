@@ -2066,11 +2066,6 @@ func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
 }
 
-// GetWalArchiveVolumeSuffix gets the wal archive volume name suffix
-func (cluster *Cluster) GetWalArchiveVolumeSuffix() string {
-	return WalArchiveVolumeSuffix
-}
-
 // GetPostgresUID returns the UID that is being used for the "postgres"
 // user
 func (cluster Cluster) GetPostgresUID() int64 {

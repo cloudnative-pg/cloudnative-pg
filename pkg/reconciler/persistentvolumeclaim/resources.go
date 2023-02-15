@@ -27,10 +27,10 @@ import (
 )
 
 // GetName builds the name for a given PVC of the instance
-func GetName(cluster *apiv1.Cluster, instanceName string, role utils.PVCRole) string {
+func GetName(instanceName string, role utils.PVCRole) string {
 	pvcName := instanceName
 	if role == utils.PVCRolePgWal {
-		pvcName += cluster.GetWalArchiveVolumeSuffix()
+		pvcName += apiv1.WalArchiveVolumeSuffix
 	}
 	return pvcName
 }
@@ -126,7 +126,7 @@ func getExpectedPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC 
 	var expectedMounts []expectedPVC
 	// At the moment detecting a pod is missing the data pvc has no real use.
 	// In the future we will handle all the PVC creation with the package reconciler
-	dataPVCName := GetName(cluster, instanceName, utils.PVCRolePgData)
+	dataPVCName := GetName(instanceName, utils.PVCRolePgData)
 	expectedMounts = append(expectedMounts,
 		expectedPVC{
 			name: dataPVCName,
@@ -137,7 +137,7 @@ func getExpectedPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC 
 		},
 	)
 
-	walPVCName := GetName(cluster, instanceName, utils.PVCRolePgWal)
+	walPVCName := GetName(instanceName, utils.PVCRolePgWal)
 	if cluster.ShouldCreateWalArchiveVolume() {
 		expectedMounts = append(expectedMounts,
 			expectedPVC{

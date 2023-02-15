@@ -19,6 +19,7 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -76,11 +77,23 @@ func reconcileMetadataComingFromInstance(
 ) error {
 	for _, pod := range instances {
 		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+		podSerial, podSerialErr := specs.GetNodeSerial(pod.ObjectMeta)
+		if podSerialErr != nil {
+			return podSerialErr
+		}
+
 		instanceReconciler := metadataReconciler{
 			name: "instance-inheritance",
 			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-				return (podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole) &&
-					pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] != pod.Name
+				if podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole {
+					return false
+				}
+
+				if serial, err := specs.GetNodeSerial(pvc.ObjectMeta); err != nil || serial != podSerial {
+					return false
+				}
+
+				return true
 			},
 			update: func(pvc *corev1.PersistentVolumeClaim) {
 				// this is needed, because on older versions pvc.labels could be nil
@@ -88,7 +101,12 @@ func reconcileMetadataComingFromInstance(
 					pvc.Labels = map[string]string{}
 				}
 				pvc.Labels[specs.ClusterRoleLabelName] = podRole
-				pvc.Labels[utils.InstanceNameLabelName] = pod.Name
+
+				if pvc.Annotations == nil {
+					pvc.Annotations = map[string]string{}
+				}
+
+				pvc.Annotations[specs.ClusterSerialAnnotationName] = strconv.Itoa(podSerial)
 			},
 		}
 
@@ -108,7 +126,23 @@ func reconcileMetadata(
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	annotationReconciler := metadataReconciler{
+	if err := reconcileMetadataComingFromInstance(ctx, c, instances, pvcs); err != nil {
+		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
+	}
+
+	if err := newAnnotationReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
+		return fmt.Errorf("cannot update annotations on pvcs: %w", err)
+	}
+
+	if err := newLabelReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
+		return fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
+	}
+
+	return nil
+}
+
+func newAnnotationReconciler(cluster *apiv1.Cluster) metadataReconciler {
+	return metadataReconciler{
 		name: "annotations",
 		isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
 			return utils.IsAnnotationSubset(pvc.Annotations,
@@ -122,31 +156,68 @@ func reconcileMetadata(
 				cluster.GetFixedInheritedAnnotations(), configuration.Current)
 		},
 	}
+}
 
-	labelReconciler := metadataReconciler{
+func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler {
+	return metadataReconciler{
 		name: "labels",
 		isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-			return utils.IsLabelSubset(pvc.Labels,
+			if !utils.IsLabelSubset(pvc.Labels,
 				cluster.Labels,
 				cluster.GetFixedInheritedLabels(),
-				configuration.Current)
+				configuration.Current) {
+				return false
+			}
+
+			pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+			for _, instanceName := range cluster.Status.InstanceNames {
+				var found bool
+				if pvc.Name == GetName(instanceName, utils.PVCRolePgData) {
+					found = true
+					if pvcRole != utils.PVCRolePgData {
+						return false
+					}
+				}
+
+				if pvc.Name == GetName(instanceName, utils.PVCRolePgWal) {
+					found = true
+					if pvcRole != utils.PVCRolePgWal {
+						return false
+					}
+				}
+
+				if found && pvc.Labels[utils.InstanceNameLabelName] != instanceName {
+					return false
+				}
+			}
+
+			return true
 		},
 		update: func(pvc *corev1.PersistentVolumeClaim) {
 			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+
+			pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+			for _, instanceName := range cluster.Status.InstanceNames {
+				var found bool
+				if pvc.Name == GetName(instanceName, utils.PVCRolePgData) {
+					found = true
+					if pvcRole != utils.PVCRolePgData {
+						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgData)
+					}
+				}
+
+				if pvc.Name == GetName(instanceName, utils.PVCRolePgWal) {
+					found = true
+					if pvcRole != utils.PVCRolePgWal {
+						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgWal)
+					}
+				}
+
+				if found {
+					pvc.Labels[utils.InstanceNameLabelName] = instanceName
+					break
+				}
+			}
 		},
 	}
-
-	if err := reconcileMetadataComingFromInstance(ctx, c, instances, pvcs); err != nil {
-		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
-	}
-
-	if err := annotationReconciler.reconcile(ctx, c, pvcs); err != nil {
-		return fmt.Errorf("cannot update annotations on pvcs: %w", err)
-	}
-
-	if err := labelReconciler.reconcile(ctx, c, pvcs); err != nil {
-		return fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
-	}
-
-	return nil
 }
