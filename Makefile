@@ -41,6 +41,8 @@ KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.24.3
 CONTROLLER_TOOLS_VERSION ?= v0.11.1
 GORELEASER_VERSION ?= v1.10.3
+SPELLCHECK_VERSION ?= 0.25.0
+WOKE_VERSION ?= 0.18.1
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -167,10 +169,10 @@ shellcheck: ## Shellcheck for the hack directory.
 	}
 
 spellcheck: ## Runs the spellcheck on the project.
-	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.25.0
+	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:$(SPELLCHECK_VERSION)
 
 woke: ## Runs the woke checks on project.
-	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.18.1 woke -c .woke.yaml
+	docker run --rm -v $(PWD):/src -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
 
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
