@@ -570,7 +570,6 @@ jobs:
           tool-cache: true
           large-packages: false
           swap-storage: false
-
       -
         name: Cleanup docker cache
         run: |
