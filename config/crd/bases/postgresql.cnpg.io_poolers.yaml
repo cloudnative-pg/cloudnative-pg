@@ -99,6 +99,12 @@ spec:
                       to `false` (default). Internally, the operator calls PgBouncer's
                       `PAUSE` and `RESUME` commands.
                     type: boolean
+                  pg_hba:
+                    description: PostgreSQL Host Based Authentication rules (lines
+                      to be appended to the pg_hba.conf file)
+                    items:
+                      type: string
+                    type: array
                   poolMode:
                     default: session
                     description: The pool mode
