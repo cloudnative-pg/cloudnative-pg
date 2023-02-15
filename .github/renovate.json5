@@ -1,0 +1,211 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base"
+  ],
+// The maximum number of PRs to be created in parallel
+  "prConcurrentLimit": 5,
+// The branches renovate should target
+// PLEASE UPDATE THIS WHEN RELEASING.
+  "baseBranches": ["main","release-1.17","release-1.18"],
+  "ignorePaths": ["docs/**", "config/**", "releases/**", "contribute/**", "config/**", "licenses/**"],
+  "postUpdateOptions": ["gomodTidy"],
+  "semanticCommits": "enabled",
+// All PRs should have a label
+  "labels": ["automated", "do not backport"],
+  "regexManagers": [
+    {
+      // We want a PR to bump Kustomize version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "KUSTOMIZE_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "go",
+      "depNameTemplate": "sigs.k8s.io/kustomize/kustomize/v4",
+    }, {
+      // We want a PR to bump controller-gen version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "CONTROLLER_TOOLS_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "go",
+      "depNameTemplate": "sigs.k8s.io/controller-tools",
+    }, {
+      // We want a PR to bump goreleaser version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "GORELEASER_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "go",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "github.com/goreleaser/goreleaser",
+    }, {
+      // We want a PR to bump kind version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "KIND_CLUSTER_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kindest/node",
+    }, {
+      // We want a PR to bump kind version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "SPELLCHECK_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "jonasbn/github-action-spellcheck",
+    }, {
+      // We want a PR to bump kind version in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "WOKE_VERSION \\?\\= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "getwoke/woke",
+    }, {
+      // We want a PR to bump Default Container Images versions.
+      "fileMatch": [
+        "^pkg\\/versions\\/versions\\.go$",
+        "^pkg\\/specs\\/pgbouncer\\/deployments\\.go$"
+      ],
+      "matchStrings": [
+        "DefaultImageName = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
+        "DefaultPgbouncerImage = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "loose",
+    }, {
+// We want a PR to bump Go versions used through env variables in any Github
+// Actions, taking it from the official Github repository.
+      "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
+      "matchStrings": [
+        "GO_VERSION: '(?<currentValue>.*?)'\\n"
+      ],
+      "datasourceTemplate": "golang-version",
+      "depNameTemplate": "golang"
+    }, {
+// We want a PR to bump golangci-lint versions used through env variables in
+// any Github Actions or Makefile, taking it from the official Github
+// repository tags.
+      "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
+      "matchStrings": [
+        "GOLANGCI_LINT_VERSION: \"(?<currentValue>.*?)\"\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "golangci/golangci-lint",
+    }
+  ],
+  "packageRules": [
+    {
+// We need to ignore k8s.io/client-go older versions as they switched to
+// semantic version and old tags are still available in the repo.
+      "matchDatasources": [
+        "go"
+      ],
+      "matchDepNames": [
+        "k8s.io/client-go"
+      ],
+      "allowedVersions": "<1.0"
+    }, {
+// We want a single PR for all the patches bumps of kubernetes related
+// dependencies, as most of the times these are all strictly related.
+      "matchDatasources": [
+        "go"
+      ],
+      "groupName": "kubernetes patches",
+      "matchUpdateTypes": [
+        "patch",
+        "digest"
+      ],
+      "matchPackagePrefixes": [
+        "k8s.io",
+        "sigs.k8s.io"
+      ],
+      "excludeDepNames": [
+        "sigs.k8s.io/kustomize/kustomize/v4",
+        "sigs.k8s.io/controller-tools"
+      ]
+    }, {
+// We want dedicated PRs for each minor and major bumps to kubernetes related
+// dependencies.
+      "matchDatasources": [
+        "go"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "matchPackagePrefixes": [
+        "k8s.io",
+        "sigs.k8s.io"
+      ]
+    }, {
+// We want dedicated PRs for each bump to non-kubernetes Go dependencies.
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "excludePackagePrefixes": [
+        "k8s.io",
+        "sigs.k8s.io"
+      ],
+      "matchUpdateTypes": [
+        "major",
+      ],
+    }, {
+// We want a single PR for all minor and patch bumps to non-kubernetes Go
+// dependencies.
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "excludePackagePrefixes": [
+        "k8s.io",
+        "sigs.k8s.io"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "all non-major go dependencies"
+    }, {
+// We want a single PR for all minor and patch bumps of Github Actions
+      "matchDepTypes": [
+        "action"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "all non-major github action",
+      "pinDigests": true
+    },{
+// We want dedicated PRs for each major bump to Github Actions
+      "matchDepTypes": [
+        "action"
+      ],
+      "pinDigests": true
+    }
+  ]
+}
