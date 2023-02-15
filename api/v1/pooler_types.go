@@ -135,6 +135,11 @@ type PgBouncerSpec struct {
 	// the CNPG documentation for a list of options you can configure
 	Parameters map[string]string `json:"parameters,omitempty"`
 
+	// PostgreSQL Host Based Authentication rules (lines to be appended
+	// to the pg_hba.conf file)
+	// +optional
+	PgHBA []string `json:"pg_hba,omitempty"`
+
 	// When set to `true`, PgBouncer will disconnect from the PostgreSQL
 	// server, first waiting for all queries to complete, and pause all new
 	// client connections until this value is set to `false` (default). Internally,

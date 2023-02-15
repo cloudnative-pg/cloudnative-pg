@@ -1134,6 +1134,11 @@ func (in *PgBouncerSpec) DeepCopyInto(out *PgBouncerSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.PgHBA != nil {
+		in, out := &in.PgHBA, &out.PgHBA
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Paused != nil {
 		in, out := &in.Paused, &out.Paused
 		*out = new(bool)
