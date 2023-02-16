@@ -28,7 +28,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-func create(
+func createIfNotExists(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,

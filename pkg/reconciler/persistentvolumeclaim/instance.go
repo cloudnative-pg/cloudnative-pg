@@ -87,7 +87,7 @@ func reconcileInstanceMissingPVCs(
 
 		createConfiguration := expectedPVC.toCreateConfiguration(serial, conf)
 
-		if err := create(ctx, c, cluster, createConfiguration); err != nil {
+		if err := createIfNotExists(ctx, c, cluster, createConfiguration); err != nil {
 			return ctrl.Result{}, err
 		}
 		shouldReconcile = true

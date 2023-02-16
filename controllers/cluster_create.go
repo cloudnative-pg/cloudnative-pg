@@ -1187,7 +1187,7 @@ func findInstancePodToCreate(
 	instancesStatus postgres.PostgresqlStatusList,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (*corev1.Pod, error) {
-	aliveInstances := instancesStatus.GetNames()
+	instanceThatHavePods := instancesStatus.GetNames()
 
 	iterablePVCs := cluster.Status.DanglingPVC
 	// appending unusablePVC ensures that some corner cases are covered. (EX: an instance is deleted manually while
@@ -1207,7 +1207,7 @@ func findInstancePodToCreate(
 		}
 
 		instanceName := specs.GetInstanceName(cluster.Name, serial)
-		if k8slices.Contains(aliveInstances, instanceName) {
+		if k8slices.Contains(instanceThatHavePods, instanceName) {
 			continue
 		}
 

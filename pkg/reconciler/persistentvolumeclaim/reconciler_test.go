@@ -39,6 +39,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// Deprecated rely on fake.Client
 type clientMock struct {
 	client.Reader
 	client.Writer
