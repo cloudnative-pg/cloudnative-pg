@@ -22,10 +22,15 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -128,6 +133,89 @@ var _ = Describe("scale down", func() {
 				types.NamespacedName{Name: pvcWalName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("cluster scale pod and job deletion logic", func() {
+	var (
+		fakeClientSet ctrl.WithWatch
+		reconciler    *ClusterReconciler
+		ctx           context.Context
+		cancel        context.CancelFunc
+		cluster       *apiv1.Cluster
+		instanceName  string
+	)
+
+	BeforeEach(func() {
+		fakeClientSet = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
+		ctx, cancel = context.WithCancel(context.Background())
+
+		reconciler = &ClusterReconciler{
+			Client: fakeClientSet,
+		}
+
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+		}
+
+		instanceName = "test-instance"
+	})
+
+	AfterEach(func() {
+		cancel()
+	})
+
+	It("should delete all the jobs", func() {
+		for _, jobName := range specs.GetPossibleJobNames(instanceName) {
+			job := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      jobName,
+					Namespace: cluster.Namespace,
+				},
+			}
+			err := fakeClientSet.Create(context.TODO(), job)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		err := reconciler.ensureInstanceJobAreDeleted(ctx, cluster, instanceName)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, jobName := range specs.GetPossibleJobNames(instanceName) {
+			var expectedJob batchv1.Job
+			err = fakeClientSet.Get(context.Background(),
+				types.NamespacedName{Name: jobName, Namespace: cluster.Namespace},
+				&expectedJob)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		}
+	})
+
+	It("should return nil error when the instance pod is already deleted", func() {
+		err := reconciler.ensureInstancePodIsDeleted(ctx, cluster, instanceName)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should delete the instance pod and report no errors", func() {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      instanceName,
+				Namespace: cluster.Namespace,
+			},
+		}
+		err := fakeClientSet.Create(ctx, pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = reconciler.ensureInstancePodIsDeleted(ctx, cluster, instanceName)
+		Expect(err).ToNot(HaveOccurred())
+
+		var expectedPod corev1.Pod
+		err = fakeClientSet.Get(ctx,
+			types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
+			&expectedPod)
+
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
 })
 

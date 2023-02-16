@@ -134,5 +134,5 @@ func (r *ClusterReconciler) ensureInstancePodIsDeleted(
 	if apierrs.IsNotFound(err) || err == nil {
 		return nil
 	}
-	return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
+	return fmt.Errorf("cannot delete the instance: %w", err)
 }
