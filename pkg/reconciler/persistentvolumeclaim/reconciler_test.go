@@ -185,7 +185,9 @@ var _ = Describe("PVC reconciliation", func() {
 
 	fetchPVC := func(cl client.Client, pvcToFetch corev1.PersistentVolumeClaim) corev1.PersistentVolumeClaim {
 		var pvc corev1.PersistentVolumeClaim
-		err := cl.Get(context.Background(), types.NamespacedName{Name: pvcToFetch.Name, Namespace: pvcToFetch.Namespace}, &pvc)
+		err := cl.Get(context.Background(),
+			types.NamespacedName{Name: pvcToFetch.Name, Namespace: pvcToFetch.Namespace},
+			&pvc)
 		Expect(err).ToNot(HaveOccurred())
 		return pvc
 	}
@@ -320,6 +322,11 @@ var _ = Describe("PVC reconciliation", func() {
 	})
 
 	It("will reconcile each PVC's instance-relative labels by invoking the instance metadata reconciler", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-name", Namespace: "test-namespace"},
+			Spec:       apiv1.ClusterSpec{WalStorage: &apiv1.StorageConfiguration{Size: "1Gi"}},
+		}
+
 		pods := []corev1.Pod{
 			makePod(clusterName, "1", specs.ClusterRoleLabelPrimary),
 			makePod(clusterName, "2", specs.ClusterRoleLabelReplica),
@@ -328,7 +335,7 @@ var _ = Describe("PVC reconciliation", func() {
 
 		pvc := makePVC(clusterName, "1", utils.PVCRolePgData, false)
 		pvc2 := makePVC(clusterName, "2", utils.PVCRolePgData, false)
-		pvc3Wal := makePVC(clusterName, "3", utils.PVCRolePgWal, false)
+		pvc3Wal := makePVC(clusterName, "3-wal", utils.PVCRolePgWal, false)
 		pvc3Data := makePVC(clusterName, "3", utils.PVCRolePgData, false)
 		pvcs := []corev1.PersistentVolumeClaim{
 			pvc,
@@ -344,6 +351,7 @@ var _ = Describe("PVC reconciliation", func() {
 		err := reconcileMetadataComingFromInstance(
 			context.Background(),
 			cl,
+			cluster,
 			pods,
 			pvcs)
 		Expect(err).NotTo(HaveOccurred())

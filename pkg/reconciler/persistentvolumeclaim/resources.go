@@ -35,12 +35,12 @@ func GetName(instanceName string, role utils.PVCRole) string {
 	return pvcName
 }
 
-// FilterByInstance returns all the corev1.PersistentVolumeClaim that are used inside the podSpec
-func FilterByInstance(
+// FilterByPodSpec returns all the corev1.PersistentVolumeClaim that are used inside the podSpec
+func FilterByPodSpec(
 	pvcs []corev1.PersistentVolumeClaim,
 	instanceSpec corev1.PodSpec,
 ) []corev1.PersistentVolumeClaim {
-	var instancePVCs []corev1.PersistentVolumeClaim
+	var usedByPodSpec []corev1.PersistentVolumeClaim
 	for _, volume := range instanceSpec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
 			continue
@@ -48,12 +48,12 @@ func FilterByInstance(
 
 		for _, pvc := range pvcs {
 			if volume.PersistentVolumeClaim.ClaimName == pvc.Name {
-				instancePVCs = append(instancePVCs, pvc)
+				usedByPodSpec = append(usedByPodSpec, pvc)
 			}
 		}
 	}
 
-	return instancePVCs
+	return usedByPodSpec
 }
 
 // IsUsedByPodSpec checks if the given pod spec is using the PVCs
@@ -82,9 +82,26 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 }
 
 // BelongToInstance returns a boolean indicating if that given PVC belongs to an instance
-func BelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
-	expectedInstancePVCs := getExpectedInstancePVCNames(cluster, instanceName)
-	return slices.Contains(expectedInstancePVCs, resourceName)
+func BelongToInstance(cluster *apiv1.Cluster, instanceName, pvcName string) bool {
+	expectedPVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
+	return slices.Contains(expectedPVCs, pvcName)
+}
+
+func filterByInstanceExpectedPVCs(
+	cluster *apiv1.Cluster,
+	instanceName string,
+	pvcs []corev1.PersistentVolumeClaim,
+) []corev1.PersistentVolumeClaim {
+	expectedInstancePVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
+	var belongingPVCs []corev1.PersistentVolumeClaim
+	for i := range pvcs {
+		pvc := pvcs[i]
+		if slices.Contains(expectedInstancePVCs, pvc.Name) {
+			belongingPVCs = append(belongingPVCs, pvc)
+		}
+	}
+
+	return belongingPVCs
 }
 
 // getNamesFromPVCList returns a list of PVC names extracted from a list of PVCs
@@ -98,7 +115,7 @@ func getNamesFromPVCList(pvcs []corev1.PersistentVolumeClaim) []string {
 
 // InstanceHasMissingMounts returns true if the instance has expected PVCs that are not mounted
 func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool {
-	for _, pvcName := range getExpectedInstancePVCNames(cluster, instance.Name) {
+	for _, pvcName := range getExpectedInstancePVCNamesFromCluster(cluster, instance.Name) {
 		if !IsUsedByPodSpec(instance.Spec, pvcName) {
 			return true
 		}
@@ -121,24 +138,56 @@ func (e *expectedPVC) toCreateConfiguration(serial int, storage apiv1.StorageCon
 	}
 }
 
-// here we should register any new PVC for the instance
-func getExpectedPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
-	var expectedMounts []expectedPVC
-	// At the moment detecting a pod is missing the data pvc has no real use.
-	// In the future we will handle all the PVC creation with the package reconciler
-	dataPVCName := GetName(instanceName, utils.PVCRolePgData)
-	expectedMounts = append(expectedMounts,
-		expectedPVC{
-			name: dataPVCName,
-			role: utils.PVCRolePgData,
-			// This requires a init, ideally we should move to a design where each pvc can be init separately
-			// and then  attached
-			initialStatus: StatusInitializing,
-		},
-	)
+func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
+	roles := []utils.PVCRole{utils.PVCRolePgData}
 
-	walPVCName := GetName(instanceName, utils.PVCRolePgWal)
 	if cluster.ShouldCreateWalArchiveVolume() {
+		roles = append(roles, utils.PVCRolePgWal)
+	}
+
+	return buildExpectedPVCs(instanceName, roles)
+}
+
+// getExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
+func getExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName string) []string {
+	expectedPVCs := getExpectedPVCsFromCluster(cluster, instanceName)
+	expectedPVCNames := make([]string, len(expectedPVCs))
+	for idx, mount := range expectedPVCs {
+		expectedPVCNames[idx] = mount.name
+	}
+	return expectedPVCNames
+}
+
+func containsRole(roles []utils.PVCRole, role utils.PVCRole) bool {
+	for _, pvcRole := range roles {
+		if pvcRole == role {
+			return true
+		}
+	}
+	return false
+}
+
+// here we should register any new PVC for the instance
+func buildExpectedPVCs(instanceName string, roles []utils.PVCRole) []expectedPVC {
+	var expectedMounts []expectedPVC
+
+	if containsRole(roles, utils.PVCRolePgData) {
+		// At the moment detecting a pod is missing the data pvc has no real use.
+		// In the future we will handle all the PVC creation with the package reconciler
+		dataPVCName := GetName(instanceName, utils.PVCRolePgData)
+		expectedMounts = append(expectedMounts,
+			expectedPVC{
+				name: dataPVCName,
+				role: utils.PVCRolePgData,
+				// This requires a init, ideally we should move to a design where each pvc can be init separately
+				// and then  attached
+				initialStatus: StatusInitializing,
+			},
+		)
+	}
+
+	if containsRole(roles, utils.PVCRolePgWal) {
+		walPVCName := GetName(instanceName, utils.PVCRolePgWal)
 		expectedMounts = append(expectedMounts,
 			expectedPVC{
 				name:          walPVCName,
@@ -149,16 +198,6 @@ func getExpectedPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC 
 	}
 
 	return expectedMounts
-}
-
-// getExpectedInstancePVCNames gets all the PVC names for a given instance
-func getExpectedInstancePVCNames(cluster *apiv1.Cluster, instanceName string) []string {
-	expectedPVCs := getExpectedPVCs(cluster, instanceName)
-	expectedPVCNames := make([]string, len(expectedPVCs))
-	for idx, mount := range expectedPVCs {
-		expectedPVCNames[idx] = mount.name
-	}
-	return expectedPVCNames
 }
 
 func getStorageConfiguration(

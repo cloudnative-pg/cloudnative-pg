@@ -1117,7 +1117,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	}
 
 	// TODO: this logic eventually should be moved elsewhere
-	instancePVCs := persistentvolumeclaim.FilterByInstance(resources.pvcs.Items, instanceToCreate.Spec)
+	instancePVCs := persistentvolumeclaim.FilterByPodSpec(resources.pvcs.Items, instanceToCreate.Spec)
 	for _, instancePVC := range instancePVCs {
 		// This should not happen. However, we put this guard here
 		// as an assertion to catch unexpected events.

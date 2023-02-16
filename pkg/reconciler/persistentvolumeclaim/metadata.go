@@ -72,6 +72,7 @@ func (m metadataReconciler) reconcile(
 func reconcileMetadataComingFromInstance(
 	ctx context.Context,
 	c client.Client,
+	cluster *apiv1.Cluster,
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
@@ -110,7 +111,8 @@ func reconcileMetadataComingFromInstance(
 			},
 		}
 
-		instancePVCs := FilterByInstance(pvcs, pod.Spec)
+		// todo: this should not rely on expected cluster instance pvc but should fetch every possible pvc name
+		instancePVCs := filterByInstanceExpectedPVCs(cluster, pod.Name, pvcs)
 		if err := instanceReconciler.reconcile(ctx, c, instancePVCs); err != nil {
 			return err
 		}
@@ -126,7 +128,7 @@ func reconcileMetadata(
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	if err := reconcileMetadataComingFromInstance(ctx, c, instances, pvcs); err != nil {
+	if err := reconcileMetadataComingFromInstance(ctx, c, cluster, instances, pvcs); err != nil {
 		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 
@@ -158,7 +160,7 @@ func newAnnotationReconciler(cluster *apiv1.Cluster) metadataReconciler {
 	}
 }
 
-func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler {
+func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: gocognit
 	return metadataReconciler{
 		name: "labels",
 		isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {

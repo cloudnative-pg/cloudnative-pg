@@ -39,7 +39,8 @@ func EnsureInstancePVCGroupIsDeleted(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	expectedPVCs := getExpectedPVCs(cluster, name)
+	// todo: this should not rely on expected cluster instance pvc but should fetch every possible pvc name
+	expectedPVCs := getExpectedPVCsFromCluster(cluster, name)
 
 	for _, expectedPVC := range expectedPVCs {
 		pvc := corev1.PersistentVolumeClaim{

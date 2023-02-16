@@ -167,7 +167,7 @@ func classifyPVC(
 		return ignored
 	}
 
-	expectedPVCs := getExpectedInstancePVCNames(cluster, instanceName)
+	expectedPVCs := getExpectedInstancePVCNamesFromCluster(cluster, instanceName)
 	pvcNames := getNamesFromPVCList(pvcList)
 
 	// PVC is part of an incomplete group
