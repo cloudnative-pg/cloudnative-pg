@@ -12,7 +12,7 @@
   "postUpdateOptions": ["gomodTidy"],
   "semanticCommits": "enabled",
 // All PRs should have a label
-  "labels": ["automated", "do not backport"],
+  "labels": ["automated", "do not backport", "no-issue"],
   "regexManagers": [
     {
       // We want a PR to bump Kustomize version in the Makefile
@@ -46,18 +46,20 @@
       "versioningTemplate": "loose",
       "depNameTemplate": "github.com/goreleaser/goreleaser",
     }, {
-      // We want a PR to bump kind version in the Makefile
+      // We want a PR to bump kind node version in the Makefile
       "fileMatch": [
         "^Makefile$",
+        "^hack/setup-cluster.sh^",
       ],
       "matchStrings": [
-        "KIND_CLUSTER_VERSION \\?\\= (?<currentValue>.*?)\\n"
+        "KIND_CLUSTER_VERSION \\?\\= (?<currentValue>.*?)\\n",
+        "K8S_DEFAULT_VERSION=(?<currentValue>.*?)",
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
       "depNameTemplate": "kindest/node",
     }, {
-      // We want a PR to bump kind version in the Makefile
+      // We want a PR to bump spellcheck version in the Makefile
       "fileMatch": [
         "^Makefile$",
       ],
@@ -68,7 +70,7 @@
       "versioningTemplate": "loose",
       "depNameTemplate": "jonasbn/github-action-spellcheck",
     }, {
-      // We want a PR to bump kind version in the Makefile
+      // We want a PR to bump woke version in the Makefile
       "fileMatch": [
         "^Makefile$",
       ],
@@ -91,8 +93,8 @@
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
     }, {
-// We want a PR to bump Go versions used through env variables in any Github
-// Actions, taking it from the official Github repository.
+// We want a PR to bump Go versions used through env variables in any GitHub
+// Actions, taking it from the official GitHub repository.
       "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
       "matchStrings": [
         "GO_VERSION: '(?<currentValue>.*?)'\\n"
@@ -101,7 +103,7 @@
       "depNameTemplate": "golang"
     }, {
 // We want a PR to bump golangci-lint versions used through env variables in
-// any Github Actions or Makefile, taking it from the official Github
+// any GitHub Actions or Makefile, taking it from the official GitHub
 // repository tags.
       "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
       "matchStrings": [
@@ -124,7 +126,7 @@
       "allowedVersions": "<1.0"
     }, {
 // We want a single PR for all the patches bumps of kubernetes related
-// dependencies, as most of the times these are all strictly related.
+// dependencies, as usually these are all strictly related.
       "matchDatasources": [
         "go"
       ],
@@ -190,7 +192,7 @@
       ],
       "groupName": "all non-major go dependencies"
     }, {
-// We want a single PR for all minor and patch bumps of Github Actions
+// We want a single PR for all minor and patch bumps of GitHub Actions
       "matchDepTypes": [
         "action"
       ],
@@ -201,7 +203,7 @@
       "groupName": "all non-major github action",
       "pinDigests": true
     },{
-// We want dedicated PRs for each major bump to Github Actions
+// We want dedicated PRs for each major bump to GitHub Actions
       "matchDepTypes": [
         "action"
       ],
