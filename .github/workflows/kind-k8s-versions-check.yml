@@ -25,7 +25,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
       -
         name: Get updated kind node version
         run : |
@@ -41,7 +41,7 @@ jobs:
           done | jq -Rs 'split("\n") | map(select(length>0))' | tee .github/kind_versions.json
       -
         name: Create Pull Request if kind k8s versions have been updated
-        uses: peter-evans/create-pull-request@v4
+        uses: peter-evans/create-pull-request@2b011faafdcbc9ceb11414d64d0573f37c774b04 # v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

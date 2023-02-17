@@ -83,7 +83,7 @@ jobs:
     steps:
       - name: Check for Command
         id: command
-        uses: xt0rted/slash-command-action@v2
+        uses: xt0rted/slash-command-action@bf51f8f5f4ea3d58abc7eca58f77104182b23e88 # v2
         continue-on-error: false
         with:
           command: test
@@ -133,11 +133,11 @@ jobs:
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
-        uses: xt0rted/pull-request-comment-branch@v1
+        uses: xt0rted/pull-request-comment-branch@653a7d5ca8bd91d3c5cb83286063314d0b063b8e # v1
         id: refs
 
       - name: Create comment
-        uses: peter-evans/create-or-update-comment@v2
+        uses: peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d # v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
@@ -246,19 +246,19 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Cache Go modules
-        uses: actions/cache@v3
+        uses: actions/cache@6998d139ddd3e68c71e9e398d8e40b71a2f39812 # v3
         with:
           path: |
             ~/go/pkg/mod
@@ -323,7 +323,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser to build kubectl-cnpg plugin
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@f82d6c1c344bcacabba2c841718984797f664a6b # v4
         if: |
           github.event_name == 'schedule' || needs.evaluate_options.outputs.build_plugin == 'true'
         with:
@@ -337,7 +337,7 @@ jobs:
       # Send Slack notification once build including plugin kubectl-cnpg fails, we only report the scheduled run to avoid message overflow
       -
         name: Slack Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@12e36fc18b0689399306c2e0b3e0f2978b7f1ee7 # v2
         if: |
           failure() && github.event_name == 'schedule' &&
           github.organization == 'cloudnative-pg'
@@ -349,7 +349,7 @@ jobs:
           SLACK_MESSAGE: Building plugin `kubectl-cnpg` failed!
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@f82d6c1c344bcacabba2c841718984797f664a6b # v4
         with:
           distribution: goreleaser
           version: latest
@@ -361,7 +361,7 @@ jobs:
       -
         name: Docker meta
         id: docker-meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@507c2f2dc502c992ad446e3d7a5dfbe311567a96 # v4
         with:
           images: ${{ env.IMAGES }}
           tags: |
@@ -376,23 +376,23 @@ jobs:
           echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18 # v2
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7 # v2
       -
         name: Login to ghcr.io
-        uses: docker/login-action@v2
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671 # v4
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -421,7 +421,7 @@ jobs:
           make generate-manifest
       -
         name: Upload the operator manifest as artifact in workflow
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3
         with:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
@@ -440,7 +440,7 @@ jobs:
     steps:
       -
         name: Checkout artifact
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
         with:
           repository: cloudnative-pg/artifacts
           token: ${{ secrets.REPO_GHA_PAT }}
@@ -463,7 +463,7 @@ jobs:
           rm -fr manifests/operator-manifest.yaml
       -
         name: Prepare the operator manifest
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           name: operator-manifest.yaml
           path: manifests
@@ -482,7 +482,7 @@ jobs:
           git commit -m "${COMMIT_MESSAGE}"
       -
         name: Push changes
-        uses: ad-m/github-push-action@v0.6.0
+        uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6 # v0.6.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts
@@ -510,7 +510,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
@@ -582,17 +582,17 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
         with:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Cache Go modules
-        uses: actions/cache@v3
+        uses: actions/cache@6998d139ddd3e68c71e9e398d8e40b71a2f39812 # v3
         with:
           path: |
             ~/go/pkg/mod
@@ -603,7 +603,7 @@ jobs:
       -
         # 'Retry' preparing the E2E test ENV
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd # v2
         with:
           timeout_seconds: 120
           max_attempts: 3
@@ -660,7 +660,7 @@ jobs:
       -
         name: Archive test artifacts
         if: (always() && !cancelled())
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3
         with:
           name: testartifacts-local
           path: testartifacts-${{ env.MATRIX }}/
@@ -686,7 +686,7 @@ jobs:
         # Archive logs for failed test cases if there are any
         name: Archive Kind logs
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3
         with:
           name: kind-logs-${{ matrix.id }}
           path: kind-logs/
@@ -694,7 +694,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -719,7 +719,7 @@ jobs:
         run: mkdir test-artifacts
 
       - name: Download all artifacts to the directory
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           path: test-artifacts
 
@@ -773,7 +773,7 @@ jobs:
       - name: Label the PR as "ok to merge :ok_hand:"
         if: |
           env.OK_LABEL == ''
-        uses: actions-ecosystem/action-add-labels@v1.1.3
+        uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf # v1.1.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           number: ${{ github.event.issue.number }}
@@ -802,7 +802,7 @@ jobs:
       - name: Remove "ok to merge :ok_hand:" label from PR
         if: |
           env.OK_LABEL != ''
-        uses: actions-ecosystem/action-remove-labels@v1.3.0
+        uses: actions-ecosystem/action-remove-labels@2ce5d41b4b6aa8503e285553f75ed56e0a40bae0 # v1.3.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           number: ${{ github.event.issue.number }}

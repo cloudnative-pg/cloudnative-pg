@@ -14,11 +14,11 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
       -
         name: Create tag
         if: github.event.pull_request.merged == true && startsWith(github.head_ref, 'release/v')
-        uses: christophebedard/tag-version-commit@v1.6.3
+        uses: christophebedard/tag-version-commit@ea0363ff76cae3e81c21695cdd21218204be290b # v1.6.3
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           version_regex: '^Version tag to ([0-9]+\.[0-9]+\.[0-9]+)'

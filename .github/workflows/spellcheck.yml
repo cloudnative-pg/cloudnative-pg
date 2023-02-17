@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
 
       - name: woke
-        uses: get-woke/woke-action@v0
+        uses: get-woke/woke-action@b2ec032c4a2c912142b38a6a453ad62017813ed0 # v0
         with:
           # Cause the check to fail on any broke rules
           fail-on-error: true
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
 
       - name: Spellcheck
-        uses: rojopolis/spellcheck-github-actions@0.29.0
+        uses: rojopolis/spellcheck-github-actions@58bd6665414e77e1d08688ff54323e01b9b434e5 # 0.29.0

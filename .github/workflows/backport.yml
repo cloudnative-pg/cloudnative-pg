@@ -19,7 +19,7 @@ jobs:
     steps:
       -
         name: label the pull request
-        uses: actions-ecosystem/action-add-labels@v1
+        uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf # v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           number:  ${{ github.event.pull_request.number }}
@@ -30,7 +30,7 @@ jobs:
             release-1.19
       -
         name: Create comment
-        uses: peter-evans/create-or-update-comment@v2
+        uses: peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d # v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -68,7 +68,7 @@ jobs:
       -
         name: Checkout code
         if: contains( github.event.pull_request.labels.*.name, matrix.branch )
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
         with:
           fetch-depth: 0
           ref: ${{ matrix.branch }}
