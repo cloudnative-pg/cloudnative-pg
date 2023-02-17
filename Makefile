@@ -36,7 +36,7 @@ OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v4.5.7
+KUSTOMIZE_VERSION ?= v5.0.0
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.25.0
 CONTROLLER_TOOLS_VERSION ?= v0.11.3
@@ -225,7 +225,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 
 KUSTOMIZE = $(LOCALBIN)/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@$(KUSTOMIZE_VERSION))
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION))
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
