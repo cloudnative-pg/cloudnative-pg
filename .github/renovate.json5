@@ -3,6 +3,7 @@
   "extends": [
     "config:base"
   ],
+  "rebaseWhen": "never",
 // The maximum number of PRs to be created in parallel
   "prConcurrentLimit": 5,
 // The branches renovate should target
@@ -20,7 +21,7 @@
         "^Makefile$",
       ],
       "matchStrings": [
-        "KUSTOMIZE_VERSION \\?\\= (?<currentValue>.*?)\\n"
+        "KUSTOMIZE_VERSION \\?= (?<currentValue>.*?)\\n"
       ],
       "datasourceTemplate": "go",
       "depNameTemplate": "sigs.k8s.io/kustomize/kustomize/v4",
@@ -30,7 +31,7 @@
         "^Makefile$",
       ],
       "matchStrings": [
-        "CONTROLLER_TOOLS_VERSION \\?\\= (?<currentValue>.*?)\\n"
+        "CONTROLLER_TOOLS_VERSION \\?= (?<currentValue>.*?)\\n"
       ],
       "datasourceTemplate": "go",
       "depNameTemplate": "sigs.k8s.io/controller-tools",
@@ -40,7 +41,7 @@
         "^Makefile$",
       ],
       "matchStrings": [
-        "GORELEASER_VERSION \\?\\= (?<currentValue>.*?)\\n"
+        "GORELEASER_VERSION \\?= (?<currentValue>.*?)\\n"
       ],
       "datasourceTemplate": "go",
       "versioningTemplate": "loose",
@@ -52,8 +53,8 @@
         "^hack/setup-cluster.sh^",
       ],
       "matchStrings": [
-        "KIND_CLUSTER_VERSION \\?\\= (?<currentValue>.*?)\\n",
-        "K8S_DEFAULT_VERSION=(?<currentValue>.*?)",
+        "KIND_CLUSTER_VERSION \\?= (?<currentValue>.*?)\\n",
+        "K8S_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
@@ -64,7 +65,7 @@
         "^Makefile$",
       ],
       "matchStrings": [
-        "SPELLCHECK_VERSION \\?\\= (?<currentValue>.*?)\\n"
+        "SPELLCHECK_VERSION \\?= (?<currentValue>.*?)\\n"
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
@@ -75,7 +76,7 @@
         "^Makefile$",
       ],
       "matchStrings": [
-        "WOKE_VERSION \\?\\= (?<currentValue>.*?)\\n"
+        "WOKE_VERSION \\?= (?<currentValue>.*?)\\n"
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
@@ -201,13 +202,13 @@
         "patch"
       ],
       "groupName": "all non-major github action",
-      "pinDigests": true
+      "pinDigests": false
     },{
 // We want dedicated PRs for each major bump to GitHub Actions
       "matchDepTypes": [
         "action"
       ],
-      "pinDigests": true
+      "pinDigests": false
     }
   ]
 }
