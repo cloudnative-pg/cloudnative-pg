@@ -24,7 +24,7 @@
         "KUSTOMIZE_VERSION \\?= (?<currentValue>.*?)\\n"
       ],
       "datasourceTemplate": "go",
-      "depNameTemplate": "sigs.k8s.io/kustomize/kustomize/v4",
+      "depNameTemplate": "sigs.k8s.io/kustomize/kustomize/v5",
     }, {
       // We want a PR to bump controller-gen version in the Makefile
       "fileMatch": [
@@ -141,7 +141,7 @@
         "sigs.k8s.io"
       ],
       "excludeDepNames": [
-        "sigs.k8s.io/kustomize/kustomize/v4",
+        "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/controller-tools"
       ]
     }, {
