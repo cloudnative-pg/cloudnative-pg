@@ -71,9 +71,6 @@ func reconcilePVCQuantity(
 	if parsedSize == nil {
 		return ErrorInvalidSize
 	}
-	if err != nil {
-		return ErrorInvalidSize
-	}
 	currentSize := pvc.Spec.Resources.Requests["storage"]
 
 	switch currentSize.AsDec().Cmp(parsedSize.AsDec()) {
