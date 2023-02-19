@@ -19,7 +19,6 @@ package log
 import (
 	"flag"
 	"fmt"
-	stdLog "log"
 	"os"
 
 	"github.com/spf13/pflag"
@@ -87,10 +86,7 @@ func (l *Flags) ConfigureLogging() {
 		logger.Info("Invalid log level, defaulting", "level", logLevel, "default", DefaultLevel)
 	}
 
-	stdLog.SetPrefix("")
-	stdLog.SetFlags(0)
-	stdLog.SetOutput(logWriter{logger: logger})
-
+	redirectStdLog(logger)
 	controllerruntime.SetLogger(logger)
 	klog.SetLogger(logger)
 	SetLogger(logger)

@@ -20,6 +20,7 @@ package log
 import (
 	"context"
 	"fmt"
+	stdLog "log"
 	"os"
 	"runtime"
 
@@ -250,4 +251,10 @@ type logWriter struct {
 func (l logWriter) Write(b []byte) (int, error) {
 	l.logger.Info(string(b))
 	return len(b), nil
+}
+
+func redirectStdLog(logger logr.Logger) {
+	stdLog.SetPrefix("")
+	stdLog.SetFlags(0)
+	stdLog.SetOutput(logWriter{logger: logger})
 }
