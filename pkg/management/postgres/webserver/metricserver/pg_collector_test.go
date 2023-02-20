@@ -79,11 +79,11 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 		metrics, _ := registry.Gather()
 		for _, metric := range metrics {
 			m := metric.GetMetric()
-			t := time.Unix(int64(m[0].GetGauge().GetValue()), 0)
+			t := time.Unix(int64(m[0].GetGauge().GetValue()), 0).UTC()
 			Expect(t.Year()).To(BeEquivalentTo(2023))
 			Expect(t.Month()).To(BeEquivalentTo(2))
 			Expect(t.Day()).To(BeEquivalentTo(16))
-			Expect(t.Hour()).To(BeEquivalentTo(19))
+			Expect(t.Hour()).To(BeEquivalentTo(22))
 			Expect(t.Minute()).To(BeEquivalentTo(44))
 			Expect(t.Second()).To(BeEquivalentTo(56))
 
