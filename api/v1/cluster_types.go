@@ -459,6 +459,12 @@ type ClusterStatus struct {
 	// The first recoverability point, stored as a date in RFC3339 format
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
+	// Stored as a date in RFC3339 format
+	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
+
+	// Stored as a date in RFC3339 format
+	LastFailedBackup string `json:"lastFailedBackup,omitempty"`
+
 	// The commit hash number of which this operator running
 	CommitHash string `json:"cloudNativePGCommitHash,omitempty"`
 

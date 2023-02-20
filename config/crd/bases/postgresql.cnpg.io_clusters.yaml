@@ -3450,6 +3450,12 @@ spec:
                 description: How many Jobs have been created by this cluster
                 format: int32
                 type: integer
+              lastFailedBackup:
+                description: Stored as a date in RFC3339 format
+                type: string
+              lastSuccessfulBackup:
+                description: Stored as a date in RFC3339 format
+                type: string
               latestGeneratedNode:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)
