@@ -198,12 +198,31 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 						cluster)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						cluster)
+					return cluster.Status.LastSuccessfulBackup, err
+				}, 30).ShouldNot(BeEmpty())
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						cluster)
+					return cluster.Status.LastFailedBackup, err
+				}, 30).Should(BeEmpty())
 			})
 
 			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName, psqlClientPod)
 
-			AssertMetricsData(namespace, restoredClusterName, curlPodName, targetDBOne, targetDBTwo, targetDBSecret)
+			cluster := &apiv1.Cluster{}
+			err = env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: restoredClusterName},
+				cluster)
+			Expect(err).ToNot(HaveOccurred())
+			AssertMetricsData(namespace, curlPodName, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 
 			previous := 0
 			latestGZ := filepath.Join("*", clusterName, "*", "*.history.gz")

@@ -26,6 +26,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -50,20 +51,22 @@ type Exporter struct {
 // metrics here are related to the exporter itself, which is instrumented to
 // expose them
 type metrics struct {
-	CollectionsTotal         prometheus.Counter
-	PgCollectionErrors       *prometheus.CounterVec
-	Error                    prometheus.Gauge
-	PostgreSQLUp             *prometheus.GaugeVec
-	CollectionDuration       *prometheus.GaugeVec
-	SwitchoverRequired       prometheus.Gauge
-	SyncReplicas             *prometheus.GaugeVec
-	ReplicaCluster           prometheus.Gauge
-	PgWALArchiveStatus       *prometheus.GaugeVec
-	PgWALDirectory           *prometheus.GaugeVec
-	PgVersion                *prometheus.GaugeVec
-	FirstRecoverabilityPoint prometheus.Gauge
-	FencingOn                prometheus.Gauge
-	PgStatWalMetrics         PgStatWalMetrics
+	CollectionsTotal             prometheus.Counter
+	PgCollectionErrors           *prometheus.CounterVec
+	Error                        prometheus.Gauge
+	PostgreSQLUp                 *prometheus.GaugeVec
+	CollectionDuration           *prometheus.GaugeVec
+	SwitchoverRequired           prometheus.Gauge
+	SyncReplicas                 *prometheus.GaugeVec
+	ReplicaCluster               prometheus.Gauge
+	PgWALArchiveStatus           *prometheus.GaugeVec
+	PgWALDirectory               *prometheus.GaugeVec
+	PgVersion                    *prometheus.GaugeVec
+	FirstRecoverabilityPoint     prometheus.Gauge
+	LastAvailableBackupTimestamp prometheus.Gauge
+	LastFailedBackupTimestamp    prometheus.Gauge
+	FencingOn                    prometheus.Gauge
+	PgStatWalMetrics             PgStatWalMetrics
 }
 
 // PgStatWalMetrics is available from PG14+
@@ -165,6 +168,18 @@ func newMetrics() *metrics {
 			Name:      "first_recoverability_point",
 			Help:      "The first point of recoverability for the cluster as a unix timestamp",
 		}),
+		LastAvailableBackupTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "last_available_backup_timestamp",
+			Help:      "The last available backup as a unix timestamp",
+		}),
+		LastFailedBackupTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "last_failed_backup_timestamp",
+			Help:      "The last failed backup as a unix timestamp",
+		}),
 		FencingOn: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
@@ -246,6 +261,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.PgVersion.Describe(ch)
 	e.Metrics.FirstRecoverabilityPoint.Describe(ch)
 	e.Metrics.FencingOn.Describe(ch)
+	e.Metrics.LastFailedBackupTimestamp.Describe(ch)
+	e.Metrics.LastAvailableBackupTimestamp.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -280,6 +297,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.Metrics.PgWALDirectory.Collect(ch)
 	e.Metrics.PgVersion.Collect(ch)
 	e.Metrics.FirstRecoverabilityPoint.Collect(ch)
+	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
+	e.Metrics.LastFailedBackupTimestamp.Collect(ch)
 
 	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
 		e.Metrics.PgStatWalMetrics.WalSync.Collect(ch)
@@ -353,6 +372,11 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 
 		// getting the first point of recoverability
 		e.collectFromPrimaryFirstPointOnTimeRecovery()
+
+		// getting the last available backup timestamp
+		e.collectFromPrimaryLastAvailableBackupTimestamp()
+
+		e.collectFromPrimaryLastFailedBackupTimestamp()
 	}
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
@@ -385,9 +409,11 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
-	const errorLabel = "Collect.FirstRecoverabilityPoint"
-
+func (e *Exporter) setTimestampMetric(
+	gauge prometheus.Gauge,
+	errorLabel string,
+	getTimestampFunc func(cluster *apiv1.Cluster) string,
+) {
 	cluster, err := cache.LoadCluster()
 	// there isn't a cached object yet
 	if errors.Is(err, cache.ErrCacheMiss) {
@@ -400,24 +426,23 @@ func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 		e.Metrics.PgCollectionErrors.WithLabelValues(errorLabel).Inc()
 		// if there is a programmatic error in the cache we should reset any potential data because it cannot be
 		// trusted as still valid
-		e.Metrics.FirstRecoverabilityPoint.Set(0)
+		gauge.Set(0)
 		return
 	}
 
-	ts := cluster.Status.FirstRecoverabilityPoint
-	// means no First recoverability point yet
+	ts := getTimestampFunc(cluster)
 	if ts == "" {
+		// if there is no timestamp we report the timestamp metric with the zero value
+		gauge.Set(0)
 		return
 	}
 
 	parsedTS, err := time.Parse(time.RFC3339, ts)
 	if err != nil {
-		log.Error(err, "while collecting parsing first recoverability point timestamp")
+		log.Error(err, "while collecting timestamp", "errorLabel", errorLabel)
 		e.Metrics.Error.Set(1)
 		e.Metrics.PgCollectionErrors.WithLabelValues(errorLabel).Inc()
-		// if we cannot parse FirstRecoverabilityPoint we should reset the potential existing value because it cannot be
-		// trusted as still valid
-		e.Metrics.FirstRecoverabilityPoint.Set(0)
+		gauge.Set(0)
 		return
 	}
 
@@ -425,7 +450,28 @@ func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 	// exposing timestamps using the relative Unix timestamp
 	// number. See:
 	// https://prometheus.io/docs/practices/instrumentation/#timestamps-not-time-since
-	e.Metrics.FirstRecoverabilityPoint.Set(float64(parsedTS.Unix()))
+	gauge.Set(float64(parsedTS.Unix()))
+}
+
+func (e *Exporter) collectFromPrimaryLastFailedBackupTimestamp() {
+	const errorLabel = "Collect.LastFailedBackupTimestamp"
+	e.setTimestampMetric(e.Metrics.LastFailedBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
+		return cluster.Status.LastFailedBackup
+	})
+}
+
+func (e *Exporter) collectFromPrimaryLastAvailableBackupTimestamp() {
+	const errorLabel = "Collect.LastAvailableBackupTimestamp"
+	e.setTimestampMetric(e.Metrics.LastAvailableBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
+		return cluster.Status.LastSuccessfulBackup
+	})
+}
+
+func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
+	const errorLabel = "Collect.FirstRecoverabilityPoint"
+	e.setTimestampMetric(e.Metrics.FirstRecoverabilityPoint, errorLabel, func(cluster *apiv1.Cluster) string {
+		return cluster.Status.FirstRecoverabilityPoint
+	})
 }
 
 func (e *Exporter) collectFromPrimarySynchronousStandbysNumber(db *sql.DB) {
