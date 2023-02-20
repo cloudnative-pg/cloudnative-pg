@@ -44,6 +44,12 @@ func GetCurrentTimestamp() string {
 	return t.Format(metav1.RFC3339Micro)
 }
 
+// GetCurrentTimestampWithFormat returns the current timestamp as a string with the specified format
+func GetCurrentTimestampWithFormat(format string) string {
+	t := time.Now()
+	return t.Format(format)
+}
+
 // ParseTargetTime returns the parsed targetTime which is used for point-in-time-recovery
 // Currently, we support formats of targetTime as follows:
 // YYYY-MM-DD HH24:MI:SS
