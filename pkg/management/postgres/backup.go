@@ -411,7 +411,7 @@ func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
 			cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
 			lastBackup := backupList.LatestBackupInfo()
 			if lastBackup != nil {
-				cluster.Status.LastSuccessfulBackup = lastBackup.EndTimeString
+				cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
 			}
 
 			if !reflect.DeepEqual(origCluster, cluster) {
