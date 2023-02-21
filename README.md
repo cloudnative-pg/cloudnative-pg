@@ -128,6 +128,12 @@ The current maintainers of the CloudNativePG project are:
 
 They are listed in the [CODEOWNERS](CODEOWNERS) file.
 
+## Adopters
+
+A list of publicly known users of the CloudNativePG operator is in [ADOPTERS.md].
+Help us grow our community and CloudNativePG by adding yourself and your
+organization to this list!
+
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=cloudnative-pg/cloudnative-pg&type=Date)](https://star-history.com/#cloudnative-pg/cloudnative-pg&Date)
