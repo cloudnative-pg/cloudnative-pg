@@ -73,7 +73,7 @@ func (l *Flags) ConfigureLogging() {
 	default:
 		logger.Info("Invalid log level, defaulting", "level", logLevel, "default", mlog.DefaultLevel)
 	}
-
+	mlog.RedirectStdLog(logger)
 	ctrl.SetLogger(logger)
 	klog.SetLogger(logger)
 	mlog.SetLogger(logger)

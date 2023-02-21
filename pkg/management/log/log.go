@@ -20,6 +20,7 @@ package log
 import (
 	"context"
 	"fmt"
+	stdLog "log"
 	"os"
 	"runtime"
 
@@ -241,4 +242,20 @@ func SetupLogger(ctx context.Context) (Logger, context.Context) {
 	newLogger, _ := logr.FromContext(ctx)
 
 	return FromContext(ctx), IntoContext(ctx, &logger{Logger: newLogger})
+}
+
+type logWriter struct {
+	logger logr.Logger
+}
+
+func (l logWriter) Write(b []byte) (int, error) {
+	l.logger.Info(string(b))
+	return len(b), nil
+}
+
+// RedirectStdLog format log with json
+func RedirectStdLog(logger logr.Logger) {
+	stdLog.SetPrefix("")
+	stdLog.SetFlags(0)
+	stdLog.SetOutput(logWriter{logger: logger})
 }
