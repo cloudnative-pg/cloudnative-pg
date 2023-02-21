@@ -15,8 +15,9 @@ before:
 
 builds:
 - id: manager
-  binary: manager
+  binary: manager/manager_{{ .Arch }}
   main: cmd/manager/main.go
+  no_unique_dist_dir: true
   gcflags:
     - all=-trimpath={{.Env.GOPATH}};{{.Env.PWD}}
   ldflags:
