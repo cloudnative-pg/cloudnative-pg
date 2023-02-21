@@ -74,6 +74,7 @@ ConfigMapKeySelector
 ConfigMapRefs
 ConfigMapResourceVersion
 ConfigMaps
+ConnectionLimit
 ContinuousArchiving
 ContinuousArchivingFailing
 Coverity
@@ -101,6 +102,7 @@ EOF
 EmbeddedObjectMetadata
 EncryptionType
 EndpointCA
+EnsureOption
 EnterpriseDB
 EnterpriseDB's
 EnvFrom
@@ -167,6 +169,7 @@ LoadBalancer
 LocalObjectReference
 MAPPEDMETRIC
 MVCC
+ManagedConfiguration
 MetricDescription
 MetricName
 MetricType
@@ -206,6 +209,7 @@ PODNAME
 PPROF
 PV
 PVCs
+PasswordConfiguration
 Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
@@ -268,6 +272,7 @@ ResourceRequirements
 ResourceVersion
 RetentionPolicy
 RoleBinding
+RoleConfiguration
 RollingUpdateStatus
 Ruocco
 SAS
