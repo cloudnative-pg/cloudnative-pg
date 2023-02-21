@@ -86,6 +86,7 @@ func (l *Flags) ConfigureLogging() {
 		logger.Info("Invalid log level, defaulting", "level", logLevel, "default", DefaultLevel)
 	}
 
+	redirectStdLog(logger)
 	controllerruntime.SetLogger(logger)
 	klog.SetLogger(logger)
 	SetLogger(logger)
