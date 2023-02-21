@@ -110,6 +110,10 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 		*config.DataChecksums {
 		options = append(options, "-k")
 	}
+	if logLevel := cluster.Spec.LogLevel; log.DebugLevelString == logLevel ||
+		log.TraceLevelString == logLevel {
+		options = append(options, "-d")
+	}
 	if encoding := config.Encoding; encoding != "" {
 		options = append(options, fmt.Sprintf("--encoding=%s", encoding))
 	}
