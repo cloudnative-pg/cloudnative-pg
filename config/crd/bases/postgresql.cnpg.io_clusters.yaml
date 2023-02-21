@@ -2174,6 +2174,81 @@ spec:
                 - debug
                 - trace
                 type: string
+              managed:
+                description: ManagedConfiguration represents the portions of PostgreSQL
+                  that are managed by the instance manager
+                properties:
+                  roles:
+                    items:
+                      description: "RoleConfiguration is the representation, in Kubernetes,
+                        of a PostgreSQL role with the additional field Ensure specifying
+                        whether to ensure the presence or absence of the role in the
+                        database \n The defaults of the CREATE ROLE command are applied
+                        Reference: https://www.postgresql.org/docs/current/sql-createrole.html"
+                      properties:
+                        bypassrls:
+                          type: boolean
+                        connectionLimit:
+                          default: -1
+                          description: connection Limit defaults to `-1`
+                          format: int64
+                          type: integer
+                        createdb:
+                          type: boolean
+                        createrole:
+                          type: boolean
+                        ensure:
+                          default: present
+                          description: ensure defaults to 'present'
+                          type: string
+                        in_roles:
+                          items:
+                            type: string
+                          type: array
+                        inherit:
+                          default: true
+                          description: inherit defaults to true
+                          type: boolean
+                        login:
+                          type: boolean
+                        name:
+                          type: string
+                        passwordSecret:
+                          description: PasswordConfiguration contains the location
+                            of the RoleConfiguration password
+                          properties:
+                            name:
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        replication:
+                          type: boolean
+                        role:
+                          items:
+                            type: string
+                          type: array
+                        superuser:
+                          type: boolean
+                        validUntil:
+                          type: string
+                      required:
+                      - bypassrls
+                      - connectionLimit
+                      - createdb
+                      - createrole
+                      - ensure
+                      - in_roles
+                      - inherit
+                      - login
+                      - name
+                      - replication
+                      - role
+                      - superuser
+                      - validUntil
+                      type: object
+                    type: array
+                type: object
               maxSyncReplicas:
                 default: 0
                 description: The target value for the synchronous replication quorum,
