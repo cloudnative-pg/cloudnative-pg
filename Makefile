@@ -36,13 +36,13 @@ OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v4.5.2
+KUSTOMIZE_VERSION ?= v5.0.0
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.24.3
-CONTROLLER_TOOLS_VERSION ?= v0.11.1
+CONTROLLER_TOOLS_VERSION ?= v0.11.3
 GORELEASER_VERSION ?= v1.15.2
-SPELLCHECK_VERSION ?= 0.25.0
-WOKE_VERSION ?= 0.18.1
+SPELLCHECK_VERSION ?= 0.29.0
+WOKE_VERSION ?= 0.19.0
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -108,7 +108,7 @@ run: generate fmt vet manifests ## Run against the configured Kubernetes cluster
 
 docker-build: go-releaser ## Build the docker image.
 	GOOS=linux GOARCH=${ARCH} DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
-	  $(GO_RELEASER) build --skip-validate --rm-dist --single-target
+	  $(GO_RELEASER) build --skip-validate --clean --single-target
 	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
 
 docker-push: ## Push the docker image.
@@ -223,7 +223,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 
 KUSTOMIZE = $(LOCALBIN)/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@$(KUSTOMIZE_VERSION))
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION))
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
