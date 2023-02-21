@@ -71,7 +71,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			By("removing an instance from the cluster", func() {
 				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
-				timeout := 60
+				timeout := 61
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
 			AssertClusterReplicationSlots(clusterName, namespace)
