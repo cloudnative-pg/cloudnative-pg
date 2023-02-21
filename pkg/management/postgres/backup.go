@@ -351,7 +351,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionTrue,
 		Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
-		Message: "Backup has successful",
+		Message: "Backup was successful",
 	}
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
 		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
