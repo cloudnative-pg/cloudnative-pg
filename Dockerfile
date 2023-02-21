@@ -3,9 +3,10 @@
 FROM gcr.io/distroless/static-debian11:debug-nonroot as builder
 ARG TARGETARCH
 
-COPY --chown=nonroot:nonroot --chmod=0755 dist/manager_* .
 SHELL ["/busybox/sh", "-c"]
-RUN ln -sf manager_${TARGETARCH} manager
+RUN mkdir bind
+COPY --chown=nonroot:nonroot --chmod=0755 dist/manager/* bin/
+RUN ln -sf bin/manager_${TARGETARCH} manager
 
 FROM gcr.io/distroless/static-debian11:nonroot
 ARG VERSION="dev"

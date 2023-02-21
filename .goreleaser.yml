@@ -15,7 +15,7 @@ before:
 
 builds:
 - id: manager
-  binary: manager_{{ .Arch }}
+  binary: manager/manager_{{ .Arch }}
   main: cmd/manager/main.go
   no_unique_dist_dir: true
   gcflags:
