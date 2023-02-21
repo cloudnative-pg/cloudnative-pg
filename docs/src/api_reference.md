@@ -52,9 +52,11 @@ Below you will find a description of the defined resources:
 - [LDAPBindSearchAuth](#LDAPBindSearchAuth)
 - [LDAPConfig](#LDAPConfig)
 - [LocalObjectReference](#LocalObjectReference)
+- [ManagedConfiguration](#ManagedConfiguration)
 - [Metadata](#Metadata)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
+- [PasswordConfiguration](#PasswordConfiguration)
 - [PgBouncerIntegrationStatus](#PgBouncerIntegrationStatus)
 - [PgBouncerSecrets](#PgBouncerSecrets)
 - [PgBouncerSpec](#PgBouncerSpec)
@@ -71,6 +73,7 @@ Below you will find a description of the defined resources:
 - [ReplicaClusterConfiguration](#ReplicaClusterConfiguration)
 - [ReplicationSlotsConfiguration](#ReplicationSlotsConfiguration)
 - [ReplicationSlotsHAConfiguration](#ReplicationSlotsHAConfiguration)
+- [RoleConfiguration](#RoleConfiguration)
 - [RollingUpdateStatus](#RollingUpdateStatus)
 - [S3Credentials](#S3Credentials)
 - [ScheduledBackup](#ScheduledBackup)
@@ -386,6 +389,7 @@ Name                    | Description                                           
 `projectedVolumeTemplate` | Template to be used to define projected volumes, projected volumes will be mounted under `/projected` base folder                                                                                                                                                                                                                                                                                                       | *corev1.ProjectedVolumeSource                                                                                                   
 `env                    ` | Env follows the Env format to pass environment variables to the pods created in the cluster                                                                                                                                                                                                                                                                                                                             | []corev1.EnvVar                                                                                                                 
 `envFrom                ` | EnvFrom follows the EnvFrom format to pass environment variables sources to the pods to be used by Env                                                                                                                                                                                                                                                                                                                  | []corev1.EnvFromSource                                                                                                          
+`managed                ` |                                                                                                                                                                                                                                                                                                                                                                                                                         | [*ManagedConfiguration](#ManagedConfiguration)                                                                                  
 
 <a id='ClusterStatus'></a>
 
@@ -599,6 +603,16 @@ Name | Description           | Type
 ---- | --------------------- | ------
 `name` | Name of the referent. - *mandatory*  | string
 
+<a id='ManagedConfiguration'></a>
+
+## ManagedConfiguration
+
+ManagedConfiguration represents the portions of PostgreSQL that are managed by the instance manager
+
+Name  | Description            | Type                                     
+----- | --- | -----------------------------------------
+`roles` |  | [[]RoleConfiguration](#RoleConfiguration)
+
 <a id='Metadata'></a>
 
 ## Metadata
@@ -635,6 +649,16 @@ Name       | Description                                                        
 ---------- | ---------------------------------------------------------------------------------------------------------------- | -----
 `inProgress` | Is there a node maintenance activity in progress?                                                                - *mandatory*  | bool 
 `reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere - when `instances` >1) - *mandatory*  | *bool
+
+<a id='PasswordConfiguration'></a>
+
+## PasswordConfiguration
+
+PasswordConfiguration contains the location of the RoleConfiguration password
+
+Name | Description            | Type  
+---- | --- | ------
+`name` |  - *mandatory*  | string
 
 <a id='PgBouncerIntegrationStatus'></a>
 
@@ -832,6 +856,31 @@ Name       | Description                                                        
 ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
 `enabled   ` | If enabled, the operator will automatically manage replication slots on the primary instance and use them in streaming replication connections with all the standby instances that are part of the HA cluster. If disabled (default), the operator will not take advantage of replication slots in streaming connections with the replicas. This feature also controls replication slots in replica cluster, from the designated primary to its cascading replicas. This can only be set at creation time. - *mandatory*  | bool  
 `slotPrefix` | Prefix for replication slots managed by the operator for HA. It may only contain lower case letters, numbers, and the underscore character. This can only be set at creation time. By default set to `_cnpg_`.                                                                                                                                                                                                                                                                                             | string
+
+<a id='RoleConfiguration'></a>
+
+## RoleConfiguration
+
+RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role with the additional field Ensure specifying whether to ensure the presence or absence of the role in the database
+
+The defaults of the CREATE ROLE command are applied Reference: https://www.postgresql.org/docs/current/sql-createrole.html
+
+Name            | Description                       | Type                                            
+--------------- | --------------------------------- | ------------------------------------------------
+`name           ` |                                   - *mandatory*  | string                                          
+`ensure         ` | ensure defaults to 'present'      - *mandatory*  | EnsureOption                                    
+`passwordSecret ` |                                   | [*PasswordConfiguration](#PasswordConfiguration)
+`superuser      ` |                                   - *mandatory*  | bool                                            
+`createdb       ` |                                   - *mandatory*  | bool                                            
+`createrole     ` |                                   - *mandatory*  | bool                                            
+`inherit        ` | inherit defaults to true          - *mandatory*  | bool                                            
+`login          ` |                                   - *mandatory*  | bool                                            
+`replication    ` |                                   - *mandatory*  | bool                                            
+`bypassrls      ` |                                   - *mandatory*  | bool                                            
+`connectionLimit` | connection Limit defaults to `-1` - *mandatory*  | int64                                           
+`validUntil     ` |                                   - *mandatory*  | string                                          
+`in_roles       ` |                                   - *mandatory*  | []string                                        
+`role           ` |                                   - *mandatory*  | []string                                        
 
 <a id='RollingUpdateStatus'></a>
 
