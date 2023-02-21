@@ -243,9 +243,9 @@ func (b *BackupCommand) ensureBarmanCompatibility() error {
 	}
 }
 
-func (b *BackupCommand) retryWithLatestCluster(
+func (b *BackupCommand) retryWithRefreshedCluster(
 	ctx context.Context,
-	cb func(cluster *apiv1.Cluster) error,
+	cb func() error,
 ) error {
 	return retry.OnError(retry.DefaultBackoff, resources.RetryAlways, func() error {
 		if err := b.Client.Get(ctx, types.NamespacedName{
@@ -255,7 +255,7 @@ func (b *BackupCommand) retryWithLatestCluster(
 			return err
 		}
 
-		return cb(b.Cluster)
+		return cb()
 	})
 }
 
@@ -268,10 +268,10 @@ func (b *BackupCommand) run(ctx context.Context) {
 		if backupErr == nil {
 			return
 		}
-		if failErr := b.retryWithLatestCluster(ctx, func(cluster *apiv1.Cluster) error {
-			origCluster := cluster.DeepCopy()
-			cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
-			return b.Client.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
+		if failErr := b.retryWithRefreshedCluster(ctx, func() error {
+			origCluster := b.Cluster.DeepCopy()
+			b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
+			return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 		}); failErr != nil {
 			b.Log.Error(failErr, "while setting last failed backup")
 		}
@@ -297,8 +297,8 @@ func (b *BackupCommand) run(ctx context.Context) {
 		Reason:  string(apiv1.ConditionBackupStarted),
 		Message: "New Backup starting up",
 	}
-	if err := b.retryWithLatestCluster(ctx, func(cluster *apiv1.Cluster) error {
-		return conditions.Update(ctx, b.Client, cluster, &condition)
+	if err := b.retryWithRefreshedCluster(ctx, func() error {
+		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup started)")
 		// We do not terminate here because we could still have a good backup
@@ -328,8 +328,8 @@ func (b *BackupCommand) run(ctx context.Context) {
 			Message: backupErr.Error(),
 		}
 
-		if err := b.retryWithLatestCluster(ctx, func(cluster *apiv1.Cluster) error {
-			return conditions.Update(ctx, b.Client, cluster, &condition)
+		if err := b.retryWithRefreshedCluster(ctx, func() error {
+			return conditions.Update(ctx, b.Client, b.Cluster, &condition)
 		}); err != nil {
 			b.Log.Error(err, "Error changing backup condition (backup failed)")
 			// We do not terminate here because we want to update the Backup object too
@@ -351,10 +351,10 @@ func (b *BackupCommand) run(ctx context.Context) {
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionTrue,
 		Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
-		Message: "Backup has successful",
+		Message: "Backup was successful",
 	}
-	if err := b.retryWithLatestCluster(ctx, func(cluster *apiv1.Cluster) error {
-		return conditions.Update(ctx, b.Client, cluster, &condition)
+	if err := b.retryWithRefreshedCluster(ctx, func() error {
+		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup succeeded)")
 		// We do not terminate here because we want to continue with
@@ -405,17 +405,17 @@ func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
 	// Set the first recoverability point
 	if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
 		firstRecoverabilityPoint := ts.Format(time.RFC3339)
-		if err = b.retryWithLatestCluster(ctx, func(cluster *apiv1.Cluster) error {
-			origCluster := cluster.DeepCopy()
+		if err = b.retryWithRefreshedCluster(ctx, func() error {
+			origCluster := b.Cluster.DeepCopy()
 
-			cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
+			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
 			lastBackup := backupList.LatestBackupInfo()
 			if lastBackup != nil {
-				cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
+				b.Cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
 			}
 
-			if !reflect.DeepEqual(origCluster, cluster) {
-				return b.Client.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
+			if !reflect.DeepEqual(origCluster, b.Cluster) {
+				return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 			}
 
 			return nil
