@@ -289,6 +289,8 @@ type ClusterSpec struct {
 	// sources to the pods to be used by Env
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	Managed *ManagedConfiguration `json:"managed,omitempty"`
 }
 
 const (
@@ -1557,6 +1559,56 @@ func (in ExternalCluster) GetServerName() string {
 		return in.BarmanObjectStore.ServerName
 	}
 	return in.Name
+}
+
+// EnsureOption represents whether we should enforce the presence or absence of
+// a Role in a PostgreSQL instance
+type EnsureOption string
+
+// values taken by EnsureOption
+const (
+	EnsurePresent EnsureOption = "present"
+	EnsureAbsent  EnsureOption = "absent"
+)
+
+// ManagedConfiguration represents the portions of PostgreSQL that are managed
+// by the instance manager
+type ManagedConfiguration struct {
+	Roles []RoleConfiguration `json:"roles,omitempty"`
+}
+
+// RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
+// with the additional field Ensure specifying whether to ensure the presence or
+// absence of the role in the database
+//
+// The defaults of the CREATE ROLE command are applied
+// Reference: https://www.postgresql.org/docs/current/sql-createrole.html
+type RoleConfiguration struct {
+	Name string `json:"name"`
+	// ensure defaults to 'present'
+	// +kubebuilder:default:="present"
+	Ensure         EnsureOption           `json:"ensure"`
+	PasswordSecret *PasswordConfiguration `json:"passwordSecret,omitempty"`
+	Superuser      bool                   `json:"superuser"`
+	CreateDB       bool                   `json:"createdb"`
+	CreateRole     bool                   `json:"createrole"`
+	// inherit defaults to true
+	// +kubebuilder:default:=true
+	Inherit     bool `json:"inherit"` // IMPORTANT default is INHERIT
+	Login       bool `json:"login"`
+	Replication bool `json:"replication"`
+	BypassRLS   bool `json:"bypassrls"` // Row-Level Security
+	// connection Limit defaults to `-1`
+	// +kubebuilder:default:=-1
+	ConnectionLimit int64    `json:"connectionLimit"`
+	ValidUntil      string   `json:"validUntil"`
+	InRoles         []string `json:"in_role"`
+	WithRoles       []string `json:"role"`
+}
+
+// PasswordConfiguration contains the location of the RoleConfiguration password
+type PasswordConfiguration struct {
+	Name string `json:"name"`
 }
 
 // +kubebuilder:object:root=true
