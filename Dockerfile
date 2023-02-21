@@ -1,6 +1,6 @@
 # This builder stage it's only because we need a command
 # to create a symlink and reduce the size of the image
-FROM gcr.io/distroless/static:debug-nonroot as builder
+FROM gcr.io/distroless/static-debian11:debug-nonroot as builder
 ARG TARGETARCH
 
 COPY --chown=nonroot:nonroot --chmod=0755 dist/manager_* .
