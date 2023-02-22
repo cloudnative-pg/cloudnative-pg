@@ -36,6 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
@@ -199,6 +200,16 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		setupLog.Error(err, "unable to create slot replicator")
 		return err
 	}
+
+	roleSynchronizer := roles.NewRoleSynchronizer(instance)
+	if err = mgr.Add(roleSynchronizer); err != nil {
+		setupLog.Error(err, "unable to create slot replicator")
+		return err
+	}
+
+	setupLog.Info("XXXX added role syncrhonizer",
+		"version", versions.Version,
+		"build", versions.Info)
 
 	// onlineUpgradeCtx is a child context of the postgres context.
 	// onlineUpgradeCtx will be the context passed to all the manager handled Runnables via Start(ctx),
