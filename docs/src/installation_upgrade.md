@@ -75,16 +75,31 @@ curl -sSfL \
 
 The operator can be installed using the provided [Helm chart](https://github.com/cloudnative-pg/charts).
 
-
 ## Details about the deployment
 
-In Kubernetes, the operator is by default installed in the `cnpg-system` namespace as a Kubernetes
-`Deployment` called `cnpg-controller-manager`. You can get more information by running:
+In Kubernetes, the operator is by default installed in the `cnpg-system`
+namespace as a Kubernetes `Deployment`. The name of this deployment
+depends on the installation method.
+When installed through the manifest or the `cnpg` plugin, it is called
+`cnpg-controller-manager` by default. When installed via Helm, the default name
+is `cnpg-cloudnative-pg`.
+
+!!! Note
+    With Helm you can customize the name of the deployment via the
+    `fullnameOverride` field in the [*"values.yaml"* file](https://helm.sh/docs/chart_template_guide/values_files/).
+
+You can get more information using the `describe` command in `kubectl`:
+
+```sh
+$ kubectl get deployments -n cnpg-system
+NAME                READY   UP-TO-DATE   AVAILABLE   AGE
+<deployment-name>   1/1     1            1           18m
+```
 
 ```sh
 kubectl describe deploy \
   -n cnpg-system \
-  cnpg-controller-manager
+  <deployment-name>
 ```
 
 As with any Deployment, it sits on top of a ReplicaSet and supports rolling
