@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CreateRoleBinding is the binding between the permissions that PGK can use
+// CreateRoleBinding is the binding between the permissions that the instance manager can use
 // and the ServiceAccount used by the Pod
 func CreateRoleBinding(objectMeta metav1.ObjectMeta) rbacv1.RoleBinding {
 	return rbacv1.RoleBinding{
