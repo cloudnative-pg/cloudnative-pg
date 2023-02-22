@@ -2770,3 +2770,75 @@ var _ = Describe("Storage configuration validation", func() {
 		})
 	})
 })
+
+var _ = Describe("Role management validation", func() {
+
+	It("should succeed if there is no management stanza", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{},
+		}
+		Expect(cluster.validateManagedRoles()).To(BeEmpty())
+	})
+
+	It("should succeed if the role defined is not reserved", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name: "non-conflicting",
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateManagedRoles()).To(BeEmpty())
+	})
+
+	It("should produce an error on invalid connection limit", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name:            "non-conflicting",
+							ConnectionLimit: -3,
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateManagedRoles()).To(HaveLen(1))
+	})
+
+	It("should produce an error if the role is reserved", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name: "postgres",
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateManagedRoles()).To(HaveLen(1))
+	})
+
+	It("should produce two errors if the role is reserved and the connection limit is invalid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name:            "postgres",
+							ConnectionLimit: -3,
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateManagedRoles()).To(HaveLen(2))
+	})
+})

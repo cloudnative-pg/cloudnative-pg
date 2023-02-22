@@ -1832,6 +1832,10 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 		"postgres":              true,
 	}
 
+	if r.Spec.Managed == nil {
+		return nil
+	}
+
 	for _, role := range r.Spec.Managed.Roles {
 		if role.ConnectionLimit != -1 && role.ConnectionLimit < 0 {
 			result = append(
