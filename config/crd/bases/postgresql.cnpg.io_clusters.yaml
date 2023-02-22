@@ -2201,7 +2201,7 @@ spec:
                           type: boolean
                         ensure:
                           default: present
-                          description: ensure defaults to 'present'
+                          description: ensure defaults to "present"
                           type: string
                         in_role:
                           items:
@@ -2235,17 +2235,7 @@ spec:
                         validUntil:
                           type: string
                       required:
-                      - bypassrls
-                      - comment
-                      - connectionLimit
-                      - createdb
-                      - createrole
-                      - ensure
-                      - inherit
-                      - login
                       - name
-                      - replication
-                      - superuser
                       type: object
                     type: array
                 type: object

@@ -1585,26 +1585,32 @@ type ManagedConfiguration struct {
 // Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 type RoleConfiguration struct {
 	Name    string `json:"name"`
-	Comment string `json:"comment"`
-	// ensure defaults to 'present'
+	Comment string `json:"comment,omitempty"`
+
+	// ensure defaults to "present"
 	// +kubebuilder:default:="present"
-	Ensure         EnsureOption           `json:"ensure"`
+	Ensure EnsureOption `json:"ensure,omitempty"`
+
 	PasswordSecret *PasswordConfiguration `json:"passwordSecret,omitempty"`
-	Superuser      bool                   `json:"superuser"`
-	CreateDB       bool                   `json:"createdb"`
-	CreateRole     bool                   `json:"createrole"`
+	Superuser      bool                   `json:"superuser,omitempty"`
+	CreateDB       bool                   `json:"createdb,omitempty"`
+	CreateRole     bool                   `json:"createrole,omitempty"`
+
 	// inherit defaults to true
 	// +kubebuilder:default:=true
-	Inherit     bool `json:"inherit"` // IMPORTANT default is INHERIT
-	Login       bool `json:"login"`
-	Replication bool `json:"replication"`
-	BypassRLS   bool `json:"bypassrls"` // Row-Level Security
+	Inherit bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
+
+	Login       bool `json:"login,omitempty"`
+	Replication bool `json:"replication,omitempty"`
+	BypassRLS   bool `json:"bypassrls,omitempty"` // Row-Level Security
+
 	// connection Limit defaults to `-1`
 	// +kubebuilder:default:=-1
-	ConnectionLimit int64    `json:"connectionLimit"`
-	ValidUntil      string   `json:"validUntil,omitempty"`
-	InRoles         []string `json:"in_role,omitempty"`
-	WithRoles       []string `json:"role,omitempty"`
+	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
+
+	ValidUntil string   `json:"validUntil,omitempty"`
+	InRoles    []string `json:"in_role,omitempty"`
+	WithRoles  []string `json:"role,omitempty"`
 }
 
 // PasswordConfiguration contains the location of the RoleConfiguration password

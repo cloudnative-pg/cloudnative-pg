@@ -869,17 +869,17 @@ The defaults of the CREATE ROLE command are applied Reference: https://www.postg
 Name            | Description                       | Type                                            
 --------------- | --------------------------------- | ------------------------------------------------
 `name           ` |                                   - *mandatory*  | string                                          
-`comment        ` |                                   - *mandatory*  | string                                          
-`ensure         ` | ensure defaults to 'present'      - *mandatory*  | EnsureOption                                    
+`comment        ` |                                   | string                                          
+`ensure         ` | ensure defaults to "present"      | EnsureOption                                    
 `passwordSecret ` |                                   | [*PasswordConfiguration](#PasswordConfiguration)
-`superuser      ` |                                   - *mandatory*  | bool                                            
-`createdb       ` |                                   - *mandatory*  | bool                                            
-`createrole     ` |                                   - *mandatory*  | bool                                            
-`inherit        ` | inherit defaults to true          - *mandatory*  | bool                                            
-`login          ` |                                   - *mandatory*  | bool                                            
-`replication    ` |                                   - *mandatory*  | bool                                            
-`bypassrls      ` |                                   - *mandatory*  | bool                                            
-`connectionLimit` | connection Limit defaults to `-1` - *mandatory*  | int64                                           
+`superuser      ` |                                   | bool                                            
+`createdb       ` |                                   | bool                                            
+`createrole     ` |                                   | bool                                            
+`inherit        ` | inherit defaults to true          | bool                                            
+`login          ` |                                   | bool                                            
+`replication    ` |                                   | bool                                            
+`bypassrls      ` |                                   | bool                                            
+`connectionLimit` | connection Limit defaults to `-1` | int64                                           
 `validUntil     ` |                                   | string                                          
 `in_role        ` |                                   | []string                                        
 `role           ` |                                   | []string                                        
