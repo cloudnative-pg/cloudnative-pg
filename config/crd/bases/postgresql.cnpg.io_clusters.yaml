@@ -2188,6 +2188,8 @@ spec:
                       properties:
                         bypassrls:
                           type: boolean
+                        comment:
+                          type: string
                         connectionLimit:
                           default: -1
                           description: connection Limit defaults to `-1`
@@ -2201,7 +2203,7 @@ spec:
                           default: present
                           description: ensure defaults to 'present'
                           type: string
-                        in_roles:
+                        in_role:
                           items:
                             type: string
                           type: array
@@ -2234,11 +2236,12 @@ spec:
                           type: string
                       required:
                       - bypassrls
+                      - comment
                       - connectionLimit
                       - createdb
                       - createrole
                       - ensure
-                      - in_roles
+                      - in_role
                       - inherit
                       - login
                       - name
