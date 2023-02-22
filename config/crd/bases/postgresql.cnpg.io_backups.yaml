@@ -143,7 +143,7 @@ spec:
               destinationPath:
                 description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
                   this path, with different destination folders, will be used for
-                  WALs and for data
+                  WALs and for data. This may not be populated in case of errors.
                 type: string
               encryption:
                 description: Encryption method required to S3 API
@@ -286,8 +286,6 @@ spec:
                 description: When the backup was terminated
                 format: date-time
                 type: string
-            required:
-            - destinationPath
             type: object
         type: object
     served: true
