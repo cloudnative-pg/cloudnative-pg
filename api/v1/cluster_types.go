@@ -1602,9 +1602,9 @@ type RoleConfiguration struct {
 	// connection Limit defaults to `-1`
 	// +kubebuilder:default:=-1
 	ConnectionLimit int64    `json:"connectionLimit"`
-	ValidUntil      string   `json:"validUntil"`
-	InRoles         []string `json:"in_role"`
-	WithRoles       []string `json:"role"`
+	ValidUntil      string   `json:"validUntil,omitempty"`
+	InRoles         []string `json:"in_role,omitempty"`
+	WithRoles       []string `json:"role,omitempty"`
 }
 
 // PasswordConfiguration contains the location of the RoleConfiguration password
