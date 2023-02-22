@@ -868,6 +868,7 @@ The defaults of the CREATE ROLE command are applied Reference: https://www.postg
 Name            | Description                       | Type                                            
 --------------- | --------------------------------- | ------------------------------------------------
 `name           ` |                                   - *mandatory*  | string                                          
+`comment        ` |                                   - *mandatory*  | string                                          
 `ensure         ` | ensure defaults to 'present'      - *mandatory*  | EnsureOption                                    
 `passwordSecret ` |                                   | [*PasswordConfiguration](#PasswordConfiguration)
 `superuser      ` |                                   - *mandatory*  | bool                                            
@@ -879,7 +880,7 @@ Name            | Description                       | Type
 `bypassrls      ` |                                   - *mandatory*  | bool                                            
 `connectionLimit` | connection Limit defaults to `-1` - *mandatory*  | int64                                           
 `validUntil     ` |                                   - *mandatory*  | string                                          
-`in_roles       ` |                                   - *mandatory*  | []string                                        
+`in_role        ` |                                   - *mandatory*  | []string                                        
 `role           ` |                                   - *mandatory*  | []string                                        
 
 <a id='RollingUpdateStatus'></a>
