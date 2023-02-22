@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -78,14 +79,9 @@ func NewBackupReconciler(mgr manager.Manager) *BackupReconciler {
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
 // Reconcile is the main reconciliation loop
-func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { // nolint: gocognit
 	contextLogger, ctx := log.SetupLogger(ctx)
-
 	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
-
-	defer func() {
-		contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
-	}()
 
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
@@ -114,7 +110,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 
-		backup.Status.SetAsFailed(fmt.Errorf("while getting cluster %s: %w", clusterName, err))
+		tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("while getting cluster %s: %w", clusterName, err))
 		r.Recorder.Eventf(&backup, "Warning", "FindingCluster",
 			"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
 		return ctrl.Result{}, err
@@ -126,6 +122,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			clusterName)
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupConfig", message)
+		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
 		return ctrl.Result{RequeueAfter: 300 * time.Second}, nil
 	}
 
@@ -142,7 +139,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			backup.Status.Phase = apiv1.BackupPhasePending
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Update(ctx, &backup)
 		}
-		backup.Status.SetAsFailed(fmt.Errorf("while getting pod: %w", err))
+		tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("while getting pod: %w", err))
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
 		return ctrl.Result{}, r.Status().Update(ctx, &backup)
@@ -199,6 +196,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil {
 		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 	}
+
+	contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
 
 	return ctrl.Result{}, err
 }
@@ -260,7 +259,7 @@ func StartBackup(
 	status.Phase = apiv1.BackupPhaseStarted
 	status.InstanceID = &apiv1.InstanceID{PodName: pod.Name, ContainerID: pod.Status.ContainerStatuses[0].ContainerID}
 	if err := postgres.UpdateBackupStatusAndRetry(ctx, client, backup); err != nil {
-		status.SetAsFailed(fmt.Errorf("can't update backup: %w", err))
+		tryFlagBackupAsFailed(ctx, client, backup, fmt.Errorf("can't update backup: %w", err))
 		return err
 	}
 	config := ctrl.GetConfigOrDie()
@@ -386,4 +385,19 @@ var clustersWithBackupPredicate = predicate.Funcs{
 		}
 		return cluster.Spec.Backup != nil
 	},
+}
+
+func tryFlagBackupAsFailed(
+	ctx context.Context,
+	cli client.Client,
+	backup *apiv1.Backup,
+	err error,
+) {
+	contextLogger := log.FromContext(ctx)
+	origBackup := backup.DeepCopy()
+	backup.Status.SetAsFailed(err)
+
+	if err := cli.Status().Patch(ctx, backup, client.MergeFrom(origBackup)); err != nil {
+		contextLogger.Error(err, "while flagging backup as failed")
+	}
 }
