@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package log contains the logging subsystem of PGK
+// Package log contains the logging subsystem of the instance manager
 package log
 
 import (
