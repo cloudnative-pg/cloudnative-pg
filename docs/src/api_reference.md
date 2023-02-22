@@ -880,9 +880,9 @@ Name            | Description                       | Type
 `replication    ` |                                   - *mandatory*  | bool                                            
 `bypassrls      ` |                                   - *mandatory*  | bool                                            
 `connectionLimit` | connection Limit defaults to `-1` - *mandatory*  | int64                                           
-`validUntil     ` |                                   - *mandatory*  | string                                          
-`in_role        ` |                                   - *mandatory*  | []string                                        
-`role           ` |                                   - *mandatory*  | []string                                        
+`validUntil     ` |                                   | string                                          
+`in_role        ` |                                   | []string                                        
+`role           ` |                                   | []string                                        
 
 <a id='RollingUpdateStatus'></a>
 
