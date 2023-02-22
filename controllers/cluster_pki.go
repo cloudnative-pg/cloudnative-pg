@@ -60,7 +60,7 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 			return fmt.Errorf("missing specified server TLS secret %s: %w",
 				cluster.Status.Certificates.ServerTLSSecret, err)
 		}
-		return fmt.Errorf("generating server certificate: %w", err)
+		return fmt.Errorf("generating server TLS certificate: %w", err)
 	}
 
 	clientCaSecret, err := r.ensureClientCASecret(ctx, cluster)
@@ -86,7 +86,7 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 		nil,
 		nil)
 	if err != nil {
-		return fmt.Errorf("generating server certificate: %w", err)
+		return fmt.Errorf("generating streaming replication client certificate: %w", err)
 	}
 
 	return nil

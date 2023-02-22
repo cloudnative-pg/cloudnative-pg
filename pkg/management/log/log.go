@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package log contains the logging subsystem of PGK
+// Package log contains the logging subsystem of the instance manager
 package log
 
 import (
 	"context"
 	"fmt"
+	stdLog "log"
 	"os"
 	"runtime"
 
@@ -241,4 +242,19 @@ func SetupLogger(ctx context.Context) (Logger, context.Context) {
 	newLogger, _ := logr.FromContext(ctx)
 
 	return FromContext(ctx), IntoContext(ctx, &logger{Logger: newLogger})
+}
+
+type logWriter struct {
+	logger logr.Logger
+}
+
+func (l logWriter) Write(b []byte) (int, error) {
+	l.logger.Info(string(b))
+	return len(b), nil
+}
+
+func redirectStdLog(logger logr.Logger) {
+	stdLog.SetPrefix("")
+	stdLog.SetFlags(0)
+	stdLog.SetOutput(logWriter{logger: logger})
 }

@@ -1166,9 +1166,9 @@ func AssertApplicationDatabaseConnection(
 	})
 }
 
-func AssertMetricsData(namespace, clusterName, curlPodName, targetOne, targetTwo, targetSecret string) {
+func AssertMetricsData(namespace, curlPodName, targetOne, targetTwo, targetSecret string, cluster *apiv1.Cluster) {
 	By("collect and verify metric being exposed with target databases", func() {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := env.GetClusterPodList(namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
@@ -1182,6 +1182,13 @@ func AssertMetricsData(namespace, clusterName, curlPodName, targetOne, targetTwo
 			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_test_rows{datname="%v"} 1`,
 				targetSecret))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
+
+			if pod.Name != cluster.Status.CurrentPrimary {
+				continue
+			}
+
+			Expect(out).Should(ContainSubstring("last_available_backup_timestamp"))
+			Expect(out).Should(ContainSubstring("last_failed_backup_timestamp"))
 		}
 	})
 }
