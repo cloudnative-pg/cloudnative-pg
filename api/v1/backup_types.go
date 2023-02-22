@@ -65,8 +65,8 @@ type BackupStatus struct {
 
 	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
 	// this path, with different destination folders, will be used for WALs
-	// and for data
-	DestinationPath string `json:"destinationPath"`
+	// and for data. This may not be populated in case of errors.
+	DestinationPath string `json:"destinationPath,omitempty"`
 
 	// The server name on S3, the cluster name is used if this
 	// parameter is omitted
