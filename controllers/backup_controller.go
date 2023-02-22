@@ -107,6 +107,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	if cluster.Spec.Backup == nil {
+		message := fmt.Sprintf(
+			"cannot proceed with the backup because cluster '%s' has no backup section defined",
+			clusterName)
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupConfig", message)
+		return ctrl.Result{RequeueAfter: 300 * time.Second}, nil
+	}
+
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
 	// Detect the pod where a backup will be executed
