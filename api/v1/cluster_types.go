@@ -1584,7 +1584,8 @@ type ManagedConfiguration struct {
 // The defaults of the CREATE ROLE command are applied
 // Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 type RoleConfiguration struct {
-	Name string `json:"name"`
+	Name    string `json:"name"`
+	Comment string `json:"comment"`
 	// ensure defaults to 'present'
 	// +kubebuilder:default:="present"
 	Ensure         EnsureOption           `json:"ensure"`
