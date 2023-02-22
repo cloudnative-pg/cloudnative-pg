@@ -297,6 +297,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateLDAP,
 		r.validateReplicationSlots,
 		r.validateEnv,
+		r.validateManagedRoles,
 	}
 
 	for _, validate := range validations {
@@ -1819,4 +1820,36 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 	}
 
 	return allErrors
+}
+
+// validateManagedRoles validate the environment variables settings proposed by the user
+func (r *Cluster) validateManagedRoles() field.ErrorList {
+	var result field.ErrorList
+
+	isReserved := map[string]bool{
+		"cnpg_pooler_pgbouncer": true,
+		"streaming_replica":     true,
+		"postgres":              true,
+	}
+
+	for _, role := range r.Spec.Managed.Roles {
+		if role.ConnectionLimit != -1 && role.ConnectionLimit < 0 {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "managed", "roles"),
+					role.ConnectionLimit,
+					"Connection limit should be positive, unless defaulting to -1"))
+		}
+		if isReserved[role.Name] {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "managed", "roles"),
+					role.Name,
+					"This role is reserved for operator use"))
+		}
+	}
+
+	return result
 }
