@@ -79,12 +79,14 @@ The operator can be installed using the provided [Helm chart](https://github.com
 
 In Kubernetes, the operator is by default installed in the `cnpg-system`
 namespace as a Kubernetes `Deployment`. The name of this deployment
-depends on the installation method.  By default it is called
-`cnpg-controller-manager` when installing using the manifest or the `cnpg`
-plugin. When installing via Helm, the default name is `cnpg-cloudnative-pg`. \
-Note that with Helm, you can customize the name of the deployment via the
-`fullnameOverride` field in the
-[*values* file](https://helm.sh/docs/chart_template_guide/values_files/).
+depends on the installation method.
+When installed through the manifest or the `cnpg` plugin, it is called
+`cnpg-controller-manager` by default. When installed via Helm, the default name
+is `cnpg-cloudnative-pg`.
+
+!!! Note
+    With Helm you can customize the name of the deployment via the
+    `fullnameOverride` field in the [*"values.yaml"* file](https://helm.sh/docs/chart_template_guide/values_files/).
 
 You can get more information using the `describe` command in `kubectl`:
 
