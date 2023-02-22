@@ -2241,14 +2241,11 @@ spec:
                       - createdb
                       - createrole
                       - ensure
-                      - in_role
                       - inherit
                       - login
                       - name
                       - replication
-                      - role
                       - superuser
-                      - validUntil
                       type: object
                     type: array
                 type: object
