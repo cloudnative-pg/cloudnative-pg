@@ -259,6 +259,12 @@ func (b *BackupCommand) retryWithRefreshedCluster(
 	})
 }
 
+func (b *BackupCommand) tryUpdateBackupClusterCondition(ctx context.Context, condition metav1.Condition) error {
+	return b.retryWithRefreshedCluster(ctx, func() error {
+		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
+	})
+}
+
 // run executes the barman-cloud-backup command and updates the status
 // This method will take long time and is supposed to run inside a dedicated
 // goroutine.
@@ -291,14 +297,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
-	condition := metav1.Condition{
+	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionFalse,
 		Reason:  string(apiv1.ConditionBackupStarted),
 		Message: "New Backup starting up",
-	}
-	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup started)")
 		// We do not terminate here because we could still have a good backup
@@ -321,15 +324,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
 
 		// Update backup status in cluster conditions on failure
-		condition = metav1.Condition{
+		if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
 			Type:    string(apiv1.ConditionBackup),
 			Status:  metav1.ConditionFalse,
 			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
 			Message: backupErr.Error(),
-		}
-
-		if err := b.retryWithRefreshedCluster(ctx, func() error {
-			return conditions.Update(ctx, b.Client, b.Cluster, &condition)
 		}); err != nil {
 			b.Log.Error(err, "Error changing backup condition (backup failed)")
 			// We do not terminate here because we want to update the Backup object too
@@ -347,14 +346,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 
 	// Update backup status in cluster conditions on backup completion
-	condition = metav1.Condition{
+	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionTrue,
 		Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
 		Message: "Backup was successful",
-	}
-	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup succeeded)")
 		// We do not terminate here because we want to continue with
