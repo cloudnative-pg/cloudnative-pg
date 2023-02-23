@@ -733,7 +733,7 @@ jobs:
         run: ls -R test-artifacts/data
 
       - name: Compute the E2E test summary
-        uses: cloudnative-pg/ciclops@main
+        uses: cloudnative-pg/ciclops@v1.1.0
         with:
           artifact_directory: test-artifacts/data
           output_file: test-summary.md
