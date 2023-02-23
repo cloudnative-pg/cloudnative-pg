@@ -28,7 +28,7 @@ jobs:
       - name: Delete '-testing' images for containers
         uses: snok/container-retention-policy@v2
         with:
-          image-names: pgbouncer-testing, postgresql-testing
+          image-names: pgbouncer-testing, postgresql-testing, postgis-testing
           cut-off: A week ago UTC
           keep-at-least: 1
           account-type: org
