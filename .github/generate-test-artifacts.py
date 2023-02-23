@@ -21,6 +21,7 @@ import os
 import hashlib
 from datetime import *
 
+
 def flatten(arr):
     """flatten an array of arrays"""
     out = []
@@ -94,6 +95,7 @@ def convert_ginkgo_test(t, matrix):
     }
     return x
 
+
 def write_artifact(artifact, matrix):
     """writes an artifact to local storage as a JSON file
 
@@ -115,6 +117,7 @@ def write_artifact(artifact, matrix):
     with open(filename, "w") as f:
         f.write(json.dumps(artifact))
 
+
 def create_artifact(matrix, name, state, error):
     """creates an artifact with a given name, state and error,
     with the metadata provided by the `matrix` argument.
@@ -132,6 +135,8 @@ def create_artifact(matrix, name, state, error):
         "start_time": datetime.now().isoformat(),
         "end_time": datetime.now().isoformat(),  # NOTE: Grafana will need a default timestamp field. This is a good candidate
         "error": error,
+        "error_file": "no-file",
+        "error_line": 0,
         "platform": matrix["runner"],
         "matrix_id": matrix["id"],
         "postgres_kind": kind,
@@ -141,6 +146,7 @@ def create_artifact(matrix, name, state, error):
         "repo": matrix["repo"],
         "branch": branch,
     }
+
 
 if __name__ == "__main__":
 
@@ -184,10 +190,12 @@ if __name__ == "__main__":
         # we still want to get an entry in the E2E Dashboard for workflows that even
         # failed to run the ginkgo suite or failed to produce a JSON report.
         # We create a custom Artifact with a `failed` status for the Dashboard
-        artifact = create_artifact(matrix,
-            "[report missing] Generate artifacts from Ginkgo report",
+        artifact = create_artifact(
+            matrix,
+            "Open Ginkgo report",
             "failed",
-            "ginkgo Report Not Found: " + args.file)
+            "ginkgo Report Not Found: " + args.file,
+        )
         write_artifact(artifact, matrix)
         exit(0)
 
@@ -202,8 +210,7 @@ if __name__ == "__main__":
                     write_artifact(test1, matrix)
     except Exception as e:
         # Reflect any unexpected failure in an artifact
-        artifact = create_artifact(matrix,
-            "Generate artifacts from Ginkgo report",
-            "failed",
-            f"{e}")
+        artifact = create_artifact(
+            matrix, "Generate artifacts from Ginkgo report", "failed", f"{e}"
+        )
         write_artifact(artifact, matrix)
