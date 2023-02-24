@@ -194,6 +194,26 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
 	}
 
+	// if there is only one primary and restart reason is create new wal volume
+	if reason == apiv1.NewWalReason {
+		nodeSerial, err := specs.GetNodeSerial(primaryPod.ObjectMeta)
+		if err != nil {
+			return false, err
+		}
+		if err := r.createPVC(
+			ctx,
+			cluster,
+			&persistentvolumeclaim.CreateConfiguration{
+				Status:     persistentvolumeclaim.StatusReady,
+				NodeSerial: nodeSerial,
+				Role:       utils.PVCRolePgWal,
+				Storage:    *cluster.Spec.WalStorage,
+			},
+		); err != nil {
+			return false, err
+		}
+	}
+
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 		fmt.Sprintf("The primary instance needs to be restarted: %s, reason: %s",
