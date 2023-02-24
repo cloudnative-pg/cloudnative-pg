@@ -14,7 +14,7 @@ jobs:
   label-source-pr:
     name: label the source pr
     if: github.event.pull_request.merged == false &&
-        !contains(github.event.pull_request.labels.*.name, 'do not backport')
+        !contains(github.event.pull_request.labels.*.name, 'backport-requested')
     runs-on: ubuntu-20.04
     steps:
       -
