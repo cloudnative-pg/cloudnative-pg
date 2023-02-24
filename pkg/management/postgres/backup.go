@@ -300,18 +300,17 @@ func (b *BackupCommand) run(ctx context.Context) {
 	b.backupListMaintenance(ctx)
 }
 
-func (b *BackupCommand) takeBackup(ctx context.Context) (backupErr error) {
+func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
-	var options []string
-	options, backupErr = b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
+	options, backupErr := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
 	if backupErr != nil {
 		b.Log.Error(backupErr, "while getting barman-cloud-backup options")
 		return backupErr
 	}
-	b.Log.Info("Backup started", "options", options)
 
+	b.Log.Info("Backup started", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
@@ -326,17 +325,16 @@ func (b *BackupCommand) takeBackup(ctx context.Context) (backupErr error) {
 		// even if we are unable to communicate with the Kubernetes API server
 	}
 
-	if backupErr = fileutils.EnsureDirectoryExists(postgres.BackupTemporaryDirectory); backupErr != nil {
-		b.Log.Error(backupErr, "Cannot create backup temporary directory", "err", backupErr)
-		return backupErr
+	if err := fileutils.EnsureDirectoryExists(postgres.BackupTemporaryDirectory); err != nil {
+		b.Log.Error(err, "Cannot create backup temporary directory", "err", err)
+		return err
 	}
 
 	cmd := exec.Command(barmanCapabilities.BarmanCloudBackup, options...) // #nosec G204
 	cmd.Env = b.Env
 	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
-	backupErr = execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup)
-	if backupErr != nil {
-		return backupErr
+	if err := execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup); err != nil {
+		return err
 	}
 
 	// Set the status to completed
