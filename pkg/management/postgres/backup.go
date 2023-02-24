@@ -269,20 +269,20 @@ func (b *BackupCommand) tryUpdateBackupClusterCondition(ctx context.Context, con
 // This method will take long time and is supposed to run inside a dedicated
 // goroutine.
 func (b *BackupCommand) run(ctx context.Context) {
-	var backupErr error
-	defer func() {
-		if backupErr == nil {
-			return
-		}
-		if failErr := b.retryWithRefreshedCluster(ctx, func() error {
-			origCluster := b.Cluster.DeepCopy()
-			b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
-			return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
-		}); failErr != nil {
-			b.Log.Error(failErr, "while setting last failed backup")
-		}
-	}()
+	err := b.takeBackup(ctx)
+	if err == nil {
+		return
+	}
+	if failErr := b.retryWithRefreshedCluster(ctx, func() error {
+		origCluster := b.Cluster.DeepCopy()
+		b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
+		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
+	}); failErr != nil {
+		b.Log.Error(failErr, "while setting last failed backup")
+	}
+}
 
+func (b *BackupCommand) takeBackup(ctx context.Context) (backupErr error) {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
@@ -358,6 +358,8 @@ func (b *BackupCommand) run(ctx context.Context) {
 	}
 
 	b.backupListMaintenance(ctx)
+
+	return nil
 }
 
 func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
