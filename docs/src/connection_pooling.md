@@ -244,10 +244,10 @@ spec:
           image: my-pgbouncer:latest
           resources:
             requests:
-              cpu: 0.1
+              cpu: "0.1"
               memory: 100Mi
             limits:
-              cpu: 0.5
+              cpu: "0.5"
               memory: 500Mi
 ```
 
