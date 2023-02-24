@@ -43,18 +43,17 @@ func NewRoleSynchronizer(instance *postgres.Instance) *RoleSynchronizer {
 // Start starts running the slot RoleSynchronizer
 func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("XXXX starting up the runnable")
+	contextLog.Info("starting up the runnable")
 	isPrimary, err := sr.instance.IsPrimary()
 	if err != nil {
 		return err
 	}
 	if !isPrimary {
-		contextLog.Info("XXXX skipping the role syncrhonization in replicas")
+		contextLog.Info("skipping the role syncrhonization in replicas")
 	}
 	go func() {
-		contextLog.Info("XXXX before got config")
 		config := <-sr.instance.RoleSynchronizerChan()
-		contextLog.Info("XXXX got config", "managedConfig", config)
+		contextLog.Info("setting up role syncrhonizer loop")
 		updateInterval := 1 * time.Minute // TODO: make configurable
 		ticker := time.NewTicker(updateInterval)
 
@@ -64,7 +63,6 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 		}()
 
 		for {
-			contextLog.Info("XXXX synchronizing roles", "err", "none")
 			select {
 			case <-ctx.Done():
 				return
@@ -91,7 +89,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 
 			err := sr.reconcile(ctx, config)
 			if err != nil {
-				contextLog.Info("synchronizing roles", "err", err)
+				contextLog.Error(err, "synchronizing roles", "config", config)
 				continue
 			}
 		}
@@ -109,17 +107,41 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		}
 	}()
 
-	primaryPool, err := sr.instance.GetSuperUserDB()
+	superUserDB, err := sr.instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while reconciling managed roles: %w", err)
 	}
 	err = synchronizeRoles(
 		ctx,
-		NewPostgresRoleManager(primaryPool),
+		NewPostgresRoleManager(superUserDB),
 		sr.instance.PodName,
 		config,
 	)
 	return err
+}
+
+// areEquivalent does a constrained check of two roles
+func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
+	reduced := []struct {
+		CreateDB  bool
+		Superuser bool
+		Login     bool
+		BypassRLS bool
+	}{
+		{
+			CreateDB:  role1.CreateDB,
+			Superuser: role1.Superuser,
+			Login:     role1.Login,
+			BypassRLS: role1.BypassRLS,
+		},
+		{
+			CreateDB:  role2.CreateDB,
+			Superuser: role2.Superuser,
+			Login:     role2.Login,
+			BypassRLS: role2.BypassRLS,
+		},
+	}
+	return reduced[0] == reduced[1]
 }
 
 // synchronizeRoles aligns roles in the database to the spec
@@ -129,44 +151,59 @@ func synchronizeRoles(
 	podName string,
 	config *apiv1.ManagedConfiguration,
 ) error {
-	contextLog := log.FromContext(ctx).WithName("synchronizeRoles")
-	contextLog.Info("XXXInvokedRoleSyncrhonizer",
-		"primary", roleManager,
+	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog.Info("syncronizing roles",
 		"podName", podName,
-		"config", config)
+		"managedConfig", config)
+
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while synchronizing roles in primary: %w", err)
+	}
 
 	rolesInDB, err := roleManager.List(ctx, config)
 	if err != nil {
-		return fmt.Errorf("while getting roles from primary: %v", err)
+		return wrapErr(err)
 	}
-	contextLog.Info("primaryRolesInDB", "rolesInDB", rolesInDB)
+	contextLog.Info("found roles in DB", "roles", rolesInDB)
 
 	rolesInSpec := config.Roles
-	roleWithName := make(map[string]apiv1.RoleConfiguration)
+	// setup a map name -> role for the spec roles
+	roleInSpecNamed := make(map[string]apiv1.RoleConfiguration)
 	for _, r := range rolesInSpec {
-		roleWithName[r.Name] = r
+		roleInSpecNamed[r.Name] = r
 	}
 
 	// 1. do any of the roles in the DB require update/delete?
-	roleInDB := make(map[string]apiv1.RoleConfiguration)
+	roleInDBNamed := make(map[string]apiv1.RoleConfiguration)
 	for _, role := range rolesInDB {
-		roleInDB[role.Name] = role
-		_, found := roleWithName[role.Name]
-		if found {
-			contextLog.Info("role in DB and Spec", "role", role.Name)
-		} else {
-			contextLog.Info("role in DB but not Spec", "role", role.Name)
+		roleInDBNamed[role.Name] = role
+		inSpec, found := roleInSpecNamed[role.Name]
+		switch {
+		case found && inSpec.Ensure == apiv1.EnsureAbsent:
+			contextLog.Info("role in DB and Spec, but spec wants it absent. Deleting", "role", role.Name)
+			err = roleManager.Delete(ctx, role)
+			if err != nil {
+				return wrapErr(err)
+			}
+		case found && !areEquivalent(inSpec, role):
+			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
+			err = roleManager.Update(ctx, role)
+			if err != nil {
+				return wrapErr(err)
+			}
+		case !found:
+			contextLog.Debug("role in DB but not Spec. Ignoring it", "role", role.Name)
 		}
 	}
 
 	// 2. create managed roles that are not in the DB
-	for _, r := range config.Roles {
-		_, found := roleInDB[r.Name]
-		if !found {
-			contextLog.Info("Creating role in DB", "role", r.Name)
+	for _, r := range rolesInSpec {
+		_, found := roleInDBNamed[r.Name]
+		if !found && r.Ensure == apiv1.EnsurePresent {
+			contextLog.Info("role not in DB and spec wants it present. Creating", "role", r.Name)
 			err = roleManager.Create(ctx, r)
 			if err != nil {
-				return fmt.Errorf("while creating a role in the DB:: %w", err)
+				return wrapErr(err)
 			}
 		}
 	}

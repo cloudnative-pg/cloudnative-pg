@@ -207,10 +207,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	setupLog.Info("XXXX added role syncrhonizer",
-		"version", versions.Version,
-		"build", versions.Info)
-
 	// onlineUpgradeCtx is a child context of the postgres context.
 	// onlineUpgradeCtx will be the context passed to all the manager handled Runnables via Start(ctx),
 	// its deletion will imply all Runnables to stop, but will be handled
