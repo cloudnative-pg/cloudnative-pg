@@ -194,12 +194,17 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
 	}
 
-	// if there is only one primary and restart reason is create new wal volume
+	// in case the reason is apiv1.NewWalReason we should create the PVC before proceeding to the 'upgrade'
 	if reason == apiv1.NewWalReason {
 		nodeSerial, err := specs.GetNodeSerial(primaryPod.ObjectMeta)
 		if err != nil {
 			return false, err
 		}
+
+		if cluster.Spec.WalStorage == nil {
+			return false, fmt.Errorf("requested a PVC WAL but no WalStorage configuration is present")
+		}
+
 		if err := r.createPVC(
 			ctx,
 			cluster,
