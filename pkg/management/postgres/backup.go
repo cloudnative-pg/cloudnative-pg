@@ -281,6 +281,8 @@ func (b *BackupCommand) run(ctx context.Context) {
 		backupStatus.SetAsFailed(err)
 		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 			b.Log.Error(err, "Can't mark backup as failed")
+			// We do not terminate here because we still want to do the maintenance
+			// activity on the backups and to set the condition on the cluster.
 		}
 
 		// add backup failed condition to the cluster
@@ -299,6 +301,8 @@ func (b *BackupCommand) run(ctx context.Context) {
 			return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 		}); failErr != nil {
 			b.Log.Error(failErr, "while setting cluster condition for failed backup")
+			// We do not terminate here because it's more important to properly handle
+			// the backup maintenance activity than putting a condition in the cluster
 		}
 	}
 
@@ -347,6 +351,10 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	b.Log.Info("Backup completed")
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 	backupStatus.SetAsCompleted()
+
+	if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+		b.Log.Error(err, "Can't mark backup as completed")
+	}
 
 	// Update backup status in cluster conditions on backup completion
 	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
