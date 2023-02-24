@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -269,17 +270,34 @@ func (b *BackupCommand) tryUpdateBackupClusterCondition(ctx context.Context, con
 // This method will take long time and is supposed to run inside a dedicated
 // goroutine.
 func (b *BackupCommand) run(ctx context.Context) {
-	err := b.takeBackup(ctx)
-	if err == nil {
-		return
+	if err := b.takeBackup(ctx); err != nil {
+		backupStatus := b.Backup.GetStatus()
+
+		b.Log.Error(err, "Backup failed")
+		backupStatus.SetAsFailed(err)
+		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
+
+		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+			b.Log.Error(err, "Can't mark backup as failed")
+		}
+
+		if failErr := b.retryWithRefreshedCluster(ctx, func() error {
+			origCluster := b.Cluster.DeepCopy()
+			condition := metav1.Condition{
+				Type:    string(apiv1.ConditionBackup),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonLastBackupFailed),
+				Message: err.Error(),
+			}
+			meta.SetStatusCondition(&b.Cluster.Status.Conditions, condition)
+			b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
+			return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
+		}); failErr != nil {
+			b.Log.Error(failErr, "while setting last failed backup")
+		}
 	}
-	if failErr := b.retryWithRefreshedCluster(ctx, func() error {
-		origCluster := b.Cluster.DeepCopy()
-		b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
-		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
-	}); failErr != nil {
-		b.Log.Error(failErr, "while setting last failed backup")
-	}
+
+	b.backupListMaintenance(ctx)
 }
 
 func (b *BackupCommand) takeBackup(ctx context.Context) (backupErr error) {
@@ -290,7 +308,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) (backupErr error) {
 	options, backupErr = b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
 	if backupErr != nil {
 		b.Log.Error(backupErr, "while getting barman-cloud-backup options")
-		return
+		return backupErr
 	}
 	b.Log.Info("Backup started", "options", options)
 
@@ -310,7 +328,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) (backupErr error) {
 
 	if backupErr = fileutils.EnsureDirectoryExists(postgres.BackupTemporaryDirectory); backupErr != nil {
 		b.Log.Error(backupErr, "Cannot create backup temporary directory", "err", backupErr)
-		return
+		return backupErr
 	}
 
 	cmd := exec.Command(barmanCapabilities.BarmanCloudBackup, options...) // #nosec G204
@@ -318,26 +336,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) (backupErr error) {
 	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
 	backupErr = execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup)
 	if backupErr != nil {
-		// Set the status to failed and exit
-		b.Log.Error(backupErr, "Backup failed")
-		backupStatus.SetAsFailed(backupErr)
-		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
-
-		// Update backup status in cluster conditions on failure
-		if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
-			Type:    string(apiv1.ConditionBackup),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
-			Message: backupErr.Error(),
-		}); err != nil {
-			b.Log.Error(err, "Error changing backup condition (backup failed)")
-			// We do not terminate here because we want to update the Backup object too
-		}
-
-		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-			b.Log.Error(err, "Can't mark backup as failed")
-		}
-		return
+		return backupErr
 	}
 
 	// Set the status to completed
@@ -356,8 +355,6 @@ func (b *BackupCommand) takeBackup(ctx context.Context) (backupErr error) {
 		// We do not terminate here because we want to continue with
 		// the backup list maintenance
 	}
-
-	b.backupListMaintenance(ctx)
 
 	return nil
 }
