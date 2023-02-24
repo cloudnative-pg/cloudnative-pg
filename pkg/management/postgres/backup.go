@@ -273,27 +273,32 @@ func (b *BackupCommand) run(ctx context.Context) {
 	if err := b.takeBackup(ctx); err != nil {
 		backupStatus := b.Backup.GetStatus()
 
+		// record the failure
 		b.Log.Error(err, "Backup failed")
-		backupStatus.SetAsFailed(err)
 		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
 
+		// update backup status as failed
+		backupStatus.SetAsFailed(err)
 		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 			b.Log.Error(err, "Can't mark backup as failed")
 		}
 
+		// add backup failed condition to the cluster
 		if failErr := b.retryWithRefreshedCluster(ctx, func() error {
 			origCluster := b.Cluster.DeepCopy()
-			condition := metav1.Condition{
+
+			meta.SetStatusCondition(&b.Cluster.
+				Status.Conditions, metav1.Condition{
 				Type:    string(apiv1.ConditionBackup),
 				Status:  metav1.ConditionFalse,
 				Reason:  string(apiv1.ConditionReasonLastBackupFailed),
 				Message: err.Error(),
-			}
-			meta.SetStatusCondition(&b.Cluster.Status.Conditions, condition)
+			})
+
 			b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
 			return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 		}); failErr != nil {
-			b.Log.Error(failErr, "while setting last failed backup")
+			b.Log.Error(failErr, "while setting cluster condition for failed backup")
 		}
 	}
 
@@ -310,6 +315,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 		return backupErr
 	}
 
+	// record the backup beginning
 	b.Log.Info("Backup started", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
@@ -339,8 +345,8 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 
 	// Set the status to completed
 	b.Log.Info("Backup completed")
-	backupStatus.SetAsCompleted()
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
+	backupStatus.SetAsCompleted()
 
 	// Update backup status in cluster conditions on backup completion
 	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
@@ -350,8 +356,6 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 		Message: "Backup was successful",
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup succeeded)")
-		// We do not terminate here because we want to continue with
-		// the backup list maintenance
 	}
 
 	return nil
