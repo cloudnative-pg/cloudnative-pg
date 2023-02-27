@@ -1609,8 +1609,7 @@ type RoleConfiguration struct {
 	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
 
 	ValidUntil string   `json:"validUntil,omitempty"`
-	InRoles    []string `json:"in_role,omitempty"`
-	WithRoles  []string `json:"role,omitempty"`
+	InRoles    []string `json:"inRoles,omitempty"`
 }
 
 // PasswordConfiguration contains the location of the RoleConfiguration password
