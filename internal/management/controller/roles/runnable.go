@@ -123,6 +123,8 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 }
 
 // areEquivalent does a constrained check of two roles
+// TODO: this needs to be completed, there is a ticket to track that
+// we should see if DeepEquals will serve
 func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 	reduced := []struct {
 		CreateDB  bool
