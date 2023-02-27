@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -259,109 +260,113 @@ func (b *BackupCommand) retryWithRefreshedCluster(
 	})
 }
 
+func (b *BackupCommand) tryUpdateBackupClusterCondition(ctx context.Context, condition metav1.Condition) error {
+	return b.retryWithRefreshedCluster(ctx, func() error {
+		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
+	})
+}
+
 // run executes the barman-cloud-backup command and updates the status
 // This method will take long time and is supposed to run inside a dedicated
 // goroutine.
 func (b *BackupCommand) run(ctx context.Context) {
-	var backupErr error
-	defer func() {
-		if backupErr == nil {
-			return
+	if err := b.takeBackup(ctx); err != nil {
+		backupStatus := b.Backup.GetStatus()
+
+		// record the failure
+		b.Log.Error(err, "Backup failed")
+		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
+
+		// update backup status as failed
+		backupStatus.SetAsFailed(err)
+		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+			b.Log.Error(err, "Can't mark backup as failed")
+			// We do not terminate here because we still want to do the maintenance
+			// activity on the backups and to set the condition on the cluster.
 		}
+
+		// add backup failed condition to the cluster
 		if failErr := b.retryWithRefreshedCluster(ctx, func() error {
 			origCluster := b.Cluster.DeepCopy()
+
+			meta.SetStatusCondition(&b.Cluster.
+				Status.Conditions, metav1.Condition{
+				Type:    string(apiv1.ConditionBackup),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ConditionReasonLastBackupFailed),
+				Message: err.Error(),
+			})
+
 			b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
 			return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 		}); failErr != nil {
-			b.Log.Error(failErr, "while setting last failed backup")
+			b.Log.Error(failErr, "while setting cluster condition for failed backup")
+			// We do not terminate here because it's more important to properly handle
+			// the backup maintenance activity than putting a condition in the cluster
 		}
-	}()
+	}
 
+	b.backupListMaintenance(ctx)
+}
+
+func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
-	var options []string
-	options, backupErr = b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
+	options, backupErr := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
 	if backupErr != nil {
 		b.Log.Error(backupErr, "while getting barman-cloud-backup options")
-		return
+		return backupErr
 	}
-	b.Log.Info("Backup started", "options", options)
 
+	// record the backup beginning
+	b.Log.Info("Backup started", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
-	condition := metav1.Condition{
+	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionFalse,
 		Reason:  string(apiv1.ConditionBackupStarted),
 		Message: "New Backup starting up",
-	}
-	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup started)")
 		// We do not terminate here because we could still have a good backup
 		// even if we are unable to communicate with the Kubernetes API server
 	}
 
-	if backupErr = fileutils.EnsureDirectoryExists(postgres.BackupTemporaryDirectory); backupErr != nil {
-		b.Log.Error(backupErr, "Cannot create backup temporary directory", "err", backupErr)
-		return
+	if err := fileutils.EnsureDirectoryExists(postgres.BackupTemporaryDirectory); err != nil {
+		b.Log.Error(err, "Cannot create backup temporary directory", "err", err)
+		return err
 	}
 
 	cmd := exec.Command(barmanCapabilities.BarmanCloudBackup, options...) // #nosec G204
 	cmd.Env = b.Env
 	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
-	backupErr = execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup)
-	if backupErr != nil {
-		// Set the status to failed and exit
-		b.Log.Error(backupErr, "Backup failed")
-		backupStatus.SetAsFailed(backupErr)
-		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
-
-		// Update backup status in cluster conditions on failure
-		condition = metav1.Condition{
-			Type:    string(apiv1.ConditionBackup),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
-			Message: backupErr.Error(),
-		}
-
-		if err := b.retryWithRefreshedCluster(ctx, func() error {
-			return conditions.Update(ctx, b.Client, b.Cluster, &condition)
-		}); err != nil {
-			b.Log.Error(err, "Error changing backup condition (backup failed)")
-			// We do not terminate here because we want to update the Backup object too
-		}
-
-		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-			b.Log.Error(err, "Can't mark backup as failed")
-		}
-		return
+	if err := execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup); err != nil {
+		return err
 	}
 
 	// Set the status to completed
 	b.Log.Info("Backup completed")
-	backupStatus.SetAsCompleted()
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
+	backupStatus.SetAsCompleted()
+
+	if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+		b.Log.Error(err, "Can't mark backup as completed")
+	}
 
 	// Update backup status in cluster conditions on backup completion
-	condition = metav1.Condition{
+	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionTrue,
 		Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
 		Message: "Backup was successful",
-	}
-	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup succeeded)")
-		// We do not terminate here because we want to continue with
-		// the backup list maintenance
 	}
 
-	b.backupListMaintenance(ctx)
+	return nil
 }
 
 func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
