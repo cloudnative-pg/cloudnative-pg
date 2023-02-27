@@ -100,11 +100,11 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// the list of backups we have already taken to see if anything
 	// is running now
 	for _, backup := range childBackups {
-		if backup.GetStatus().IsInProgress() {
+		if backup.Status.IsInProgress() {
 			contextLogger.Info(
 				"The system is already taking a scheduledBackup, retrying in 60 seconds",
 				"backupName", backup.GetName(),
-				"backupPhase", backup.GetStatus().Phase)
+				"backupPhase", backup.Status.Phase)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
 	}
@@ -116,7 +116,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func ReconcileScheduledBackup(
 	ctx context.Context,
 	event record.EventRecorder,
-	client client.Client,
+	cli client.Client,
 	scheduledBackup *apiv1.ScheduledBackup,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -130,15 +130,16 @@ func ReconcileScheduledBackup(
 	}
 
 	now := time.Now()
+	origScheduled := scheduledBackup.DeepCopy()
 
-	if scheduledBackup.GetStatus().LastCheckTime == nil {
+	if scheduledBackup.Status.LastCheckTime == nil {
 		// This is the first time we check this schedule,
 		// let's wait until the first job will be actually
 		// scheduled
-		scheduledBackup.GetStatus().LastCheckTime = &metav1.Time{
+		scheduledBackup.Status.LastCheckTime = &metav1.Time{
 			Time: now,
 		}
-		err := client.Status().Update(ctx, scheduledBackup)
+		err := cli.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled))
 		if err != nil {
 			if apierrs.IsConflict(err) {
 				// Retry later, the cache is stale
@@ -150,7 +151,7 @@ func ReconcileScheduledBackup(
 
 		if scheduledBackup.IsImmediate() {
 			event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
-			return createBackup(ctx, event, client, scheduledBackup, now, now, schedule, true)
+			return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
 		}
 
 		nextTime := schedule.Next(now)
@@ -168,14 +169,14 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
-	return createBackup(ctx, event, client, scheduledBackup, nextTime, now, schedule, false)
+	return createBackup(ctx, event, cli, scheduledBackup, nextTime, now, schedule, false)
 }
 
 // createBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
 func createBackup(
 	ctx context.Context,
 	event record.EventRecorder,
-	client client.Client,
+	cli client.Client,
 	scheduledBackup *apiv1.ScheduledBackup,
 	backupTime time.Time,
 	now time.Time,
@@ -184,12 +185,14 @@ func createBackup(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
+	origScheduled := scheduledBackup.DeepCopy()
+
 	// So we have no backup running, let's create a backup.
 	// Let's have deterministic names to avoid creating the job two
 	// times
 	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), backupTime.Unix())
 	backup := scheduledBackup.CreateBackup(name)
-	metadata := backup.GetMetadata()
+	metadata := &backup.ObjectMeta
 	if metadata.Labels == nil {
 		metadata.Labels = make(map[string]string)
 	}
@@ -200,7 +203,7 @@ func createBackup(
 	switch scheduledBackup.Spec.BackupOwnerReference {
 	case "cluster":
 		var cluster apiv1.Cluster
-		if err := client.Get(
+		if err := cli.Get(
 			ctx,
 			types.NamespacedName{Name: scheduledBackup.Spec.Cluster.Name, Namespace: scheduledBackup.Namespace},
 			&cluster,
@@ -216,7 +219,7 @@ func createBackup(
 	}
 
 	contextLogger.Info("Creating backup", "backupName", backup.Name)
-	if err := client.Create(ctx, backup); err != nil {
+	if err := cli.Create(ctx, backup); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			contextLogger.Debug("Conflict while creating backup", "error", err)
@@ -231,18 +234,18 @@ func createBackup(
 	}
 
 	// Ok, now update the latest check to now
-	scheduledBackup.GetStatus().LastCheckTime = &metav1.Time{
+	scheduledBackup.Status.LastCheckTime = &metav1.Time{
 		Time: now,
 	}
-	scheduledBackup.GetStatus().LastScheduleTime = &metav1.Time{
+	scheduledBackup.Status.LastScheduleTime = &metav1.Time{
 		Time: backupTime,
 	}
 	nextBackupTime := schedule.Next(now)
-	scheduledBackup.GetStatus().NextScheduleTime = &metav1.Time{
+	scheduledBackup.Status.NextScheduleTime = &metav1.Time{
 		Time: nextBackupTime,
 	}
 
-	if err := client.Status().Update(ctx, scheduledBackup); err != nil {
+	if err := cli.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled)); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			contextLogger.Debug("Conflict while updating scheduled backup", "error", err)
