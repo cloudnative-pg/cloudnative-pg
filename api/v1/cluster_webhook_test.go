@@ -2772,7 +2772,6 @@ var _ = Describe("Storage configuration validation", func() {
 })
 
 var _ = Describe("Role management validation", func() {
-
 	It("should succeed if there is no management stanza", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{},
