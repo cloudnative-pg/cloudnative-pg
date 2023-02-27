@@ -180,7 +180,7 @@ func run(ctx context.Context, podName, pgData string, args []string, client clie
 			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
-		if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error updating wal archiving condition (wal archiving failed)")
 		}
 		return err
@@ -205,7 +205,7 @@ func run(ctx context.Context, podName, pgData string, args []string, client clie
 		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
 		Message: "Continuous archiving is working",
 	}
-	if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
+	if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
 		log.Error(errCond, "Error while updating wal archiving condition (wal archiving succeeded)")
 	}
 	// We return only the first error to PostgreSQL, because the first error
@@ -370,7 +370,7 @@ func checkWalArchive(ctx context.Context,
 			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
-		if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err
@@ -389,7 +389,7 @@ func checkWalArchive(ctx context.Context,
 			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
-		if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err

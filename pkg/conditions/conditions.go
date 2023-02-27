@@ -27,8 +27,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// Update will allow update a particular condition in cluster status.
-func Update(
+// Patch will patch a particular condition in cluster status.
+func Patch(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
