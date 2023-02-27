@@ -128,12 +128,9 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 	if err != nil {
 		return err
 	}
-	rows, err := result.RowsAffected()
+	_, err = result.RowsAffected()
 	if err != nil {
-		return err
-	}
-	if rows != 1 {
-		return fmt.Errorf("could not update role %s", role.Name)
+		return fmt.Errorf("could not update role %s: %w", role.Name, err)
 	}
 
 	return nil
@@ -141,23 +138,16 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 
 // Create the role
 // TODO: do we give the role any database-level permissions?
-func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfiguration) (err error) {
+func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfiguration) error {
 	contextLog := log.FromContext(ctx).WithName("createRole")
 	contextLog.Trace("Invoked", "role", role)
 
 	// NOTE: defensively we might think of doint CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	result, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("CREATE ROLE %s", role.Name))
+	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("CREATE ROLE %s", role.Name))
 	if err != nil {
-		return err
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows != 1 {
-		return fmt.Errorf("could not create role %s, %d row updated", role.Name, rows)
+		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
 
 	return nil
@@ -165,21 +155,15 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 
 // Delete the role
 // TODO: we need to do something better here. We should not delete a user that
-// has created tables or other objects
+// has created tables or other objects. That should be blocked at the validation
+// webhook level, otherwise it will be very poor UX and the operator may not notice
 func (sm PostgresRoleManager) Delete(ctx context.Context, role v1.RoleConfiguration) error {
 	contextLog := log.FromContext(ctx).WithName("dropRole")
 	contextLog.Trace("Invoked", "role", role)
 
-	result, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("DROP ROLE %s", role.Name))
+	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("DROP ROLE %s", role.Name))
 	if err != nil {
-		return err
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows != 1 {
-		return fmt.Errorf("could not delete role %s, %d row deleted", role.Name, rows)
+		return fmt.Errorf("could not delete role %s: %w", role.Name, err)
 	}
 
 	return nil

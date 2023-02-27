@@ -26,13 +26,15 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// A RoleSynchronizer is a runnable that makes sure the Roles in the PostgreSQL databases
-// are in sync with the spec
+// A RoleSynchronizer is a Kubernetes manager.Runnable
+// that makes sure the Roles in the PostgreSQL databases are in sync with the spec
+//
+// c.f. https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Runnable
 type RoleSynchronizer struct {
 	instance *postgres.Instance
 }
 
-// NewRoleSynchronizer creates a new slot RoleSynchronizer
+// NewRoleSynchronizer creates a new RoleSynchronizer
 func NewRoleSynchronizer(instance *postgres.Instance) *RoleSynchronizer {
 	runner := &RoleSynchronizer{
 		instance: instance,
@@ -40,7 +42,7 @@ func NewRoleSynchronizer(instance *postgres.Instance) *RoleSynchronizer {
 	return runner
 }
 
-// Start starts running the slot RoleSynchronizer
+// Start starts running the RoleSynchronizer
 func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("starting up the runnable")
@@ -70,7 +72,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			case <-ticker.C:
 			}
 
-			// If replication is disabled stop the timer,
+			// If the spec contains no roles to manage, stop the timer,
 			// the process will resume through the wakeUp channel if necessary
 			if config == nil || len(config.Roles) == 0 {
 				ticker.Stop()
