@@ -880,8 +880,7 @@ Name            | Description                       | Type
 `bypassrls      ` |                                   | bool                                            
 `connectionLimit` | connection Limit defaults to `-1` | int64                                           
 `validUntil     ` |                                   | string                                          
-`in_role        ` |                                   | []string                                        
-`role           ` |                                   | []string                                        
+`inRoles        ` |                                   | []string                                        
 
 <a id='RollingUpdateStatus'></a>
 
