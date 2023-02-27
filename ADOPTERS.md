@@ -28,4 +28,5 @@ This list is sorted in chronological order, based on the submission date.
 | ------------ | ------- | ---- | ------------------ |
 | [EDB](https://enterprisedb.com) | @gbartolini | 2023-02-21 | EDB's DataBase as a Service solution, [BigAnimal](https://www.enterprisedb.com/products/biganimal-cloud-postgresql), relies on CloudNativePG to run PostgreSQL and Postgres Distributed workloads. EDB is one of the primary contributors to the open source PostgreSQL project and the founder of CloudNativePG. |
 | [Clustermarket](https://clustermarket.com/) | @itay-grudev | 2023-02-25 | Primary production database cluster. Clustermarket provides the easiest way to manage shared lab instrument scheduling and get all your team members' schedules aligned. |
+| [Opencell](https://opencellsoft.com/) | @AntoineMicheaOpencell | 2023-02-27 | Opencell is an open source agile monetization platform that uses CloudNativePG to run PostgreSQL clusters for its SaaS. |
 
