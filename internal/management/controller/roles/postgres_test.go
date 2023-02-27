@@ -18,27 +18,94 @@ package roles
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/DATA-DOG/go-sqlmock"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Postgres RoleManager implementation test", func() {
-	It("can read the list of non-system roles from the DB", func(ctx context.Context) {
+	It("List can read the list of roles from the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 		prm := NewPostgresRoleManager(db)
 
-		rows := sqlmock.NewRows([]string{"rolname", "rolcreatedb", "rolsuper",
-			"rolcanlogin", "rolbypassrls", "rolpassword", "rolvaliduntil"}).
-			AddRow("postgres", true, true, true, true, []byte("12345"), nil)
-		mock.ExpectQuery(fmt.Sprintf(`SELECT rolname, rolcreatedb, rolsuper, rolcanlogin, rolbypassrls,
+		rows := sqlmock.NewRows([]string{
+			"rolname", "rolcreatedb", "rolsuper",
+			"rolcanlogin", "rolbypassrls", "rolpassword", "rolvaliduntil",
+		}).
+			AddRow("postgres", true, false, true, false, []byte("12345"), nil).
+			AddRow("streaming_replica", false, true, false, true, []byte("54321"), "2023-04-04")
+		mock.ExpectQuery(`SELECT rolname, rolcreatedb, rolsuper, rolcanlogin, rolbypassrls,
 		rolpassword, rolvaliduntil
-	  FROM pg_catalog.pg_roles where rolname not like 'pg_%%';`)).WillReturnRows(rows)
-		_, err = prm.List(ctx, nil)
+	  FROM pg_catalog.pg_roles where rolname not like 'pg_%';`).WillReturnRows(rows)
+		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
+		roles, err := prm.List(ctx, nil)
 		Expect(err).ShouldNot(HaveOccurred())
+		Expect(roles).To(HaveLen(2))
+		Expect(roles).To(ContainElements(apiv1.RoleConfiguration{
+			Name:       "postgres",
+			CreateDB:   true,
+			Superuser:  false,
+			Login:      true,
+			BypassRLS:  false,
+			ValidUntil: "",
+		}))
+		Expect(roles).To(ContainElements(apiv1.RoleConfiguration{
+			Name:       "streaming_replica",
+			CreateDB:   false,
+			Superuser:  true,
+			Login:      false,
+			BypassRLS:  true,
+			ValidUntil: "2023-04-04",
+		}))
+	})
+	It("List returns error if there is a problem with the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		dbError := errors.New("Kaboom")
+		mock.ExpectQuery(`SELECT rolname, rolcreatedb, rolsuper, rolcanlogin, rolbypassrls,
+		rolpassword, rolvaliduntil
+	  FROM pg_catalog.pg_roles where rolname not like 'pg_%';`).WillReturnError(dbError)
+		roles, err := prm.List(ctx, nil)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(BeEquivalentTo(dbError))
+		Expect(roles).To(BeEmpty())
+	})
+
+	It("Create can create the role in the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		wantedRole := apiv1.RoleConfiguration{
+			Name: "foo",
+		}
+
+		mock.ExpectExec("CREATE ROLE " + wantedRole.Name).WillReturnResult(sqlmock.NewResult(2, 3))
+
+		err = prm.Create(ctx, wantedRole)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+	It("Create will return error if there is a problem creating the role in the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		wantedRole := apiv1.RoleConfiguration{
+			Name: "foo",
+		}
+		dbError := errors.New("Kaboom")
+		mock.ExpectExec("CREATE ROLE " + wantedRole.Name).WillReturnError(dbError)
+
+		err = prm.Create(ctx, wantedRole)
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
 	})
 })
