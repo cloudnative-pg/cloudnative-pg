@@ -150,7 +150,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			BypassRLS: true,
 		}
 
-		mock.ExpectExec("ALTER ROLE " + wantedRole.Name + " .+").WillReturnResult(sqlmock.NewResult(2, 3)).String()
+		mock.ExpectExec("ALTER ROLE " + wantedRole.Name + " .+").WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Update(ctx, wantedRole)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -166,7 +166,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			BypassRLS: true,
 		}
 		dbError := errors.New("Kaboom")
-		mock.ExpectExec("ALTER ROLE " + wantedRole.Name + " .+").WillReturnError(dbError).String()
+		mock.ExpectExec("ALTER ROLE " + wantedRole.Name + " .+").WillReturnError(dbError)
 
 		err = prm.Update(ctx, wantedRole)
 		Expect(err).To(HaveOccurred())
