@@ -352,9 +352,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 	backupStatus.SetAsCompleted()
 
-	if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-		b.Log.Error(err, "Can't mark backup as completed")
-	}
+	// We cannot commit the backup completed here, it will be done in the backupListMaintenance
 
 	// Update backup status in cluster conditions on backup completion
 	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
