@@ -20,7 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
@@ -103,24 +103,24 @@ var _ = Describe("Sacrificial Pod detection", func() {
 
 	It("detects if the list of Pods is empty", func() {
 		var podList []corev1.Pod
-		Expect(findDeletableInstance(&v1.Cluster{}, podList)).To(BeEmpty())
+		Expect(findDeletableInstance(&apiv1.Cluster{}, podList)).To(BeEmpty())
 	})
 
 	It("detects if we have not a ready Pod", func() {
 		podList := []corev1.Pod{foo, bar}
-		Expect(findDeletableInstance(&v1.Cluster{}, podList)).To(BeEmpty())
+		Expect(findDeletableInstance(&apiv1.Cluster{}, podList)).To(BeEmpty())
 	})
 
 	It("detects it if is the first available", func() {
 		podList := []corev1.Pod{foo, bar, car1, car2}
-		resultName := findDeletableInstance(&v1.Cluster{}, podList)
+		resultName := findDeletableInstance(&apiv1.Cluster{}, podList)
 		Expect(resultName).ToNot(BeEmpty())
 		Expect(resultName).To(Equal("car-2"))
 	})
 
 	It("detects it if is not the first one", func() {
 		podList := []corev1.Pod{car2, foo, bar, car1}
-		resultName := findDeletableInstance(&v1.Cluster{}, podList)
+		resultName := findDeletableInstance(&apiv1.Cluster{}, podList)
 		Expect(resultName).ToNot(BeEmpty())
 		Expect(resultName).To(Equal("car-2"))
 	})

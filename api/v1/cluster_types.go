@@ -382,16 +382,16 @@ type Topology struct {
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
-	// Total number of PVC Groups detected in the cluster. This doesn't equal to the number of instance pod created.
+	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
 	Instances int `json:"instances,omitempty"`
 
-	// Total number of ready instances in the cluster. This equals to the number of ready instances pods.
+	// The total number of ready instances in the cluster. It is equal to the number of ready instance pods.
 	ReadyInstances int `json:"readyInstances,omitempty"`
 
 	// InstancesStatus indicates in which status the instances are
 	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
 
-	// the reported state of the instances during the last reconciliation loop
+	// The reported state of the instances during the last reconciliation loop
 	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
 
 	// The timeline of the Postgres cluster

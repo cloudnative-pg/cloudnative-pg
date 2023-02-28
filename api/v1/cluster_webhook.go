@@ -1323,10 +1323,6 @@ func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 		}
 	}
 
-	if r.Spec.WalStorage != nil {
-		return nil
-	}
-
 	return validateStorageConfigurationChange("walStorage", *old.Spec.WalStorage, *r.Spec.WalStorage)
 }
 
