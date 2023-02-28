@@ -12,7 +12,7 @@ spec:
     roles:
     - name: edb_admin
       ensure: present
-      comment: This hovercraft is full of eels
+      comment: my database-side comment
       login: true
       superuser: false
       createdb: true
