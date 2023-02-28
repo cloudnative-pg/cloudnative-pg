@@ -60,7 +60,7 @@ jobs:
           - release-1.19
     steps:
       - name: Invoke workflow with inputs
-        uses: benc-uk/workflow-dispatch@v121
+        uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: continuous-delivery
           ref: ${{ matrix.branch }}
@@ -292,11 +292,13 @@ jobs:
           author_email=$(git show -s --format='%ae' "${commit_sha}")
 
           # extract branch name
-          if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
+          if [[ ${{ github.event_name }} == 'workflow_dispatch' ]] || [[ ${{ github.event_name }} == 'schedule' ]]
           then
             branch_name=${GITHUB_REF#refs/heads/}
-          else
-            branch_name=${GITHUB_HEAD_REF}
+          fi
+          if [[ ${{ github.event_name }} == 'issue_comment' ]]
+          then
+            branch_name=$(gh pr view "${{ github.event.issue.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
           fi
 
           upload_artifacts=false
@@ -435,7 +437,7 @@ jobs:
       (always() && !cancelled()) &&
       needs.buildx.result == 'success' &&
       needs.buildx.outputs.upload_artifacts == 'true' &&
-      github.organization == 'cloudnative-pg'
+      github.repository_owner == 'cloudnative-pg'
     runs-on: ubuntu-20.04
     steps:
       -
@@ -744,19 +746,19 @@ jobs:
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
 
-# Adds the 'ok-to-merge' label to workflows that have run successfully and
-# have adequate test and matrix coverage.
-# This label is a prerequisite to be able to merge a PR.
-# Also see to 'require-labels.yml'
+  # Adds the 'ok-to-merge' label to workflows that have run successfully and
+  # have adequate test and matrix coverage.
+  # This label is a prerequisite to be able to merge a PR.
+  # Also see to 'require-labels.yml'
   ok-to-merge:
     name: Label the PR as "ok to merge :ok_hand:"
     needs:
       - evaluate_options
       - e2e-local
     if: |
-      always() && 
-      needs.e2e-local.result == 'success' && 
-      github.event_name == 'issue_comment' && 
+      always() &&
+      needs.e2e-local.result == 'success' &&
+      github.event_name == 'issue_comment' &&
       needs.evaluate_options.outputs.test_level == '4'
     runs-on: ubuntu-20.04
     steps:
@@ -765,7 +767,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
+          ok_label=$(gh pr view "${{ github.event.issue.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
 
       - name: Label the PR as "ok to merge :ok_hand:"
@@ -784,8 +786,8 @@ jobs:
       - evaluate_options
       - e2e-local
     if: |
-      always() && 
-      needs.e2e-local.result == 'failure' && 
+      always() &&
+      needs.e2e-local.result == 'failure' &&
       github.event_name == 'issue_comment'
     runs-on: ubuntu-20.04
     steps:
@@ -794,7 +796,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
+          ok_label=$(gh pr view "${{ github.event.issue.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
 
       - name: Remove "ok to merge :ok_hand:" label from PR

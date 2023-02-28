@@ -50,7 +50,7 @@ for a more comprehensive example.
     one of the allowed ones, or open the webhooks' port (`9443`) on the
     firewall.
 
-#### Testing the latest development snapshot
+### Testing the latest development snapshot
 
 If you want to test or evaluate the latest development snapshot of
 CloudNativePG before the next official patch release, you can download the
