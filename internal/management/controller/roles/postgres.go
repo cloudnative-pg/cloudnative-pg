@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/lib/pq"
+
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
@@ -95,7 +97,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 
 	var query strings.Builder
 	query.WriteString("ALTER ROLE ")
-	query.WriteString(role.Name)
+	query.WriteString(pq.QuoteIdentifier(role.Name))
 	query.WriteString(" ")
 
 	if role.BypassRLS {
@@ -145,7 +147,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 	// NOTE: defensively we might think of doint CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("CREATE ROLE %s", role.Name))
+	_, err := sm.superUserDB.ExecContext(ctx, "CREATE ROLE $1", pq.QuoteIdentifier(role.Name))
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
@@ -161,7 +163,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role v1.RoleConfigurat
 	contextLog := log.FromContext(ctx).WithName("dropRole")
 	contextLog.Trace("Invoked", "role", role)
 
-	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("DROP ROLE %s", role.Name))
+	_, err := sm.superUserDB.ExecContext(ctx, "DROP ROLE $1", pq.QuoteIdentifier(role.Name))
 	if err != nil {
 		return fmt.Errorf("could not delete role %s: %w", role.Name, err)
 	}
