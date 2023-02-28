@@ -181,6 +181,9 @@ type Instance struct {
 
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
 	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
+
+	// roleSynchronizerChan is used to send replication slot configuration to the slot replicator
+	roleSynchronizerChan chan *apiv1.ManagedConfiguration
 }
 
 // IsFenced checks whether the instance is marked as fenced
@@ -228,6 +231,18 @@ func (instance *Instance) SlotReplicatorChan() <-chan *apiv1.ReplicationSlotsCon
 	return instance.slotsReplicatorChan
 }
 
+// ConfigureRoleSynchronizer sends the configuration to the role synchronizer
+func (instance *Instance) ConfigureRoleSynchronizer(config *apiv1.ManagedConfiguration) {
+	go func() {
+		instance.roleSynchronizerChan <- config
+	}()
+}
+
+// RoleSynchronizerChan returns the communication channel to the role synchronizer
+func (instance *Instance) RoleSynchronizerChan() <-chan *apiv1.ManagedConfiguration {
+	return instance.roleSynchronizerChan
+}
+
 // InstanceCommand are commands for the goroutine managing postgres
 type InstanceCommand string
 
@@ -252,9 +267,10 @@ const (
 // NewInstance creates a new Instance object setting the defaults
 func NewInstance() *Instance {
 	return &Instance{
-		SocketDirectory:     postgres.SocketDirectory,
-		instanceCommandChan: make(chan InstanceCommand),
-		slotsReplicatorChan: make(chan *apiv1.ReplicationSlotsConfiguration),
+		SocketDirectory:      postgres.SocketDirectory,
+		instanceCommandChan:  make(chan InstanceCommand),
+		slotsReplicatorChan:  make(chan *apiv1.ReplicationSlotsConfiguration),
+		roleSynchronizerChan: make(chan *apiv1.ManagedConfiguration),
 	}
 }
 
