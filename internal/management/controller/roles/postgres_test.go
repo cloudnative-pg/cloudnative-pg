@@ -19,8 +19,10 @@ package roles
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -29,6 +31,7 @@ import (
 )
 
 var _ = Describe("Postgres RoleManager implementation test", func() {
+	// Testing List
 	It("List can read the list of roles from the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
@@ -78,7 +81,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).To(BeEquivalentTo(dbError))
 		Expect(roles).To(BeEmpty())
 	})
-
+	// Testing Create
 	It("Create will send a correct CREATE to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
@@ -88,7 +91,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "foo",
 		}
 
-		mock.ExpectExec("CREATE ROLE " + wantedRole.Name).WillReturnResult(sqlmock.NewResult(2, 3))
+		mock.ExpectExec("CREATE ROLE $1").
+			WithArgs(pq.QuoteIdentifier(wantedRole.Name)).
+			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Create(ctx, wantedRole)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -102,13 +107,15 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "foo",
 		}
 		dbError := errors.New("Kaboom")
-		mock.ExpectExec("CREATE ROLE " + wantedRole.Name).WillReturnError(dbError)
+		mock.ExpectExec("CREATE ROLE $1").
+			WithArgs(pq.QuoteIdentifier(wantedRole.Name)).
+			WillReturnError(dbError)
 
 		err = prm.Create(ctx, wantedRole)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
 	})
-
+	// Testing Delete
 	It("Delete will send a correct DROP to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
@@ -118,7 +125,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "foo",
 		}
 
-		mock.ExpectExec("DROP ROLE " + unWantedRole.Name).WillReturnResult(sqlmock.NewResult(2, 3))
+		mock.ExpectExec("DROP ROLE $1").
+			WithArgs(pq.QuoteIdentifier(unWantedRole.Name)).
+			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Delete(ctx, unWantedRole)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -132,13 +141,15 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "foo",
 		}
 		dbError := errors.New("Kaboom")
-		mock.ExpectExec("DROP ROLE " + unWantedRole.Name).WillReturnError(dbError)
+		mock.ExpectExec("DROP ROLE $1").
+			WithArgs(pq.QuoteIdentifier(unWantedRole.Name)).
+			WillReturnError(dbError)
 
 		err = prm.Delete(ctx, unWantedRole)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
 	})
-
+	// Testing Alter
 	It("Update will send a correct ALTER to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 		Expect(err).ToNot(HaveOccurred())
@@ -150,7 +161,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			BypassRLS: true,
 		}
 
-		mock.ExpectExec("ALTER ROLE " + wantedRole.Name + " .+").WillReturnResult(sqlmock.NewResult(2, 3))
+		mock.ExpectExec(
+			fmt.Sprintf("ALTER ROLE %s [NOCREATEDB|BYPASSRLS]{2}", pq.QuoteIdentifier(wantedRole.Name))).
+			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Update(ctx, wantedRole)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -166,7 +179,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			BypassRLS: true,
 		}
 		dbError := errors.New("Kaboom")
-		mock.ExpectExec("ALTER ROLE " + wantedRole.Name + " .+").WillReturnError(dbError)
+		mock.ExpectExec(
+			fmt.Sprintf("ALTER ROLE %s [NOCREATEDB|BYPASSRLS]{2}", pq.QuoteIdentifier(wantedRole.Name))).
+			WillReturnError(dbError)
 
 		err = prm.Update(ctx, wantedRole)
 		Expect(err).To(HaveOccurred())
