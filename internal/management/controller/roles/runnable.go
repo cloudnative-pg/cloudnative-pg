@@ -156,7 +156,7 @@ func synchronizeRoles(
 	config *apiv1.ManagedConfiguration,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("syncronizing roles",
+	contextLog.Info("synchronizing roles",
 		"podName", podName,
 		"managedConfig", config)
 
@@ -191,7 +191,7 @@ func synchronizeRoles(
 			}
 		case found && !areEquivalent(inSpec, role):
 			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
-			err = roleManager.Update(ctx, role)
+			err = roleManager.Update(ctx, inSpec)
 			if err != nil {
 				return wrapErr(err)
 			}
