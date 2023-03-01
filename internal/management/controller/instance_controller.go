@@ -40,6 +40,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/reconciler"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
@@ -170,7 +171,14 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.configureSlotReplicator(cluster)
 
-	r.instance.ConfigureRoleSynchronizer(cluster.Spec.Managed)
+	if r.instance.PodName == cluster.Status.CurrentPrimary {
+		r.instance.ConfigureRoleSynchronizer(cluster.Spec.Managed)
+	}
+
+	result, err := roles.Reconcile(ctx, r.instance, cluster, r.client)
+	if err != nil || !result.IsZero() {
+		return result, err
+	}
 
 	if result, err := reconciler.ReconcileReplicationSlots(
 		ctx,
