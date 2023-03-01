@@ -214,3 +214,78 @@ func synchronizeRoles(
 
 	return nil
 }
+
+// getRoleStatus compares the roles in the Spec and in the DB and computes a status
+func getRoleStatus(
+	ctx context.Context,
+	roleManager RoleManager,
+	podName string,
+	config *apiv1.ManagedConfiguration,
+) (map[apiv1.RoleStatus][]string, error) {
+	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog.Info("synchronizing roles",
+		"podName", podName,
+		"managedConfig", config)
+
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while synchronizing roles in primary: %w", err)
+	}
+
+	rolesInDB, err := roleManager.List(ctx, config)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	contextLog.Info("found roles in DB", "roles", rolesInDB)
+
+	status := make(map[apiv1.RoleStatus][]string)
+
+	rolesInSpec := config.Roles
+	// setup a map name -> role for the spec roles
+	roleInSpecNamed := make(map[string]apiv1.RoleConfiguration)
+	for _, r := range rolesInSpec {
+		roleInSpecNamed[r.Name] = r
+	}
+
+	// 1. do any of the roles in the DB require update/delete?
+	roleInDBNamed := make(map[string]apiv1.RoleConfiguration)
+	for _, role := range rolesInDB {
+		roleInDBNamed[role.Name] = role
+		inSpec, found := roleInSpecNamed[role.Name]
+		switch {
+		case found && inSpec.Ensure == apiv1.EnsureAbsent:
+			contextLog.Info("role in DB and Spec, but spec wants it absent. Deleting", "role", role.Name)
+			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], role.Name)
+			err = roleManager.Delete(ctx, role)
+			if err != nil {
+				return nil, wrapErr(err)
+			}
+		case found && !areEquivalent(inSpec, role):
+			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
+			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], role.Name)
+			err = roleManager.Update(ctx, inSpec)
+			if err != nil {
+				return nil, wrapErr(err)
+			}
+		case !found:
+			status[apiv1.RoleStatusNotManaged] = append(status[apiv1.RoleStatusNotManaged], role.Name)
+			contextLog.Debug("role in DB but not Spec. Ignoring it", "role", role.Name)
+		default:
+			status[apiv1.RoleStatusReconciled] = append(status[apiv1.RoleStatusReconciled], role.Name)
+		}
+	}
+
+	// 2. create managed roles that are not in the DB
+	for _, r := range rolesInSpec {
+		_, found := roleInDBNamed[r.Name]
+		if !found && r.Ensure == apiv1.EnsurePresent {
+			contextLog.Info("role not in DB and spec wants it present. Creating", "role", r.Name)
+			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], r.Name)
+			err = roleManager.Create(ctx, r)
+			if err != nil {
+				return nil, wrapErr(err)
+			}
+		}
+	}
+
+	return status, nil
+}

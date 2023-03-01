@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
@@ -42,15 +43,27 @@ func Reconcile(
 		return reconcile.Result{}, nil
 	}
 
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Updating managed roles information")
+
+	// forces runnable to run
+	instance.ConfigureRoleSynchronizer(cluster.Spec.Managed)
+	contextLogger.Info("Updating managed roles information")
+
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	_ = NewPostgresRoleManager(db)
+
+	mgr := NewPostgresRoleManager(db)
+	status, err := getRoleStatus(ctx, mgr, instance.PodName, cluster.Spec.Managed)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	updatedCluster := cluster.DeepCopy()
 
 	updatedCluster.Status.Phase = apiv1.PhaseHealthy
-	updatedCluster.Status.PhaseReason = "Primary instance restarted in-place"
+	updatedCluster.Status.RoleStatus = status
 	return reconcile.Result{}, statusClient.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
 }

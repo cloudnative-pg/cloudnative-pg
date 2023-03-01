@@ -714,6 +714,21 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 			(*out)[key] = val
 		}
 	}
+	if in.RoleStatus != nil {
+		in, out := &in.RoleStatus, &out.RoleStatus
+		*out = make(map[RoleStatus][]string, len(*in))
+		for key, val := range *in {
+			var outVal []string
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make([]string, len(*in))
+				copy(*out, *in)
+			}
+			(*out)[key] = outVal
+		}
+	}
 	in.Topology.DeepCopyInto(&out.Topology)
 	if in.DanglingPVC != nil {
 		in, out := &in.DanglingPVC, &out.DanglingPVC
