@@ -51,11 +51,11 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 		return err
 	}
 	if !isPrimary {
-		contextLog.Info("skipping the role syncrhonization in replicas")
+		contextLog.Info("skipping the role synchronization in replicas")
 	}
 	go func() {
 		config := <-sr.instance.RoleSynchronizerChan()
-		contextLog.Info("setting up role syncrhonizer loop")
+		contextLog.Info("setting up role synchronizer loop")
 		updateInterval := 1 * time.Minute // TODO: make configurable
 		ticker := time.NewTicker(updateInterval)
 

@@ -182,7 +182,7 @@ type Instance struct {
 	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
 	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
 
-	// roleSynchronizerChan is used to send replication slot configuration to the slot replicator
+	// roleSynchronizerChan is used to send managed role configuration to the role synchronizer
 	roleSynchronizerChan chan *apiv1.ManagedConfiguration
 }
 
