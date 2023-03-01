@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -41,7 +42,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
-	// +kubebuilder:scaffold:imports
 )
 
 var (
