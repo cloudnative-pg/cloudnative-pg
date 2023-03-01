@@ -25,7 +25,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/cheynewallace/tabby"
-	"github.com/logrusorgru/aurora/v3"
+	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
