@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -91,8 +90,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "foo",
 		}
 
-		mock.ExpectExec("CREATE ROLE $1").
-			WithArgs(pq.QuoteIdentifier(wantedRole.Name)).
+		mock.ExpectExec(fmt.Sprintf("CREATE ROLE %s", wantedRole.Name)).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Create(ctx, wantedRole)
@@ -107,8 +105,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "foo",
 		}
 		dbError := errors.New("Kaboom")
-		mock.ExpectExec("CREATE ROLE $1").
-			WithArgs(pq.QuoteIdentifier(wantedRole.Name)).
+		mock.ExpectExec(fmt.Sprintf("CREATE ROLE %s", wantedRole.Name)).
 			WillReturnError(dbError)
 
 		err = prm.Create(ctx, wantedRole)
@@ -125,8 +122,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "foo",
 		}
 
-		mock.ExpectExec("DROP ROLE $1").
-			WithArgs(pq.QuoteIdentifier(unWantedRole.Name)).
+		mock.ExpectExec(fmt.Sprintf("DROP ROLE %s", unWantedRole.Name)).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Delete(ctx, unWantedRole)
@@ -141,8 +137,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "foo",
 		}
 		dbError := errors.New("Kaboom")
-		mock.ExpectExec("DROP ROLE $1").
-			WithArgs(pq.QuoteIdentifier(unWantedRole.Name)).
+		mock.ExpectExec(fmt.Sprintf("DROP ROLE %s", unWantedRole.Name)).
 			WillReturnError(dbError)
 
 		err = prm.Delete(ctx, unWantedRole)
@@ -162,7 +157,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		}
 
 		mock.ExpectExec(
-			fmt.Sprintf("ALTER ROLE %s [NOCREATEDB|BYPASSRLS]{2}", pq.QuoteIdentifier(wantedRole.Name))).
+			fmt.Sprintf("ALTER ROLE %s [NOCREATEDB|BYPASSRLS]{2}", wantedRole.Name)).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Update(ctx, wantedRole)
@@ -180,7 +175,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		}
 		dbError := errors.New("Kaboom")
 		mock.ExpectExec(
-			fmt.Sprintf("ALTER ROLE %s [NOCREATEDB|BYPASSRLS]{2}", pq.QuoteIdentifier(wantedRole.Name))).
+			fmt.Sprintf("ALTER ROLE %s [NOCREATEDB|BYPASSRLS]{2}", wantedRole.Name)).
 			WillReturnError(dbError)
 
 		err = prm.Update(ctx, wantedRole)
