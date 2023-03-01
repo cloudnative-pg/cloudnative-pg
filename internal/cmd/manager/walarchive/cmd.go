@@ -181,7 +181,7 @@ func run(ctx context.Context, podName, pgData string, args []string, client clie
 			Message: err.Error(),
 		}
 		if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
-			log.Error(errCond, "Error updating wal archiving condition (wal archiving failed)")
+			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err
 	}
@@ -206,7 +206,7 @@ func run(ctx context.Context, podName, pgData string, args []string, client clie
 		Message: "Continuous archiving is working",
 	}
 	if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
-		log.Error(errCond, "Error while updating wal archiving condition (wal archiving succeeded)")
+		log.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
 	}
 	// We return only the first error to PostgreSQL, because the first error
 	// is the one raised by the file that PostgreSQL has requested to archive.
