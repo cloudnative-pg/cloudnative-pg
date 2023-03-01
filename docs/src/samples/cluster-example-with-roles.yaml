@@ -22,7 +22,7 @@ spec:
       bypassrls: false
       connectionLimit: 4
       validUntil: "2023-04-12"
-      in_role:
+      inRoles:
         - pg_monitor
         - pg_signal_backend
       passwordSecret:
