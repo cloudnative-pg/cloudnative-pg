@@ -33,9 +33,7 @@ type mockRoleManager struct {
 	callHistory []funcCall
 }
 
-func (m *mockRoleManager) List(
-	ctx context.Context, config *apiv1.ManagedConfiguration,
-) ([]apiv1.RoleConfiguration, error) {
+func (m *mockRoleManager) List(ctx context.Context) ([]apiv1.RoleConfiguration, error) {
 	m.callHistory = append(m.callHistory, funcCall{"list", ""})
 	re := make([]apiv1.RoleConfiguration, len(m.roles))
 	i := 0

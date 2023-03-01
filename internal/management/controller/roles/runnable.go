@@ -164,7 +164,7 @@ func synchronizeRoles(
 		return fmt.Errorf("while synchronizing roles in primary: %w", err)
 	}
 
-	rolesInDB, err := roleManager.List(ctx, config)
+	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
 		return wrapErr(err)
 	}
@@ -231,7 +231,7 @@ func getRoleStatus(
 		return fmt.Errorf("while synchronizing roles in primary: %w", err)
 	}
 
-	rolesInDB, err := roleManager.List(ctx, config)
+	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
 		return nil, wrapErr(err)
 	}
