@@ -273,6 +273,7 @@ ResourceVersion
 RetentionPolicy
 RoleBinding
 RoleConfiguration
+RoleStatus
 RollingUpdateStatus
 Ruocco
 SAS

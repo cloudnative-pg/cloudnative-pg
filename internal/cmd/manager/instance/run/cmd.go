@@ -203,7 +203,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	roleSynchronizer := roles.NewRoleSynchronizer(instance, reconciler.GetClient())
 	if err = mgr.Add(roleSynchronizer); err != nil {
-		setupLog.Error(err, "unable to create slot replicator")
+		setupLog.Error(err, "unable to create role synchronizer")
 		return err
 	}
 
