@@ -51,11 +51,11 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 		return err
 	}
 	if !isPrimary {
-		contextLog.Info("skipping the role syncrhonization in replicas")
+		contextLog.Info("skipping the role synchronization in replicas")
 	}
 	go func() {
 		config := <-sr.instance.RoleSynchronizerChan()
-		contextLog.Info("setting up role syncrhonizer loop")
+		contextLog.Info("setting up role synchronizer loop")
 		updateInterval := 1 * time.Minute // TODO: make configurable
 		ticker := time.NewTicker(updateInterval)
 
@@ -69,6 +69,14 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case config = <-sr.instance.RoleSynchronizerChan():
+				if config != nil && len(config.Roles) != 0 {
+					contextLog.Info("got managed roles info", "roles", config.Roles)
+				} else {
+					contextLog.Info("got nil managed roles info, turning ticker off")
+					ticker.Stop()
+					updateInterval = 0
+					continue
+				}
 			case <-ticker.C:
 			}
 
@@ -148,6 +156,14 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 	return reduced[0] == reduced[1]
 }
 
+func getRoleNames(roles []apiv1.RoleConfiguration) []string {
+	names := make([]string, len(roles))
+	for i, role := range roles {
+		names[i] = role.Name
+	}
+	return names
+}
+
 // synchronizeRoles aligns roles in the database to the spec
 func synchronizeRoles(
 	ctx context.Context,
@@ -164,11 +180,74 @@ func synchronizeRoles(
 		return fmt.Errorf("while synchronizing roles in primary: %w", err)
 	}
 
-	rolesInDB, err := roleManager.List(ctx, config)
+	rolesByAction, err := evaluateRoleActions(ctx, roleManager, config)
 	if err != nil {
 		return wrapErr(err)
 	}
-	contextLog.Info("found roles in DB", "roles", rolesInDB)
+
+	// Note that the roleIgnore, roleIsReconciled, and roleIsReserved require no action
+	for action, roles := range rolesByAction {
+		switch action {
+		case roleCreate:
+			contextLog.Info("roles in Spec missing from the DB. Creating",
+				"roles", getRoleNames(roles))
+			for _, role := range roles {
+				err = roleManager.Create(ctx, role)
+				if err != nil {
+					return wrapErr(err)
+				}
+			}
+		case roleUpdate:
+			contextLog.Info("roles in DB out of sync with Spec. Updating",
+				"roles", getRoleNames(roles))
+			for _, role := range roles {
+				err = roleManager.Update(ctx, role)
+				if err != nil {
+					return wrapErr(err)
+				}
+			}
+		case roleDelete:
+			contextLog.Info("roles in DB marked as Ensure:Absent in Spec. Deleting",
+				"roles", getRoleNames(roles))
+			for _, role := range roles {
+				err = roleManager.Delete(ctx, role)
+				if err != nil {
+					return wrapErr(err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// roleAction encodes the action necessary for a role, i.e. ignore, or CRUD
+type roleAction int
+
+// possible role actions
+const (
+	roleIsReconciled roleAction = iota
+	roleCreate
+	roleDelete
+	roleUpdate
+	roleIgnore
+	roleIsReserved
+)
+
+// evaluateRoleActions evaluates the action needed for each role in the DB and/or the Spec.
+// It has no side-effects
+func evaluateRoleActions(
+	ctx context.Context,
+	roleManager RoleManager,
+	config *apiv1.ManagedConfiguration,
+) (map[roleAction][]apiv1.RoleConfiguration, error) {
+	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog.Info("evaluating the role actions")
+
+	rolesInDB, err := roleManager.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("while evaluating the roles: %w", err)
+	}
 
 	rolesInSpec := config.Roles
 	// setup a map name -> role for the spec roles
@@ -177,40 +256,76 @@ func synchronizeRoles(
 		roleInSpecNamed[r.Name] = r
 	}
 
-	// 1. do any of the roles in the DB require update/delete?
+	rolesByAction := make(map[roleAction][]apiv1.RoleConfiguration)
+	// 1. find the next actions for the roles in the DB
 	roleInDBNamed := make(map[string]apiv1.RoleConfiguration)
 	for _, role := range rolesInDB {
 		roleInDBNamed[role.Name] = role
-		inSpec, found := roleInSpecNamed[role.Name]
+		inSpec, isInSpec := roleInSpecNamed[role.Name]
 		switch {
-		case found && inSpec.Ensure == apiv1.EnsureAbsent:
-			contextLog.Info("role in DB and Spec, but spec wants it absent. Deleting", "role", role.Name)
-			err = roleManager.Delete(ctx, role)
-			if err != nil {
-				return wrapErr(err)
-			}
-		case found && !areEquivalent(inSpec, role):
-			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
-			err = roleManager.Update(ctx, inSpec)
-			if err != nil {
-				return wrapErr(err)
-			}
-		case !found:
-			contextLog.Debug("role in DB but not Spec. Ignoring it", "role", role.Name)
+		case ReservedRoles[role.Name]:
+			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], role)
+		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
+			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], role)
+			//TODO need adopt to !areEquivalent or commentsUpdate or passwordNeedSync
+			// wait for sync with cnp-3437, or we introduced in RoleCommentsUpdate ??
+			// and RolePasswordUpdate ?? action
+		case isInSpec && !areEquivalent(inSpec, role):
+			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
+		case !isInSpec:
+			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], role)
+		default:
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], role)
 		}
 	}
 
-	// 2. create managed roles that are not in the DB
+	contextLog.Info("roles in spec", "role", rolesInSpec)
+	// 2. get status of roles in spec missing from the DB
 	for _, r := range rolesInSpec {
-		_, found := roleInDBNamed[r.Name]
-		if !found && r.Ensure == apiv1.EnsurePresent {
-			contextLog.Info("role not in DB and spec wants it present. Creating", "role", r.Name)
-			err = roleManager.Create(ctx, r)
-			if err != nil {
-				return wrapErr(err)
-			}
+		_, isInDB := roleInDBNamed[r.Name]
+		if isInDB {
+			continue // covered by the previous loop
+		}
+		contextLog.Info("roles in spec but not db", "role", r.Name)
+		if r.Ensure == apiv1.EnsurePresent {
+			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], r)
+		} else {
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], r)
 		}
 	}
 
-	return nil
+	return rolesByAction, nil
+}
+
+// getRoleStatus gets the status of every role in the Spec and/or in the DB
+func getRoleStatus(
+	ctx context.Context,
+	roleManager RoleManager,
+	config *apiv1.ManagedConfiguration,
+) (map[string]apiv1.RoleStatus, error) {
+	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog.Info("getting the managed roles status")
+
+	rolesByAction, err := evaluateRoleActions(ctx, roleManager, config)
+	if err != nil {
+		return nil, fmt.Errorf("while getting the ManagedRoles status: %w", err)
+	}
+
+	statusByAction := map[roleAction]apiv1.RoleStatus{
+		roleCreate:       apiv1.RoleStatusPendingReconciliation,
+		roleDelete:       apiv1.RoleStatusPendingReconciliation,
+		roleUpdate:       apiv1.RoleStatusPendingReconciliation,
+		roleIsReconciled: apiv1.RoleStatusReconciled,
+		roleIgnore:       apiv1.RoleStatusNotManaged,
+		roleIsReserved:   apiv1.RoleStatusReserved,
+	}
+
+	statusByRole := make(map[string]apiv1.RoleStatus)
+	for action, roles := range rolesByAction {
+		for _, role := range roles {
+			statusByRole[role.Name] = statusByAction[action]
+		}
+	}
+
+	return statusByRole, nil
 }

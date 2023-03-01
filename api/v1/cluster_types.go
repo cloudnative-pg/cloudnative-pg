@@ -385,6 +385,20 @@ type Topology struct {
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
 }
 
+// RoleStatus represents the status of a managed role in the cluster
+type RoleStatus string
+
+const (
+	// RoleStatusReconciled indicates the role in DB matches the Spec
+	RoleStatusReconciled = "reconciled"
+	// RoleStatusNotManaged indicates the role is not in the Spec, therefore not managed
+	RoleStatusNotManaged = "not-managed"
+	// RoleStatusPendingReconciliation indicates the role in Spec requires updated/creation in DB
+	RoleStatusPendingReconciliation = "pending-reconciliation"
+	// RoleStatusReserved indicates this is one of the roles reserved by the operator. E.g. `postgres`
+	RoleStatusReserved = "reserved"
+)
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// Total number of instances in the cluster
@@ -398,6 +412,9 @@ type ClusterStatus struct {
 
 	// the reported state of the instances during the last reconciliation loop
 	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
+
+	// RoleStatus gives the list of roles in each state
+	RoleStatus map[RoleStatus][]string `json:"roleStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	TimelineID int `json:"timelineID,omitempty"`

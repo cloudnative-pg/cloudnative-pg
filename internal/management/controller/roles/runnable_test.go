@@ -33,9 +33,7 @@ type mockRoleManager struct {
 	callHistory []funcCall
 }
 
-func (m *mockRoleManager) List(
-	ctx context.Context, config *apiv1.ManagedConfiguration,
-) ([]apiv1.RoleConfiguration, error) {
+func (m *mockRoleManager) List(ctx context.Context) ([]apiv1.RoleConfiguration, error) {
 	m.callHistory = append(m.callHistory, funcCall{"list", ""})
 	re := make([]apiv1.RoleConfiguration, len(m.roles))
 	i := 0
@@ -228,3 +226,120 @@ var _ = Describe("Role synchronizer tests", func() {
 		))
 	})
 })
+
+var _ = DescribeTable("Role status getter tests",
+	func(spec *apiv1.ManagedConfiguration, db mockRoleManager, expected map[string]apiv1.RoleStatus) {
+		ctx := context.TODO()
+		statusMap, err := getRoleStatus(ctx, &db, spec)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(statusMap).To(BeEquivalentTo(expected))
+	},
+	Entry("detects roles that are fully reconciled",
+		&apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name:      "ensurePresent",
+					Superuser: true,
+					Ensure:    apiv1.EnsurePresent,
+				},
+				{
+					Name:      "ensureAbsent",
+					Superuser: true,
+					Ensure:    apiv1.EnsureAbsent,
+				},
+			},
+		},
+		mockRoleManager{
+			roles: map[string]apiv1.RoleConfiguration{
+				"postgres": {
+					Name:      "postgres",
+					Superuser: true,
+				},
+				"ensurePresent": {
+					Name:      "ensurePresent",
+					Superuser: true,
+				},
+			},
+		},
+		map[string]apiv1.RoleStatus{
+			"ensurePresent": apiv1.RoleStatusReconciled,
+			"ensureAbsent":  apiv1.RoleStatusReconciled,
+			"postgres":      apiv1.RoleStatusReserved,
+		},
+	),
+	Entry("detects roles that are not reconciled",
+		&apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name:      "unwantedInDB",
+					Superuser: true,
+					Ensure:    apiv1.EnsureAbsent,
+				},
+				{
+					Name:      "missingFromDB",
+					Superuser: true,
+					Ensure:    apiv1.EnsurePresent,
+				},
+				{
+					Name:      "drifted",
+					Superuser: true,
+					Ensure:    apiv1.EnsurePresent,
+				},
+			},
+		},
+		mockRoleManager{
+			roles: map[string]apiv1.RoleConfiguration{
+				"postgres": {
+					Name:      "postgres",
+					Superuser: true,
+				},
+				"unwantedInDB": {
+					Name:      "unwantedInDB",
+					Superuser: true,
+				},
+				"drifted": {
+					Name:      "drifted",
+					Superuser: false,
+				},
+			},
+		},
+		map[string]apiv1.RoleStatus{
+			"postgres":      apiv1.RoleStatusReserved,
+			"unwantedInDB":  apiv1.RoleStatusPendingReconciliation,
+			"missingFromDB": apiv1.RoleStatusPendingReconciliation,
+			"drifted":       apiv1.RoleStatusPendingReconciliation,
+		},
+	),
+	Entry("detects roles that are not in the spec and ignores them",
+		&apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name:      "edb_admin",
+					Superuser: true,
+					Ensure:    apiv1.EnsurePresent,
+				},
+			},
+		},
+		mockRoleManager{
+			roles: map[string]apiv1.RoleConfiguration{
+				"postgres": {
+					Name:      "postgres",
+					Superuser: true,
+				},
+				"edb_admin": {
+					Name:      "edb_admin",
+					Superuser: true,
+				},
+				"missingFromSpec": {
+					Name:      "missingFromSpec",
+					Superuser: false,
+				},
+			},
+		},
+		map[string]apiv1.RoleStatus{
+			"postgres":        apiv1.RoleStatusReserved,
+			"edb_admin":       apiv1.RoleStatusReconciled,
+			"missingFromSpec": apiv1.RoleStatusNotManaged,
+		},
+	),
+)

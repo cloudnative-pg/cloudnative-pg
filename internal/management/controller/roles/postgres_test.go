@@ -46,7 +46,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		rolpassword, rolvaliduntil
 	  FROM pg_catalog.pg_roles where rolname not like 'pg_%';`).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
-		roles, err := prm.List(ctx, nil)
+		roles, err := prm.List(ctx)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(roles).To(HaveLen(2))
 		Expect(roles).To(ContainElements(apiv1.RoleConfiguration{
@@ -75,7 +75,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectQuery(`SELECT rolname, rolcreatedb, rolsuper, rolcanlogin, rolbypassrls,
 		rolpassword, rolvaliduntil
 	  FROM pg_catalog.pg_roles where rolname not like 'pg_%';`).WillReturnError(dbError)
-		roles, err := prm.List(ctx, nil)
+		roles, err := prm.List(ctx)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(dbError))
 		Expect(roles).To(BeEmpty())

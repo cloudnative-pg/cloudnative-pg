@@ -39,10 +39,7 @@ func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 }
 
 // List the available roles
-func (sm PostgresRoleManager) List(
-	ctx context.Context,
-	config *v1.ManagedConfiguration,
-) ([]v1.RoleConfiguration, error) {
+func (sm PostgresRoleManager) List(ctx context.Context) ([]v1.RoleConfiguration, error) {
 	rows, err := sm.superUserDB.QueryContext(
 		ctx,
 		`SELECT rolname, rolcreatedb, rolsuper, rolcanlogin, rolbypassrls,
