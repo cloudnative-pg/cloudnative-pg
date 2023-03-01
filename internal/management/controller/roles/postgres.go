@@ -24,7 +24,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
@@ -43,7 +42,6 @@ func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 // List the available roles
 func (sm PostgresRoleManager) List(
 	ctx context.Context,
-	config *v1.ManagedConfiguration,
 ) ([]DatabaseRole, error) {
 	rows, err := sm.superUserDB.QueryContext(
 		ctx,

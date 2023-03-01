@@ -77,7 +77,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 				"2023-04-04", false, []byte("This is streaming_replica user"))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
-		roles, err := prm.List(ctx, nil)
+		roles, err := prm.List(ctx)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(roles).To(HaveLen(2))
 		password1 := "12345"
@@ -123,7 +123,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		dbError := errors.New("Kaboom")
 		mock.ExpectQuery(expectedSelStmt).WillReturnError(dbError)
-		roles, err := prm.List(ctx, nil)
+		roles, err := prm.List(ctx)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeEquivalentTo(dbError))
 		Expect(roles).To(BeEmpty())

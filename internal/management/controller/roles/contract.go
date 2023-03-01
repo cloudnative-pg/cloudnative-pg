@@ -29,13 +29,21 @@ type DatabaseRole struct {
 	apiv1.RoleConfiguration
 	password string // the plain password to set for the role
 	// sql.NullString??
-	// hasPassword bool   // whether a role read from the DB has a password
+	// hasPassword bool   // whether a role read from the DB has a passwor
+}
+
+// ReservedRoles is the set of roles managed by the operator that should
+// never be put in the managed roles stanza
+var ReservedRoles = map[string]bool{
+	"cnpg_pooler_pgbouncer": true,
+	"streaming_replica":     true,
+	"postgres":              true,
 }
 
 // RoleManager abstracts the functionality of reconciling with PostgreSQL roles
 type RoleManager interface {
 	// List the roles in the database
-	List(ctx context.Context, config *apiv1.ManagedConfiguration) ([]DatabaseRole, error)
+	List(ctx context.Context) ([]DatabaseRole, error)
 	// Update the role in the database
 	Update(ctx context.Context, role DatabaseRole) error
 	// Create the role in the database
