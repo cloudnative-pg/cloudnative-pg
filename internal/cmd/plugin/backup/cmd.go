@@ -33,6 +33,7 @@ import (
 // NewCmd creates the new "backup" subcommand
 func NewCmd() *cobra.Command {
 	var backupName string
+	var backupTarget string
 
 	backupSubcommand := &cobra.Command{
 		Use:   "backup [cluster]",
@@ -48,7 +49,13 @@ func NewCmd() *cobra.Command {
 					time.Now().Format("20060102150400"))
 			}
 
-			return createBackup(cmd.Context(), backupName, clusterName)
+			backupTargetPolicy := apiv1.BackupTarget(backupTarget)
+			switch backupTargetPolicy {
+			case apiv1.BackupTargetPrimary, apiv1.BackupTargetStandby, "":
+				return createBackup(cmd.Context(), backupName, clusterName, backupTargetPolicy)
+			default:
+				return fmt.Errorf("backup-target: %s is not supported by the backup command", backupTarget)
+			}
 		},
 	}
 
@@ -59,12 +66,19 @@ func NewCmd() *cobra.Command {
 		"The name of the Backup resource that will be created, "+
 			"defaults to \"[cluster]-[current_timestamp]\"",
 	)
+	backupSubcommand.Flags().StringVar(
+		&backupTarget,
+		"backup-target",
+		"",
+		"If present, will override the backup target defined in cluster, "+
+			"valid value are primary and prefer-standby.",
+	)
 
 	return backupSubcommand
 }
 
 // createBackup handles the Backup resource creation
-func createBackup(ctx context.Context, backupName, clusterName string) error {
+func createBackup(ctx context.Context, backupName, clusterName string, backupTarget apiv1.BackupTarget) error {
 	backup := apiv1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: plugin.Namespace,
@@ -74,6 +88,7 @@ func createBackup(ctx context.Context, backupName, clusterName string) error {
 			Cluster: apiv1.LocalObjectReference{
 				Name: clusterName,
 			},
+			Target: backupTarget,
 		},
 	}
 
