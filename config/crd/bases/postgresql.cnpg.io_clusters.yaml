@@ -3585,6 +3585,13 @@ spec:
                 items:
                   type: string
                 type: array
+              roleStatus:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                description: RoleStatus gives the list of roles in each state
+                type: object
               secretsResourceVersion:
                 description: The list of resource versions of the secrets managed
                   by the operator. Every change here is done in the interest of the

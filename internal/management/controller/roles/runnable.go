@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -57,11 +55,11 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 		return err
 	}
 	if !isPrimary {
-		contextLog.Info("skipping the role syncrhonization in replicas")
+		contextLog.Info("skipping the role synchronization in replicas")
 	}
 	go func() {
 		config := <-sr.instance.RoleSynchronizerChan()
-		contextLog.Info("setting up role syncrhonizer loop")
+		contextLog.Info("setting up role synchronizer loop")
 		updateInterval := 1 * time.Minute // TODO: make configurable
 		ticker := time.NewTicker(updateInterval)
 
@@ -75,6 +73,14 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case config = <-sr.instance.RoleSynchronizerChan():
+				if config != nil && len(config.Roles) != 0 {
+					contextLog.Info("got managed roles info", "roles", config.Roles)
+				} else {
+					contextLog.Info("got nil managed roles info, turning ticker off")
+					ticker.Stop()
+					updateInterval = 0
+					continue
+				}
 			case <-ticker.C:
 			}
 
@@ -128,6 +134,40 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	return err
 }
 
+// areEquivalent does a constrained check of two roles
+// TODO: this needs to be completed, there is a ticket to track that
+// we should see if DeepEquals will serve
+func areEquivalent(role1 apiv1.RoleConfiguration, role2 DatabaseRole) bool {
+	reduced := []struct {
+		CreateDB  bool
+		Superuser bool
+		Login     bool
+		BypassRLS bool
+	}{
+		{
+			CreateDB:  role1.CreateDB,
+			Superuser: role1.Superuser,
+			Login:     role1.Login,
+			BypassRLS: role1.BypassRLS,
+		},
+		{
+			CreateDB:  role2.CreateDB,
+			Superuser: role2.Superuser,
+			Login:     role2.Login,
+			BypassRLS: role2.BypassRLS,
+		},
+	}
+	return reduced[0] == reduced[1]
+}
+
+func getRoleNames(roles []DatabaseRole) []string {
+	names := make([]string, len(roles))
+	for i, role := range roles {
+		names[i] = role.Name
+	}
+	return names
+}
+
 // synchronizeRoles aligns roles in the database to the spec
 func synchronizeRoles(
 	ctx context.Context,
@@ -144,11 +184,74 @@ func synchronizeRoles(
 		return fmt.Errorf("while synchronizing roles in primary: %w", err)
 	}
 
-	rolesInDB, err := roleManager.List(ctx, config)
+	rolesByAction, err := evaluateRoleActions(ctx, roleManager, config)
 	if err != nil {
 		return wrapErr(err)
 	}
-	contextLog.Info("found roles in DB", "roles", rolesInDB)
+
+	// Note that the roleIgnore, roleIsReconciled, and roleIsReserved require no action
+	for action, roles := range rolesByAction {
+		switch action {
+		case roleCreate:
+			contextLog.Info("roles in Spec missing from the DB. Creating",
+				"roles", getRoleNames(roles))
+			for _, role := range roles {
+				err = roleManager.Create(ctx, role)
+				if err != nil {
+					return wrapErr(err)
+				}
+			}
+		case roleUpdate:
+			contextLog.Info("roles in DB out of sync with Spec. Updating",
+				"roles", getRoleNames(roles))
+			for _, role := range roles {
+				err = roleManager.Update(ctx, role)
+				if err != nil {
+					return wrapErr(err)
+				}
+			}
+		case roleDelete:
+			contextLog.Info("roles in DB marked as Ensure:Absent in Spec. Deleting",
+				"roles", getRoleNames(roles))
+			for _, role := range roles {
+				err = roleManager.Delete(ctx, role)
+				if err != nil {
+					return wrapErr(err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// roleAction encodes the action necessary for a role, i.e. ignore, or CRUD
+type roleAction int
+
+// possible role actions
+const (
+	roleIsReconciled roleAction = iota
+	roleCreate
+	roleDelete
+	roleUpdate
+	roleIgnore
+	roleIsReserved
+)
+
+// evaluateRoleActions evaluates the action needed for each role in the DB and/or the Spec.
+// It has no side-effects
+func evaluateRoleActions(
+	ctx context.Context,
+	roleManager RoleManager,
+	config *apiv1.ManagedConfiguration,
+) (map[roleAction][]DatabaseRole, error) {
+	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog.Info("evaluating the role actions")
+
+	rolesInDB, err := roleManager.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("while evaluating the roles: %w", err)
+	}
 
 	rolesInSpec := config.Roles
 	// setup a map name -> role for the spec roles
@@ -157,87 +260,109 @@ func synchronizeRoles(
 		roleInSpecNamed[r.Name] = r
 	}
 
-	// 1. do any of the roles in the DB require update/delete?
+	rolesByAction := make(map[roleAction][]DatabaseRole)
+	// 1. find the next actions for the roles in the DB
 	roleInDBNamed := make(map[string]DatabaseRole)
 	for _, role := range rolesInDB {
 		roleInDBNamed[role.Name] = role
-		inSpec, found := roleInSpecNamed[role.Name]
+		inSpec, isInSpec := roleInSpecNamed[role.Name]
 		switch {
-		case found && inSpec.Ensure == apiv1.EnsureAbsent:
-			contextLog.Info("role in DB and Spec, but spec wants it absent. Deleting", "role", role.Name)
-			err = roleManager.Delete(ctx, role)
-			if err != nil {
-				return wrapErr(err)
-			}
-		case found:
-			// TODO: rethink. We are always updating the role, to simplify password
-			// management. Keeping the SCRAM-SHA-256 encoded value readable from DB in
-			// sync with the password stored in the Kubernetes secret is complex
-			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
-			pass, err := getPassword(ctx, sr, inSpec)
-			if err != nil {
-				return wrapErr(err)
-			}
-			err = roleManager.Update(ctx, DatabaseRole{
-				password:          pass,
+		case ReservedRoles[role.Name]:
+			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], role)
+		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
+			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], role)
+		case isInSpec && !areEquivalent(inSpec, role):
+			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], DatabaseRole{
 				RoleConfiguration: inSpec,
 			})
-			if err != nil {
-				return wrapErr(err)
-			}
-		case !found:
-			contextLog.Debug("role in DB but not Spec. Ignoring it", "role", role.Name)
+		case !isInSpec:
+			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], role)
+		default:
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], role)
 		}
 	}
 
-	// 2. create managed roles that are not in the DB
+	contextLog.Info("roles in spec", "role", rolesInSpec)
+	// 2. get status of roles in spec missing from the DB
 	for _, r := range rolesInSpec {
-		_, found := roleInDBNamed[r.Name]
-		if !found && r.Ensure == apiv1.EnsurePresent {
-			pass, err := getPassword(ctx, sr, r)
-			if err != nil {
-				return wrapErr(err)
-			}
-			contextLog.Info("role not in DB and spec wants it present. Creating", "role", r.Name)
-			err = roleManager.Create(ctx, DatabaseRole{
-				password:          pass,
+		_, isInDB := roleInDBNamed[r.Name]
+		if isInDB {
+			continue // covered by the previous loop
+		}
+		contextLog.Info("roles in spec but not db", "role", r.Name)
+		if r.Ensure == apiv1.EnsurePresent {
+			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], DatabaseRole{
 				RoleConfiguration: r,
 			})
-			if err != nil {
-				return wrapErr(err)
-			}
+		} else {
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], DatabaseRole{
+				RoleConfiguration: r,
+			})
 		}
 	}
 
-	return nil
+	return rolesByAction, nil
+}
+
+// getRoleStatus gets the status of every role in the Spec and/or in the DB
+func getRoleStatus(
+	ctx context.Context,
+	roleManager RoleManager,
+	config *apiv1.ManagedConfiguration,
+) (map[string]apiv1.RoleStatus, error) {
+	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog.Info("getting the managed roles status")
+
+	rolesByAction, err := evaluateRoleActions(ctx, roleManager, config)
+	if err != nil {
+		return nil, fmt.Errorf("while getting the ManagedRoles status: %w", err)
+	}
+
+	statusByAction := map[roleAction]apiv1.RoleStatus{
+		roleCreate:       apiv1.RoleStatusPendingReconciliation,
+		roleDelete:       apiv1.RoleStatusPendingReconciliation,
+		roleUpdate:       apiv1.RoleStatusPendingReconciliation,
+		roleIsReconciled: apiv1.RoleStatusReconciled,
+		roleIgnore:       apiv1.RoleStatusNotManaged,
+		roleIsReserved:   apiv1.RoleStatusReserved,
+	}
+
+	statusByRole := make(map[string]apiv1.RoleStatus)
+	for action, roles := range rolesByAction {
+		for _, role := range roles {
+			statusByRole[role.Name] = statusByAction[action]
+		}
+	}
+
+	return statusByRole, nil
 }
 
 // getPassword retrieves the password stored in the Kubernetes secret for the
 // RoleConfiguration
-func getPassword(ctx context.Context, sr *RoleSynchronizer,
-	roleInSpec apiv1.RoleConfiguration,
-) (string, error) {
-	secretName := roleInSpec.GetRoleSecretsName()
-	// no secrets defined, will keep roleInSpec.Password nil
-	if secretName == "" {
-		return "", nil
-	}
-
-	var secret corev1.Secret
-	err := sr.client.Get(
-		ctx,
-		client.ObjectKey{Namespace: sr.instance.Namespace, Name: secretName},
-		&secret)
-	if err != nil {
-		return "", err
-	}
-	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
-	if err != nil {
-		return "", err
-	}
-	if roleInSpec.Name != usernameFromSecret {
-		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
-		return "", err
-	}
-	return passwordFromSecret, nil
-}
+// func getPassword(ctx context.Context, sr *RoleSynchronizer,
+//	roleInSpec apiv1.RoleConfiguration,
+// ) (string, error) {
+//	secretName := roleInSpec.GetRoleSecretsName()
+//	// no secrets defined, will keep roleInSpec.Password nil
+//	if secretName == "" {
+//		return "", nil
+//	}
+//
+//	var secret corev1.Secret
+//	err := sr.client.Get(
+//		ctx,
+//		client.ObjectKey{Namespace: sr.instance.Namespace, Name: secretName},
+//		&secret)
+//	if err != nil {
+//		return "", err
+//	}
+//	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
+//	if err != nil {
+//		return "", err
+//	}
+//	if roleInSpec.Name != usernameFromSecret {
+//		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
+//		return "", err
+//	}
+//	return passwordFromSecret, nil
+// }
