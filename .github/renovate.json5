@@ -98,20 +98,24 @@
 // Actions, taking it from the official GitHub repository.
       "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
       "matchStrings": [
-        "GO_VERSION: '(?<currentValue>.*?)'\\n"
+        "GOLANG_VERSION: \"(?<currentValue>.*?)\\.x\"",
       ],
       "datasourceTemplate": "golang-version",
-      "depNameTemplate": "golang"
+      "depNameTemplate": "golang",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+)"
     }, {
 // We want a PR to bump golangci-lint versions used through env variables in
 // any GitHub Actions or Makefile, taking it from the official GitHub
 // repository tags.
       "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
       "matchStrings": [
-        "GOLANGCI_LINT_VERSION: \"(?<currentValue>.*?)\"\\n",
+        "GOLANGCI_LINT_VERSION: \"v(?<currentValue>.*?)\"",
       ],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "golangci/golangci-lint",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+)"
     }
   ],
   "packageRules": [
