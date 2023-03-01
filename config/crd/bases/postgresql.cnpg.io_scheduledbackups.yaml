@@ -80,12 +80,11 @@ spec:
                 description: If this backup is suspended or not
                 type: boolean
               target:
-                default: none
-                description: The policy to override the backup.target policy defined
-                  in cluster. Available options are empty string, which will use backup
-                  policy defined in cluster, `primary` which to have scheduled backups
-                  run on primary instances, `prefer-standby` to have scheduled backups
-                  run preferably on the most updated standby, if available.
+                description: The policy to override the backup target policy defined
+                  in cluster. Available options are empty string, which will skip
+                  the override, `primary` which to have scheduled backups run on primary
+                  instances, `prefer-standby` to have scheduled backups run preferably
+                  on the most updated standby, if available.
                 enum:
                 - primary
                 - prefer-standby

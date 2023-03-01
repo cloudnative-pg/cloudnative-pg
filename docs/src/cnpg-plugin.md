@@ -772,3 +772,7 @@ The created backup will be named after the request time:
 kubectl cnpg backup cluster-example
 backup/cluster-example-20230121002300 created
 ```
+By default, new created backup will use the backup target policy defined
+in cluster to choose which instance to run on. You can also use `--backup-target` 
+option to override this policy. please refer to [Backup and Recovery](backup_recovery.md)
+for more information about backup target.
