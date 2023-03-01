@@ -47,6 +47,14 @@ const (
 type BackupSpec struct {
 	// The cluster to backup
 	Cluster LocalObjectReference `json:"cluster,omitempty"`
+
+	// The policy to override the backup.target policy defined in cluster. Available
+	// options are empty string, which will use backup policy defined in cluster,
+	// `primary` which to have this backup run on primary instances, `prefer-standby`
+	//  to have this backup run preferably on the most updated standby, if available.
+	// +kubebuilder:validation:Enum=primary;prefer-standby
+	// +kubebuilder:default:=none
+	Target BackupTarget `json:"target,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup

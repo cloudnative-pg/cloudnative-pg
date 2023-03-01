@@ -58,6 +58,17 @@ spec:
                 required:
                 - name
                 type: object
+              target:
+                default: none
+                description: The policy to override the backup.target policy defined
+                  in cluster. Available options are empty string, which will use backup
+                  policy defined in cluster, `primary` which to have this backup run
+                  on primary instances, `prefer-standby` to have this backup run preferably
+                  on the most updated standby, if available.
+                enum:
+                - primary
+                - prefer-standby
+                type: string
             type: object
           status:
             description: 'Most recently observed status of the backup. This data may

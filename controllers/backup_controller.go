@@ -131,7 +131,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	origBackup := backup.DeepCopy()
 
 	// Detect the pod where a backup will be executed
-	pod, err := r.getBackupTargetPod(ctx, cluster)
+	pod, err := r.getBackupTargetPod(ctx, cluster, &backup)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
@@ -206,13 +206,19 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 // getBackupTargetPod returns the correct pod that should run the backup according to the current
 // cluster's target policy
-func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, cluster apiv1.Cluster) (*corev1.Pod, error) {
+func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
+	cluster apiv1.Cluster,
+	backup *apiv1.Backup,
+) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx)
 	pods, err := GetManagedInstances(ctx, &cluster, r.Client)
 	if err != nil {
 		return nil, err
 	}
-
+	backupTarget := cluster.Spec.Backup.Target
+	if backup.Spec.Target != "" {
+		backupTarget = backup.Spec.Target
+	}
 	posgresqlStatusList := r.instanceStatusClient.getStatusFromInstances(ctx, pods)
 	for _, item := range posgresqlStatusList.Items {
 		if !item.IsPodReady {
@@ -220,7 +226,7 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context, cluster apiv1
 				"pod", item.Pod.Name)
 			continue
 		}
-		switch cluster.Spec.Backup.Target {
+		switch backupTarget {
 		case apiv1.BackupTargetPrimary, "":
 			if item.IsPrimary {
 				contextLogger.Debug("Primary Instance is elected as backup target",
