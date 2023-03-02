@@ -130,7 +130,7 @@ They are listed in the [CODEOWNERS](CODEOWNERS) file.
 
 ## Adopters
 
-A list of publicly known users of the CloudNativePG operator is in [ADOPTERS.md].
+A list of publicly known users of the CloudNativePG operator is in [ADOPTERS.md](ADOPTERS.md).
 Help us grow our community and CloudNativePG by adding yourself and your
 organization to this list!
 
