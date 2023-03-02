@@ -236,39 +236,54 @@ func getRoleStatus(
 		roleInSpecNamed[r.Name] = r
 	}
 
-	// 1. do any of the roles in the DB require update/delete?
+	type roleStatus struct {
+		roleName string
+		status   apiv1.RoleStatus
+	}
+	// 1. find the status of the roles in the DB
 	roleInDBNamed := make(map[string]apiv1.RoleConfiguration)
-	var pending, reconciled, reserved, unmanaged []string
+	roleStatuses := make([]roleStatus, 0, len(rolesInSpec)+len(rolesInDB))
 	for _, role := range rolesInDB {
 		roleInDBNamed[role.Name] = role
 		inSpec, found := roleInSpecNamed[role.Name]
+		var status apiv1.RoleStatus
 		switch {
 		case ReservedRoles[role.Name]:
-			reserved = append(reserved, role.Name)
+			status = apiv1.RoleStatusReserved
 		case found && inSpec.Ensure == apiv1.EnsureAbsent:
-			pending = append(pending, role.Name)
+			status = apiv1.RoleStatusPendingReconciliation
 		case found && !areEquivalent(inSpec, role):
-			pending = append(pending, role.Name)
+			status = apiv1.RoleStatusPendingReconciliation
 		case !found:
-			unmanaged = append(unmanaged, role.Name)
+			status = apiv1.RoleStatusNotManaged
 		default:
-			reconciled = append(reconciled, role.Name)
+			status = apiv1.RoleStatusReconciled
 		}
+		roleStatuses = append(roleStatuses, roleStatus{roleName: role.Name, status: status})
 	}
 
-	// 2. create managed roles that are not in the DB
+	// 2. get status of roles in spec missing from the DB
 	for _, r := range rolesInSpec {
 		_, found := roleInDBNamed[r.Name]
-		if !found && r.Ensure == apiv1.EnsurePresent {
-			contextLog.Info("role not in DB and spec wants it present. Creating", "role", r.Name)
-			pending = append(pending, r.Name)
+		if found {
+			break // covered by the previous loop
 		}
+		var status apiv1.RoleStatus
+		if r.Ensure == apiv1.EnsurePresent {
+			status = apiv1.RoleStatusPendingReconciliation
+		} else {
+			status = apiv1.RoleStatusReconciled
+		}
+		roleStatuses = append(roleStatuses, roleStatus{
+			roleName: r.Name,
+			status:   status,
+		})
 	}
 
-	return map[apiv1.RoleStatus][]string{
-		apiv1.RoleStatusNotManaged:            unmanaged,
-		apiv1.RoleStatusPendingReconciliation: pending,
-		apiv1.RoleStatusReserved:              reserved,
-		apiv1.RoleStatusReconciled:            reconciled,
-	}, nil
+	statusMap := make(map[apiv1.RoleStatus][]string)
+	for _, rs := range roleStatuses {
+		statusMap[rs.status] = append(statusMap[rs.status], rs.roleName)
+	}
+
+	return statusMap, nil
 }

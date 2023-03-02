@@ -27,7 +27,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// Reconcile reconciles the managed roles in the primary instance
+// Reconcile triggers reconciliation of managed roles, gets their status, and
+// updates it into the cluster Status
 func Reconcile(
 	ctx context.Context,
 	instance *postgres.Instance,

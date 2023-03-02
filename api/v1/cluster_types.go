@@ -385,17 +385,17 @@ type Topology struct {
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
 }
 
-// RoleStatus represents the status of a role reconciliation
+// RoleStatus represents the status of a managed role in the cluster
 type RoleStatus string
 
 const (
-	// RoleStatusReconciled indicates the role in DB matches Spec
+	// RoleStatusReconciled indicates the role in DB matches the Spec
 	RoleStatusReconciled = "reconciled"
 	// RoleStatusNotManaged indicates the role is not in the Spec, therefore not managed
 	RoleStatusNotManaged = "not-managed"
 	// RoleStatusPendingReconciliation indicates the role in Spec requires updated/creation in DB
 	RoleStatusPendingReconciliation = "pending-reconciliation"
-	// RoleStatusReserved indicates the role is one reserved by the operator. E.g. `postgres`
+	// RoleStatusReserved indicates this is one of the roles reserved by the operator. E.g. `postgres`
 	RoleStatusReserved = "reserved"
 )
 
