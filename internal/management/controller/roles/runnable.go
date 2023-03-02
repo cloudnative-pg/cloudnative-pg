@@ -222,7 +222,7 @@ func getRoleStatus(
 	config *apiv1.ManagedConfiguration,
 ) (map[apiv1.RoleStatus][]string, error) {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Trace("getting the managed roles status")
+	contextLog.Info("getting the managed roles status")
 
 	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
@@ -262,12 +262,14 @@ func getRoleStatus(
 		roleStatuses = append(roleStatuses, roleStatus{roleName: role.Name, status: status})
 	}
 
+	contextLog.Info("roles in spec", "role", rolesInSpec)
 	// 2. get status of roles in spec missing from the DB
 	for _, r := range rolesInSpec {
 		_, found := roleInDBNamed[r.Name]
 		if found {
 			break // covered by the previous loop
 		}
+		contextLog.Info("roles in spec but not db", "role", r.Name)
 		var status apiv1.RoleStatus
 		if r.Ensure == apiv1.EnsurePresent {
 			status = apiv1.RoleStatusPendingReconciliation
