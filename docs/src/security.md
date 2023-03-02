@@ -141,16 +141,16 @@ describe clusterrole cnpg-manager`.
 The instance manager, which is the entry point of the operand container, needs
 to make some calls to the Kubernetes API server to ensure that the status of
 some resources is correctly updated and to access the config maps and secrets
-that are associated to that Postgres cluster. Such calls are performed through
-a dedicated `ServiceAccount` that is created by the operator together with the
-PostgreSQL `Cluster` and that shares the same name.
+that are associated with that Postgres cluster. Such calls are performed through
+a dedicated `ServiceAccount` created by the operator that shares the same
+PostgreSQL `Cluster` resource name.
 
 !!! Important
     The operand can only access a specific and limited subset of resources
-    through the API server. Service account is the
+    through the API server. A service account is the
     [recommended way to access the API server from within a Pod](https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/).
 
-For transparency, the permissions associated to the service account are defined in the
+For transparency, the permissions associated with the service account are defined in the
 [roles.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/pkg/specs/roles.go)
 file. For example, to retrieve the permissions of a generic `mypg` cluster in the
 `myns` namespace, you can type the following command:
@@ -168,7 +168,7 @@ kubectl get rolebinding -n myns mypg -o yaml
 !!! Important
     Remember that **roles are limited to a given namespace**.
 
-Below we provide a quick summary of the permissions associated to the service
+Below we provide a quick summary of the permissions associated with the service
 account for generic Kubernetes resources.
 
 `configmaps`
@@ -185,7 +185,7 @@ account for generic Kubernetes resources.
 : The instance manager can create an event for the cluster, informing the
   API server about a particular aspect of the PostgreSQL instance lifecycle
 
-Here instead, we provide the same summary for resources that are specific to
+Here instead, we provide the same summary for resources specific to
 CloudNativePG.
 
 `clusters`
@@ -199,8 +199,8 @@ CloudNativePG.
 `backups`
 : The instance manager requires `get` and `list` permissions to read any
   `Backup` resource in the namespace. Additionally, it requires the `delete`
-  permission to cleanup the Kubernetes cluster by removing the `Backup` objects
-  that do not have a counter part in the object store - typically because of
+  permission to clean up the Kubernetes cluster by removing the `Backup` objects
+  that do not have a counterpart in the object store - typically because of
   retention policies
 
 `backups/status`
