@@ -255,17 +255,9 @@ func getRoleStatus(
 		case found && inSpec.Ensure == apiv1.EnsureAbsent:
 			contextLog.Info("role in DB and Spec, but spec wants it absent. Deleting", "role", role.Name)
 			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], role.Name)
-			err = roleManager.Delete(ctx, role)
-			if err != nil {
-				return nil, wrapErr(err)
-			}
 		case found && !areEquivalent(inSpec, role):
 			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
 			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], role.Name)
-			err = roleManager.Update(ctx, inSpec)
-			if err != nil {
-				return nil, wrapErr(err)
-			}
 		case !found:
 			status[apiv1.RoleStatusNotManaged] = append(status[apiv1.RoleStatusNotManaged], role.Name)
 			contextLog.Debug("role in DB but not Spec. Ignoring it", "role", role.Name)
@@ -280,10 +272,6 @@ func getRoleStatus(
 		if !found && r.Ensure == apiv1.EnsurePresent {
 			contextLog.Info("role not in DB and spec wants it present. Creating", "role", r.Name)
 			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], r.Name)
-			err = roleManager.Create(ctx, r)
-			if err != nil {
-				return nil, wrapErr(err)
-			}
 		}
 	}
 
