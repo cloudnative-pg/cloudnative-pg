@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/client-go/tools/record"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -32,6 +34,7 @@ import (
 // c.f. https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Runnable
 type RoleSynchronizer struct {
 	instance *postgres.Instance
+	recorder record.EventRecorder
 }
 
 // NewRoleSynchronizer creates a new RoleSynchronizer
@@ -54,7 +57,8 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 		contextLog.Info("skipping the role synchronization in replicas")
 	}
 	go func() {
-		config := <-sr.instance.RoleSynchronizerChan()
+		// config := <-sr.instance.RoleSynchronizerChan()
+		var config *apiv1.ManagedConfiguration
 		contextLog.Info("setting up role synchronizer loop")
 		updateInterval := 1 * time.Minute // TODO: make configurable
 		ticker := time.NewTicker(updateInterval)
@@ -69,6 +73,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case config = <-sr.instance.RoleSynchronizerChan():
+				contextLog.Info("got managed roles info", "roles", config.Roles)
 			case <-ticker.C:
 			}
 
@@ -223,6 +228,9 @@ func getRoleStatus(
 ) (map[apiv1.RoleStatus][]string, error) {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("getting the managed roles status")
+
+	// eventer := record.EventRecorder
+	// eventer.Eventf("foo")
 
 	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
