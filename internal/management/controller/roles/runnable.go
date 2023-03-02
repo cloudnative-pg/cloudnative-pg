@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -32,12 +34,14 @@ import (
 // c.f. https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Runnable
 type RoleSynchronizer struct {
 	instance *postgres.Instance
+	client   client.Client
 }
 
 // NewRoleSynchronizer creates a new RoleSynchronizer
-func NewRoleSynchronizer(instance *postgres.Instance) *RoleSynchronizer {
+func NewRoleSynchronizer(instance *postgres.Instance, client client.Client) *RoleSynchronizer {
 	runner := &RoleSynchronizer{
 		instance: instance,
+		client:   client,
 	}
 	return runner
 }
@@ -115,7 +119,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 	err = synchronizeRoles(
 		ctx,
-		NewPostgresRoleManager(superUserDB),
+		NewPostgresRoleManager(superUserDB, sr.client, sr.instance),
 		sr.instance.PodName,
 		config,
 	)

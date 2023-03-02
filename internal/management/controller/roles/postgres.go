@@ -22,19 +22,30 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 // PostgresRoleManager is a RoleManager for a database instance
 type PostgresRoleManager struct {
 	superUserDB *sql.DB
+	client      ctrl.Client
+	instance    *postgres.Instance
 }
 
 // NewPostgresRoleManager returns an implementation of RoleManager for postgres
-func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
+func NewPostgresRoleManager(superDB *sql.DB, client ctrl.Client, instance *postgres.Instance) RoleManager {
 	return PostgresRoleManager{
 		superUserDB: superDB,
+		client:      client,
+		instance:    instance,
 	}
 }
 
@@ -95,31 +106,13 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 
 	var query strings.Builder
 	query.WriteString("ALTER ROLE ")
-	query.WriteString(role.Name)
+	query.WriteString(pgx.Identifier{role.Name}.Sanitize())
 	query.WriteString(" ")
 
-	if role.BypassRLS {
-		query.WriteString("BYPASSRLS ")
-	} else {
-		query.WriteString("NOBYPASSRLS ")
-	}
-
-	if role.CreateDB {
-		query.WriteString("CREATEDB ")
-	} else {
-		query.WriteString("NOCREATEDB ")
-	}
-
-	if role.Login {
-		query.WriteString("LOGIN ")
-	} else {
-		query.WriteString("NOLOGIN ")
-	}
-
-	if role.Superuser {
-		query.WriteString("SUPERUSER ")
-	} else {
-		query.WriteString("NOSUPERUSER ")
+	createRoleOptions(role, &query)
+	err := sm.handlePassword(ctx, role, &query)
+	if err != nil {
+		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
 
 	contextLog.Info("Updating", "query", query.String())
@@ -142,10 +135,22 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 	contextLog := log.FromContext(ctx).WithName("createRole")
 	contextLog.Trace("Invoked", "role", role)
 
+	var query strings.Builder
+	query.WriteString("CREATE ROLE ")
+	query.WriteString(pgx.Identifier{role.Name}.Sanitize())
+	query.WriteString(" ")
+
+	createRoleOptions(role, &query)
+	err := sm.handlePassword(ctx, role, &query)
+	if err != nil {
+		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
+	}
+
+	contextLog.Info("Creating", "query", query.String())
 	// NOTE: defensively we might think of doint CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("CREATE ROLE %s", role.Name))
+	_, err = sm.superUserDB.ExecContext(ctx, query.String())
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
@@ -166,5 +171,83 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role v1.RoleConfigurat
 		return fmt.Errorf("could not delete role %s: %w", role.Name, err)
 	}
 
+	return nil
+}
+
+func createRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
+	if role.BypassRLS {
+		query.WriteString("BYPASSRLS ")
+	} else {
+		query.WriteString("NOBYPASSRLS ")
+	}
+
+	if role.CreateDB {
+		query.WriteString("CREATEDB ")
+	} else {
+		query.WriteString("NOCREATEDB ")
+	}
+
+	if role.CreateRole {
+		query.WriteString("CREATEROLE ")
+	} else {
+		query.WriteString("NOCREATEROLE ")
+	}
+
+	if role.Inherit {
+		query.WriteString("INHERIT ")
+	} else {
+		query.WriteString("NOINHERIT ")
+	}
+
+	if role.Login {
+		query.WriteString("LOGIN ")
+		if role.ConnectionLimit > -1 {
+			query.WriteString(fmt.Sprintf("CONNECTION LIMIT %d ", role.ConnectionLimit))
+		}
+	} else {
+		query.WriteString("NOLOGIN ")
+	}
+
+	if role.Replication {
+		query.WriteString("REPLICATION ")
+	} else {
+		query.WriteString("NOREPLICATION ")
+	}
+
+	if role.Superuser {
+		query.WriteString("SUPERUSER ")
+	} else {
+		query.WriteString("NOSUPERUSER ")
+	}
+}
+
+func (sm PostgresRoleManager) handlePassword(ctx context.Context,
+	role v1.RoleConfiguration,
+	query *strings.Builder,
+) error {
+	if role.PasswordSecret == nil {
+		return nil
+	}
+	secretName := role.PasswordSecret.Name
+	var secret corev1.Secret
+	err := sm.client.Get(
+		ctx,
+		ctrl.ObjectKey{Namespace: sm.instance.Namespace, Name: secretName},
+		&secret)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	password, err := utils.GetPasswordFromSecret(&secret)
+	if err != nil {
+		return err
+	}
+	if password == "" {
+		query.WriteString(fmt.Sprintf("PASSWORD %s", password))
+	} else {
+		query.WriteString("PASSWORD NULL")
+	}
 	return nil
 }

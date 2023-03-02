@@ -22,19 +22,27 @@ import (
 	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	controllerScheme "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Postgres RoleManager implementation test", func() {
+	client := generateFakeClient()
+	instance := postgres.Instance{
+		Namespace: "fakeNS",
+	}
 	// Testing List
 	It("List can read the list of roles from the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
-		prm := NewPostgresRoleManager(db)
+		prm := NewPostgresRoleManager(db, client, &instance)
 
 		rows := sqlmock.NewRows([]string{
 			"rolname", "rolcreatedb", "rolsuper",
@@ -69,7 +77,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("List returns error if there is a problem with the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
-		prm := NewPostgresRoleManager(db)
+		prm := NewPostgresRoleManager(db, client, &instance)
 
 		dbError := errors.New("Kaboom")
 		mock.ExpectQuery(`SELECT rolname, rolcreatedb, rolsuper, rolcanlogin, rolbypassrls,
@@ -84,13 +92,21 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("Create will send a correct CREATE to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
-		prm := NewPostgresRoleManager(db)
+		prm := NewPostgresRoleManager(db, client, &instance)
 
 		wantedRole := apiv1.RoleConfiguration{
-			Name: "foo",
+			Name:            "foo",
+			BypassRLS:       true,
+			CreateDB:        false,
+			CreateRole:      true,
+			Login:           true,
+			Inherit:         false,
+			ConnectionLimit: 2,
 		}
 
-		mock.ExpectExec(fmt.Sprintf("CREATE ROLE %s", wantedRole.Name)).
+		mock.ExpectExec(fmt.Sprintf(
+			"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN CONNECTION LIMIT 2 NOREPLICATION NOSUPERUSER",
+			wantedRole.Name)).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Create(ctx, wantedRole)
@@ -99,13 +115,21 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("Create will return error if there is a problem creating the role in the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
-		prm := NewPostgresRoleManager(db)
+		prm := NewPostgresRoleManager(db, client, &instance)
 
 		wantedRole := apiv1.RoleConfiguration{
-			Name: "foo",
+			Name:            "foo",
+			BypassRLS:       true,
+			CreateDB:        false,
+			CreateRole:      true,
+			Login:           true,
+			Inherit:         false,
+			ConnectionLimit: 2,
 		}
 		dbError := errors.New("Kaboom")
-		mock.ExpectExec(fmt.Sprintf("CREATE ROLE %s", wantedRole.Name)).
+		mock.ExpectExec(fmt.Sprintf(
+			"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN CONNECTION LIMIT 2 NOREPLICATION NOSUPERUSER",
+			wantedRole.Name)).
 			WillReturnError(dbError)
 
 		err = prm.Create(ctx, wantedRole)
@@ -116,7 +140,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("Delete will send a correct DROP to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
-		prm := NewPostgresRoleManager(db)
+		prm := NewPostgresRoleManager(db, client, &instance)
 
 		unWantedRole := apiv1.RoleConfiguration{
 			Name: "foo",
@@ -131,7 +155,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("Delete will return error if there is a problem deleting the role in the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
-		prm := NewPostgresRoleManager(db)
+		prm := NewPostgresRoleManager(db, client, &instance)
 
 		unWantedRole := apiv1.RoleConfiguration{
 			Name: "foo",
@@ -148,16 +172,22 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("Update will send a correct ALTER to the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 		Expect(err).ToNot(HaveOccurred())
-		prm := NewPostgresRoleManager(db)
+		prm := NewPostgresRoleManager(db, client, &instance)
 
 		wantedRole := apiv1.RoleConfiguration{
-			Name:      "foo",
-			CreateDB:  false,
-			BypassRLS: true,
+			Name:            "foo",
+			BypassRLS:       true,
+			CreateDB:        false,
+			CreateRole:      true,
+			Login:           true,
+			Inherit:         false,
+			ConnectionLimit: 2,
 		}
 
 		mock.ExpectExec(
-			fmt.Sprintf("ALTER ROLE %s [NOCREATEDB|BYPASSRLS]{2}", wantedRole.Name)).
+			fmt.Sprintf(
+				"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN CONNECTION LIMIT 2 NOREPLICATION NOSUPERUSER",
+				wantedRole.Name)).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Update(ctx, wantedRole)
@@ -166,16 +196,22 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("Update will return error if there is a problem updating the role in the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 		Expect(err).ToNot(HaveOccurred())
-		prm := NewPostgresRoleManager(db)
+		prm := NewPostgresRoleManager(db, client, &instance)
 
 		wantedRole := apiv1.RoleConfiguration{
-			Name:      "foo",
-			CreateDB:  false,
-			BypassRLS: true,
+			Name:            "foo",
+			BypassRLS:       true,
+			CreateDB:        false,
+			CreateRole:      true,
+			Login:           true,
+			Inherit:         false,
+			ConnectionLimit: 2,
 		}
 		dbError := errors.New("Kaboom")
 		mock.ExpectExec(
-			fmt.Sprintf("ALTER ROLE %s [NOCREATEDB|BYPASSRLS]{2}", wantedRole.Name)).
+			fmt.Sprintf(
+				"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN CONNECTION LIMIT 2 NOREPLICATION NOSUPERUSER",
+				wantedRole.Name)).
 			WillReturnError(dbError)
 
 		err = prm.Update(ctx, wantedRole)
@@ -183,3 +219,10 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).To(BeEquivalentTo(dbError))
 	})
 })
+
+func generateFakeClient() client.Client {
+	scheme := controllerScheme.BuildWithAllKnownScheme()
+	return fake.NewClientBuilder().
+		WithScheme(scheme).
+		Build()
+}

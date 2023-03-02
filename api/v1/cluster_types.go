@@ -1591,10 +1591,10 @@ type RoleConfiguration struct {
 	// +kubebuilder:default:="present"
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
-	PasswordSecret *PasswordConfiguration `json:"passwordSecret,omitempty"`
-	Superuser      bool                   `json:"superuser,omitempty"`
-	CreateDB       bool                   `json:"createdb,omitempty"`
-	CreateRole     bool                   `json:"createrole,omitempty"`
+	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
+	Superuser      bool                  `json:"superuser,omitempty"`
+	CreateDB       bool                  `json:"createdb,omitempty"`
+	CreateRole     bool                  `json:"createrole,omitempty"`
 
 	// inherit defaults to true
 	// +kubebuilder:default:=true

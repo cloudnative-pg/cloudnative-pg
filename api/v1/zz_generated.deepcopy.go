@@ -1591,7 +1591,7 @@ func (in *RoleConfiguration) DeepCopyInto(out *RoleConfiguration) {
 	*out = *in
 	if in.PasswordSecret != nil {
 		in, out := &in.PasswordSecret, &out.PasswordSecret
-		*out = new(PasswordConfiguration)
+		*out = new(LocalObjectReference)
 		**out = **in
 	}
 	if in.InRoles != nil {
