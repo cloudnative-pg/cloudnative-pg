@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
-	"github.com/logrusorgru/aurora/v3"
+	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
