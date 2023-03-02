@@ -136,6 +136,76 @@ namespaced resources.
 To see all the permissions required by the operator, you can run `kubectl
 describe clusterrole cnpg-manager`.
 
+### Calls to the API server made by the instance manager
+
+The instance manager, which is the entry point of the operand container, needs
+to make some calls to the Kubernetes API server to ensure that the status of
+some resources is correctly updated and to access the config maps and secrets
+that are associated to that Postgres cluster. Such calls are performed through
+a dedicated `ServiceAccount` that is created by the operator together with the
+PostgreSQL `Cluster` and that shares the same name.
+
+!!! Important
+    The operand can only access a specific and limited subset of resources
+    through the API server. Service account is the
+    [recommended way to access the API server from within a Pod](https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/).
+
+For transparency, the permissions associated to the service account are defined in the
+[roles.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/pkg/specs/roles.go)
+file. For example, to retrieve the permissions of a generic `mypg` cluster in the
+`myns` namespace, you can type the following command:
+
+```bash
+kubectl get role -n myns mypg -o yaml
+```
+
+Then verify that the role is bound to the service account:
+
+```bash
+kubectl get rolebinding -n myns mypg -o yaml
+```
+
+!!! Important
+    Remember that **roles are limited to a given namespace**.
+
+Below we provide a quick summary of the permissions associated to the service
+account for generic Kubernetes resources.
+
+`configmaps`
+: The instance manager can only read config maps that are related to the same
+  cluster, such as custom monitoring queries
+
+`secrets`
+: The instance manager can only read secrets that are related to the same
+  cluster, namely: streaming replication user, application user, super user,
+  LDAP authentication user, client CA, server CA, server certificate, backup
+  credentials, custom monitoring queries
+
+`events`
+: The instance manager can create an event for the cluster, informing the
+  API server about a particular aspect of the PostgreSQL instance lifecycle
+
+Here instead, we provide the same summary for resources that are specific to
+CloudNativePG.
+
+`clusters`
+: The instance manager requires read-only permissions, namely `get`, `list` and
+  `watch`, just for its own `Cluster` resource
+
+`clusters/status`
+: The instance manager requires to `update` and `patch` the status of just its
+  own `Cluster` resource
+
+`backups`
+: The instance manager requires `get` and `list` permissions to read any
+  `Backup` resource in the namespace. Additionally, it requires the `delete`
+  permission to cleanup the Kubernetes cluster by removing the `Backup` objects
+  that do not have a counter part in the object store - typically because of
+  retention policies
+
+`backups/status`
+: The instance manager requires to `update` and `patch` the status of any
+  `Backup` resource in the namespace
 
 ### Pod Security Policies
 
