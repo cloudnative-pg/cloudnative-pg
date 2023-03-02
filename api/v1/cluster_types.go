@@ -393,8 +393,10 @@ const (
 	RoleStatusReconciled = "reconciled"
 	// RoleStatusNotManaged indicates the role is not in the Spec, therefore not managed
 	RoleStatusNotManaged = "not-managed"
-	// RoleStatusOutdated indicates the role in Spec requires updated/creation in DB
-	RoleStatusOutdated = "outdated"
+	// RoleStatusPendingReconciliation indicates the role in Spec requires updated/creation in DB
+	RoleStatusPendingReconciliation = "pending-reconciliation"
+	// RoleStatusReserved indicates the role is one reserved by the operator. E.g. `postgres`
+	RoleStatusReserved = "reserved"
 )
 
 // ClusterStatus defines the observed state of Cluster

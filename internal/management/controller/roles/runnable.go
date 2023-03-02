@@ -219,25 +219,15 @@ func synchronizeRoles(
 func getRoleStatus(
 	ctx context.Context,
 	roleManager RoleManager,
-	podName string,
 	config *apiv1.ManagedConfiguration,
 ) (map[apiv1.RoleStatus][]string, error) {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("synchronizing roles",
-		"podName", podName,
-		"managedConfig", config)
-
-	wrapErr := func(err error) error {
-		return fmt.Errorf("while synchronizing roles in primary: %w", err)
-	}
+	contextLog.Trace("getting the managed roles status")
 
 	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, fmt.Errorf("while getting the ManagedRoles status: %w", err)
 	}
-	contextLog.Info("found roles in DB", "roles", rolesInDB)
-
-	status := make(map[apiv1.RoleStatus][]string)
 
 	rolesInSpec := config.Roles
 	// setup a map name -> role for the spec roles
@@ -248,21 +238,21 @@ func getRoleStatus(
 
 	// 1. do any of the roles in the DB require update/delete?
 	roleInDBNamed := make(map[string]apiv1.RoleConfiguration)
+	var pending, reconciled, reserved, unmanaged []string
 	for _, role := range rolesInDB {
 		roleInDBNamed[role.Name] = role
 		inSpec, found := roleInSpecNamed[role.Name]
 		switch {
+		case ReservedRoles[role.Name]:
+			reserved = append(reserved, role.Name)
 		case found && inSpec.Ensure == apiv1.EnsureAbsent:
-			contextLog.Info("role in DB and Spec, but spec wants it absent. Deleting", "role", role.Name)
-			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], role.Name)
+			pending = append(pending, role.Name)
 		case found && !areEquivalent(inSpec, role):
-			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
-			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], role.Name)
+			pending = append(pending, role.Name)
 		case !found:
-			status[apiv1.RoleStatusNotManaged] = append(status[apiv1.RoleStatusNotManaged], role.Name)
-			contextLog.Debug("role in DB but not Spec. Ignoring it", "role", role.Name)
+			unmanaged = append(unmanaged, role.Name)
 		default:
-			status[apiv1.RoleStatusReconciled] = append(status[apiv1.RoleStatusReconciled], role.Name)
+			reconciled = append(reconciled, role.Name)
 		}
 	}
 
@@ -271,9 +261,14 @@ func getRoleStatus(
 		_, found := roleInDBNamed[r.Name]
 		if !found && r.Ensure == apiv1.EnsurePresent {
 			contextLog.Info("role not in DB and spec wants it present. Creating", "role", r.Name)
-			status[apiv1.RoleStatusOutdated] = append(status[apiv1.RoleStatusOutdated], r.Name)
+			pending = append(pending, r.Name)
 		}
 	}
 
-	return status, nil
+	return map[apiv1.RoleStatus][]string{
+		apiv1.RoleStatusNotManaged:            unmanaged,
+		apiv1.RoleStatusPendingReconciliation: pending,
+		apiv1.RoleStatusReserved:              reserved,
+		apiv1.RoleStatusReconciled:            reconciled,
+	}, nil
 }

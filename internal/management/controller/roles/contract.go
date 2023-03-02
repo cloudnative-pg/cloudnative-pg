@@ -22,6 +22,14 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
+// ReservedRoles is the set of roles managed by the operator that should
+// never be put in the managed roles stanza
+var ReservedRoles = map[string]bool{
+	"cnpg_pooler_pgbouncer": true,
+	"streaming_replica":     true,
+	"postgres":              true,
+}
+
 // RoleManager abstracts the functionality of reconciling with PostgreSQL roles
 type RoleManager interface {
 	// List the roles in the database

@@ -171,14 +171,6 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.configureSlotReplicator(cluster)
 
-	if r.instance.PodName == cluster.Status.CurrentPrimary {
-		r.instance.ConfigureRoleSynchronizer(cluster.Spec.Managed)
-		result, err := roles.Reconcile(ctx, r.instance, cluster, r.client)
-		if err != nil || !result.IsZero() {
-			return result, err
-		}
-	}
-
 	if result, err := reconciler.ReconcileReplicationSlots(
 		ctx,
 		r.instance.PodName,
@@ -186,6 +178,14 @@ func (r *InstanceReconciler) Reconcile(
 		cluster,
 	); err != nil || !result.IsZero() {
 		return result, err
+	}
+
+	if r.instance.PodName == cluster.Status.CurrentPrimary {
+		r.instance.ConfigureRoleSynchronizer(cluster.Spec.Managed)
+		result, err := roles.Reconcile(ctx, r.instance, cluster, r.client)
+		if err != nil || !result.IsZero() {
+			return result, err
+		}
 	}
 
 	restarted, err := r.reconcilePrimary(ctx, cluster)

@@ -56,7 +56,7 @@ func Reconcile(
 	}
 
 	mgr := NewPostgresRoleManager(db)
-	status, err := getRoleStatus(ctx, mgr, instance.PodName, cluster.Spec.Managed)
+	status, err := getRoleStatus(ctx, mgr, cluster.Spec.Managed)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
