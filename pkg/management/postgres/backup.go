@@ -369,7 +369,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	// Update backup status in cluster conditions on backup completion
-	return b.retryWithRefreshedCluster(ctx, func() error {
+	if err := b.retryWithRefreshedCluster(ctx, func() error {
 		origCluster := b.Cluster.DeepCopy()
 
 		// Set the first recoverability point
@@ -392,7 +392,11 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 		meta.SetStatusCondition(&b.Cluster.Status.Conditions, condition)
 
 		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
-	})
+	}); err != nil {
+		b.Log.Error(err, "Can't update the cluster wit the completed backup data")
+	}
+
+	return nil
 }
 
 func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
