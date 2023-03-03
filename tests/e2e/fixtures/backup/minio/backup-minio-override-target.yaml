@@ -1,0 +1,8 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: cluster-backup-override
+spec:
+  cluster:
+    name: pg-backup-minio-primary
+  target: prefer-standby

@@ -44,5 +44,22 @@ var _ = Describe("Scheduled backup", func() {
 		Expect(backup).ToNot(BeNil())
 		Expect(backup.ObjectMeta.Name).To(BeEquivalentTo(backupName))
 		Expect(backup.Annotations).ToNot(BeEmpty())
+		Expect(backup.Spec.Target).To(BeEmpty())
+	})
+
+	It("properly creates a backup with standby target", func() {
+		scheduledBackup.Spec.Target = BackupTargetStandby
+		backup := scheduledBackup.CreateBackup("test")
+		Expect(backup).ToNot(BeNil())
+		Expect(backup.ObjectMeta.Name).To(BeEquivalentTo(backupName))
+		Expect(backup.Spec.Target).To(BeEquivalentTo(BackupTargetStandby))
+	})
+
+	It("properly creates a backup with primary target", func() {
+		scheduledBackup.Spec.Target = BackupTargetPrimary
+		backup := scheduledBackup.CreateBackup("test")
+		Expect(backup).ToNot(BeNil())
+		Expect(backup.ObjectMeta.Name).To(BeEquivalentTo(backupName))
+		Expect(backup.Spec.Target).To(BeEquivalentTo(BackupTargetPrimary))
 	})
 })

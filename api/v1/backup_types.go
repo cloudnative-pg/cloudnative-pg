@@ -47,6 +47,15 @@ const (
 type BackupSpec struct {
 	// The cluster to backup
 	Cluster LocalObjectReference `json:"cluster,omitempty"`
+
+	// The policy to decide which instance should perform this backup. If empty,
+	// it defaults to `cluster.spec.backup.target`.
+	// Available options are empty string, which will default to `primary`
+	// policy, `primary` to have backups run always on primary instances,
+	// `prefer-standby` to have backups run preferably on the most updated
+	// standby, if available.
+	// +kubebuilder:validation:Enum=primary;prefer-standby
+	Target BackupTarget `json:"target,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup

@@ -46,6 +46,15 @@ type ScheduledBackupSpec struct {
 	// +kubebuilder:validation:Enum=none;self;cluster
 	// +kubebuilder:default:=none
 	BackupOwnerReference string `json:"backupOwnerReference,omitempty"`
+
+	// The policy to decide which instance should perform this backup. If empty,
+	// it defaults to `cluster.spec.backup.target`.
+	// Available options are empty string, which will default to `primary`
+	// policy, `primary` to have backups run always on primary instances,
+	// `prefer-standby` to have backups run preferably on the most updated
+	// standby, if available.
+	// +kubebuilder:validation:Enum=primary;prefer-standby
+	Target BackupTarget `json:"target,omitempty"`
 }
 
 // ScheduledBackupStatus defines the observed state of ScheduledBackup
@@ -142,6 +151,7 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 		},
 		Spec: BackupSpec{
 			Cluster: scheduledBackup.Spec.Cluster,
+			Target:  scheduledBackup.Spec.Target,
 		},
 	}
 	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, configuration.Current)
