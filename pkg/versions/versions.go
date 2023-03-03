@@ -26,7 +26,7 @@ const (
 	DefaultImageName = "ghcr.io/cloudnative-pg/postgresql:15.1"
 
 	// DefaultOperatorImageName is the default operator image used by the controller in the pods running PostgreSQL
-	DefaultOperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:1.18.1"
+	DefaultOperatorImageName = "artifactory.netskope.io/stork-release/cloudnative-pg-manager:release-1.18-legacy_k8s_compatibility"
 )
 
 // BuildInfo is a struct containing all the info about the build
