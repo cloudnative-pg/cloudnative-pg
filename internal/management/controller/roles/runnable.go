@@ -254,7 +254,7 @@ func evaluateRoleActions(
 	}
 
 	rolesInSpec := config.Roles
-	// setup a map name -> role for the spec roles
+	// set up a map name -> role for the spec roles
 	roleInSpecNamed := make(map[string]apiv1.RoleConfiguration)
 	for _, r := range rolesInSpec {
 		roleInSpecNamed[r.Name] = r
