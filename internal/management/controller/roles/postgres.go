@@ -56,10 +56,9 @@ func (sm PostgresRoleManager) List(
 ) ([]v1.RoleConfiguration, error) {
 	rows, err := sm.superUserDB.QueryContext(
 		ctx,
-		`SELECT rolname, rolcreatedb, rolsuper, rolcanlogin, rolbypassrls,
-		  rolpassword, rolvaliduntil
+		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
+       			rolcanlogin, rolreplication, rolconnlimit, rolvaliduntil, rolbypassrls,
 		FROM pg_catalog.pg_roles where rolname not like 'pg_%';`)
-	// TODO: read rolinherit, rolcreaterole, rolreplication, rolconnlimit
 	if err != nil {
 		return []v1.RoleConfiguration{}, err
 	}
@@ -69,16 +68,19 @@ func (sm PostgresRoleManager) List(
 
 	var roles []v1.RoleConfiguration
 	for rows.Next() {
-		var validuntil, password sql.NullString
+		var validuntil sql.NullString
 		var role v1.RoleConfiguration
 		err := rows.Scan(
 			&role.Name,
-			&role.CreateDB,
 			&role.Superuser,
+			&role.Inherit,
+			&role.CreateRole,
+			&role.CreateDB,
 			&role.Login,
-			&role.BypassRLS,
-			&password,
+			&role.Replication,
+			&role.ConnectionLimit,
 			&validuntil,
+			&role.BypassRLS,
 		)
 		if err != nil {
 			return []v1.RoleConfiguration{}, err
@@ -88,7 +90,6 @@ func (sm PostgresRoleManager) List(
 		}
 		// TODO: should we check that the password is the same as the password
 		// stored in the secret?
-
 		roles = append(roles, role)
 	}
 
@@ -105,11 +106,8 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 	contextLog.Trace("Invoked", "role", role)
 
 	var query strings.Builder
-	query.WriteString("ALTER ROLE ")
-	query.WriteString(pgx.Identifier{role.Name}.Sanitize())
-	query.WriteString(" ")
-
-	createRoleOptions(role, &query)
+	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+	parseRoleOptions(role, &query)
 	err := sm.handlePassword(ctx, role, &query)
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
@@ -136,11 +134,8 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 	contextLog.Trace("Invoked", "role", role)
 
 	var query strings.Builder
-	query.WriteString("CREATE ROLE ")
-	query.WriteString(pgx.Identifier{role.Name}.Sanitize())
-	query.WriteString(" ")
-
-	createRoleOptions(role, &query)
+	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+	parseRoleOptions(role, &query)
 	err := sm.handlePassword(ctx, role, &query)
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
@@ -166,7 +161,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role v1.RoleConfigurat
 	contextLog := log.FromContext(ctx).WithName("dropRole")
 	contextLog.Trace("Invoked", "role", role)
 
-	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("DROP ROLE %s", role.Name))
+	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize()))
 	if err != nil {
 		return fmt.Errorf("could not delete role %s: %w", role.Name, err)
 	}
@@ -174,7 +169,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role v1.RoleConfigurat
 	return nil
 }
 
-func createRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
+func parseRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
 	if role.BypassRLS {
 		query.WriteString("BYPASSRLS ")
 	} else {
