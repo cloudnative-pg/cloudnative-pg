@@ -18,7 +18,8 @@ LABEL summary="$SUMMARY" \
 USER root
 WORKDIR /
 
-COPY  --chmod=0755 dist/manager_linux_amd64/manager .
+COPY dist/manager_linux_amd64/manager /
+RUN chmod 755 /manager
 
 USER nobody 
 ENTRYPOINT ["/manager"]
