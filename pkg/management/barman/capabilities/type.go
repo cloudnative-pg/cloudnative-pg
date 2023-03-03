@@ -23,6 +23,7 @@ import (
 
 // Capabilities collects a set of boolean values that shows the possible capabilities of Barman and the version
 type Capabilities struct {
+	HasName                    bool
 	HasAzure                   bool
 	HasS3                      bool
 	HasGoogle                  bool

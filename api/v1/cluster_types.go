@@ -2224,7 +2224,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	var errs []string
 
 	// Elapsed time since the last request of promotion (TargetPrimaryTimestamp)
-	if diff, err := utils.DifferenceBetweenTimestamps(
+	if diff, err := utils.DifferenceBetweenMicroTimestamps(
 		currentTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
@@ -2238,7 +2238,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	}
 
 	// Elapsed time since the last promotion (CurrentPrimaryTimestamp)
-	if currentPrimaryDifference, err := utils.DifferenceBetweenTimestamps(
+	if currentPrimaryDifference, err := utils.DifferenceBetweenMicroTimestamps(
 		currentTimestamp,
 		cluster.Status.CurrentPrimaryTimestamp,
 	); err == nil {
@@ -2255,7 +2255,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	// When positive, it is the amount of time required in the last promotion
 	// of a standby to a primary. If negative, it means we have a failover/switchover
 	// in progress, and the value represents the last measured uptime of the primary.
-	if currentPrimaryTargetDifference, err := utils.DifferenceBetweenTimestamps(
+	if currentPrimaryTargetDifference, err := utils.DifferenceBetweenMicroTimestamps(
 		cluster.Status.CurrentPrimaryTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {

@@ -42,10 +42,8 @@ package barman
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"os/exec"
-	"sort"
-	"time"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
@@ -56,48 +54,13 @@ import (
 // barmanLog is the log that will be used for interactions with Barman
 var barmanLog = log.WithName("barman")
 
-// barmanTimeLayout is the format that is being used to parse
-// the backupInfo from barman-cloud-backup-list
-const (
-	barmanTimeLayout = "Mon Jan 2 15:04:05 2006"
-)
-
-// ParseBarmanCloudBackupList parses the output of barman-cloud-backup-list
-func ParseBarmanCloudBackupList(output string) (*catalog.Catalog, error) {
-	result := &catalog.Catalog{}
-	err := json.Unmarshal([]byte(output), result)
-	if err != nil {
-		return nil, err
-	}
-
-	for idx := range result.List {
-		if result.List[idx].BeginTimeString != "" {
-			result.List[idx].BeginTime, err = time.Parse(barmanTimeLayout, result.List[idx].BeginTimeString)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if result.List[idx].EndTimeString != "" {
-			result.List[idx].EndTime, err = time.Parse(barmanTimeLayout, result.List[idx].EndTimeString)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	// Sort the list of backups in order of time
-	sort.Sort(result)
-
-	return result, nil
-}
-
-// GetBackupList returns the catalog reading it from the object store
-func GetBackupList(
+func executeQueryCommand(
+	barmanCommand string,
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 	serverName string,
+	additionalOptions []string,
 	env []string,
-) (*catalog.Catalog, error) {
+) (string, error) {
 	options := []string{"--format", "json"}
 
 	if barmanConfiguration.EndpointURL != "" {
@@ -106,14 +69,15 @@ func GetBackupList(
 
 	options, err := AppendCloudProviderOptionsFromConfiguration(options, barmanConfiguration)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	options = append(options, barmanConfiguration.DestinationPath, serverName)
+	options = append(options, additionalOptions...)
 
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
-	cmd := exec.Command(barmanCapabilities.BarmanCloudBackupList, options...) // #nosec G204
+	cmd := exec.Command(barmanCommand, options...) // #nosec G204
 	cmd.Env = env
 	cmd.Stdout = &stdoutBuffer
 	cmd.Stderr = &stderrBuffer
@@ -124,14 +88,58 @@ func GetBackupList(
 			"options", options,
 			"stdout", stdoutBuffer.String(),
 			"stderr", stderrBuffer.String())
-		return nil, err
+		return "", err
 	}
 
-	backupList, err := ParseBarmanCloudBackupList(stdoutBuffer.String())
+	return stdoutBuffer.String(), nil
+}
+
+// GetBackupList returns the catalog reading it from the object store
+func GetBackupList(
+	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
+	serverName string,
+	env []string,
+) (*catalog.Catalog, error) {
+	rawJSON, err := executeQueryCommand(
+		barmanCapabilities.BarmanCloudBackupList,
+		barmanConfiguration,
+		serverName,
+		[]string{},
+		env,
+	)
+	if err != nil {
+		return nil, err
+	}
+	backupList, err := catalog.NewCatalogFromBarmanCloudBackupList(rawJSON)
 	if err != nil {
 		barmanLog.Error(err, "Can't parse barman-cloud-backup-list output")
 		return nil, err
 	}
 
 	return backupList, nil
+}
+
+// GetBackupByName returns the data for a given backup that has been tagged with a name
+func GetBackupByName(
+	ctx context.Context,
+	backupName string,
+	serverName string,
+	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
+	env []string,
+) (*catalog.BarmanBackup, error) {
+	rawJSON, err := executeQueryCommand(
+		barmanCapabilities.BarmanCloudBackupShow,
+		barmanConfiguration,
+		serverName,
+		[]string{backupName},
+		env,
+	)
+	if err != nil {
+		return nil, err
+	}
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Debug("raw backup barman object", "rawBarmanObject", rawJSON)
+
+	return catalog.NewBackupFromBarmanCloudBackupShow(rawJSON)
 }
