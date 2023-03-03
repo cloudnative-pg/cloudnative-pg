@@ -1,6 +1,6 @@
-FROM gcr.io/distroless/static:nonroot
-ARG VERSION="dev"
-ARG TARGETARCH
+FROM artifactory-gcp.netskope.io/pe-docker/ns-ubuntu-2004-fips:latest 
+ARG VERSION="netskope-1.0.0"
+ARG TARGETARCH="amd64"
 
 ENV SUMMARY="CloudNativePG Operator Container Image." \
     DESCRIPTION="This Docker image contains CloudNativePG Operator."
@@ -15,10 +15,10 @@ LABEL summary="$SUMMARY" \
       version="$VERSION" \
       release="1"
 
+USER root
 WORKDIR /
 
-USER nonroot:nonroot
+COPY  --chmod=0755 dist/manager_linux_amd64/manager .
 
-COPY --chown=nonroot:nonroot --chmod=0755 dist/manager_linux_${TARGETARCH}*/manager .
-
+USER nobody 
 ENTRYPOINT ["/manager"]
