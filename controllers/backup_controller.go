@@ -115,6 +115,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
+	origBackup := backup.DeepCopy()
+
 	// Detect the pod where a backup will be executed
 	var pod corev1.Pod
 	err := r.Get(ctx, client.ObjectKey{
@@ -128,7 +130,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
 				cluster.Status.TargetPrimary)
 			backup.Status.Phase = apiv1.BackupPhasePending
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Update(ctx, &backup)
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
 		}
 		tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("while getting pod: %w", err))
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
@@ -142,7 +144,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		backup.Status.Phase = apiv1.BackupPhasePending
 		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 			cluster.Status.TargetPrimary)
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Update(ctx, &backup)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
 	}
 
 	if backup.Status.Phase != "" && backup.Status.InstanceID != nil {
@@ -206,7 +208,7 @@ func StartBackup(
 	status := backup.GetStatus()
 	status.Phase = apiv1.BackupPhaseStarted
 	status.InstanceID = &apiv1.InstanceID{PodName: pod.Name, ContainerID: pod.Status.ContainerStatuses[0].ContainerID}
-	if err := postgres.UpdateBackupStatusAndRetry(ctx, client, backup); err != nil {
+	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
 		return err
 	}
 	config := ctrl.GetConfigOrDie()
@@ -242,10 +244,10 @@ func StartBackup(
 			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
 			Message: err.Error(),
 		}
-		if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
 			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup failed)")
 		}
-		return postgres.UpdateBackupStatusAndRetry(ctx, client, backup)
+		return postgres.PatchBackupStatusAndRetry(ctx, client, backup)
 	}
 
 	return nil
