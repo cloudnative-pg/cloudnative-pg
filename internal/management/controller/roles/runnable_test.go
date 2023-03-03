@@ -114,11 +114,11 @@ var _ = Describe("Role synchronizer tests", func() {
 		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
-			([]funcCall{
+			[]funcCall{
 				{"list", ""},
 				{"create", "edb_test"},
 				{"create", "foo_bar"},
-			}),
+			},
 		))
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
