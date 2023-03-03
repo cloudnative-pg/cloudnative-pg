@@ -139,7 +139,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 	contextLog := log.FromContext(ctx).WithName("createRole")
 	contextLog.Trace("Invoked", "role", role)
 
-	// NOTE: defensively we might think of doint CREATE ... IF EXISTS
+	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
 	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("CREATE ROLE %s", role.Name))
