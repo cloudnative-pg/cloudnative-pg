@@ -57,14 +57,20 @@ func Reconcile(
 	}
 
 	mgr := NewPostgresRoleManager(db)
-	status, err := getRoleStatus(ctx, mgr, cluster.Spec.Managed)
+	statusByRole, err := getRoleStatus(ctx, mgr, cluster.Spec.Managed)
 	if err != nil {
 		return reconcile.Result{}, err
+	}
+
+	// pivot the role status for display in the cluster Status
+	rolesByStatus := make(map[apiv1.RoleStatus][]string)
+	for role, status := range statusByRole {
+		rolesByStatus[status] = append(rolesByStatus[status], role)
 	}
 
 	updatedCluster := cluster.DeepCopy()
 
 	updatedCluster.Status.Phase = apiv1.PhaseHealthy
-	updatedCluster.Status.RoleStatus = status
+	updatedCluster.Status.RoleStatus = rolesByStatus
 	return reconcile.Result{}, statusClient.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
 }
