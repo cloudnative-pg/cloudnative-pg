@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/client-go/tools/record"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -34,7 +32,6 @@ import (
 // c.f. https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Runnable
 type RoleSynchronizer struct {
 	instance *postgres.Instance
-	recorder record.EventRecorder
 }
 
 // NewRoleSynchronizer creates a new RoleSynchronizer
@@ -228,9 +225,6 @@ func getRoleStatus(
 ) (map[string]apiv1.RoleStatus, error) {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("getting the managed roles status")
-
-	// eventer := record.EventRecorder
-	// eventer.Eventf("foo")
 
 	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
