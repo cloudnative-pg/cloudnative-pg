@@ -144,6 +144,10 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 		"--user", "postgres",
 	}
 
+	if capabilities.HasName {
+		options = append(options, "--name", b.Backup.Name)
+	}
+
 	options, err = getDataConfiguration(options, configuration, capabilities)
 	if err != nil {
 		return nil, err
@@ -303,6 +307,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 }
 
 func (b *BackupCommand) takeBackup(ctx context.Context) error {
+	capabilities, err := barmanCapabilities.CurrentCapabilities()
+	if err != nil {
+		return err
+	}
+
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
@@ -313,7 +322,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	// record the backup beginning
-	b.Log.Info("Backup started", "options", options)
+	b.Log.Debug("Backup started", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
@@ -345,8 +354,77 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	b.Log.Info("Backup completed")
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 
-	// NOTE: given that we don't know the backupId we assign the last executed barman backup to the backup CRD
+	if !capabilities.HasName {
+		return b.setBackupAsCompletedLegacy(ctx)
+	}
 
+	return b.setBackupAsCompleted(ctx)
+}
+
+func (b *BackupCommand) setBackupAsCompleted(ctx context.Context) error {
+	barmanBackup, err := barman.GetBackupByName(
+		ctx,
+		b.Backup.Name,
+		b.Backup.Status.ServerName,
+		b.Cluster.Spec.Backup.BarmanObjectStore,
+		b.Env,
+	)
+	if err != nil {
+		return err
+	}
+
+	b.Log.Debug("extracted barman backup", "backup", barmanBackup)
+
+	b.Backup.Status.SetAsCompleted()
+	assignBarmanBackupToBackup(b.Backup, barmanBackup)
+	if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+		b.Log.Error(err, "Can't set backup status as completed")
+	}
+
+	// Update backup status in cluster conditions on backup completion
+	if err := b.retryWithRefreshedCluster(ctx, func() error {
+		origCluster := b.Cluster.DeepCopy()
+
+		// TODO: probably this logic should be moved to backup maintenance
+		endTimeRFC3339 := barmanBackup.EndTime.Format(time.RFC3339)
+		if b.Cluster.Status.FirstRecoverabilityPoint == "" {
+			b.Cluster.Status.FirstRecoverabilityPoint = endTimeRFC3339
+		}
+
+		if b.Cluster.Status.LastSuccessfulBackup == "" {
+			b.Cluster.Status.LastSuccessfulBackup = endTimeRFC3339
+		} else {
+			difference, err := utils.DifferenceBetweenTimestamps(endTimeRFC3339,
+				b.Cluster.Status.LastSuccessfulBackup,
+				time.RFC3339)
+			if err != nil {
+				return err
+			}
+			if difference > 0 {
+				b.Cluster.Status.LastSuccessfulBackup = endTimeRFC3339
+			}
+		}
+
+		condition := metav1.Condition{
+			Type:    string(apiv1.ConditionBackup),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
+			Message: "Backup was successful",
+		}
+
+		meta.SetStatusCondition(&b.Cluster.Status.Conditions, condition)
+
+		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
+	}); err != nil {
+		b.Log.Error(err, "Can't patch the cluster with the currently taken backup data ")
+	}
+
+	return nil
+}
+
+// setBackupAsCompletedLegacy works by assuming that we don't know the id of the executed backup so it assigns
+// the last executed barman backup to the backup CRD
+func (b *BackupCommand) setBackupAsCompletedLegacy(ctx context.Context) error {
 	// Extracting the latest backup using barman-cloud-backup-list
 	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, b.Backup.Status.ServerName, b.Env)
 	if err != nil {
@@ -362,8 +440,8 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	// Set the status to completed
-	backupStatus.SetAsCompleted()
-	b.updateBackupStatusWithLatestTakenBackup(backupList)
+	b.Backup.Status.SetAsCompleted()
+	updateBackupStatusWithLatestTakenBackup(b.Backup, backupList)
 	if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 		b.Log.Error(err, "Can't set backup status as completed")
 	}
@@ -469,17 +547,21 @@ func (b *BackupCommand) setupBackupStatus() {
 
 // updateBackupStatusWithLatestTakenBackup updates the backup calling barman-cloud-backup-list
 // to retrieve all the relevant data
-func (b *BackupCommand) updateBackupStatusWithLatestTakenBackup(backupList *catalog.Catalog) {
-	backupStatus := b.Backup.GetStatus()
-
+func updateBackupStatusWithLatestTakenBackup(backup *apiv1.Backup, backupList *catalog.Catalog) {
 	// Update the backup with the data from the backup list retrieved
 	// get latest backup and set BackupId, StartedAt, StoppedAt, BeginWal, EndWAL, BeginLSN, EndLSN
 	latestBackup := backupList.LatestBackupInfo()
-	backupStatus.BackupID = latestBackup.ID
-	backupStatus.StartedAt = &metav1.Time{Time: latestBackup.BeginTime}
-	backupStatus.StoppedAt = &metav1.Time{Time: latestBackup.EndTime}
-	backupStatus.BeginWal = latestBackup.BeginWal
-	backupStatus.EndWal = latestBackup.EndWal
-	backupStatus.BeginLSN = latestBackup.BeginLSN
-	backupStatus.EndLSN = latestBackup.EndLSN
+	assignBarmanBackupToBackup(backup, latestBackup)
+}
+
+func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *catalog.BarmanBackup) {
+	backupStatus := backup.GetStatus()
+
+	backupStatus.BackupID = barmanBackup.ID
+	backupStatus.StartedAt = &metav1.Time{Time: barmanBackup.BeginTime}
+	backupStatus.StoppedAt = &metav1.Time{Time: barmanBackup.EndTime}
+	backupStatus.BeginWal = barmanBackup.BeginWal
+	backupStatus.EndWal = barmanBackup.EndWal
+	backupStatus.BeginLSN = barmanBackup.BeginLSN
+	backupStatus.EndLSN = barmanBackup.EndLSN
 }

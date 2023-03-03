@@ -75,14 +75,21 @@ func ParseTargetTime(currentLocation *time.Location, targetTime string) (time.Ti
 	return time.Parse("2006-01-02T15:04:05", targetTime)
 }
 
-// DifferenceBetweenTimestamps returns the time.Duration difference between two timestamps strings in time.RFC3339.
-func DifferenceBetweenTimestamps(first, second string) (time.Duration, error) {
-	parsedTimestamp, err := time.Parse(metav1.RFC3339Micro, first)
+// DifferenceBetweenMicroTimestamps returns the time.Duration difference between two timestamps strings
+// in metav1.RFC3339Micro.
+func DifferenceBetweenMicroTimestamps(first, second string) (time.Duration, error) {
+	return DifferenceBetweenTimestamps(first, second, metav1.RFC3339Micro)
+}
+
+// DifferenceBetweenTimestamps returns the time.Duration difference between two timestamps strings
+// with the specified format
+func DifferenceBetweenTimestamps(first, second, format string) (time.Duration, error) {
+	parsedTimestamp, err := time.Parse(format, first)
 	if err != nil {
 		return 0, err
 	}
 
-	parsedTimestampTwo, err := time.Parse(metav1.RFC3339Micro, second)
+	parsedTimestampTwo, err := time.Parse(format, second)
 	if err != nil {
 		return 0, err
 	}

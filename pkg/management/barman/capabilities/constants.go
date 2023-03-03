@@ -20,6 +20,9 @@ const (
 	// BarmanCloudBackup is the command name for 'barman-cloud-backup'
 	BarmanCloudBackup = "barman-cloud-backup"
 
+	// BarmanCloudBackupShow is the command name for 'barman-cloud-backup-show'
+	BarmanCloudBackupShow = BarmanCloudBackup + "-show"
+
 	// BarmanCloudRestore is the command name for 'barman-cloud-backup'
 	BarmanCloudRestore = "barman-cloud-restore"
 
