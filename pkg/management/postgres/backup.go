@@ -393,7 +393,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 
 		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 	}); err != nil {
-		b.Log.Error(err, "Can't update the cluster wit the completed backup data")
+		b.Log.Error(err, "Can't update the cluster with the completed backup data")
 	}
 
 	return nil
