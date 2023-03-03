@@ -303,7 +303,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		}
 	}
 
-	b.backupListMaintenance(ctx)
+	b.backupMaintenance(ctx)
 }
 
 func (b *BackupCommand) takeBackup(ctx context.Context) error {
@@ -354,11 +354,35 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	b.Log.Info("Backup completed")
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 
+	// Set the status to completed
+	b.Backup.Status.SetAsCompleted()
 	if !capabilities.HasName {
-		return b.setBackupAsCompletedLegacy(ctx)
+		if err := b.setBackupAsCompletedLegacy(); err != nil {
+			return err
+		}
+	} else {
+		if err := b.setBackupAsCompleted(ctx); err != nil {
+			return err
+		}
 	}
 
-	return b.setBackupAsCompleted(ctx)
+	if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+		b.Log.Error(err, "Can't set backup status as completed")
+	}
+
+	// Update backup status in cluster conditions on backup completion
+	if err := b.retryWithRefreshedCluster(ctx, func() error {
+		return conditions.Patch(ctx, b.Client, b.Cluster, &metav1.Condition{
+			Type:    string(apiv1.ConditionBackup),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
+			Message: "Backup was successful",
+		})
+	}); err != nil {
+		b.Log.Error(err, "Can't update the cluster with the completed backup data")
+	}
+
+	return nil
 }
 
 func (b *BackupCommand) setBackupAsCompleted(ctx context.Context) error {
@@ -374,57 +398,14 @@ func (b *BackupCommand) setBackupAsCompleted(ctx context.Context) error {
 	}
 
 	b.Log.Debug("extracted barman backup", "backup", barmanBackup)
-
-	b.Backup.Status.SetAsCompleted()
 	assignBarmanBackupToBackup(b.Backup, barmanBackup)
-	if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-		b.Log.Error(err, "Can't set backup status as completed")
-	}
-
-	// Update backup status in cluster conditions on backup completion
-	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		origCluster := b.Cluster.DeepCopy()
-
-		// TODO: probably this logic should be moved to backup maintenance
-		endTimeRFC3339 := barmanBackup.EndTime.Format(time.RFC3339)
-		if b.Cluster.Status.FirstRecoverabilityPoint == "" {
-			b.Cluster.Status.FirstRecoverabilityPoint = endTimeRFC3339
-		}
-
-		if b.Cluster.Status.LastSuccessfulBackup == "" {
-			b.Cluster.Status.LastSuccessfulBackup = endTimeRFC3339
-		} else {
-			difference, err := utils.DifferenceBetweenTimestamps(endTimeRFC3339,
-				b.Cluster.Status.LastSuccessfulBackup,
-				time.RFC3339)
-			if err != nil {
-				return err
-			}
-			if difference > 0 {
-				b.Cluster.Status.LastSuccessfulBackup = endTimeRFC3339
-			}
-		}
-
-		condition := metav1.Condition{
-			Type:    string(apiv1.ConditionBackup),
-			Status:  metav1.ConditionTrue,
-			Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
-			Message: "Backup was successful",
-		}
-
-		meta.SetStatusCondition(&b.Cluster.Status.Conditions, condition)
-
-		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
-	}); err != nil {
-		b.Log.Error(err, "Can't patch the cluster with the currently taken backup data ")
-	}
 
 	return nil
 }
 
 // setBackupAsCompletedLegacy works by assuming that we don't know the id of the executed backup so it assigns
 // the last executed barman backup to the backup CRD
-func (b *BackupCommand) setBackupAsCompletedLegacy(ctx context.Context) error {
+func (b *BackupCommand) setBackupAsCompletedLegacy() error {
 	// Extracting the latest backup using barman-cloud-backup-list
 	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, b.Backup.Status.ServerName, b.Env)
 	if err != nil {
@@ -439,45 +420,12 @@ func (b *BackupCommand) setBackupAsCompletedLegacy(ctx context.Context) error {
 		return fmt.Errorf("the executed backup could be found on the remote object storage")
 	}
 
-	// Set the status to completed
-	b.Backup.Status.SetAsCompleted()
 	updateBackupStatusWithLatestTakenBackup(b.Backup, backupList)
-	if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-		b.Log.Error(err, "Can't set backup status as completed")
-	}
-
-	// Update backup status in cluster conditions on backup completion
-	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		origCluster := b.Cluster.DeepCopy()
-
-		// Set the first recoverability point
-		if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
-			firstRecoverabilityPoint := ts.Format(time.RFC3339)
-			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
-			lastBackup := backupList.LatestBackupInfo()
-			if lastBackup != nil {
-				b.Cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
-			}
-		}
-
-		condition := metav1.Condition{
-			Type:    string(apiv1.ConditionBackup),
-			Status:  metav1.ConditionTrue,
-			Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
-			Message: "Backup was successful",
-		}
-
-		meta.SetStatusCondition(&b.Cluster.Status.Conditions, condition)
-
-		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
-	}); err != nil {
-		b.Log.Error(err, "Can't update the cluster with the completed backup data")
-	}
 
 	return nil
 }
 
-func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
+func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	// Delete backups per policy
 	if b.Cluster.Spec.Backup.RetentionPolicy != "" {
 		b.Log.Info("Applying backup retention policy",
@@ -498,6 +446,24 @@ func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
 
 	if err := barman.DeleteBackupsNotInCatalog(ctx, b.Client, b.Cluster, backupList); err != nil {
 		b.Log.Error(err, "while deleting Backups not present in the catalog")
+	}
+
+	if err := b.retryWithRefreshedCluster(ctx, func() error {
+		origCluster := b.Cluster.DeepCopy()
+
+		// Set the first recoverability point
+		if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
+			firstRecoverabilityPoint := ts.Format(time.RFC3339)
+			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
+			lastBackup := backupList.LatestBackupInfo()
+			if lastBackup != nil {
+				b.Cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
+			}
+		}
+
+		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
+	}); err != nil {
+		b.Log.Error(err, "while setting the firstRecoverabilityPoint and latestSuccessfulBackup")
 	}
 }
 
