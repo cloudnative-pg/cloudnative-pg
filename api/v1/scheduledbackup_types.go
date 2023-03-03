@@ -47,10 +47,12 @@ type ScheduledBackupSpec struct {
 	// +kubebuilder:default:=none
 	BackupOwnerReference string `json:"backupOwnerReference,omitempty"`
 
-	// The policy to override the backup target policy defined in cluster. Available
-	// options are empty string, which will skip the override, `primary` which to have
-	// scheduled backups run on primary instances, `prefer-standby` to have scheduled
-	// backups run preferably on the most updated standby, if available.
+	// The policy to decide which instance should perform this backup. If empty,
+	// it defaults to `cluster.spec.backup.target`.
+	// Available options are empty string, which will default to `primary`
+	// policy, `primary` to have backups run always on primary instances,
+	// `prefer-standby` to have backups run preferably on the most updated
+	// standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
 	Target BackupTarget `json:"target,omitempty"`
 }
