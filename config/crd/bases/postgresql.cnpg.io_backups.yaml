@@ -58,6 +58,16 @@ spec:
                 required:
                 - name
                 type: object
+              target:
+                description: The policy to decide which instance should perform this
+                  backup. If empty, it defaults to `cluster.spec.backup.target`. Available
+                  options are empty string, which will default to `primary` policy,
+                  `primary` to have backups run always on primary instances, `prefer-standby`
+                  to have backups run preferably on the most updated standby, if available.
+                enum:
+                - primary
+                - prefer-standby
+                type: string
             type: object
           status:
             description: 'Most recently observed status of the backup. This data may

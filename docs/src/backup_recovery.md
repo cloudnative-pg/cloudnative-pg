@@ -677,6 +677,7 @@ example below:
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
+metadata:
   [...]
 spec:
   backup:
@@ -689,6 +690,23 @@ instance is available.
 
 By default, when not specified, target is automatically set to take backups
 from a primary.
+
+The backup target specified in the `Cluster` can be overridden in the `Backup`
+and `ScheduledBackup` types, like in the following example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  [...]
+spec:
+  cluster:
+    name: [...]
+  target: "primary"
+```
+
+In the previous example, CloudNativePG will invariably choose the primary
+instance even if the `Cluster` is set to prefer replicas.
 
 ## Recovery
 

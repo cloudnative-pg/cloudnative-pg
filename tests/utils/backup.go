@@ -68,9 +68,12 @@ func ExecuteBackup(namespace string, backupFile string, onlyTargetStandbys bool,
 	}, timeout).ShouldNot(HaveOccurred())
 
 	backupStatus := backup.GetStatus()
-
 	if cluster.Spec.Backup != nil {
-		switch cluster.Spec.Backup.Target {
+		backupTarget := cluster.Spec.Backup.Target
+		if backup.Spec.Target != "" {
+			backupTarget = backup.Spec.Target
+		}
+		switch backupTarget {
 		case apiv1.BackupTargetPrimary, "":
 			Expect(backupStatus.InstanceID.PodName).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 		case apiv1.BackupTargetStandby:
