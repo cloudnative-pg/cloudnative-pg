@@ -187,7 +187,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 
 	b.setupBackupStatus()
 
-	err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
+	err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup)
 	if err != nil {
 		return fmt.Errorf("can't set backup as running: %v", err)
 	}
@@ -195,12 +195,12 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 	if err := ensureWalArchiveIsWorking(b.Instance); err != nil {
 		log.Warning("WAL archiving is not working", "err", err)
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
-		return UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
+		return PatchBackupStatusAndRetry(ctx, b.Client, b.Backup)
 	}
 
 	if b.Backup.GetStatus().Phase != apiv1.BackupPhaseRunning {
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseRunning
-		err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
+		err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup)
 		if err != nil {
 			log.Error(err, "can't set backup as WAL archiving failing")
 		}
@@ -260,9 +260,9 @@ func (b *BackupCommand) retryWithRefreshedCluster(
 	})
 }
 
-func (b *BackupCommand) tryUpdateBackupClusterCondition(ctx context.Context, condition metav1.Condition) error {
+func (b *BackupCommand) tryPatchBackupClusterCondition(ctx context.Context, condition metav1.Condition) error {
 	return b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Update(ctx, b.Client, b.Cluster, &condition)
+		return conditions.Patch(ctx, b.Client, b.Cluster, &condition)
 	})
 }
 
@@ -279,7 +279,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 
 		// update backup status as failed
 		backupStatus.SetAsFailed(err)
-		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+		if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 			b.Log.Error(err, "Can't mark backup as failed")
 			// We do not terminate here because we still want to do the maintenance
 			// activity on the backups and to set the condition on the cluster.
@@ -324,7 +324,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
-	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
+	if err := b.tryPatchBackupClusterCondition(ctx, metav1.Condition{
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionFalse,
 		Reason:  string(apiv1.ConditionBackupStarted),
@@ -355,7 +355,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	// We cannot commit the backup completed here, it will be done in the backupListMaintenance
 
 	// Update backup status in cluster conditions on backup completion
-	if err := b.tryUpdateBackupClusterCondition(ctx, metav1.Condition{
+	if err := b.tryPatchBackupClusterCondition(ctx, metav1.Condition{
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionTrue,
 		Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
@@ -401,7 +401,7 @@ func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
 
 	// Update backup status to match with the latest completed backup
 	b.updateCompletedBackupStatus(backupList)
-	if err = UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+	if err = PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 		b.Log.Error(err, "Can't set backup status as completed")
 	}
 
@@ -428,9 +428,9 @@ func (b *BackupCommand) backupListMaintenance(ctx context.Context) {
 	}
 }
 
-// UpdateBackupStatusAndRetry updates a certain backup's status in the k8s database,
+// PatchBackupStatusAndRetry updates a certain backup's status in the k8s database,
 // retries when error occurs
-func UpdateBackupStatusAndRetry(
+func PatchBackupStatusAndRetry(
 	ctx context.Context,
 	cli client.Client,
 	backup *apiv1.Backup,
@@ -444,8 +444,10 @@ func UpdateBackupStatusAndRetry(
 				return err
 			}
 
+			origBackup := newBackup.DeepCopy()
+
 			newBackup.Status = backup.Status
-			return cli.Status().Update(ctx, newBackup)
+			return cli.Status().Patch(ctx, newBackup, client.MergeFrom(origBackup))
 		})
 }
 
