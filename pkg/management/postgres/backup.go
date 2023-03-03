@@ -420,7 +420,8 @@ func (b *BackupCommand) setBackupAsCompletedLegacy() error {
 		return fmt.Errorf("the executed backup could be found on the remote object storage")
 	}
 
-	updateBackupStatusWithLatestTakenBackup(b.Backup, backupList)
+	latestBackup := backupList.LatestBackupInfo()
+	assignBarmanBackupToBackup(b.Backup, latestBackup)
 
 	return nil
 }
@@ -509,15 +510,6 @@ func (b *BackupCommand) setupBackupStatus() {
 		backupStatus.ServerName = b.Cluster.Name
 	}
 	backupStatus.Phase = apiv1.BackupPhaseRunning
-}
-
-// updateBackupStatusWithLatestTakenBackup updates the backup calling barman-cloud-backup-list
-// to retrieve all the relevant data
-func updateBackupStatusWithLatestTakenBackup(backup *apiv1.Backup, backupList *catalog.Catalog) {
-	// Update the backup with the data from the backup list retrieved
-	// get latest backup and set BackupId, StartedAt, StoppedAt, BeginWal, EndWAL, BeginLSN, EndLSN
-	latestBackup := backupList.LatestBackupInfo()
-	assignBarmanBackupToBackup(backup, latestBackup)
 }
 
 func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *catalog.BarmanBackup) {
