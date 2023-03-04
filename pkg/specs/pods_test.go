@@ -110,6 +110,36 @@ var _ = Describe("Create affinity section", func() {
 		Expect(affinity).To(BeNil())
 	})
 
+	It("sets node affinity if provided", func() {
+		config := v1.AffinityConfiguration{
+			NodeAffinity: &corev1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "node-label",
+									Operator: corev1.NodeSelectorOpExists,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		affinity := CreateAffinitySection(clusterName, config)
+		Expect(affinity).NotTo(BeNil())
+		Expect(affinity.NodeAffinity).ToNot(BeNil())
+		Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).NotTo(BeNil())
+		Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).To(
+			BeEquivalentTo(&corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: "node-label", Operator: corev1.NodeSelectorOpExists}}},
+				},
+			}),
+		)
+	})
+
 	When("given additional affinity terms", func() {
 		When("generated pod anti-affinity is enabled", func() {
 			It("sets both pod affinity and anti-affinity correctly if passed and set to required", func() {

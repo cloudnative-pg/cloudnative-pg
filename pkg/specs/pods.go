@@ -221,7 +221,8 @@ func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguratio
 	affinity := CreateGeneratedAntiAffinity(clusterName, config)
 
 	if config.AdditionalPodAffinity == nil &&
-		config.AdditionalPodAntiAffinity == nil {
+		config.AdditionalPodAntiAffinity == nil &&
+		config.NodeAffinity == nil {
 		return affinity
 	}
 
