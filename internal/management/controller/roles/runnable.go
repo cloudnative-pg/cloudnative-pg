@@ -69,7 +69,14 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case config = <-sr.instance.RoleSynchronizerChan():
-				contextLog.Info("got managed roles info", "roles", config.Roles)
+				if config != nil && len(config.Roles) != 0 {
+					contextLog.Info("got managed roles info", "roles", config.Roles)
+				} else {
+					contextLog.Info("got nil managed roles info, turning ticker off")
+					ticker.Stop()
+					updateInterval = 0
+					continue
+				}
 			case <-ticker.C:
 			}
 
