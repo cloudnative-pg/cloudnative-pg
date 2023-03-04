@@ -69,8 +69,6 @@ func Reconcile(
 	}
 
 	updatedCluster := cluster.DeepCopy()
-
-	updatedCluster.Status.Phase = apiv1.PhaseHealthy
 	updatedCluster.Status.RoleStatus = rolesByStatus
 	return reconcile.Result{}, statusClient.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
 }
