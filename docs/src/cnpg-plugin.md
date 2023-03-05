@@ -776,3 +776,37 @@ By default, new created backup will use the backup target policy defined
 in cluster to choose which instance to run on. You can also use `--backup-target` 
 option to override this policy. please refer to [Backup and Recovery](backup_recovery.md)
 for more information about backup target.
+
+### Launching psql
+
+The `kubectl cnpg psql` command start a new PostgreSQL interactive front-end
+process (psql) connected to an existing Postgres cluster.
+
+```shell
+kubectl cnpg psql cluster-example
+
+psql (15.2 (Debian 15.2-1.pgdg110+1))
+Type "help" for help.
+
+postgres=#
+```
+
+By default, the command will connect to the primary instance. The user can
+select to work against a replica by using the `--role` flag:
+
+```shell
+psql (15.2 (Debian 15.2-1.pgdg110+1))
+
+Type "help" for help.
+
+postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ t
+(1 row)
+
+postgres=# \q
+```
+
+This command will start `kubectl exec`, and the `kubectl` executable must be
+reachable in PATH to correctly work.
