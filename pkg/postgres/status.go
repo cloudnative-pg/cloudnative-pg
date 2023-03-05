@@ -45,21 +45,17 @@ type PostgresqlStatus struct {
 	// populated when MightBeUnavailable reported a healthy status even if it found an error
 	MightBeUnavailableMaskedError string `json:"mightBeUnavailableMaskedError,omitempty"`
 
-	// WAL Status
-	// SELECT
-	//		last_archived_wal,
-	// 		last_archived_time,
-	// 		last_failed_wal,
-	// 		last_failed_time,
-	// 		COALESCE(last_archived_time,'-infinity') > COALESCE(last_failed_time, '-infinity') AS is_archiving,
-	// 		pg_walfile_name(pg_current_wal_lsn()) as current_wal
-	// FROM pg_stat_archiver;
+	// Archiver status
+
 	LastArchivedWAL     string `json:"lastArchivedWAL,omitempty"`
 	LastArchivedWALTime string `json:"lastArchivedWALTime,omitempty"`
 	LastFailedWAL       string `json:"lastFailedWAL,omitempty"`
 	LastFailedWALTime   string `json:"lastFailedWALTime,omitempty"`
 	IsArchivingWAL      bool   `json:"isArchivingWAL,omitempty"`
-	CurrentWAL          string `json:"currentWAL,omitempty"`
+
+	// WAL Status
+
+	CurrentWAL string `json:"currentWAL,omitempty"`
 
 	// Is the number of '.ready' wal files contained in the wal archive folder
 	ReadyWALFiles int `json:"readyWalFiles,omitempty"`
