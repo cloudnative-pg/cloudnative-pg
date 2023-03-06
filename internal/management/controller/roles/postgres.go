@@ -105,23 +105,23 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 	contextLog.Trace("Invoked", "role", role)
 	var query strings.Builder
 
-	// if comments changed, we update the comments for the first time
-	if role.CommentInDatabase != role.Comment {
-		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
-	} else {
-		query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
-		appendRoleOptions(role, &query)
-		appendPasswordOption(role, &query)
-	}
-	contextLog.Info("Updating", "query", query.String())
+	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+	appendRoleOptions(role, &query)
+	appendPasswordOption(role, &query)
+	contextLog.Info("Updating role", "role", role.Name, "query", query.String())
 
-	result, err := sm.superUserDB.ExecContext(ctx, query.String())
-	if err != nil {
-		return err
-	}
-	_, err = result.RowsAffected()
+	_, err := sm.superUserDB.ExecContext(ctx, query.String())
 	if err != nil {
 		return fmt.Errorf("could not update role %s: %w", role.Name, err)
+	}
+
+	// TODO: comments are not expected to be updated much. Perhaps separate
+	// the comment updating to a separate call
+	contextLog.Info("Updating role comment", "role", role.Name)
+	_, err = sm.superUserDB.ExecContext(ctx,
+		fmt.Sprintf("COMMENT ON ROLE %s %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
+	if err != nil {
+		return fmt.Errorf("could not update role comments for %s: %w", role.Name, err)
 	}
 
 	return nil
@@ -134,14 +134,9 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 	contextLog.Trace("Invoked", "role", role)
 
 	var query strings.Builder
-	// if comments changed, we update the comments for the first time
-	if role.CommentInDatabase != role.Comment {
-		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
-	} else {
-		query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
-		appendRoleOptions(role, &query)
-		appendPasswordOption(role, &query)
-	}
+	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+	appendRoleOptions(role, &query)
+	appendPasswordOption(role, &query)
 
 	contextLog.Info("Creating", "query", query.String())
 	// NOTE: defensively we might think of doint CREATE ... IF EXISTS
@@ -151,6 +146,15 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
+
+	// TODO: as with the Update() method, it may be better to handle role comments
+	// in a separate call.
+	_, err = sm.superUserDB.ExecContext(ctx,
+		fmt.Sprintf("COMMENT ON ROLE %s %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
+	if err != nil {
+		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
+	}
+
 	return nil
 }
 

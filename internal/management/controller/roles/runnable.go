@@ -142,6 +142,7 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 		Superuser       bool
 		Login           bool
 		ConnectionLimit int64
+		Comment         string
 	}{
 		{
 			CreateDB:        role1.CreateDB,
@@ -152,6 +153,7 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 			BypassRLS:       role1.BypassRLS,
 			Replication:     role1.Replication,
 			ConnectionLimit: role1.ConnectionLimit,
+			Comment:         role1.Comment,
 		},
 		{
 			CreateDB:        role2.CreateDB,
@@ -162,6 +164,7 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 			BypassRLS:       role2.BypassRLS,
 			Replication:     role2.Replication,
 			ConnectionLimit: role2.ConnectionLimit,
+			Comment:         role2.Comment,
 		},
 	}
 	return reduced[0] == reduced[1]
@@ -238,16 +241,7 @@ func isRoleInDBNeedUpdate(ctx context.Context, sr *RoleSynchronizer, roleInSpec 
 	roleInDB apiv1.RoleConfiguration,
 ) bool {
 	return !areEquivalent(*roleInSpec, roleInDB) ||
-		passwordNeedSync(ctx, sr, roleInSpec, *roleInDB.Password) ||
-		commentNeedUpdate(roleInSpec, roleInDB)
-}
-
-func commentNeedUpdate(roleInSpec *apiv1.RoleConfiguration, roleInDB apiv1.RoleConfiguration) bool {
-	if roleInSpec.Comment != roleInDB.Comment {
-		roleInSpec.CommentInDatabase = roleInDB.Comment
-		return true
-	}
-	return false
+		passwordNeedSync(ctx, sr, roleInSpec, *roleInDB.Password)
 }
 
 // roleInSpecPasswordChanged Check if the password stored in database is the same with password in external secrets

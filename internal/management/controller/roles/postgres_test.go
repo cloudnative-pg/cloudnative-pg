@@ -47,6 +47,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Login:           true,
 		Inherit:         false,
 		ConnectionLimit: 2,
+		Comment:         "this user is a test",
 	}
 	unWantedRole := apiv1.RoleConfiguration{
 		Name: "foo",
@@ -54,6 +55,10 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	wantedRoleExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 ",
 		wantedRole.Name)
+
+	wantedRoleCommentStmt := fmt.Sprintf(
+		"COMMENT ON ROLE \"%s\" %s",
+		wantedRole.Name, wantedRole.Comment)
 
 	wantedRoleExpectedAltStmt := fmt.Sprintf(
 		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 ",
@@ -137,6 +142,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleExpectedCrtStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
+		mock.ExpectExec(wantedRoleCommentStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
 		err = prm.Create(ctx, wantedRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
@@ -186,6 +193,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectExec(wantedRoleExpectedAltStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
+		mock.ExpectExec(wantedRoleCommentStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		err = prm.Update(ctx, wantedRole)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -201,7 +210,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		err = prm.Update(ctx, wantedRole)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeEquivalentTo(dbError))
+		Expect(errors.Is(err, dbError)).To(BeTrue())
 	})
 })
 
