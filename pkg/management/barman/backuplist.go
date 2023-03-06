@@ -43,6 +43,7 @@ package barman
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -51,16 +52,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-// barmanLog is the log that will be used for interactions with Barman
-var barmanLog = log.WithName("barman")
-
 func executeQueryCommand(
+	ctx context.Context,
 	barmanCommand string,
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 	serverName string,
 	additionalOptions []string,
 	env []string,
 ) (string, error) {
+	contextLogger := log.FromContext(ctx).WithName("barman")
+
 	options := []string{"--format", "json"}
 
 	if barmanConfiguration.EndpointURL != "" {
@@ -83,7 +84,7 @@ func executeQueryCommand(
 	cmd.Stderr = &stderrBuffer
 	err = cmd.Run()
 	if err != nil {
-		barmanLog.Error(err,
+		contextLogger.Error(err,
 			"Can't extract backup id using barman-cloud-backup-list",
 			"options", options,
 			"stdout", stdoutBuffer.String(),
@@ -96,11 +97,15 @@ func executeQueryCommand(
 
 // GetBackupList returns the catalog reading it from the object store
 func GetBackupList(
+	ctx context.Context,
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 	serverName string,
 	env []string,
 ) (*catalog.Catalog, error) {
+	contextLogger := log.FromContext(ctx).WithName("barman")
+
 	rawJSON, err := executeQueryCommand(
+		ctx,
 		barmanCapabilities.BarmanCloudBackupList,
 		barmanConfiguration,
 		serverName,
@@ -112,14 +117,14 @@ func GetBackupList(
 	}
 	backupList, err := catalog.NewCatalogFromBarmanCloudBackupList(rawJSON)
 	if err != nil {
-		barmanLog.Error(err, "Can't parse barman-cloud-backup-list output")
+		contextLogger.Error(err, "Can't parse barman-cloud-backup-list output")
 		return nil, err
 	}
 
 	return backupList, nil
 }
 
-// GetBackupByName returns the data for a given backup that has been tagged with a name
+// GetBackupByName returns the backup data found for a given backup
 func GetBackupByName(
 	ctx context.Context,
 	backupName string,
@@ -128,6 +133,7 @@ func GetBackupByName(
 	env []string,
 ) (*catalog.BarmanBackup, error) {
 	rawJSON, err := executeQueryCommand(
+		ctx,
 		barmanCapabilities.BarmanCloudBackupShow,
 		barmanConfiguration,
 		serverName,
@@ -142,4 +148,29 @@ func GetBackupByName(
 	contextLogger.Debug("raw backup barman object", "rawBarmanObject", rawJSON)
 
 	return catalog.NewBackupFromBarmanCloudBackupShow(rawJSON)
+}
+
+// GetLatestBackup returns the latest executed backup
+func GetLatestBackup(
+	ctx context.Context,
+	serverName string,
+	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
+	env []string,
+) (*catalog.BarmanBackup, error) {
+	contextLogger := log.FromContext(ctx)
+	// Extracting the latest backup using barman-cloud-backup-list
+	backupList, err := GetBackupList(ctx, barmanConfiguration, serverName, env)
+	if err != nil {
+		// Proper logging already happened inside GetBackupList
+		return nil, err
+	}
+
+	// We have just made a new backup, if the backup list is empty
+	// something is going wrong in the cloud storage
+	if backupList.Len() == 0 {
+		contextLogger.Error(nil, "Can't set backup status as completed: empty backup list")
+		return nil, fmt.Errorf("the executed backup could be found on the remote object storage")
+	}
+
+	return backupList.LatestBackupInfo(), nil
 }

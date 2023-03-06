@@ -357,15 +357,13 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	// Set the status to completed
 	b.Backup.Status.SetAsCompleted()
 
-	if capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		if err := b.setBackupAsCompleted(ctx); err != nil {
-			return err
-		}
-	} else {
-		if err := b.setBackupAsCompletedLegacy(); err != nil {
-			return err
-		}
+	barmanBackup, err := b.getExecutedBackupInfo(ctx, capabilities)
+	if err != nil {
+		return err
 	}
+
+	b.Log.Debug("extracted barman backup", "backup", barmanBackup)
+	assignBarmanBackupToBackup(b.Backup, barmanBackup)
 
 	if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 		b.Log.Error(err, "Can't set backup status as completed")
@@ -386,45 +384,27 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	return nil
 }
 
-func (b *BackupCommand) setBackupAsCompleted(ctx context.Context) error {
-	barmanBackup, err := barman.GetBackupByName(
+func (b *BackupCommand) getExecutedBackupInfo(
+	ctx context.Context,
+	capabilities *barmanCapabilities.Capabilities,
+) (*catalog.BarmanBackup, error) {
+	if capabilities.ShouldExecuteBackupWithName(b.Cluster) {
+		return barman.GetBackupByName(
+			ctx,
+			b.Backup.Name,
+			b.Backup.Status.ServerName,
+			b.Cluster.Spec.Backup.BarmanObjectStore,
+			b.Env,
+		)
+	}
+	// we don't know the id or the name of the executed backup so it fetches the last executed barman backup.
+	// it could create issues in case of concurrent backups. It is a deprecated way of detecting the backup.
+	return barman.GetLatestBackup(
 		ctx,
-		b.Backup.Name,
 		b.Backup.Status.ServerName,
 		b.Cluster.Spec.Backup.BarmanObjectStore,
 		b.Env,
 	)
-	if err != nil {
-		return err
-	}
-
-	b.Log.Debug("extracted barman backup", "backup", barmanBackup)
-	assignBarmanBackupToBackup(b.Backup, barmanBackup)
-
-	return nil
-}
-
-// setBackupAsCompletedLegacy works by assuming that we don't know the id of the executed backup so it assigns
-// the last executed barman backup to the backup CRD
-func (b *BackupCommand) setBackupAsCompletedLegacy() error {
-	// Extracting the latest backup using barman-cloud-backup-list
-	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, b.Backup.Status.ServerName, b.Env)
-	if err != nil {
-		// Proper logging already happened inside GetBackupList
-		return err
-	}
-
-	// We have just made a new backup, if the backup list is empty
-	// something is going wrong in the cloud storage
-	if backupList.Len() == 0 {
-		b.Log.Error(nil, "Can't set backup status as completed: empty backup list")
-		return fmt.Errorf("the executed backup could be found on the remote object storage")
-	}
-
-	latestBackup := backupList.LatestBackupInfo()
-	assignBarmanBackupToBackup(b.Backup, latestBackup)
-
-	return nil
 }
 
 func (b *BackupCommand) backupMaintenance(ctx context.Context) {
@@ -432,7 +412,7 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	if b.Cluster.Spec.Backup.RetentionPolicy != "" {
 		b.Log.Info("Applying backup retention policy",
 			"retentionPolicy", b.Cluster.Spec.Backup.RetentionPolicy)
-		if err := barman.DeleteBackupsByPolicy(b.Cluster.Spec.Backup, b.Backup.Status.ServerName, b.Env); err != nil {
+		if err := barman.DeleteBackupsByPolicy(ctx, b.Cluster.Spec.Backup, b.Backup.Status.ServerName, b.Env); err != nil {
 			// Proper logging already happened inside DeleteBackupsByPolicy
 			b.Recorder.Event(b.Cluster, "Warning", "RetentionPolicyFailed", "Retention policy failed")
 			// We do not want to return here, we must go on to set the fist recoverability point
@@ -440,7 +420,12 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	}
 
 	// Extracting the latest backup using barman-cloud-backup-list
-	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, b.Backup.Status.ServerName, b.Env)
+	backupList, err := barman.GetBackupList(
+		ctx,
+		b.Cluster.Spec.Backup.BarmanObjectStore,
+		b.Backup.Status.ServerName,
+		b.Env,
+	)
 	if err != nil {
 		// Proper logging already happened inside GetBackupList
 		return
