@@ -144,7 +144,7 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 		"--user", "postgres",
 	}
 
-	if capabilities.HasName {
+	if capabilities.ShouldExecuteBackupWithName(b.Cluster) {
 		options = append(options, "--name", b.Backup.Name)
 	}
 
@@ -356,12 +356,13 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 
 	// Set the status to completed
 	b.Backup.Status.SetAsCompleted()
-	if !capabilities.HasName {
-		if err := b.setBackupAsCompletedLegacy(); err != nil {
+
+	if capabilities.ShouldExecuteBackupWithName(b.Cluster) {
+		if err := b.setBackupAsCompleted(ctx); err != nil {
 			return err
 		}
 	} else {
-		if err := b.setBackupAsCompleted(ctx); err != nil {
+		if err := b.setBackupAsCompletedLegacy(); err != nil {
 			return err
 		}
 	}

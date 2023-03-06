@@ -351,7 +351,7 @@ func (r *ClusterReconciler) evaluateFailoverDelay(
 			return err
 		}
 	}
-	primaryFailingSince, err := utils.DifferenceBetweenMicroTimestamps(
+	primaryFailingSince, err := utils.DifferenceBetweenTimestamps(
 		utils.GetCurrentTimestamp(),
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp,
 	)

@@ -48,7 +48,7 @@ func Detect() (*Capabilities, error) {
 
 	switch {
 	case version.GE(semver.Version{Major: 3, Minor: 3}):
-		newCapabilities.HasName = true
+		newCapabilities.hasName = true
 		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 18}):
 		// Tags, added in Barman >= 2.18
