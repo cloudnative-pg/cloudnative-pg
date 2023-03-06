@@ -327,7 +327,7 @@ func (r *ClusterReconciler) enforceFailoverDelay(ctx context.Context, cluster *a
 			return err
 		}
 	}
-	primaryFailingSince, err := utils.DifferenceBetweenMicroTimestamps(
+	primaryFailingSince, err := utils.DifferenceBetweenTimestamps(
 		utils.GetCurrentTimestamp(),
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp,
 	)

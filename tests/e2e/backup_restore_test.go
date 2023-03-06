@@ -63,13 +63,22 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		// own namespace, they can share the configuration file
 
 		const (
-			backupFile                 = fixturesDir + "/backup/minio/backup-minio.yaml"
-			clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
-			customQueriesSampleFile    = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
-			minioCaSecName             = "minio-server-ca-secret"
-			minioTLSSecName            = "minio-server-tls-secret"
+			backupFile              = fixturesDir + "/backup/minio/backup-minio.yaml"
+			customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+			minioCaSecName          = "minio-server-ca-secret"
+			minioTLSSecName         = "minio-server-tls-secret"
 		)
+
+		clusterWithMinioSampleFile := fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
+
 		BeforeAll(func() {
+			//
+			// IMPORTANT: this is to ensure that we test the old backup system too
+			//
+			if env.PostgresVersion < 13 {
+				clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-legacy.yaml.template"
+			}
+
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if isAKS {
@@ -89,6 +98,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				Skip("This test is not run on an IBM architecture")
 			}
 			namespace = "cluster-backup-minio"
+
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
