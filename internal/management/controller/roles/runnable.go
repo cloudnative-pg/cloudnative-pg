@@ -95,7 +95,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			}
 
 			// Update the ticker if the update interval has changed
-			newUpdateInterval := updateInterval // TODO: make configurable
+			newUpdateInterval := config.GetUpdateInterval() // TODO: make configurable
 			if updateInterval != newUpdateInterval {
 				ticker.Reset(newUpdateInterval)
 				updateInterval = newUpdateInterval
