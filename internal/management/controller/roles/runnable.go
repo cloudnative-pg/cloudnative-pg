@@ -253,10 +253,15 @@ func passwordNeedSync(ctx context.Context, sr *RoleSynchronizer, role apiv1.Role
 		log.Error(err, "error while retrieving the role user password secret")
 		return false
 	}
-	pwd, err := utils.GetPasswordFromSecret(&secret)
+	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
+	if role.Name != usernameFromSecret {
+		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, role.Name)
+		log.Error(err, "error while retrieving the role user password secret")
+		return false
+	}
 	if err != nil {
 		log.Error(err, "error while retrieving the role user password secret")
 		return false
 	}
-	return password != pwd
+	return password != passwordFromSecret
 }

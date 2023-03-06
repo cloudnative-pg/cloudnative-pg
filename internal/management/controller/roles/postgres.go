@@ -236,9 +236,12 @@ func (sm PostgresRoleManager) appendPasswordOption(ctx context.Context,
 		}
 		return err
 	}
-	password, err := utils.GetPasswordFromSecret(&secret)
+	usernameFromSecret, password, err := utils.GetUserPasswordFromSecret(&secret)
 	if err != nil {
 		return err
+	}
+	if role.Name != usernameFromSecret {
+		return fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, role.Name)
 	}
 	if password == "" {
 		query.WriteString(fmt.Sprintf("PASSWORD %s", password))
