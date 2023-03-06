@@ -23,26 +23,20 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 // PostgresRoleManager is a RoleManager for a database instance
 type PostgresRoleManager struct {
 	superUserDB *sql.DB
-	client      ctrl.Client
-	instance    *postgres.Instance
 }
 
 // NewPostgresRoleManager returns an implementation of RoleManager for postgres
-func NewPostgresRoleManager(superDB *sql.DB, client ctrl.Client, instance *postgres.Instance) RoleManager {
+func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 	return PostgresRoleManager{
 		superUserDB: superDB,
-		client:      client,
-		instance:    instance,
 	}
 }
 
@@ -50,7 +44,7 @@ func NewPostgresRoleManager(superDB *sql.DB, client ctrl.Client, instance *postg
 func (sm PostgresRoleManager) List(
 	ctx context.Context,
 	config *v1.ManagedConfiguration,
-) ([]v1.RoleConfiguration, error) {
+) ([]DatabaseRole, error) {
 	rows, err := sm.superUserDB.QueryContext(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
@@ -58,16 +52,16 @@ func (sm PostgresRoleManager) List(
        			pg_catalog.shobj_description(oid, 'pg_authid') as comment
 		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`)
 	if err != nil {
-		return []v1.RoleConfiguration{}, err
+		return []DatabaseRole{}, err
 	}
 	defer func() {
 		_ = rows.Close()
 	}()
 
-	var roles []v1.RoleConfiguration
+	var roles []DatabaseRole
 	for rows.Next() {
 		var validuntil sql.NullString
-		var role v1.RoleConfiguration
+		var role DatabaseRole
 		err := rows.Scan(
 			&role.Name,
 			&role.Superuser,
@@ -77,13 +71,13 @@ func (sm PostgresRoleManager) List(
 			&role.Login,
 			&role.Replication,
 			&role.ConnectionLimit,
-			&role.Password,
+			&role.password,
 			&validuntil,
 			&role.BypassRLS,
 			&role.Comment,
 		)
 		if err != nil {
-			return []v1.RoleConfiguration{}, err
+			return []DatabaseRole{}, err
 		}
 		if validuntil.Valid {
 			role.ValidUntil = validuntil.String
@@ -93,14 +87,14 @@ func (sm PostgresRoleManager) List(
 	}
 
 	if rows.Err() != nil {
-		return []v1.RoleConfiguration{}, rows.Err()
+		return []DatabaseRole{}, rows.Err()
 	}
 
 	return roles, nil
 }
 
 // Update the role
-func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfiguration) error {
+func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("updateRole")
 	contextLog.Trace("Invoked", "role", role)
 	var query strings.Builder
@@ -115,11 +109,10 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 		return fmt.Errorf("could not update role %s: %w", role.Name, err)
 	}
 
-	// TODO: comments are not expected to be updated much. Perhaps separate
-	// the comment updating to a separate call
+	// TODO: perhaps separate the comment updating to a separate call
 	contextLog.Info("Updating role comment", "role", role.Name)
 	_, err = sm.superUserDB.ExecContext(ctx,
-		fmt.Sprintf("COMMENT ON ROLE %s %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
+		fmt.Sprintf("COMMENT ON ROLE %s IS %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
 	if err != nil {
 		return fmt.Errorf("could not update role comments for %s: %w", role.Name, err)
 	}
@@ -129,7 +122,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 
 // Create the role
 // TODO: do we give the role any database-level permissions?
-func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfiguration) error {
+func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("createRole")
 	contextLog.Trace("Invoked", "role", role)
 
@@ -150,7 +143,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 	// TODO: as with the Update() method, it may be better to handle role comments
 	// in a separate call.
 	_, err = sm.superUserDB.ExecContext(ctx,
-		fmt.Sprintf("COMMENT ON ROLE %s %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
+		fmt.Sprintf("COMMENT ON ROLE %s IS %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
@@ -162,7 +155,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 // TODO: we need to do something better here. We should not delete a user that
 // has created tables or other objects. That should be blocked at the validation
 // webhook level, otherwise it will be very poor UX and the operator may not notice
-func (sm PostgresRoleManager) Delete(ctx context.Context, role v1.RoleConfiguration) error {
+func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("dropRole")
 	contextLog.Trace("Invoked", "role", role)
 
@@ -174,7 +167,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role v1.RoleConfigurat
 	return nil
 }
 
-func appendRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
+func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 	if role.BypassRLS {
 		query.WriteString("BYPASSRLS ")
 	} else {
@@ -222,15 +215,12 @@ func appendRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
 	}
 }
 
-func appendPasswordOption(role v1.RoleConfiguration,
+func appendPasswordOption(role DatabaseRole,
 	query *strings.Builder,
 ) {
-	if role.Password == nil {
-		return
-	}
-	if len(*role.Password) > 0 {
-		query.WriteString(fmt.Sprintf("PASSWORD %s", *role.Password))
-	} else {
+	if role.password == "" {
 		query.WriteString("PASSWORD NULL")
+	} else {
+		query.WriteString(fmt.Sprintf("PASSWORD %s", role.password))
 	}
 }
