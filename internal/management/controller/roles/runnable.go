@@ -134,6 +134,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 // we should see if DeepEquals will serve
 func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 	reduced := []struct {
+		Comment         string
 		BypassRLS       bool
 		CreateDB        bool
 		CreateRole      bool
@@ -144,6 +145,7 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 		ConnectionLimit int64
 	}{
 		{
+			Comment:         role1.Comment,
 			CreateDB:        role1.CreateDB,
 			CreateRole:      role1.CreateRole,
 			Inherit:         role1.Inherit,
@@ -154,6 +156,7 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 			ConnectionLimit: role1.ConnectionLimit,
 		},
 		{
+			Comment:         role2.Comment,
 			CreateDB:        role2.CreateDB,
 			CreateRole:      role2.CreateRole,
 			Inherit:         role2.Inherit,
@@ -208,7 +211,7 @@ func synchronizeRoles(
 			if err != nil {
 				return wrapErr(err)
 			}
-		case found && (!areEquivalent(inSpec, role) || passwordNeedSync(ctx, sr, inSpec, *role.Password)):
+		case found && isRoleInDBNeedUpdate(ctx, sr, &inSpec, role):
 			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
 			err = roleManager.Update(ctx, inSpec)
 			if err != nil {
@@ -234,9 +237,28 @@ func synchronizeRoles(
 	return nil
 }
 
+func isRoleInDBNeedUpdate(ctx context.Context, sr *RoleSynchronizer, roleInSpec *apiv1.RoleConfiguration,
+	roleInDB apiv1.RoleConfiguration,
+) bool {
+	return !areEquivalent(*roleInSpec, roleInDB) ||
+		passwordNeedSync(ctx, sr, roleInSpec, *roleInDB.Password) ||
+		commentNeedUpdate(roleInSpec, roleInDB)
+}
+
+func commentNeedUpdate(roleInSpec *apiv1.RoleConfiguration, roleInDB apiv1.RoleConfiguration) bool {
+	if roleInSpec.Comment != roleInDB.Comment {
+		roleInSpec.CommentInDatabase = roleInDB.Comment
+		return true
+	}
+	return false
+}
+
 // roleInSpecPasswordChanged Check if the password stored in database is the same with password in external secrets
-func passwordNeedSync(ctx context.Context, sr *RoleSynchronizer, role apiv1.RoleConfiguration, password string) bool {
-	secretName := role.GetRoleSecretsName()
+func passwordNeedSync(ctx context.Context, sr *RoleSynchronizer,
+	roleInSpec *apiv1.RoleConfiguration, password string,
+) bool {
+	secretName := roleInSpec.GetRoleSecretsName()
+	// no secrets defined, will keep roleInSpec.Password nil
 	if secretName == "" {
 		return false
 	}
@@ -254,8 +276,8 @@ func passwordNeedSync(ctx context.Context, sr *RoleSynchronizer, role apiv1.Role
 		return false
 	}
 	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
-	if role.Name != usernameFromSecret {
-		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, role.Name)
+	if roleInSpec.Name != usernameFromSecret {
+		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
 		log.Error(err, "error while retrieving the role user password secret")
 		return false
 	}
@@ -263,5 +285,9 @@ func passwordNeedSync(ctx context.Context, sr *RoleSynchronizer, role apiv1.Role
 		log.Error(err, "error while retrieving the role user password secret")
 		return false
 	}
-	return password != passwordFromSecret
+	if password != passwordFromSecret {
+		roleInSpec.Password = &passwordFromSecret
+		return true
+	}
+	return false
 }

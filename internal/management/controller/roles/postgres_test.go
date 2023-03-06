@@ -61,6 +61,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)
 	expectedSelStmt := `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
+       			pg_catalog.shobj_description(oid, 'pg_authid') as comment
 		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`
 
 	// Testing List
@@ -71,10 +72,12 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		rows := sqlmock.NewRows([]string{
 			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
-			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls", "comment",
 		}).
-			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"), nil, false).
-			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"), "2023-04-04", false)
+			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
+				nil, false, []byte("This is postgres user")).
+			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
+				"2023-04-04", false, []byte("This is streaming_replica user"))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := prm.List(ctx, nil)
@@ -95,6 +98,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			PasswordSecret:  nil,
 			ConnectionLimit: -1,
 			ValidUntil:      "",
+			Comment:         "This is postgres user",
 		}))
 		Expect(roles).To(ContainElements(apiv1.RoleConfiguration{
 			Name:            "streaming_replica",
@@ -109,6 +113,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			PasswordSecret:  nil,
 			ConnectionLimit: 10,
 			ValidUntil:      "2023-04-04",
+			Comment:         "This is streaming_replica user",
 		}))
 	})
 	It("List returns error if there is a problem with the DB", func(ctx context.Context) {

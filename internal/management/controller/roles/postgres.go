@@ -23,12 +23,9 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -58,6 +55,7 @@ func (sm PostgresRoleManager) List(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
+       			pg_catalog.shobj_description(oid, 'pg_authid') as comment
 		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`)
 	if err != nil {
 		return []v1.RoleConfiguration{}, err
@@ -82,6 +80,7 @@ func (sm PostgresRoleManager) List(
 			&role.Password,
 			&validuntil,
 			&role.BypassRLS,
+			&role.Comment,
 		)
 		if err != nil {
 			return []v1.RoleConfiguration{}, err
@@ -104,15 +103,16 @@ func (sm PostgresRoleManager) List(
 func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfiguration) error {
 	contextLog := log.FromContext(ctx).WithName("updateRole")
 	contextLog.Trace("Invoked", "role", role)
-
 	var query strings.Builder
-	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
-	appendRoleOptions(role, &query)
-	err := sm.appendPasswordOption(ctx, role, &query)
-	if err != nil {
-		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
-	}
 
+	// if comments changed, we update the comments for the first time
+	if role.CommentInDatabase != role.Comment {
+		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
+	} else {
+		query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+		appendRoleOptions(role, &query)
+		appendPasswordOption(role, &query)
+	}
 	contextLog.Info("Updating", "query", query.String())
 
 	result, err := sm.superUserDB.ExecContext(ctx, query.String())
@@ -134,22 +134,23 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 	contextLog.Trace("Invoked", "role", role)
 
 	var query strings.Builder
-	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
-	appendRoleOptions(role, &query)
-	err := sm.appendPasswordOption(ctx, role, &query)
-	if err != nil {
-		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
+	// if comments changed, we update the comments for the first time
+	if role.CommentInDatabase != role.Comment {
+		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
+	} else {
+		query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
+		appendRoleOptions(role, &query)
+		appendPasswordOption(role, &query)
 	}
 
 	contextLog.Info("Creating", "query", query.String())
 	// NOTE: defensively we might think of doint CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	_, err = sm.superUserDB.ExecContext(ctx, query.String())
+	_, err := sm.superUserDB.ExecContext(ctx, query.String())
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
-
 	return nil
 }
 
@@ -217,36 +218,15 @@ func appendRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
 	}
 }
 
-func (sm PostgresRoleManager) appendPasswordOption(ctx context.Context,
-	role v1.RoleConfiguration,
+func appendPasswordOption(role v1.RoleConfiguration,
 	query *strings.Builder,
-) error {
-	if role.PasswordSecret == nil {
-		return nil
+) {
+	if role.Password == nil {
+		return
 	}
-	secretName := role.PasswordSecret.Name
-	var secret corev1.Secret
-	err := sm.client.Get(
-		ctx,
-		ctrl.ObjectKey{Namespace: sm.instance.Namespace, Name: secretName},
-		&secret)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-	usernameFromSecret, password, err := utils.GetUserPasswordFromSecret(&secret)
-	if err != nil {
-		return err
-	}
-	if role.Name != usernameFromSecret {
-		return fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, role.Name)
-	}
-	if password == "" {
-		query.WriteString(fmt.Sprintf("PASSWORD %s", password))
+	if len(*role.Password) > 0 {
+		query.WriteString(fmt.Sprintf("PASSWORD %s", *role.Password))
 	} else {
 		query.WriteString("PASSWORD NULL")
 	}
-	return nil
 }
