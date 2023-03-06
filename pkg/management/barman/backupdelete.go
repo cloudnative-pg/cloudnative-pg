@@ -28,12 +28,20 @@ import (
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // DeleteBackupsByPolicy executes a command that deletes backups, given the Barman object store configuration,
 // the retention policies, the server name and the environment variables
-func DeleteBackupsByPolicy(backupConfig *v1.BackupConfiguration, serverName string, env []string) error {
+func DeleteBackupsByPolicy(
+	ctx context.Context,
+	backupConfig *v1.BackupConfiguration,
+	serverName string,
+	env []string,
+) error {
+	contextLogger := log.FromContext(ctx).WithName("barman")
+
 	capabilities, err := barmanCapabilities.CurrentCapabilities()
 	if err != nil {
 		return err
@@ -43,7 +51,7 @@ func DeleteBackupsByPolicy(backupConfig *v1.BackupConfiguration, serverName stri
 		err := fmt.Errorf(
 			"barman >= 2.14 is required to use retention policy, current: %v",
 			capabilities.Version)
-		barmanLog.Error(err, "Failed applying backup retention policies")
+		contextLogger.Error(err, "Failed applying backup retention policies")
 		return err
 	}
 
@@ -78,7 +86,7 @@ func DeleteBackupsByPolicy(backupConfig *v1.BackupConfiguration, serverName stri
 	cmd.Stderr = &stderrBuffer
 	err = cmd.Run()
 	if err != nil {
-		barmanLog.Error(err,
+		contextLogger.Error(err,
 			"Error invoking "+barmanCapabilities.BarmanCloudBackupDelete,
 			"options", options,
 			"stdout", stdoutBuffer.String(),
