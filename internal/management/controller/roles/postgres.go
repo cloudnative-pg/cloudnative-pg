@@ -57,8 +57,8 @@ func (sm PostgresRoleManager) List(
 	rows, err := sm.superUserDB.QueryContext(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
-       			rolcanlogin, rolreplication, rolconnlimit, rolvaliduntil, rolbypassrls,
-		FROM pg_catalog.pg_roles where rolname not like 'pg_%';`)
+       			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
+		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`)
 	if err != nil {
 		return []v1.RoleConfiguration{}, err
 	}
@@ -79,6 +79,7 @@ func (sm PostgresRoleManager) List(
 			&role.Login,
 			&role.Replication,
 			&role.ConnectionLimit,
+			&role.Password,
 			&validuntil,
 			&role.BypassRLS,
 		)
@@ -88,8 +89,7 @@ func (sm PostgresRoleManager) List(
 		if validuntil.Valid {
 			role.ValidUntil = validuntil.String
 		}
-		// TODO: should we check that the password is the same as the password
-		// stored in the secret?
+
 		roles = append(roles, role)
 	}
 
@@ -107,8 +107,8 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role v1.RoleConfigurat
 
 	var query strings.Builder
 	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
-	parseRoleOptions(role, &query)
-	err := sm.handlePassword(ctx, role, &query)
+	appendRoleOptions(role, &query)
+	err := sm.appendPasswordOption(ctx, role, &query)
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
@@ -135,8 +135,8 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role v1.RoleConfigurat
 
 	var query strings.Builder
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
-	parseRoleOptions(role, &query)
-	err := sm.handlePassword(ctx, role, &query)
+	appendRoleOptions(role, &query)
+	err := sm.appendPasswordOption(ctx, role, &query)
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
@@ -169,7 +169,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role v1.RoleConfigurat
 	return nil
 }
 
-func parseRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
+func appendRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
 	if role.BypassRLS {
 		query.WriteString("BYPASSRLS ")
 	} else {
@@ -196,9 +196,6 @@ func parseRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
 
 	if role.Login {
 		query.WriteString("LOGIN ")
-		if role.ConnectionLimit > -1 {
-			query.WriteString(fmt.Sprintf("CONNECTION LIMIT %d ", role.ConnectionLimit))
-		}
 	} else {
 		query.WriteString("NOLOGIN ")
 	}
@@ -214,9 +211,13 @@ func parseRoleOptions(role v1.RoleConfiguration, query *strings.Builder) {
 	} else {
 		query.WriteString("NOSUPERUSER ")
 	}
+
+	if role.ConnectionLimit > -1 {
+		query.WriteString(fmt.Sprintf("CONNECTION LIMIT %d ", role.ConnectionLimit))
+	}
 }
 
-func (sm PostgresRoleManager) handlePassword(ctx context.Context,
+func (sm PostgresRoleManager) appendPasswordOption(ctx context.Context,
 	role v1.RoleConfiguration,
 	query *strings.Builder,
 ) error {

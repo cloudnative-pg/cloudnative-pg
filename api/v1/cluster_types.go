@@ -1592,6 +1592,7 @@ type RoleConfiguration struct {
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
+	Password       *string               `json:"-"`
 	Superuser      bool                  `json:"superuser,omitempty"`
 	CreateDB       bool                  `json:"createdb,omitempty"`
 	CreateRole     bool                  `json:"createrole,omitempty"`
@@ -1612,9 +1613,12 @@ type RoleConfiguration struct {
 	InRoles    []string `json:"inRoles,omitempty"`
 }
 
-// PasswordConfiguration contains the location of the RoleConfiguration password
-type PasswordConfiguration struct {
-	Name string `json:"name"`
+// GetRoleSecretsName Get the name of the secret which is used to store the password of a role configuration user
+func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
+	if roleConfiguration.PasswordSecret != nil {
+		return roleConfiguration.PasswordSecret.Name
+	}
+	return ""
 }
 
 // +kubebuilder:object:root=true

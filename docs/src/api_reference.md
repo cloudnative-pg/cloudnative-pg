@@ -56,7 +56,6 @@ Below you will find a description of the defined resources:
 - [Metadata](#Metadata)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
-- [PasswordConfiguration](#PasswordConfiguration)
 - [PgBouncerIntegrationStatus](#PgBouncerIntegrationStatus)
 - [PgBouncerSecrets](#PgBouncerSecrets)
 - [PgBouncerSpec](#PgBouncerSpec)
@@ -649,16 +648,6 @@ Name       | Description                                                        
 ---------- | ---------------------------------------------------------------------------------------------------------------- | -----
 `inProgress` | Is there a node maintenance activity in progress?                                                                - *mandatory*  | bool 
 `reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere - when `instances` >1) - *mandatory*  | *bool
-
-<a id='PasswordConfiguration'></a>
-
-## PasswordConfiguration
-
-PasswordConfiguration contains the location of the RoleConfiguration password
-
-Name | Description            | Type  
----- | --- | ------
-`name` |  - *mandatory*  | string
 
 <a id='PgBouncerIntegrationStatus'></a>
 

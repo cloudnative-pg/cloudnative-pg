@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -31,6 +32,12 @@ type funcCall struct{ verb, roleName string }
 type mockRoleManager struct {
 	roles       map[string]apiv1.RoleConfiguration
 	callHistory []funcCall
+}
+
+var syncInstance = RoleSynchronizer{
+	instance: &postgres.Instance{
+		Namespace: "myPod",
+	},
 }
 
 func (m *mockRoleManager) List(
@@ -104,7 +111,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			([]funcCall{
@@ -137,7 +144,8 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -163,7 +171,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -189,7 +197,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -220,7 +228,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},

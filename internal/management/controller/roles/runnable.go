@@ -21,9 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -120,7 +123,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	err = synchronizeRoles(
 		ctx,
 		NewPostgresRoleManager(superUserDB, sr.client, sr.instance),
-		sr.instance.PodName,
+		sr,
 		config,
 	)
 	return err
@@ -131,22 +134,34 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 // we should see if DeepEquals will serve
 func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 	reduced := []struct {
-		CreateDB  bool
-		Superuser bool
-		Login     bool
-		BypassRLS bool
+		BypassRLS       bool
+		CreateDB        bool
+		CreateRole      bool
+		Inherit         bool
+		Replication     bool
+		Superuser       bool
+		Login           bool
+		ConnectionLimit int64
 	}{
 		{
-			CreateDB:  role1.CreateDB,
-			Superuser: role1.Superuser,
-			Login:     role1.Login,
-			BypassRLS: role1.BypassRLS,
+			CreateDB:        role1.CreateDB,
+			CreateRole:      role1.CreateRole,
+			Inherit:         role1.Inherit,
+			Superuser:       role1.Superuser,
+			Login:           role1.Login,
+			BypassRLS:       role1.BypassRLS,
+			Replication:     role1.Replication,
+			ConnectionLimit: role1.ConnectionLimit,
 		},
 		{
-			CreateDB:  role2.CreateDB,
-			Superuser: role2.Superuser,
-			Login:     role2.Login,
-			BypassRLS: role2.BypassRLS,
+			CreateDB:        role2.CreateDB,
+			CreateRole:      role2.CreateRole,
+			Inherit:         role2.Inherit,
+			Superuser:       role2.Superuser,
+			Login:           role2.Login,
+			BypassRLS:       role2.BypassRLS,
+			Replication:     role2.Replication,
+			ConnectionLimit: role2.ConnectionLimit,
 		},
 	}
 	return reduced[0] == reduced[1]
@@ -156,12 +171,12 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 func synchronizeRoles(
 	ctx context.Context,
 	roleManager RoleManager,
-	podName string,
+	sr *RoleSynchronizer,
 	config *apiv1.ManagedConfiguration,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("synchronizing roles",
-		"podName", podName,
+		"podName", sr.instance.PodName,
 		"managedConfig", config)
 
 	wrapErr := func(err error) error {
@@ -193,7 +208,7 @@ func synchronizeRoles(
 			if err != nil {
 				return wrapErr(err)
 			}
-		case found && !areEquivalent(inSpec, role):
+		case found && (!areEquivalent(inSpec, role) || passwordNeedSync(ctx, sr, inSpec, *role.Password)):
 			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
 			err = roleManager.Update(ctx, inSpec)
 			if err != nil {
@@ -217,4 +232,31 @@ func synchronizeRoles(
 	}
 
 	return nil
+}
+
+// roleInSpecPasswordChanged Check if the password stored in database is the same with password in external secrets
+func passwordNeedSync(ctx context.Context, sr *RoleSynchronizer, role apiv1.RoleConfiguration, password string) bool {
+	secretName := role.GetRoleSecretsName()
+	if secretName == "" {
+		return false
+	}
+
+	var secret corev1.Secret
+	err := sr.client.Get(
+		ctx,
+		client.ObjectKey{Namespace: sr.instance.Namespace, Name: secretName},
+		&secret)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false
+		}
+		log.Error(err, "error while retrieving the role user password secret")
+		return false
+	}
+	pwd, err := utils.GetPasswordFromSecret(&secret)
+	if err != nil {
+		log.Error(err, "error while retrieving the role user password secret")
+		return false
+	}
+	return password != pwd
 }

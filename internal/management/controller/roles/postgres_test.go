@@ -52,16 +52,16 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Name: "foo",
 	}
 	wantedRoleExpectedCrtStmt := fmt.Sprintf(
-		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN CONNECTION LIMIT 2 NOREPLICATION NOSUPERUSER",
+		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 ",
 		wantedRole.Name)
 
 	wantedRoleExpectedAltStmt := fmt.Sprintf(
-		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN CONNECTION LIMIT 2 NOREPLICATION NOSUPERUSER",
+		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 ",
 		wantedRole.Name)
 	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)
 	expectedSelStmt := `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
-       			rolcanlogin, rolreplication, rolconnlimit, rolvaliduntil, rolbypassrls,
-		FROM pg_catalog.pg_roles where rolname not like 'pg_%';`
+       			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
+		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`
 
 	// Testing List
 	It("List can read the list of roles from the DB", func(ctx context.Context) {
@@ -71,15 +71,17 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		rows := sqlmock.NewRows([]string{
 			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
-			"rolcanlogin", "rolreplication", "rolconnlimit", "rolvaliduntil", "rolbypassrls",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls",
 		}).
-			AddRow("postgres", true, false, true, true, true, false, -1, nil, false).
-			AddRow("streaming_replica", false, false, true, true, false, true, 10, "2023-04-04", false)
+			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"), nil, false).
+			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"), "2023-04-04", false)
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := prm.List(ctx, nil)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(roles).To(HaveLen(2))
+		password1 := "12345"
+		password2 := "54321"
 		Expect(roles).To(ContainElements(apiv1.RoleConfiguration{
 			Name:            "postgres",
 			CreateDB:        true,
@@ -89,6 +91,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Login:           true,
 			Replication:     false,
 			BypassRLS:       false,
+			Password:        &password1,
+			PasswordSecret:  nil,
 			ConnectionLimit: -1,
 			ValidUntil:      "",
 		}))
@@ -101,6 +105,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Login:           false,
 			Replication:     true,
 			BypassRLS:       false,
+			Password:        &password2,
+			PasswordSecret:  nil,
 			ConnectionLimit: 10,
 			ValidUntil:      "2023-04-04",
 		}))
