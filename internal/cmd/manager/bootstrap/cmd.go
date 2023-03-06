@@ -19,6 +19,7 @@ package bootstrap
 
 import (
 	"os"
+	"os/exec"
 
 	"github.com/spf13/cobra"
 
@@ -39,16 +40,16 @@ func NewCmd() *cobra.Command {
 				"destination", dest,
 				"version", versions.Version,
 				"build", versions.Info)
-			cmd := "ps -ef | grep /controller/manager | grep -v grep  | awk '{print \"kill -9 \" $2}'"
-			out, err := exec.Command("bash", "-c", cmd).Output()
+			runningCmd := "ps -ef | grep /controller/manager | grep -v grep  | awk '{print \"kill -9 \" $2}' "
+			out, err := exec.Command("bash", "-c", runningCmd).Output()
 			if err != nil {
-				return log.Error(err, "Failed to execute command: "+cmd)
+				log.Error(err, "Failed to execute command: "+runningCmd)
 			}
 			log.Info(string(out))
-			cmd = "ps -ef | grep /controller/manager | grep -v grep  | awk '{print \"kill -9 \" $2}' | bash"
-			out, err = exec.Command("bash", "-c", cmd).Output()
+			runningCmd = "ps -ef | grep /controller/manager | grep -v grep  | awk '{print \"kill -9 \" $2}' | bash"
+			out, err = exec.Command("bash", "-c", runningCmd).Output()
 			if err != nil {
-				return log.Error(err, "Failed to execute command: "+cmd)
+				log.Error(err, "Failed to execute command: "+runningCmd)
 			}
 			log.Info(string(out))
 			err = fileutils.CopyFile(cmd.Root().Name(), dest)
