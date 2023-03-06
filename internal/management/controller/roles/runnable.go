@@ -134,7 +134,6 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 // we should see if DeepEquals will serve
 func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 	reduced := []struct {
-		Comment         string
 		BypassRLS       bool
 		CreateDB        bool
 		CreateRole      bool
@@ -145,7 +144,6 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 		ConnectionLimit int64
 	}{
 		{
-			Comment:         role1.Comment,
 			CreateDB:        role1.CreateDB,
 			CreateRole:      role1.CreateRole,
 			Inherit:         role1.Inherit,
@@ -156,7 +154,6 @@ func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
 			ConnectionLimit: role1.ConnectionLimit,
 		},
 		{
-			Comment:         role2.Comment,
 			CreateDB:        role2.CreateDB,
 			CreateRole:      role2.CreateRole,
 			Inherit:         role2.Inherit,
