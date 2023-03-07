@@ -209,7 +209,8 @@ func (catalog *Catalog) findBackupFromID(backupID string) (*BarmanBackup, error)
 // BarmanBackup represent a backup as created
 // by Barman
 type BarmanBackup struct {
-	// populated consistently only on barman 3.3+
+	// The backup name, can be used as a way to identify a backup.
+	// Populated only if the backup was executed with barman 3.3.0+.
 	BackupName string `json:"backup_name,omitempty"`
 
 	// The backup label
