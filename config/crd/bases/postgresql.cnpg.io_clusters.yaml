@@ -2216,10 +2216,12 @@ spec:
                         name:
                           type: string
                         passwordSecret:
-                          description: PasswordConfiguration contains the location
-                            of the RoleConfiguration password
+                          description: LocalObjectReference contains enough information
+                            to let you locate a local object with a known type inside
+                            the same namespace
                           properties:
                             name:
+                              description: Name of the referent.
                               type: string
                           required:
                           - name

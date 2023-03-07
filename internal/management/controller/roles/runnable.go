@@ -21,7 +21,11 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -32,12 +36,14 @@ import (
 // c.f. https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Runnable
 type RoleSynchronizer struct {
 	instance *postgres.Instance
+	client   client.Client
 }
 
 // NewRoleSynchronizer creates a new RoleSynchronizer
-func NewRoleSynchronizer(instance *postgres.Instance) *RoleSynchronizer {
+func NewRoleSynchronizer(instance *postgres.Instance, client client.Client) *RoleSynchronizer {
 	runner := &RoleSynchronizer{
 		instance: instance,
+		client:   client,
 	}
 	return runner
 }
@@ -116,48 +122,22 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	err = synchronizeRoles(
 		ctx,
 		NewPostgresRoleManager(superUserDB),
-		sr.instance.PodName,
+		sr,
 		config,
 	)
 	return err
-}
-
-// areEquivalent does a constrained check of two roles
-// TODO: this needs to be completed, there is a ticket to track that
-// we should see if DeepEquals will serve
-func areEquivalent(role1, role2 apiv1.RoleConfiguration) bool {
-	reduced := []struct {
-		CreateDB  bool
-		Superuser bool
-		Login     bool
-		BypassRLS bool
-	}{
-		{
-			CreateDB:  role1.CreateDB,
-			Superuser: role1.Superuser,
-			Login:     role1.Login,
-			BypassRLS: role1.BypassRLS,
-		},
-		{
-			CreateDB:  role2.CreateDB,
-			Superuser: role2.Superuser,
-			Login:     role2.Login,
-			BypassRLS: role2.BypassRLS,
-		},
-	}
-	return reduced[0] == reduced[1]
 }
 
 // synchronizeRoles aligns roles in the database to the spec
 func synchronizeRoles(
 	ctx context.Context,
 	roleManager RoleManager,
-	podName string,
+	sr *RoleSynchronizer,
 	config *apiv1.ManagedConfiguration,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("synchronizing roles",
-		"podName", podName,
+		"podName", sr.instance.PodName,
 		"managedConfig", config)
 
 	wrapErr := func(err error) error {
@@ -178,7 +158,7 @@ func synchronizeRoles(
 	}
 
 	// 1. do any of the roles in the DB require update/delete?
-	roleInDBNamed := make(map[string]apiv1.RoleConfiguration)
+	roleInDBNamed := make(map[string]DatabaseRole)
 	for _, role := range rolesInDB {
 		roleInDBNamed[role.Name] = role
 		inSpec, found := roleInSpecNamed[role.Name]
@@ -189,9 +169,19 @@ func synchronizeRoles(
 			if err != nil {
 				return wrapErr(err)
 			}
-		case found && !areEquivalent(inSpec, role):
+		case found:
+			// TODO: rethink. We are always updating the role, to simplify password
+			// management. Keeping the SCRAM-SHA-256 encoded value readable from DB in
+			// sync with the password stored in the Kubernetes secret is complex
 			contextLog.Info("role in DB and Spec, are different. Updating", "role", role.Name)
-			err = roleManager.Update(ctx, inSpec)
+			pass, err := getPassword(ctx, sr, inSpec)
+			if err != nil {
+				return wrapErr(err)
+			}
+			err = roleManager.Update(ctx, DatabaseRole{
+				password:          pass,
+				RoleConfiguration: inSpec,
+			})
 			if err != nil {
 				return wrapErr(err)
 			}
@@ -204,8 +194,15 @@ func synchronizeRoles(
 	for _, r := range rolesInSpec {
 		_, found := roleInDBNamed[r.Name]
 		if !found && r.Ensure == apiv1.EnsurePresent {
+			pass, err := getPassword(ctx, sr, r)
+			if err != nil {
+				return wrapErr(err)
+			}
 			contextLog.Info("role not in DB and spec wants it present. Creating", "role", r.Name)
-			err = roleManager.Create(ctx, r)
+			err = roleManager.Create(ctx, DatabaseRole{
+				password:          pass,
+				RoleConfiguration: r,
+			})
 			if err != nil {
 				return wrapErr(err)
 			}
@@ -213,4 +210,34 @@ func synchronizeRoles(
 	}
 
 	return nil
+}
+
+// getPassword retrieves the password stored in the Kubernetes secret for the
+// RoleConfiguration
+func getPassword(ctx context.Context, sr *RoleSynchronizer,
+	roleInSpec apiv1.RoleConfiguration,
+) (string, error) {
+	secretName := roleInSpec.GetRoleSecretsName()
+	// no secrets defined, will keep roleInSpec.Password nil
+	if secretName == "" {
+		return "", nil
+	}
+
+	var secret corev1.Secret
+	err := sr.client.Get(
+		ctx,
+		client.ObjectKey{Namespace: sr.instance.Namespace, Name: secretName},
+		&secret)
+	if err != nil {
+		return "", err
+	}
+	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
+	if err != nil {
+		return "", err
+	}
+	if roleInSpec.Name != usernameFromSecret {
+		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
+		return "", err
+	}
+	return passwordFromSecret, nil
 }
