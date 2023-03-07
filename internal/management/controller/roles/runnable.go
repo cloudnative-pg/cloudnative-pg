@@ -142,10 +142,7 @@ func (sr *RoleSynchronizer) createRoleFromSpec(
 	if err != nil {
 		return fmt.Errorf("while getting role password for %s: %w", role.Name, err)
 	}
-	return roleManager.Create(ctx, DatabaseRole{
-		RoleConfiguration: role,
-		password:          pass,
-	})
+	return roleManager.Create(ctx, managedToDatabase(role, pass))
 }
 
 func (sr *RoleSynchronizer) updateRoleFromSpec(
@@ -157,10 +154,7 @@ func (sr *RoleSynchronizer) updateRoleFromSpec(
 	if err != nil {
 		return fmt.Errorf("while getting role password for %s: %w", role.Name, err)
 	}
-	return roleManager.Update(ctx, DatabaseRole{
-		RoleConfiguration: role,
-		password:          pass,
-	})
+	return roleManager.Update(ctx, managedToDatabase(role, pass))
 }
 
 // synchronizeRoles aligns roles in the database to the spec
@@ -223,9 +217,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			contextLog.Info("roles in DB marked as Ensure:Absent in Spec. Deleting",
 				"roles", getRoleNames(roles))
 			for _, role := range roles {
-				err := roleManager.Delete(ctx, DatabaseRole{
-					RoleConfiguration: role,
-				})
+				err := roleManager.Delete(ctx, managedToDatabase(role, sql.NullString{}))
 				if err != nil {
 					return wrapErr(err)
 				}
