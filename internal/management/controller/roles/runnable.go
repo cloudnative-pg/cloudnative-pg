@@ -63,7 +63,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 	go func() {
 		config := <-sr.instance.RoleSynchronizerChan()
 		contextLog.Info("setting up role synchronizer loop")
-		updateInterval := 1 * time.Minute // TODO: make configurable
+		updateInterval := config.GetUpdateInterval()
 		ticker := time.NewTicker(updateInterval)
 
 		defer func() {
@@ -76,14 +76,6 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case config = <-sr.instance.RoleSynchronizerChan():
-				if config != nil && len(config.Roles) != 0 {
-					contextLog.Info("got managed roles info", "roles", config.Roles)
-				} else {
-					contextLog.Info("got nil managed roles info, turning ticker off")
-					ticker.Stop()
-					updateInterval = 0
-					continue
-				}
 			case <-ticker.C:
 			}
 
@@ -98,7 +90,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			}
 
 			// Update the ticker if the update interval has changed
-			newUpdateInterval := config.GetUpdateInterval() // TODO: make configurable
+			newUpdateInterval := config.GetUpdateInterval()
 			if updateInterval != newUpdateInterval {
 				ticker.Reset(newUpdateInterval)
 				updateInterval = newUpdateInterval
@@ -141,7 +133,7 @@ func getRoleNames(roles []apiv1.RoleConfiguration) []string {
 	return names
 }
 
-func (sr *RoleSynchronizer) createInSpecRole(
+func (sr *RoleSynchronizer) createRoleFromSpec(
 	ctx context.Context,
 	roleManager RoleManager,
 	role apiv1.RoleConfiguration,
@@ -156,7 +148,7 @@ func (sr *RoleSynchronizer) createInSpecRole(
 	})
 }
 
-func (sr *RoleSynchronizer) updateInSpecRole(
+func (sr *RoleSynchronizer) updateRoleFromSpec(
 	ctx context.Context,
 	roleManager RoleManager,
 	role apiv1.RoleConfiguration,
@@ -213,7 +205,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			contextLog.Info("roles in Spec missing from the DB. Creating",
 				"roles", getRoleNames(roles))
 			for _, role := range roles {
-				err := sr.createInSpecRole(ctx, roleManager, role)
+				err := sr.createRoleFromSpec(ctx, roleManager, role)
 				if err != nil {
 					return wrapErr(err)
 				}
@@ -222,7 +214,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			contextLog.Info("roles in DB out of sync with Spec. Updating",
 				"roles", getRoleNames(roles))
 			for _, role := range roles {
-				err := sr.updateInSpecRole(ctx, roleManager, role)
+				err := sr.updateRoleFromSpec(ctx, roleManager, role)
 				if err != nil {
 					return wrapErr(err)
 				}
@@ -293,9 +285,9 @@ func evaluateRoleActions(
 		case isInSpec:
 			// TODO: this is very aggressive. We update the role each time. This
 			// is due to the complexity of decrypting-encrypting SCRAM-SHA-256 so we
-			// can do reconciliation properly
+			// can compare if passwords have changed.
 			// We have another ticket open to implement encryption/decription and then
-			// we can do fewer updates
+			// we can issue updates only when the role in DB has drifted from spec
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
 		case !isInSpec:
 			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})

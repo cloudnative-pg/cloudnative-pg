@@ -1584,10 +1584,12 @@ type EnsureOption string
 
 // values taken by EnsureOption
 const (
-	EnsurePresent             EnsureOption = "present"
-	EnsureAbsent              EnsureOption = "absent"
-	DefaultRoleUpdateInterval              = 30
+	EnsurePresent EnsureOption = "present"
+	EnsureAbsent  EnsureOption = "absent"
 )
+
+// DefaultRoleUpdateInterval is the default in seconds for the managed roles update interval
+const DefaultRoleUpdateInterval = 30
 
 // ManagedConfiguration represents the portions of PostgreSQL that are managed
 // by the instance manager
