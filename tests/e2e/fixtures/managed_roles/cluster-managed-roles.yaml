@@ -25,4 +25,15 @@ spec:
       inRoles:
         - pg_monitor
         - pg_signal_backend
+      passwordSecret:
+        name: cluster-example-edbadmin
+---
+apiVersion: v1
+data:
+  username: ZWRiX2FkbWluCg==
+  password: ZWRiX2FkbWluCg==
+kind: Secret
+metadata:
+  name: cluster-example-edbadmin
+type: kubernetes.io/basic-auth
 

@@ -18,6 +18,7 @@ package specs
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -218,5 +219,50 @@ var _ = Describe("Secrets", func() {
 		}
 		secrets = backupSecrets(cluster, nil)
 		Expect(secrets).To(ConsistOf("test-secret", "test-access", "test-endpoint-ca-name"))
+	})
+})
+
+var _ = Describe("Managed Roles", func() {
+	cluster := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "thisTest",
+			Namespace: "default",
+		},
+		Spec: apiv1.ClusterSpec{
+			Managed: &apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name: "role1",
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: "my_secret1",
+						},
+					},
+					{
+						Name: "role2hasNoPassword",
+					},
+					{
+						Name: "role3",
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: "my_secret3",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	It("gets the list of secrets needed by the managed roles", func() {
+		Expect(managedRolesSecrets(cluster)).
+			To(ConsistOf("my_secret1", "my_secret3"))
+		serviceAccount := CreateRole(cluster, nil)
+		Expect(serviceAccount.Name).To(Equal(cluster.Name))
+		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
+		var secretsPolicy v1.PolicyRule
+		for _, policy := range serviceAccount.Rules {
+			if len(policy.Resources) > 0 && policy.Resources[0] == "secrets" {
+				secretsPolicy = policy
+			}
+		}
+		Expect(secretsPolicy.ResourceNames).To(ContainElements("my_secret1", "my_secret3"))
 	})
 })
