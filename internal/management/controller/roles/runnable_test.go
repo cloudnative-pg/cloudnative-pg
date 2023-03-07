@@ -34,7 +34,7 @@ type mockRoleManager struct {
 	callHistory []funcCall
 }
 
-var syncInstance = RoleSynchronizer{
+var roleSynchronizer = RoleSynchronizer{
 	instance: &postgres.Instance{
 		Namespace: "myPod",
 	},
@@ -111,7 +111,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			[]funcCall{
@@ -147,7 +147,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 
-		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -177,7 +177,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -207,7 +207,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -242,7 +242,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -290,7 +290,9 @@ var _ = DescribeTable("Role status getter tests",
 			},
 		},
 		map[string]apiv1.RoleStatus{
-			"ensurePresent": apiv1.RoleStatusReconciled,
+			// TODO: at the moment, any role in DB and Spec will get reconciled
+			// Once we can read SCRAM-SHA-256 and reconcile only on drift, this will change
+			"ensurePresent": apiv1.RoleStatusPendingReconciliation,
 			"ensureAbsent":  apiv1.RoleStatusReconciled,
 			"postgres":      apiv1.RoleStatusReserved,
 		},
@@ -377,8 +379,10 @@ var _ = DescribeTable("Role status getter tests",
 			},
 		},
 		map[string]apiv1.RoleStatus{
-			"postgres":        apiv1.RoleStatusReserved,
-			"edb_admin":       apiv1.RoleStatusReconciled,
+			"postgres": apiv1.RoleStatusReserved,
+			// TODO: at the moment, any role in DB and Spec will get reconciled
+			// Once we can read SCRAM-SHA-256 and reconcile only on drift, this will change
+			"edb_admin":       apiv1.RoleStatusPendingReconciliation,
 			"missingFromSpec": apiv1.RoleStatusNotManaged,
 		},
 	),
