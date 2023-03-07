@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,15 +30,21 @@ import (
 type funcCall struct{ verb, roleName string }
 
 type mockRoleManager struct {
-	roles       map[string]apiv1.RoleConfiguration
+	roles       map[string]DatabaseRole
 	callHistory []funcCall
+}
+
+var syncInstance = RoleSynchronizer{
+	instance: &postgres.Instance{
+		Namespace: "myPod",
+	},
 }
 
 func (m *mockRoleManager) List(
 	ctx context.Context, config *apiv1.ManagedConfiguration,
-) ([]apiv1.RoleConfiguration, error) {
+) ([]DatabaseRole, error) {
 	m.callHistory = append(m.callHistory, funcCall{"list", ""})
-	re := make([]apiv1.RoleConfiguration, len(m.roles))
+	re := make([]DatabaseRole, len(m.roles))
 	i := 0
 	for _, r := range m.roles {
 		re[i] = r
@@ -47,7 +54,7 @@ func (m *mockRoleManager) List(
 }
 
 func (m *mockRoleManager) Update(
-	ctx context.Context, role apiv1.RoleConfiguration,
+	ctx context.Context, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"update", role.Name})
 	_, found := m.roles[role.Name]
@@ -59,7 +66,7 @@ func (m *mockRoleManager) Update(
 }
 
 func (m *mockRoleManager) Create(
-	ctx context.Context, role apiv1.RoleConfiguration,
+	ctx context.Context, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"create", role.Name})
 	_, found := m.roles[role.Name]
@@ -71,7 +78,7 @@ func (m *mockRoleManager) Create(
 }
 
 func (m *mockRoleManager) Delete(
-	ctx context.Context, role apiv1.RoleConfiguration,
+	ctx context.Context, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"delete", role.Name})
 	_, found := m.roles[role.Name]
@@ -97,14 +104,16 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 		rm := mockRoleManager{
-			roles: map[string]apiv1.RoleConfiguration{
+			roles: map[string]DatabaseRole{
 				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
+					RoleConfiguration: apiv1.RoleConfiguration{
+						Name:      "postgres",
+						Superuser: true,
+					},
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			([]funcCall{
@@ -130,14 +139,17 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 		rm := mockRoleManager{
-			roles: map[string]apiv1.RoleConfiguration{
+			roles: map[string]DatabaseRole{
 				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
+					RoleConfiguration: apiv1.RoleConfiguration{
+						Name:      "postgres",
+						Superuser: true,
+					},
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -152,18 +164,22 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 		rm := mockRoleManager{
-			roles: map[string]apiv1.RoleConfiguration{
+			roles: map[string]DatabaseRole{
 				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
+					RoleConfiguration: apiv1.RoleConfiguration{
+						Name:      "postgres",
+						Superuser: true,
+					},
 				},
 				"ignorezMoi": {
-					Name:      "ignorezMoi",
-					Superuser: true,
+					RoleConfiguration: apiv1.RoleConfiguration{
+						Name:      "ignorezMoi",
+						Superuser: true,
+					},
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -178,18 +194,22 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 		rm := mockRoleManager{
-			roles: map[string]apiv1.RoleConfiguration{
+			roles: map[string]DatabaseRole{
 				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
+					RoleConfiguration: apiv1.RoleConfiguration{
+						Name:      "postgres",
+						Superuser: true,
+					},
 				},
 				"edb_test": {
-					Name:      "edb_test",
-					Superuser: true,
+					RoleConfiguration: apiv1.RoleConfiguration{
+						Name:      "edb_test",
+						Superuser: true,
+					},
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -209,18 +229,22 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 		rm := mockRoleManager{
-			roles: map[string]apiv1.RoleConfiguration{
+			roles: map[string]DatabaseRole{
 				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
+					RoleConfiguration: apiv1.RoleConfiguration{
+						Name:      "postgres",
+						Superuser: true,
+					},
 				},
 				"edb_test": {
-					Name:      "edb_test",
-					Superuser: true,
+					RoleConfiguration: apiv1.RoleConfiguration{
+						Name:      "edb_test",
+						Superuser: true,
+					},
 				},
 			},
 		}
-		err := synchronizeRoles(ctx, &rm, "myPod", &managedConf)
+		err := synchronizeRoles(ctx, &rm, &syncInstance, &managedConf)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
