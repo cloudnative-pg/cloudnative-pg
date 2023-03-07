@@ -18,6 +18,7 @@ package roles
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -80,8 +81,14 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		roles, err := prm.List(ctx)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(roles).To(HaveLen(2))
-		password1 := "12345"
-		password2 := "54321"
+		password1 := sql.NullString{
+			Valid:  true,
+			String: "12345",
+		}
+		password2 := sql.NullString{
+			Valid:  true,
+			String: "54321",
+		}
 		Expect(roles).To(ContainElements(DatabaseRole{
 			RoleConfiguration: apiv1.RoleConfiguration{
 				Name:            "postgres",
