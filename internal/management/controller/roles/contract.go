@@ -19,18 +19,25 @@ package roles
 import (
 	"context"
 	"database/sql"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // DatabaseRole represents the role information read from / written to the Database
 // The password management in the apiv1.RoleConfiguration assumes the use of Secrets,
 // so cannot cleanly mapped to Postgres
 type DatabaseRole struct {
-	apiv1.RoleConfiguration
-	password sql.NullString // the plain password to set for the role
-	// sql.NullString??
-	// hasPassword bool   // whether a role read from the DB has a passwor
+	Name            string   `json:"name"`
+	Comment         string   `json:"comment,omitempty"`
+	Superuser       bool     `json:"superuser,omitempty"`
+	CreateDB        bool     `json:"createdb,omitempty"`
+	CreateRole      bool     `json:"createrole,omitempty"`
+	Inherit         bool     `json:"inherit,omitempty"` // defaults to true
+	Login           bool     `json:"login,omitempty"`
+	Replication     bool     `json:"replication,omitempty"`
+	BypassRLS       bool     `json:"bypassrls,omitempty"`       // Row-Level Security
+	ConnectionLimit int64    `json:"connectionLimit,omitempty"` // default is -1
+	ValidUntil      string   `json:"validUntil,omitempty"`
+	InRoles         []string `json:"inRoles,omitempty"`
+	password        sql.NullString
 }
 
 // ReservedRoles is the set of roles managed by the operator that should
