@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -75,7 +76,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			//
 			// IMPORTANT: this is to ensure that we test the old backup system too
 			//
-			if env.PostgresVersion < 13 {
+			if funk.RandomInt(0, 100) < 50 {
+				GinkgoWriter.Println("---- Testing barman backups without the name flag ----")
 				clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-legacy.yaml.template"
 			}
 
