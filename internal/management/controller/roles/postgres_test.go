@@ -90,37 +90,31 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			String: "54321",
 		}
 		Expect(roles).To(ContainElements(DatabaseRole{
-			RoleConfiguration: apiv1.RoleConfiguration{
-				Name:            "postgres",
-				CreateDB:        true,
-				CreateRole:      true,
-				Superuser:       true,
-				Inherit:         false,
-				Login:           true,
-				Replication:     false,
-				BypassRLS:       false,
-				PasswordSecret:  nil,
-				ConnectionLimit: -1,
-				ValidUntil:      "",
-				Comment:         "This is postgres user",
-			},
-			password: password1,
+			Name:            "postgres",
+			CreateDB:        true,
+			CreateRole:      true,
+			Superuser:       true,
+			Inherit:         false,
+			Login:           true,
+			Replication:     false,
+			BypassRLS:       false,
+			ConnectionLimit: -1,
+			ValidUntil:      "",
+			Comment:         "This is postgres user",
+			password:        password1,
 		}, DatabaseRole{
-			RoleConfiguration: apiv1.RoleConfiguration{
-				Name:            "streaming_replica",
-				CreateDB:        true,
-				CreateRole:      true,
-				Superuser:       false,
-				Inherit:         false,
-				Login:           false,
-				Replication:     true,
-				BypassRLS:       false,
-				PasswordSecret:  nil,
-				ConnectionLimit: 10,
-				ValidUntil:      "2023-04-04",
-				Comment:         "This is streaming_replica user",
-			},
-			password: password2,
+			Name:            "streaming_replica",
+			CreateDB:        true,
+			CreateRole:      true,
+			Superuser:       false,
+			Inherit:         false,
+			Login:           false,
+			Replication:     true,
+			BypassRLS:       false,
+			ConnectionLimit: 10,
+			ValidUntil:      "2023-04-04",
+			Comment:         "This is streaming_replica user",
+			password:        password2,
 		}))
 	})
 	It("List returns error if there is a problem with the DB", func(ctx context.Context) {
@@ -146,9 +140,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
-		err = prm.Create(ctx, DatabaseRole{
-			RoleConfiguration: wantedRole,
-		})
+		err = prm.Create(ctx, managedToDatabase(wantedRole, sql.NullString{}))
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 	It("Create will return error if there is a problem creating the role in the DB", func(ctx context.Context) {
@@ -160,9 +152,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleExpectedCrtStmt).
 			WillReturnError(dbError)
 
-		err = prm.Create(ctx, DatabaseRole{
-			RoleConfiguration: wantedRole,
-		})
+		err = prm.Create(ctx, managedToDatabase(wantedRole, sql.NullString{}))
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
 	})
@@ -175,9 +165,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(unWantedRoleExpectedDelStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
-		err = prm.Delete(ctx, DatabaseRole{
-			RoleConfiguration: unWantedRole,
-		})
+		err = prm.Delete(ctx, managedToDatabase(unWantedRole, sql.NullString{}))
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 	It("Delete will return error if there is a problem deleting the role in the DB", func(ctx context.Context) {
@@ -189,9 +177,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(unWantedRoleExpectedDelStmt).
 			WillReturnError(dbError)
 
-		err = prm.Delete(ctx, DatabaseRole{
-			RoleConfiguration: unWantedRole,
-		})
+		err = prm.Delete(ctx, managedToDatabase(unWantedRole, sql.NullString{}))
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
 	})
@@ -206,9 +192,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
-		err = prm.Update(ctx, DatabaseRole{
-			RoleConfiguration: wantedRole,
-		})
+		err = prm.Update(ctx, managedToDatabase(wantedRole, sql.NullString{}))
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 	It("Update will return error if there is a problem updating the role in the DB", func(ctx context.Context) {
@@ -220,9 +204,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleExpectedAltStmt).
 			WillReturnError(dbError)
 
-		err = prm.Update(ctx, DatabaseRole{
-			RoleConfiguration: wantedRole,
-		})
+		err = prm.Update(ctx, managedToDatabase(wantedRole, sql.NullString{}))
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, dbError)).To(BeTrue())
 	})

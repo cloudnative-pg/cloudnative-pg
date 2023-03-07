@@ -104,10 +104,8 @@ var _ = Describe("Role synchronizer tests", func() {
 		rm := mockRoleManager{
 			roles: map[string]DatabaseRole{
 				"postgres": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "postgres",
-						Superuser: true,
-					},
+					Name:      "postgres",
+					Superuser: true,
 				},
 			},
 		}
@@ -139,10 +137,8 @@ var _ = Describe("Role synchronizer tests", func() {
 		rm := mockRoleManager{
 			roles: map[string]DatabaseRole{
 				"postgres": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "postgres",
-						Superuser: true,
-					},
+					Name:      "postgres",
+					Superuser: true,
 				},
 			},
 		}
@@ -164,16 +160,12 @@ var _ = Describe("Role synchronizer tests", func() {
 		rm := mockRoleManager{
 			roles: map[string]DatabaseRole{
 				"postgres": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "postgres",
-						Superuser: true,
-					},
+					Name:      "postgres",
+					Superuser: true,
 				},
 				"ignorezMoi": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "ignorezMoi",
-						Superuser: true,
-					},
+					Name:      "ignorezMoi",
+					Superuser: true,
 				},
 			},
 		}
@@ -194,16 +186,12 @@ var _ = Describe("Role synchronizer tests", func() {
 		rm := mockRoleManager{
 			roles: map[string]DatabaseRole{
 				"postgres": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "postgres",
-						Superuser: true,
-					},
+					Name:      "postgres",
+					Superuser: true,
 				},
 				"edb_test": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "edb_test",
-						Superuser: true,
-					},
+					Name:      "edb_test",
+					Superuser: true,
 				},
 			},
 		}
@@ -229,16 +217,12 @@ var _ = Describe("Role synchronizer tests", func() {
 		rm := mockRoleManager{
 			roles: map[string]DatabaseRole{
 				"postgres": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "postgres",
-						Superuser: true,
-					},
+					Name:      "postgres",
+					Superuser: true,
 				},
 				"edb_test": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "edb_test",
-						Superuser: true,
-					},
+					Name:      "edb_test",
+					Superuser: true,
 				},
 			},
 		}
@@ -276,16 +260,12 @@ var _ = DescribeTable("Role status getter tests",
 		mockRoleManager{
 			roles: map[string]DatabaseRole{
 				"postgres": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "postgres",
-						Superuser: true,
-					},
+					Name:      "postgres",
+					Superuser: true,
 				},
 				"ensurePresent": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "ensurePresent",
-						Superuser: true,
-					},
+					Name:      "ensurePresent",
+					Superuser: true,
 				},
 			},
 		},
@@ -320,22 +300,16 @@ var _ = DescribeTable("Role status getter tests",
 		mockRoleManager{
 			roles: map[string]DatabaseRole{
 				"postgres": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "postgres",
-						Superuser: true,
-					},
+					Name:      "postgres",
+					Superuser: true,
 				},
 				"unwantedInDB": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "unwantedInDB",
-						Superuser: true,
-					},
+					Name:      "unwantedInDB",
+					Superuser: true,
 				},
 				"drifted": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "drifted",
-						Superuser: false,
-					},
+					Name:      "drifted",
+					Superuser: false,
 				},
 			},
 		},
@@ -359,22 +333,16 @@ var _ = DescribeTable("Role status getter tests",
 		mockRoleManager{
 			roles: map[string]DatabaseRole{
 				"postgres": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "postgres",
-						Superuser: true,
-					},
+					Name:      "postgres",
+					Superuser: true,
 				},
 				"edb_admin": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "edb_admin",
-						Superuser: true,
-					},
+					Name:      "edb_admin",
+					Superuser: true,
 				},
 				"missingFromSpec": {
-					RoleConfiguration: apiv1.RoleConfiguration{
-						Name:      "missingFromSpec",
-						Superuser: false,
-					},
+					Name:      "missingFromSpec",
+					Superuser: false,
 				},
 			},
 		},
