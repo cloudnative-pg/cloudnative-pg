@@ -53,6 +53,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 
 	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster, backupOrigin)...)
 	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(cluster)...)
+	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(cluster)...)
 
 	rules := []rbacv1.PolicyRule{
 		{
@@ -296,4 +297,23 @@ func googleCredentialsSecrets(googleCredentials *apiv1.GoogleCredentials) []stri
 	}
 
 	return secrets
+}
+
+func managedRolesSecrets(cluster apiv1.Cluster) []string {
+	if cluster.Spec.Managed == nil {
+		return nil
+	}
+	managedRoles := cluster.Spec.Managed.Roles
+	if len(managedRoles) == 0 {
+		return nil
+	}
+	secretNames := make([]string, 0, len(managedRoles))
+	for _, role := range managedRoles {
+		secretName := role.GetRoleSecretsName()
+		if secretName != "" {
+			secretNames = append(secretNames, secretName)
+		}
+	}
+
+	return secretNames
 }

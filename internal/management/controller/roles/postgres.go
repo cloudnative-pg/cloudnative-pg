@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/lib/pq"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
@@ -223,6 +224,6 @@ func appendPasswordOption(role DatabaseRole,
 	if !role.password.Valid {
 		query.WriteString("PASSWORD NULL")
 	} else {
-		query.WriteString(fmt.Sprintf("PASSWORD %s", role.password.String))
+		query.WriteString(fmt.Sprintf("PASSWORD %s", pq.QuoteLiteral(role.password.String)))
 	}
 }

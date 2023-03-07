@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -176,7 +177,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	)
 }
 
-// applyRoleActions aligns roles in the database to the spec
+// applyRoleActions applies the actions to reconcile roles in the DB with the Spec
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	roleManager RoleManager,
@@ -362,12 +363,12 @@ func getPassword(ctx context.Context, sr *RoleSynchronizer,
 	if err != nil {
 		return sql.NullString{}, err
 	}
-	if roleInSpec.Name != usernameFromSecret {
+	if strings.TrimSpace(roleInSpec.Name) != strings.TrimSpace(usernameFromSecret) {
 		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
 		return sql.NullString{}, err
 	}
 	return sql.NullString{
 		Valid:  true,
-		String: passwordFromSecret,
+		String: strings.TrimSpace(passwordFromSecret),
 	}, nil
 }
