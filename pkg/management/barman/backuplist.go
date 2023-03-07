@@ -132,6 +132,8 @@ func GetBackupByName(
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 	env []string,
 ) (*catalog.BarmanBackup, error) {
+	contextLogger := log.FromContext(ctx)
+
 	rawJSON, err := executeQueryCommand(
 		ctx,
 		barmanCapabilities.BarmanCloudBackupShow,
@@ -143,7 +145,6 @@ func GetBackupByName(
 	if err != nil {
 		return nil, err
 	}
-	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Debug("raw backup barman object", "rawBarmanObject", rawJSON)
 
@@ -165,11 +166,12 @@ func GetLatestBackup(
 		return nil, err
 	}
 
+	contextLogger.Debug("raw backup list object", "backupList", backupList)
+
 	// We have just made a new backup, if the backup list is empty
 	// something is going wrong in the cloud storage
 	if backupList.Len() == 0 {
-		contextLogger.Error(nil, "Can't set backup status as completed: empty backup list")
-		return nil, fmt.Errorf("the executed backup could be found on the remote object storage")
+		return nil, fmt.Errorf("no backup found on the remote object storage")
 	}
 
 	return backupList.LatestBackupInfo(), nil

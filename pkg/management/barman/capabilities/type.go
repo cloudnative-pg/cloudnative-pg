@@ -25,6 +25,7 @@ import (
 
 // Capabilities collects a set of boolean values that shows the possible capabilities of Barman and the version
 type Capabilities struct {
+	// this is not exported because the consumers have to use ShouldExecuteBackupWithName
 	hasName                    bool
 	HasAzure                   bool
 	HasS3                      bool
@@ -38,7 +39,7 @@ type Capabilities struct {
 	Version                    *semver.Version
 }
 
-// ShouldExecuteBackupWithName returns true if the new backup logic should be ran
+// ShouldExecuteBackupWithName returns true if the new backup logic should be executed
 func (c *Capabilities) ShouldExecuteBackupWithName(cluster *apiv1.Cluster) bool {
 	if !c.hasName || cluster == nil {
 		return c.hasName
