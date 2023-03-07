@@ -19,7 +19,6 @@ package bootstrap
 
 import (
 	"os"
-	"os/exec"
 
 	"github.com/spf13/cobra"
 
@@ -40,21 +39,17 @@ func NewCmd() *cobra.Command {
 				"destination", dest,
 				"version", versions.Version,
 				"build", versions.Info)
-			runningCmd := "ps -ef | grep /controller/manager | grep -v grep  | awk '{print \"kill -9 \" $2}' "
-			out, err := exec.Command("bash", "-c", runningCmd).Output()
-			if err != nil {
-				log.Error(err, "Failed to execute command: "+runningCmd)
-			}
-			log.Info(string(out))
-			runningCmd = "ps -ef | grep /controller/manager | grep -v grep  | awk '{print \"kill -9 \" $2}' | bash"
-			out, err = exec.Command("bash", "-c", runningCmd).Output()
-			if err != nil {
-				log.Error(err, "Failed to execute command: "+runningCmd)
-			}
-			log.Info(string(out))
-			err = fileutils.CopyFile(cmd.Root().Name(), dest)
+			exists, err := fileutils.FileExists(dest)
 			if err != nil {
 				panic(err)
+			}
+			if !exists {
+				err = fileutils.CopyFile(cmd.Root().Name(), dest)
+				if err != nil {
+					panic(err)
+				}
+			} else {
+				log.Info(dest + "already exist")
 			}
 
 			log.Info("Setting 0750 permissions")
