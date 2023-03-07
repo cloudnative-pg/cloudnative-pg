@@ -18,6 +18,7 @@ package roles
 
 import (
 	"context"
+	"database/sql"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -27,7 +28,7 @@ import (
 // so cannot cleanly mapped to Postgres
 type DatabaseRole struct {
 	apiv1.RoleConfiguration
-	password string // the plain password to set for the role
+	password sql.NullString // the plain password to set for the role
 	// sql.NullString??
 	// hasPassword bool   // whether a role read from the DB has a passwor
 }
