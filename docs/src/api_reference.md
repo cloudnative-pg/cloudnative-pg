@@ -866,7 +866,7 @@ Name            | Description                       | Type
 `superuser      ` |                                   | bool                                          
 `createdb       ` |                                   | bool                                          
 `createrole     ` |                                   | bool                                          
-`inherit        ` | inherit defaults to true          | bool                                          
+`inherit        ` | inherit defaults to true          - *mandatory*  | bool                                          
 `login          ` |                                   | bool                                          
 `replication    ` |                                   | bool                                          
 `bypassrls      ` |                                   | bool                                          
