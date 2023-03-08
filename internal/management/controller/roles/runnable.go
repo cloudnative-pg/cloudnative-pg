@@ -372,3 +372,22 @@ func getPassword(ctx context.Context, sr *RoleSynchronizer,
 		String: strings.TrimSpace(passwordFromSecret),
 	}, nil
 }
+
+// managedToDatabase map the RoleConfiguration to DatabaseRole
+func managedToDatabase(role apiv1.RoleConfiguration, password sql.NullString) DatabaseRole {
+	return DatabaseRole{
+		Name:            role.Name,
+		Comment:         role.Comment,
+		Superuser:       role.Superuser,
+		CreateDB:        role.CreateDB,
+		CreateRole:      role.CreateRole,
+		Inherit:         role.Inherit,
+		Login:           role.Login,
+		Replication:     role.Replication,
+		BypassRLS:       role.BypassRLS,
+		ConnectionLimit: role.ConnectionLimit,
+		ValidUntil:      role.ValidUntil,
+		InRoles:         role.InRoles,
+		password:        password,
+	}
+}
