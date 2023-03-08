@@ -85,7 +85,8 @@ func executeQueryCommand(
 	err = cmd.Run()
 	if err != nil {
 		contextLogger.Error(err,
-			"Can't extract backup id using barman-cloud-backup-list",
+			"Can't extract backup id",
+			"command", barmanCommand,
 			"options", options,
 			"stdout", stdoutBuffer.String(),
 			"stderr", stderrBuffer.String())
@@ -117,7 +118,9 @@ func GetBackupList(
 	}
 	backupList, err := catalog.NewCatalogFromBarmanCloudBackupList(rawJSON)
 	if err != nil {
-		contextLogger.Error(err, "Can't parse barman-cloud-backup-list output")
+		contextLogger.Error(err, "Can't parse barman output",
+			"command", barmanCapabilities.BarmanCloudBackupList,
+			"output", rawJSON)
 		return nil, err
 	}
 
