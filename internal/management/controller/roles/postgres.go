@@ -115,7 +115,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 	// TODO: perhaps separate the comment updating to a separate call
 	contextLog.Info("Updating role comment", "role", role.Name)
 	_, err = sm.superUserDB.ExecContext(ctx,
-		fmt.Sprintf("COMMENT ON ROLE %s IS %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
+		fmt.Sprintf("COMMENT ON ROLE %s IS %s", pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
 	if err != nil {
 		return fmt.Errorf("could not update role comments for %s: %w", role.Name, err)
 	}
@@ -146,7 +146,8 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	// TODO: as with the Update() method, it may be better to handle role comments
 	// in a separate call.
 	_, err = sm.superUserDB.ExecContext(ctx,
-		fmt.Sprintf("COMMENT ON ROLE %s IS %s", pgx.Identifier{role.Name}.Sanitize(), role.Comment))
+		fmt.Sprintf("COMMENT ON ROLE %s IS %s",
+			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
 	if err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
@@ -162,7 +163,8 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 	contextLog := log.FromContext(ctx).WithName("dropRole")
 	contextLog.Trace("Invoked", "role", role)
 
-	_, err := sm.superUserDB.ExecContext(ctx, fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize()))
+	_, err := sm.superUserDB.ExecContext(ctx,
+		fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize()))
 	if err != nil {
 		return fmt.Errorf("could not delete role %s: %w", role.Name, err)
 	}
