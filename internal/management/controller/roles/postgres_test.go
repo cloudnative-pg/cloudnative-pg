@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -51,7 +52,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 	wantedRoleCommentStmt := fmt.Sprintf(
 		"COMMENT ON ROLE \"%s\" IS %s",
-		wantedRole.Name, wantedRole.Comment)
+		wantedRole.Name, pq.QuoteLiteral(wantedRole.Comment))
 
 	wantedRoleExpectedAltStmt := fmt.Sprintf(
 		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 ",
