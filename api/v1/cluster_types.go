@@ -1624,7 +1624,7 @@ type RoleConfiguration struct {
 
 	// inherit defaults to true
 	// +kubebuilder:default:=true
-	Inherit bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
+	Inherit bool `json:"inherit"` // IMPORTANT default is INHERIT
 
 	Login       bool `json:"login,omitempty"`
 	Replication bool `json:"replication,omitempty"`
