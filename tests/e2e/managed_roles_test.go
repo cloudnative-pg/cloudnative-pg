@@ -53,6 +53,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			namespace = "managed-roles"
 			username := "edb_admin"
 			password := "edb_admin"
+			rolCanLogin := true
+			rolSuper := false
+			rolCreateDB := true
+			rolCreateRole := false
+			rolInherit := false
+			rolReplication := false
+			rolByPassRLS := false
+			rolConnLimit := 4
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
@@ -74,6 +82,22 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					cmd))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout).To(ContainSubstring(username))
+
+				cmd = fmt.Sprintf("psql -U postgres postgres -tAc "+
+					"\"SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
+					"and rolcreatedb=%v and rolcreaterole=%v and rolinherit=%v and rolreplication=%v "+
+					"and rolbypassrls=%v and rolconnlimit=%v\"", username, rolCanLogin, rolSuper, rolCreateDB,
+					rolCreateRole, rolInherit, rolReplication, rolByPassRLS, rolConnLimit)
+
+				stdout, _, err = utils.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryDst,
+					cmd))
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(stdout).To(Equal("1\n"))
+
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				// assert connectable use username and password defined in secrets
 				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 10, env)
