@@ -1087,11 +1087,6 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	resources *managedResources,
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
-	// The cluster is over provisioned, no action to be taken here.
-	if cluster.Status.Instances > cluster.Spec.Instances {
-		return ctrl.Result{}, nil
-	}
-
 	contextLogger := log.FromContext(ctx)
 
 	instanceToCreate, err := findInstancePodToCreate(cluster, instancesStatus, resources.pvcs.Items)
