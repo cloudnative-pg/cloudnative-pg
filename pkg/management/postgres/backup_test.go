@@ -11,6 +11,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -97,6 +98,8 @@ var _ = Describe("testing backup command", func() {
 				},
 			},
 		}
+		capabilities, err := barmanCapabilities.CurrentCapabilities()
+		Expect(err).ShouldNot(HaveOccurred())
 		backupCommand = BackupCommand{
 			Cluster: cluster,
 			Backup:  backup,
@@ -104,10 +107,11 @@ var _ = Describe("testing backup command", func() {
 				WithScheme(scheme.BuildWithAllKnownScheme()).
 				WithObjects(cluster, backup).
 				Build(),
-			Recorder: &record.FakeRecorder{},
-			Env:      os.Environ(),
-			Log:      log.FromContext(context.Background()),
-			Instance: &Instance{},
+			Recorder:     &record.FakeRecorder{},
+			Env:          os.Environ(),
+			Log:          log.FromContext(context.Background()),
+			Instance:     &Instance{},
+			Capabilities: capabilities,
 		}
 	})
 

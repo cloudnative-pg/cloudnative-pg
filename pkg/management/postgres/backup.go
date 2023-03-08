@@ -57,13 +57,14 @@ var retryUntilWalArchiveWorking = wait.Backoff{
 
 // BackupCommand represent a backup command that is being executed
 type BackupCommand struct {
-	Cluster  *apiv1.Cluster
-	Backup   *apiv1.Backup
-	Client   client.Client
-	Recorder record.EventRecorder
-	Env      []string
-	Log      log.Logger
-	Instance *Instance
+	Cluster      *apiv1.Cluster
+	Backup       *apiv1.Backup
+	Client       client.Client
+	Recorder     record.EventRecorder
+	Env          []string
+	Log          log.Logger
+	Instance     *Instance
+	Capabilities *barmanCapabilities.Capabilities
 }
 
 // NewBackupCommand initializes a BackupCommand object
@@ -74,16 +75,22 @@ func NewBackupCommand(
 	recorder record.EventRecorder,
 	instance *Instance,
 	log log.Logger,
-) *BackupCommand {
-	return &BackupCommand{
-		Cluster:  cluster,
-		Backup:   backup,
-		Client:   client,
-		Recorder: recorder,
-		Env:      os.Environ(),
-		Instance: instance,
-		Log:      log,
+) (*BackupCommand, error) {
+	capabilities, err := barmanCapabilities.CurrentCapabilities()
+	if err != nil {
+		return nil, err
 	}
+
+	return &BackupCommand{
+		Cluster:      cluster,
+		Backup:       backup,
+		Client:       client,
+		Recorder:     recorder,
+		Env:          os.Environ(),
+		Instance:     instance,
+		Log:          log,
+		Capabilities: capabilities,
+	}, nil
 }
 
 // getDataConfiguration gets the configuration in the `Data` object of the Barman configuration
@@ -135,20 +142,15 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	serverName string,
 ) ([]string, error) {
-	capabilities, err := barmanCapabilities.CurrentCapabilities()
-	if err != nil {
-		return nil, err
-	}
-
 	options := []string{
 		"--user", "postgres",
 	}
 
-	if capabilities.ShouldExecuteBackupWithName(b.Cluster) {
+	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
 		options = append(options, "--name", b.Backup.Name)
 	}
 
-	options, err = getDataConfiguration(options, configuration, capabilities)
+	options, err := getDataConfiguration(options, configuration, b.Capabilities)
 	if err != nil {
 		return nil, err
 	}
@@ -230,17 +232,12 @@ func (b *BackupCommand) ensureBarmanCompatibility() error {
 	if err != nil {
 		return err
 	}
-	capabilities, err := barmanCapabilities.Detect()
-	if err != nil {
-		return err
-	}
-
 	switch {
-	case postgresVers.Major == 15 && capabilities.Version.Major < 3:
+	case postgresVers.Major == 15 && b.Capabilities.Version.Major < 3:
 		return fmt.Errorf(
 			"PostgreSQL %d is not supported by Barman %d.x",
 			postgresVers.Major,
-			capabilities.Version.Major,
+			b.Capabilities.Version.Major,
 		)
 	default:
 		return nil
@@ -307,11 +304,6 @@ func (b *BackupCommand) run(ctx context.Context) {
 }
 
 func (b *BackupCommand) takeBackup(ctx context.Context) error {
-	capabilities, err := barmanCapabilities.CurrentCapabilities()
-	if err != nil {
-		return err
-	}
-
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
@@ -322,7 +314,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	// record the backup beginning
-	b.Log.Debug("Backup started", "options", options)
+	b.Log.Info("Backup started", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
@@ -357,7 +349,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	// Set the status to completed
 	b.Backup.Status.SetAsCompleted()
 
-	barmanBackup, err := b.getExecutedBackupInfo(ctx, capabilities)
+	barmanBackup, err := b.getExecutedBackupInfo(ctx)
 	if err != nil {
 		return err
 	}
@@ -386,9 +378,8 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 
 func (b *BackupCommand) getExecutedBackupInfo(
 	ctx context.Context,
-	capabilities *barmanCapabilities.Capabilities,
 ) (*catalog.BarmanBackup, error) {
-	if capabilities.ShouldExecuteBackupWithName(b.Cluster) {
+	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
 		return barman.GetBackupByName(
 			ctx,
 			b.Backup.Name,
