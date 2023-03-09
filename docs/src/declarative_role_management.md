@@ -68,7 +68,7 @@ There is a section in the CRD status for the status of the managed roles. E.g.
 ```
 
 It includes the roles reserved for operator use and the roles that are **not**
-managed by CloudNativePG, in order to get a complete view of the roles in
+under declarative management, in order to get a complete view of the roles in
 the database instances.
 
 This segues into the topic of backward compatibility: declarative role
