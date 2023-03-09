@@ -1594,6 +1594,11 @@ func (in *RoleConfiguration) DeepCopyInto(out *RoleConfiguration) {
 		*out = new(LocalObjectReference)
 		**out = **in
 	}
+	if in.Inherit != nil {
+		in, out := &in.Inherit, &out.Inherit
+		*out = new(bool)
+		**out = **in
+	}
 	if in.InRoles != nil {
 		in, out := &in.InRoles, &out.InRoles
 		*out = make([]string, len(*in))

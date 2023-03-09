@@ -32,13 +32,14 @@ import (
 )
 
 var _ = Describe("Postgres RoleManager implementation test", func() {
+	falseValue := false
 	wantedRole := apiv1.RoleConfiguration{
 		Name:            "foo",
 		BypassRLS:       true,
 		CreateDB:        false,
 		CreateRole:      true,
 		Login:           true,
-		Inherit:         false,
+		Inherit:         &falseValue,
 		ConnectionLimit: 2,
 		Comment:         "this user is a test",
 	}

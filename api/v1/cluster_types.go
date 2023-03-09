@@ -1624,7 +1624,7 @@ type RoleConfiguration struct {
 
 	// inherit defaults to true
 	// +kubebuilder:default:=true
-	Inherit bool `json:"inherit"` // IMPORTANT default is INHERIT
+	Inherit *bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
 
 	Login       bool `json:"login,omitempty"`
 	Replication bool `json:"replication,omitempty"`
@@ -1644,6 +1644,14 @@ func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
 		return roleConfiguration.PasswordSecret.Name
 	}
 	return ""
+}
+
+// GetRoleInherit return the inherit attribute of a roleConfiguration
+func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
+	if roleConfiguration.Inherit != nil {
+		return *roleConfiguration.Inherit
+	}
+	return true
 }
 
 // GetUpdateInterval returns the update interval, defaulting to DefaultRoleUpdateInterval if empty
