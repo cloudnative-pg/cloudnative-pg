@@ -72,6 +72,7 @@ managed by CloudNativePG, in order to get a complete view of the roles in
 the database instances.
 
 This segues into the topic of backward compatibility: declarative role
-management is defined to ignore roles that exist in the database but are not in the spec. The lifecycle of those roles will continue to be handled within
+management is defined to ignore roles that exist in the database but are not in
+the spec. The lifecycle of those roles will continue to be handled within
 PostgreSQL. This allows users of CloudNativePG to opt into the feature at
 their convenience.
