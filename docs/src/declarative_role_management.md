@@ -18,7 +18,7 @@ them too, if they are not yet present in the database.
 The creation of those roles will happen *after* the database bootstrapping is
 complete.
 
-There is an example manifest for a cluster including declarative role management
+There is an example manifest for a cluster with declarative role management
 in the file
 [`cluster-example-with-roles.yaml`](samples/cluster-example-with-roles.yaml)
 
@@ -49,7 +49,7 @@ A few points are worth noting:
 3. the `connectionLimit` attribute is by default -1, as per PostgreSQL
   conventions.
 
-The declarative role management will ensure that PostgreSQL instances are in
+Declarative role management will ensure that PostgreSQL instances are in
 line with the spec. This means that if a user were to log onto the
 database and change role attributes there, the CloudNativePG operator would
 roll back those changes in the next reconciliation cycle.
