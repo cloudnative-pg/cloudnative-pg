@@ -1096,8 +1096,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	if instanceToCreate == nil {
 		contextLogger.Debug(
 			"haven't found any instance to create",
-			"instances",
-			instancesStatus.GetNames(),
+			"instances", instancesStatus.GetNames(),
 			"dangling", cluster.Status.DanglingPVC,
 			"unusable", cluster.Status.UnusablePVC,
 		)
