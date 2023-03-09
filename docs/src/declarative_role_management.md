@@ -10,7 +10,7 @@ needed in PostgreSQL instances:
 This is described in the ["Bootstrap" section](bootstrap.md).
 
 With the `managed` stanza in the cluster spec, CloudNativePG extends management
-from creation to the full lifecycle management for roles describe in
+from creation to the full lifecycle management for roles described in
 `.spec.managed.roles`.
 
 This feature allows to manage existing roles in a declarative way, and to create
