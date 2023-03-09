@@ -381,7 +381,7 @@ func managedToDatabase(role apiv1.RoleConfiguration, password sql.NullString) Da
 		Superuser:       role.Superuser,
 		CreateDB:        role.CreateDB,
 		CreateRole:      role.CreateRole,
-		Inherit:         role.Inherit,
+		Inherit:         role.GetRoleInherit(),
 		Login:           role.Login,
 		Replication:     role.Replication,
 		BypassRLS:       role.BypassRLS,

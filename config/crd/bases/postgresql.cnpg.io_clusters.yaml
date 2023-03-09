@@ -2233,7 +2233,6 @@ spec:
                         validUntil:
                           type: string
                       required:
-                      - inherit
                       - name
                       type: object
                     type: array
