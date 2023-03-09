@@ -53,3 +53,25 @@ Declarative role management will ensure that PostgreSQL instances are in
 line with the spec. This means that if a user were to log onto the
 database and change role attributes there, the CloudNativePG operator would
 roll back those changes in the next reconciliation cycle.
+
+There is a section in the CRD status for the status of the managed roles. E.g.
+
+``` yaml
+  roleStatus:
+    not-managed:
+    - app
+    pending-reconciliation:
+    - edb_admin
+    reserved:
+    - postgres
+    - streaming_replica
+```
+
+It includes the roles reserved for operator use and the roles that are **not**
+managed by CloudNativePG, in order to get a complete view of the roles in
+the database instances.
+
+This segues into the topic of backward compatibility: declarative role
+management is defined to ignore roles that exist in the database but are not in the spec. The lifecycle of those roles will continue to be handled within
+PostgreSQL. This allows users of CloudNativePG to opt into the feature at
+their convenience.
