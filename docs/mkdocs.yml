@@ -55,3 +55,4 @@ nav:
   - api_reference.md
   - supported_releases.md
   - release_notes.md
+  - declarative_role_management.md
