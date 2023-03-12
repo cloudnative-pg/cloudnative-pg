@@ -154,6 +154,7 @@ LTS
 LastBackupFailed
 LastBackupSucceeded
 Lifecycle
+Linkerd
 Linode
 ListMeta
 Liveness
