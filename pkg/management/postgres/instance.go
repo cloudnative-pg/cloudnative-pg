@@ -231,8 +231,8 @@ func (instance *Instance) SlotReplicatorChan() <-chan *apiv1.ReplicationSlotsCon
 	return instance.slotsReplicatorChan
 }
 
-// ConfigureRoleSynchronizer sends the configuration to the role synchronizer
-func (instance *Instance) ConfigureRoleSynchronizer(config *apiv1.ManagedConfiguration) {
+// TriggerRoleSynchronizer sends the configuration to the role synchronizer
+func (instance *Instance) TriggerRoleSynchronizer(config *apiv1.ManagedConfiguration) {
 	go func() {
 		instance.roleSynchronizerChan <- config
 	}()
