@@ -109,7 +109,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			[]funcCall{
@@ -143,7 +143,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -169,7 +169,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -195,7 +195,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -226,7 +226,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -238,8 +238,7 @@ var _ = Describe("Role synchronizer tests", func() {
 var _ = DescribeTable("Role status getter tests",
 	func(spec *apiv1.ManagedConfiguration, db mockRoleManager, expected map[string]apiv1.RoleStatus) {
 		ctx := context.TODO()
-		statusMap, err := getRoleStatus(ctx, &db, spec)
-		Expect(err).ShouldNot(HaveOccurred())
+		statusMap, _ := getRoleStatus(ctx, &db, spec, map[string]apiv1.PasswordState{}, nil)
 		Expect(statusMap).To(BeEquivalentTo(expected))
 	},
 	Entry("detects roles that are fully reconciled",

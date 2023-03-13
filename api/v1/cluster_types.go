@@ -399,6 +399,14 @@ const (
 	RoleStatusReserved = "reserved"
 )
 
+// PasswordState represents the state of the password of a managed RoleConfiguration
+type PasswordState struct {
+	// the last transaction ID to affect the role definition in PostgreSQL
+	TransactionID int64 `json:"transactionID"`
+	// the hash of the password stored in the kubernetes secret
+	PasswordHash []byte `json:"passwordHash"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// Total number of instances in the cluster
@@ -415,6 +423,9 @@ type ClusterStatus struct {
 
 	// RoleStatus gives the list of roles in each state
 	RoleStatus map[RoleStatus][]string `json:"roleStatus,omitempty"`
+
+	// RolePasswordStatus gives the last transaction id and hash for each managed role
+	RolePasswordStatus map[string]PasswordState `json:"rolePasswordStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	TimelineID int `json:"timelineID,omitempty"`

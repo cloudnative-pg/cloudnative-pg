@@ -17,11 +17,12 @@ limitations under the License.
 package roles
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,16 +60,13 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 		return err
 	}
 	if !isPrimary {
-		contextLog.Info("skipping the role synchronization in replicas")
+		contextLog.Info("skipping the RoleSynchronizer in replicas")
 	}
 	go func() {
-		config := <-sr.instance.RoleSynchronizerChan()
-		contextLog.Info("setting up role synchronizer loop")
-		updateInterval := config.GetUpdateInterval()
-		ticker := time.NewTicker(updateInterval)
+		var config *apiv1.ManagedConfiguration
+		contextLog.Info("setting up RoleSynchronizer loop")
 
 		defer func() {
-			ticker.Stop()
 			contextLog.Info("Terminated RoleSynchronizer loop")
 		}()
 
@@ -77,24 +75,12 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case config = <-sr.instance.RoleSynchronizerChan():
-			case <-ticker.C:
 			}
 
 			// If the spec contains no roles to manage, stop the timer,
 			// the process will resume through the wakeUp channel if necessary
 			if config == nil || len(config.Roles) == 0 {
-				ticker.Stop()
-				// we set updateInterval to 0 to make sure the Ticker will be reset
-				// if the feature is enabled again
-				updateInterval = 0
 				continue
-			}
-
-			// Update the ticker if the update interval has changed
-			newUpdateInterval := config.GetUpdateInterval()
-			if updateInterval != newUpdateInterval {
-				ticker.Reset(newUpdateInterval)
-				updateInterval = newUpdateInterval
 			}
 
 			err := sr.reconcile(ctx, config)
@@ -123,7 +109,8 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 	roleManager := NewPostgresRoleManager(superUserDB)
 
-	return sr.synchronizeRoles(ctx, roleManager, config)
+	var rolePasswords map[string]apiv1.PasswordState
+	return sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
 }
 
 func getRoleNames(roles []apiv1.RoleConfiguration) []string {
@@ -139,7 +126,7 @@ func (sr *RoleSynchronizer) createRoleFromSpec(
 	roleManager RoleManager,
 	role apiv1.RoleConfiguration,
 ) error {
-	pass, err := getPassword(ctx, sr, role)
+	pass, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
 	if err != nil {
 		return fmt.Errorf("while getting role password for %s: %w", role.Name, err)
 	}
@@ -151,7 +138,7 @@ func (sr *RoleSynchronizer) updateRoleFromSpec(
 	roleManager RoleManager,
 	role apiv1.RoleConfiguration,
 ) error {
-	pass, err := getPassword(ctx, sr, role)
+	pass, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
 	if err != nil {
 		return fmt.Errorf("while getting role password for %s: %w", role.Name, err)
 	}
@@ -163,8 +150,20 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
 	roleManager RoleManager,
 	config *apiv1.ManagedConfiguration,
+	storedPasswordState map[string]apiv1.PasswordState,
 ) error {
-	rolesByAction, err := evaluateRoleActions(ctx, roleManager, config)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
+	}
+	hashes, err := getPasswordHashes(ctx, sr.client, config.Roles, sr.instance.Namespace)
+	if err != nil {
+		return wrapErr(err)
+	}
+	rolesInDB, err := roleManager.List(ctx)
+	if err != nil {
+		return wrapErr(err)
+	}
+	rolesByAction := evaluateRoleActions(ctx, config, rolesInDB, storedPasswordState, hashes)
 	if err != nil {
 		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
@@ -172,7 +171,6 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	return sr.applyRoleActions(
 		ctx,
 		roleManager,
-		config,
 		rolesByAction,
 	)
 }
@@ -181,13 +179,11 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	roleManager RoleManager,
-	config *apiv1.ManagedConfiguration,
 	rolesByAction map[roleAction][]apiv1.RoleConfiguration,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("synchronizing roles",
-		"podName", sr.instance.PodName,
-		"managedConfig", config)
+		"podName", sr.instance.PodName)
 
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while synchronizing roles in primary: %w", err)
@@ -240,22 +236,20 @@ const (
 	roleUpdate
 	roleIgnore
 	roleIsReserved
+	roleSetPassword
 )
 
 // evaluateRoleActions evaluates the action needed for each role in the DB and/or the Spec.
-// It has no side-effects
+// It has no side effects
 func evaluateRoleActions(
 	ctx context.Context,
-	roleManager RoleManager,
 	config *apiv1.ManagedConfiguration,
-) (map[roleAction][]apiv1.RoleConfiguration, error) {
+	rolesInDB []DatabaseRole,
+	lastPasswordState map[string]apiv1.PasswordState,
+	passwordsInSpec map[string][]byte,
+) map[roleAction][]apiv1.RoleConfiguration {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("evaluating the role actions")
-
-	rolesInDB, err := roleManager.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("while evaluating the roles: %w", err)
-	}
 
 	rolesInSpec := config.Roles
 	// set up a map name -> role for the spec roles
@@ -263,6 +257,8 @@ func evaluateRoleActions(
 	for _, r := range rolesInSpec {
 		roleInSpecNamed[r.Name] = r
 	}
+
+	passwordNeedsUpdating := getPasswordEvaluator(lastPasswordState, passwordsInSpec)
 
 	rolesByAction := make(map[roleAction][]apiv1.RoleConfiguration)
 	// 1. find the next actions for the roles in the DB
@@ -275,13 +271,10 @@ func evaluateRoleActions(
 			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], apiv1.RoleConfiguration{Name: role.Name})
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
 			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
-		case isInSpec:
-			// TODO: this is very aggressive. We update the role each time. This
-			// is due to the complexity of decrypting-encrypting SCRAM-SHA-256 so we
-			// can compare if passwords have changed.
-			// We have another ticket open to implement encryption/decription and then
-			// we can issue updates only when the role in DB has drifted from spec
+		case isInSpec && !areEquivalent(role, inSpec):
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
+		case isInSpec && passwordNeedsUpdating(role):
+			rolesByAction[roleSetPassword] = append(rolesByAction[roleSetPassword], inSpec)
 		case !isInSpec:
 			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})
 		default:
@@ -304,7 +297,19 @@ func evaluateRoleActions(
 		}
 	}
 
-	return rolesByAction, nil
+	return rolesByAction
+}
+
+// getPasswordEvaluator creates a function that will evaluate whether a
+// DatabaseRole needs to be updated
+func getPasswordEvaluator(
+	storedPasswordState map[string]apiv1.PasswordState,
+	passwordsInSpec map[string][]byte,
+) func(role DatabaseRole) bool {
+	return func(role DatabaseRole) bool {
+		return !bytes.Equal(storedPasswordState[role.Name].PasswordHash, passwordsInSpec[role.Name]) ||
+			storedPasswordState[role.Name].TransactionID != role.transactionID
+	}
 }
 
 // getRoleStatus gets the status of every role in the Spec and/or in the DB
@@ -312,19 +317,27 @@ func getRoleStatus(
 	ctx context.Context,
 	roleManager RoleManager,
 	config *apiv1.ManagedConfiguration,
-) (map[string]apiv1.RoleStatus, error) {
+	storedPasswordState map[string]apiv1.PasswordState,
+	passwordHashes map[string][]byte,
+) (map[string]apiv1.RoleStatus, map[string]apiv1.PasswordState) {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("getting the managed roles status")
 
-	rolesByAction, err := evaluateRoleActions(ctx, roleManager, config)
+	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("while getting the ManagedRoles status: %w", err)
+		return nil, nil
+	}
+
+	rolesByAction := evaluateRoleActions(ctx, config, rolesInDB, storedPasswordState, passwordHashes)
+	if err != nil {
+		return nil, nil
 	}
 
 	statusByAction := map[roleAction]apiv1.RoleStatus{
 		roleCreate:       apiv1.RoleStatusPendingReconciliation,
 		roleDelete:       apiv1.RoleStatusPendingReconciliation,
 		roleUpdate:       apiv1.RoleStatusPendingReconciliation,
+		roleSetPassword:  apiv1.RoleStatusPendingReconciliation,
 		roleIsReconciled: apiv1.RoleStatusReconciled,
 		roleIgnore:       apiv1.RoleStatusNotManaged,
 		roleIsReserved:   apiv1.RoleStatusReserved,
@@ -337,13 +350,21 @@ func getRoleStatus(
 		}
 	}
 
-	return statusByRole, nil
+	passwordSate := make(map[string]apiv1.PasswordState)
+	for _, role := range rolesInDB {
+		passwordSate[role.Name] = apiv1.PasswordState{
+			TransactionID: role.transactionID,
+			PasswordHash:  passwordHashes[role.Name],
+		}
+	}
+
+	return statusByRole, passwordSate
 }
 
 // getPassword retrieves the password stored in the Kubernetes secret for the
 // RoleConfiguration
-func getPassword(ctx context.Context, sr *RoleSynchronizer,
-	roleInSpec apiv1.RoleConfiguration,
+func getPassword(ctx context.Context, cl client.Client,
+	roleInSpec apiv1.RoleConfiguration, namespace string,
 ) (sql.NullString, error) {
 	secretName := roleInSpec.GetRoleSecretsName()
 	// no secrets defined, will keep roleInSpec.Password nil
@@ -352,9 +373,8 @@ func getPassword(ctx context.Context, sr *RoleSynchronizer,
 	}
 
 	var secret corev1.Secret
-	err := sr.client.Get(
-		ctx,
-		client.ObjectKey{Namespace: sr.instance.Namespace, Name: secretName},
+	err := cl.Get(ctx,
+		client.ObjectKey{Namespace: namespace, Name: secretName},
 		&secret)
 	if err != nil {
 		return sql.NullString{}, err
@@ -371,6 +391,71 @@ func getPassword(ctx context.Context, sr *RoleSynchronizer,
 		Valid:  true,
 		String: strings.TrimSpace(passwordFromSecret),
 	}, nil
+}
+
+func getPasswordHashes(ctx context.Context, client client.Client,
+	rolesInSpec []apiv1.RoleConfiguration, namespace string,
+) (map[string][]byte, error) {
+	re := make(map[string][]byte)
+	for _, role := range rolesInSpec {
+		pass, err := getPassword(ctx, client, role, namespace)
+		if err != nil {
+			return nil, err
+		}
+		encoder := sha256.New()
+		_, err = encoder.Write([]byte(pass.String))
+		if err != nil {
+			return nil, err
+		}
+		re[role.Name] = encoder.Sum(nil)
+	}
+	return re, nil
+}
+
+// areEquivalent checks a subset of the attributes of roles in DB and Spec
+// leaving passwords and role membership (InRoles) to be done separately
+func areEquivalent(inDB DatabaseRole, inSpec apiv1.RoleConfiguration) bool {
+	reducedEntries := []struct {
+		Name            string
+		Comment         string
+		Superuser       bool
+		CreateDB        bool
+		CreateRole      bool
+		Inherit         bool
+		Login           bool
+		Replication     bool
+		BypassRLS       bool
+		ConnectionLimit int64
+		ValidUntil      string
+	}{
+		{
+			Name:            inDB.Name,
+			Comment:         inDB.Comment,
+			Superuser:       inDB.Superuser,
+			CreateDB:        inDB.CreateDB,
+			CreateRole:      inDB.CreateDB,
+			Inherit:         inDB.Inherit,
+			Login:           inDB.Login,
+			Replication:     inDB.Replication,
+			BypassRLS:       inDB.BypassRLS,
+			ConnectionLimit: inDB.ConnectionLimit,
+			ValidUntil:      inDB.ValidUntil,
+		},
+		{
+			Name:            inSpec.Name,
+			Comment:         inSpec.Comment,
+			Superuser:       inSpec.Superuser,
+			CreateDB:        inSpec.CreateDB,
+			CreateRole:      inSpec.CreateDB,
+			Inherit:         inSpec.GetRoleInherit(),
+			Login:           inSpec.Login,
+			Replication:     inSpec.Replication,
+			BypassRLS:       inSpec.BypassRLS,
+			ConnectionLimit: inSpec.ConnectionLimit,
+			ValidUntil:      inSpec.ValidUntil,
+		},
+	}
+	return reducedEntries[0] == reducedEntries[1]
 }
 
 // managedToDatabase map the RoleConfiguration to DatabaseRole

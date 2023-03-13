@@ -210,6 +210,7 @@ PPROF
 PV
 PVCs
 PasswordConfiguration
+PasswordState
 Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
@@ -273,6 +274,7 @@ ResourceVersion
 RetentionPolicy
 RoleBinding
 RoleConfiguration
+RolePasswordStatus
 RoleStatus
 RollingUpdateStatus
 Ruocco
