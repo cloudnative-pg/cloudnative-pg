@@ -25,19 +25,20 @@ import (
 // The password management in the apiv1.RoleConfiguration assumes the use of Secrets,
 // so cannot cleanly mapped to Postgres
 type DatabaseRole struct {
-	Name            string   `json:"name"`
-	Comment         string   `json:"comment,omitempty"`
-	Superuser       bool     `json:"superuser,omitempty"`
-	CreateDB        bool     `json:"createdb,omitempty"`
-	CreateRole      bool     `json:"createrole,omitempty"`
-	Inherit         bool     `json:"inherit,omitempty"` // defaults to true
-	Login           bool     `json:"login,omitempty"`
-	Replication     bool     `json:"replication,omitempty"`
-	BypassRLS       bool     `json:"bypassrls,omitempty"`       // Row-Level Security
-	ConnectionLimit int64    `json:"connectionLimit,omitempty"` // default is -1
-	ValidUntil      string   `json:"validUntil,omitempty"`
-	InRoles         []string `json:"inRoles,omitempty"`
-	password        sql.NullString
+	Name            string         `json:"name"`
+	Comment         string         `json:"comment,omitempty"`
+	Superuser       bool           `json:"superuser,omitempty"`
+	CreateDB        bool           `json:"createdb,omitempty"`
+	CreateRole      bool           `json:"createrole,omitempty"`
+	Inherit         bool           `json:"inherit,omitempty"` // defaults to true
+	Login           bool           `json:"login,omitempty"`
+	Replication     bool           `json:"replication,omitempty"`
+	BypassRLS       bool           `json:"bypassrls,omitempty"`       // Row-Level Security
+	ConnectionLimit int64          `json:"connectionLimit,omitempty"` // default is -1
+	ValidUntil      string         `json:"validUntil,omitempty"`
+	InRoles         []string       `json:"inRoles,omitempty"`
+	password        sql.NullString `json:"-"`
+	transactionID   int64          `json:"-"`
 }
 
 // ReservedRoles is the set of roles managed by the operator that should
@@ -58,4 +59,8 @@ type RoleManager interface {
 	Create(ctx context.Context, role DatabaseRole) error
 	// Delete the role in the database
 	Delete(ctx context.Context, role DatabaseRole) error
+	// GetLastTransactionID returns the last TransactionID as the `xmin`
+	// from the database
+	// See https://www.postgresql.org/docs/current/datatype-oid.html for reference
+	GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error)
 }

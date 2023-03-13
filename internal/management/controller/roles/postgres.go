@@ -48,7 +48,7 @@ func (sm PostgresRoleManager) List(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
-       			pg_catalog.shobj_description(oid, 'pg_authid') as comment
+				pg_catalog.shobj_description(oid, 'pg_authid') as comment, xmin
 		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`)
 	if err != nil {
 		return []DatabaseRole{}, err
@@ -75,6 +75,7 @@ func (sm PostgresRoleManager) List(
 			&validuntil,
 			&role.BypassRLS,
 			&comment,
+			&role.transactionID,
 		)
 		if err != nil {
 			return []DatabaseRole{}, err
@@ -104,6 +105,8 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 
 	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
+	// NOTE: always apply the password update. Since the transaction ID of the role
+	// will change no matter what, the next reconciliation cycle we would update the password
 	appendPasswordOption(role, &query)
 	contextLog.Info("Updating role", "role", role.Name, "query", query.String())
 
@@ -172,6 +175,26 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 	return nil
 }
 
+// GetLastTransactionID get the last xmin for the role, to help keep track of
+// whether the role has been changed in on the Database since last reconciliation
+func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error) {
+	contextLog := log.FromContext(ctx).WithName("getLastTransactionID")
+	contextLog.Trace("Invoked", "role", role)
+
+	var xmin int64
+	err := sm.superUserDB.QueryRowContext(ctx,
+		`SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1`,
+		role.Name).Scan(&xmin)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("while getting last transaction ID. Role %s not found", role.Name)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("while getting last transaction ID for %s: %w", role.Name, err)
+	}
+
+	return xmin, nil
+}
+
 func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 	if role.BypassRLS {
 		query.WriteString("BYPASSRLS ")
@@ -227,5 +250,9 @@ func appendPasswordOption(role DatabaseRole,
 		query.WriteString("PASSWORD NULL")
 	} else {
 		query.WriteString(fmt.Sprintf("PASSWORD %s", pq.QuoteLiteral(role.password.String)))
+	}
+
+	if role.password.Valid && role.ValidUntil != "" {
+		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(role.ValidUntil)))
 	}
 }

@@ -87,6 +87,10 @@ func (m *mockRoleManager) Delete(
 	return nil
 }
 
+func (m *mockRoleManager) GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error) {
+	return 0, nil
+}
+
 var _ = Describe("Role synchronizer tests", func() {
 	It("it will Create ensure:present roles in spec missing from DB", func(ctx context.Context) {
 		managedConf := apiv1.ManagedConfiguration{
@@ -109,7 +113,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			[]funcCall{
@@ -143,7 +147,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -169,7 +173,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -195,7 +199,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -226,7 +230,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf)
+		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -238,9 +242,16 @@ var _ = Describe("Role synchronizer tests", func() {
 var _ = DescribeTable("Role status getter tests",
 	func(spec *apiv1.ManagedConfiguration, db mockRoleManager, expected map[string]apiv1.RoleStatus) {
 		ctx := context.TODO()
-		statusMap, err := getRoleStatus(ctx, &db, spec)
+		statusMap, err := getRoleStatus(ctx, &db, spec, map[string]apiv1.PasswordState{}, nil)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(statusMap).To(BeEquivalentTo(expected))
+		// pivot the result to have a map: roleName -> Status, which is easier to compare for Ginkgo
+		statusByRole := make(map[string]apiv1.RoleStatus)
+		for action, roles := range statusMap {
+			for _, role := range roles {
+				statusByRole[role.Name] = action
+			}
+		}
+		Expect(statusByRole).To(BeEquivalentTo(expected))
 	},
 	Entry("detects roles that are fully reconciled",
 		&apiv1.ManagedConfiguration{

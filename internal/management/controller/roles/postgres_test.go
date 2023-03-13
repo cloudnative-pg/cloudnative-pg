@@ -61,7 +61,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)
 	expectedSelStmt := `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
-       			pg_catalog.shobj_description(oid, 'pg_authid') as comment
+       			pg_catalog.shobj_description(oid, 'pg_authid') as comment, xmin
 		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`
 
 	// Testing List
@@ -73,11 +73,12 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		rows := sqlmock.NewRows([]string{
 			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
 			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls", "comment",
+			"xmin",
 		}).
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
-				nil, false, []byte("This is postgres user")).
+				nil, false, []byte("This is postgres user"), 11).
 			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
-				"2023-04-04", false, []byte("This is streaming_replica user"))
+				"2023-04-04", false, []byte("This is streaming_replica user"), 22)
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := prm.List(ctx)
@@ -104,6 +105,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			ValidUntil:      "",
 			Comment:         "This is postgres user",
 			password:        password1,
+			transactionID:   11,
 		}, DatabaseRole{
 			Name:            "streaming_replica",
 			CreateDB:        true,
@@ -117,6 +119,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			ValidUntil:      "2023-04-04",
 			Comment:         "This is streaming_replica user",
 			password:        password2,
+			transactionID:   22,
 		}))
 	})
 	It("List returns error if there is a problem with the DB", func(ctx context.Context) {

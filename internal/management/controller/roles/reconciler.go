@@ -33,7 +33,7 @@ func Reconcile(
 	ctx context.Context,
 	instance *postgres.Instance,
 	cluster *apiv1.Cluster,
-	statusClient client.StatusClient,
+	c client.Client,
 ) (reconcile.Result, error) {
 	if cluster.Spec.Managed == nil ||
 		len(cluster.Spec.Managed.Roles) == 0 {
@@ -43,28 +43,35 @@ func Reconcile(
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("Updating managed roles information")
 
-	// forces runnable to run
-	instance.ConfigureRoleSynchronizer(cluster.Spec.Managed)
-	contextLogger.Info("Updating managed roles information")
-
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	mgr := NewPostgresRoleManager(db)
-	statusByRole, err := getRoleStatus(ctx, mgr, cluster.Spec.Managed)
+	// get current passwords from spec/secrets
+	passwordsInSpec, err := getPasswordHashes(ctx, c, cluster.Spec.Managed.Roles, instance.Namespace)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// pivot the role status for display in the cluster Status
-	rolesByStatus := make(map[apiv1.RoleStatus][]string)
-	for role, status := range statusByRole {
-		rolesByStatus[status] = append(rolesByStatus[status], role)
+	latestPasswords := cluster.Status.RolePasswordStatus
+	rolesByStatus, err := getRoleStatus(ctx, mgr, cluster.Spec.Managed, latestPasswords, passwordsInSpec)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	roleNamesByStatus := make(map[apiv1.RoleStatus][]string)
+	for status, roles := range rolesByStatus {
+		roleNamesByStatus[status] = getRoleNames(roles)
+	}
+
+	if len(rolesByStatus[apiv1.RoleStatusPendingReconciliation]) != 0 {
+		// forces runnable to run
+		instance.TriggerRoleSynchronizer(cluster.Spec.Managed)
+		contextLogger.Info("Triggered a managed role reconciliation")
 	}
 
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Status.RoleStatus = rolesByStatus
-	return reconcile.Result{}, statusClient.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
+	updatedCluster.Status.RoleStatus = roleNamesByStatus
+	return reconcile.Result{}, c.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
 }
