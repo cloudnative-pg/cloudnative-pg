@@ -56,6 +56,7 @@ Below you will find a description of the defined resources:
 - [Metadata](#Metadata)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
+- [PasswordState](#PasswordState)
 - [PgBouncerIntegrationStatus](#PgBouncerIntegrationStatus)
 - [PgBouncerSecrets](#PgBouncerSecrets)
 - [PgBouncerSpec](#PgBouncerSpec)
@@ -404,7 +405,8 @@ Name                                | Description                               
 `readyInstances                     ` | The total number of ready instances in the cluster. It is equal to the number of ready instance pods.                                                                              | int                                                        
 `instancesStatus                    ` | InstancesStatus indicates in which status the instances are                                                                                                                        | map[utils.PodStatus][]string
 `instancesReportedState             ` | the reported state of the instances during the last reconciliation loop                                                                                                            | [map[PodName]InstanceReportedState](#InstanceReportedState)
-`roleStatus                         ` | RoleStatus gives the list of roles in each state                                                                                                                                   | map[RoleStatus][]string
+`roleStatus                         ` | RoleStatus gives the list of roles in each state                                                                                                                                   | map[RoleStatus][]string                                    
+`rolePasswordStatus                 ` | RolePasswordStatus gives the last transaction id and hash for each managed role                                                                                                    | [map[string]PasswordState](#PasswordState)
 `timelineID                         ` | The timeline of the Postgres cluster                                                                                                                                               | int                                                        
 `topology                           ` | Instances topology.                                                                                                                                                                | [Topology](#Topology)                                      
 `latestGeneratedNode                ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                        
@@ -652,6 +654,17 @@ Name       | Description                                                        
 ---------- | ---------------------------------------------------------------------------------------------------------------- | -----
 `inProgress` | Is there a node maintenance activity in progress?                                                                - *mandatory*  | bool 
 `reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere - when `instances` >1) - *mandatory*  | *bool
+
+<a id='PasswordState'></a>
+
+## PasswordState
+
+PasswordState represents the state of the password of a managed RoleConfiguration
+
+Name          | Description                                                         | Type  
+------------- | ------------------------------------------------------------------- | ------
+`transactionID` | the last transaction ID to affect the role definition in PostgreSQL | int64 
+`passwordHash ` | the hash of the password stored in the kubernetes secret            | []byte
 
 <a id='PgBouncerIntegrationStatus'></a>
 
