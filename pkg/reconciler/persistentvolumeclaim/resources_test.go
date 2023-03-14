@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -51,8 +52,8 @@ var _ = Describe("PVC detection", func() {
 			context.TODO(),
 			cluster,
 			[]corev1.Pod{
-				makePod(clusterName, "1"),
-				makePod(clusterName, "3"),
+				makePod(clusterName, "1", specs.ClusterRoleLabelPrimary),
+				makePod(clusterName, "3", specs.ClusterRoleLabelReplica),
 			},
 			[]batchv1.Job{makeJob(clusterName, "2")},
 			pvcs,
@@ -95,15 +96,15 @@ var _ = Describe("PVCs used by instance", func() {
 	}
 
 	It("true if the pvc belongs to the instance name", func() {
-		res := IsUsedByInstance(cluster, instanceName, instanceName)
+		res := BelongToInstance(cluster, instanceName, instanceName)
 		Expect(res).To(BeTrue())
 
-		res = IsUsedByInstance(cluster, instanceName, instanceName+"-wal")
+		res = BelongToInstance(cluster, instanceName, instanceName+"-wal")
 		Expect(res).To(BeTrue())
 	})
 
 	It("fails when trying to get a pvc that doesn't belong to the instance", func() {
-		res := IsUsedByInstance(cluster, instanceName, instanceName+"-nil")
+		res := BelongToInstance(cluster, instanceName, instanceName+"-nil")
 		Expect(res).To(BeFalse())
 	})
 })
