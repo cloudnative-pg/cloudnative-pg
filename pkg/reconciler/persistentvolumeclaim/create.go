@@ -18,42 +18,49 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// Reconcile reconciles the PVCs
-func Reconcile(
+func createIfNotExists(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	instances []corev1.Pod,
-	pvcs []corev1.PersistentVolumeClaim,
-) (ctrl.Result, error) {
+	configuration *CreateConfiguration,
+) error {
 	contextLogger := log.FromContext(ctx)
 
-	if err := reconcileMetadata(ctx, c, cluster, instances, pvcs); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if res, err := reconcileMultipleInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
-		return res, err
-	}
-
-	if err := reconcileResourceRequests(ctx, c, cluster, pvcs); err != nil {
-		if apierrs.IsConflict(err) {
-			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+	pvc, err := Build(cluster, configuration)
+	if err != nil {
+		if err == ErrorInvalidSize {
+			// This error should have been caught by the validating
+			// webhook, but since we are here the user must have disabled server-side
+			// validation, and we must react.
+			contextLogger.Info("The size specified for the cluster is not valid",
+				"size",
+				configuration.Storage.Size)
+			return utils.ErrNextLoop
 		}
-
-		return ctrl.Result{}, err
+		return fmt.Errorf(
+			"unable to create a PVC spec for node with serial %v: %w",
+			configuration.NodeSerial,
+			err,
+		)
 	}
 
-	return ctrl.Result{}, nil
+	if err = c.Create(ctx, pvc); err != nil && !apierrs.IsAlreadyExists(err) {
+		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
+			pvc.Name,
+			configuration.NodeSerial,
+			err,
+		)
+	}
+
+	return nil
 }

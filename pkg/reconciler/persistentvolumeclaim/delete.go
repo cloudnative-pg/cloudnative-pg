@@ -18,42 +18,46 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-// Reconcile reconciles the PVCs
-func Reconcile(
+// EnsureInstancePVCGroupIsDeleted ensures that all the expected pvc for a given instance are deleted
+func EnsureInstancePVCGroupIsDeleted(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	instances []corev1.Pod,
-	pvcs []corev1.PersistentVolumeClaim,
-) (ctrl.Result, error) {
+	name string,
+	namespace string,
+) error {
 	contextLogger := log.FromContext(ctx)
 
-	if err := reconcileMetadata(ctx, c, cluster, instances, pvcs); err != nil {
-		return ctrl.Result{}, err
-	}
+	// todo: this should not rely on expected cluster instance pvc but should fetch every possible pvc name
+	expectedPVCs := getExpectedPVCsFromCluster(cluster, name)
 
-	if res, err := reconcileMultipleInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
-		return res, err
-	}
-
-	if err := reconcileResourceRequests(ctx, c, cluster, pvcs); err != nil {
-		if apierrs.IsConflict(err) {
-			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
-			return ctrl.Result{Requeue: true}, nil
+	for _, expectedPVC := range expectedPVCs {
+		pvc := corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      expectedPVC.name,
+				Namespace: namespace,
+			},
 		}
+		contextLogger.Info("Deleting PVC", "pvc", pvc.Name)
 
-		return ctrl.Result{}, err
+		if err := c.Delete(ctx, &pvc); err != nil {
+			// Ignore if NotFound, otherwise report the error
+			if !apierrs.IsNotFound(err) {
+				return fmt.Errorf("scaling down node (%s pvc) %v: %w", expectedPVC.name, name, err)
+			}
+		}
 	}
 
-	return ctrl.Result{}, nil
+	return nil
 }

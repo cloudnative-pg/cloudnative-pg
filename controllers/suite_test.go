@@ -154,7 +154,7 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	return pooler
 }
 
-func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluster)) *apiv1.Cluster {
+func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
 	const instances int = 3
 	name := "cluster-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
@@ -189,10 +189,6 @@ func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluste
 	}
 
 	cluster.SetDefaults()
-
-	for _, mutator := range mutators {
-		mutator(cluster)
-	}
 
 	err := k8sClient.Create(context.Background(), cluster)
 	Expect(err).To(BeNil())
@@ -285,7 +281,11 @@ func getPoolerDeployment(ctx context.Context, pooler *apiv1.Pooler) *appsv1.Depl
 	return deployment
 }
 
-func generateFakeClusterPods(c client.Client, cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
+func generateFakeClusterPods(
+	c client.Client,
+	cluster *apiv1.Cluster,
+	markAsReady bool,
+) []corev1.Pod {
 	var idx int
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {

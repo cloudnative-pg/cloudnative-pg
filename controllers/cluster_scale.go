@@ -19,9 +19,9 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,7 +29,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.
@@ -54,79 +54,85 @@ func (r *ClusterReconciler) scaleDownCluster(
 		return nil
 	}
 
-	// Is there one pod to be deleted?
-	sacrificialInstance := getSacrificialInstance(resources.instances.Items)
-	if sacrificialInstance == nil {
+	// Is there is an instance to be deleted?
+	instanceName := findDeletableInstance(cluster, resources.instances.Items)
+	if instanceName == "" {
 		contextLogger.Info("There are no instances to be sacrificed. Wait for the next sync loop")
 		return nil
 	}
 
-	r.Recorder.Eventf(cluster, "Normal", "ScaleDown",
-		"Scaling down: removing instance %v", sacrificialInstance.Name)
+	message := fmt.Sprintf("Scaling down - removing instance: %v", instanceName)
+	r.Recorder.Event(cluster, "Normal", "ScaleDown", message)
+	contextLogger.Info(message)
 
-	contextLogger.Info("Too many nodes for cluster, deleting an instance",
-		"pod", sacrificialInstance.Name)
-	if err := r.Delete(ctx, sacrificialInstance); err != nil {
-		// Ignore if NotFound, otherwise report the error
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
-		}
+	return r.ensureInstanceIsDeleted(ctx, cluster, instanceName)
+}
+
+func (r *ClusterReconciler) ensureInstanceIsDeleted(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instanceName string,
+) error {
+	if err := r.ensureInstancePodIsDeleted(ctx, cluster, instanceName); err != nil {
+		return err
 	}
 
-	// Let's drop the PVC too
-	pvc := v1.PersistentVolumeClaim{
+	if err := persistentvolumeclaim.EnsureInstancePVCGroupIsDeleted(
+		ctx,
+		r.Client,
+		cluster,
+		instanceName,
+		cluster.Namespace,
+	); err != nil {
+		return err
+	}
+
+	return r.ensureInstanceJobAreDeleted(ctx, cluster, instanceName)
+}
+
+func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instanceName string,
+) error {
+	for _, jobName := range specs.GetPossibleJobNames(instanceName) {
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      jobName,
+				Namespace: cluster.Namespace,
+			},
+		}
+		// This job was working against the PVC of this Pod,
+		// let's remove it
+		foreground := metav1.DeletePropagationForeground
+		if err := r.Delete(ctx, job, &client.DeleteOptions{PropagationPolicy: &foreground}); err != nil {
+			// Ignore if NotFound, otherwise report the error
+			if !apierrs.IsNotFound(err) {
+				return fmt.Errorf("scaling down node (job) %v: %w", instanceName, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (r *ClusterReconciler) ensureInstancePodIsDeleted(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instanceName string,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	nominatedInstance := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sacrificialInstance.Name,
-			Namespace: sacrificialInstance.Namespace,
+			Name:      instanceName,
+			Namespace: cluster.Namespace,
 		},
 	}
 
-	contextLogger.Info("Deleting PGDATA PVC", "pvc", pvc.Name)
-	if err := r.Delete(ctx, &pvc); err != nil {
-		// Ignore if NotFound, otherwise report the error
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("scaling down node (pgdata pvc) %v: %w", sacrificialInstance.Name, err)
-		}
+	contextLogger.Info("ensuring an instance is deleted", "pod", nominatedInstance.Name)
+	err := r.Delete(ctx, nominatedInstance)
+	if apierrs.IsNotFound(err) || err == nil {
+		return nil
 	}
-
-	if cluster.ShouldCreateWalArchiveVolume() {
-		// Let's drop the WAL PVC too
-		pvcWalName := persistentvolumeclaim.GetName(cluster, sacrificialInstance.Name, utils.PVCRolePgWal)
-		pvcWal := v1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      pvcWalName,
-				Namespace: sacrificialInstance.Namespace,
-			},
-		}
-		contextLogger.Info("Deleting WAL PVC", "pvc", pvcWal.Name)
-		if err := r.Delete(ctx, &pvcWal); err != nil {
-			// Ignore if NotFound, otherwise report the error
-			if !apierrs.IsNotFound(err) {
-				return fmt.Errorf("scaling down node (wal pvc) %v: %w", sacrificialInstance.Name, err)
-			}
-		}
-	}
-
-	// And now also the Job
-	for idx := range resources.jobs.Items {
-		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialInstance.Name+"-") {
-			// This job was working against the PVC of this Pod,
-			// let's remove it
-			foreground := metav1.DeletePropagationForeground
-			if err := r.Delete(
-				ctx,
-				&resources.jobs.Items[idx],
-				&client.DeleteOptions{
-					PropagationPolicy: &foreground,
-				},
-			); err != nil {
-				// Ignore if NotFound, otherwise report the error
-				if !apierrs.IsNotFound(err) {
-					return fmt.Errorf("scaling down node (job) %v: %w", sacrificialInstance.Name, err)
-				}
-			}
-		}
-	}
-
-	return nil
+	return fmt.Errorf("cannot delete the instance: %w", err)
 }

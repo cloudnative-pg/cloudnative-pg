@@ -57,7 +57,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 	Context("hibernate", func() {
 		var err error
-		getPrimaryAndClusterManifest := func(namespace, clusterName string) ([]byte, *apiv1.Cluster, string) {
+		getPrimaryAndClusterManifest := func(namespace, clusterName string) ([]byte, string) {
 			var beforeHibernationClusterInfo *apiv1.Cluster
 			var clusterManifest []byte
 			var beforeHibernationCurrentPrimary string
@@ -69,10 +69,10 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				clusterManifest, err = json.Marshal(&beforeHibernationClusterInfo)
 				Expect(err).ToNot(HaveOccurred())
 			})
-			return clusterManifest, beforeHibernationClusterInfo, beforeHibernationCurrentPrimary
+			return clusterManifest, beforeHibernationCurrentPrimary
 		}
-		getPvc := func(role utils.PVCRole, clusterInfo *apiv1.Cluster, instanceName string) corev1.PersistentVolumeClaim {
-			pvcName := persistentvolumeclaim.GetName(clusterInfo, instanceName, role)
+		getPvc := func(role utils.PVCRole, instanceName string) corev1.PersistentVolumeClaim {
+			pvcName := persistentvolumeclaim.GetName(instanceName, role)
 			pvcInfo := corev1.PersistentVolumeClaim{}
 			err = testsUtils.GetObject(env, ctrlclient.ObjectKey{Namespace: namespace, Name: pvcName}, &pvcInfo)
 			Expect(err).ToNot(HaveOccurred())
@@ -198,10 +198,10 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				})
 			})
 		}
-		verifyPvc := func(role utils.PVCRole, pvcUid types.UID, clusterInfo *apiv1.Cluster, clusterManifest []byte,
+		verifyPvc := func(role utils.PVCRole, pvcUid types.UID, clusterManifest []byte,
 			instanceName string,
 		) {
-			pvcInfo := getPvc(role, clusterInfo, instanceName)
+			pvcInfo := getPvc(role, instanceName)
 			Expect(pvcUid).Should(BeEquivalentTo(pvcInfo.GetUID()))
 			// pvc should be attached annotation with pgControlData and Cluster manifesto
 			expectedAnnotationKeyPresent := []string{
@@ -221,15 +221,15 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
-			clusterManifest, beforeHibernationClusterInfo, currentPrimary := getPrimaryAndClusterManifest(namespace, clusterName)
+			clusterManifest, currentPrimary := getPrimaryAndClusterManifest(namespace, clusterName)
 
 			By("collecting pgWal pvc details of current primary", func() {
-				pvcInfo := getPvc(utils.PVCRolePgWal, beforeHibernationClusterInfo, currentPrimary)
+				pvcInfo := getPvc(utils.PVCRolePgWal, currentPrimary)
 				beforeHibernationPgWalPvcUID = pvcInfo.GetUID()
 			})
 
 			By("collecting pgData pvc details of current primary", func() {
-				pvcInfo := getPvc(utils.PVCRolePgData, beforeHibernationClusterInfo, currentPrimary)
+				pvcInfo := getPvc(utils.PVCRolePgData, currentPrimary)
 				beforeHibernationPgDataPvcUID = pvcInfo.GetUID()
 			})
 
@@ -250,13 +250,11 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			verifyClusterResources(namespace, clusterName, []utils.PVCRole{utils.PVCRolePgWal, utils.PVCRolePgData})
 
 			By("verifying primary pgWal pvc info", func() {
-				verifyPvc(utils.PVCRolePgWal, beforeHibernationPgWalPvcUID, beforeHibernationClusterInfo,
-					clusterManifest, currentPrimary)
+				verifyPvc(utils.PVCRolePgWal, beforeHibernationPgWalPvcUID, clusterManifest, currentPrimary)
 			})
 
 			By("verifying primary pgData pvc info", func() {
-				verifyPvc(utils.PVCRolePgData, beforeHibernationPgDataPvcUID, beforeHibernationClusterInfo,
-					clusterManifest, currentPrimary)
+				verifyPvc(utils.PVCRolePgData, beforeHibernationPgDataPvcUID, clusterManifest, currentPrimary)
 			})
 
 			// verifying hibernation off
@@ -297,11 +295,11 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
-				clusterManifest, beforeHibernationClusterInfo, currentPrimary := getPrimaryAndClusterManifest(namespace,
+				clusterManifest, currentPrimary := getPrimaryAndClusterManifest(namespace,
 					clusterName)
 
 				By("collecting pgData pvc details of current primary", func() {
-					pvcInfo := getPvc(utils.PVCRolePgData, beforeHibernationClusterInfo, currentPrimary)
+					pvcInfo := getPvc(utils.PVCRolePgData, currentPrimary)
 					beforeHibernationPgDataPvcUID = pvcInfo.GetUID()
 				})
 
@@ -322,8 +320,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				verifyClusterResources(namespace, clusterName, []utils.PVCRole{utils.PVCRolePgData})
 
 				By("verifying primary pgData pvc info", func() {
-					verifyPvc(utils.PVCRolePgData, beforeHibernationPgDataPvcUID, beforeHibernationClusterInfo,
-						clusterManifest, currentPrimary)
+					verifyPvc(utils.PVCRolePgData, beforeHibernationPgDataPvcUID, clusterManifest, currentPrimary)
 				})
 
 				// verifying hibernation off

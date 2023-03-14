@@ -66,9 +66,25 @@ func IsPodActive(p corev1.Pod) bool {
 
 // IsPodEvicted checks if a pod has been evicted by the
 // Kubelet
-func IsPodEvicted(p corev1.Pod) bool {
+func IsPodEvicted(p *corev1.Pod) bool {
 	return corev1.PodFailed == p.Status.Phase &&
 		PodReasonEvicted == p.Status.Reason
+}
+
+// IsPodUnscheduled check if a Pod is unscheduled
+func IsPodUnscheduled(p *corev1.Pod) bool {
+	if corev1.PodPending != p.Status.Phase && corev1.PodFailed != p.Status.Phase {
+		return false
+	}
+	for _, c := range p.Status.Conditions {
+		if c.Type == corev1.PodScheduled &&
+			c.Status == corev1.ConditionFalse &&
+			c.Reason == corev1.PodReasonUnschedulable {
+			return true
+		}
+	}
+
+	return false
 }
 
 // IsPodAlive check if a pod is active and not crash-looping

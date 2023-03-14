@@ -100,9 +100,8 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 	}
 }
 
-// ErrNextLoop is not a real error. It forces the current reconciliation loop to stop
-// and return the associated Result object
-var ErrNextLoop = errors.New("stop this loop and return the associated Result object")
+// ErrNextLoop see utils.ErrNextLoop
+var ErrNextLoop = utils.ErrNextLoop
 
 // Alphabetical order to not repeat or miss permissions
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list;patch
@@ -453,7 +452,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Delete Pods which have been evicted by the Kubelet
-	result, err := r.deleteEvictedPods(ctx, cluster, resources)
+	result, err := r.deleteEvictedOrUnscheduledInstances(ctx, cluster, resources)
 	if err != nil {
 		contextLogger.Error(err, "While deleting evicted pods")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -462,12 +461,22 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
+	// TODO: move into a central waiting phase
+	// If we are joining a node, we should wait for the process to finish
+	if resources.countRunningJobs() > 0 {
+		contextLogger.Debug("Waiting for jobs to finish",
+			"clusterName", cluster.Name,
+			"namespace", cluster.Namespace,
+			"jobs", len(resources.jobs.Items))
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
 	if !resources.allInstancesAreActive() {
 		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	if res, err := persistentvolumeclaim.ReconcileExistingResources(
+	if res, err := persistentvolumeclaim.Reconcile(
 		ctx,
 		r.Client,
 		cluster,
@@ -502,31 +511,58 @@ func (r *ClusterReconciler) reconcileResources(
 	return ctrl.Result{}, nil
 }
 
-// deleteEvictedPods will delete the Pods that the Kubelet has evicted
-func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv1.Cluster,
+// deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
+func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 	deletedPods := false
 
 	for idx := range resources.instances.Items {
-		if utils.IsPodEvicted(resources.instances.Items[idx]) {
-			contextLogger.Warning("Deleting evicted pod",
-				"pod", resources.instances.Items[idx].Name,
-				"podStatus", resources.instances.Items[idx].Status)
-			if err := r.Delete(ctx, &resources.instances.Items[idx]); err != nil {
-				if apierrs.IsConflict(err) {
-					contextLogger.Debug("Conflict error while deleting instances item", "error", err)
-					return &ctrl.Result{Requeue: true}, nil
-				}
-				return nil, err
-			}
-			deletedPods = true
-			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
-				"Deleted evicted Pod %v",
-				resources.instances.Items[idx].Name)
+		instance := &resources.instances.Items[idx]
+
+		// we process unscheduled pod only if we are in IsNodeMaintenanceWindow, and we can delete the PVC Group
+		// This will be better handled in a next patch
+		if !utils.IsPodEvicted(instance) && !(utils.IsPodUnscheduled(instance) &&
+			cluster.IsNodeMaintenanceWindowInProgress() &&
+			!cluster.IsReusePVCEnabled()) {
+			continue
 		}
+		contextLogger.Warning("Deleting evicted/unscheduled pod",
+			"pod", instance.Name,
+			"podStatus", instance.Status)
+		if err := r.Delete(ctx, instance); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Debug("Conflict error while deleting instances item", "error", err)
+				return &ctrl.Result{Requeue: true}, nil
+			}
+			return nil, err
+		}
+		deletedPods = true
+
+		r.Recorder.Eventf(cluster, "Normal", "DeletePod",
+			"Deleted evicted/unscheduled Pod %v",
+			instance.Name)
+
+		// we never delete the pvc unless we are in node Maintenance Window and the Reuse PVC is false
+		if !cluster.IsNodeMaintenanceWindowInProgress() || cluster.IsReusePVCEnabled() {
+			continue
+		}
+
+		if err := persistentvolumeclaim.EnsureInstancePVCGroupIsDeleted(
+			ctx,
+			r.Client,
+			cluster,
+			instance.Name,
+			instance.Namespace,
+		); err != nil {
+			return nil, err
+		}
+		r.Recorder.Eventf(cluster, "Normal", "DeletePVCs",
+			"Deleted evicted/unscheduled Pod %v PVCs",
+			instance.Name)
 	}
+
 	if deletedPods {
 		// We cleaned up Pods which were evicted.
 		// Let's wait for the informer cache to notice that
@@ -574,23 +610,12 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// If we are joining a node, we should wait for the process to finish
-	if resources.countRunningJobs() > 0 {
-		contextLogger.Debug("Waiting for jobs to finish",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"jobs", len(resources.jobs.Items))
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
 	if err := r.markPVCReadyForCompletedJobs(ctx, resources); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Work on the PVCs we currently have
-	pvcNeedingMaintenance := len(cluster.Status.DanglingPVC) + len(cluster.Status.InitializingPVC)
-	if pvcNeedingMaintenance > 0 {
-		return r.reconcilePVCs(ctx, cluster, resources, instancesStatus)
+	if res, err := r.ensureInstancesAreCreated(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	if err := r.ensureHealthyPVCsAnnotation(ctx, cluster, resources); err != nil {
