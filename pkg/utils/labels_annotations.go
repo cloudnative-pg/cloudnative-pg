@@ -114,14 +114,6 @@ func LabelClusterName(object *metav1.ObjectMeta, name string) {
 	object.Labels[ClusterLabelName] = name
 }
 
-// LabelJobRole labels a job with its role
-func LabelJobRole(object *metav1.ObjectMeta, role string) {
-	if object.Labels == nil {
-		object.Labels = make(map[string]string)
-	}
-	object.Labels[JobRoleLabelName] = role
-}
-
 // SetOperatorVersion set inside a certain object metadata the annotation
 // containing the version of the operator that generated the object
 func SetOperatorVersion(object *metav1.ObjectMeta, version string) {

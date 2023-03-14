@@ -17,18 +17,11 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -98,45 +91,6 @@ var _ = Describe("Pod upgrade", func() {
 		Expect(needRollout).To(BeTrue())
 		Expect(inplacePossible).To(BeTrue())
 		Expect(reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
-	})
-
-	It("add a WAL PVC to a single instance cluster", func() {
-		ctx := context.Background()
-
-		err := k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"}})
-		Expect(err).ToNot(HaveOccurred())
-
-		cluster := newFakeCNPGCluster("test-namespace", func(cluster *apiv1.Cluster) {
-			cluster.Spec.Instances = 1
-			cluster.Spec.WalStorage = &apiv1.StorageConfiguration{
-				Size: "1Gi",
-			}
-		})
-
-		pods := generateFakeClusterPods(k8sClient, cluster, true)
-		upg, err := clusterReconciler.updatePrimaryPod(
-			ctx,
-			cluster,
-			&postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{{Pod: pods[0]}}},
-			pods[0],
-			true,
-			apiv1.NewWalReason,
-		)
-
-		Expect(err).ToNot(HaveOccurred())
-		Expect(upg).To(BeTrue())
-
-		var expectedPod corev1.Pod
-		podName := pods[0].Name
-		namespace := pods[0].Namespace
-		err = k8sClient.Get(ctx, types.NamespacedName{Name: podName, Namespace: namespace}, &expectedPod)
-		Expect(apierrs.IsNotFound(err)).To(BeTrue())
-
-		pvcName := persistentvolumeclaim.GetName(cluster, pods[0].Name, utils.PVCRolePgWal)
-		var expectedPVC corev1.PersistentVolumeClaim
-		err = k8sClient.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: namespace}, &expectedPVC)
-		Expect(err).To(BeNil())
-		Expect(expectedPVC.Labels[utils.PvcRoleLabelName]).To(Equal(string(utils.PVCRolePgWal)))
 	})
 
 	When("there's a custom environment variable set", func() {

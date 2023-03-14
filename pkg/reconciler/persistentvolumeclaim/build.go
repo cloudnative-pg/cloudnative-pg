@@ -43,7 +43,7 @@ func Build(
 	configuration *CreateConfiguration,
 ) (*corev1.PersistentVolumeClaim, error) {
 	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
-	pvcName := GetName(cluster, instanceName, configuration.Role)
+	pvcName := GetName(instanceName, configuration.Role)
 
 	builder := resources.NewPersistentVolumeClaimBuilder().
 		BeginMetadata().
