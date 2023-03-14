@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -85,7 +86,15 @@ func NewCmd() *cobra.Command {
 			})
 		},
 		PostRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.TryInvokeQuitEndpoint(cmd.Context())
+			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
+				return err
+			}
+
+			if err := linkerd.TryInvokeShutdownEndpoint(cmd.Context()); err != nil {
+				return err
+			}
+
+			return nil
 		},
 	}
 
