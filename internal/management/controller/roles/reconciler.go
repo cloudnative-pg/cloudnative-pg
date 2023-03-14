@@ -56,25 +56,22 @@ func Reconcile(
 	}
 
 	latestPasswords := cluster.Status.RolePasswordStatus
-	statusByRole, passwordStatus := getRoleStatus(ctx, mgr, cluster.Spec.Managed, latestPasswords, passwordsInSpec)
+	rolesByStatus, err := getRoleStatus(ctx, mgr, cluster.Spec.Managed, latestPasswords, passwordsInSpec)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
-	// pivot the role status for display in the cluster Status
-	rolesByStatus := make(map[apiv1.RoleStatus][]string)
-	for role, status := range statusByRole {
-		rolesByStatus[status] = append(rolesByStatus[status], role)
+	roleNamesByStatus := make(map[apiv1.RoleStatus][]string)
+	for status, roles := range rolesByStatus {
+		roleNamesByStatus[status] = getRoleNames(roles)
 	}
 
 	if len(rolesByStatus[apiv1.RoleStatusPendingReconciliation]) != 0 {
 		// forces runnable to run
-		instance.ConfigureRoleSynchronizer(cluster.Spec.Managed)
+		instance.TriggerRoleSynchronizer(cluster.Spec.Managed)
 		contextLogger.Info("Updating managed roles information")
 	}
 
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Status.RoleStatus = rolesByStatus
-	updatedCluster.Status.RolePasswordStatus = passwordStatus
+	updatedCluster.Status.RoleStatus = roleNamesByStatus
 	return reconcile.Result{}, c.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
 }

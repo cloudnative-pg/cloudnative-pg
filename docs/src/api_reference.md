@@ -658,12 +658,12 @@ Name       | Description                                                        
 
 ## PasswordState
 
-PasswordState represents the state of a managed RoleConfiguration
+PasswordState represents the state of the password of a managed RoleConfiguration
 
 Name          | Description                                                         | Type  
 ------------- | ------------------------------------------------------------------- | ------
-`transactionID` | the last transaction ID to affect the role definition in PostgreSQL - *mandatory*  | int64 
-`passwordHash ` | the hash of the password stored in the kubernetes secret            - *mandatory*  | []byte
+`transactionID` | the last transaction ID to affect the role definition in PostgreSQL | int64 
+`passwordHash ` | the hash of the password stored in the kubernetes secret            | []byte
 
 <a id='PgBouncerIntegrationStatus'></a>
 

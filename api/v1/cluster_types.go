@@ -402,9 +402,9 @@ const (
 // PasswordState represents the state of the password of a managed RoleConfiguration
 type PasswordState struct {
 	// the last transaction ID to affect the role definition in PostgreSQL
-	TransactionID int64 `json:"transactionID"`
+	TransactionID int64 `json:"transactionID,omitempty"`
 	// the hash of the password stored in the kubernetes secret
-	PasswordHash []byte `json:"passwordHash"`
+	PasswordHash []byte `json:"passwordHash,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster

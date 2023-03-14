@@ -59,4 +59,8 @@ type RoleManager interface {
 	Create(ctx context.Context, role DatabaseRole) error
 	// Delete the role in the database
 	Delete(ctx context.Context, role DatabaseRole) error
+	// GetLastTransactionID returns the last TransactionID as the `xmin`
+	// from the database
+	// See https://www.postgresql.org/docs/current/datatype-oid.html for reference
+	GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error)
 }

@@ -3591,7 +3591,8 @@ spec:
                 type: array
               rolePasswordStatus:
                 additionalProperties:
-                  description: PasswordState represents the state of a managed RoleConfiguration
+                  description: PasswordState represents the state of the password
+                    of a managed RoleConfiguration
                   properties:
                     passwordHash:
                       description: the hash of the password stored in the kubernetes
@@ -3603,9 +3604,6 @@ spec:
                         in PostgreSQL
                       format: int64
                       type: integer
-                  required:
-                  - passwordHash
-                  - transactionID
                   type: object
                 description: RolePasswordStatus gives the last transaction id and
                   hash for each managed role
