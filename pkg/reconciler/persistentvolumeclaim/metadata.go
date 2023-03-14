@@ -73,10 +73,10 @@ func reconcileMetadataComingFromInstance(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	instances []corev1.Pod,
+	runningInstances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	for _, pod := range instances {
+	for _, pod := range runningInstances {
 		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
 		podSerial, podSerialErr := specs.GetNodeSerial(pod.ObjectMeta)
 		if podSerialErr != nil {
@@ -125,10 +125,10 @@ func reconcileMetadata(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	instances []corev1.Pod,
+	runningInstances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	if err := reconcileMetadataComingFromInstance(ctx, c, cluster, instances, pvcs); err != nil {
+	if err := reconcileMetadataComingFromInstance(ctx, c, cluster, runningInstances, pvcs); err != nil {
 		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 

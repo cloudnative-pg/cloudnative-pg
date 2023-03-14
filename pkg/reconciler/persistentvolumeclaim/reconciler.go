@@ -42,7 +42,7 @@ func Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	if res, err := reconcileInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
+	if res, err := reconcileMultipleInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
 		return res, err
 	}
 

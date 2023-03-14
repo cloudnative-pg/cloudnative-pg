@@ -96,7 +96,7 @@ func (s statuses) getSorted(label status) []string {
 func EnrichStatus(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	instances []corev1.Pod,
+	runningInstances []corev1.Pod,
 	jobs []batchv1.Job,
 	managedPVCs []corev1.PersistentVolumeClaim,
 ) {
@@ -130,7 +130,7 @@ func EnrichStatus(
 	result := make(statuses)
 	for instanceName, pvcs := range instancesPVCs {
 		for _, pvc := range pvcs {
-			pvcStatus := classifyPVC(ctx, pvc, instances, jobs, pvcs, cluster, instanceName)
+			pvcStatus := classifyPVC(ctx, pvc, runningInstances, jobs, pvcs, cluster, instanceName)
 			result.add(pvcStatus, pvc.Name)
 		}
 		result.add(instanceNames, instanceName)
@@ -141,9 +141,9 @@ func EnrichStatus(
 	cluster.Status.Instances = len(sortedInstances)
 	cluster.Status.InstanceNames = sortedInstances
 
-	filteredPods := utils.FilterActivePods(instances)
+	filteredPods := utils.FilterActivePods(runningInstances)
 	cluster.Status.ReadyInstances = utils.CountReadyPods(filteredPods)
-	cluster.Status.InstancesStatus = utils.ListStatusPods(instances)
+	cluster.Status.InstancesStatus = utils.ListStatusPods(runningInstances)
 
 	cluster.Status.PVCCount = int32(len(managedPVCs))
 	cluster.Status.InitializingPVC = result.getSorted(initializing)

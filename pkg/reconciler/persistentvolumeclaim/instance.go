@@ -36,24 +36,27 @@ func CreateInstancePVCs(
 	cluster *apiv1.Cluster,
 	serial int,
 ) error {
-	_, err := reconcileInstanceMissingPVCs(ctx, c, cluster, serial, nil)
+	_, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil)
 	return err
 }
 
-func reconcileInstancesMissingPVCs(
+// reconcileMultipleInstancesMissingPVCs evaluate multiple instances that may miss some PVCs.
+// It will work on the first instance where the PVCs should be reconciled, leaving the next
+// ones for the other reconciliation loops.
+func reconcileMultipleInstancesMissingPVCs(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	instances []corev1.Pod,
+	runningInstances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (ctrl.Result, error) {
 	var result ctrl.Result
-	for idx := range instances {
-		serial, err := specs.GetNodeSerial(instances[idx].ObjectMeta)
+	for idx := range runningInstances {
+		serial, err := specs.GetNodeSerial(runningInstances[idx].ObjectMeta)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		res, err := reconcileInstanceMissingPVCs(ctx, c, cluster, serial, pvcs)
+		res, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, pvcs)
 		if err != nil {
 			return res, err
 		}
@@ -65,8 +68,8 @@ func reconcileInstancesMissingPVCs(
 	return result, nil
 }
 
-// reconcileInstanceMissingPVCs reconcile an instance missing PVCs
-func reconcileInstanceMissingPVCs(
+// reconcileSingleInstanceMissingPVCs reconcile an instance missing PVCs
+func reconcileSingleInstanceMissingPVCs(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,

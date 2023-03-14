@@ -520,11 +520,11 @@ func findDeletableInstance(cluster *apiv1.Cluster, instances []corev1.Pod) strin
 	resultIdx := -1
 	var lastFoundSerial int
 
-	instancesWithOnlyPVCs := cluster.Status.InstanceNames
+	instancesNotRunning := cluster.Status.InstanceNames
 
 	for idx, pod := range instances {
-		if nameIndex := slices.Index(instancesWithOnlyPVCs, pod.Name); nameIndex != -1 {
-			instancesWithOnlyPVCs = slices.Delete(instancesWithOnlyPVCs, nameIndex, nameIndex+1)
+		if nameIndex := slices.Index(instancesNotRunning, pod.Name); nameIndex != -1 {
+			instancesNotRunning = slices.Delete(instancesNotRunning, nameIndex, nameIndex+1)
 		}
 
 		// Avoid parting non ready nodes, non active nodes, or primary nodes
@@ -544,8 +544,8 @@ func findDeletableInstance(cluster *apiv1.Cluster, instances []corev1.Pod) strin
 		}
 	}
 
-	if len(instancesWithOnlyPVCs) > 0 {
-		return instancesWithOnlyPVCs[len(instancesWithOnlyPVCs)-1]
+	if len(instancesNotRunning) > 0 {
+		return instancesNotRunning[len(instancesNotRunning)-1]
 	}
 
 	if resultIdx == -1 {
