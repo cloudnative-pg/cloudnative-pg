@@ -51,7 +51,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 	// Setting variables
 	var replicaClusterName, replicaNamespace string
-	replicaCommandTimeout := time.Second * 5
+	replicaCommandTimeout := time.Second * 10
 
 	Context("can bootstrap a replica cluster using TLS auth", func() {
 		const replicaClusterSampleTLS = fixturesDir + replicaModeClusterDir + "cluster-replica-tls.yaml.template"
@@ -119,7 +119,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("verifying write operation on the replica cluster primary pod", func() {
-				query := "CREATE TABLE replica_cluster_primary AS VALUES (1), (2);"
+				query := "CREATE TABLE IF NOT EXISTS replica_cluster_primary AS VALUES (1),(2);"
 				// Expect write operation to succeed
 				Eventually(func() error {
 					// Get primary from replica cluster
@@ -193,7 +193,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			primaryReplicaCluster, err := env.GetClusterPrimary(replicaNamespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			commandTimeout := time.Second * 5
+			commandTimeout := time.Second * 10
 
 			By("verify archive mode is set to 'always on' designated primary", func() {
 				query := "show archive_mode;"

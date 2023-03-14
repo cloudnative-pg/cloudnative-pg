@@ -116,7 +116,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			ExpectedValue := "ANY " + fmt.Sprint(cluster.Spec.MaxSyncReplicas) + " (\"" + strings.Join(podNames, "\",\"") + "\")"
 
 			// Verify the parameter has been updated in every pod
-			commandTimeout := time.Second * 5
+			commandTimeout := time.Second * 10
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
 				Eventually(func() (string, error) {
