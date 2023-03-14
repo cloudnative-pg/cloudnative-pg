@@ -32,7 +32,7 @@ import (
 
 func TestSpecs(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Specification properties")
+	RunSpecs(t, "PersistentVolumeClaim reconciler")
 }
 
 func makePVC(clusterName, serial string, role utils.PVCRole, isResizing bool) corev1.PersistentVolumeClaim {
