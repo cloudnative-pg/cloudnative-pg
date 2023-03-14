@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -40,7 +41,6 @@ import (
 type RoleSynchronizer struct {
 	instance *postgres.Instance
 	client   client.Client
-	cluster  *apiv1.Cluster
 }
 
 // NewRoleSynchronizer creates a new RoleSynchronizer
@@ -96,6 +96,8 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 	return nil
 }
 
+// reconcile applied any necessary changes to the database to bring it in line
+// with the spec. It also updates the cluster Status with the latest applied changes
 func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.ManagedConfiguration) error {
 	var err error
 
@@ -120,10 +122,15 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		return fmt.Errorf("while reconciling managed roles: %w", err)
 	}
 
-	updatedCluster := sr.cluster.DeepCopy()
+	var remoteCluster apiv1.Cluster
+	err = sr.client.Get(ctx, types.NamespacedName{
+		Name:      sr.instance.ClusterName,
+		Namespace: sr.instance.Namespace,
+	}, &remoteCluster)
+
+	updatedCluster := remoteCluster.DeepCopy()
 	updatedCluster.Status.RolePasswordStatus = appliedState
-	contextLog.Info("patching cluster status with appliedState", "appliedState", appliedState)
-	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(sr.cluster))
+	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(&remoteCluster))
 }
 
 func getRoleNames(roles []apiv1.RoleConfiguration) []string {
@@ -263,7 +270,6 @@ const (
 	roleUpdate
 	roleIgnore
 	roleIsReserved
-	roleSetPassword
 )
 
 // evaluateRoleActions evaluates the action needed for each role in the DB and/or the Spec.
@@ -298,10 +304,8 @@ func evaluateRoleActions(
 			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], apiv1.RoleConfiguration{Name: role.Name})
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
 			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
-		case isInSpec && !areEquivalent(role, inSpec):
+		case isInSpec && (!areEquivalent(role, inSpec) || passwordNeedsUpdating(role)):
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
-		case isInSpec && passwordNeedsUpdating(role):
-			rolesByAction[roleSetPassword] = append(rolesByAction[roleSetPassword], inSpec)
 		case !isInSpec:
 			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})
 		default:
@@ -309,14 +313,12 @@ func evaluateRoleActions(
 		}
 	}
 
-	contextLog.Info("roles in spec", "role", rolesInSpec)
 	// 2. get status of roles in spec missing from the DB
 	for _, r := range rolesInSpec {
 		_, isInDB := roleInDBNamed[r.Name]
 		if isInDB {
 			continue // covered by the previous loop
 		}
-		contextLog.Info("roles in spec but not db", "role", r.Name)
 		if r.Ensure == apiv1.EnsurePresent {
 			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], r)
 		} else {
@@ -361,7 +363,6 @@ func getRoleStatus(
 		roleCreate:       apiv1.RoleStatusPendingReconciliation,
 		roleDelete:       apiv1.RoleStatusPendingReconciliation,
 		roleUpdate:       apiv1.RoleStatusPendingReconciliation,
-		roleSetPassword:  apiv1.RoleStatusPendingReconciliation,
 		roleIsReconciled: apiv1.RoleStatusReconciled,
 		roleIgnore:       apiv1.RoleStatusNotManaged,
 		roleIsReserved:   apiv1.RoleStatusReserved,
@@ -449,6 +450,10 @@ func getPasswordHashes(
 
 // areEquivalent checks a subset of the attributes of roles in DB and Spec
 // leaving passwords and role membership (InRoles) to be done separately
+//
+// TODO: timestamp parsing is necessary here, as we may have non-identical
+// strings back from Postgres.
+// And, in the Spec, do we use Postgres timestamp format?
 func areEquivalent(inDB DatabaseRole, inSpec apiv1.RoleConfiguration) bool {
 	reducedEntries := []struct {
 		Name            string
@@ -474,7 +479,7 @@ func areEquivalent(inDB DatabaseRole, inSpec apiv1.RoleConfiguration) bool {
 			Replication:     inDB.Replication,
 			BypassRLS:       inDB.BypassRLS,
 			ConnectionLimit: inDB.ConnectionLimit,
-			ValidUntil:      inDB.ValidUntil,
+			// ValidUntil:      inDB.ValidUntil,
 		},
 		{
 			Name:            inSpec.Name,
@@ -487,7 +492,7 @@ func areEquivalent(inDB DatabaseRole, inSpec apiv1.RoleConfiguration) bool {
 			Replication:     inSpec.Replication,
 			BypassRLS:       inSpec.BypassRLS,
 			ConnectionLimit: inSpec.ConnectionLimit,
-			ValidUntil:      inSpec.ValidUntil,
+			// ValidUntil:      inSpec.ValidUntil,
 		},
 	}
 	return reducedEntries[0] == reducedEntries[1]

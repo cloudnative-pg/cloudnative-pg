@@ -48,7 +48,7 @@ func (sm PostgresRoleManager) List(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
-       			pg_catalog.shobj_description(oid, 'pg_authid') as comment
+				pg_catalog.shobj_description(oid, 'pg_authid') as comment, xmin
 		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`)
 	if err != nil {
 		return []DatabaseRole{}, err
@@ -75,6 +75,7 @@ func (sm PostgresRoleManager) List(
 			&validuntil,
 			&role.BypassRLS,
 			&comment,
+			&role.transactionID,
 		)
 		if err != nil {
 			return []DatabaseRole{}, err
@@ -249,5 +250,9 @@ func appendPasswordOption(role DatabaseRole,
 		query.WriteString("PASSWORD NULL")
 	} else {
 		query.WriteString(fmt.Sprintf("PASSWORD %s", pq.QuoteLiteral(role.password.String)))
+	}
+
+	if role.password.Valid && role.ValidUntil != "" {
+		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(role.ValidUntil)))
 	}
 }
