@@ -77,6 +77,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 				return
 			case config = <-sr.instance.RoleSynchronizerChan():
 			}
+			contextLog.Info("RoleSynchronizer loop triggered")
 
 			// If the spec contains no roles to manage, stop the timer,
 			// the process will resume through the wakeUp channel if necessary
@@ -104,6 +105,9 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		}
 	}()
 
+	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog.Info("reconciling managed roles")
+
 	superUserDB, err := sr.instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while reconciling managed roles: %w", err)
@@ -118,6 +122,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 
 	updatedCluster := sr.cluster.DeepCopy()
 	updatedCluster.Status.RolePasswordStatus = appliedState
+	contextLog.Info("patching cluster status with appliedState", "appliedState", appliedState)
 	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(sr.cluster))
 }
 
@@ -201,8 +206,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	rolesByAction map[roleAction][]apiv1.RoleConfiguration,
 ) (map[string]apiv1.PasswordState, error) {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("synchronizing roles",
-		"podName", sr.instance.PodName)
+	contextLog.Info("applying role actions")
 
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while synchronizing roles in primary: %w", err)
@@ -272,7 +276,7 @@ func evaluateRoleActions(
 	passwordsInSpec map[string][]byte,
 ) map[roleAction][]apiv1.RoleConfiguration {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("evaluating the role actions")
+	contextLog.Info("evaluating role actions")
 
 	rolesInSpec := config.Roles
 	// set up a map name -> role for the spec roles
