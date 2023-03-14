@@ -176,6 +176,20 @@ func (sr *RoleSynchronizer) wrapDatabaseChange(
 	}, nil
 }
 
+func (sr *RoleSynchronizer) updateRoleCommentFromSpec(
+	ctx context.Context,
+	roleManager RoleManager,
+	roles []apiv1.RoleConfiguration,
+) error {
+	for _, role := range roles {
+		err := roleManager.UpdateComment(ctx, managedToDatabase(role, sql.NullString{}))
+		if err != nil {
+			return fmt.Errorf("while update comments for role %s: %w", role.Name, err)
+		}
+	}
+	return nil
+}
+
 // synchronizeRoles aligns roles in the database to the spec
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
@@ -253,6 +267,13 @@ func (sr *RoleSynchronizer) applyRoleActions(
 					return nil, wrapErr(err)
 				}
 			}
+		case roleSetComment:
+			contextLog.Info("role comments in DB out of sync with Spec. Updating",
+				"roles", getRoleNames(roles))
+			err := sr.updateRoleCommentFromSpec(ctx, roleManager, roles)
+			if err != nil {
+				return nil, wrapErr(err)
+			}
 		}
 	}
 
@@ -270,6 +291,7 @@ const (
 	roleUpdate
 	roleIgnore
 	roleIsReserved
+	roleSetComment
 )
 
 // evaluateRoleActions evaluates the action needed for each role in the DB and/or the Spec.
@@ -306,6 +328,8 @@ func evaluateRoleActions(
 			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
 		case isInSpec && (!areEquivalent(role, inSpec) || passwordNeedsUpdating(role)):
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
+		case isInSpec && commentNeedUpdating(role, inSpec):
+			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], inSpec)
 		case !isInSpec:
 			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})
 		default:
@@ -363,6 +387,7 @@ func getRoleStatus(
 		roleCreate:       apiv1.RoleStatusPendingReconciliation,
 		roleDelete:       apiv1.RoleStatusPendingReconciliation,
 		roleUpdate:       apiv1.RoleStatusPendingReconciliation,
+		roleSetComment:   apiv1.RoleStatusPendingReconciliation,
 		roleIsReconciled: apiv1.RoleStatusReconciled,
 		roleIgnore:       apiv1.RoleStatusNotManaged,
 		roleIsReserved:   apiv1.RoleStatusReserved,
@@ -448,6 +473,10 @@ func getPasswordHashes(
 	return re, nil
 }
 
+func commentNeedUpdating(inDB DatabaseRole, inSpec apiv1.RoleConfiguration) bool {
+	return inDB.Comment == inSpec.Comment
+}
+
 // areEquivalent checks a subset of the attributes of roles in DB and Spec
 // leaving passwords and role membership (InRoles) to be done separately
 //
@@ -457,7 +486,6 @@ func getPasswordHashes(
 func areEquivalent(inDB DatabaseRole, inSpec apiv1.RoleConfiguration) bool {
 	reducedEntries := []struct {
 		Name            string
-		Comment         string
 		Superuser       bool
 		CreateDB        bool
 		CreateRole      bool
@@ -470,7 +498,6 @@ func areEquivalent(inDB DatabaseRole, inSpec apiv1.RoleConfiguration) bool {
 	}{
 		{
 			Name:            inDB.Name,
-			Comment:         inDB.Comment,
 			Superuser:       inDB.Superuser,
 			CreateDB:        inDB.CreateDB,
 			CreateRole:      inDB.CreateDB,
@@ -483,7 +510,6 @@ func areEquivalent(inDB DatabaseRole, inSpec apiv1.RoleConfiguration) bool {
 		},
 		{
 			Name:            inSpec.Name,
-			Comment:         inSpec.Comment,
 			Superuser:       inSpec.Superuser,
 			CreateDB:        inSpec.CreateDB,
 			CreateRole:      inSpec.CreateDB,
