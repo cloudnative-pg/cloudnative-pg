@@ -69,25 +69,6 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			continue
 		}
 
-		if reason == apiv1.NewWalReason {
-			nodeSerial, err := specs.GetNodeSerial(postgresqlStatus.Pod.ObjectMeta)
-			if err != nil {
-				return false, err
-			}
-			if err := r.createPVC(
-				ctx,
-				cluster,
-				&persistentvolumeclaim.CreateConfiguration{
-					Status:     persistentvolumeclaim.StatusReady,
-					NodeSerial: nodeSerial,
-					Role:       utils.PVCRolePgWal,
-					Storage:    *cluster.Spec.WalStorage,
-				},
-			); err != nil {
-				return false, err
-			}
-		}
-
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 			fmt.Sprintf("Restarting instance %s, because: %s", postgresqlStatus.Pod.Name, reason),
 		); err != nil {
@@ -194,31 +175,6 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
 	}
 
-	// in case the reason is apiv1.NewWalReason we should create the PVC before proceeding to the 'upgrade'
-	if reason == apiv1.NewWalReason {
-		nodeSerial, err := specs.GetNodeSerial(primaryPod.ObjectMeta)
-		if err != nil {
-			return false, err
-		}
-
-		if cluster.Spec.WalStorage == nil {
-			return false, fmt.Errorf("requested a PVC WAL but no WalStorage configuration is present")
-		}
-
-		if err := r.createPVC(
-			ctx,
-			cluster,
-			&persistentvolumeclaim.CreateConfiguration{
-				Status:     persistentvolumeclaim.StatusReady,
-				NodeSerial: nodeSerial,
-				Role:       utils.PVCRolePgWal,
-				Storage:    *cluster.Spec.WalStorage,
-			},
-		); err != nil {
-			return false, err
-		}
-	}
-
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 		fmt.Sprintf("The primary instance needs to be restarted: %s, reason: %s",
@@ -286,7 +242,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, pvcName := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC begins with the name of the pod using it.
-			if persistentvolumeclaim.IsUsedByInstance(cluster, status.Pod.Name, pvcName) {
+			if persistentvolumeclaim.BelongToInstance(cluster, status.Pod.Name, pvcName) {
 				return true, false, fmt.Sprintf("rebooting pod to complete resizing %s", pvcName)
 			}
 		}
@@ -321,11 +277,8 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		}
 	}
 
-	// If the cluster should have a wal but a wal is not being used by this pod we need to roll out to create and attach
-	// the new wal
-	if cluster.ShouldCreateWalArchiveVolume() && !persistentvolumeclaim.IsUsedByPodSpec(status.Pod.Spec,
-		persistentvolumeclaim.GetName(cluster, status.Pod.Name, utils.PVCRolePgWal)) {
-		return true, false, apiv1.NewWalReason
+	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, &status.Pod) {
+		return true, false, string(apiv1.DetachedVolume)
 	}
 
 	// Check if there is a change in the environment section
