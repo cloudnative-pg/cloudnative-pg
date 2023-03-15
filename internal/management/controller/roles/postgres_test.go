@@ -194,9 +194,6 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectExec(wantedRoleExpectedAltStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
-		mock.ExpectExec(wantedRoleCommentStmt).
-			WillReturnResult(sqlmock.NewResult(2, 3))
-
 		err = prm.Update(ctx, managedToDatabase(wantedRole, sql.NullString{}))
 		Expect(err).ShouldNot(HaveOccurred())
 	})
@@ -210,6 +207,32 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			WillReturnError(dbError)
 
 		err = prm.Update(ctx, managedToDatabase(wantedRole, sql.NullString{}))
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, dbError)).To(BeTrue())
+	})
+
+	// Testing COMMENT
+	It("UpdateComment will send a correct COMMENT to the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		mock.ExpectExec(wantedRoleCommentStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+		err = prm.UpdateComment(ctx, managedToDatabase(wantedRole, sql.NullString{}))
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+
+	It("UpdateComment will return error if there is a problem updating the role in the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		dbError := errors.New("Kaboom")
+		mock.ExpectExec(wantedRoleCommentStmt).
+			WillReturnError(dbError)
+
+		err = prm.UpdateComment(ctx, managedToDatabase(wantedRole, sql.NullString{}))
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, dbError)).To(BeTrue())
 	})
