@@ -132,8 +132,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	_, err := sm.superUserDB.ExecContext(ctx, query.String())
-	if err != nil {
+	if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
 
@@ -141,12 +140,14 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 		query.Reset()
 		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
+
 		contextLog.Info("Creating", "query", query.String())
-		_, err = sm.superUserDB.ExecContext(ctx, query.String())
-		if err != nil {
+
+		if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
 			return fmt.Errorf("could not create comment for role %s: %w ", role.Name, err)
 		}
 	}
+
 	return nil
 }
 
