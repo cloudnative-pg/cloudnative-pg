@@ -403,10 +403,10 @@ Name                                | Description                               
 ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------------------
 `instances                          ` | The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.                                                                   | int                                                        
 `readyInstances                     ` | The total number of ready instances in the cluster. It is equal to the number of ready instance pods.                                                                              | int                                                        
-`instancesStatus                    ` | InstancesStatus indicates in which status the instances are                                                                                                                        | map[utils.PodStatus][]string
-`instancesReportedState             ` | the reported state of the instances during the last reconciliation loop                                                                                                            | [map[PodName]InstanceReportedState](#InstanceReportedState)
+`instancesStatus                    ` | InstancesStatus indicates in which status the instances are                                                                                                                        | map[utils.PodStatus][]string                               
+`instancesReportedState             ` | The reported state of the instances during the last reconciliation loop                                                                                                            | [map[PodName]InstanceReportedState](#InstanceReportedState)
 `roleStatus                         ` | RoleStatus gives the list of roles in each state                                                                                                                                   | map[RoleStatus][]string                                    
-`rolePasswordStatus                 ` | RolePasswordStatus gives the last transaction id and hash for each managed role                                                                                                    | [map[string]PasswordState](#PasswordState)
+`rolePasswordStatus                 ` | RolePasswordStatus gives the last transaction id and hash for each managed role                                                                                                    | [map[string]PasswordState](#PasswordState)                 
 `timelineID                         ` | The timeline of the Postgres cluster                                                                                                                                               | int                                                        
 `topology                           ` | Instances topology.                                                                                                                                                                | [Topology](#Topology)                                      
 `latestGeneratedNode                ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                        
@@ -613,10 +613,9 @@ Name | Description           | Type
 
 ManagedConfiguration represents the portions of PostgreSQL that are managed by the instance manager
 
-Name           | Description                                                                                     | Type                                     
--------------- | ----------------------------------------------------------------------------------------------- | -----------------------------------------
-`roles         ` |                                                                                                 | [[]RoleConfiguration](#RoleConfiguration)
-`updateInterval` | Primary will update the status of the managed role every `updateInterval` seconds (default 30). | int                                      
+Name  | Description            | Type                                     
+----- | --- | -----------------------------------------
+`roles` |  | [[]RoleConfiguration](#RoleConfiguration)
 
 <a id='Metadata'></a>
 
