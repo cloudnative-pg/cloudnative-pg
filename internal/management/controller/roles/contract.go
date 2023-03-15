@@ -63,4 +63,6 @@ type RoleManager interface {
 	// from the database
 	// See https://www.postgresql.org/docs/current/datatype-oid.html for reference
 	GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error)
+	// UpdateComment Update the comment of role in the database
+	UpdateComment(ctx context.Context, role DatabaseRole) error
 }
