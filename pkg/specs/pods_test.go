@@ -48,6 +48,14 @@ var (
 		Weight:          100,
 		PodAffinityTerm: testAffinityTerm,
 	}
+	testNodeSelectorTerm = corev1.NodeSelectorTerm{
+		MatchExpressions: []corev1.NodeSelectorRequirement{
+			{
+				Key:      "test",
+				Operator: corev1.NodeSelectorOpExists,
+			},
+		},
+	}
 )
 
 var _ = Describe("The PostgreSQL security context", func() {
@@ -247,6 +255,24 @@ var _ = Describe("Create affinity section", func() {
 				Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
 					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
 			})
+		})
+	})
+
+	When("given node affinity config", func() {
+		It("sets node affinity", func() {
+			config := v1.AffinityConfiguration{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{testNodeSelectorTerm},
+					},
+				},
+			}
+			affinity := CreateAffinitySection(clusterName, config)
+			Expect(affinity).NotTo(BeNil())
+			Expect(affinity.NodeAffinity).NotTo(BeNil())
+			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).NotTo(BeNil())
+			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms).
+				To(BeEquivalentTo([]corev1.NodeSelectorTerm{testNodeSelectorTerm}))
 		})
 	})
 })
