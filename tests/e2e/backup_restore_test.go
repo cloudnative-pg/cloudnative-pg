@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -185,6 +185,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			)
 
 			restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
 			backupName, err := env.GetResourceNameFromYAML(backupFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create required test data
@@ -229,7 +230,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			})
 
 			By("executing a second backup and verifying the number of backups on minio", func() {
-
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
@@ -248,7 +248,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
 				}, 60).Should(BeEquivalentTo(2))
-
 			})
 
 			By("verifying the backupName is properly set in the status of the backup", func() {
@@ -269,7 +268,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				} else {
 					Expect(backup.Status.BackupName).To(BeEmpty())
 				}
-
 			})
 
 			// Restore backup in a new cluster, also cover if no application database is configured
