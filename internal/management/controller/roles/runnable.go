@@ -121,10 +121,12 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 
 	var remoteCluster apiv1.Cluster
-	err = sr.client.Get(ctx, types.NamespacedName{
+	if err = sr.client.Get(ctx, types.NamespacedName{
 		Name:      sr.instance.ClusterName,
 		Namespace: sr.instance.Namespace,
-	}, &remoteCluster)
+	}, &remoteCluster); err != nil {
+		return err
+	}
 
 	updatedCluster := remoteCluster.DeepCopy()
 	updatedCluster.Status.RolePasswordStatus = appliedState
