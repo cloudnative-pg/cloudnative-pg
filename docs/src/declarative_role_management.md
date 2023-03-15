@@ -1,78 +1,61 @@
 # Database Role Management
 
-CloudNativePG has from inception managed role creation for a few specific roles
-needed in PostgreSQL instances:
+From its inception, CloudNativePG has managed the creation of specific roles required in PostgreSQL instances:
 
-- the superuser `postgres` of course, as well as the `streaming_replica` role
-- the application user, set as the low-privilege owner of the application
-  database
+- The superuser `postgres` and the `streaming_replica` role
+- The application user, set as the low-privilege owner of the application database
 
-This is described in the ["Bootstrap" section](bootstrap.md).
+This process is described in the ["Bootstrap"](bootstrap.md) section.
 
-With the `managed` stanza in the cluster spec, CloudNativePG extends management
-from creation to the full lifecycle management for roles described in
-`.spec.managed.roles`.
+With the `managed` stanza in the cluster spec, CloudNativePG now provides full lifecycle management for roles specified 
+in `.spec.managed.roles`.
 
-This feature allows to manage existing roles in a declarative way, and to create
-them too, if they are not yet present in the database.
-The creation of those roles will happen *after* the database bootstrapping is
-complete.
+This feature enables declarative management of existing roles, as well as the creation of new roles if they are not 
+already present in the database. Role creation will occur *after* the database bootstrapping is complete.
 
-There is an example manifest for a cluster with declarative role management
-in the file
-[`cluster-example-with-roles.yaml`](samples/cluster-example-with-roles.yaml)
+An example manifest for a cluster with declarative role management can be found in the file [`cluster-example-with-roles.yaml`](samples/cluster-example-with-roles.yaml).
 
 An excerpt from that file:
 
-``` yaml
+```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 spec:
   managed:
     roles:
-    - name: edb_admin
+    - name: cnpg_admin
       ensure: present
       comment: my database-side comment
       login: true
       superuser: false
 ```
-
-The role specification in `spec.managed.roles` follows the
-[PostgreSQL structure
-and naming conventions](https://www.postgresql.org/docs/current/sql-createrole.html).
+The role specification in `spec.managed.roles` adheres to the [PostgreSQL structure and naming conventions](https://www.postgresql.org/docs/current/sql-createrole.html).  
 A few points are worth noting:
 
-1. the `ensure` attribute is **not** a part of PostgreSQL. It allows declarative
-  role management to extend not only to role creation, but to role destruction.
-  The two possible values are `present` (the default,) and `absent`.
-2. the `inherit` attribute is true by default, as per PostgreSQL conventions.
-3. the `connectionLimit` attribute is by default -1, as per PostgreSQL
-  conventions.
+1. The `ensure` attribute is **not** part of PostgreSQL. It enables declarative role management to create and remove roles. 
+   The two possible values are `present` (the default) and `absent`.
+2. The `inherit` attribute is true by default, following PostgreSQL conventions.
+3. The `connectionLimit` attribute defaults to -1, in line with PostgreSQL conventions.
 
-Declarative role management will ensure that PostgreSQL instances are in
-line with the spec. This means that if a user were to log onto the
-database and change role attributes there, the CloudNativePG operator would
-roll back those changes in the next reconciliation cycle.
+Declarative role management ensures that PostgreSQL instances align with the spec. If a user modifies role attributes 
+directly in the database, the CloudNativePG operator will revert those changes during the next reconciliation cycle.
 
-There is a section in the CRD status for the status of the managed roles. E.g.
+The CRD status includes a section for the managed roles' status, as shown below:
 
-``` yaml
+```yaml
   roleStatus:
     not-managed:
     - app
     pending-reconciliation:
-    - edb_admin
+    - cnpg_admin
     reserved:
     - postgres
     - streaming_replica
 ```
 
-It includes the roles reserved for operator use and the roles that are **not**
-under declarative management, in order to get a complete view of the roles in
-the database instances.
+This section covers roles reserved for operator use and those that are **not** under declarative management, providing a
+comprehensive view of the roles in the database instances.
 
-This segues into the topic of backward compatibility: declarative role
-management is defined to ignore roles that exist in the database but are not in
-the spec. The lifecycle of those roles will continue to be handled within
-PostgreSQL. This allows users of CloudNativePG to opt into the feature at
-their convenience.
+In terms of backward compatibility, declarative role management is designed to ignore roles that exist in the database 
+but are not included in the spec. The lifecycle of these roles will continue to be managed within PostgreSQL, allowing 
+CloudNativePG users to adopt this feature at their convenience.
