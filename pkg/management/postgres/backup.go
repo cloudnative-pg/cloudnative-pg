@@ -59,7 +59,6 @@ var retryUntilWalArchiveWorking = wait.Backoff{
 type BackupCommand struct {
 	Cluster      *apiv1.Cluster
 	Backup       *apiv1.Backup
-	BackupName   string
 	Client       client.Client
 	Recorder     record.EventRecorder
 	Env          []string
@@ -82,19 +81,11 @@ func NewBackupCommand(
 		return nil, err
 	}
 
-	var backupName string
-	if capabilities.ShouldExecuteBackupWithName(cluster) {
-		backupName = fmt.Sprintf("%s-%v", backup.Name, time.Now().Unix())
-	} else {
-		backupName = "N/A"
-	}
-
 	return &BackupCommand{
 		Cluster:      cluster,
 		Backup:       backup,
 		Client:       client,
 		Recorder:     recorder,
-		BackupName:   backupName,
 		Env:          os.Environ(),
 		Instance:     instance,
 		Log:          log,
@@ -156,7 +147,7 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	}
 
 	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		options = append(options, "--name", b.BackupName)
+		options = append(options, "--name", b.Backup.Status.BackupName)
 	}
 
 	options, err := getDataConfiguration(options, configuration, b.Capabilities)
@@ -364,7 +355,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	b.Log.Debug("extracted barman backup", "backup", barmanBackup)
-	b.assignBarmanBackupToBackup(barmanBackup)
+	assignBarmanBackupToBackup(b.Backup, barmanBackup)
 
 	if err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 		b.Log.Error(err, "Can't set backup status as completed")
@@ -391,7 +382,7 @@ func (b *BackupCommand) getExecutedBackupInfo(
 	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
 		return barman.GetBackupByName(
 			ctx,
-			b.BackupName,
+			b.Backup.Status.BackupName,
 			b.Backup.Status.ServerName,
 			b.Cluster.Spec.Backup.BarmanObjectStore,
 			b.Env,
@@ -482,6 +473,9 @@ func (b *BackupCommand) setupBackupStatus() {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
+	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
+		backupStatus.BackupName = fmt.Sprintf("%s-%v", b.Backup.Name, time.Now().Unix())
+	}
 	backupStatus.BarmanCredentials = barmanConfiguration.BarmanCredentials
 	backupStatus.EndpointCA = barmanConfiguration.EndpointCA
 	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
@@ -498,13 +492,11 @@ func (b *BackupCommand) setupBackupStatus() {
 	backupStatus.Phase = apiv1.BackupPhaseRunning
 }
 
-func (b *BackupCommand) assignBarmanBackupToBackup(barmanBackup *catalog.BarmanBackup) {
-	backupStatus := b.Backup.GetStatus()
+func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *catalog.BarmanBackup) {
+	backupStatus := backup.GetStatus()
 
+	backupStatus.BackupName = barmanBackup.BackupName
 	backupStatus.BackupID = barmanBackup.ID
-	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		backupStatus.BackupName = b.BackupName
-	}
 	backupStatus.StartedAt = &metav1.Time{Time: barmanBackup.BeginTime}
 	backupStatus.StoppedAt = &metav1.Time{Time: barmanBackup.EndTime}
 	backupStatus.BeginWal = barmanBackup.BeginWal
