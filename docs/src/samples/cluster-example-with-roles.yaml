@@ -10,7 +10,7 @@ spec:
 
   managed:
     roles:
-    - name: edb_admin
+    - name: cnpg_admin
       ensure: present
       comment: my database-side comment
       login: true
@@ -26,7 +26,7 @@ spec:
         - pg_monitor
         - pg_signal_backend
       passwordSecret:
-        name: cluster-example-edbadmin
+        name: cluster-example-cnpgadmin
 ---
 apiVersion: v1
 data:
@@ -34,5 +34,5 @@ data:
   password: ZWRiX2FkbWluCg==
 kind: Secret
 metadata:
-  name: cluster-example-edbadmin
+  name: cluster-example-cnpgadmin
 type: kubernetes.io/basic-auth

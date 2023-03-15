@@ -290,6 +290,7 @@ type ClusterSpec struct {
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
+	// The configuration that is used by the portions of PostgreSQL that are managed by the instance manager
 	Managed *ManagedConfiguration `json:"managed,omitempty"`
 }
 
@@ -387,13 +388,13 @@ type RoleStatus string
 
 const (
 	// RoleStatusReconciled indicates the role in DB matches the Spec
-	RoleStatusReconciled = "reconciled"
+	RoleStatusReconciled RoleStatus = "reconciled"
 	// RoleStatusNotManaged indicates the role is not in the Spec, therefore not managed
-	RoleStatusNotManaged = "not-managed"
+	RoleStatusNotManaged RoleStatus = "not-managed"
 	// RoleStatusPendingReconciliation indicates the role in Spec requires updated/creation in DB
-	RoleStatusPendingReconciliation = "pending-reconciliation"
+	RoleStatusPendingReconciliation RoleStatus = "pending-reconciliation"
 	// RoleStatusReserved indicates this is one of the roles reserved by the operator. E.g. `postgres`
-	RoleStatusReserved = "reserved"
+	RoleStatusReserved RoleStatus = "reserved"
 )
 
 // PasswordState represents the state of the password of a managed RoleConfiguration
@@ -1598,9 +1599,6 @@ const (
 	EnsurePresent EnsureOption = "present"
 	EnsureAbsent  EnsureOption = "absent"
 )
-
-// DefaultRoleUpdateInterval is the default in seconds for the managed roles update interval
-const DefaultRoleUpdateInterval = 30
 
 // ManagedConfiguration represents the portions of PostgreSQL that are managed
 // by the instance manager
