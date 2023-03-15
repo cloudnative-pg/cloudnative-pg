@@ -105,24 +105,15 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 
 	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
+	contextLog.Info("Updating role", "role", role.Name, "query", query.String())
 	// NOTE: always apply the password update. Since the transaction ID of the role
 	// will change no matter what, the next reconciliation cycle we would update the password
 	appendPasswordOption(role, &query)
-	contextLog.Info("Updating role", "role", role.Name, "query", query.String())
 
 	_, err := sm.superUserDB.ExecContext(ctx, query.String())
 	if err != nil {
 		return fmt.Errorf("could not update role %s: %w", role.Name, err)
 	}
-
-	// TODO: perhaps separate the comment updating to a separate call
-	contextLog.Info("Updating role comment", "role", role.Name)
-	_, err = sm.superUserDB.ExecContext(ctx,
-		fmt.Sprintf("COMMENT ON ROLE %s IS %s", pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
-	if err != nil {
-		return fmt.Errorf("could not update role comments for %s: %w", role.Name, err)
-	}
-
 	return nil
 }
 
@@ -135,10 +126,10 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	var query strings.Builder
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
+	contextLog.Info("Creating", "query", query.String())
 	appendPasswordOption(role, &query)
 
-	contextLog.Info("Creating", "query", query.String())
-	// NOTE: defensively we might think of doint CREATE ... IF EXISTS
+	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
 	_, err := sm.superUserDB.ExecContext(ctx, query.String())
@@ -146,15 +137,16 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
 	}
 
-	// TODO: as with the Update() method, it may be better to handle role comments
-	// in a separate call.
-	_, err = sm.superUserDB.ExecContext(ctx,
-		fmt.Sprintf("COMMENT ON ROLE %s IS %s",
+	if len(role.Comment) > 0 {
+		query.Reset()
+		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
-	if err != nil {
-		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
+		contextLog.Info("Creating", "query", query.String())
+		_, err = sm.superUserDB.ExecContext(ctx, query.String())
+		if err != nil {
+			return fmt.Errorf("could not create comment for role %s: %w ", role.Name, err)
+		}
 	}
-
 	return nil
 }
 
@@ -193,6 +185,21 @@ func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role Dat
 	}
 
 	return xmin, nil
+}
+
+// UpdateComment of the role
+func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRole) error {
+	contextLog := log.FromContext(ctx).WithName("updateRole")
+	contextLog.Trace("Invoked", "role", role)
+
+	_, err := sm.superUserDB.ExecContext(ctx,
+		fmt.Sprintf("COMMENT ON ROLE %s IS %s",
+			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
+	if err != nil {
+		return fmt.Errorf("could not update comment of role %s: %w", role.Name, err)
+	}
+
+	return nil
 }
 
 func appendRoleOptions(role DatabaseRole, query *strings.Builder) {

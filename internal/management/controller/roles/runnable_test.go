@@ -63,6 +63,18 @@ func (m *mockRoleManager) Update(
 	return nil
 }
 
+func (m *mockRoleManager) UpdateComment(
+	ctx context.Context, role DatabaseRole,
+) error {
+	m.callHistory = append(m.callHistory, funcCall{"updateComment", role.Name})
+	_, found := m.roles[role.Name]
+	if !found {
+		return fmt.Errorf("tring to update comment of unknown role: %s", role.Name)
+	}
+	m.roles[role.Name] = role
+	return nil
+}
+
 func (m *mockRoleManager) Create(
 	ctx context.Context, role DatabaseRole,
 ) error {
