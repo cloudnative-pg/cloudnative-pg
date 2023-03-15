@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"os"
 	"path/filepath"
 	"strings"
@@ -174,7 +175,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		// We backup and restore a cluster, and verify some expected data to
 		// be there
-		It("backs up and restore a cluster", func() {
+		It("backs up and restores a cluster using minio", func() {
 			const (
 				targetDBOne              = "test"
 				targetDBTwo              = "test1"
@@ -184,6 +185,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			)
 
 			restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			backupName, err := env.GetResourceNameFromYAML(backupFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create required test data
 			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBOne, testTableName, psqlClientPod)
@@ -224,6 +226,50 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 						cluster)
 					return cluster.Status.LastFailedBackup, err
 				}, 30).Should(BeEmpty())
+			})
+
+			By("executing a second backup and verifying the number of backups on minio", func() {
+
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+				}, 60).Should(BeEquivalentTo(1))
+
+				// delete the first backup and create a second backup
+				backup := &apiv1.Backup{}
+				err := env.Client.Get(env.Ctx,
+					ctrlclient.ObjectKey{Namespace: namespace, Name: backupName},
+					backup)
+				Expect(err).ToNot(HaveOccurred())
+				err = env.Client.Delete(env.Ctx, backup)
+				Expect(err).ToNot(HaveOccurred())
+				// create a second backup
+				testUtils.ExecuteBackup(namespace, backupFile, false, env)
+				latestTar = minioPath(clusterName, "data.tar")
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+				}, 60).Should(BeEquivalentTo(2))
+
+			})
+
+			By("verifying the backupName is properly set in the status of the backup", func() {
+				backup := &apiv1.Backup{}
+				err := env.Client.Get(env.Ctx,
+					ctrlclient.ObjectKey{Namespace: namespace, Name: backupName},
+					backup)
+				Expect(err).ToNot(HaveOccurred())
+				cluster := &apiv1.Cluster{}
+				err = env.Client.Get(env.Ctx,
+					ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+					cluster)
+				Expect(err).ToNot(HaveOccurred())
+				bmc, err := capabilities.CurrentCapabilities()
+				Expect(err).ToNot(HaveOccurred())
+				if bmc.ShouldExecuteBackupWithName(cluster) {
+					Expect(backup.Status.BackupName).To(Equal(backupName))
+				} else {
+					Expect(backup.Status.BackupName).To(BeEmpty())
+				}
+
 			})
 
 			// Restore backup in a new cluster, also cover if no application database is configured
