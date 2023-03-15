@@ -1606,12 +1606,6 @@ const DefaultRoleUpdateInterval = 30
 // by the instance manager
 type ManagedConfiguration struct {
 	Roles []RoleConfiguration `json:"roles,omitempty"`
-
-	// Primary will update the status of the managed role
-	// every `updateInterval` seconds (default 30).
-	//+kubebuilder:default:=30
-	//+kubebuilder:validation:Minimum=1
-	UpdateInterval int `json:"updateInterval,omitempty"`
 }
 
 // RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
@@ -1663,14 +1657,6 @@ func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
 		return *roleConfiguration.Inherit
 	}
 	return true
-}
-
-// GetUpdateInterval returns the update interval, defaulting to DefaultRoleUpdateInterval if empty
-func (r *ManagedConfiguration) GetUpdateInterval() time.Duration {
-	if r == nil || r.UpdateInterval <= 0 {
-		return DefaultRoleUpdateInterval
-	}
-	return time.Duration(r.UpdateInterval) * time.Second
 }
 
 // +kubebuilder:object:root=true
