@@ -255,8 +255,13 @@ var _ = Describe("Role synchronizer tests", func() {
 var _ = DescribeTable("Role status getter tests",
 	func(spec *apiv1.ManagedConfiguration, db mockRoleManager, expected map[string]apiv1.RoleStatus) {
 		ctx := context.TODO()
-		statusMap, err := getRoleStatus(ctx, &db, spec, map[string]apiv1.PasswordState{}, nil)
-		Expect(err).ShouldNot(HaveOccurred())
+
+		roles, err := db.List(ctx)
+		Expect(err).ToNot(HaveOccurred())
+
+		statusMap := newRolesByAction(ctx, spec, roles, map[string]apiv1.PasswordState{}, nil).
+			convertToRolesByStatus()
+
 		// pivot the result to have a map: roleName -> Status, which is easier to compare for Ginkgo
 		statusByRole := make(map[string]apiv1.RoleStatus)
 		for action, roles := range statusMap {

@@ -32,6 +32,20 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
+// roleAction encodes the action necessary for a role, i.e. ignore, or CRUD
+type roleAction string
+
+// possible role actions
+const (
+	roleIsReconciled roleAction = "RECONCILED"
+	roleCreate       roleAction = "CREATE"
+	roleDelete       roleAction = "DELETE"
+	roleUpdate       roleAction = "UPDATE"
+	roleIgnore       roleAction = "IGNORE"
+	roleIsReserved   roleAction = "RESERVED"
+	roleSetComment   roleAction = "SET_COMMENT"
+)
+
 // A RoleSynchronizer is a Kubernetes manager.Runnable
 // that makes sure the Roles in the PostgreSQL databases are in sync with the spec
 //
@@ -184,7 +198,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	if err != nil {
 		return nil, err
 	}
-	rolesByAction := evaluateRoleActions(ctx, config, rolesInDB, storedPasswordState, hashes)
+	rolesByAction := newRolesByAction(ctx, config, rolesInDB, storedPasswordState, hashes)
 	if err != nil {
 		return nil, fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
@@ -262,115 +276,6 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	}
 
 	return appliedChanges, nil
-}
-
-// roleAction encodes the action necessary for a role, i.e. ignore, or CRUD
-type roleAction string
-
-// possible role actions
-const (
-	roleIsReconciled roleAction = "RECONCILED"
-	roleCreate       roleAction = "CREATE"
-	roleDelete       roleAction = "DELETE"
-	roleUpdate       roleAction = "UPDATE"
-	roleIgnore       roleAction = "IGNORE"
-	roleIsReserved   roleAction = "RESERVED"
-	roleSetComment   roleAction = "SET_COMMENT"
-)
-
-// evaluateRoleActions evaluates the action needed for each role in the DB and/or the Spec.
-// It has no side effects
-func evaluateRoleActions(
-	ctx context.Context,
-	config *apiv1.ManagedConfiguration,
-	rolesInDB []DatabaseRole,
-	lastPasswordState map[string]apiv1.PasswordState,
-	passwordsInSpec map[string][]byte,
-) map[roleAction][]apiv1.RoleConfiguration {
-	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("evaluating role actions")
-
-	rolesInSpec := config.Roles
-	// set up a map name -> role for the spec roles
-	roleInSpecNamed := make(map[string]apiv1.RoleConfiguration)
-	for _, r := range rolesInSpec {
-		roleInSpecNamed[r.Name] = r
-	}
-
-	rolesByAction := make(map[roleAction][]apiv1.RoleConfiguration)
-	// 1. find the next actions for the roles in the DB
-	roleInDBNamed := make(map[string]DatabaseRole)
-	for _, role := range rolesInDB {
-		roleInDBNamed[role.Name] = role
-		inSpec, isInSpec := roleInSpecNamed[role.Name]
-		switch {
-		case ReservedRoles[role.Name]:
-			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], apiv1.RoleConfiguration{Name: role.Name})
-		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
-			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
-		case isInSpec && (!role.isEquivalent(inSpec) || role.passwordNeedsUpdating(lastPasswordState, passwordsInSpec)):
-			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
-		case isInSpec && !role.isCommentEqual(inSpec):
-			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], inSpec)
-		case !isInSpec:
-			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})
-		default:
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], apiv1.RoleConfiguration{Name: role.Name})
-		}
-	}
-
-	// 2. get status of roles in spec missing from the DB
-	for _, r := range rolesInSpec {
-		_, isInDB := roleInDBNamed[r.Name]
-		if isInDB {
-			continue // covered by the previous loop
-		}
-		if r.Ensure == apiv1.EnsurePresent {
-			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], r)
-		} else {
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], r)
-		}
-	}
-
-	return rolesByAction
-}
-
-// getRoleStatus gets the status of every role in the Spec and/or in the DB
-func getRoleStatus(
-	ctx context.Context,
-	roleManager RoleManager,
-	config *apiv1.ManagedConfiguration,
-	storedPasswordState map[string]apiv1.PasswordState,
-	passwordHashes map[string][]byte,
-) (map[apiv1.RoleStatus][]apiv1.RoleConfiguration, error) {
-	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("getting the managed roles status")
-
-	rolesInDB, err := roleManager.List(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	rolesByAction := evaluateRoleActions(ctx, config, rolesInDB, storedPasswordState, passwordHashes)
-
-	statusByAction := map[roleAction]apiv1.RoleStatus{
-		roleCreate:       apiv1.RoleStatusPendingReconciliation,
-		roleDelete:       apiv1.RoleStatusPendingReconciliation,
-		roleUpdate:       apiv1.RoleStatusPendingReconciliation,
-		roleSetComment:   apiv1.RoleStatusPendingReconciliation,
-		roleIsReconciled: apiv1.RoleStatusReconciled,
-		roleIgnore:       apiv1.RoleStatusNotManaged,
-		roleIsReserved:   apiv1.RoleStatusReserved,
-	}
-
-	rolesByStatus := make(map[apiv1.RoleStatus][]apiv1.RoleConfiguration)
-	for action, roles := range rolesByAction {
-		// NOTE: several actions map to the PendingReconciliation status, so
-		// we need to append the roles in each action
-		rolesByStatus[statusByAction[action]] = append(rolesByStatus[statusByAction[action]], roles...)
-	}
-
-	return rolesByStatus, nil
 }
 
 // getPassword retrieves the password stored in the Kubernetes secret for the
