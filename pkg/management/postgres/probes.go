@@ -363,16 +363,24 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 // fillWalStatus retrieves information about the WAL senders processes
 // and the on-disk WAL archives status
 func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error {
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	return instance.fillWalStatusFromConnection(result, superUserDB)
+}
+
+// fillWalStatus retrieves information about the WAL senders processes
+// and the on-disk WAL archives status using a specified database
+// interface. This is mainly useful for testing
+func (instance *Instance) fillWalStatusFromConnection(result *postgres.PostgresqlStatus, superUserDB *sql.DB) error {
 	if !result.IsPrimary {
 		return nil
 	}
 	var err error
 	var replicationInfo postgres.PgStatReplicationList
 
-	superUserDB, err := instance.GetSuperUserDB()
-	if err != nil {
-		return err
-	}
 	rows, err := superUserDB.Query(
 		`SELECT
 			application_name,
@@ -391,6 +399,9 @@ func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error
 		fmt.Sprintf("%s-%%", instance.ClusterName),
 		v1.StreamingReplicationUser,
 	)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && err == nil {
 			err = closeErr
