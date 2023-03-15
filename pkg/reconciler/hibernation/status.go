@@ -32,7 +32,7 @@ const (
 	HibernationAnnotationName = "cnpg.io/hibernation"
 
 	// HibernationOff is the value of hibernation annotation when the hibernation
-	// has been deactivated for the clusetr
+	// has been deactivated for the cluster
 	HibernationOff = "off"
 
 	// HibernationOn is the value of hibernation annotation when the hibernation

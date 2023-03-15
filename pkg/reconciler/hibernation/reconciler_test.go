@@ -62,7 +62,7 @@ var _ = Describe("Reconcile resources", func() {
 		Expect(mock.deletedPods).To(BeEmpty())
 	})
 
-	It("let the reconciliation loog stop if the cluster is already hibernated", func(ctx SpecContext) {
+	It("let the reconciliation loop stop if the cluster is already hibernated", func(ctx SpecContext) {
 		mock := &clientMock{}
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{

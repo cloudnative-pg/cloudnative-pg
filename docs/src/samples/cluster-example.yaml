@@ -1,6 +1,8 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
+  annotations:
+    cnpg.io/hibernation: "on"
   name: cluster-example
 spec:
   instances: 3

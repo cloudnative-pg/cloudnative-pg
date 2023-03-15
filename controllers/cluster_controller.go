@@ -276,7 +276,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// If the user has requested to hibernate the cluster, we do that before
 	// ensuring the primary to be healthy. The hibernation starts from the
 	// primary Pod to ensure the replicas are in sync and doing it here avoids
-	// any unwanted switchovers.
+	// any unwanted switchover's.
 	if result, err := hibernation.Reconcile(
 		ctx,
 		r.Client,
