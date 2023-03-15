@@ -51,7 +51,7 @@ func (sm PostgresRoleManager) List(
 				pg_catalog.shobj_description(oid, 'pg_authid') as comment, xmin
 		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`)
 	if err != nil {
-		return []DatabaseRole{}, err
+		return nil, err
 	}
 	defer func() {
 		_ = rows.Close()
@@ -78,7 +78,7 @@ func (sm PostgresRoleManager) List(
 			&role.transactionID,
 		)
 		if err != nil {
-			return []DatabaseRole{}, err
+			return nil, err
 		}
 		if validuntil.Valid {
 			role.ValidUntil = validuntil.String
@@ -91,7 +91,7 @@ func (sm PostgresRoleManager) List(
 	}
 
 	if rows.Err() != nil {
-		return []DatabaseRole{}, rows.Err()
+		return nil, rows.Err()
 	}
 
 	return roles, nil
