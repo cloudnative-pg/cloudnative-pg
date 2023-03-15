@@ -612,10 +612,9 @@ Name | Description           | Type
 
 ManagedConfiguration represents the portions of PostgreSQL that are managed by the instance manager
 
-Name           | Description                                                                                     | Type                                     
--------------- | ----------------------------------------------------------------------------------------------- | -----------------------------------------
-`roles         ` |                                                                                                 | [[]RoleConfiguration](#RoleConfiguration)
-`updateInterval` | Primary will update the status of the managed role every `updateInterval` seconds (default 30). | int                                      
+Name  | Description            | Type                                     
+----- | --- | -----------------------------------------
+`roles` |  | [[]RoleConfiguration](#RoleConfiguration)
 
 <a id='Metadata'></a>
 

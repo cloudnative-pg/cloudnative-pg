@@ -2236,12 +2236,6 @@ spec:
                       - name
                       type: object
                     type: array
-                  updateInterval:
-                    default: 30
-                    description: Primary will update the status of the managed role
-                      every `updateInterval` seconds (default 30).
-                    minimum: 1
-                    type: integer
                 type: object
               maxSyncReplicas:
                 default: 0
