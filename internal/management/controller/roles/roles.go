@@ -23,10 +23,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-type rolesByAction map[roleAction][]apiv1.RoleConfiguration
+type (
+	rolesByAction map[roleAction][]apiv1.RoleConfiguration
+	rolesByStatus map[apiv1.RoleStatus][]apiv1.RoleConfiguration
+)
 
 // convertToRolesByStatus gets the status of every role in the Spec and/or in the DB
-func (r rolesByAction) convertToRolesByStatus() map[apiv1.RoleStatus][]apiv1.RoleConfiguration {
+func (r rolesByAction) convertToRolesByStatus() rolesByStatus {
 	statusByAction := map[roleAction]apiv1.RoleStatus{
 		roleCreate:       apiv1.RoleStatusPendingReconciliation,
 		roleDelete:       apiv1.RoleStatusPendingReconciliation,
@@ -37,7 +40,7 @@ func (r rolesByAction) convertToRolesByStatus() map[apiv1.RoleStatus][]apiv1.Rol
 		roleIsReserved:   apiv1.RoleStatusReserved,
 	}
 
-	rolesByStatus := make(map[apiv1.RoleStatus][]apiv1.RoleConfiguration)
+	rolesByStatus := make(rolesByStatus)
 	for action, roles := range r {
 		// NOTE: several actions map to the PendingReconciliation status, so
 		// we need to append the roles in each action
@@ -66,7 +69,7 @@ func newRolesByAction(
 		roleInSpecNamed[r.Name] = r
 	}
 
-	rolesByAction := make(map[roleAction][]apiv1.RoleConfiguration)
+	rolesByAction := make(rolesByAction)
 	// 1. find the next actions for the roles in the DB
 	roleInDBNamed := make(map[string]DatabaseRole)
 	for _, role := range rolesInDB {

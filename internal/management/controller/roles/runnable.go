@@ -220,7 +220,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	roleManager RoleManager,
-	rolesByAction map[roleAction][]apiv1.RoleConfiguration,
+	rolesByAction rolesByAction,
 ) (map[string]apiv1.PasswordState, error) {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("applying role actions")
