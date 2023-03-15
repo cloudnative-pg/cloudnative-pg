@@ -48,15 +48,19 @@ func Reconcile(
 		return reconcile.Result{}, err
 	}
 
-	mgr := NewPostgresRoleManager(db)
 	// get current passwords from spec/secrets
 	passwordsInSpec, err := getPasswordHashes(ctx, c, cluster.Spec.Managed.Roles, instance.Namespace)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	latestPasswords := cluster.Status.RolePasswordStatus
-	rolesByStatus, err := getRoleStatus(ctx, mgr, cluster.Spec.Managed, latestPasswords, passwordsInSpec)
+	rolesByStatus, err := getRoleStatus(
+		ctx,
+		NewPostgresRoleManager(db),
+		cluster.Spec.Managed,
+		cluster.Status.RolePasswordStatus,
+		passwordsInSpec,
+	)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
