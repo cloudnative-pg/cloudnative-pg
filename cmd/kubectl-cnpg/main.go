@@ -34,6 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/psql"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/report"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/restart"
@@ -71,6 +72,7 @@ func main() {
 	rootCmd.AddCommand(status.NewCmd())
 	rootCmd.AddCommand(versions.NewCmd())
 	rootCmd.AddCommand(backup.NewCmd())
+	rootCmd.AddCommand(psql.NewCmd())
 
 	if err := rootCmd.ExecuteContext(context.Background()); err != nil {
 		os.Exit(1)

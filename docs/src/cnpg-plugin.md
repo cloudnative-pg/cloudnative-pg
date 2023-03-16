@@ -716,3 +716,43 @@ The created backup will be named after the request time:
 kubectl cnpg backup cluster-example
 backup/cluster-example-20230121002300 created
 ```
+
+### Launching psql
+
+The `kubectl cnpg psql` command starts a new PostgreSQL interactive front-end
+process (psql) connected to an existing Postgres cluster, as if you were running
+it from the actual pod. This means that you will be using the `postgres` user.
+
+!!! Important
+    As you will be connecting as `postgres` user, in production environments this
+    method should be used with extreme care, by authorized personnel only.
+
+```shell
+kubectl cnpg psql cluster-example
+
+psql (15.2 (Debian 15.2-1.pgdg110+1))
+Type "help" for help.
+
+postgres=#
+```
+
+By default, the command will connect to the primary instance. The user can
+select to work against a replica by using the `--replica` option:
+
+```shell
+kubectl cnpg psql --replica cluster-example
+psql (15.2 (Debian 15.2-1.pgdg110+1))
+
+Type "help" for help.
+
+postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ t
+(1 row)
+
+postgres=# \q
+```
+
+This command will start `kubectl exec`, and the `kubectl` executable must be
+reachable in your `PATH` variable to correctly work.
