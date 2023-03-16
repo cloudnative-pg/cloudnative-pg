@@ -74,6 +74,9 @@ var _ = Describe("Status enrichment", func() {
 					HibernationAnnotationName: "not-correct",
 				},
 			},
+			Status: apiv1.ClusterStatus{
+				Phase: apiv1.PhaseHealthy,
+			},
 		}
 		EnrichStatus(ctx, &cluster, nil)
 
@@ -97,6 +100,7 @@ var _ = Describe("Status enrichment", func() {
 						Status: metav1.ConditionTrue,
 					},
 				},
+				Phase: apiv1.PhaseHealthy,
 			},
 		}
 
@@ -111,6 +115,9 @@ var _ = Describe("Status enrichment", func() {
 				Annotations: map[string]string{
 					HibernationAnnotationName: HibernationOn,
 				},
+			},
+			Status: apiv1.ClusterStatus{
+				Phase: apiv1.PhaseHealthy,
 			},
 		}
 
@@ -128,6 +135,9 @@ var _ = Describe("Status enrichment", func() {
 					HibernationAnnotationName: HibernationOn,
 				},
 			},
+			Status: apiv1.ClusterStatus{
+				Phase: apiv1.PhaseHealthy,
+			},
 		}
 
 		EnrichStatus(ctx, &cluster, []corev1.Pod{{}})
@@ -137,12 +147,32 @@ var _ = Describe("Status enrichment", func() {
 		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonDeletingPods))
 	})
 
+	It("doesn't work when the cluster is not ready", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					HibernationAnnotationName: HibernationOn,
+				},
+			},
+			Status: apiv1.ClusterStatus{
+				Phase: apiv1.PhaseCreatingReplica,
+			},
+		}
+
+		EnrichStatus(ctx, &cluster, []corev1.Pod{{}})
+		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
+		Expect(hibernationCondition).To(BeNil())
+	})
+
 	It("waits for Pod to be deleted gracefully", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
 					HibernationAnnotationName: HibernationOn,
 				},
+			},
+			Status: apiv1.ClusterStatus{
+				Phase: apiv1.PhaseHealthy,
 			},
 		}
 

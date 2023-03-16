@@ -97,6 +97,13 @@ func EnrichStatus(
 		return
 	}
 
+	// We proceed to hibernate the cluster only when it is ready.
+	// Hibernating a non-ready cluster may be dangerous since the PVCs
+	// won't to completely created.
+	if cluster.Status.Phase != apiv1.PhaseHealthy {
+		return
+	}
+
 	if len(podList) == 0 {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    HibernationConditionType,
