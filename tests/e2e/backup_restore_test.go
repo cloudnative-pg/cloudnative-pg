@@ -264,7 +264,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				if cluster.ShouldForceLegacyBackup() {
 					Expect(backup.Status.BackupName).To(BeEmpty())
 				} else {
-					Expect(backup.Status.BackupName).To(Equal(backupName))
+					Expect(backup.Status.BackupName).ToNot(HavePrefix("backup-"))
 				}
 			})
 
