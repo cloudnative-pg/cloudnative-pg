@@ -49,8 +49,8 @@ type psqlCommand struct {
 
 // psqlCommandOptions are the options required to start psql
 type psqlCommandOptions struct {
-	// The role of the pod where we should launch psql
-	role string
+	// Require a connection to a replica
+	replica bool
 
 	// The cluster name
 	name string
@@ -124,14 +124,19 @@ func (psql *psqlCommand) getKubectlInvocation() ([]string, error) {
 
 // getPodName get the first Pod name with the required role
 func (psql *psqlCommand) getPodName() (string, error) {
+	targetPodRole := specs.ClusterRoleLabelPrimary
+	if psql.replica {
+		targetPodRole = specs.ClusterRoleLabelReplica
+	}
+
 	for i := range psql.podList {
 		podRole := psql.podList[i].Labels[specs.ClusterRoleLabelName]
-		if podRole == psql.role {
+		if podRole == targetPodRole {
 			return psql.podList[i].Name, nil
 		}
 	}
 
-	return "", &ErrMissingPod{role: psql.role}
+	return "", &ErrMissingPod{role: targetPodRole}
 }
 
 // exec replaces the current process with a `kubectl exec` invocation.

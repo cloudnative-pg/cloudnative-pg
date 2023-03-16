@@ -22,12 +22,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // NewCmd creates the "psql" command
 func NewCmd() *cobra.Command {
-	var role string
+	var replica bool
 	var allocateTTY bool
 	var passStdin bool
 
@@ -39,13 +38,8 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			psqlArgs := args[1:]
-
-			if role != specs.ClusterRoleLabelPrimary && role != specs.ClusterRoleLabelReplica {
-				return fmt.Errorf("invalid pod role")
-			}
-
 			psqlOptions := psqlCommandOptions{
-				role:        role,
+				replica:     replica,
 				namespace:   plugin.Namespace,
 				allocateTTY: allocateTTY,
 				passStdin:   passStdin,
@@ -62,12 +56,11 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(
-		&role,
-		"role",
-		"r",
-		"primary",
-		"The role of the Pod to connect to. Valid values are 'primary' and 'replica'",
+	cmd.Flags().BoolVar(
+		&replica,
+		"replica",
+		false,
+		"Connect to a replica (defaults to connecting to a primary)",
 	)
 
 	cmd.Flags().BoolVarP(

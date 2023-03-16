@@ -36,7 +36,7 @@ var _ = Describe("psql launcher", func() {
 	It("selects the correct Pod when looking for a primary", func() {
 		cmd := psqlCommand{
 			psqlCommandOptions: psqlCommandOptions{
-				role: specs.ClusterRoleLabelPrimary,
+				replica: false,
 			},
 			podList: podList,
 		}
@@ -46,7 +46,7 @@ var _ = Describe("psql launcher", func() {
 	It("selects the correct Pod when looking for a replica", func() {
 		cmd := psqlCommand{
 			psqlCommandOptions: psqlCommandOptions{
-				role: specs.ClusterRoleLabelReplica,
+				replica: true,
 			},
 			podList: podList,
 		}
@@ -54,11 +54,17 @@ var _ = Describe("psql launcher", func() {
 	})
 
 	It("raises an error when a Pod cannot be found", func() {
+		fakePodList := []corev1.Pod{
+			fakePod("cluster-example-1", "guitar"),
+			fakePod("cluster-example-2", "piano"),
+			fakePod("cluster-example-3", "oboe"),
+		}
+
 		cmd := psqlCommand{
 			psqlCommandOptions: psqlCommandOptions{
-				role: "non-existing-role",
+				replica: false,
 			},
-			podList: podList,
+			podList: fakePodList,
 		}
 
 		_, err := cmd.getPodName()
@@ -69,7 +75,7 @@ var _ = Describe("psql launcher", func() {
 	It("correctly composes a kubectl exec command line", func() {
 		cmd := psqlCommand{
 			psqlCommandOptions: psqlCommandOptions{
-				role:        specs.ClusterRoleLabelReplica,
+				replica:     true,
 				allocateTTY: true,
 				passStdin:   true,
 				namespace:   "default",
@@ -94,7 +100,7 @@ var _ = Describe("psql launcher", func() {
 	It("correctly composes a kubectl exec command line with psql args", func() {
 		cmd := psqlCommand{
 			psqlCommandOptions: psqlCommandOptions{
-				role:      specs.ClusterRoleLabelReplica,
+				replica:   true,
 				namespace: "default",
 				args: []string{
 					"-c",
