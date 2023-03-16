@@ -317,9 +317,18 @@ func GetPodsNotOnPrimaryNode(
 	return podsOnOtherNodes
 }
 
+// enforceFailoverDelay checks if the cluster is in the online upgrading phase and enforces a failover delay of
+// 30 seconds.
+// If the cluster is not in the online upgrading phase, it evaluates the failover delay specified in the
+// cluster's specification.
+// If the user has set a custom failoverDelay value and the cluster is in the OnlineUpgrading phase, the function will
+// wait for the remaining time of the custom delay, as long as it is greater than the fixed delay of
+// 30 seconds for online upgrades.
+// Returns an error if there is an issue with evaluating the failover delay.
 func (r *ClusterReconciler) enforceFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
 	if cluster.Status.Phase == apiv1.PhaseOnlineUpgrading {
-		return r.evaluateFailoverDelay(ctx, cluster, 30)
+		const fixedDelayForOnlineUpgrades = 30
+		return r.evaluateFailoverDelay(ctx, cluster, fixedDelayForOnlineUpgrades)
 	}
 
 	return r.evaluateFailoverDelay(ctx, cluster, cluster.Spec.FailoverDelay)
