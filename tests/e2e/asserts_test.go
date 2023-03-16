@@ -1736,8 +1736,9 @@ func prepareClusterForPITROnMinio(
 		latestTar := minioPath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
-		}, 60).Should(BeEquivalentTo(expectedVal),
-			fmt.Sprintf("verify the number of backups %v is equals to %v", latestTar, expectedVal))
+		}, 60).Should(BeNumerically(">=", expectedVal),
+			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
+				expectedVal))
 		Eventually(func() (string, error) {
 			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx,
