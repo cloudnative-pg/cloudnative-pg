@@ -814,4 +814,4 @@ postgres=# \q
 ```
 
 This command will start `kubectl exec`, and the `kubectl` executable must be
-reachable in PATH to correctly work.
+reachable in your `PATH` variable to correctly work.
