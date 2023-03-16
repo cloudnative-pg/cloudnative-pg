@@ -37,11 +37,3 @@ func GetUserPasswordFromSecret(secret *corev1.Secret) (string, string, error) {
 
 	return string(secret.Data["username"]), string(secret.Data["password"]), nil
 }
-
-// GetPasswordFromSecret gets the password from a secret
-func GetPasswordFromSecret(secret *corev1.Secret) (string, error) {
-	if _, ok := secret.Data["password"]; !ok {
-		return "", fmt.Errorf("password key doesn't exist inside the secret")
-	}
-	return string(secret.Data["password"]), nil
-}

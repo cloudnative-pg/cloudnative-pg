@@ -128,12 +128,6 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 	roleManager := NewPostgresRoleManager(superUserDB)
 
-	var rolePasswords map[string]apiv1.PasswordState
-	appliedState, err := sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
-	if err != nil {
-		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
-	}
-
 	var remoteCluster apiv1.Cluster
 	if err = sr.client.Get(ctx, types.NamespacedName{
 		Name:      sr.instance.ClusterName,
@@ -142,6 +136,18 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		return err
 	}
 
+	rolePasswords := remoteCluster.Status.RolePasswordStatus
+	appliedState, err := sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
+	if err != nil {
+		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
+	}
+
+	if err = sr.client.Get(ctx, types.NamespacedName{
+		Name:      sr.instance.ClusterName,
+		Namespace: sr.instance.Namespace,
+	}, &remoteCluster); err != nil {
+		return err
+	}
 	updatedCluster := remoteCluster.DeepCopy()
 	updatedCluster.Status.RolePasswordStatus = appliedState
 	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(&remoteCluster))
@@ -212,7 +218,15 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 		return nil, fmt.Errorf("while synchronizing roles in primary: %w", err)
 	}
 
-	return res, nil
+	for role, stateInDatabase := range res {
+		if stateInSpec, ok := storedPasswordState[role]; ok {
+			stateInSpec.PasswordHash = stateInDatabase.PasswordHash
+			stateInSpec.TransactionID = stateInDatabase.TransactionID
+		} else {
+			storedPasswordState[role] = stateInDatabase
+		}
+	}
+	return storedPasswordState, nil
 }
 
 // applyRoleActions applies the actions to reconcile roles in the DB with the Spec
@@ -259,6 +273,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				if err != nil {
 					return nil, err
 				}
+
 				appliedChanges[role.Name] = apiv1.PasswordState{
 					TransactionID: transactionID,
 					PasswordHash:  hashPassword(pass),
