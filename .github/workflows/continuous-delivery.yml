@@ -252,7 +252,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
@@ -590,7 +590,7 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
