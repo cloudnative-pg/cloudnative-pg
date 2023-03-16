@@ -262,7 +262,11 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 		return err
 	}
 
-	if err := instance.fillArchiverStatus(result); err != nil {
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+	if err := fillArchiverStatus(superUserDB, result); err != nil {
 		return err
 	}
 
@@ -295,14 +299,7 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 }
 
 // fillArchiverStatus get information about the PostgreSQL archiving process
-func (instance *Instance) fillArchiverStatus(result *postgres.PostgresqlStatus) error {
-	var err error
-
-	superUserDB, err := instance.GetSuperUserDB()
-	if err != nil {
-		return err
-	}
-
+func fillArchiverStatus(superUserDB *sql.DB, result *postgres.PostgresqlStatus) error {
 	row := superUserDB.QueryRow(
 		`
 		SELECT
@@ -313,14 +310,13 @@ func (instance *Instance) fillArchiverStatus(result *postgres.PostgresqlStatus) 
 			COALESCE(last_archived_time,'-infinity') > COALESCE(last_failed_time, '-infinity') AS is_archiving
 		FROM pg_catalog.pg_stat_archiver
 		`)
-	err = row.Scan(&result.LastArchivedWAL,
+
+	return row.Scan(&result.LastArchivedWAL,
 		&result.LastArchivedWALTime,
 		&result.LastFailedWAL,
 		&result.LastFailedWALTime,
 		&result.IsArchivingWAL,
 	)
-
-	return err
 }
 
 // fillReplicationSlotsStatus get information about the replication slots
