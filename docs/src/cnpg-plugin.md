@@ -797,7 +797,7 @@ postgres=#
 ```
 
 By default, the command will connect to the primary instance. The user can
-select to work against a replica by using the `--role` flag:
+select to work against a replica by using the `--replica` option:
 
 ```shell
 psql (15.2 (Debian 15.2-1.pgdg110+1))
