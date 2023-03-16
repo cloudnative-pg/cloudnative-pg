@@ -474,7 +474,7 @@ func (b *BackupCommand) setupBackupStatus() {
 	backupStatus := b.Backup.GetStatus()
 
 	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		backupStatus.BackupName = fmt.Sprintf("%s-%v", b.Backup.Name, time.Now().Unix())
+		backupStatus.BackupName = fmt.Sprintf("backup-%v", time.Now().Unix())
 	}
 	backupStatus.BarmanCredentials = barmanConfiguration.BarmanCredentials
 	backupStatus.EndpointCA = barmanConfiguration.EndpointCA
