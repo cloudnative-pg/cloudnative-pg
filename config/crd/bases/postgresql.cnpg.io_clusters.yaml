@@ -3408,7 +3408,8 @@ spec:
                 type: string
               currentPrimaryFailingSinceTimestamp:
                 description: The timestamp when the primary was detected to be unhealthy
-                  This field is reported only when spec.failoverDelay is populated
+                  This field is reported when spec.failoverDelay is populated or during
+                  online upgrades
                 type: string
               currentPrimaryTimestamp:
                 description: The timestamp when the last actual promotion to primary

@@ -318,7 +318,19 @@ func GetPodsNotOnPrimaryNode(
 }
 
 func (r *ClusterReconciler) enforceFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
-	if cluster.Spec.FailoverDelay == 0 {
+	if cluster.Status.Phase == apiv1.PhaseOnlineUpgrading {
+		return r.evaluateFailoverDelay(ctx, cluster, 30)
+	}
+
+	return r.evaluateFailoverDelay(ctx, cluster, cluster.Spec.FailoverDelay)
+}
+
+func (r *ClusterReconciler) evaluateFailoverDelay(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	failOverDelay int32,
+) error {
+	if failOverDelay == 0 {
 		return nil
 	}
 
@@ -335,7 +347,7 @@ func (r *ClusterReconciler) enforceFailoverDelay(ctx context.Context, cluster *a
 	if err != nil {
 		return err
 	}
-	delay := time.Duration(cluster.Spec.FailoverDelay) * time.Second
+	delay := time.Duration(failOverDelay) * time.Second
 	if delay > primaryFailingSince {
 		return ErrWaitingOnFailOverDelay
 	}
