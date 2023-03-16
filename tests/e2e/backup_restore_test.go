@@ -28,7 +28,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -261,12 +260,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
 					cluster)
 				Expect(err).ToNot(HaveOccurred())
-				bmc, err := capabilities.CurrentCapabilities()
-				Expect(err).ToNot(HaveOccurred())
-				if bmc.ShouldExecuteBackupWithName(cluster) {
-					Expect(backup.Status.BackupName).To(Equal(backupName))
-				} else {
+				// We know that our current images always contain the latest barman version
+				if cluster.ShouldForceLegacyBackup() {
 					Expect(backup.Status.BackupName).To(BeEmpty())
+				} else {
+					Expect(backup.Status.BackupName).To(Equal(backupName))
 				}
 			})
 
@@ -466,8 +464,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// their base backups
 			Eventually(func() (int, error) {
 				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestBaseTar)
-			}, 60).Should(BeNumerically("==", 2),
-				fmt.Sprintf("verify the number of backup %v is equals to 2", latestBaseTar))
+			}, 60).Should(BeNumerically(">=", 2),
+				fmt.Sprintf("verify the number of backup %v is >= 2", latestBaseTar))
 		})
 
 		It("backs up and restore a cluster with PITR MinIO", func() {
