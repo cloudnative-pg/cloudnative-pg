@@ -779,8 +779,13 @@ for more information about backup target.
 
 ### Launching psql
 
-The `kubectl cnpg psql` command start a new PostgreSQL interactive front-end
-process (psql) connected to an existing Postgres cluster.
+The `kubectl cnpg psql` command starts a new PostgreSQL interactive front-end
+process (psql) connected to an existing Postgres cluster, as if you were running
+it from the actual pod. This means that you will be using the `postgres` user.
+
+!!! Important
+    As you will be connecting as `postgres` user, in production environments this
+    method should be used with extreme care, by authorized personnel only.
 
 ```shell
 kubectl cnpg psql cluster-example
