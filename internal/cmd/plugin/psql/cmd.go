@@ -60,7 +60,7 @@ func NewCmd() *cobra.Command {
 		&replica,
 		"replica",
 		false,
-		"Connect to a replica (defaults to connecting to a primary)",
+		"Connects to the first replica on the pod list (by default connects to the primary)",
 	)
 
 	cmd.Flags().BoolVarP(
