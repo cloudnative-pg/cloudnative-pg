@@ -285,6 +285,7 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 	row := superUserDB.QueryRow(
 		`
 		SELECT
+			(SELECT COALESCE(last_archived_wal, '') FROM pg_catalog.pg_stat_archiver),
 			pg_walfile_name(pg_current_wal_lsn()) as current_wal,
 			pg_current_wal_lsn(),
 			(SELECT timeline_id FROM pg_control_checkpoint()) as timeline_id
