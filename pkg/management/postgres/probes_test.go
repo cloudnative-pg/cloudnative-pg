@@ -59,4 +59,31 @@ var _ = Describe("probes", func() {
 		err = instance.fillWalStatusFromConnection(status, db)
 		Expect(err).To(Equal(errFailedQuery))
 	})
+
+	It("fillArchiveStatus should properly handle errors", func() {
+		db, mock, err := sqlmock.New()
+		Expect(err).ToNot(HaveOccurred())
+
+		mock.ExpectQuery(`.*`).
+			WillReturnRows(sqlmock.NewRows([]string{
+				"last_archived_wal",
+				"last_archived_time",
+				"last_failed_wal",
+				"last_failed_time",
+				"is_archiving",
+			},
+			).AddRow("000000010000000000000001", "2021-05-05 12:00:00", "", "2021-05-05 12:00:00", false))
+
+		status := &postgres.PostgresqlStatus{}
+		err = fillArchiverStatus(db, status)
+		Expect(err).To(BeNil())
+
+		Expect(mock.ExpectationsWereMet()).To(BeNil())
+
+		Expect(status.LastArchivedWAL).To(Equal("000000010000000000000001"))
+		Expect(status.LastArchivedWALTime).To(Equal("2021-05-05 12:00:00"))
+		Expect(status.LastFailedWAL).To(Equal(""))
+		Expect(status.LastFailedWALTime).To(Equal("2021-05-05 12:00:00"))
+		Expect(status.IsArchivingWAL).To(BeFalse())
+	})
 })
