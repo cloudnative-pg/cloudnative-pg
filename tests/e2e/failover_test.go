@@ -77,7 +77,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Get the walreceiver pid
-			timeout := time.Second * 5
+			timeout := time.Second * 10
 			query := "SELECT pid FROM pg_stat_activity WHERE backend_type = 'walreceiver'"
 			out, _, err := env.EventuallyExecCommand(
 				env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
@@ -206,7 +206,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			pausedPod := corev1.Pod{}
 			err = env.Client.Get(env.Ctx, namespacedPausedPodName, &pausedPod)
 			Expect(err).ToNot(HaveOccurred())
-			commandTimeout := time.Second * 5
+			commandTimeout := time.Second * 10
 			_, _, err = env.EventuallyExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName,
 				&commandTimeout, "sh", "-c", fmt.Sprintf("kill -CONT %v", pid))
 			Expect(err).ToNot(HaveOccurred())

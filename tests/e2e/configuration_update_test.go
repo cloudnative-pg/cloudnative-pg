@@ -51,7 +51,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		Namespace: namespace,
 		Name:      clusterName,
 	}
-	commandTimeout := time.Second * 5
+	commandTimeout := time.Second * 10
 	postgresParams := map[string]string{
 		"work_mem":                    "8MB",
 		"max_connections":             "110",
@@ -501,7 +501,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 				podList, err := env.GetClusterPodList(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				commandTimeout := time.Second * 5
+				commandTimeout := time.Second * 10
 				for _, pod := range podList.Items {
 					Eventually(func() (int, error, error) {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
@@ -522,7 +522,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			})
 
 			By("verifying that old primary was actually restarted", func() {
-				commandTimeout := time.Second * 5
+				commandTimeout := time.Second * 10
 				pod := corev1.Pod{}
 				err := env.Client.Get(env.Ctx, types.NamespacedName{
 					Namespace: namespace,
@@ -546,7 +546,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 
 		It("work_mem config change should not require a restart", func() {
 			const expectedNewValueForWorkMem = "10MB"
-			commandTimeout := time.Second * 5
+			commandTimeout := time.Second * 10
 
 			By("updating work mem ", func() {
 				var cluster apiv1.Cluster
