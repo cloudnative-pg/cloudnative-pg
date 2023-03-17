@@ -47,7 +47,7 @@ func Detect() (*Capabilities, error) {
 	newCapabilities.Version = version
 
 	switch {
-	case version.GE(semver.Version{Major: 3, Minor: 3}):
+	case version.GE(semver.Version{Major: 3, Minor: 4}):
 		newCapabilities.hasName = true
 		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 18}):
