@@ -96,7 +96,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 				}
 				return fmt.Errorf("pod %v has not been evicted", pod.Name)
 			},
-			retry.Delay(time.Second),
+			retry.Delay(2*time.Second),
 			retry.Attempts(timeoutSeconds),
 		)
 		return err

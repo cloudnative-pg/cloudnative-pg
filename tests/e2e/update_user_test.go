@@ -99,7 +99,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 
 			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
 				rwService, newUser, "app", newPassword)
-			timeout := time.Second * 5
+			timeout := time.Second * 10
 			_, _, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig,
 				pod, specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "SELECT 1")

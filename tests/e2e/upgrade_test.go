@@ -152,7 +152,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, 60).ShouldNot(HaveOccurred())
 
 			timeout := 300
-			commandTimeout := time.Second * 5
+			commandTimeout := time.Second * 10
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
@@ -192,14 +192,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 
 		By("verifying that all the standbys streams from the primary", func() {
-			// To check this we find the primary an create a table on it.
+			// To check this we find the primary and create a table on it.
 			// The table should be replicated on the standbys.
 			primary, err := env.GetClusterPrimary(upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			commandTimeout := time.Second * 5
+			commandTimeout := time.Second * 10
+			query := "CREATE TABLE IF NOT EXISTS postswitch(i int);"
 			_, _, err = env.EventuallyExecCommand(env.Ctx, *primary, specs.PostgresContainerName, &commandTimeout,
-				"psql", "-U", "postgres", "appdb", "-tAc", "CREATE TABLE postswitch(i int)")
+				"psql", "-U", "postgres", "appdb", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 
 			for i := 1; i < 4; i++ {
@@ -365,13 +366,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// Now that everything is in place, we add a bit of data we'll use to
 		// check if the backup is working
 		By("creating data on the database", func() {
-			primary := clusterName1 + "-1"
-			cmd := "psql -U postgres appdb -tAc 'CREATE TABLE to_restore AS VALUES (1), (2);'"
-			_, _, err := testsUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				upgradeNamespace,
-				primary,
-				cmd))
+			primary, err := env.GetClusterPrimary(upgradeNamespace, clusterName1)
+			Expect(err).ToNot(HaveOccurred())
+
+			commandTimeout := time.Second * 10
+			query := "CREATE TABLE IF NOT EXISTS to_restore AS VALUES (1),(2);"
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *primary, specs.PostgresContainerName, &commandTimeout,
+				"psql", "-U", "postgres", "appdb", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

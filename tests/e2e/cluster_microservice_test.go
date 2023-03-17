@@ -195,8 +195,9 @@ func assertCreateTableWithDataOnSourceCluster(
 		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 		By("create user, insert record in new table, assign new user as owner "+
 			"and grant read only to app user", func() {
-			query := fmt.Sprintf("CREATE USER micro;CREATE TABLE %v AS VALUES (1), "+
-				"(2);ALTER TABLE %v OWNER TO micro;grant select on %v to app;", tableName, tableName, tableName)
+			query := fmt.Sprintf("DROP USER IF EXISTS micro; CREATE USER micro; "+
+				"CREATE TABLE IF NOT EXISTS %[1]v AS VALUES (1),(2); "+
+				"ALTER TABLE %[1]v OWNER TO micro;grant select on %[1]v to app;", tableName)
 			_, _, err = testsUtils.RunQueryFromPod(
 				psqlClientPod, rwService, "app", superUser, generatedSuperuserPassword, query, env)
 			Expect(err).ToNot(HaveOccurred())
@@ -294,7 +295,7 @@ func assertImportRenamesSelectedDatabase(
 		// create test data and insert records
 		_, _, err = testsUtils.RunQueryFromPod(psqlClientPod, rwService,
 			dbToImport, superUser, getSuperUserPassword,
-			fmt.Sprintf("CREATE TABLE %s AS VALUES (1),(2);", tableName), env)
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", tableName), env)
 		Expect(err).ToNot(HaveOccurred())
 	})
 

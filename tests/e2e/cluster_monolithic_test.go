@@ -143,7 +143,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 
 			// create test data and insert some records in both databases
 			for _, database := range sourceDatabases {
-				query := fmt.Sprintf("CREATE TABLE %v AS VALUES (1), (2);", tableName)
+				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
 				_, _, err = testsUtils.RunQueryFromPod(
 					psqlClientPod,
 					sourceClusterHost,

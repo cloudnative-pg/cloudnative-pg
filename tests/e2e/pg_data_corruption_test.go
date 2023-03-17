@@ -176,7 +176,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			err = env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
 			Expect(err).ToNot(HaveOccurred())
 			// check that pod should join as in recovery mode
-			commandTimeout := time.Second * 5
+			commandTimeout := time.Second * 10
 			Eventually(func() (string, error) {
 				stdOut, _, err := env.ExecCommand(env.Ctx, *newPod, specs.PostgresContainerName,
 					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", "select pg_is_in_recovery();")

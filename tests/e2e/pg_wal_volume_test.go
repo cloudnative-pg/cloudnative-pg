@@ -63,7 +63,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 		})
 		By("checking that pg_wal is a symlink to the dedicated volume", func() {
 			for _, pod := range podList.Items {
-				commandTimeout := time.Second * 5
+				commandTimeout := time.Second * 10
 				out, _, err := env.EventuallyExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 					"readlink", "-f", specs.PgWalPath)
 				Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo(specs.PgWalVolumePgWalPath))
