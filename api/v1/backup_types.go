@@ -78,6 +78,9 @@ type BackupStatus struct {
 	// The ID of the Barman backup
 	BackupID string `json:"backupId,omitempty"`
 
+	// The Name of the Barman backup
+	BackupName string `json:"backupName,omitempty"`
+
 	// The last backup status
 	Phase BackupPhase `json:"phase,omitempty"`
 

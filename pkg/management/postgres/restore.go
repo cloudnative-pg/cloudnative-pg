@@ -269,7 +269,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		return nil, nil, err
 	}
 
-	backupCatalog, err := barman.GetBackupList(server.BarmanObjectStore, serverName, env)
+	backupCatalog, err := barman.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
 	if err != nil {
 		return nil, nil, err
 	}
