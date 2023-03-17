@@ -170,7 +170,7 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		"backupName", backup.Name,
 		"backupNamespace", backup.Name)
 
-	backupCommand := postgres.NewBackupCommand(
+	backupCommand, err := postgres.NewBackupCommand(
 		&cluster,
 		&backup,
 		ws.typedClient,
@@ -178,6 +178,14 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		ws.instance,
 		backupLog,
 	)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("error while initializing backup: %v", err.Error()),
+			http.StatusInternalServerError)
+		return
+	}
+
 	if err := backupCommand.Start(ctx); err != nil {
 		http.Error(
 			w,
