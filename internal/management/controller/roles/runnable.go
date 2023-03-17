@@ -137,6 +137,9 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 
 	rolePasswords := remoteCluster.Status.RolePasswordStatus
+	if rolePasswords == nil {
+		rolePasswords = map[string]apiv1.PasswordState{}
+	}
 	appliedState, err := sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
 	if err != nil {
 		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
@@ -218,13 +221,10 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 		return nil, fmt.Errorf("while synchronizing roles in primary: %w", err)
 	}
 
+	// Merge the status from database into spec. We should keep all the status
+	// otherwise in the next loop the user without status will be marked as need update
 	for role, stateInDatabase := range res {
-		if stateInSpec, ok := storedPasswordState[role]; ok {
-			stateInSpec.PasswordHash = stateInDatabase.PasswordHash
-			stateInSpec.TransactionID = stateInDatabase.TransactionID
-		} else {
-			storedPasswordState[role] = stateInDatabase
-		}
+		storedPasswordState[role] = stateInDatabase
 	}
 	return storedPasswordState, nil
 }
