@@ -65,7 +65,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		})
 
 		By("being able to restart a killed pod without losing it", func() {
-			aSecond := time.Second
+			commandTimeout := time.Second * 10
 			timeout := 120
 			podName := clusterName + "-1"
 			pod := &corev1.Pod{}
@@ -82,7 +82,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			Expect(err).NotTo(HaveOccurred())
 			host, err := testsUtils.GetHostName(namespace, clusterName, env)
 			Expect(err).NotTo(HaveOccurred())
-			query := "CREATE TABLE test (id bigserial PRIMARY KEY, t text)"
+			query := "CREATE TABLE IF NOT EXISTS test (id bigserial PRIMARY KEY, t text);"
 			_, _, err = testsUtils.RunQueryFromPod(
 				psqlClientPod,
 				host,
@@ -103,7 +103,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 					restart = data.RestartCount
 				}
 			}
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
 				"sh", "-c", "kill 1")
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int32, error) {

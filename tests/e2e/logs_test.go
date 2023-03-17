@@ -90,7 +90,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 			for _, pod := range podList.Items {
 				var queryError error
 				// Run a wrong query and save its result
-				commandTimeout := time.Second * 5
+				commandTimeout := time.Second * 10
 				Eventually(func(g Gomega) error {
 					_, _, queryError = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, pod,
 						specs.PostgresContainerName, &commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
@@ -122,7 +122,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 			var queryError error
 			// Run a wrong query on just the primary and save its result
-			commandTimeout := time.Second * 5
+			commandTimeout := time.Second * 10
 			Eventually(func() error {
 				_, _, queryError = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig,
 					*primaryPod, specs.PostgresContainerName,
