@@ -207,7 +207,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	if err != nil {
 		return nil, err
 	}
-	rolesByAction := newRolesByAction(ctx, config, rolesInDB, storedPasswordState, hashes)
+	rolesByAction := evaluateNextRoleActions(ctx, config, rolesInDB, storedPasswordState, hashes)
 	if err != nil {
 		return nil, fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}

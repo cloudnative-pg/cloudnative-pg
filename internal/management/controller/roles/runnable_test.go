@@ -259,7 +259,7 @@ var _ = DescribeTable("Role status getter tests",
 		roles, err := db.List(ctx)
 		Expect(err).ToNot(HaveOccurred())
 
-		statusMap := newRolesByAction(ctx, spec, roles, map[string]apiv1.PasswordState{}, nil).
+		statusMap := evaluateNextRoleActions(ctx, spec, roles, map[string]apiv1.PasswordState{}, nil).
 			convertToRolesByStatus()
 
 		// pivot the result to have a map: roleName -> Status, which is easier to compare for Ginkgo
