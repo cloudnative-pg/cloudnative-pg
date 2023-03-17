@@ -261,6 +261,15 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 	if err := instance.fillReplicationSlotsStatus(result); err != nil {
 		return err
 	}
+
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+	if err := fillArchiverStatus(superUserDB, result); err != nil {
+		return err
+	}
+
 	return instance.fillWalStatus(result)
 }
 
@@ -274,21 +283,14 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 	}
 
 	row := superUserDB.QueryRow(
-		"SELECT " +
-			"COALESCE(last_archived_wal, '') , " +
-			"COALESCE(last_archived_time,'-infinity'), " +
-			"COALESCE(last_failed_wal, ''), " +
-			"COALESCE(last_failed_time, '-infinity'), " +
-			"COALESCE(last_archived_time,'-infinity') > COALESCE(last_failed_time, '-infinity') AS is_archiving," +
-			"pg_walfile_name(pg_current_wal_lsn()) as current_wal, " +
-			"pg_current_wal_lsn(), " +
-			"(SELECT timeline_id FROM pg_control_checkpoint()) as timeline_id " +
-			"FROM pg_catalog.pg_stat_archiver")
+		`
+		SELECT
+			(SELECT COALESCE(last_archived_wal, '') FROM pg_catalog.pg_stat_archiver),
+			pg_walfile_name(pg_current_wal_lsn()) as current_wal,
+			pg_current_wal_lsn(),
+			(SELECT timeline_id FROM pg_control_checkpoint()) as timeline_id
+		`)
 	err = row.Scan(&result.LastArchivedWAL,
-		&result.LastArchivedWALTime,
-		&result.LastFailedWAL,
-		&result.LastFailedWALTime,
-		&result.IsArchivingWAL,
 		&result.CurrentWAL,
 		&result.CurrentLsn,
 		&result.TimeLineID,
@@ -297,6 +299,28 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 	return err
 }
 
+// fillArchiverStatus get information about the PostgreSQL archiving process
+func fillArchiverStatus(superUserDB *sql.DB, result *postgres.PostgresqlStatus) error {
+	row := superUserDB.QueryRow(
+		`
+		SELECT
+			COALESCE(last_archived_wal, ''),
+			COALESCE(last_archived_time,'-infinity'),
+			COALESCE(last_failed_wal, ''),
+			COALESCE(last_failed_time, '-infinity'),
+			COALESCE(last_archived_time,'-infinity') > COALESCE(last_failed_time, '-infinity') AS is_archiving
+		FROM pg_catalog.pg_stat_archiver
+		`)
+
+	return row.Scan(&result.LastArchivedWAL,
+		&result.LastArchivedWALTime,
+		&result.LastFailedWAL,
+		&result.LastFailedWALTime,
+		&result.IsArchivingWAL,
+	)
+}
+
+// fillReplicationSlotsStatus get information about the replication slots
 func (instance *Instance) fillReplicationSlotsStatus(result *postgres.PostgresqlStatus) error {
 	if !result.IsPrimary {
 		return nil
