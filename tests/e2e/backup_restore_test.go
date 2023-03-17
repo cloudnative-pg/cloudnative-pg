@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -63,13 +64,23 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		// own namespace, they can share the configuration file
 
 		const (
-			backupFile                 = fixturesDir + "/backup/minio/backup-minio.yaml"
-			clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
-			customQueriesSampleFile    = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
-			minioCaSecName             = "minio-server-ca-secret"
-			minioTLSSecName            = "minio-server-tls-secret"
+			backupFile              = fixturesDir + "/backup/minio/backup-minio.yaml"
+			customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+			minioCaSecName          = "minio-server-ca-secret"
+			minioTLSSecName         = "minio-server-tls-secret"
 		)
+
+		clusterWithMinioSampleFile := fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
+
 		BeforeAll(func() {
+			//
+			// IMPORTANT: this is to ensure that we test the old backup system too
+			//
+			if funk.RandomInt(0, 100) < 50 {
+				GinkgoWriter.Println("---- Testing barman backups without the name flag ----")
+				clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-legacy.yaml.template"
+			}
+
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if isAKS {
@@ -89,6 +100,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				Skip("This test is not run on an IBM architecture")
 			}
 			namespace = "cluster-backup-minio"
+
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -162,7 +174,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		// We backup and restore a cluster, and verify some expected data to
 		// be there
-		It("backs up and restore a cluster", func() {
+		It("backs up and restores a cluster using minio", func() {
 			const (
 				targetDBOne              = "test"
 				targetDBTwo              = "test1"
@@ -172,6 +184,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			)
 
 			restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			backupName, err := env.GetResourceNameFromYAML(backupFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create required test data
 			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBOne, testTableName, psqlClientPod)
@@ -212,6 +226,46 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 						cluster)
 					return cluster.Status.LastFailedBackup, err
 				}, 30).Should(BeEmpty())
+			})
+
+			By("executing a second backup and verifying the number of backups on minio", func() {
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+				}, 60).Should(BeEquivalentTo(1))
+
+				// delete the first backup and create a second backup
+				backup := &apiv1.Backup{}
+				err := env.Client.Get(env.Ctx,
+					ctrlclient.ObjectKey{Namespace: namespace, Name: backupName},
+					backup)
+				Expect(err).ToNot(HaveOccurred())
+				err = env.Client.Delete(env.Ctx, backup)
+				Expect(err).ToNot(HaveOccurred())
+				// create a second backup
+				testUtils.ExecuteBackup(namespace, backupFile, false, env)
+				latestTar = minioPath(clusterName, "data.tar")
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+				}, 60).Should(BeEquivalentTo(2))
+			})
+
+			By("verifying the backupName is properly set in the status of the backup", func() {
+				backup := &apiv1.Backup{}
+				err := env.Client.Get(env.Ctx,
+					ctrlclient.ObjectKey{Namespace: namespace, Name: backupName},
+					backup)
+				Expect(err).ToNot(HaveOccurred())
+				cluster := &apiv1.Cluster{}
+				err = env.Client.Get(env.Ctx,
+					ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+					cluster)
+				Expect(err).ToNot(HaveOccurred())
+				// We know that our current images always contain the latest barman version
+				if cluster.ShouldForceLegacyBackup() {
+					Expect(backup.Status.BackupName).To(BeEmpty())
+				} else {
+					Expect(backup.Status.BackupName).To(HavePrefix("backup-"))
+				}
 			})
 
 			// Restore backup in a new cluster, also cover if no application database is configured
@@ -410,8 +464,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// their base backups
 			Eventually(func() (int, error) {
 				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestBaseTar)
-			}, 60).Should(BeNumerically("==", 2),
-				fmt.Sprintf("verify the number of backup %v is equals to 2", latestBaseTar))
+			}, 60).Should(BeNumerically(">=", 2),
+				fmt.Sprintf("verify the number of backup %v is >= 2", latestBaseTar))
 		})
 
 		It("backs up and restore a cluster with PITR MinIO", func() {

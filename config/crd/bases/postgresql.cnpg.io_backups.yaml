@@ -138,6 +138,9 @@ spec:
               backupId:
                 description: The ID of the Barman backup
                 type: string
+              backupName:
+                description: The Name of the Barman backup
+                type: string
               beginLSN:
                 description: The starting xlog
                 type: string
