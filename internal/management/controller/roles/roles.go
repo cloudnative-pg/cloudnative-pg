@@ -50,9 +50,9 @@ func (r rolesByAction) convertToRolesByStatus() rolesByStatus {
 	return rolesByStatus
 }
 
-// newRolesByAction evaluates the action needed for each role in the DB and/or the Spec.
+// evaluateNextRoleActions evaluates the action needed for each role in the DB and/or the Spec.
 // It has no side effects
-func newRolesByAction(
+func evaluateNextRoleActions(
 	ctx context.Context,
 	config *apiv1.ManagedConfiguration,
 	rolesInDB []DatabaseRole,

@@ -61,7 +61,7 @@ func Reconcile(
 		return reconcile.Result{}, err
 	}
 
-	rolesByStatus := newRolesByAction(
+	rolesByStatus := evaluateNextRoleActions(
 		ctx,
 		cluster.Spec.Managed,
 		rolesInDB,
