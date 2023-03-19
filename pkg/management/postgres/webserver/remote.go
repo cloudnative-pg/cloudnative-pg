@@ -69,7 +69,7 @@ func NewRemoteWebServer(
 	return NewWebServer(instance, server), nil
 }
 
-func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, r *http.Request) {
+func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
 	// If `pg_rewind` is running the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
 	// Same goes for instances with fencing on.
@@ -91,7 +91,7 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, r *ht
 }
 
 // This is the readiness probe
-func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
+func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http.Request) {
 	if err := ws.instance.IsServerReady(); err != nil {
 		log.Info("Readiness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -103,7 +103,7 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 }
 
 // This probe is for the instance status, including replication
-func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, r *http.Request) {
+func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
 	// Extract the status of the current instance
 	status, err := ws.instance.GetStatus()
 	if err != nil {

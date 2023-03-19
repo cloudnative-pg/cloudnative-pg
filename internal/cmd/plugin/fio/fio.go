@@ -85,10 +85,7 @@ func (cmd *fioCommand) execute(ctx context.Context) error {
 	deployment := cmd.generateFioDeployment(cmd.name)
 	objectList := []client.Object{pvc, configMap, deployment}
 
-	if err = plugin.CreateAndGenerateObjects(ctx, objectList, cmd.dryRun); err != nil {
-		return err
-	}
-	return nil
+	return plugin.CreateAndGenerateObjects(ctx, objectList, cmd.dryRun)
 }
 
 // CreatePVC creates spec of a PVC, given its name and the storage configuration

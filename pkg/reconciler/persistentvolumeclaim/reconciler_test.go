@@ -50,14 +50,14 @@ type clientMock struct {
 }
 
 func (cm *clientMock) Patch(
-	ctx context.Context, obj client.Object,
-	patch client.Patch, opts ...client.PatchOption,
+	_ context.Context, _ client.Object,
+	_ client.Patch, _ ...client.PatchOption,
 ) error {
 	cm.timesCalled++
 	return nil
 }
 
-func (cm *clientMock) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+func (cm *clientMock) Create(_ context.Context, _ client.Object, _ ...client.CreateOption) error {
 	cm.timesCalled++
 	return nil
 }

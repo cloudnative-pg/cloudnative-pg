@@ -114,11 +114,7 @@ func AddFencedInstance(serverName string, object *metav1.ObjectMeta) error {
 		fencedInstances.Put(serverName)
 	}
 
-	if err := SetFencedInstances(object, fencedInstances); err != nil {
-		return err
-	}
-
-	return nil
+	return SetFencedInstances(object, fencedInstances)
 }
 
 // RemoveFencedInstance removes the given server name from the FencedInstanceAnnotation annotation
