@@ -35,7 +35,7 @@ data:
   password: Y25wZ19hZG1pbgo=
 kind: Secret
 metadata:
-  name: cluster-example-edbadmin
+  name: cluster-example-cnpgadmin
   labels:
     cnpg.io/reload: "true"
 type: kubernetes.io/basic-auth

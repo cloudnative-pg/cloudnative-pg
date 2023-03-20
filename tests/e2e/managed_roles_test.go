@@ -324,7 +324,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 		})
 		// TODO remove pending decorator once CNP-3571 is fixed
-		PIt("Can update role password in secrets and db and verify the connectivity", func() {
+		It("Can update role password in secrets and db and verify the connectivity", func() {
 			newPassword := "ThisIsNew"
 			By("update password from secrets", func() {
 				var secret corev1.Secret
