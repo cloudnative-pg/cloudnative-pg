@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -1641,6 +1642,17 @@ type RoleConfiguration struct {
 	InRoles    []string `json:"inRoles,omitempty"`
 }
 
+// GetManagedSecrets return the all the secrets name for managed roles
+func (managed *ManagedConfiguration) GetManagedSecrets() []string {
+	var secrets []string
+	for _, role := range managed.Roles {
+		if role.PasswordSecret != nil {
+			secrets = append(secrets, role.PasswordSecret.Name)
+		}
+	}
+	return secrets
+}
+
 // GetRoleSecretsName gets the name of the secret which is used to store the role's password
 func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
 	if roleConfiguration.PasswordSecret != nil {
@@ -1705,6 +1717,9 @@ type SecretsResourceVersion struct {
 	// The resource version of the "app" user secret
 	ApplicationSecretVersion string `json:"applicationSecretVersion,omitempty"`
 
+	// The resource versions of the managed role secret
+	ManagedRoleSecretVersion map[string]string `json:"managedRoleSecretVersion,omitempty"`
+
 	// Unused. Retained for compatibility with old versions.
 	CASecretVersion string `json:"caSecretVersion,omitempty"`
 
@@ -1731,6 +1746,14 @@ type ConfigMapResourceVersion struct {
 	// A map with the versions of all the config maps used to pass metrics.
 	// Map keys are the config map names, map values are the versions
 	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// SetManagedRoleSecretVersion Add or Update the resource version of managed role secret
+func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion(secret, version string) {
+	if secretResourceVersion.ManagedRoleSecretVersion == nil {
+		secretResourceVersion.ManagedRoleSecretVersion = make(map[string]string)
+	}
+	secretResourceVersion.ManagedRoleSecretVersion[secret] = version
 }
 
 // GetImageName get the name of the image that should be used
@@ -2263,6 +2286,10 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		certificates.ReplicationTLSSecret,
 		certificates.ServerCASecret,
 		certificates.ServerTLSSecret:
+		return true
+	}
+
+	if slices.Contains(cluster.Spec.Managed.GetManagedSecrets(), secret) {
 		return true
 	}
 

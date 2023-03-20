@@ -3630,6 +3630,11 @@ spec:
                     description: The resource version of the PostgreSQL client-side
                       CA secret version
                     type: string
+                  managedRoleSecretVersion:
+                    additionalProperties:
+                      type: string
+                    description: The resource versions of the managed role secret
+                    type: object
                   metrics:
                     additionalProperties:
                       type: string

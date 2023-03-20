@@ -600,6 +600,17 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 	}
 	versions.ApplicationSecretVersion = version
 
+	managedRoleSecrets := cluster.Spec.Managed.GetManagedSecrets()
+	if len(managedRoleSecrets) > 0 {
+		for _, roleSecret := range managedRoleSecrets {
+			version, err = r.getSecretResourceVersion(ctx, cluster, roleSecret)
+			if err != nil {
+				return err
+			}
+			versions.SetManagedRoleSecretVersion(roleSecret, version)
+		}
+	}
+
 	certificates := cluster.Status.Certificates
 
 	// Reset the content of the unused CASecretVersion field

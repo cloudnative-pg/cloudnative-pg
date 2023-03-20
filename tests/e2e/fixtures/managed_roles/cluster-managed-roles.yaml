@@ -35,5 +35,7 @@ data:
 kind: Secret
 metadata:
   name: cluster-example-edbadmin
+  labels:
+    cnpg.io/reload: "true"
 type: kubernetes.io/basic-auth
 
