@@ -2463,10 +2463,10 @@ func AssertPostgresNoPendingRestart(namespace, clusterName string, cmdTimeout ti
 				}
 				if strings.Trim(stdout, "\n") == "f" {
 					continue
-				} else {
-					noPendingRestart = false
-					break
 				}
+
+				noPendingRestart = false
+				break
 			}
 			return noPendingRestart, nil
 		}, timeout, 2).Should(BeEquivalentTo(true),

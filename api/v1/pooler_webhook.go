@@ -102,7 +102,7 @@ func (r *Pooler) ValidateCreate() error {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Pooler) ValidateUpdate(old runtime.Object) error {
+func (r *Pooler) ValidateUpdate(_ runtime.Object) error {
 	var allErrs field.ErrorList
 	poolerLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 

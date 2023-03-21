@@ -66,9 +66,5 @@ func Microservice(
 		return err
 	}
 
-	if err := ds.analyze(ctx, destination, []string{cluster.Spec.Bootstrap.InitDB.Database}); err != nil {
-		return err
-	}
-
-	return nil
+	return ds.analyze(ctx, destination, []string{cluster.Spec.Bootstrap.InitDB.Database})
 }

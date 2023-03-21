@@ -377,11 +377,7 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 
 	result.ReplicationSlotsInfo = slots
 
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	return nil
+	return rows.Err()
 }
 
 // fillWalStatus retrieves information about the WAL senders processes

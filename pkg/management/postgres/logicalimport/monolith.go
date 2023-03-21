@@ -64,9 +64,5 @@ func Monolith(
 		return err
 	}
 
-	if err := ds.analyze(ctx, destination, databases); err != nil {
-		return err
-	}
-
-	return nil
+	return ds.analyze(ctx, destination, databases)
 }

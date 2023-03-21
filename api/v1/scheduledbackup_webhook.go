@@ -69,7 +69,7 @@ func (r *ScheduledBackup) ValidateCreate() error {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ScheduledBackup) ValidateUpdate(old runtime.Object) error {
+func (r *ScheduledBackup) ValidateUpdate(_ runtime.Object) error {
 	scheduledBackupLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 	return nil
 }
