@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -34,13 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -60,6 +58,7 @@ var (
 	poolerReconciler  *PoolerReconciler
 	clusterReconciler *ClusterReconciler
 	scheme            *runtime.Scheme
+	discoveryClient   discovery.DiscoveryInterface
 )
 
 func init() {
@@ -73,9 +72,7 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
-
 	testEnv = buildTestEnv()
-
 	var err error
 	cfg, err = testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
@@ -88,13 +85,16 @@ var _ = BeforeSuite(func() {
 	utilruntime.Must(apiv1.AddToScheme(scheme))
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	Expect(err).To(BeNil())
 
+	discoveryClient, err = discovery.NewDiscoveryClientForConfig(cfg)
 	Expect(err).To(BeNil())
 
 	clusterReconciler = &ClusterReconciler{
-		Client:   k8sClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
+		Client:          k8sClient,
+		Scheme:          scheme,
+		Recorder:        record.NewFakeRecorder(120),
+		DiscoveryClient: discoveryClient,
 	}
 
 	poolerReconciler = &PoolerReconciler{
@@ -154,7 +154,7 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	return pooler
 }
 
-func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
+func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluster)) *apiv1.Cluster {
 	const instances int = 3
 	name := "cluster-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
@@ -190,6 +190,9 @@ func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
 
 	cluster.SetDefaults()
 
+	for _, mutator := range mutators {
+		mutator(cluster)
+	}
 	err := k8sClient.Create(context.Background(), cluster)
 	Expect(err).To(BeNil())
 
@@ -380,38 +383,6 @@ func generateFakePVCWithDefaultClient(cluster *apiv1.Cluster) []corev1.Persisten
 	return generateFakePVC(k8sClient, cluster)
 }
 
-func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *PoolerReconciler, manager.Manager) {
-	mgr, err := controllerruntime.NewManager(cfg, controllerruntime.Options{
-		Scheme:             scheme,
-		LeaderElection:     false,
-		MetricsBindAddress: "0",
-		Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-		Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-		CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
-	})
-	Expect(err).To(BeNil())
-
-	clusterRec := &ClusterReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
-	}
-
-	err = clusterRec.SetupWithManager(ctx, mgr)
-	Expect(err).To(BeNil())
-
-	poolerRec := &PoolerReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
-	}
-
-	err = poolerRec.SetupWithManager(ctx, mgr)
-	Expect(err).To(BeNil())
-
-	return clusterRec, poolerRec, mgr
-}
-
 // generateFakeCASecret follows the conventions established by cert.GenerateCASecret
 func generateFakeCASecret(c client.Client, name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
 	keyPair, err := certs.CreateRootCA(domain, namespace)
@@ -464,35 +435,67 @@ func expectResourceDoesntExistWithDefaultClient(name, namespace string, resource
 	expectResourceDoesntExist(k8sClient, name, namespace, resource)
 }
 
-// withManager bootstraps a manager.Manager inside a ginkgo.It statement
-func withManager(callback func(context.Context, *ClusterReconciler, *PoolerReconciler, manager.Manager)) {
-	ctx, ctxCancel := context.WithCancel(context.TODO())
+type (
+	indexAdapter               func(list client.ObjectList, opts ...client.ListOption) client.ObjectList
+	fakeClientWithIndexAdapter struct {
+		client.Client
+		indexerAdapters []indexAdapter
+	}
+)
 
-	crReconciler, poolerReconciler, mgr := createManagerWithReconcilers(ctx)
+func (f fakeClientWithIndexAdapter) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	var optsWithoutMatchingFields []client.ListOption
+	// matchingFields rely on indexes that we don't have on the default kube client
+	var matchingFields []client.ListOption // nolint:prealloc
+	for _, opt := range opts {
+		_, ok := opt.(client.MatchingFields)
+		if !ok {
+			optsWithoutMatchingFields = append(optsWithoutMatchingFields, opt)
+			continue
+		}
+		matchingFields = append(matchingFields, opt)
+	}
 
-	wg := sync.WaitGroup{}
+	err := f.Client.List(ctx, list, optsWithoutMatchingFields...)
 
-	By("starting the manager", func() {
-		wg.Add(1)
-		go func() {
-			defer GinkgoRecover()
-			defer wg.Done()
-			err := mgr.Start(ctx)
-			Expect(err).ShouldNot(HaveOccurred())
-		}()
-	})
+	// we try to process the index filters
+	for _, filter := range f.indexerAdapters {
+		list = filter(list, matchingFields...)
+	}
 
-	callback(ctx, crReconciler, poolerReconciler, mgr)
-
-	By("stopping the manager", func() {
-		ctxCancel()
-		wg.Wait()
-	})
+	return err
 }
 
-func assertRefreshManagerCache(ctx context.Context, manager manager.Manager) {
-	By("waiting the cache to sync", func() {
-		syncDone := manager.GetCache().WaitForCacheSync(ctx)
-		Expect(syncDone).To(BeTrue())
-	})
+func clusterDefaultQueriesFalsePathIndexAdapter(list client.ObjectList, opts ...client.ListOption) client.ObjectList {
+	var matchesFilter bool
+	for _, opt := range opts {
+		res, ok := opt.(client.MatchingFields)
+		if !ok {
+			continue
+		}
+		if res[disableDefaultQueriesSpecPath] == "false" {
+			matchesFilter = true
+		}
+	}
+
+	if !matchesFilter {
+		return list
+	}
+
+	clusterList, ok := list.(*apiv1.ClusterList)
+	if !ok {
+		return list
+	}
+
+	var filteredClusters []apiv1.Cluster
+	for _, cluster := range clusterList.Items {
+		if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.DisableDefaultQueries != nil {
+			if !*cluster.Spec.Monitoring.DisableDefaultQueries {
+				filteredClusters = append(filteredClusters, cluster)
+			}
+		}
+	}
+
+	clusterList.Items = filteredClusters
+	return clusterList
 }

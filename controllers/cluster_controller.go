@@ -67,7 +67,7 @@ var apiGVString = apiv1.GroupVersion.String()
 type ClusterReconciler struct {
 	client.Client
 
-	DiscoveryClient *discovery.DiscoveryClient
+	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 
