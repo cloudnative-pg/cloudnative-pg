@@ -175,17 +175,6 @@ func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluste
 				Size: "1G",
 			},
 		},
-		Status: apiv1.ClusterStatus{
-			Instances:                instances,
-			SecretsResourceVersion:   apiv1.SecretsResourceVersion{},
-			ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{},
-			Certificates: apiv1.CertificatesStatus{
-				CertificatesConfiguration: apiv1.CertificatesConfiguration{
-					ServerCASecret: caServer,
-					ClientCASecret: caClient,
-				},
-			},
-		},
 	}
 
 	cluster.SetDefaults()
@@ -193,7 +182,30 @@ func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluste
 	for _, mutator := range mutators {
 		mutator(cluster)
 	}
+
 	err := k8sClient.Create(context.Background(), cluster)
+	Expect(err).To(BeNil())
+
+	cluster.Status = apiv1.ClusterStatus{
+		Instances:                instances,
+		SecretsResourceVersion:   apiv1.SecretsResourceVersion{},
+		ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{},
+		Certificates: apiv1.CertificatesStatus{
+			CertificatesConfiguration: apiv1.CertificatesConfiguration{
+				ServerCASecret: caServer,
+				ClientCASecret: caClient,
+			},
+		},
+	}
+	// nolint: lll
+	// https://github.com/kubernetes-sigs/controller-runtime/blob/c3c1f058a9a080581e8fe99c004fcc792b2aff07/pkg/client/fake/doc.go#L30
+	for _, mutator := range mutators {
+		mutator(cluster)
+	}
+
+	err = k8sClient.Status().Update(context.Background(), cluster)
+	Expect(err).To(BeNil())
+	err = k8sClient.Update(context.Background(), cluster)
 	Expect(err).To(BeNil())
 
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
@@ -303,6 +315,7 @@ func generateFakeClusterPods(
 		// 'Pending'
 		if markAsReady {
 			pod.Status = corev1.PodStatus{
+				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
 					{
 						Type:   corev1.ContainersReady,
@@ -339,48 +352,64 @@ func generateFakeInitDBJobsWithDefaultClient(cluster *apiv1.Cluster) []batchv1.J
 	return generateFakeInitDBJobs(k8sClient, cluster)
 }
 
-func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
+func generateClusterPVC(
+	c client.Client,
+	cluster *apiv1.Cluster,
+	status persistentvolumeclaim.PVCStatus, // nolint:unparam
+) []corev1.PersistentVolumeClaim {
 	var idx int
 	var pvcs []corev1.PersistentVolumeClaim
 	for idx < cluster.Spec.Instances {
 		idx++
-
-		pvc, err := persistentvolumeclaim.Build(
-			cluster,
-			&persistentvolumeclaim.CreateConfiguration{
-				Status:     persistentvolumeclaim.StatusInitializing,
-				NodeSerial: idx,
-				Role:       utils.PVCRolePgData,
-				Storage:    cluster.Spec.StorageConfiguration,
-			})
-		Expect(err).To(BeNil())
-		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
-
-		err = c.Create(context.Background(), pvc)
-		Expect(err).To(BeNil())
-		pvcs = append(pvcs, *pvc)
-		if cluster.ShouldCreateWalArchiveVolume() {
-			pvcWal, err := persistentvolumeclaim.Build(
-				cluster,
-				&persistentvolumeclaim.CreateConfiguration{
-					Status:     persistentvolumeclaim.StatusInitializing,
-					NodeSerial: idx,
-					Role:       utils.PVCRolePgWal,
-					Storage:    cluster.Spec.StorageConfiguration,
-				},
-			)
-			Expect(err).To(BeNil())
-			cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta)
-			err = c.Create(context.Background(), pvcWal)
-			Expect(err).To(BeNil())
-			pvcs = append(pvcs, *pvcWal)
-		}
+		pvcs = append(pvcs, newFakePVC(c, cluster, idx, status)...)
 	}
 	return pvcs
 }
 
+func newFakePVC(
+	c client.Client,
+	cluster *apiv1.Cluster,
+	serial int,
+	status persistentvolumeclaim.PVCStatus,
+) []corev1.PersistentVolumeClaim {
+	var pvcGroup []corev1.PersistentVolumeClaim
+	pvc, err := persistentvolumeclaim.Build(
+		cluster,
+		&persistentvolumeclaim.CreateConfiguration{
+			Status:     status,
+			NodeSerial: serial,
+			Role:       utils.PVCRolePgData,
+			Storage:    cluster.Spec.StorageConfiguration,
+		})
+	Expect(err).To(BeNil())
+	cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+
+	err = c.Create(context.Background(), pvc)
+	Expect(err).To(BeNil())
+	pvcGroup = append(pvcGroup, *pvc)
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		pvcWal, err := persistentvolumeclaim.Build(
+			cluster,
+			&persistentvolumeclaim.CreateConfiguration{
+				Status:     status,
+				NodeSerial: serial,
+				Role:       utils.PVCRolePgWal,
+				Storage:    cluster.Spec.StorageConfiguration,
+			},
+		)
+		Expect(err).To(BeNil())
+		cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta)
+		err = c.Create(context.Background(), pvcWal)
+		Expect(err).To(BeNil())
+		pvcGroup = append(pvcGroup, *pvcWal)
+	}
+
+	return pvcGroup
+}
+
 func generateFakePVCWithDefaultClient(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
-	return generateFakePVC(k8sClient, cluster)
+	return generateClusterPVC(k8sClient, cluster, persistentvolumeclaim.StatusReady)
 }
 
 // generateFakeCASecret follows the conventions established by cert.GenerateCASecret
