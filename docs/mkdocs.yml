@@ -44,6 +44,7 @@ nav:
   - failover.md
   - troubleshooting.md
   - fencing.md
+  - declarative_hibernation.md
   - postgis.md
   - e2e.md
   - container_images.md
@@ -51,7 +52,6 @@ nav:
   - controller.md
   - samples.md
   - benchmarking.md
-  - declarative_hibernation.md
   - commercial_support.md
   - faq.md
   - api_reference.md
