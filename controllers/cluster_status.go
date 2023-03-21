@@ -600,7 +600,7 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 	}
 	versions.ApplicationSecretVersion = version
 
-	if cluster.ContainsManagedRoleConfiguration() {
+	if cluster.ContainsManagedRolesConfiguration() {
 		for _, role := range cluster.Spec.Managed.Roles {
 			if role.PasswordSecret != nil {
 				version, err = r.getSecretResourceVersion(ctx, cluster, role.PasswordSecret.Name)

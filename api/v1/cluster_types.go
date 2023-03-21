@@ -1705,8 +1705,8 @@ type SecretsResourceVersion struct {
 	// The resource version of the "app" user secret
 	ApplicationSecretVersion string `json:"applicationSecretVersion,omitempty"`
 
-	// The resource versions of the managed role secret
-	ManagedRoleSecretVersion map[string]string `json:"managedRoleSecretVersion,omitempty"`
+	// The resource versions of the managed roles secrets
+	ManagedRoleSecretVersions map[string]string `json:"managedRoleSecretVersion,omitempty"`
 
 	// Unused. Retained for compatibility with old versions.
 	CASecretVersion string `json:"caSecretVersion,omitempty"`
@@ -1736,15 +1736,15 @@ type ConfigMapResourceVersion struct {
 	Metrics map[string]string `json:"metrics,omitempty"`
 }
 
-// SetManagedRoleSecretVersion Add or update or delete the resource version of managed role secret
+// SetManagedRoleSecretVersion Add or update or delete the resource version of the managed role secret
 func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion(secret string, version *string) {
-	if secretResourceVersion.ManagedRoleSecretVersion == nil {
-		secretResourceVersion.ManagedRoleSecretVersion = make(map[string]string)
+	if secretResourceVersion.ManagedRoleSecretVersions == nil {
+		secretResourceVersion.ManagedRoleSecretVersions = make(map[string]string)
 	}
 	if version == nil {
-		delete(secretResourceVersion.ManagedRoleSecretVersion, secret)
+		delete(secretResourceVersion.ManagedRoleSecretVersions, secret)
 	} else {
-		secretResourceVersion.ManagedRoleSecretVersion[secret] = *version
+		secretResourceVersion.ManagedRoleSecretVersions[secret] = *version
 	}
 }
 
@@ -1808,14 +1808,14 @@ func (cluster *Cluster) GetLDAPSecretName() string {
 	return ""
 }
 
-// ContainsManagedRoleConfiguration returns if there is managed role configuration
-func (cluster *Cluster) ContainsManagedRoleConfiguration() bool {
+// ContainsManagedRolesConfiguration returns true iff there are managed roles configured
+func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
 	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
 }
 
-// ContainsManagedRoleSecret verify if the given secret name exists in managed role or not
-func (cluster *Cluster) ContainsManagedRoleSecret(secretName string) bool {
-	if !cluster.ContainsManagedRoleConfiguration() {
+// UsesSecretInManagedRoles checks if the given secret name is used in a managed role
+func (cluster *Cluster) UsesSecretInManagedRoles(secretName string) bool {
+	if !cluster.ContainsManagedRolesConfiguration() {
 		return false
 	}
 	for _, role := range cluster.Spec.Managed.Roles {
@@ -2290,7 +2290,7 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
-	if cluster.ContainsManagedRoleSecret(secret) {
+	if cluster.UsesSecretInManagedRoles(secret) {
 		return true
 	}
 

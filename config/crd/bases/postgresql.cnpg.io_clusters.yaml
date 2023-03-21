@@ -3631,7 +3631,7 @@ spec:
                   managedRoleSecretVersion:
                     additionalProperties:
                       type: string
-                    description: The resource versions of the managed role secret
+                    description: The resource versions of the managed roles secrets
                     type: object
                   metrics:
                     additionalProperties:

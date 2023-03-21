@@ -44,7 +44,7 @@ type DatabaseRole struct {
 	transactionID   int64          `json:"-"`
 }
 
-// passwordNeedsUpdating creates a function that will evaluate whether a DatabaseRole needs to be updated
+// passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
 func (d *DatabaseRole) passwordNeedsUpdating(
 	storedPasswordState map[string]apiv1.PasswordState,
 	latestSecretResourceVersion map[string]string,

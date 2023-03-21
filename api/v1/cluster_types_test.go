@@ -845,7 +845,7 @@ var _ = Describe("Replication slots names for instances", func() {
 })
 
 var _ = Describe("Managed Roles ", func() {
-	It("Verify default value", func() {
+	It("Verify default values", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Managed: &ManagedConfiguration{
@@ -860,18 +860,18 @@ var _ = Describe("Managed Roles ", func() {
 				},
 			},
 		}
-		Expect(cluster.ContainsManagedRoleConfiguration()).To(BeTrue())
-		Expect(cluster.ContainsManagedRoleSecret("test_user_secrets")).To(BeTrue())
-		Expect(cluster.ContainsManagedRoleSecret("test_user_secrets1")).To(BeFalse())
+		Expect(cluster.ContainsManagedRolesConfiguration()).To(BeTrue())
+		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeTrue())
+		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets1")).To(BeFalse())
 		Expect(cluster.Spec.Managed.Roles[0].GetRoleInherit()).To(BeTrue())
 		Expect(cluster.Spec.Managed.Roles[0].GetRoleSecretsName() == "test_user_secrets").To(BeTrue())
 	})
 
-	It("Verify default value if managed role not exists", func() {
+	It("Verifies default values when there are no managed roles", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{},
 		}
-		Expect(cluster.ContainsManagedRoleConfiguration()).To(BeFalse())
-		Expect(cluster.ContainsManagedRoleSecret("test_user_secrets")).To(BeFalse())
+		Expect(cluster.ContainsManagedRolesConfiguration()).To(BeFalse())
+		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeFalse())
 	})
 })
