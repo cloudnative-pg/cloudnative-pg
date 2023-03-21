@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -35,7 +34,6 @@ import (
 var _ = Describe("cluster_status unit tests", func() {
 	It("should make sure setCertExpiration works correctly", func() {
 		var certExpirationDate string
-
 		ctx := context.Background()
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
@@ -130,35 +128,40 @@ var _ = Describe("cluster_status unit tests", func() {
 	})
 
 	It("makes sure that getManagedResources works correctly", func() {
+		ctx := context.Background()
+		crReconciler := &ClusterReconciler{
+			Client: fakeClientWithIndexAdapter{
+				Client: clusterReconciler.Client,
+			},
+			DiscoveryClient:      clusterReconciler.DiscoveryClient,
+			Scheme:               clusterReconciler.Scheme,
+			Recorder:             clusterReconciler.Recorder,
+			instanceStatusClient: clusterReconciler.instanceStatusClient,
+		}
+
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
 		var jobs []batchv1.Job
 		var pods []corev1.Pod
 		var pvcs []corev1.PersistentVolumeClaim
 
-		withManager(func(ctx context.Context, crReconciler *ClusterReconciler, poolerReconciler *PoolerReconciler,
-			manager manager.Manager,
-		) {
-			By("creating the required resources", func() {
-				jobs = generateFakeInitDBJobs(crReconciler.Client, cluster)
-				pods = generateFakeClusterPods(crReconciler.Client, cluster, true)
-				pvcs = generateFakePVC(crReconciler.Client, cluster)
-				name, isOwned := IsOwnedByCluster(&pods[0])
-				Expect(isOwned).To(BeTrue())
-				Expect(name).To(Equal(cluster.Name))
-			})
+		By("creating the required resources", func() {
+			jobs = generateFakeInitDBJobs(crReconciler.Client, cluster)
+			pods = generateFakeClusterPods(crReconciler.Client, cluster, true)
+			pvcs = generateFakePVC(crReconciler.Client, cluster)
+			name, isOwned := IsOwnedByCluster(&pods[0])
+			Expect(isOwned).To(BeTrue())
+			Expect(name).To(Equal(cluster.Name))
+		})
 
-			assertRefreshManagerCache(ctx, manager)
-
-			By("making sure that the required resources are found", func() {
-				Eventually(func() (*managedResources, error) {
-					return crReconciler.getManagedResources(ctx, cluster)
-				}).Should(Satisfy(func(mr *managedResources) bool {
-					return len(mr.instances.Items) == len(pods) &&
-						len(mr.jobs.Items) == len(jobs) &&
-						len(mr.pvcs.Items) == len(pvcs)
-				}))
-			})
+		By("making sure that the required resources are found", func() {
+			Eventually(func() (*managedResources, error) {
+				return crReconciler.getManagedResources(ctx, cluster)
+			}).Should(Satisfy(func(mr *managedResources) bool {
+				return len(mr.instances.Items) == len(pods) &&
+					len(mr.jobs.Items) == len(jobs) &&
+					len(mr.pvcs.Items) == len(pvcs)
+			}))
 		})
 	})
 })
