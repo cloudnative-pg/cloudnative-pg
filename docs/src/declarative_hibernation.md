@@ -24,7 +24,7 @@ A hibernated cluster won't have any running Pods, while the PVCs are retained
 so that the cluster can be rehydrated at a later time. Replica PVCs will be
 kept in addition to the primary's PVC.
 
-The hibernation procedure will delete the primary Pod and then the the replica
+The hibernation procedure will delete the primary Pod and then the replica
 Pods, avoiding switchover, to ensure the replicas are kept in sync.
 
 The hibernation status can be monitored by looking for the `cnpg.io/hibernation`
