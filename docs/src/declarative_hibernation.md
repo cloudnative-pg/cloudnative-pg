@@ -42,8 +42,8 @@ $ kubectl get cluster <cluster-name> -o "jsonpath={.status.conditions[?(.type==\
 }
 ```
 
-The hibernation status can also be read with the `status` sub-command of the the
-kubectl-cnp plugin:
+The hibernation status can also be read with the `status` sub-command of the
+`cnpg` plugin for `kubectl`:
 
 ``` sh
 $ kubectl cnpg status <cluster-name>
