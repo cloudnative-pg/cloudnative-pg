@@ -18,7 +18,6 @@ package roles
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -384,15 +383,3 @@ var _ = DescribeTable("Role status getter tests",
 		},
 	),
 )
-
-var _ = Describe("runnable utils", func() {
-	It("should return an empty hash if password is empty", func() {
-		res := hashPassword("")
-		Expect(res).To(BeEmpty())
-	})
-
-	It("should properly hash a password", func() {
-		res := hashPassword("password")
-		Expect(hex.EncodeToString(res)).To(Equal("5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"))
-	})
-})

@@ -3592,10 +3592,8 @@ spec:
                   description: PasswordState represents the state of the password
                     of a managed RoleConfiguration
                   properties:
-                    passwordHash:
-                      description: the hash of the password stored in the kubernetes
-                        secret
-                      format: byte
+                    resourceVersion:
+                      description: the resource version of the password secret
                       type: string
                     transactionID:
                       description: the last transaction ID to affect the role definition
@@ -3632,6 +3630,11 @@ spec:
                     description: The resource version of the PostgreSQL client-side
                       CA secret version
                     type: string
+                  managedRoleSecretVersion:
+                    additionalProperties:
+                      type: string
+                    description: The resource versions of the managed roles secrets
+                    type: object
                   metrics:
                     additionalProperties:
                       type: string
