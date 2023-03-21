@@ -30,8 +30,8 @@ spec:
 ---
 apiVersion: v1
 data:
-  username: ZWRiX2FkbWluCg==
-  password: ZWRiX2FkbWluCg==
+  username: Y25wZ19hZG1pbgo=
+  password: Y25wZ19hZG1pbgo=
 kind: Secret
 metadata:
   name: cluster-example-cnpgadmin
