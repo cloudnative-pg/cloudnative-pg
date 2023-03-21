@@ -67,7 +67,7 @@ builds:
 
 archives:
 - name_template: >-
-    kubectl-cnpg_
+    kubectl-cnpg_{{ .Version }}_
     {{- .Os }}_
     {{- if eq .Arch "amd64" }}x86_64
     {{- else if eq .Arch "386" }}i386
