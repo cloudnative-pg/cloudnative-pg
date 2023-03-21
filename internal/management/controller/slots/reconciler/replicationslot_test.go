@@ -37,23 +37,23 @@ type fakeReplicationSlotManager struct {
 
 const slotPrefix = "_cnpg_"
 
-func (fk fakeReplicationSlotManager) Create(ctx context.Context, slot infrastructure.ReplicationSlot) error {
+func (fk fakeReplicationSlotManager) Create(_ context.Context, slot infrastructure.ReplicationSlot) error {
 	fk.replicationSlots[fakeSlot{name: slot.SlotName}] = true
 	return nil
 }
 
-func (fk fakeReplicationSlotManager) Delete(ctx context.Context, slot infrastructure.ReplicationSlot) error {
+func (fk fakeReplicationSlotManager) Delete(_ context.Context, slot infrastructure.ReplicationSlot) error {
 	delete(fk.replicationSlots, fakeSlot{name: slot.SlotName})
 	return nil
 }
 
-func (fk fakeReplicationSlotManager) Update(ctx context.Context, slot infrastructure.ReplicationSlot) error {
+func (fk fakeReplicationSlotManager) Update(_ context.Context, _ infrastructure.ReplicationSlot) error {
 	return nil
 }
 
 func (fk fakeReplicationSlotManager) List(
-	ctx context.Context,
-	config *apiv1.ReplicationSlotsConfiguration,
+	_ context.Context,
+	_ *apiv1.ReplicationSlotsConfiguration,
 ) (infrastructure.ReplicationSlotList, error) {
 	var slotList infrastructure.ReplicationSlotList
 	for slot := range fk.replicationSlots {

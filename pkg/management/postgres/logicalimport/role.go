@@ -68,11 +68,7 @@ func cloneRoles(
 		return err
 	}
 
-	if err := rs.importRoles(ctx, roles); err != nil {
-		return err
-	}
-
-	return nil
+	return rs.importRoles(ctx, roles)
 }
 
 func (rs *roleManager) importRoles(ctx context.Context, roles []Role) error {

@@ -258,9 +258,5 @@ func verifyPgDataCoherence(ctx context.Context, instance *postgres.Instance) err
 		return err
 	}
 
-	if err := postgres.WritePostgresUserMaps(instance.PgData); err != nil {
-		return err
-	}
-
-	return nil
+	return postgres.WritePostgresUserMaps(instance.PgData)
 }

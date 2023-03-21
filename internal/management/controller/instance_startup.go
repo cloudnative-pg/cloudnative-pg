@@ -296,9 +296,5 @@ func (r *InstanceReconciler) ReconcileWalStorage(ctx context.Context) error {
 
 	// We moved all the files now we should create the proper symlink
 	contextLogger.Debug("Creating symlink", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
-	if err := os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath)
 }
