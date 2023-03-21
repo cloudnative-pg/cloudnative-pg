@@ -81,11 +81,11 @@ activities:
 
 ## Updating release notes on the branches
 
-**IMPORTANT**. If you're creating a new minor release, the "backporting" of
-release notes described in this section should be skipped *for the new minor.*
-Since you already
-created the release notes for the new minor in `main`, and you will create the
-new release branch off of `main`, the release notes are done for free.
+**IMPORTANT:** If you're creating a new minor release, the "backporting" of
+release notes described in this section should be skipped *for the new minor*.
+Since you already  created the release notes for the new minor in `main`, and
+you will create the  new release branch off of `main`, the release notes are
+done for free.
 
 Once you are done with the items in the "Preparing the release" section, and you
 have committed the release notes on `main`, you
@@ -108,7 +108,7 @@ Take care to:
   as a conflict when you do the cherry pick.
 3. Continue with the cherry pick once conflicts are solved. Commit and push.
 
-**IMPORTANT**. When moving a release into EOL, we are moving its release
+**IMPORTANT:** When moving a release into EOL, we are moving its release
 notes file from `docs/src/release_notes/` into `docs/src/release_notes/old/`.
 This should NOT be done in the release branch that we are EOL'ing. \
 E.g. when we are EOL'ing release 1.17, we should move the file `v1.17.md` into
