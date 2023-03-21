@@ -32,7 +32,7 @@ func NewCmd() *cobra.Command {
 	fioCmd := &cobra.Command{
 		Use:     "fio [name]",
 		Short:   "Creates a fio deployment,pvc and configmap.",
-		Args:    validateCommandArgs,
+		Args:    cobra.MinimumNArgs(1),
 		Long:    `Creates a fio deployment that will execute a fio job on the specified pvc.`,
 		Example: jobExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -85,11 +85,4 @@ func NewCmd() *cobra.Command {
 	)
 
 	return fioCmd
-}
-
-func validateCommandArgs(cmd *cobra.Command, args []string) error {
-	if err := cobra.MinimumNArgs(1)(cmd, args); err != nil {
-		return err
-	}
-	return nil
 }

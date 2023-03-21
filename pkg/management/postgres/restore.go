@@ -667,11 +667,7 @@ func (info *InitInfo) checkBackupDestination(
 	}
 
 	// Check if we're ok to archive in the desired destination
-	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {
-		return err
-	}
-
-	return nil
+	return walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions)
 }
 
 // waitUntilRecoveryFinishes periodically checks the underlying

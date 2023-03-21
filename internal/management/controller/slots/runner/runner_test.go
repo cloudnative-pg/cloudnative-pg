@@ -40,8 +40,8 @@ type fakeSlotManager struct {
 }
 
 func (sm *fakeSlotManager) List(
-	ctx context.Context,
-	config *apiv1.ReplicationSlotsConfiguration,
+	_ context.Context,
+	_ *apiv1.ReplicationSlotsConfiguration,
 ) (infrastructure.ReplicationSlotList, error) {
 	var slotList infrastructure.ReplicationSlotList
 	for _, slot := range sm.slots {
@@ -55,7 +55,7 @@ func (sm *fakeSlotManager) List(
 	return slotList, nil
 }
 
-func (sm *fakeSlotManager) Update(ctx context.Context, slot infrastructure.ReplicationSlot) error {
+func (sm *fakeSlotManager) Update(_ context.Context, slot infrastructure.ReplicationSlot) error {
 	localSlot, found := sm.slots[slot.SlotName]
 	if !found {
 		return fmt.Errorf("while updating slot: Slot %s not found", slot.SlotName)
@@ -67,7 +67,7 @@ func (sm *fakeSlotManager) Update(ctx context.Context, slot infrastructure.Repli
 	return nil
 }
 
-func (sm *fakeSlotManager) Create(ctx context.Context, slot infrastructure.ReplicationSlot) error {
+func (sm *fakeSlotManager) Create(_ context.Context, slot infrastructure.ReplicationSlot) error {
 	if _, found := sm.slots[slot.SlotName]; found {
 		return fmt.Errorf("while creating slot: Slot %s already exists", slot.SlotName)
 	}
@@ -76,7 +76,7 @@ func (sm *fakeSlotManager) Create(ctx context.Context, slot infrastructure.Repli
 	return nil
 }
 
-func (sm *fakeSlotManager) Delete(ctx context.Context, slot infrastructure.ReplicationSlot) error {
+func (sm *fakeSlotManager) Delete(_ context.Context, slot infrastructure.ReplicationSlot) error {
 	if _, found := sm.slots[slot.SlotName]; !found {
 		return fmt.Errorf("while deleting slot: Slot %s not found", slot.SlotName)
 	}

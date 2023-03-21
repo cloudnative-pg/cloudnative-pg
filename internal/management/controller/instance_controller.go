@@ -80,7 +80,7 @@ type shoudRequeue bool
 //nolint:gocognit,gocyclo
 func (r *InstanceReconciler) Reconcile(
 	ctx context.Context,
-	request reconcile.Request,
+	_ reconcile.Request,
 ) (reconcile.Result, error) {
 	// set up a convenient contextLog object so we don't have to type request over and over again
 	contextLogger, ctx := log.SetupLogger(ctx)

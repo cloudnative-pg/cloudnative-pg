@@ -76,11 +76,7 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			if err := linkerd.TryInvokeShutdownEndpoint(cmd.Context()); err != nil {
-				return err
-			}
-
-			return nil
+			return linkerd.TryInvokeShutdownEndpoint(cmd.Context())
 		},
 	}
 
