@@ -57,7 +57,7 @@ func evaluateNextRoleActions(
 	config *apiv1.ManagedConfiguration,
 	rolesInDB []DatabaseRole,
 	lastPasswordState map[string]apiv1.PasswordState,
-	passwordsInSpec map[string][]byte,
+	latestSecretResourceVersion map[string]string,
 ) rolesByAction {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
 	contextLog.Info("evaluating role actions")
@@ -80,7 +80,9 @@ func evaluateNextRoleActions(
 			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], apiv1.RoleConfiguration{Name: role.Name})
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
 			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
-		case isInSpec && (!role.isEquivalent(inSpec) || role.passwordNeedsUpdating(lastPasswordState, passwordsInSpec)):
+		case isInSpec &&
+			(!role.isEquivalent(inSpec) ||
+				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
 		case isInSpec && !role.isCommentEqual(inSpec):
 			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], inSpec)

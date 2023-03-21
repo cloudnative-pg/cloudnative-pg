@@ -659,10 +659,10 @@ Name       | Description                                                        
 
 PasswordState represents the state of the password of a managed RoleConfiguration
 
-Name          | Description                                                         | Type  
-------------- | ------------------------------------------------------------------- | ------
-`transactionID` | the last transaction ID to affect the role definition in PostgreSQL | int64 
-`passwordHash ` | the hash of the password stored in the kubernetes secret            | []byte
+Name            | Description                                                         | Type  
+--------------- | ------------------------------------------------------------------- | ------
+`transactionID  ` | the last transaction ID to affect the role definition in PostgreSQL | int64 
+`resourceVersion` | the resource version of the password secret                         | string
 
 <a id='PgBouncerIntegrationStatus'></a>
 
@@ -997,6 +997,7 @@ Name                     | Description                                          
 `superuserSecretVersion  ` | The resource version of the "postgres" user secret                                                                          | string           
 `replicationSecretVersion` | The resource version of the "streaming_replica" user secret                                                                 | string           
 `applicationSecretVersion` | The resource version of the "app" user secret                                                                               | string           
+`managedRoleSecretVersion` | The resource versions of the managed roles secrets                                                                          | map[string]string
 `caSecretVersion         ` | Unused. Retained for compatibility with old versions.                                                                       | string           
 `clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version                                                        | string           
 `serverCaSecretVersion   ` | The resource version of the PostgreSQL server-side CA secret version                                                        | string           

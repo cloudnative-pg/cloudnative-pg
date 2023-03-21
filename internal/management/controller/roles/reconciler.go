@@ -49,7 +49,8 @@ func Reconcile(
 	}
 
 	// get current passwords from spec/secrets
-	passwordHashes, err := getPasswordHashes(ctx, c, cluster.Spec.Managed.Roles, instance.Namespace)
+	latestPasswordResourceVersion, err := getPasswordSecretResourceVersion(
+		ctx, c, cluster.Spec.Managed.Roles, instance.Namespace)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -66,7 +67,7 @@ func Reconcile(
 		cluster.Spec.Managed,
 		rolesInDB,
 		cluster.Status.RolePasswordStatus,
-		passwordHashes,
+		latestPasswordResourceVersion,
 	).convertToRolesByStatus()
 
 	roleNamesByStatus := make(map[apiv1.RoleStatus][]string)

@@ -401,8 +401,8 @@ const (
 type PasswordState struct {
 	// the last transaction ID to affect the role definition in PostgreSQL
 	TransactionID int64 `json:"transactionID,omitempty"`
-	// the hash of the password stored in the kubernetes secret
-	PasswordHash []byte `json:"passwordHash,omitempty"`
+	// the resource version of the password secret
+	SecretResourceVersion string `json:"resourceVersion,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -1705,6 +1705,9 @@ type SecretsResourceVersion struct {
 	// The resource version of the "app" user secret
 	ApplicationSecretVersion string `json:"applicationSecretVersion,omitempty"`
 
+	// The resource versions of the managed roles secrets
+	ManagedRoleSecretVersions map[string]string `json:"managedRoleSecretVersion,omitempty"`
+
 	// Unused. Retained for compatibility with old versions.
 	CASecretVersion string `json:"caSecretVersion,omitempty"`
 
@@ -1731,6 +1734,18 @@ type ConfigMapResourceVersion struct {
 	// A map with the versions of all the config maps used to pass metrics.
 	// Map keys are the config map names, map values are the versions
 	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// SetManagedRoleSecretVersion Add or update or delete the resource version of the managed role secret
+func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion(secret string, version *string) {
+	if secretResourceVersion.ManagedRoleSecretVersions == nil {
+		secretResourceVersion.ManagedRoleSecretVersions = make(map[string]string)
+	}
+	if version == nil {
+		delete(secretResourceVersion.ManagedRoleSecretVersions, secret)
+	} else {
+		secretResourceVersion.ManagedRoleSecretVersions[secret] = *version
+	}
 }
 
 // GetImageName get the name of the image that should be used
@@ -1793,13 +1808,22 @@ func (cluster *Cluster) GetLDAPSecretName() string {
 	return ""
 }
 
-// GetEnableSuperuserAccess returns if the superuser access is enabled or not
-func (cluster *Cluster) GetEnableSuperuserAccess() bool {
-	if cluster.Spec.EnableSuperuserAccess != nil {
-		return *cluster.Spec.EnableSuperuserAccess
-	}
+// ContainsManagedRolesConfiguration returns true iff there are managed roles configured
+func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
+	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
+}
 
-	return true
+// UsesSecretInManagedRoles checks if the given secret name is used in a managed role
+func (cluster *Cluster) UsesSecretInManagedRoles(secretName string) bool {
+	if !cluster.ContainsManagedRolesConfiguration() {
+		return false
+	}
+	for _, role := range cluster.Spec.Managed.Roles {
+		if role.PasswordSecret != nil && role.PasswordSecret.Name == secretName {
+			return true
+		}
+	}
+	return false
 }
 
 // GetApplicationSecretName get the name of the application secret for any bootstrap type
@@ -2266,6 +2290,10 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
+	if cluster.UsesSecretInManagedRoles(secret) {
+		return true
+	}
+
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() && cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name == secret {
 		return true
 	}
@@ -2300,6 +2328,15 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	}
 
 	return false
+}
+
+// GetEnableSuperuserAccess returns if the superuser access is enabled or not
+func (cluster *Cluster) GetEnableSuperuserAccess() bool {
+	if cluster.Spec.EnableSuperuserAccess != nil {
+		return *cluster.Spec.EnableSuperuserAccess
+	}
+
+	return true
 }
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout
