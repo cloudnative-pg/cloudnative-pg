@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/strings/slices"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -1642,17 +1641,6 @@ type RoleConfiguration struct {
 	InRoles    []string `json:"inRoles,omitempty"`
 }
 
-// GetManagedSecrets return the all the secrets name for managed roles
-func (managed *ManagedConfiguration) GetManagedSecrets() []string {
-	var secrets []string
-	for _, role := range managed.Roles {
-		if role.PasswordSecret != nil {
-			secrets = append(secrets, role.PasswordSecret.Name)
-		}
-	}
-	return secrets
-}
-
 // GetRoleSecretsName gets the name of the secret which is used to store the role's password
 func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
 	if roleConfiguration.PasswordSecret != nil {
@@ -1748,12 +1736,16 @@ type ConfigMapResourceVersion struct {
 	Metrics map[string]string `json:"metrics,omitempty"`
 }
 
-// SetManagedRoleSecretVersion Add or Update the resource version of managed role secret
-func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion(secret, version string) {
+// SetManagedRoleSecretVersion Add or update or delete the resource version of managed role secret
+func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion(secret string, version *string) {
 	if secretResourceVersion.ManagedRoleSecretVersion == nil {
 		secretResourceVersion.ManagedRoleSecretVersion = make(map[string]string)
 	}
-	secretResourceVersion.ManagedRoleSecretVersion[secret] = version
+	if version == nil {
+		delete(secretResourceVersion.ManagedRoleSecretVersion, secret)
+	} else {
+		secretResourceVersion.ManagedRoleSecretVersion[secret] = *version
+	}
 }
 
 // GetImageName get the name of the image that should be used
@@ -1816,13 +1808,22 @@ func (cluster *Cluster) GetLDAPSecretName() string {
 	return ""
 }
 
-// GetEnableSuperuserAccess returns if the superuser access is enabled or not
-func (cluster *Cluster) GetEnableSuperuserAccess() bool {
-	if cluster.Spec.EnableSuperuserAccess != nil {
-		return *cluster.Spec.EnableSuperuserAccess
-	}
+// ContainsManagedRoleConfiguration returns if there is managed role configuration
+func (cluster *Cluster) ContainsManagedRoleConfiguration() bool {
+	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
+}
 
-	return true
+// ContainsManagedRoleSecret verify if the given secret name exists in managed role or not
+func (cluster *Cluster) ContainsManagedRoleSecret(secretName string) bool {
+	if !cluster.ContainsManagedRoleConfiguration() {
+		return false
+	}
+	for _, role := range cluster.Spec.Managed.Roles {
+		if role.PasswordSecret != nil && role.PasswordSecret.Name == secretName {
+			return true
+		}
+	}
+	return false
 }
 
 // GetApplicationSecretName get the name of the application secret for any bootstrap type
@@ -2289,7 +2290,7 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
-	if slices.Contains(cluster.Spec.Managed.GetManagedSecrets(), secret) {
+	if cluster.ContainsManagedRoleSecret(secret) {
 		return true
 	}
 
@@ -2327,6 +2328,15 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	}
 
 	return false
+}
+
+// GetEnableSuperuserAccess returns if the superuser access is enabled or not
+func (cluster *Cluster) GetEnableSuperuserAccess() bool {
+	if cluster.Spec.EnableSuperuserAccess != nil {
+		return *cluster.Spec.EnableSuperuserAccess
+	}
+
+	return true
 }
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout

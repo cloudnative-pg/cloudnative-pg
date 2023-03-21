@@ -843,3 +843,35 @@ var _ = Describe("Replication slots names for instances", func() {
 			"_232_test_cluster_example_1"))
 	})
 })
+
+var _ = Describe("Managed Roles ", func() {
+	It("Verify default value", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name: "test_user",
+							PasswordSecret: &LocalObjectReference{
+								Name: "test_user_secrets",
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.ContainsManagedRoleConfiguration()).To(BeTrue())
+		Expect(cluster.ContainsManagedRoleSecret("test_user_secrets")).To(BeTrue())
+		Expect(cluster.ContainsManagedRoleSecret("test_user_secrets1")).To(BeFalse())
+		Expect(cluster.Spec.Managed.Roles[0].GetRoleInherit()).To(BeTrue())
+		Expect(cluster.Spec.Managed.Roles[0].GetRoleSecretsName() == "test_user_secrets").To(BeTrue())
+	})
+
+	It("Verify default value if managed role not exists", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{},
+		}
+		Expect(cluster.ContainsManagedRoleConfiguration()).To(BeFalse())
+		Expect(cluster.ContainsManagedRoleSecret("test_user_secrets")).To(BeFalse())
+	})
+})
