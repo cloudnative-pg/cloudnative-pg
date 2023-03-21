@@ -28,12 +28,12 @@ import (
 )
 
 var _ = Describe("Hibernation annotation management", func() {
-	It("classifies clusters with not annotation as not hibernated", func() {
+	It("classifies clusters with no annotation as not hibernated", func() {
 		cluster := apiv1.Cluster{}
 		Expect(getHibernationAnnotationValue(&cluster)).To(BeFalse())
 	})
 
-	It("correctly handle on/off values", func() {
+	It("correctly handles on/off values", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -67,7 +67,7 @@ var _ = Describe("Status enrichment", func() {
 		Expect(cluster.Status.Conditions).To(BeEmpty())
 	})
 
-	It("adds an error condition when the hibernation annotation have a wrong value", func(ctx SpecContext) {
+	It("adds an error condition when the hibernation annotation has a wrong value", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -86,7 +86,7 @@ var _ = Describe("Status enrichment", func() {
 		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonWrongAnnotationValue))
 	})
 
-	It("removes the hibernation condition when not requested", func(ctx SpecContext) {
+	It("removes the hibernation condition when hibernation is turned off", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -109,7 +109,7 @@ var _ = Describe("Status enrichment", func() {
 		Expect(hibernationCondition).To(BeNil())
 	})
 
-	It("set the cluster as hibernated when every Pod have been deleted", func(ctx SpecContext) {
+	It("sets the cluster as hibernated when all Pods have been deleted", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -128,7 +128,7 @@ var _ = Describe("Status enrichment", func() {
 		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonHibernated))
 	})
 
-	It("set the cluster as not hibernated when at least Pod is still alive", func(ctx SpecContext) {
+	It("sets the cluster as not hibernated when at least one Pod is present", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -147,7 +147,7 @@ var _ = Describe("Status enrichment", func() {
 		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonDeletingPods))
 	})
 
-	It("doesn't work when the cluster is not ready", func(ctx SpecContext) {
+	It("doesn't enrich the status while the cluster is not ready", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -164,7 +164,7 @@ var _ = Describe("Status enrichment", func() {
 		Expect(hibernationCondition).To(BeNil())
 	})
 
-	It("waits for Pod to be deleted gracefully", func(ctx SpecContext) {
+	It("waits for each Pod to be deleted gracefully", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{

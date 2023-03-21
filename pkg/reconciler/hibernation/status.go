@@ -99,7 +99,7 @@ func EnrichStatus(
 
 	// We proceed to hibernate the cluster only when it is ready.
 	// Hibernating a non-ready cluster may be dangerous since the PVCs
-	// won't to completely created.
+	// won't be completely created.
 	if cluster.Status.Phase != apiv1.PhaseHealthy {
 		return
 	}

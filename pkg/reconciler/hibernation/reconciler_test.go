@@ -55,14 +55,15 @@ func (cm *clientMock) RESTMapper() meta.RESTMapper {
 }
 
 var _ = Describe("Reconcile resources", func() {
-	It("let the reconciliation loop proceed when there's no hibernation annotation", func(ctx SpecContext) {
+	It("lets the reconciliation loop proceed when there's no hibernation annotation", func(ctx SpecContext) {
 		mock := &clientMock{}
 		cluster := apiv1.Cluster{}
-		Expect(Reconcile(ctx, mock, &cluster, nil)).To(BeZero())
+		// A Reconcile with a nil return will allow cluster reconciliation to proceed
+		Expect(Reconcile(ctx, mock, &cluster, nil)).To(BeNil())
 		Expect(mock.deletedPods).To(BeEmpty())
 	})
 
-	It("let the reconciliation loop stop if the cluster is already hibernated", func(ctx SpecContext) {
+	It("stops the reconciliation loop if the cluster is already hibernated", func(ctx SpecContext) {
 		mock := &clientMock{}
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -80,11 +81,12 @@ var _ = Describe("Reconcile resources", func() {
 				},
 			},
 		}
-		Expect(Reconcile(ctx, mock, &cluster, nil)).ToNot(BeZero())
+		// A Reconcile with a non-nil return will stop the cluster reconciliation
+		Expect(Reconcile(ctx, mock, &cluster, nil)).ToNot(BeNil())
 		Expect(mock.deletedPods).To(BeEmpty())
 	})
 
-	It("waits if a Pod is being deleted", func(ctx SpecContext) {
+	It("re-queues if a Pod is being deleted", func(ctx SpecContext) {
 		mock := &clientMock{}
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -111,11 +113,14 @@ var _ = Describe("Reconcile resources", func() {
 				},
 			},
 		}
-		Expect(Reconcile(ctx, mock, &cluster, pods)).ToNot(BeZero())
+		result, err := Reconcile(ctx, mock, &cluster, pods)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result).ToNot(BeNil())
+		Expect(result.RequeueAfter).ToNot(BeZero())
 		Expect(mock.deletedPods).To(BeEmpty())
 	})
 
-	It("delete the primary pod if available", func(ctx SpecContext) {
+	It("deletes the primary pod if available", func(ctx SpecContext) {
 		mock := &clientMock{}
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -136,11 +141,11 @@ var _ = Describe("Reconcile resources", func() {
 		}
 
 		pods := fakePodListWithPrimary()
-		Expect(Reconcile(ctx, mock, &cluster, pods)).ToNot(BeZero())
+		Expect(Reconcile(ctx, mock, &cluster, pods)).ToNot(BeNil())
 		Expect(mock.deletedPods).To(ConsistOf("cluster-example-2"))
 	})
 
-	It("delete the replicas if the primary pod have already been deleted", func(ctx SpecContext) {
+	It("deletes the replica pods if the primary has already been deleted", func(ctx SpecContext) {
 		mock := &clientMock{}
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -161,7 +166,7 @@ var _ = Describe("Reconcile resources", func() {
 		}
 
 		pods := fakePodListWithoutPrimary()
-		Expect(Reconcile(ctx, mock, &cluster, pods)).ToNot(BeZero())
+		Expect(Reconcile(ctx, mock, &cluster, pods)).ToNot(BeNil())
 		Expect(mock.deletedPods).To(ConsistOf("cluster-example-1"))
 	})
 })
