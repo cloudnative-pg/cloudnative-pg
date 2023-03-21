@@ -18,11 +18,11 @@ package roles
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -199,7 +199,8 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	config *apiv1.ManagedConfiguration,
 	storedPasswordState map[string]apiv1.PasswordState,
 ) (map[string]apiv1.PasswordState, error) {
-	hashes, err := getPasswordHashes(ctx, sr.client, config.Roles, sr.instance.Namespace)
+	latestSecretResourceVersion, err := getPasswordSecretResourceVersion(
+		ctx, sr.client, config.Roles, sr.instance.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +208,8 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	if err != nil {
 		return nil, err
 	}
-	rolesByAction := evaluateNextRoleActions(ctx, config, rolesInDB, storedPasswordState, hashes)
+	rolesByAction := evaluateNextRoleActions(
+		ctx, config, rolesInDB, storedPasswordState, latestSecretResourceVersion)
 	if err != nil {
 		return nil, fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
@@ -250,7 +252,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			continue
 		case roleCreate, roleUpdate:
 			for _, role := range roles {
-				pass, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
+				pass, version, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
 				if err != nil {
 					return nil, err
 				}
@@ -275,8 +277,8 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				}
 
 				appliedChanges[role.Name] = apiv1.PasswordState{
-					TransactionID: transactionID,
-					PasswordHash:  hashPassword(pass),
+					TransactionID:         transactionID,
+					SecretResourceVersion: version,
 				}
 			}
 		case roleDelete:
@@ -300,11 +302,11 @@ func getPassword(
 	cl client.Client,
 	roleInSpec apiv1.RoleConfiguration,
 	namespace string,
-) (string, error) {
+) (string, string, error) {
 	secretName := roleInSpec.GetRoleSecretsName()
 	// no secrets defined, will keep roleInSpec.Password nil
 	if secretName == "" {
-		return "", nil
+		return "", "", nil
 	}
 
 	var secret corev1.Secret
@@ -312,43 +314,37 @@ func getPassword(
 		client.ObjectKey{Namespace: namespace, Name: secretName},
 		&secret)
 	if err != nil {
-		return "", err
+		if apierrs.IsNotFound(err) {
+			return "", "", nil
+		}
+		return "", "", err
 	}
 	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if strings.TrimSpace(roleInSpec.Name) != strings.TrimSpace(usernameFromSecret) {
 		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
-		return "", err
+		return "", "", err
 	}
-	return strings.TrimSpace(passwordFromSecret), nil
+	return strings.TrimSpace(passwordFromSecret), secret.GetResourceVersion(), nil
 }
 
-func hashPassword(pass string) []byte {
-	if pass == "" {
-		return nil
-	}
-
-	hash := sha256.Sum256([]byte(pass))
-	return hash[:]
-}
-
-// getPasswordHashes returns a list of hashes of the passwords for managed roles
+// getPasswordSecretResourceVersion returns a list of resource version of the passwords secrets for managed roles
 // stored as Kubernetes secrets
-func getPasswordHashes(
+func getPasswordSecretResourceVersion(
 	ctx context.Context,
 	client client.Client,
 	rolesInSpec []apiv1.RoleConfiguration,
 	namespace string,
-) (map[string][]byte, error) {
-	re := make(map[string][]byte)
+) (map[string]string, error) {
+	re := make(map[string]string)
 	for _, role := range rolesInSpec {
-		pass, err := getPassword(ctx, client, role, namespace)
+		_, version, err := getPassword(ctx, client, role, namespace)
 		if err != nil {
 			return nil, err
 		}
-		re[role.Name] = hashPassword(pass)
+		re[role.Name] = version
 	}
 	return re, nil
 }

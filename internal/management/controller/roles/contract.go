@@ -17,7 +17,6 @@ limitations under the License.
 package roles
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"reflect"
@@ -48,9 +47,9 @@ type DatabaseRole struct {
 // passwordNeedsUpdating creates a function that will evaluate whether a DatabaseRole needs to be updated
 func (d *DatabaseRole) passwordNeedsUpdating(
 	storedPasswordState map[string]apiv1.PasswordState,
-	passwordsInSpec map[string][]byte,
+	latestSecretResourceVersion map[string]string,
 ) bool {
-	return !bytes.Equal(storedPasswordState[d.Name].PasswordHash, passwordsInSpec[d.Name]) ||
+	return storedPasswordState[d.Name].SecretResourceVersion != latestSecretResourceVersion[d.Name] ||
 		storedPasswordState[d.Name].TransactionID != d.transactionID
 }
 
