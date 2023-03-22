@@ -143,7 +143,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 		})
 
-		It("Can update role attribute and verify it take effective in database", func() {
+		It("can update role attributes in the spec and they are applied in the database", func() {
 			expectedLogin := false
 			expectedCreateDB := false
 			expectedCreateRole := true
@@ -186,7 +186,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				}, 10).Should(Equal("1\n"))
 			})
 
-			By("The connection should be failed as we disable the login", func() {
+			By("the connection should fail since we disabled the login", func() {
 				dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
 					rwService, username, "postgres", password)
 				timeout := time.Second * 5
@@ -195,7 +195,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(err).To(HaveOccurred())
 			})
 
-			By("Enable the canLogin and verify the connection again", func() {
+			By("enable Login again", func() {
 				var cluster apiv1.Cluster
 				err := env.Client.Get(env.Ctx, *clusterNameSpacedName, &cluster)
 				Expect(err).ToNot(HaveOccurred())
@@ -205,14 +205,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("The connectivity should be success again", func() {
+			By("the connectivity should be success again", func() {
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				// assert connectable use username and password defined in secrets
 				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 10, env)
 			})
 		})
 
-		It("Can add role with all attribute omit and verify it is default", func() {
+		It("Can add role with all attribute omitted and verify it is default", func() {
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			const (
@@ -262,8 +262,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 		})
 
-		It("Can update role comments and verify changes in db ", func() {
-			By("Update comments for role new_role", func() {
+		It("Can update role comment and verify changes in db ", func() {
+			By("Update comment for role new_role", func() {
 				var cluster apiv1.Cluster
 				err := env.Client.Get(env.Ctx, *clusterNameSpacedName, &cluster)
 				Expect(err).ToNot(HaveOccurred())
@@ -364,7 +364,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 		})
 
-		It("Can drop role with ensure absence option", func() {
+		It("Can drop role with ensure absent option", func() {
 			By("Delete role new_role with EnsureOption ", func() {
 				var cluster apiv1.Cluster
 				err := env.Client.Get(env.Ctx, *clusterNameSpacedName, &cluster)
