@@ -1826,12 +1826,6 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 func (r *Cluster) validateManagedRoles() field.ErrorList {
 	var result field.ErrorList
 
-	isReserved := map[string]bool{
-		"cnpg_pooler_pgbouncer": true,
-		"streaming_replica":     true,
-		"postgres":              true,
-	}
-
 	if r.Spec.Managed == nil {
 		return nil
 	}
@@ -1845,7 +1839,7 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 					role.ConnectionLimit,
 					"Connection limit should be positive, unless defaulting to -1"))
 		}
-		if isReserved[role.Name] {
+		if postgres.IsRoleReserved(role.Name) {
 			result = append(
 				result,
 				field.Invalid(

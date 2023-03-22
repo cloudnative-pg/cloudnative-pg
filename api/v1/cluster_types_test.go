@@ -844,7 +844,7 @@ var _ = Describe("Replication slots names for instances", func() {
 	})
 })
 
-var _ = Describe("Managed Roles ", func() {
+var _ = Describe("Managed Roles", func() {
 	It("Verify default values", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
