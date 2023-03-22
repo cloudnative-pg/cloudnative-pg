@@ -10,7 +10,7 @@ spec:
 
   managed:
     roles:
-    - name: cnpg_admin
+    - name: my_admin
       ensure: present
       comment: my database-side comment
       login: true
@@ -30,8 +30,8 @@ spec:
 ---
 apiVersion: v1
 data:
-  username: Y25wZ19hZG1pbgo=
-  password: Y25wZ19hZG1pbgo=
+  username: bXlfYWRtaW4K
+  password: bXlfYWRtaW4K
 kind: Secret
 metadata:
   name: cluster-example-cnpgadmin

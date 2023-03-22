@@ -52,8 +52,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
 			namespace   = "managed-roles"
-			username    = "cnpg_admin"
-			password    = "cnpg_admin"
+			username    = "my_admin"
+			password    = "my_admin"
 			newUserName = "new_role"
 		)
 		var clusterName, secretName string
