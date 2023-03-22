@@ -59,7 +59,7 @@ func evaluateNextRoleActions(
 	lastPasswordState map[string]apiv1.PasswordState,
 	latestSecretResourceVersion map[string]string,
 ) rolesByAction {
-	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("evaluating role actions")
 
 	rolesInSpec := config.Roles

@@ -44,7 +44,7 @@ func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 func (sm PostgresRoleManager) List(
 	ctx context.Context,
 ) ([]DatabaseRole, error) {
-	logger := log.FromContext(ctx).WithName("listRoles")
+	logger := log.FromContext(ctx).WithName("roles_reconciler")
 
 	rows, err := sm.superUserDB.QueryContext(
 		ctx,
@@ -103,13 +103,13 @@ func (sm PostgresRoleManager) List(
 
 // Update the role
 func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) error {
-	contextLog := log.FromContext(ctx).WithName("updateRole")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	var query strings.Builder
 
 	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
-	contextLog.Info("Updating role", "role", role.Name, "query", query.String())
+	contextLog.Debug("Updating role", "role", role.Name, "query", query.String())
 	// NOTE: always apply the password update. Since the transaction ID of the role
 	// will change no matter what, the next reconciliation cycle we would update the password
 	appendPasswordOption(role, &query)
@@ -124,13 +124,13 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 // Create the role
 // TODO: do we give the role any database-level permissions?
 func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) error {
-	contextLog := log.FromContext(ctx).WithName("createRole")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 
 	var query strings.Builder
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
-	contextLog.Info("Creating", "query", query.String())
+	contextLog.Debug("Creating", "query", query.String())
 	appendPasswordOption(role, &query)
 
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
@@ -158,11 +158,12 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 // has created tables or other objects. That should be blocked at the validation
 // webhook level, otherwise it will be very poor UX and the operator may not notice
 func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) error {
-	contextLog := log.FromContext(ctx).WithName("dropRole")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 
-	_, err := sm.superUserDB.ExecContext(ctx,
-		fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize()))
+	query := fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize())
+	contextLog.Debug("Dropping", "query", query)
+	_, err := sm.superUserDB.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("could not delete role %s: %w", role.Name, err)
 	}
@@ -173,7 +174,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 // GetLastTransactionID get the last xmin for the role, to help keep track of
 // whether the role has been changed in on the Database since last reconciliation
 func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error) {
-	contextLog := log.FromContext(ctx).WithName("getLastTransactionID")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 
 	var xmin int64
@@ -192,12 +193,13 @@ func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role Dat
 
 // UpdateComment of the role
 func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRole) error {
-	contextLog := log.FromContext(ctx).WithName("updateRole")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 
-	_, err := sm.superUserDB.ExecContext(ctx,
-		fmt.Sprintf("COMMENT ON ROLE %s IS %s",
-			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
+	query := fmt.Sprintf("COMMENT ON ROLE %s IS %s",
+		pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment))
+	contextLog.Debug("Updating comment", "query", query)
+	_, err := sm.superUserDB.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("could not update comment of role %s: %w", role.Name, err)
 	}

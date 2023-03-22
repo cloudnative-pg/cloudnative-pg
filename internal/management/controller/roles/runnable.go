@@ -66,7 +66,7 @@ func NewRoleSynchronizer(instance *postgres.Instance, client client.Client) *Rol
 
 // Start starts running the RoleSynchronizer
 func (sr *RoleSynchronizer) Start(ctx context.Context) error {
-	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Info("starting up the runnable")
 	isPrimary, err := sr.instance.IsPrimary()
 	if err != nil {
@@ -119,7 +119,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		}
 	}()
 
-	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("reconciling managed roles")
 
 	superUserDB, err := sr.instance.GetSuperUserDB()
@@ -238,7 +238,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	roleManager RoleManager,
 	rolesByAction rolesByAction,
 ) (map[string]apiv1.PasswordState, error) {
-	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("applying role actions")
 
 	appliedChanges := make(map[string]apiv1.PasswordState)
