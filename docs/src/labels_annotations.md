@@ -74,6 +74,6 @@ kubectl get pods --show-labels
 ## Current limitations
 
 Currently, CloudNativePG does not automatically propagate labels or
-annotations deletions. Therefore, when an annotation or label is removed from
+annotations additions or deletions. Therefore, when an annotation or label is added or removed from
 a Cluster, which was previously propagated to the underlying pods, the operator
-will not automatically remove it on the associated resources.
+will not automatically update it on the associated resources.
