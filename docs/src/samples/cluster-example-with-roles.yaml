@@ -10,7 +10,7 @@ spec:
 
   managed:
     roles:
-    - name: my_admin
+    - name: dante
       ensure: present
       comment: my database-side comment
       login: true
@@ -26,13 +26,13 @@ spec:
         - pg_monitor
         - pg_signal_backend
       passwordSecret:
-        name: cluster-example-myadmin
+        name: cluster-example-dante
 ---
 apiVersion: v1
 data:
-  username: bXlfYWRtaW4K
-  password: bXlfYWRtaW4K
+  username: ZGFudGU=
+  password: ZGFudGU=
 kind: Secret
 metadata:
-  name: cluster-example-myadmin
+  name: cluster-example-dante
 type: kubernetes.io/basic-auth

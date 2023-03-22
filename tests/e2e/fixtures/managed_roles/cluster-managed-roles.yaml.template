@@ -11,9 +11,9 @@ spec:
 
   managed:
     roles:
-    - name: my_admin
+    - name: dante
       ensure: present
-      comment: my database-side comment
+      comment: Dante Alighieri
       login: true
       superuser: false
       createdb: true
@@ -31,11 +31,11 @@ spec:
 ---
 apiVersion: v1
 data:
-  username: bXlfYWRtaW4K
-  password: bXlfYWRtaW4K
+  username: ZGFudGU=
+  password: ZGFudGU=
 kind: Secret
 metadata:
-  name: cluster-example-myadmin
+  name: cluster-example-dante
   labels:
     cnpg.io/reload: "true"
 type: kubernetes.io/basic-auth
