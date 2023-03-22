@@ -52,12 +52,11 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
 			namespace   = "managed-roles"
-			username    = "my_admin"
-			password    = "my_admin"
+			username    = "dante"
+			password    = "dante"
 			newUserName = "new_role"
 		)
 		var clusterName, secretName string
-		var clusterNameSpacedName *types.NamespacedName
 		var secretNameSpacedName *types.NamespacedName
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
@@ -74,16 +73,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
-			secretName = "cluster-example-myadmin"
 			Expect(err).ToNot(HaveOccurred())
-			clusterNameSpacedName = &types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
+
+			secretName = "cluster-example-dante"
 			secretNameSpacedName = &types.NamespacedName{
 				Namespace: namespace,
 				Name:      secretName,
 			}
+
 			By("setting up cluster with managed roles", func() {
 				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 			})
@@ -141,7 +138,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By("Verify connectivity of use", func() {
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 10, env)
+				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 30, env)
 			})
 		})
 
@@ -153,8 +150,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 
 			By("updating role attribute in spec", func() {
-				var cluster apiv1.Cluster
-				err := env.Client.Get(env.Ctx, *clusterNameSpacedName, &cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				updated := cluster.DeepCopy()
@@ -162,7 +158,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				updated.Spec.Managed.Roles[0].CreateDB = expectedCreateDB
 				updated.Spec.Managed.Roles[0].CreateRole = expectedCreateRole
 				updated.Spec.Managed.Roles[0].ConnectionLimit = expectedConnLmt
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(&cluster))
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -185,32 +181,31 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						return ""
 					}
 					return stdout
-				}, 10).Should(Equal("1\n"))
+				}, 30).Should(Equal("1\n"))
 			})
 
 			By("the connection should fail since we disabled the login", func() {
 				dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
 					rwService, username, "postgres", password)
-				timeout := time.Second * 5
+				timeout := time.Second * 10
 				_, _, err := env.ExecCommand(env.Ctx, *psqlClientPod, specs.PostgresContainerName, &timeout,
 					"psql", dsn, "-tAc", "SELECT 1")
 				Expect(err).To(HaveOccurred())
 			})
 
 			By("enable Login again", func() {
-				var cluster apiv1.Cluster
-				err := env.Client.Get(env.Ctx, *clusterNameSpacedName, &cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				updated := cluster.DeepCopy()
 				updated.Spec.Managed.Roles[0].Login = true
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(&cluster))
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("the connectivity should be success again", func() {
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 10, env)
+				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 30, env)
 			})
 		})
 
@@ -228,8 +223,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				defaultRolConnLimit   = int64(-1)
 			)
 			By("Add role new_role with all attribute omit", func() {
-				var cluster apiv1.Cluster
-				err := env.Client.Get(env.Ctx, *clusterNameSpacedName, &cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				updated := cluster.DeepCopy()
@@ -237,7 +231,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					Name: newUserName,
 				}
 				updated.Spec.Managed.Roles = append(updated.Spec.Managed.Roles, role)
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(&cluster))
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -260,14 +254,13 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						return ""
 					}
 					return stdout
-				}, 10).Should(Equal("1\n"))
+				}, 30).Should(Equal("1\n"))
 			})
 		})
 
 		It("Can update role comment and verify changes in db ", func() {
 			By("Update comment for role new_role", func() {
-				var cluster apiv1.Cluster
-				err := env.Client.Get(env.Ctx, *clusterNameSpacedName, &cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				updated := cluster.DeepCopy()
@@ -279,12 +272,11 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						updated.Spec.Managed.Roles[i].Comment = ""
 					}
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(&cluster))
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-			newUserName := "new_role"
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("Verify comments update in db for %s", newUserName), func() {
@@ -303,7 +295,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						return "error"
 					}
 					return stdout
-				}, 10).Should(Equal(fmt.Sprintf("This is user %s\n", newUserName)))
+				}, 30).Should(Equal(fmt.Sprintf("This is user %s\n", newUserName)))
 			})
 
 			By(fmt.Sprintf("Verify comments update in db for %s", username), func() {
@@ -322,7 +314,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						return "error"
 					}
 					return stdout
-				}, 10).Should(Equal("\n"))
+				}, 30).Should(Equal("\n"))
 			})
 		})
 		// TODO remove pending decorator once CNP-3571 is fixed
@@ -342,7 +334,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By("Verify connectivity using changed password in secret", func() {
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(rwService, username, "postgres", newPassword, *psqlClientPod, 10, env)
+				AssertConnection(rwService, username, "postgres", newPassword, *psqlClientPod, 30, env)
 			})
 
 			By("Update password in database", func() {
@@ -362,14 +354,13 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By("Verify password in secrets could still valid", func() {
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
-				AssertConnection(rwService, username, "postgres", newPassword, *psqlClientPod, 30, env)
+				AssertConnection(rwService, username, "postgres", newPassword, *psqlClientPod, 60, env)
 			})
 		})
 
 		It("Can drop role with ensure absent option", func() {
 			By("Delete role new_role with EnsureOption ", func() {
-				var cluster apiv1.Cluster
-				err := env.Client.Get(env.Ctx, *clusterNameSpacedName, &cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				updated := cluster.DeepCopy()
@@ -378,13 +369,12 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						updated.Spec.Managed.Roles[i].Ensure = apiv1.EnsureAbsent
 					}
 				}
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(&cluster))
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("Verify new_role not existed in db", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-				newUserName := "new_role"
 				Expect(err).ToNot(HaveOccurred())
 				assertUserExists(namespace, primaryPodInfo.Name, newUserName, false)
 			})

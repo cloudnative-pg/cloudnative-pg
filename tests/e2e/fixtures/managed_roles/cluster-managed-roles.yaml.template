@@ -27,7 +27,7 @@ spec:
         - pg_monitor
         - pg_signal_backend
       passwordSecret:
-        name: cluster-example-myadmin
+        name: cluster-example-dante
 ---
 apiVersion: v1
 data:
