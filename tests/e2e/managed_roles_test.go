@@ -91,17 +91,19 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 		assertUserExists := func(namespace, primaryPod, username string, shouldExists bool) {
 			cmd := `psql -U postgres postgres -tAc '\du'`
-			stdout, _, err := utils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primaryPod,
-				cmd))
-			Expect(err).ToNot(HaveOccurred())
-			if shouldExists {
-				Expect(stdout).To(ContainSubstring(username))
-			} else {
-				Expect(stdout).NotTo(ContainSubstring(username))
-			}
+			Eventually(func(g Gomega) {
+				stdout, _, err := utils.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryPod,
+					cmd))
+				g.Expect(err).ToNot(HaveOccurred())
+				if shouldExists {
+					g.Expect(stdout).To(ContainSubstring(username))
+				} else {
+					g.Expect(stdout).NotTo(ContainSubstring(username))
+				}
+			}, 60).Should(Succeed())
 		}
 
 		It("can create roles specified in the managed roles stanza", func() {
