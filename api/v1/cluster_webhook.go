@@ -1830,7 +1830,18 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 		return nil
 	}
 
+	managedRoles := make(map[string]interface{})
 	for _, role := range r.Spec.Managed.Roles {
+		_, found := managedRoles[role.Name]
+		if found {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "managed", "roles"),
+					role.Name,
+					"Role name is duplicate of another"))
+		}
+		managedRoles[role.Name] = nil
 		if role.ConnectionLimit != -1 && role.ConnectionLimit < 0 {
 			result = append(
 				result,

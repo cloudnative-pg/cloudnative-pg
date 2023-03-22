@@ -2840,4 +2840,26 @@ var _ = Describe("Role management validation", func() {
 		}
 		Expect(cluster.validateManagedRoles()).To(HaveLen(2))
 	})
+
+	It("should produce an error if we define two roles with the same name", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name:            "my_test",
+							ConnectionLimit: -1,
+						},
+						{
+							Name:            "my_test",
+							Superuser:       true,
+							BypassRLS:       true,
+							ConnectionLimit: -1,
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateManagedRoles()).To(HaveLen(1))
+	})
 })
