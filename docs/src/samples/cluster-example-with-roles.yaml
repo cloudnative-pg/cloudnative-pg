@@ -26,7 +26,7 @@ spec:
         - pg_monitor
         - pg_signal_backend
       passwordSecret:
-        name: cluster-example-cnpgadmin
+        name: cluster-example-myadmin
 ---
 apiVersion: v1
 data:
@@ -34,5 +34,5 @@ data:
   password: bXlfYWRtaW4K
 kind: Secret
 metadata:
-  name: cluster-example-cnpgadmin
+  name: cluster-example-myadmin
 type: kubernetes.io/basic-auth
