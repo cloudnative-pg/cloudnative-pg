@@ -21,6 +21,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 type (
@@ -76,7 +77,7 @@ func evaluateNextRoleActions(
 		roleInDBNamed[role.Name] = role
 		inSpec, isInSpec := roleInSpecNamed[role.Name]
 		switch {
-		case ReservedRoles[role.Name]:
+		case postgres.IsRoleReserved(role.Name):
 			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], apiv1.RoleConfiguration{Name: role.Name})
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
 			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
