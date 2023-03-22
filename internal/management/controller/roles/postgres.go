@@ -44,17 +44,20 @@ func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 func (sm PostgresRoleManager) List(
 	ctx context.Context,
 ) ([]DatabaseRole, error) {
+	logger := log.FromContext(ctx).WithName("listRoles")
+
 	rows, err := sm.superUserDB.QueryContext(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
 				pg_catalog.shobj_description(oid, 'pg_authid') as comment, xmin
-		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`)
+		FROM pg_catalog.pg_authid where rolname not like 'pg_%'`)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		_ = rows.Close()
+		err := rows.Close()
+		logger.Info("Ignorable error while querying pg_catalog.pg_authid", "err", err)
 	}()
 
 	var roles []DatabaseRole
