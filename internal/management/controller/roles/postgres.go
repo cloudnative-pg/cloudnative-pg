@@ -145,8 +145,6 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
 
-		contextLog.Info("Creating", "query", query.String())
-
 		if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
 			return fmt.Errorf("could not create comment for role %s: %w ", role.Name, err)
 		}

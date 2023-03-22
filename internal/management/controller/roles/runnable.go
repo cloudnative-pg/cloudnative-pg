@@ -89,7 +89,7 @@ func (sr *RoleSynchronizer) Start(ctx context.Context) error {
 				return
 			case config = <-sr.instance.RoleSynchronizerChan():
 			}
-			contextLog.Info("RoleSynchronizer loop triggered")
+			contextLog.Debug("RoleSynchronizer loop triggered")
 
 			// If the spec contains no roles to manage, stop the timer,
 			// the process will resume through the wakeUp channel if necessary
@@ -120,7 +120,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}()
 
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("reconciling managed roles")
+	contextLog.Debug("reconciling managed roles")
 
 	superUserDB, err := sr.instance.GetSuperUserDB()
 	if err != nil {
@@ -239,17 +239,20 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	rolesByAction rolesByAction,
 ) (map[string]apiv1.PasswordState, error) {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("applying role actions")
+	contextLog.Debug("applying role actions")
 
 	appliedChanges := make(map[string]apiv1.PasswordState)
 	for action, roles := range rolesByAction {
-		contextLog.Info("roles in DB out of sync with Spec, evaluating action",
-			"roles", getRoleNames(roles), "action", action)
-
 		switch action {
 		case roleIgnore, roleIsReconciled, roleIsReserved:
 			contextLog.Debug("no action required", "action", action)
 			continue
+		}
+
+		contextLog.Info("roles in DB out of sync with Spec, evaluating action",
+			"roles", getRoleNames(roles), "action", action)
+
+		switch action {
 		case roleCreate, roleUpdate:
 			for _, role := range roles {
 				pass, version, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)

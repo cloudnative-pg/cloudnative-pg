@@ -60,7 +60,7 @@ func evaluateNextRoleActions(
 	latestSecretResourceVersion map[string]string,
 ) rolesByAction {
 	contextLog := log.FromContext(ctx).WithName("RoleSynchronizer")
-	contextLog.Info("evaluating role actions")
+	contextLog.Debug("evaluating role actions")
 
 	rolesInSpec := config.Roles
 	// set up a map name -> role for the spec roles

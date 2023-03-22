@@ -41,7 +41,7 @@ func Reconcile(
 	}
 
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("Updating managed roles information")
+	contextLogger.Debug("Updating managed roles information")
 
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
@@ -55,7 +55,7 @@ func Reconcile(
 		return reconcile.Result{}, err
 	}
 
-	contextLogger.Info("getting the managed roles status")
+	contextLogger.Debug("getting the managed roles status")
 	roleManager := NewPostgresRoleManager(db)
 	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
