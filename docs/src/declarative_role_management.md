@@ -23,7 +23,7 @@ kind: Cluster
 spec:
   managed:
     roles:
-    - name: cnpg_admin
+    - name: my_admin
       ensure: present
       comment: my database-side comment
       login: true
@@ -47,7 +47,7 @@ The CRD status includes a section for the managed roles' status, as shown below:
     not-managed:
     - app
     pending-reconciliation:
-    - cnpg_admin
+    - my_admin
     reserved:
     - postgres
     - streaming_replica
