@@ -40,7 +40,7 @@ var roleSynchronizer = RoleSynchronizer{
 	},
 }
 
-func (m *mockRoleManager) List(ctx context.Context) ([]DatabaseRole, error) {
+func (m *mockRoleManager) List(_ context.Context) ([]DatabaseRole, error) {
 	m.callHistory = append(m.callHistory, funcCall{"list", ""})
 	re := make([]DatabaseRole, len(m.roles))
 	i := 0
@@ -52,7 +52,7 @@ func (m *mockRoleManager) List(ctx context.Context) ([]DatabaseRole, error) {
 }
 
 func (m *mockRoleManager) Update(
-	ctx context.Context, role DatabaseRole,
+	_ context.Context, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"update", role.Name})
 	_, found := m.roles[role.Name]
@@ -64,7 +64,7 @@ func (m *mockRoleManager) Update(
 }
 
 func (m *mockRoleManager) UpdateComment(
-	ctx context.Context, role DatabaseRole,
+	_ context.Context, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"updateComment", role.Name})
 	_, found := m.roles[role.Name]
