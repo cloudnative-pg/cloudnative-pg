@@ -1603,6 +1603,7 @@ const (
 // ManagedConfiguration represents the portions of PostgreSQL that are managed
 // by the instance manager
 type ManagedConfiguration struct {
+	// Database roles managed by the `Cluster`
 	Roles []RoleConfiguration `json:"roles,omitempty"`
 }
 
@@ -1613,32 +1614,64 @@ type ManagedConfiguration struct {
 // The defaults of the CREATE ROLE command are applied
 // Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 type RoleConfiguration struct {
+	// Name of the role
 	Name    string `json:"name"`
+	// Description of the role
 	Comment string `json:"comment,omitempty"`
 
-	// ensure defaults to "present"
+	// Ensure the role is `present` or `absent` - defaults to "present"
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
+	// Secret containing the password of the role (if present)
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
+	// Whether the role is a `superuser` who can override all access
+	// restrictions within the database - superuser status is dangerous and
+	// should be used only when really needed. You must yourself be a
+	// superuser to create a new superuser. Defaults is `false`.
 	Superuser      bool                  `json:"superuser,omitempty"`
+	// When set to `true`, the role being defined will be allowed to create
+	// new databases. Specifying `false` (default) will deny a role the
+	// ability to create databases.
 	CreateDB       bool                  `json:"createdb,omitempty"`
+	// Whether the role will be permitted to create, alter, drop, comment
+	// on, change the security label for, and grant or revoke membership in
+	// other roles. Default is `false`.
 	CreateRole     bool                  `json:"createrole,omitempty"`
 
-	// inherit defaults to true
+	// Whether a role "inherits" the privileges of roles it is a member of.
+	// Defaults is `true`.
 	// +kubebuilder:default:=true
 	Inherit *bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
 
+	// Whether the role is allowed to log in. A role having the `login`
+	// attribute can be thought of as a user. Roles without this attribute
+	// are useful for managing database privileges, but are not users in
+	// the usual sense of the word. Default is `false`.
 	Login       bool `json:"login,omitempty"`
+	// Whether a role is a replication role. A role must have this
+	// attribute (or be a superuser) in order to be able to connect to the
+	// server in replication mode (physical or logical replication) and in
+	// order to be able to create or drop replication slots. A role having
+	// the `replication` attribute is a very highly privileged role, and
+	// should only be used on roles actually used for replication. Default
+	// is `false`.
 	Replication bool `json:"replication,omitempty"`
+	// Whether a role bypasses every row-level security (RLS) policy.
+	// Default is `false`.
 	BypassRLS   bool `json:"bypassrls,omitempty"` // Row-Level Security
 
-	// connection Limit defaults to `-1`
+	// If the role can log in, this specifies how many concurrent
+	// connections the role can make. `-1` (the default) means no limit.
 	// +kubebuilder:default:=-1
 	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
 
+	// Date and time after which the role's password is no longer valid.
+	// When omitted, the password will never expire (default).
 	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
+	// List of one or more existing roles to which this role will be
+	// immediately added as a new member. Default empty.
 	InRoles    []string     `json:"inRoles,omitempty"`
 }
 
