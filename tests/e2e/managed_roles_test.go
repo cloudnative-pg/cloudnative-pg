@@ -74,7 +74,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
-			secretName = "cluster-example-cnpgadmin"
+			secretName = "cluster-example-myadmin"
 			Expect(err).ToNot(HaveOccurred())
 			clusterNameSpacedName = &types.NamespacedName{
 				Namespace: namespace,
