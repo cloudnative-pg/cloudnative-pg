@@ -26,6 +26,7 @@ import (
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -147,7 +148,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		By("creating the required resources", func() {
 			jobs = generateFakeInitDBJobs(crReconciler.Client, cluster)
 			pods = generateFakeClusterPods(crReconciler.Client, cluster, true)
-			pvcs = generateFakePVC(crReconciler.Client, cluster)
+			pvcs = generateClusterPVC(crReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
 			name, isOwned := IsOwnedByCluster(&pods[0])
 			Expect(isOwned).To(BeTrue())
 			Expect(name).To(Equal(cluster.Name))
