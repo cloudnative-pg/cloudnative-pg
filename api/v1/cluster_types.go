@@ -1618,6 +1618,7 @@ type RoleConfiguration struct {
 
 	// ensure defaults to "present"
 	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`

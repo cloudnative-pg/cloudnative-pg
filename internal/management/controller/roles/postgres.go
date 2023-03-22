@@ -56,8 +56,9 @@ func (sm PostgresRoleManager) List(
 		return nil, err
 	}
 	defer func() {
-		err := rows.Close()
-		logger.Info("Ignorable error while querying pg_catalog.pg_authid", "err", err)
+		if err := rows.Close(); err != nil {
+			logger.Info("Ignorable error while querying pg_catalog.pg_authid", "err", err)
+		}
 	}()
 
 	var roles []DatabaseRole

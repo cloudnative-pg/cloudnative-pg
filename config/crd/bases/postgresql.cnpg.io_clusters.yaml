@@ -2202,6 +2202,9 @@ spec:
                         ensure:
                           default: present
                           description: ensure defaults to "present"
+                          enum:
+                          - present
+                          - absent
                           type: string
                         inRoles:
                           items:
