@@ -2234,6 +2234,7 @@ spec:
                         superuser:
                           type: boolean
                         validUntil:
+                          format: date-time
                           type: string
                       required:
                       - name

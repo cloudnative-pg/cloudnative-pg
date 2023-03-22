@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"reflect"
+	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -38,7 +39,7 @@ type DatabaseRole struct {
 	Replication     bool           `json:"replication,omitempty"`
 	BypassRLS       bool           `json:"bypassrls,omitempty"`       // Row-Level Security
 	ConnectionLimit int64          `json:"connectionLimit,omitempty"` // default is -1
-	ValidUntil      string         `json:"validUntil,omitempty"`
+	ValidUntil      *time.Time     `json:"validUntil,omitempty"`
 	InRoles         []string       `json:"inRoles,omitempty"`
 	password        sql.NullString `json:"-"`
 	transactionID   int64          `json:"-"`
@@ -126,9 +127,12 @@ func (d *databaseRoleBuilder) withRole(role apiv1.RoleConfiguration) *databaseRo
 		Replication:     role.Replication,
 		BypassRLS:       role.BypassRLS,
 		ConnectionLimit: role.ConnectionLimit,
-		ValidUntil:      role.ValidUntil,
 		InRoles:         role.InRoles,
 		password:        d.role.password,
+	}
+
+	if role.ValidUntil != nil {
+		d.role.ValidUntil = &role.ValidUntil.Time
 	}
 	return d
 }

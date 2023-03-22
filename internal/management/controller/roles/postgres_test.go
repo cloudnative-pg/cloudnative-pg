@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/lib/pq"
@@ -62,13 +63,15 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	expectedSelStmt := `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
        			pg_catalog.shobj_description(oid, 'pg_authid') as comment, xmin
-		FROM pg_catalog.pg_authid where rolname not like 'pg_%';`
+		FROM pg_catalog.pg_authid where rolname not like 'pg_%'`
 
 	// Testing List
 	It("List can read the list of roles from the DB", func(ctx context.Context) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 		prm := NewPostgresRoleManager(db)
+
+		testDate := time.Date(2023, 4, 4, 0, 0, 0, 0, time.UTC)
 
 		rows := sqlmock.NewRows([]string{
 			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
@@ -78,7 +81,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
 				nil, false, []byte("This is postgres user"), 11).
 			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
-				"2023-04-04", false, []byte("This is streaming_replica user"), 22)
+				testDate, false, []byte("This is streaming_replica user"), 22)
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := prm.List(ctx)
@@ -102,7 +105,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Replication:     false,
 			BypassRLS:       false,
 			ConnectionLimit: -1,
-			ValidUntil:      "",
+			ValidUntil:      nil,
 			Comment:         "This is postgres user",
 			password:        password1,
 			transactionID:   11,
@@ -116,7 +119,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Replication:     true,
 			BypassRLS:       false,
 			ConnectionLimit: 10,
-			ValidUntil:      "2023-04-04",
+			ValidUntil:      &testDate,
 			Comment:         "This is streaming_replica user",
 			password:        password2,
 			transactionID:   22,

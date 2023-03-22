@@ -1638,8 +1638,8 @@ type RoleConfiguration struct {
 	// +kubebuilder:default:=-1
 	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
 
-	ValidUntil string   `json:"validUntil,omitempty"`
-	InRoles    []string `json:"inRoles,omitempty"`
+	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
+	InRoles    []string     `json:"inRoles,omitempty"`
 }
 
 // GetRoleSecretsName gets the name of the secret which is used to store the role's password

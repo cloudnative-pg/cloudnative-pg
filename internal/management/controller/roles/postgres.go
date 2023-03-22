@@ -63,7 +63,7 @@ func (sm PostgresRoleManager) List(
 
 	var roles []DatabaseRole
 	for rows.Next() {
-		var validuntil sql.NullString
+		var validuntil sql.NullTime
 		var comment sql.NullString
 		var role DatabaseRole
 		err := rows.Scan(
@@ -85,7 +85,7 @@ func (sm PostgresRoleManager) List(
 			return nil, err
 		}
 		if validuntil.Valid {
-			role.ValidUntil = validuntil.String
+			role.ValidUntil = &validuntil.Time
 		}
 		if comment.Valid {
 			role.Comment = comment.String
@@ -264,7 +264,8 @@ func appendPasswordOption(role DatabaseRole,
 		query.WriteString(fmt.Sprintf("PASSWORD %s", pq.QuoteLiteral(role.password.String)))
 	}
 
-	if role.password.Valid && role.ValidUntil != "" {
-		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(role.ValidUntil)))
+	if role.password.Valid && role.ValidUntil != nil {
+		ts := string(pq.FormatTimestamp(*role.ValidUntil))
+		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(ts)))
 	}
 }
