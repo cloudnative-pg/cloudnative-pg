@@ -18,8 +18,10 @@ package postgres
 
 import "strings"
 
-const operatorReservedRolesPrefix = "cnpg_"
-const postgresqlReservedRolesPrefix = "pg_"
+const (
+	operatorReservedRolesPrefix   = "cnpg_"
+	postgresqlReservedRolesPrefix = "pg_"
+)
 
 // IsRoleReserved checks if a role is reserved for PostgreSQL
 // or the operator

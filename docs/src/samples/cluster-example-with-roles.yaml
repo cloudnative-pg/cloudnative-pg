@@ -21,7 +21,7 @@ spec:
       replication: false
       bypassrls: false
       connectionLimit: 4
-      validUntil: "2023-04-12"
+      validUntil: "2023-04-12T15:04:05Z"
       inRoles:
         - pg_monitor
         - pg_signal_backend

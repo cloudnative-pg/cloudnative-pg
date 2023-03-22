@@ -1621,6 +1621,10 @@ func (in *RoleConfiguration) DeepCopyInto(out *RoleConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ValidUntil != nil {
+		in, out := &in.ValidUntil, &out.ValidUntil
+		*out = (*in).DeepCopy()
+	}
 	if in.InRoles != nil {
 		in, out := &in.InRoles, &out.InRoles
 		*out = make([]string, len(*in))

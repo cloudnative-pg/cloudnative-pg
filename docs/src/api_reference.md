@@ -870,22 +870,22 @@ RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role wit
 
 The defaults of the CREATE ROLE command are applied Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 
-Name            | Description                       | Type                                          
---------------- | --------------------------------- | ----------------------------------------------
-`name           ` |                                   - *mandatory*  | string                                        
-`comment        ` |                                   | string                                        
-`ensure         ` | ensure defaults to "present"      | EnsureOption                                  
-`passwordSecret ` |                                   | [*LocalObjectReference](#LocalObjectReference)
-`superuser      ` |                                   | bool                                          
-`createdb       ` |                                   | bool                                          
-`createrole     ` |                                   | bool                                          
-`inherit        ` | inherit defaults to true          | *bool                                         
-`login          ` |                                   | bool                                          
-`replication    ` |                                   | bool                                          
-`bypassrls      ` |                                   | bool                                          
-`connectionLimit` | connection Limit defaults to `-1` | int64                                         
-`validUntil     ` |                                   | string                                        
-`inRoles        ` |                                   | []string                                      
+Name            | Description                       | Type                                                                                             
+--------------- | --------------------------------- | -------------------------------------------------------------------------------------------------
+`name           ` |                                   - *mandatory*  | string                                                                                           
+`comment        ` |                                   | string                                                                                           
+`ensure         ` | ensure defaults to "present"      | EnsureOption                                                                                     
+`passwordSecret ` |                                   | [*LocalObjectReference](#LocalObjectReference)                                                   
+`superuser      ` |                                   | bool                                                                                             
+`createdb       ` |                                   | bool                                                                                             
+`createrole     ` |                                   | bool                                                                                             
+`inherit        ` | inherit defaults to true          | *bool                                                                                            
+`login          ` |                                   | bool                                                                                             
+`replication    ` |                                   | bool                                                                                             
+`bypassrls      ` |                                   | bool                                                                                             
+`connectionLimit` | connection Limit defaults to `-1` | int64                                                                                            
+`validUntil     ` |                                   | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#time-v1-meta)
+`inRoles        ` |                                   | []string                                                                                         
 
 <a id='RollingUpdateStatus'></a>
 
