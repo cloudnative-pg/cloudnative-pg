@@ -101,6 +101,12 @@ jobs:
           git config user.name "${{ env.AUTHOR_NAME }}"
           git fetch
           git cherry-pick -x --mainline 1 ${{ env.COMMIT }}
+          make fmt vet generate apidoc wordlist-ordered
+          if ! git diff --exit-code --quiet
+          then
+            echo "!!! Generated files need manually handling"
+            exit 1
+          fi
           git push
 
   create-tickets:
