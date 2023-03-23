@@ -76,7 +76,7 @@ func (m *mockRoleManager) UpdateComment(
 }
 
 func (m *mockRoleManager) Create(
-	ctx context.Context, role DatabaseRole,
+	_ context.Context, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"create", role.Name})
 	_, found := m.roles[role.Name]
@@ -88,7 +88,7 @@ func (m *mockRoleManager) Create(
 }
 
 func (m *mockRoleManager) Delete(
-	ctx context.Context, role DatabaseRole,
+	_ context.Context, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"delete", role.Name})
 	_, found := m.roles[role.Name]
@@ -99,7 +99,7 @@ func (m *mockRoleManager) Delete(
 	return nil
 }
 
-func (m *mockRoleManager) GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error) {
+func (m *mockRoleManager) GetLastTransactionID(_ context.Context, role DatabaseRole) (int64, error) {
 	return 0, nil
 }
 
