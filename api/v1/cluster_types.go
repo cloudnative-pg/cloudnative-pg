@@ -1615,7 +1615,7 @@ type ManagedConfiguration struct {
 // Reference: https://www.postgresql.org/docs/current/sql-createrole.html
 type RoleConfiguration struct {
 	// Name of the role
-	Name    string `json:"name"`
+	Name string `json:"name"`
 	// Description of the role
 	Comment string `json:"comment,omitempty"`
 
@@ -1630,15 +1630,15 @@ type RoleConfiguration struct {
 	// restrictions within the database - superuser status is dangerous and
 	// should be used only when really needed. You must yourself be a
 	// superuser to create a new superuser. Defaults is `false`.
-	Superuser      bool                  `json:"superuser,omitempty"`
+	Superuser bool `json:"superuser,omitempty"`
 	// When set to `true`, the role being defined will be allowed to create
 	// new databases. Specifying `false` (default) will deny a role the
 	// ability to create databases.
-	CreateDB       bool                  `json:"createdb,omitempty"`
+	CreateDB bool `json:"createdb,omitempty"`
 	// Whether the role will be permitted to create, alter, drop, comment
 	// on, change the security label for, and grant or revoke membership in
 	// other roles. Default is `false`.
-	CreateRole     bool                  `json:"createrole,omitempty"`
+	CreateRole bool `json:"createrole,omitempty"`
 
 	// Whether a role "inherits" the privileges of roles it is a member of.
 	// Defaults is `true`.
@@ -1649,7 +1649,7 @@ type RoleConfiguration struct {
 	// attribute can be thought of as a user. Roles without this attribute
 	// are useful for managing database privileges, but are not users in
 	// the usual sense of the word. Default is `false`.
-	Login       bool `json:"login,omitempty"`
+	Login bool `json:"login,omitempty"`
 	// Whether a role is a replication role. A role must have this
 	// attribute (or be a superuser) in order to be able to connect to the
 	// server in replication mode (physical or logical replication) and in
@@ -1660,7 +1660,7 @@ type RoleConfiguration struct {
 	Replication bool `json:"replication,omitempty"`
 	// Whether a role bypasses every row-level security (RLS) policy.
 	// Default is `false`.
-	BypassRLS   bool `json:"bypassrls,omitempty"` // Row-Level Security
+	BypassRLS bool `json:"bypassrls,omitempty"` // Row-Level Security
 
 	// If the role can log in, this specifies how many concurrent
 	// connections the role can make. `-1` (the default) means no limit.
@@ -1672,7 +1672,7 @@ type RoleConfiguration struct {
 	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 	// List of one or more existing roles to which this role will be
 	// immediately added as a new member. Default empty.
-	InRoles    []string     `json:"inRoles,omitempty"`
+	InRoles []string `json:"inRoles,omitempty"`
 }
 
 // GetRoleSecretsName gets the name of the secret which is used to store the role's password
