@@ -81,21 +81,39 @@ activities:
 
 ## Updating release notes on the branches
 
-Once you have done with the items in the "Preparing the release" section, you
-should add the release notes to each of the release branches.
+**IMPORTANT:** If you're creating a new minor release, the "backporting" of
+release notes described in this section should be skipped *for the new minor*.
+Since you already  created the release notes for the new minor in `main`, and
+you will create the  new release branch off of `main`, the release notes are
+done for free.
 
-For existing release branches, get the content for the release notes from
-`main`, add to the relevant documents, commit and push directly.
-Be careful not to "show the future" in this process.
+Once you are done with the items in the "Preparing the release" section, and you
+have committed the release notes on `main`, you
+should add the release notes to each of the release branches.
+The easiest way is to use cherry-picking, but first note the following caveat:
+
+Be careful not to "show the future" in the release branches.
 Say you're releasing versions 1.18.0, 1.17.2, and 1.16.4. In the `release-1.17`
 release branch, you should update the `v1.16.md` and `v1.17.md` documents, but
 **NOT** create `v1.18.md`. In the `release-1.16` branch, you should update the
 `v1.16.md` document, but **NOT** the `v1.17.md` document, nor `v1.18.md`.
 
-**IMPORTANT**. If you're creating a new minor release, the "backporting" of
-release notes described in this section should be skipped. Since you already
-created the release notes for the new minor in `main` and will create the
-new release branch off of `main`, the release notes are done for free.
+So, say you're in branch `release-1.18`. You can `git cherry-pick` the commit
+from `main` that has the release notes.
+Take care to:
+
+1. Update the commit title so you don't show the future. I.e drop more recent
+  releases from the `doc: release notes for X.Y.Z, ...`
+2. `git rm` the files for the more recent releases. You should already have them
+  as a conflict when you do the cherry pick.
+3. Continue with the cherry pick once conflicts are solved. Commit and push.
+
+**IMPORTANT:** When moving a release into EOL, we are moving its release
+notes file from `docs/src/release_notes/` into `docs/src/release_notes/old/`.
+This should NOT be done in the release branch that we are EOL'ing. \
+E.g. when we are EOL'ing release 1.17, we should move the file `v1.17.md` into
+the `old/` subdirectory in release branches `release-1.18` and `release-1.19`,
+but in `release-1.17`, the file should stay in `release_notes/`.
 
 ## If creating a new minor release: create a new release branch from main
 
