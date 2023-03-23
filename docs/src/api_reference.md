@@ -52,9 +52,11 @@ Below you will find a description of the defined resources:
 - [LDAPBindSearchAuth](#LDAPBindSearchAuth)
 - [LDAPConfig](#LDAPConfig)
 - [LocalObjectReference](#LocalObjectReference)
+- [ManagedConfiguration](#ManagedConfiguration)
 - [Metadata](#Metadata)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
+- [PasswordState](#PasswordState)
 - [PgBouncerIntegrationStatus](#PgBouncerIntegrationStatus)
 - [PgBouncerSecrets](#PgBouncerSecrets)
 - [PgBouncerSpec](#PgBouncerSpec)
@@ -71,6 +73,7 @@ Below you will find a description of the defined resources:
 - [ReplicaClusterConfiguration](#ReplicaClusterConfiguration)
 - [ReplicationSlotsConfiguration](#ReplicationSlotsConfiguration)
 - [ReplicationSlotsHAConfiguration](#ReplicationSlotsHAConfiguration)
+- [RoleConfiguration](#RoleConfiguration)
 - [RollingUpdateStatus](#RollingUpdateStatus)
 - [S3Credentials](#S3Credentials)
 - [ScheduledBackup](#ScheduledBackup)
@@ -388,6 +391,7 @@ Name                    | Description                                           
 `projectedVolumeTemplate` | Template to be used to define projected volumes, projected volumes will be mounted under `/projected` base folder                                                                                                                                                                                                                                                                                                       | *corev1.ProjectedVolumeSource                                                                                                   
 `env                    ` | Env follows the Env format to pass environment variables to the pods created in the cluster                                                                                                                                                                                                                                                                                                                             | []corev1.EnvVar                                                                                                                 
 `envFrom                ` | EnvFrom follows the EnvFrom format to pass environment variables sources to the pods to be used by Env                                                                                                                                                                                                                                                                                                                  | []corev1.EnvFromSource                                                                                                          
+`managed                ` | The configuration that is used by the portions of PostgreSQL that are managed by the instance manager                                                                                                                                                                                                                                                                                                                   | [*ManagedConfiguration](#ManagedConfiguration)                                                                                  
 
 <a id='ClusterStatus'></a>
 
@@ -401,6 +405,8 @@ Name                                | Description                               
 `readyInstances                     ` | The total number of ready instances in the cluster. It is equal to the number of ready instance pods.                                                                              | int                                                        
 `instancesStatus                    ` | InstancesStatus indicates in which status the instances are                                                                                                                        | map[utils.PodStatus][]string                               
 `instancesReportedState             ` | The reported state of the instances during the last reconciliation loop                                                                                                            | [map[PodName]InstanceReportedState](#InstanceReportedState)
+`roleStatus                         ` | RoleStatus gives the list of roles in each state                                                                                                                                   | map[RoleStatus][]string                                    
+`rolePasswordStatus                 ` | RolePasswordStatus gives the last transaction id and hash for each managed role                                                                                                    | [map[string]PasswordState](#PasswordState)                 
 `timelineID                         ` | The timeline of the Postgres cluster                                                                                                                                               | int                                                        
 `topology                           ` | Instances topology.                                                                                                                                                                | [Topology](#Topology)                                      
 `latestGeneratedNode                ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                        
@@ -601,6 +607,16 @@ Name | Description           | Type
 ---- | --------------------- | ------
 `name` | Name of the referent. - *mandatory*  | string
 
+<a id='ManagedConfiguration'></a>
+
+## ManagedConfiguration
+
+ManagedConfiguration represents the portions of PostgreSQL that are managed by the instance manager
+
+Name  | Description                             | Type                                     
+----- | --------------------------------------- | -----------------------------------------
+`roles` | Database roles managed by the `Cluster` | [[]RoleConfiguration](#RoleConfiguration)
+
 <a id='Metadata'></a>
 
 ## Metadata
@@ -637,6 +653,17 @@ Name       | Description                                                        
 ---------- | ---------------------------------------------------------------------------------------------------------------- | -----
 `inProgress` | Is there a node maintenance activity in progress?                                                                - *mandatory*  | bool 
 `reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere - when `instances` >1) - *mandatory*  | *bool
+
+<a id='PasswordState'></a>
+
+## PasswordState
+
+PasswordState represents the state of the password of a managed RoleConfiguration
+
+Name            | Description                                                         | Type  
+--------------- | ------------------------------------------------------------------- | ------
+`transactionID  ` | the last transaction ID to affect the role definition in PostgreSQL | int64 
+`resourceVersion` | the resource version of the password secret                         | string
 
 <a id='PgBouncerIntegrationStatus'></a>
 
@@ -835,6 +862,31 @@ Name       | Description                                                        
 `enabled   ` | If enabled, the operator will automatically manage replication slots on the primary instance and use them in streaming replication connections with all the standby instances that are part of the HA cluster. If disabled (default), the operator will not take advantage of replication slots in streaming connections with the replicas. This feature also controls replication slots in replica cluster, from the designated primary to its cascading replicas. This can only be set at creation time. - *mandatory*  | bool  
 `slotPrefix` | Prefix for replication slots managed by the operator for HA. It may only contain lower case letters, numbers, and the underscore character. This can only be set at creation time. By default set to `_cnpg_`.                                                                                                                                                                                                                                                                                             | string
 
+<a id='RoleConfiguration'></a>
+
+## RoleConfiguration
+
+RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role with the additional field Ensure specifying whether to ensure the presence or absence of the role in the database
+
+The defaults of the CREATE ROLE command are applied Reference: https://www.postgresql.org/docs/current/sql-createrole.html
+
+Name            | Description                                                                                                                                                                                                                                                                                                                                                                                                               | Type                                                                                             
+--------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------
+`name           ` | Name of the role                                                                                                                                                                                                                                                                                                                                                                                                          - *mandatory*  | string                                                                                           
+`comment        ` | Description of the role                                                                                                                                                                                                                                                                                                                                                                                                   | string                                                                                           
+`ensure         ` | Ensure the role is `present` or `absent` - defaults to "present"                                                                                                                                                                                                                                                                                                                                                          | EnsureOption                                                                                     
+`passwordSecret ` | Secret containing the password of the role (if present)                                                                                                                                                                                                                                                                                                                                                                   | [*LocalObjectReference](#LocalObjectReference)                                                   
+`superuser      ` | Whether the role is a `superuser` who can override all access restrictions within the database - superuser status is dangerous and should be used only when really needed. You must yourself be a superuser to create a new superuser. Defaults is `false`.                                                                                                                                                               | bool                                                                                             
+`createdb       ` | When set to `true`, the role being defined will be allowed to create new databases. Specifying `false` (default) will deny a role the ability to create databases.                                                                                                                                                                                                                                                        | bool                                                                                             
+`createrole     ` | Whether the role will be permitted to create, alter, drop, comment on, change the security label for, and grant or revoke membership in other roles. Default is `false`.                                                                                                                                                                                                                                                  | bool                                                                                             
+`inherit        ` | Whether a role "inherits" the privileges of roles it is a member of. Defaults is `true`.                                                                                                                                                                                                                                                                                                                                  | *bool                                                                                            
+`login          ` | Whether the role is allowed to log in. A role having the `login` attribute can be thought of as a user. Roles without this attribute are useful for managing database privileges, but are not users in the usual sense of the word. Default is `false`.                                                                                                                                                                   | bool                                                                                             
+`replication    ` | Whether a role is a replication role. A role must have this attribute (or be a superuser) in order to be able to connect to the server in replication mode (physical or logical replication) and in order to be able to create or drop replication slots. A role having the `replication` attribute is a very highly privileged role, and should only be used on roles actually used for replication. Default is `false`. | bool                                                                                             
+`bypassrls      ` | Whether a role bypasses every row-level security (RLS) policy. Default is `false`.                                                                                                                                                                                                                                                                                                                                        | bool                                                                                             
+`connectionLimit` | If the role can log in, this specifies how many concurrent connections the role can make. `-1` (the default) means no limit.                                                                                                                                                                                                                                                                                              | int64                                                                                            
+`validUntil     ` | Date and time after which the role's password is no longer valid. When omitted, the password will never expire (default).                                                                                                                                                                                                                                                                                                 | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#time-v1-meta)
+`inRoles        ` | List of one or more existing roles to which this role will be immediately added as a new member. Default empty.                                                                                                                                                                                                                                                                                                           | []string                                                                                         
+
 <a id='RollingUpdateStatus'></a>
 
 ## RollingUpdateStatus
@@ -946,6 +998,7 @@ Name                     | Description                                          
 `superuserSecretVersion  ` | The resource version of the "postgres" user secret                                                                          | string           
 `replicationSecretVersion` | The resource version of the "streaming_replica" user secret                                                                 | string           
 `applicationSecretVersion` | The resource version of the "app" user secret                                                                               | string           
+`managedRoleSecretVersion` | The resource versions of the managed roles secrets                                                                          | map[string]string
 `caSecretVersion         ` | Unused. Retained for compatibility with old versions.                                                                       | string           
 `clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version                                                        | string           
 `serverCaSecretVersion   ` | The resource version of the PostgreSQL server-side CA secret version                                                        | string           

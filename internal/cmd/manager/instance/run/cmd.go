@@ -36,6 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
@@ -202,6 +203,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	slotReplicator := runner.NewReplicator(instance)
 	if err = mgr.Add(slotReplicator); err != nil {
 		setupLog.Error(err, "unable to create slot replicator")
+		return err
+	}
+
+	roleSynchronizer := roles.NewRoleSynchronizer(instance, reconciler.GetClient())
+	if err = mgr.Add(roleSynchronizer); err != nil {
+		setupLog.Error(err, "unable to create role synchronizer")
 		return err
 	}
 
