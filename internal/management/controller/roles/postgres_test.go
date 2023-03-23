@@ -62,8 +62,12 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)
 	expectedSelStmt := `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
-       			pg_catalog.shobj_description(oid, 'pg_authid') as comment, xmin
-		FROM pg_catalog.pg_authid where rolname not like 'pg_%'`
+				pg_catalog.shobj_description(oid, 'pg_authid') as comment, auth.xmin, 
+				string_agg(pg_get_userbyid(members.roleid),',') as inroles
+		FROM pg_catalog.pg_authid as auth LEFT JOIN  pg_auth_members as members 
+		ON  auth.oid = members.member
+		WHERE rolname not like 'pg_%'
+		GROUP BY auth.oid`
 
 	// Testing List
 	It("List can read the list of roles from the DB", func(ctx context.Context) {
@@ -76,12 +80,12 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		rows := sqlmock.NewRows([]string{
 			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
 			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls", "comment",
-			"xmin",
+			"xmin", "inroles",
 		}).
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
-				nil, false, []byte("This is postgres user"), 11).
+				nil, false, []byte("This is postgres user"), 11, []byte("")).
 			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
-				testDate, false, []byte("This is streaming_replica user"), 22)
+				testDate, false, []byte("This is streaming_replica user"), 22, []byte("role1 role2"))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := prm.List(ctx)
@@ -123,6 +127,10 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Comment:         "This is streaming_replica user",
 			password:        password2,
 			transactionID:   22,
+			InRoles: []string{
+				"role1",
+				"role2",
+			},
 		}))
 	})
 	It("List returns error if there is a problem with the DB", func(ctx context.Context) {

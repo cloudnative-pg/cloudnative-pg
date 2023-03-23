@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"reflect"
+	"sort"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -58,6 +59,20 @@ func (d *DatabaseRole) isCommentEqual(inSpec apiv1.RoleConfiguration) bool {
 	return d.Comment == inSpec.Comment
 }
 
+func (d *DatabaseRole) isInRoleEqual(inSpec apiv1.RoleConfiguration) bool {
+	if len(d.InRoles) == 0 && len(inSpec.InRoles) == 0 {
+		return true
+	}
+
+	if len(d.InRoles) != len(inSpec.InRoles) {
+		return false
+	}
+
+	sort.Strings(d.InRoles)
+	sort.Strings(inSpec.InRoles)
+	return reflect.DeepEqual(d.InRoles, inSpec.InRoles)
+}
+
 // isEquivalent checks a subset of the attributes of roles in DB and Spec
 // leaving passwords and role membership (InRoles) to be done separately
 //
@@ -77,7 +92,6 @@ func (d *DatabaseRole) isEquivalent(inSpec apiv1.RoleConfiguration) bool {
 		ConnectionLimit int64
 		ValidUntil      string
 	}
-
 	role := reducedEntries{
 		Name:            d.Name,
 		Superuser:       d.Superuser,
@@ -127,8 +141,8 @@ func (d *databaseRoleBuilder) withRole(role apiv1.RoleConfiguration) *databaseRo
 		Replication:     role.Replication,
 		BypassRLS:       role.BypassRLS,
 		ConnectionLimit: role.ConnectionLimit,
-		InRoles:         role.InRoles,
 		password:        d.role.password,
+		InRoles:         role.InRoles,
 	}
 
 	if role.ValidUntil != nil {
@@ -162,4 +176,8 @@ type RoleManager interface {
 	GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error)
 	// UpdateComment Update the comment of role in the database
 	UpdateComment(ctx context.Context, role DatabaseRole) error
+	// UpdateMembership Update the In Role membership of role in the database
+	UpdateMembership(ctx context.Context, role DatabaseRole, rolesToGrant []string, rolesToRevoke []string) error
+	// GetParentRoles return the roles current role belongs to
+	GetParentRoles(ctx context.Context, role DatabaseRole) ([]string, error)
 }

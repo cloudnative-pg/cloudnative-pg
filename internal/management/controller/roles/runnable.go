@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -37,13 +38,14 @@ type roleAction string
 
 // possible role actions
 const (
-	roleIsReconciled roleAction = "RECONCILED"
-	roleCreate       roleAction = "CREATE"
-	roleDelete       roleAction = "DELETE"
-	roleUpdate       roleAction = "UPDATE"
-	roleIgnore       roleAction = "IGNORE"
-	roleIsReserved   roleAction = "RESERVED"
-	roleSetComment   roleAction = "SET_COMMENT"
+	roleIsReconciled  roleAction = "RECONCILED"
+	roleCreate        roleAction = "CREATE"
+	roleDelete        roleAction = "DELETE"
+	roleUpdate        roleAction = "UPDATE"
+	roleIgnore        roleAction = "IGNORE"
+	roleIsReserved    roleAction = "RESERVED"
+	roleSetComment    roleAction = "SET_COMMENT"
+	roleUpdateMembers roleAction = "UPDATE_MEMBERS"
 )
 
 // A RoleSynchronizer is a Kubernetes manager.Runnable
@@ -192,6 +194,29 @@ func (sr *RoleSynchronizer) updateRoleCommentFromSpec(
 	return nil
 }
 
+func (sr *RoleSynchronizer) updateInRoleFromSpec(
+	ctx context.Context,
+	roleManager RoleManager,
+	roles []apiv1.RoleConfiguration,
+) error {
+	for _, role := range roles {
+		inRoleInDB, err := roleManager.GetParentRoles(
+			ctx,
+			newDatabaseRoleBuilder().withRole(role).build(),
+		)
+		if err != nil {
+			return fmt.Errorf("while update membership for role %s: %w", role.Name, err)
+		}
+		rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
+		rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
+		err = roleManager.UpdateMembership(ctx, newDatabaseRoleBuilder().withRole(role).build(), rolesToGrant, rolesToRevoke)
+		if err != nil {
+			return fmt.Errorf("while update membership for role %s: %w", role.Name, err)
+		}
+	}
+	return nil
+}
+
 // synchronizeRoles aligns roles in the database to the spec
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
@@ -259,7 +284,6 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				if err != nil {
 					return nil, err
 				}
-
 				databaseRole := newDatabaseRoleBuilder().withRole(role).withPassword(pass).build()
 				switch action {
 				case roleCreate:
@@ -290,6 +314,10 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			}
 		case roleSetComment:
 			if err := sr.updateRoleCommentFromSpec(ctx, roleManager, roles); err != nil {
+				return nil, err
+			}
+		case roleUpdateMembers:
+			if err := sr.updateInRoleFromSpec(ctx, roleManager, roles); err != nil {
 				return nil, err
 			}
 		}
@@ -350,4 +378,36 @@ func getPasswordSecretResourceVersion(
 		re[role.Name] = version
 	}
 	return re, nil
+}
+
+func getRolesToGrant(inRoleInDB, inRoleInSpec []string) []string {
+	if len(inRoleInSpec) == 0 {
+		return nil
+	}
+	if len(inRoleInDB) == 0 {
+		return inRoleInSpec
+	}
+	var roleToGrant []string
+	for _, v := range inRoleInSpec {
+		if !slices.Contains(inRoleInDB, v) {
+			roleToGrant = append(roleToGrant, v)
+		}
+	}
+	return roleToGrant
+}
+
+func getRolesToRevoke(inRoleInDB, inRoleInSpec []string) []string {
+	if len(inRoleInDB) == 0 {
+		return nil
+	}
+	if len(inRoleInSpec) == 0 {
+		return inRoleInDB
+	}
+	var roleToRevoke []string
+	for _, v := range inRoleInDB {
+		if !slices.Contains(inRoleInSpec, v) {
+			roleToRevoke = append(roleToRevoke, v)
+		}
+	}
+	return roleToRevoke
 }

@@ -50,8 +50,12 @@ func (sm PostgresRoleManager) List(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
-				pg_catalog.shobj_description(oid, 'pg_authid') as comment, xmin
-		FROM pg_catalog.pg_authid where rolname not like 'pg_%'`)
+				pg_catalog.shobj_description(oid, 'pg_authid') as comment, auth.xmin, 
+				string_agg(pg_get_userbyid(members.roleid),',') as inroles
+		FROM pg_catalog.pg_authid as auth LEFT JOIN  pg_auth_members as members 
+		ON  auth.oid = members.member
+		WHERE rolname not like 'pg_%'
+		GROUP BY auth.oid`)
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +70,7 @@ func (sm PostgresRoleManager) List(
 		var validuntil sql.NullTime
 		var comment sql.NullString
 		var role DatabaseRole
+		var inroles sql.NullString
 		err := rows.Scan(
 			&role.Name,
 			&role.Superuser,
@@ -80,6 +85,7 @@ func (sm PostgresRoleManager) List(
 			&role.BypassRLS,
 			&comment,
 			&role.transactionID,
+			&inroles,
 		)
 		if err != nil {
 			return nil, err
@@ -91,6 +97,9 @@ func (sm PostgresRoleManager) List(
 			role.Comment = comment.String
 		}
 
+		if inroles.Valid && len(inroles.String) > 0 {
+			role.InRoles = strings.Split(inroles.String, ",")
+		}
 		roles = append(roles, role)
 	}
 
@@ -130,6 +139,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	var query strings.Builder
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
+	appendInRoleOptions(role, &query)
 	contextLog.Debug("Creating", "query", query.String())
 	appendPasswordOption(role, &query)
 
@@ -205,6 +215,87 @@ func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRo
 	}
 
 	return nil
+}
+
+// UpdateMembership of the role
+func (sm PostgresRoleManager) UpdateMembership(
+	ctx context.Context,
+	role DatabaseRole,
+	rolesToGrant []string,
+	rolesToRevoke []string,
+) error {
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
+	contextLog.Trace("Invoked", "role", role)
+	if len(rolesToRevoke)+len(rolesToGrant) == 0 {
+		log.Debug("No membership change query to execute for role")
+		return nil
+	}
+	queries := make([]string, 0, len(rolesToRevoke)+len(rolesToGrant))
+	for _, r := range rolesToGrant {
+		queries = append(queries, fmt.Sprintf(`GRANT %s TO %s`,
+			pgx.Identifier{r}.Sanitize(),
+			pgx.Identifier{role.Name}.Sanitize()),
+		)
+	}
+	for _, r := range rolesToRevoke {
+		queries = append(queries, fmt.Sprintf(`REVOKE %s FROM %s`,
+			pgx.Identifier{r}.Sanitize(),
+			pgx.Identifier{role.Name}.Sanitize()),
+		)
+	}
+
+	tx, err := sm.superUserDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil && rollbackErr != sql.ErrTxDone {
+			log.Error(rollbackErr, "rolling back transaction")
+		}
+	}()
+
+	for _, sqlQuery := range queries {
+		log.Debug("Executing query", "sqlQuery", sqlQuery)
+		if _, err := sm.superUserDB.ExecContext(ctx, sqlQuery); err != nil {
+			log.Error(err, "executing query", "sqlQuery", sqlQuery, "err", err)
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// GetParentRoles get the in roles of this role
+func (sm PostgresRoleManager) GetParentRoles(
+	ctx context.Context,
+	role DatabaseRole,
+) ([]string, error) {
+	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
+	contextLog.Trace("Invoked", "role", role)
+	query := "SELECT string_agg(pg_get_userbyid(members.roleid),',') as inroles " +
+		"FROM pg_catalog.pg_authid as auth " +
+		"LEFT JOIN pg_catalog.pg_auth_members as members " +
+		"ON auth.oid = members.member " +
+		"WHERE rolname = $1 GROUP BY auth.oid"
+	contextLog.Debug("get parent role", "query", query)
+	var parentRoles sql.NullString
+	err := sm.superUserDB.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("while getting parent roles. Role %s not found", role.Name)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("while getting parent roles for %s: %w", role.Name, err)
+	}
+	if parentRoles.Valid && len(parentRoles.String) > 0 {
+		return strings.Split(parentRoles.String, ","), nil
+	}
+	return nil, nil
+}
+
+func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
+	if len(role.InRoles) > 0 {
+		query.WriteString(fmt.Sprintf("IN ROLE %s ", strings.Join(role.InRoles, ",")))
+	}
 }
 
 func appendRoleOptions(role DatabaseRole, query *strings.Builder) {

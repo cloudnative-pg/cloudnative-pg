@@ -32,13 +32,14 @@ type (
 // convertToRolesByStatus gets the status of every role in the Spec and/or in the DB
 func (r rolesByAction) convertToRolesByStatus() rolesByStatus {
 	statusByAction := map[roleAction]apiv1.RoleStatus{
-		roleCreate:       apiv1.RoleStatusPendingReconciliation,
-		roleDelete:       apiv1.RoleStatusPendingReconciliation,
-		roleUpdate:       apiv1.RoleStatusPendingReconciliation,
-		roleSetComment:   apiv1.RoleStatusPendingReconciliation,
-		roleIsReconciled: apiv1.RoleStatusReconciled,
-		roleIgnore:       apiv1.RoleStatusNotManaged,
-		roleIsReserved:   apiv1.RoleStatusReserved,
+		roleCreate:        apiv1.RoleStatusPendingReconciliation,
+		roleDelete:        apiv1.RoleStatusPendingReconciliation,
+		roleUpdate:        apiv1.RoleStatusPendingReconciliation,
+		roleSetComment:    apiv1.RoleStatusPendingReconciliation,
+		roleUpdateMembers: apiv1.RoleStatusPendingReconciliation,
+		roleIsReconciled:  apiv1.RoleStatusReconciled,
+		roleIgnore:        apiv1.RoleStatusNotManaged,
+		roleIsReserved:    apiv1.RoleStatusReserved,
 	}
 
 	rolesByStatus := make(rolesByStatus)
@@ -87,6 +88,8 @@ func evaluateNextRoleActions(
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
 		case isInSpec && !role.isCommentEqual(inSpec):
 			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], inSpec)
+		case isInSpec && !role.isInRoleEqual(inSpec):
+			rolesByAction[roleUpdateMembers] = append(rolesByAction[roleUpdateMembers], inSpec)
 		case !isInSpec:
 			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})
 		default:
