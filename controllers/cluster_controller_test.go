@@ -22,9 +22,13 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -71,7 +75,7 @@ var _ = Describe("Updating target primary", func() {
 		By("creating the cluster resources")
 		jobs := generateFakeInitDBJobs(clusterReconciler.Client, cluster)
 		instances := generateFakeClusterPods(clusterReconciler.Client, cluster, true)
-		pvc := generateFakePVC(clusterReconciler.Client, cluster)
+		pvc := generateClusterPVC(clusterReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
 
 		managedResources := &managedResources{
 			nodes:     nil,
@@ -132,7 +136,7 @@ var _ = Describe("Updating target primary", func() {
 		By("creating the cluster resources")
 		jobs := generateFakeInitDBJobs(clusterReconciler.Client, cluster)
 		instances := generateFakeClusterPods(clusterReconciler.Client, cluster, true)
-		pvc := generateFakePVC(clusterReconciler.Client, cluster)
+		pvc := generateClusterPVC(clusterReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
 
 		managedResources := &managedResources{
 			nodes:     nil,
@@ -197,6 +201,70 @@ var _ = Describe("Updating target primary", func() {
 				g.Expect(err).To(BeNil())
 				g.Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 			}).WithTimeout(5 * time.Second).Should(Succeed())
+		})
+	})
+
+	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func() {
+		ctx := context.TODO()
+		namespace := newFakeNamespace()
+		cluster := newFakeCNPGCluster(namespace, func(cluster *apiv1.Cluster) {
+			cluster.Spec.Instances = 2
+			cluster.Status.LatestGeneratedNode = 2
+			cluster.Status.ReadyInstances = 2
+		})
+
+		By("creating the cluster resources")
+		jobs := generateFakeInitDBJobs(clusterReconciler.Client, cluster)
+		instances := generateFakeClusterPods(clusterReconciler.Client, cluster, true)
+		pvcs := generateClusterPVC(clusterReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
+		thirdInstancePVCGroup := newFakePVC(clusterReconciler.Client, cluster, 3, persistentvolumeclaim.StatusReady)
+		pvcs = append(pvcs, thirdInstancePVCGroup...)
+
+		cluster.Status.DanglingPVC = append(cluster.Status.DanglingPVC, thirdInstancePVCGroup[0].Name)
+
+		managedResources := &managedResources{
+			nodes:     nil,
+			instances: corev1.PodList{Items: instances},
+			pvcs:      corev1.PersistentVolumeClaimList{Items: pvcs},
+			jobs:      batchv1.JobList{Items: jobs},
+		}
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:         postgres.LSN("0/0"),
+					ReceivedLsn:        postgres.LSN("0/0"),
+					ReplayLsn:          postgres.LSN("0/0"),
+					IsPodReady:         true,
+					IsPrimary:          false,
+					Pod:                instances[0],
+					MightBeUnavailable: false,
+				},
+				{
+					CurrentLsn:         postgres.LSN("0/0"),
+					ReceivedLsn:        postgres.LSN("0/0"),
+					ReplayLsn:          postgres.LSN("0/0"),
+					IsPodReady:         true,
+					IsPrimary:          true,
+					Pod:                instances[1],
+					MightBeUnavailable: false,
+				},
+			},
+		}
+
+		By("triggering ensureInstancesAreCreated", func() {
+			res, err := clusterReconciler.ensureInstancesAreCreated(ctx, cluster, managedResources, statusList)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res).To(Equal(reconcile.Result{RequeueAfter: time.Second}))
+		})
+
+		By("checking that the third instance exists even if the cluster has two instances", func() {
+			var expectedPod corev1.Pod
+			instanceName := specs.GetInstanceName(cluster.Name, 3)
+			err := clusterReconciler.Client.Get(ctx, types.NamespacedName{
+				Name:      instanceName,
+				Namespace: cluster.Namespace,
+			}, &expectedPod)
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })

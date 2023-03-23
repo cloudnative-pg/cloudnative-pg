@@ -2174,6 +2174,112 @@ spec:
                 - debug
                 - trace
                 type: string
+              managed:
+                description: The configuration that is used by the portions of PostgreSQL
+                  that are managed by the instance manager
+                properties:
+                  roles:
+                    description: Database roles managed by the `Cluster`
+                    items:
+                      description: "RoleConfiguration is the representation, in Kubernetes,
+                        of a PostgreSQL role with the additional field Ensure specifying
+                        whether to ensure the presence or absence of the role in the
+                        database \n The defaults of the CREATE ROLE command are applied
+                        Reference: https://www.postgresql.org/docs/current/sql-createrole.html"
+                      properties:
+                        bypassrls:
+                          description: Whether a role bypasses every row-level security
+                            (RLS) policy. Default is `false`.
+                          type: boolean
+                        comment:
+                          description: Description of the role
+                          type: string
+                        connectionLimit:
+                          default: -1
+                          description: If the role can log in, this specifies how
+                            many concurrent connections the role can make. `-1` (the
+                            default) means no limit.
+                          format: int64
+                          type: integer
+                        createdb:
+                          description: When set to `true`, the role being defined
+                            will be allowed to create new databases. Specifying `false`
+                            (default) will deny a role the ability to create databases.
+                          type: boolean
+                        createrole:
+                          description: Whether the role will be permitted to create,
+                            alter, drop, comment on, change the security label for,
+                            and grant or revoke membership in other roles. Default
+                            is `false`.
+                          type: boolean
+                        ensure:
+                          default: present
+                          description: Ensure the role is `present` or `absent` -
+                            defaults to "present"
+                          enum:
+                          - present
+                          - absent
+                          type: string
+                        inRoles:
+                          description: List of one or more existing roles to which
+                            this role will be immediately added as a new member. Default
+                            empty.
+                          items:
+                            type: string
+                          type: array
+                        inherit:
+                          default: true
+                          description: Whether a role "inherits" the privileges of
+                            roles it is a member of. Defaults is `true`.
+                          type: boolean
+                        login:
+                          description: Whether the role is allowed to log in. A role
+                            having the `login` attribute can be thought of as a user.
+                            Roles without this attribute are useful for managing database
+                            privileges, but are not users in the usual sense of the
+                            word. Default is `false`.
+                          type: boolean
+                        name:
+                          description: Name of the role
+                          type: string
+                        passwordSecret:
+                          description: Secret containing the password of the role
+                            (if present)
+                          properties:
+                            name:
+                              description: Name of the referent.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        replication:
+                          description: Whether a role is a replication role. A role
+                            must have this attribute (or be a superuser) in order
+                            to be able to connect to the server in replication mode
+                            (physical or logical replication) and in order to be able
+                            to create or drop replication slots. A role having the
+                            `replication` attribute is a very highly privileged role,
+                            and should only be used on roles actually used for replication.
+                            Default is `false`.
+                          type: boolean
+                        superuser:
+                          description: Whether the role is a `superuser` who can override
+                            all access restrictions within the database - superuser
+                            status is dangerous and should be used only when really
+                            needed. You must yourself be a superuser to create a new
+                            superuser. Defaults is `false`.
+                          type: boolean
+                        validUntil:
+                          description: Date and time after which the role's password
+                            is no longer valid. When omitted, the password will never
+                            expire (default).
+                          format: date-time
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                type: object
               maxSyncReplicas:
                 default: 0
                 description: The target value for the synchronous replication quorum,
@@ -3524,6 +3630,30 @@ spec:
                 items:
                   type: string
                 type: array
+              rolePasswordStatus:
+                additionalProperties:
+                  description: PasswordState represents the state of the password
+                    of a managed RoleConfiguration
+                  properties:
+                    resourceVersion:
+                      description: the resource version of the password secret
+                      type: string
+                    transactionID:
+                      description: the last transaction ID to affect the role definition
+                        in PostgreSQL
+                      format: int64
+                      type: integer
+                  type: object
+                description: RolePasswordStatus gives the last transaction id and
+                  hash for each managed role
+                type: object
+              roleStatus:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                description: RoleStatus gives the list of roles in each state
+                type: object
               secretsResourceVersion:
                 description: The list of resource versions of the secrets managed
                   by the operator. Every change here is done in the interest of the
@@ -3543,6 +3673,11 @@ spec:
                     description: The resource version of the PostgreSQL client-side
                       CA secret version
                     type: string
+                  managedRoleSecretVersion:
+                    additionalProperties:
+                      type: string
+                    description: The resource versions of the managed roles secrets
+                    type: object
                   metrics:
                     additionalProperties:
                       type: string

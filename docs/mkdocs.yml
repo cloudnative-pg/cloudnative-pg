@@ -26,6 +26,7 @@ nav:
   - replication.md
   - backup_recovery.md
   - postgresql_conf.md
+  - declarative_role_management.md
   - operator_conf.md
   - cluster_conf.md
   - storage.md
