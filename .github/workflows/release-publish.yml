@@ -68,16 +68,6 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
-        name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      -
         name: Build meta
         id: build-meta
         run: |
