@@ -40,6 +40,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/reconciler"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
@@ -177,6 +178,13 @@ func (r *InstanceReconciler) Reconcile(
 		cluster,
 	); err != nil || !result.IsZero() {
 		return result, err
+	}
+
+	if r.instance.PodName == cluster.Status.CurrentPrimary {
+		result, err := roles.Reconcile(ctx, r.instance, cluster, r.client)
+		if err != nil || !result.IsZero() {
+			return result, err
+		}
 	}
 
 	restarted, err := r.reconcilePrimary(ctx, cluster)

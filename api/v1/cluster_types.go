@@ -289,6 +289,9 @@ type ClusterSpec struct {
 	// sources to the pods to be used by Env
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// The configuration that is used by the portions of PostgreSQL that are managed by the instance manager
+	Managed *ManagedConfiguration `json:"managed,omitempty"`
 }
 
 const (
@@ -380,6 +383,28 @@ type Topology struct {
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
 }
 
+// RoleStatus represents the status of a managed role in the cluster
+type RoleStatus string
+
+const (
+	// RoleStatusReconciled indicates the role in DB matches the Spec
+	RoleStatusReconciled RoleStatus = "reconciled"
+	// RoleStatusNotManaged indicates the role is not in the Spec, therefore not managed
+	RoleStatusNotManaged RoleStatus = "not-managed"
+	// RoleStatusPendingReconciliation indicates the role in Spec requires updated/creation in DB
+	RoleStatusPendingReconciliation RoleStatus = "pending-reconciliation"
+	// RoleStatusReserved indicates this is one of the roles reserved by the operator. E.g. `postgres`
+	RoleStatusReserved RoleStatus = "reserved"
+)
+
+// PasswordState represents the state of the password of a managed RoleConfiguration
+type PasswordState struct {
+	// the last transaction ID to affect the role definition in PostgreSQL
+	TransactionID int64 `json:"transactionID,omitempty"`
+	// the resource version of the password secret
+	SecretResourceVersion string `json:"resourceVersion,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -393,6 +418,12 @@ type ClusterStatus struct {
 
 	// The reported state of the instances during the last reconciliation loop
 	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
+
+	// RoleStatus gives the list of roles in each state
+	RoleStatus map[RoleStatus][]string `json:"roleStatus,omitempty"`
+
+	// RolePasswordStatus gives the last transaction id and hash for each managed role
+	RolePasswordStatus map[string]PasswordState `json:"rolePasswordStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	TimelineID int `json:"timelineID,omitempty"`
@@ -1559,6 +1590,107 @@ func (in ExternalCluster) GetServerName() string {
 	return in.Name
 }
 
+// EnsureOption represents whether we should enforce the presence or absence of
+// a Role in a PostgreSQL instance
+type EnsureOption string
+
+// values taken by EnsureOption
+const (
+	EnsurePresent EnsureOption = "present"
+	EnsureAbsent  EnsureOption = "absent"
+)
+
+// ManagedConfiguration represents the portions of PostgreSQL that are managed
+// by the instance manager
+type ManagedConfiguration struct {
+	// Database roles managed by the `Cluster`
+	Roles []RoleConfiguration `json:"roles,omitempty"`
+}
+
+// RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
+// with the additional field Ensure specifying whether to ensure the presence or
+// absence of the role in the database
+//
+// The defaults of the CREATE ROLE command are applied
+// Reference: https://www.postgresql.org/docs/current/sql-createrole.html
+type RoleConfiguration struct {
+	// Name of the role
+	Name string `json:"name"`
+	// Description of the role
+	Comment string `json:"comment,omitempty"`
+
+	// Ensure the role is `present` or `absent` - defaults to "present"
+	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
+	Ensure EnsureOption `json:"ensure,omitempty"`
+
+	// Secret containing the password of the role (if present)
+	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
+	// Whether the role is a `superuser` who can override all access
+	// restrictions within the database - superuser status is dangerous and
+	// should be used only when really needed. You must yourself be a
+	// superuser to create a new superuser. Defaults is `false`.
+	Superuser bool `json:"superuser,omitempty"`
+	// When set to `true`, the role being defined will be allowed to create
+	// new databases. Specifying `false` (default) will deny a role the
+	// ability to create databases.
+	CreateDB bool `json:"createdb,omitempty"`
+	// Whether the role will be permitted to create, alter, drop, comment
+	// on, change the security label for, and grant or revoke membership in
+	// other roles. Default is `false`.
+	CreateRole bool `json:"createrole,omitempty"`
+
+	// Whether a role "inherits" the privileges of roles it is a member of.
+	// Defaults is `true`.
+	// +kubebuilder:default:=true
+	Inherit *bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
+
+	// Whether the role is allowed to log in. A role having the `login`
+	// attribute can be thought of as a user. Roles without this attribute
+	// are useful for managing database privileges, but are not users in
+	// the usual sense of the word. Default is `false`.
+	Login bool `json:"login,omitempty"`
+	// Whether a role is a replication role. A role must have this
+	// attribute (or be a superuser) in order to be able to connect to the
+	// server in replication mode (physical or logical replication) and in
+	// order to be able to create or drop replication slots. A role having
+	// the `replication` attribute is a very highly privileged role, and
+	// should only be used on roles actually used for replication. Default
+	// is `false`.
+	Replication bool `json:"replication,omitempty"`
+	// Whether a role bypasses every row-level security (RLS) policy.
+	// Default is `false`.
+	BypassRLS bool `json:"bypassrls,omitempty"` // Row-Level Security
+
+	// If the role can log in, this specifies how many concurrent
+	// connections the role can make. `-1` (the default) means no limit.
+	// +kubebuilder:default:=-1
+	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
+
+	// Date and time after which the role's password is no longer valid.
+	// When omitted, the password will never expire (default).
+	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
+	// List of one or more existing roles to which this role will be
+	// immediately added as a new member. Default empty.
+	InRoles []string `json:"inRoles,omitempty"`
+}
+
+// GetRoleSecretsName gets the name of the secret which is used to store the role's password
+func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
+	if roleConfiguration.PasswordSecret != nil {
+		return roleConfiguration.PasswordSecret.Name
+	}
+	return ""
+}
+
+// GetRoleInherit return the inherit attribute of a roleConfiguration
+func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
+	if roleConfiguration.Inherit != nil {
+		return *roleConfiguration.Inherit
+	}
+	return true
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
@@ -1607,6 +1739,9 @@ type SecretsResourceVersion struct {
 	// The resource version of the "app" user secret
 	ApplicationSecretVersion string `json:"applicationSecretVersion,omitempty"`
 
+	// The resource versions of the managed roles secrets
+	ManagedRoleSecretVersions map[string]string `json:"managedRoleSecretVersion,omitempty"`
+
 	// Unused. Retained for compatibility with old versions.
 	CASecretVersion string `json:"caSecretVersion,omitempty"`
 
@@ -1633,6 +1768,18 @@ type ConfigMapResourceVersion struct {
 	// A map with the versions of all the config maps used to pass metrics.
 	// Map keys are the config map names, map values are the versions
 	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// SetManagedRoleSecretVersion Add or update or delete the resource version of the managed role secret
+func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion(secret string, version *string) {
+	if secretResourceVersion.ManagedRoleSecretVersions == nil {
+		secretResourceVersion.ManagedRoleSecretVersions = make(map[string]string)
+	}
+	if version == nil {
+		delete(secretResourceVersion.ManagedRoleSecretVersions, secret)
+	} else {
+		secretResourceVersion.ManagedRoleSecretVersions[secret] = *version
+	}
 }
 
 // GetImageName get the name of the image that should be used
@@ -1695,13 +1842,22 @@ func (cluster *Cluster) GetLDAPSecretName() string {
 	return ""
 }
 
-// GetEnableSuperuserAccess returns if the superuser access is enabled or not
-func (cluster *Cluster) GetEnableSuperuserAccess() bool {
-	if cluster.Spec.EnableSuperuserAccess != nil {
-		return *cluster.Spec.EnableSuperuserAccess
-	}
+// ContainsManagedRolesConfiguration returns true iff there are managed roles configured
+func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
+	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
+}
 
-	return true
+// UsesSecretInManagedRoles checks if the given secret name is used in a managed role
+func (cluster *Cluster) UsesSecretInManagedRoles(secretName string) bool {
+	if !cluster.ContainsManagedRolesConfiguration() {
+		return false
+	}
+	for _, role := range cluster.Spec.Managed.Roles {
+		if role.PasswordSecret != nil && role.PasswordSecret.Name == secretName {
+			return true
+		}
+	}
+	return false
 }
 
 // GetApplicationSecretName get the name of the application secret for any bootstrap type
@@ -2168,6 +2324,10 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
+	if cluster.UsesSecretInManagedRoles(secret) {
+		return true
+	}
+
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() && cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name == secret {
 		return true
 	}
@@ -2202,6 +2362,15 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	}
 
 	return false
+}
+
+// GetEnableSuperuserAccess returns if the superuser access is enabled or not
+func (cluster *Cluster) GetEnableSuperuserAccess() bool {
+	if cluster.Spec.EnableSuperuserAccess != nil {
+		return *cluster.Spec.EnableSuperuserAccess
+	}
+
+	return true
 }
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout
