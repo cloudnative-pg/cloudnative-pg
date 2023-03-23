@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+env:
+  GOLANG_VERSION: "1.20.x"
+
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
   # we backport everything
@@ -69,6 +72,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ matrix.branch }}
           token: ${{ secrets.REPO_GHA_PAT }}
+      -
+        name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Check commits
         if: contains( github.event.pull_request.labels.*.name, matrix.branch )
