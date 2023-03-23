@@ -99,7 +99,7 @@ func (m *mockRoleManager) Delete(
 	return nil
 }
 
-func (m *mockRoleManager) GetLastTransactionID(_ context.Context, role DatabaseRole) (int64, error) {
+func (m *mockRoleManager) GetLastTransactionID(_ context.Context, _ DatabaseRole) (int64, error) {
 	return 0, nil
 }
 
