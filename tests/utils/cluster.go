@@ -150,7 +150,14 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLe
 	}()
 
 	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
-	return logs.GetPodLogs(env.Ctx, pod, getPrevious, f, requestedLineLength)
+
+	streamPodLogs := &logs.StreamPodLog{
+		Pod:      &pod,
+		Writer:   f,
+		Previous: getPrevious,
+		Length:   requestedLineLength,
+	}
+	return streamPodLogs.GetPodLogs(env.Ctx)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections

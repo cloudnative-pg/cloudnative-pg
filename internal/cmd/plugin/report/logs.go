@@ -38,22 +38,37 @@ var podLogOptions = &corev1.PodLogOptions{
 }
 
 // streamPodLogsToZip streams the pod logs to a new section in the ZIP
-func streamPodLogsToZip(ctx context.Context, pods []corev1.Pod,
-	dirname, name string, zipper *zip.Writer,
+func streamPodLogsToZip(
+	ctx context.Context,
+	pods []corev1.Pod,
+	dirName, name string,
+	zipper *zip.Writer,
 ) error {
-	logsdir := filepath.Join(dirname, name)
-	if _, err := zipper.Create(logsdir + "/"); err != nil {
-		return fmt.Errorf("could not add '%s' to zip: %w", logsdir, err)
+	logsDir := filepath.Join(dirName, name)
+	if _, err := zipper.Create(logsDir + "/"); err != nil {
+		return fmt.Errorf("could not add '%s' to zip: %w", logsDir, err)
 	}
 
 	for i := range pods {
 		pod := pods[i]
-		path := filepath.Join(logsdir, fmt.Sprintf("%s-logs.jsonl", pod.Name))
+		path := filepath.Join(logsDir, fmt.Sprintf("%s-logs.jsonl", pod.Name))
 		writer, zipperErr := zipper.Create(path)
 		if zipperErr != nil {
 			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
 		}
-		if err := logs.StreamPodLogs(ctx, pod, writer, podLogOptions); err != nil {
+
+		streamPodLogs := &logs.StreamPodLog{
+			Pod:      &pod,
+			Writer:   writer,
+			Options:  podLogOptions,
+			Previous: true,
+		}
+		fmt.Fprint(streamPodLogs.Writer, "\n====== Begin of Previous Log =====\n")
+		_ = streamPodLogs.StreamPodLogs(ctx)
+		fmt.Fprint(streamPodLogs.Writer, "\n====== End of Previous Log =====\n")
+
+		streamPodLogs.Previous = false
+		if err := streamPodLogs.StreamPodLogs(ctx); err != nil {
 			return err
 		}
 	}
@@ -81,6 +96,10 @@ func streamClusterLogsToZip(ctx context.Context, clusterName, namespace string,
 	if err != nil {
 		return fmt.Errorf("could not get cluster pods: %w", err)
 	}
+	streamPodLogs := &logs.StreamPodLog{
+		Options:  podLogOptions,
+		Previous: false,
+	}
 
 	for _, pod := range podList.Items {
 		writer, err := zipper.Create(filepath.Join(logsdir, pod.Name) + ".jsonl")
@@ -88,8 +107,11 @@ func streamClusterLogsToZip(ctx context.Context, clusterName, namespace string,
 			return fmt.Errorf("could not add '%s' to zip: %w",
 				filepath.Join(logsdir, pod.Name), err)
 		}
+		podPointer := pod
+		streamPodLogs.Pod = &podPointer
+		streamPodLogs.Writer = writer
 
-		err = logs.StreamPodLogs(ctx, pod, writer, podLogOptions)
+		err = streamPodLogs.StreamPodLogs(ctx)
 		if err != nil {
 			return err
 		}
@@ -129,14 +151,20 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			return fmt.Errorf("could not get pods for job '%s': %w", job.Name, err)
 		}
 
+		streamPodLogs := &logs.StreamPodLog{
+			Options:  podLogOptions,
+			Previous: false,
+		}
 		for _, pod := range podList.Items {
 			writer, err := zipper.Create(filepath.Join(logsdir, pod.Name) + ".jsonl")
 			if err != nil {
 				return fmt.Errorf("could not add '%s' to zip: %w",
 					filepath.Join(logsdir, pod.Name), err)
 			}
-
-			err = logs.StreamPodLogs(ctx, pod, writer, podLogOptions)
+			podPointer := pod
+			streamPodLogs.Pod = &podPointer
+			streamPodLogs.Writer = writer
+			err = streamPodLogs.StreamPodLogs(ctx)
 			if err != nil {
 				return err
 			}
