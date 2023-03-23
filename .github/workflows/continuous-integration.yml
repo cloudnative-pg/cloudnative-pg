@@ -229,18 +229,6 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
-      # Cache Go modules on GitHub runners to be reused across jobs
-      # See to: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
       - name: Run unit tests
         env:
           ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
@@ -367,16 +355,6 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
-
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Build meta
         run: |
