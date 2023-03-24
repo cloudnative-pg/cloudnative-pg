@@ -63,7 +63,7 @@ func deleteFakeOperatorDeployment(ctx context.Context,
 }
 
 var _ = Describe("Difference of values of maps", func() {
-	It("fuck", func(ctx SpecContext) {
+	It("will always set the app.kubernetes.io/name to cloudnative-pg", func(ctx SpecContext) {
 		operatorLabelSelector := "app.kubernetes.io/name=cloudnative-pg"
 		operatorLabels := map[string]string{
 			"app.kubernetes.io/name": "cloudnative-pg",
