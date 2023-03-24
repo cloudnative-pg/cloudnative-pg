@@ -41,7 +41,7 @@ type clientMock struct {
 	deletedPods []string
 }
 
-func (cm *clientMock) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+func (cm *clientMock) Delete(_ context.Context, obj client.Object, _ ...client.DeleteOption) error {
 	cm.deletedPods = append(cm.deletedPods, obj.GetName())
 	return nil
 }

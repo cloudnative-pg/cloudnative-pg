@@ -77,7 +77,7 @@ func (err *ErrInvalidHibernationValue) Error() string {
 
 // EnrichStatus obtains and classifies the hibernation status of the cluster
 func EnrichStatus(
-	ctx context.Context,
+	_ context.Context,
 	cluster *apiv1.Cluster,
 	podList []corev1.Pod,
 ) {

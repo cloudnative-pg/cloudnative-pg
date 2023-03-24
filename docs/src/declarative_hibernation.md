@@ -65,10 +65,16 @@ Time     2023-03-05 16:43:35 +0000 UTC
 
 ## Rehydration
 
-To rehydrate a cluster, set the `cnpg.io/hibernation=off` annotation:
+To rehydrate a cluster, either set the `cnpg.io/hibernation` annotation to `off`:
 
 ```
 $ kubectl annotate cluster <cluster-name> --overwrite cnpg.io/hibernation=off
+```
+
+Or, just unset it altogether:
+
+```
+$ kubectl annotate cluster <cluster-name> cnpg.io/hibernation-
 ```
 
 The Pods will be recreated and the cluster will resume operation.
