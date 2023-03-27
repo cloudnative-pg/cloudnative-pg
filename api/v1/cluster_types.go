@@ -395,6 +395,9 @@ const (
 	RoleStatusPendingReconciliation RoleStatus = "pending-reconciliation"
 	// RoleStatusReserved indicates this is one of the roles reserved by the operator. E.g. `postgres`
 	RoleStatusReserved RoleStatus = "reserved"
+	// RoleStatusCannotReconcile indicates the role configuration cannot be applied by Postgres,
+	// for example, if trying to DROP a role that owns content
+	RoleStatusCannotReconcile = "cannot-reconcile"
 )
 
 // PasswordState represents the state of the password of a managed RoleConfiguration
@@ -424,6 +427,10 @@ type ClusterStatus struct {
 
 	// RolePasswordStatus gives the last transaction id and hash for each managed role
 	RolePasswordStatus map[string]PasswordState `json:"rolePasswordStatus,omitempty"`
+
+	// RoleConfigurationsRejected list detailed explanations on why some role configurations
+	// cannot be applied in Postgres
+	RoleConfigurationsRejected []string `json:"roleConfigurationsRejected,omitempty"`
 
 	// The timeline of the Postgres cluster
 	TimelineID int `json:"timelineID,omitempty"`
