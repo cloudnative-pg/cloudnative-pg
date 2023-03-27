@@ -178,6 +178,6 @@ type RoleManager interface {
 	UpdateComment(ctx context.Context, role DatabaseRole) error
 	// UpdateMembership Update the In Role membership of role in the database
 	UpdateMembership(ctx context.Context, role DatabaseRole, rolesToGrant []string, rolesToRevoke []string) error
-	// GetParentRoles return the roles current role belongs to
+	// GetParentRoles returns the roles the given role is a member of
 	GetParentRoles(ctx context.Context, role DatabaseRole) ([]string, error)
 }

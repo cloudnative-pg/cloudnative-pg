@@ -109,12 +109,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			slices.Sort(expectedRoles)
 			Eventually(func() []string {
 				var rolesInDB []string
-				cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-					"\"SELECT string_agg(pg_get_userbyid(members.roleid),',') as inroles "+
-					"FROM pg_catalog.pg_authid as auth "+
-					"LEFT JOIN pg_catalog.pg_auth_members as members "+
-					"ON auth.oid = members.member "+
-					"WHERE rolname = '%s' GROUP BY auth.oid\"", newUserName)
+				query := `SELECT mem.inroles 
+					FROM pg_catalog.pg_authid as auth
+					LEFT JOIN LATERAL (
+						SELECT string_agg(pg_get_userbyid(roleid), ',') as inroles, member
+						FROM pg_auth_members GROUP BY member
+					) mem ON member = oid
+					WHERE rolname =` + pq.QuoteLiteral(newUserName)
+				cmd := "psql -U postgres postgres -tAc " + fmt.Sprintf("\"%s\"", query)
 				stdout, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,

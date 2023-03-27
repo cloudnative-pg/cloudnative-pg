@@ -51,11 +51,13 @@ func (sm PostgresRoleManager) List(
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
 				pg_catalog.shobj_description(oid, 'pg_authid') as comment, auth.xmin, 
-				string_agg(pg_get_userbyid(members.roleid),',') as inroles
-		FROM pg_catalog.pg_authid as auth LEFT JOIN  pg_auth_members as members 
-		ON  auth.oid = members.member
-		WHERE rolname not like 'pg_%'
-		GROUP BY auth.oid`)
+				mem.inroles
+		FROM pg_catalog.pg_authid as auth
+		LEFT JOIN LATERAL (
+			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
+			FROM pg_auth_members GROUP BY member
+		) mem ON member = oid
+		WHERE rolname not like 'pg_%'`)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +72,7 @@ func (sm PostgresRoleManager) List(
 		var validuntil sql.NullTime
 		var comment sql.NullString
 		var role DatabaseRole
-		var inroles sql.NullString
+		var inRoles pq.StringArray
 		err := rows.Scan(
 			&role.Name,
 			&role.Superuser,
@@ -85,7 +87,7 @@ func (sm PostgresRoleManager) List(
 			&role.BypassRLS,
 			&comment,
 			&role.transactionID,
-			&inroles,
+			&inRoles,
 		)
 		if err != nil {
 			return nil, err
@@ -97,9 +99,8 @@ func (sm PostgresRoleManager) List(
 			role.Comment = comment.String
 		}
 
-		if inroles.Valid && len(inroles.String) > 0 {
-			role.InRoles = strings.Split(inroles.String, ",")
-		}
+		role.InRoles = inRoles
+
 		roles = append(roles, role)
 	}
 
@@ -272,13 +273,15 @@ func (sm PostgresRoleManager) GetParentRoles(
 ) ([]string, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
-	query := "SELECT string_agg(pg_get_userbyid(members.roleid),',') as inroles " +
-		"FROM pg_catalog.pg_authid as auth " +
-		"LEFT JOIN pg_catalog.pg_auth_members as members " +
-		"ON auth.oid = members.member " +
-		"WHERE rolname = $1 GROUP BY auth.oid"
+	query := `SELECT mem.inroles 
+		FROM pg_catalog.pg_authid as auth
+		LEFT JOIN LATERAL (
+			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
+			FROM pg_auth_members GROUP BY member
+		) mem ON member = oid
+		WHERE rolname = $1`
 	contextLog.Debug("get parent role", "query", query)
-	var parentRoles sql.NullString
+	var parentRoles pq.StringArray
 	err := sm.superUserDB.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("while getting parent roles. Role %s not found", role.Name)
@@ -286,10 +289,8 @@ func (sm PostgresRoleManager) GetParentRoles(
 	if err != nil {
 		return nil, fmt.Errorf("while getting parent roles for %s: %w", role.Name, err)
 	}
-	if parentRoles.Valid && len(parentRoles.String) > 0 {
-		return strings.Split(parentRoles.String, ","), nil
-	}
-	return nil, nil
+
+	return parentRoles, nil
 }
 
 func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
