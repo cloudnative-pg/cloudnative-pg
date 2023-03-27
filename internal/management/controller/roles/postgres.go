@@ -165,9 +165,6 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 }
 
 // Delete the role
-// TODO: we need to do something better here. We should not delete a user that
-// has created tables or other objects. That should be blocked at the validation
-// webhook level, otherwise it will be very poor UX and the operator may not notice
 func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)

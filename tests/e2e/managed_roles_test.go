@@ -41,8 +41,9 @@ import (
 // Set of tests in which we check that the initdb options are really applied
 var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic), func() {
 	const (
-		clusterManifest = fixturesDir + "/managed_roles/cluster-managed-roles.yaml.template"
-		level           = tests.Medium
+		clusterManifest          = fixturesDir + "/managed_roles/cluster-managed-roles.yaml.template"
+		clusterManifestWithError = fixturesDir + "/managed_roles/cluster-managed-roles-errored.yaml.template"
+		level                    = tests.Medium
 	)
 
 	BeforeEach(func() {
@@ -451,6 +452,86 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(err).ToNot(HaveOccurred())
 				assertUserExists(namespace, primaryPodInfo.Name, newUserName, false)
 			})
+		})
+	})
+
+	Context("cluster with unrealizable role", Ordered, func() {
+		const (
+			namespace    = "managed-roles-with-errors"
+			username     = "petrarca"
+			unrealizable = "dante"
+		)
+		var clusterName string
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
+
+		BeforeAll(func() {
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
+
+			clusterName, err = env.GetResourceNameFromYAML(clusterManifestWithError)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("setting up cluster with managed roles", func() {
+				AssertCreateCluster(namespace, clusterName, clusterManifestWithError, env)
+			})
+		})
+
+		assertUserExists := func(namespace, primaryPod, username string, shouldExists bool) {
+			cmd := `psql -U postgres postgres -tAc '\du'`
+			Eventually(func(g Gomega) {
+				stdout, _, err := utils.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryPod,
+					cmd))
+				g.Expect(err).ToNot(HaveOccurred())
+				if shouldExists {
+					g.Expect(stdout).To(ContainSubstring(username))
+				} else {
+					g.Expect(stdout).NotTo(ContainSubstring(username))
+				}
+			}, 60).Should(Succeed())
+		}
+
+		It("can create realizable roles specified in the managed roles stanza", func() {
+			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			assertUserExists(namespace, primaryPodInfo.Name, username, true)
+		})
+		It("will not create the unrealizable role in the database", func() {
+			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			assertUserExists(namespace, primaryPodInfo.Name, unrealizable, false)
+		})
+		It("will show unrealizable role configurations in the status", func() {
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      clusterName,
+			}
+			// Eventually the number of ready instances should be equal to the
+			// amount of instances defined in the cluster and
+			// the cluster status should be in healthy state
+			cluster := &apiv1.Cluster{}
+
+			Eventually(func(g Gomega) {
+				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).Should(Succeed())
+
+			Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(HaveLen(1))
+			Expect(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizable]).To(HaveLen(1))
+			Expect(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizable][0]).
+				To(ContainSubstring("role \"foobar\" does not exist"))
 		})
 	})
 })

@@ -3612,6 +3612,43 @@ spec:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)
                 type: integer
+              managedRolesStatus:
+                description: ManagedRolesStatus reports the state of the managed roles
+                  in the cluster
+                properties:
+                  byStatus:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: ByStatus gives the list of roles in each state
+                    type: object
+                  cannotReconcile:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: CannotReconcile lists roles that cannot be reconciled
+                      in PostgreSQL, with an explanation of the cause
+                    type: object
+                  passwordStatus:
+                    additionalProperties:
+                      description: PasswordState represents the state of the password
+                        of a managed RoleConfiguration
+                      properties:
+                        resourceVersion:
+                          description: the resource version of the password secret
+                          type: string
+                        transactionID:
+                          description: the last transaction ID to affect the role
+                            definition in PostgreSQL
+                          format: int64
+                          type: integer
+                      type: object
+                    description: PasswordStatus gives the last transaction id and
+                      password secret version for each managed role
+                    type: object
+                type: object
               onlineUpdateEnabled:
                 description: OnlineUpdateEnabled shows if the online upgrade is enabled
                   inside the cluster
@@ -3651,30 +3688,6 @@ spec:
                 items:
                   type: string
                 type: array
-              rolePasswordStatus:
-                additionalProperties:
-                  description: PasswordState represents the state of the password
-                    of a managed RoleConfiguration
-                  properties:
-                    resourceVersion:
-                      description: the resource version of the password secret
-                      type: string
-                    transactionID:
-                      description: the last transaction ID to affect the role definition
-                        in PostgreSQL
-                      format: int64
-                      type: integer
-                  type: object
-                description: RolePasswordStatus gives the last transaction id and
-                  hash for each managed role
-                type: object
-              roleStatus:
-                additionalProperties:
-                  items:
-                    type: string
-                  type: array
-                description: RoleStatus gives the list of roles in each state
-                type: object
               secretsResourceVersion:
                 description: The list of resource versions of the secrets managed
                   by the operator. Every change here is done in the interest of the
@@ -3760,6 +3773,8 @@ spec:
               writeService:
                 description: Current write pod
                 type: string
+            required:
+            - managedRolesStatus
             type: object
         type: object
     served: true
