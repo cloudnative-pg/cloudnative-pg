@@ -57,18 +57,18 @@ func streamPodLogsToZip(
 			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
 		}
 
-		streamPodLogs := &logs.StreamPodLog{
+		streamPodLogs := &logs.StreamingRequest{
 			Pod:      &pod,
 			Writer:   writer,
 			Options:  podLogOptions,
 			Previous: true,
 		}
 		fmt.Fprint(streamPodLogs.Writer, "\n====== Begin of Previous Log =====\n")
-		_ = streamPodLogs.StreamPodLogs(ctx)
+		_ = streamPodLogs.Stream(ctx)
 		fmt.Fprint(streamPodLogs.Writer, "\n====== End of Previous Log =====\n")
 
 		streamPodLogs.Previous = false
-		if err := streamPodLogs.StreamPodLogs(ctx); err != nil {
+		if err := streamPodLogs.Stream(ctx); err != nil {
 			return err
 		}
 	}
@@ -96,7 +96,7 @@ func streamClusterLogsToZip(ctx context.Context, clusterName, namespace string,
 	if err != nil {
 		return fmt.Errorf("could not get cluster pods: %w", err)
 	}
-	streamPodLogs := &logs.StreamPodLog{
+	streamPodLogs := &logs.StreamingRequest{
 		Options:  podLogOptions,
 		Previous: false,
 	}
@@ -111,7 +111,7 @@ func streamClusterLogsToZip(ctx context.Context, clusterName, namespace string,
 		streamPodLogs.Pod = &podPointer
 		streamPodLogs.Writer = writer
 
-		err = streamPodLogs.StreamPodLogs(ctx)
+		err = streamPodLogs.Stream(ctx)
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			return fmt.Errorf("could not get pods for job '%s': %w", job.Name, err)
 		}
 
-		streamPodLogs := &logs.StreamPodLog{
+		streamPodLogs := &logs.StreamingRequest{
 			Options:  podLogOptions,
 			Previous: false,
 		}
@@ -164,7 +164,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			podPointer := pod
 			streamPodLogs.Pod = &podPointer
 			streamPodLogs.Writer = writer
-			err = streamPodLogs.StreamPodLogs(ctx)
+			err = streamPodLogs.Stream(ctx)
 			if err != nil {
 				return err
 			}

@@ -30,8 +30,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// StreamPodLog struct store the necessary variables to create a stream of logs from a specific pod
-type StreamPodLog struct {
+// StreamingRequest represents a request to stream a pod's logs
+type StreamingRequest struct {
 	Pod      *v1.Pod
 	Options  *v1.PodLogOptions
 	Previous bool `json:"previous,omitempty"`
@@ -40,26 +40,26 @@ type StreamPodLog struct {
 	client   kubernetes.Interface
 }
 
-func (spl *StreamPodLog) getPodName() string {
+func (spl *StreamingRequest) getPodName() string {
 	if spl.Pod != nil {
 		return spl.Pod.Name
 	}
 	return ""
 }
 
-func (spl *StreamPodLog) getPodNamespace() string {
+func (spl *StreamingRequest) getPodNamespace() string {
 	if spl.Pod != nil {
 		return spl.Pod.Namespace
 	}
 	return ""
 }
 
-func (spl *StreamPodLog) getLogOptions() *v1.PodLogOptions {
+func (spl *StreamingRequest) getLogOptions() *v1.PodLogOptions {
 	spl.Options.Previous = spl.Previous
 	return spl.Options
 }
 
-func (spl *StreamPodLog) getKubernetesClient() kubernetes.Interface {
+func (spl *StreamingRequest) getKubernetesClient() kubernetes.Interface {
 	if spl.client != nil {
 		return spl.client
 	}
@@ -70,7 +70,7 @@ func (spl *StreamPodLog) getKubernetesClient() kubernetes.Interface {
 	return spl.client
 }
 
-func (spl *StreamPodLog) getStreamLogPod() *rest.Request {
+func (spl *StreamingRequest) getStreamToPod() *rest.Request {
 	client := spl.getKubernetesClient()
 	pods := client.CoreV1().Pods(spl.getPodNamespace())
 
@@ -79,11 +79,11 @@ func (spl *StreamPodLog) getStreamLogPod() *rest.Request {
 		spl.getLogOptions())
 }
 
-// StreamPodLogs streams the pod logs and shunts them to the `writer`.
-func (spl *StreamPodLog) StreamPodLogs(ctx context.Context) (err error) {
-	wrapErr := func(err error) error { return fmt.Errorf("in StreamPodLogs: %w", err) }
+// Stream streams the pod logs and shunts them to the `writer`.
+func (spl *StreamingRequest) Stream(ctx context.Context) (err error) {
+	wrapErr := func(err error) error { return fmt.Errorf("in Stream: %w", err) }
 
-	logsRequest := spl.getStreamLogPod()
+	logsRequest := spl.getStreamToPod()
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
 		return wrapErr(err)
@@ -108,7 +108,7 @@ func (spl *StreamPodLog) StreamPodLogs(ctx context.Context) (err error) {
 // human-readable prepended. NOTE: this will make log-lines NON-JSON
 func TailPodLogs(ctx context.Context, pod v1.Pod, writer io.Writer, parseTimestamps bool) (err error) {
 	now := metav1.Now()
-	streamPodLog := StreamPodLog{
+	streamPodLog := StreamingRequest{
 		Pod: &pod,
 		Options: &v1.PodLogOptions{
 			Timestamps: parseTimestamps,
@@ -117,17 +117,32 @@ func TailPodLogs(ctx context.Context, pod v1.Pod, writer io.Writer, parseTimesta
 		},
 		Writer: writer,
 	}
-	return streamPodLog.StreamPodLogs(ctx)
+	return streamPodLog.Stream(ctx)
 }
 
 // GetPodLogs streams the pod logs and shunts them to the `writer`, as well as
 // returning the last `requestedLineLength` of lines of logs in a slice.
 // If `getPrevious` was activated, it will get the previous logs
-func (spl *StreamPodLog) GetPodLogs(ctx context.Context) (
+func GetPodLogs(
+	ctx context.Context,
+	client kubernetes.Interface,
+	pod v1.Pod,
+	getPrevious bool,
+	writer io.Writer,
+	requestedLineLength int,
+) (
 	[]string, error,
 ) {
 	wrapErr := func(err error) error { return fmt.Errorf("in GetPodLogs: %w", err) }
-	logsRequest := spl.getStreamLogPod()
+
+	streamPodLog := StreamingRequest{
+		Pod:      &pod,
+		Previous: getPrevious,
+		Options:  &v1.PodLogOptions{},
+		Writer:   writer,
+		client:   client,
+	}
+	logsRequest := streamPodLog.getStreamToPod()
 
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
@@ -141,15 +156,15 @@ func (spl *StreamPodLog) GetPodLogs(ctx context.Context) (
 	}()
 
 	rd := bufio.NewReader(logStream)
-	teedReader := io.TeeReader(rd, spl.Writer)
+	teedReader := io.TeeReader(rd, writer)
 	scanner := bufio.NewScanner(teedReader)
 
-	if spl.Length <= 0 {
-		spl.Length = 10
+	if requestedLineLength <= 0 {
+		requestedLineLength = 10
 	}
 
 	// slice to hold the last `requestedLineLength` lines of log
-	lines := make([]string, spl.Length)
+	lines := make([]string, requestedLineLength)
 	// index of the current line of the log (starting from zero)
 	i := 0
 	// index in the slice that holds the current line of log
@@ -159,7 +174,7 @@ func (spl *StreamPodLog) GetPodLogs(ctx context.Context) (
 		lines[curIdx] = scanner.Text()
 		i++
 		// `curIdx` walks from `0` to `requestedLineLength-1` and then to `0` in a cycle
-		curIdx = i % spl.Length
+		curIdx = i % requestedLineLength
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -167,7 +182,7 @@ func (spl *StreamPodLog) GetPodLogs(ctx context.Context) (
 	}
 	// if `curIdx` walks to in the middle of 0 and `requestedLineLength-1`, assemble the last `requestedLineLength`
 	// lines of logs
-	if i > spl.Length && curIdx < (spl.Length-1) {
+	if i > requestedLineLength && curIdx < (requestedLineLength-1) {
 		return append(lines[curIdx+1:], lines[:curIdx+1]...), nil
 	}
 

@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("StreamPodLog default options", func() {
+var _ = Describe("StreamingRequest default options", func() {
 	podNamespace := "pod-test"
 	podName := "pod-name-test"
 	pod := &v1.Pod{
@@ -41,7 +41,7 @@ var _ = Describe("StreamPodLog default options", func() {
 	}
 
 	podLogOptions := &v1.PodLogOptions{}
-	streamPodLog := StreamPodLog{
+	streamPodLog := StreamingRequest{
 		Pod:     pod,
 		Options: podLogOptions,
 	}
@@ -64,7 +64,7 @@ var _ = Describe("StreamPodLog default options", func() {
 		Expect(options.Previous).To(BeTrue())
 	})
 
-	It("it should provide the proper client", func() {
+	It("it should provide the proper client", func(ctx context.Context) {
 		streamPodLog.Previous = false
 		client := fake.NewSimpleClientset(pod)
 		streamPodLog.client = client
@@ -73,10 +73,10 @@ var _ = Describe("StreamPodLog default options", func() {
 		writer := bufio.NewWriter(logBuffer)
 		streamPodLog.Writer = writer
 
-		pods := streamPodLog.getStreamLogPod()
-		err := streamPodLog.StreamPodLogs(context.TODO())
+		pods := streamPodLog.getStreamToPod()
+		err := streamPodLog.Stream(ctx)
 		Expect(err).ToNot(HaveOccurred())
-		logs, err := pods.Stream(context.TODO())
+		logs, err := pods.Stream(ctx)
 		Expect(err).ToNot(HaveOccurred())
 
 		rd := bufio.NewReader(logs)
@@ -85,8 +85,18 @@ var _ = Describe("StreamPodLog default options", func() {
 		Expect(fakeLog).To(BeEquivalentTo("fake logs"))
 	})
 
-	It("stream logs with a non set length", func() {
-		_, err := streamPodLog.GetPodLogs(context.TODO())
+	It("stream logs with a non set length", func(ctx context.Context) {
+		pod := v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      podName,
+			},
+		}
+		client := fake.NewSimpleClientset(&pod)
+		streamPodLog.client = client
+		logBuffer := new(bytes.Buffer)
+		writer := bufio.NewWriter(logBuffer)
+		_, err := GetPodLogs(ctx, client, pod, false, writer, 0)
 		Expect(err).ToNot(HaveOccurred())
 	})
 })

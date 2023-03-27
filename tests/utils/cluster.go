@@ -29,6 +29,8 @@ import (
 	"github.com/cheynewallace/tabby"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -150,14 +152,9 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLe
 	}()
 
 	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
-
-	streamPodLogs := &logs.StreamPodLog{
-		Pod:      &pod,
-		Writer:   f,
-		Previous: getPrevious,
-		Length:   requestedLineLength,
-	}
-	return streamPodLogs.GetPodLogs(env.Ctx)
+	conf := ctrl.GetConfigOrDie()
+	client := kubernetes.NewForConfigOrDie(conf)
+	return logs.GetPodLogs(env.Ctx, client, pod, getPrevious, f, requestedLineLength)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
