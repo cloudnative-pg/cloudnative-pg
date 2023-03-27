@@ -44,6 +44,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -263,6 +264,11 @@ func (r *ClusterReconciler) updateResourceStatus(
 		resources.instances.Items,
 		resources.jobs.Items,
 		resources.pvcs.Items,
+	)
+	hibernation.EnrichStatus(
+		ctx,
+		cluster,
+		resources.instances.Items,
 	)
 
 	// Count jobs

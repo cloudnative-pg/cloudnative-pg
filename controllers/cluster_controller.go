@@ -48,6 +48,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -286,6 +287,19 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 				"isPodReady", isPodReady)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
+	}
+
+	// If the user has requested to hibernate the cluster, we do that before
+	// ensuring the primary to be healthy. The hibernation starts from the
+	// primary Pod to ensure the replicas are in sync and doing it here avoids
+	// any unwanted switchover.
+	if result, err := hibernation.Reconcile(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+	); result != nil || err != nil {
+		return *result, err
 	}
 
 	// We have already updated the status in updateResourceStatus call,
