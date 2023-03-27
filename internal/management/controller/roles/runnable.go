@@ -194,6 +194,11 @@ func (sr *RoleSynchronizer) updateRoleCommentFromSpec(
 	return nil
 }
 
+// updateInRoleFromSpec aligns a role's memberships in the database, by applying
+// any required GRANT or REVOKE commands
+//
+// NOTE: while in the CREATE statement we can use IN ROLE, this is not available for ALTER
+// and so reconciliation of role memberships needs to be done in a separate stage
 func (sr *RoleSynchronizer) updateInRoleFromSpec(
 	ctx context.Context,
 	roleManager RoleManager,
@@ -205,7 +210,7 @@ func (sr *RoleSynchronizer) updateInRoleFromSpec(
 			newDatabaseRoleBuilder().withRole(role).build(),
 		)
 		if err != nil {
-			return fmt.Errorf("while update membership for role %s: %w", role.Name, err)
+			return fmt.Errorf("while updating membership for role %s: %w", role.Name, err)
 		}
 		rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
 		rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)

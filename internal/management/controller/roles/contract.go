@@ -28,7 +28,7 @@ import (
 
 // DatabaseRole represents the role information read from / written to the Database
 // The password management in the apiv1.RoleConfiguration assumes the use of Secrets,
-// so cannot cleanly mapped to Postgres
+// so cannot cleanly be mapped to Postgres
 type DatabaseRole struct {
 	Name            string         `json:"name"`
 	Comment         string         `json:"comment,omitempty"`
@@ -55,11 +55,11 @@ func (d *DatabaseRole) passwordNeedsUpdating(
 		storedPasswordState[d.Name].TransactionID != d.transactionID
 }
 
-func (d *DatabaseRole) isCommentEqual(inSpec apiv1.RoleConfiguration) bool {
+func (d *DatabaseRole) hasSameCommentAs(inSpec apiv1.RoleConfiguration) bool {
 	return d.Comment == inSpec.Comment
 }
 
-func (d *DatabaseRole) isInRoleEqual(inSpec apiv1.RoleConfiguration) bool {
+func (d *DatabaseRole) isInSameRolesAs(inSpec apiv1.RoleConfiguration) bool {
 	if len(d.InRoles) == 0 && len(inSpec.InRoles) == 0 {
 		return true
 	}
@@ -73,13 +73,13 @@ func (d *DatabaseRole) isInRoleEqual(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(d.InRoles, inSpec.InRoles)
 }
 
-// isEquivalent checks a subset of the attributes of roles in DB and Spec
+// isEquivalentTo checks a subset of the attributes of roles in DB and Spec
 // leaving passwords and role membership (InRoles) to be done separately
 //
 // TODO: timestamp parsing is necessary here, as we may have non-identical
 // strings back from Postgres.
 // And, in the Spec, do we use Postgres timestamp format?
-func (d *DatabaseRole) isEquivalent(inSpec apiv1.RoleConfiguration) bool {
+func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	type reducedEntries struct {
 		Name            string
 		Superuser       bool

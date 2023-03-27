@@ -83,12 +83,12 @@ func evaluateNextRoleActions(
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
 			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
 		case isInSpec &&
-			(!role.isEquivalent(inSpec) ||
+			(!role.isEquivalentTo(inSpec) ||
 				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
-		case isInSpec && !role.isCommentEqual(inSpec):
+		case isInSpec && !role.hasSameCommentAs(inSpec):
 			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], inSpec)
-		case isInSpec && !role.isInRoleEqual(inSpec):
+		case isInSpec && !role.isInSameRolesAs(inSpec):
 			rolesByAction[roleUpdateMembers] = append(rolesByAction[roleUpdateMembers], inSpec)
 		case !isInSpec:
 			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})

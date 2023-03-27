@@ -104,10 +104,10 @@ func (m *mockRoleManager) GetLastTransactionID(_ context.Context, _ DatabaseRole
 }
 
 func (m *mockRoleManager) UpdateMembership(
-	ctx context.Context,
+	_ context.Context,
 	role DatabaseRole,
-	rolesToGrant []string,
-	rolesToRevoke []string,
+	_ []string,
+	_ []string,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"updateMembership", role.Name})
 	_, found := m.roles[role.Name]
@@ -118,7 +118,7 @@ func (m *mockRoleManager) UpdateMembership(
 	return nil
 }
 
-func (m *mockRoleManager) GetParentRoles(ctx context.Context, role DatabaseRole) ([]string, error) {
+func (m *mockRoleManager) GetParentRoles(_ context.Context, role DatabaseRole) ([]string, error) {
 	m.callHistory = append(m.callHistory, funcCall{"getParentRoles", role.Name})
 	_, found := m.roles[role.Name]
 	if !found {

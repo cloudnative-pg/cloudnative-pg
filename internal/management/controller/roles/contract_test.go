@@ -14,7 +14,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 			Inherit: true,
 		}
 		config := apiv1.RoleConfiguration{Name: "abc"}
-		res := role.isEquivalent(config)
+		res := role.isEquivalentTo(config)
 		Expect(res).To(BeTrue())
 	})
 
@@ -32,14 +32,14 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				"Userrole2", "role1", "TestroleABC",
 			},
 		}
-		res := role.isEquivalent(config)
+		res := role.isEquivalentTo(config)
 		Expect(res).To(BeTrue())
 	})
 
 	It("should return false when the objects aren't equal", func() {
 		role := DatabaseRole{Name: "abc", Inherit: true}
 		config := apiv1.RoleConfiguration{Name: "def"}
-		res := role.isEquivalent(config)
+		res := role.isEquivalentTo(config)
 		Expect(res).To(BeFalse())
 	})
 
@@ -57,7 +57,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				"Userrole2", "role1", "TestroleABC",
 			},
 		}
-		res := role.isInRoleEqual(config)
+		res := role.isInSameRolesAs(config)
 		Expect(res).To(BeTrue())
 	})
 
@@ -75,7 +75,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				"Userrole2", "role1x", "TestroleABC",
 			},
 		}
-		res := role.isInRoleEqual(config)
+		res := role.isInSameRolesAs(config)
 		Expect(res).To(BeFalse())
 	})
 
