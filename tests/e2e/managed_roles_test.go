@@ -18,9 +18,11 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,6 +103,30 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					g.Expect(stdout).NotTo(ContainSubstring(username))
 				}
 			}, 60).Should(Succeed())
+		}
+
+		assertInRoles := func(namespace, primaryPod string, expectedRoles []string) {
+			slices.Sort(expectedRoles)
+			Eventually(func() []string {
+				var rolesInDB []string
+				cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
+					"\"SELECT string_agg(pg_get_userbyid(members.roleid),',') as inroles "+
+					"FROM pg_catalog.pg_authid as auth "+
+					"LEFT JOIN pg_catalog.pg_auth_members as members "+
+					"ON auth.oid = members.member "+
+					"WHERE rolname = '%s' GROUP BY auth.oid\"", newUserName)
+				stdout, _, err := utils.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryPod,
+					cmd))
+				if err != nil {
+					return []string{"error"}
+				}
+				rolesInDB = strings.Split(strings.TrimSuffix(stdout, "\n"), ",")
+				slices.Sort(rolesInDB)
+				return rolesInDB
+			}, 30).Should(BeEquivalentTo(expectedRoles))
 		}
 
 		It("can create roles specified in the managed roles stanza", func() {
@@ -317,7 +343,52 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				}, 30).Should(Equal("\n"))
 			})
 		})
-		// TODO remove pending decorator once CNP-3571 is fixed
+
+		It("Can update role membership and verify changes in db ", func() {
+			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			By("Add role in InRole for role new_role and verify in database", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				updated := cluster.DeepCopy()
+				for i, r := range updated.Spec.Managed.Roles {
+					if r.Name == newUserName {
+						updated.Spec.Managed.Roles[i].InRoles = []string{
+							"postgres",
+							username,
+						}
+					}
+					if r.Name == username {
+						updated.Spec.Managed.Roles[i].Comment = ""
+					}
+				}
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+				assertInRoles(namespace, primaryPodInfo.Name, []string{"postgres", username})
+			})
+
+			By("Remove parent role from InRole for role new_role and verify in database", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				updated := cluster.DeepCopy()
+				for i, r := range updated.Spec.Managed.Roles {
+					if r.Name == newUserName {
+						updated.Spec.Managed.Roles[i].InRoles = []string{
+							username,
+						}
+					}
+					if r.Name == username {
+						updated.Spec.Managed.Roles[i].Comment = ""
+					}
+				}
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+				assertInRoles(namespace, primaryPodInfo.Name, []string{username})
+			})
+		})
+
 		It("Can update role password in secrets and db and verify the connectivity", func() {
 			newPassword := "ThisIsNew"
 			By("update password from secrets", func() {
