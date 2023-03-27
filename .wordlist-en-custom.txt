@@ -783,6 +783,9 @@ recoveryTarget
 recoverytarget
 recv
 redhat
+rehydrate
+rehydrated
+rehydration
 relatime
 replicationSlots
 replicationTLSSecret
