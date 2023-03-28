@@ -18,9 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,22 +52,20 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 
 	It("cluster can be recovered after pgdata corruption on primary", func() {
 		var oldPrimaryPodName, oldPrimaryPVCName string
-		var oldPrimaryPodInfo, newPrimaryPodInfo *corev1.Pod
-		var err error
 		tableName := "test_pg_data_corruption"
-		err = env.CreateNamespace(namespace)
+		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
-		By("gather current primary pod and pvc info", func() {
-			oldPrimaryPodInfo, err = env.GetClusterPrimary(namespace, clusterName)
+		By("gather current primary pod and pvc", func() {
+			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			oldPrimaryPodName = oldPrimaryPodInfo.GetName()
+			oldPrimaryPodName = oldPrimaryPod.GetName()
 			// Get the PVC related to the pod
-			pvcName := oldPrimaryPodInfo.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+			pvcName := oldPrimaryPod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
 			pvc := &corev1.PersistentVolumeClaim{}
 			namespacedPVCName := types.NamespacedName{
 				Namespace: namespace,
@@ -80,32 +75,27 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimaryPVCName = pvc.GetName()
 		})
-		By("corrupting primary pod by removing pg data", func() {
+		By("corrupting primary pod by removing PGDATA", func() {
 			cmd := fmt.Sprintf("kubectl exec %v -n %v postgres -- /bin/bash -c 'rm -fr %v/base/*'",
-				oldPrimaryPodInfo.GetName(), namespace, specs.PgDataPath)
+				oldPrimaryPodName, namespace, specs.PgDataPath)
 			_, _, err = testsUtils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		})
-		By("verify failover after primary pod pg data corruption", func() {
-			// check operator will perform a failover
+		By("verify failover happened after the primary pod PGDATA got corrupted", func() {
 			Eventually(func() string {
-				newPrimaryPodInfo, err = env.GetClusterPrimary(namespace, clusterName)
+				newPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				if err != nil {
 					return ""
 				}
-				return newPrimaryPodInfo.GetName()
+				return newPrimaryPod.GetName()
 			}, 120, 5).ShouldNot(BeEquivalentTo(oldPrimaryPodName),
 				"operator did not perform the failover")
 		})
 		By("verify the old primary pod health", func() {
-			// old primary get restarted check that
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      oldPrimaryPodName,
 			}
-			pod := &corev1.Pod{}
-			err := env.Client.Get(env.Ctx, namespacedName, pod)
-			Expect(err).ToNot(HaveOccurred())
 			// The pod should be restarted and the count of the restarts should greater than 0
 			Eventually(func() (int32, error) {
 				pod := &corev1.Pod{}
@@ -120,39 +110,56 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				return int32(-1), nil
 			}, 120).Should(BeNumerically(">", 0))
 		})
-		By("removing old primary pod and attached pvc", func() {
+		By("removing the old primary pod and its pvc", func() {
 			// Check if walStorage is enabled
 			walStorageEnabled, err := testsUtils.IsWalStorageEnabled(namespace, clusterName, env)
 			Expect(err).ToNot(HaveOccurred())
 
-			// removing old primary pod attached pvc
-			_, _, err = testsUtils.Run(
-				fmt.Sprintf("kubectl delete pvc %v -n %v --wait=false", oldPrimaryPVCName, namespace))
-			Expect(err).ToNot(HaveOccurred())
-
-			// removing WalStorage PVC if needed
-			if walStorageEnabled {
-				_, _, err = testsUtils.Run(
-					fmt.Sprintf("kubectl delete pvc %v-wal -n %v --wait=false", oldPrimaryPVCName, namespace))
-				Expect(err).ToNot(HaveOccurred())
-			}
-
+			// Force delete setting
 			zero := int64(0)
 			forceDelete := &client.DeleteOptions{
 				GracePeriodSeconds: &zero,
 			}
+
+			// removing old primary pod attached pvc
+			namespacedPVCName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      oldPrimaryPVCName,
+			}
+			oldPrimaryPVC := &corev1.PersistentVolumeClaim{}
+			err = env.Client.Get(env.Ctx, namespacedPVCName, oldPrimaryPVC)
+			Expect(err).ToNot(HaveOccurred())
+			err = env.Client.Delete(env.Ctx, oldPrimaryPVC, forceDelete)
+			Expect(err).ToNot(HaveOccurred())
+
+			// removing walStorage PVC if needed
+			if walStorageEnabled {
+				oldPrimaryWalPVCName := fmt.Sprintf("%v-wal", oldPrimaryPVCName)
+				namespacedWalPVCName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      oldPrimaryWalPVCName,
+				}
+				oldPrimaryWalPVC := &corev1.PersistentVolumeClaim{}
+				err = env.Client.Get(env.Ctx, namespacedWalPVCName, oldPrimaryWalPVC)
+				Expect(err).ToNot(HaveOccurred())
+				err = env.Client.Delete(env.Ctx, oldPrimaryWalPVC, forceDelete)
+				Expect(err).ToNot(HaveOccurred())
+			}
+
 			// Deleting old primary pod
 			err = env.DeletePod(namespace, oldPrimaryPodName, forceDelete)
 			Expect(err).ToNot(HaveOccurred())
 
-			// checking that pod and pvc should be removed
-			NamespacedName := types.NamespacedName{
+			// checking that the old primary pod is now eventually gone
+			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      oldPrimaryPodName,
 			}
-			Pod := &corev1.Pod{}
-			err = env.Client.Get(env.Ctx, NamespacedName, Pod)
-			Expect(err).To(HaveOccurred(), "pod %v is not deleted", oldPrimaryPodName)
+			Eventually(func() error {
+				oldPrimaryPod := &corev1.Pod{}
+				return env.Client.Get(env.Ctx, namespacedName, oldPrimaryPod)
+			}, 300).Should(HaveOccurred())
+
 		})
 		By("verify new pod should join as standby", func() {
 			newPodName := clusterName + "-4"
@@ -161,32 +168,19 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				Name:      newPodName,
 			}
 			Eventually(func() (bool, error) {
-				pod := &corev1.Pod{}
-				err := env.Client.Get(env.Ctx, newPodNamespacedName, pod)
+				pod := corev1.Pod{}
+				err := env.Client.Get(env.Ctx, newPodNamespacedName, &pod)
 				if err != nil {
 					return false, err
 				}
-				if utils.IsPodActive(*pod) || utils.IsPodReady(*pod) {
+				if utils.IsPodActive(pod) && utils.IsPodReady(pod) && specs.IsPodStandby(pod) {
 					return true, nil
 				}
 				return false, nil
 			}, 300).Should(BeTrue())
-
-			newPod := &corev1.Pod{}
-			err = env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
-			Expect(err).ToNot(HaveOccurred())
-			// check that pod should join as in recovery mode
-			commandTimeout := time.Second * 10
-			Eventually(func() (string, error) {
-				stdOut, _, err := env.ExecCommand(env.Ctx, *newPod, specs.PostgresContainerName,
-					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", "select pg_is_in_recovery();")
-				return strings.Trim(stdOut, "\n"), err
-			}, 60, 2).Should(BeEquivalentTo("t"))
-			// verify test data
-			AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 		})
-		// verify test data on new primary
+		AssertClusterIsReady(namespace, clusterName, 300, env)
 		AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
-		assertClusterStandbysAreStreaming(namespace, clusterName)
+		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 	})
 })

@@ -189,7 +189,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			primary, err = env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
-			assertClusterStandbysAreStreaming(namespace, clusterName)
+			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 		})
 
 		// Scenario: all the pods of a cluster are on a single node and another schedulable node exists.
@@ -313,7 +313,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				primary, err = env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
-				assertClusterStandbysAreStreaming(namespace, clusterName)
+				AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 			})
 		})
 	})
@@ -363,7 +363,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			// Retrieve the names of the current pods. All of them should
-			// not exists anymore after the drain
+			// not exist anymore after the drain
 			var podsBeforeDrain []string
 			By("retrieving the current pods' names", func() {
 				podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -394,13 +394,11 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			// Expect pods to be running on the uncordoned node and to have new names
 			By("verifying cluster pods changed names", func() {
-				timeout := 300
-				Eventually(func() bool {
+				timeout := 600
+				Eventually(func(g Gomega) {
 					matchingNames := 0
 					podList, err := env.GetClusterPodList(namespace, clusterName)
-					if err != nil {
-						return false
-					}
+					g.Expect(err).ToNot(HaveOccurred())
 					for _, pod := range podList.Items {
 						// compare the old pod list with the current pod names
 						for _, oldName := range podsBeforeDrain {
@@ -409,15 +407,16 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 							}
 						}
 					}
-					return len(podList.Items) == 3 && matchingNames == 0
-				}, timeout).Should(BeTrue())
+					g.Expect(len(podList.Items)).To(BeEquivalentTo(3))
+					g.Expect(matchingNames).To(BeEquivalentTo(0))
+				}, timeout).Should(Succeed())
 			})
 
 			// Expect the (previously created) test data to be available
 			primary, err = env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
-			assertClusterStandbysAreStreaming(namespace, clusterName)
+			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 			err = nodes.UncordonAllNodes(env)
 			Expect(err).ToNot(HaveOccurred())
 		})

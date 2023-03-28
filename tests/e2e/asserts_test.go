@@ -524,9 +524,8 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string,
 	})
 }
 
-// assertClusterStandbysAreStreaming verifies that all the standbys of a
-// cluster have a wal receiver running.
-func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
+// AssertClusterStandbysAreStreaming verifies that all the standbys of a cluster have a wal-receiver running.
+func AssertClusterStandbysAreStreaming(namespace string, clusterName string, timeout int32) {
 	Eventually(func() error {
 		standbyPods, err := env.GetClusterReplicas(namespace, clusterName)
 		if err != nil {
@@ -551,7 +550,7 @@ func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
 		}
 
 		return nil
-	}, 120).ShouldNot(HaveOccurred())
+	}, timeout).ShouldNot(HaveOccurred())
 }
 
 func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout int32) {
@@ -1378,7 +1377,7 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
 		// Restored standby should be attached to restored primary
-		assertClusterStandbysAreStreaming(namespace, restoredClusterName)
+		AssertClusterStandbysAreStreaming(namespace, restoredClusterName, 120)
 	})
 
 	By("checking the restored cluster with pre-defined app password connectable", func() {
@@ -1434,7 +1433,7 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string, pod *
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
 		// Restored standby should be attached to restored primary
-		assertClusterStandbysAreStreaming(namespace, restoredClusterName)
+		AssertClusterStandbysAreStreaming(namespace, restoredClusterName, 120)
 	})
 }
 
@@ -1442,13 +1441,13 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string, pod *
 // and that the new cluster is functioning properly
 func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName, databaseName string) {
 	By("Importing Database in a new cluster", func() {
-		err := testsUtils.ImportDatabaseMicroservice(namespace, clusterWithExternalClusterName,
-			clusterName, databaseName, env, "")
+		err := testsUtils.ImportDatabaseMicroservice(namespace, clusterName,
+			clusterWithExternalClusterName, "", databaseName, env)
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, clusterWithExternalClusterName, 800, env)
 		// Restored standby should be attached to restored primary
-		assertClusterStandbysAreStreaming(namespace, clusterWithExternalClusterName)
+		AssertClusterStandbysAreStreaming(namespace, clusterWithExternalClusterName, 120)
 	})
 }
 
