@@ -170,7 +170,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 
 	if includeLogs {
 		logZipper := func(zipper *zip.Writer, dirname string) error {
-			return streamPodLogsToZip(ctx, operatorPods, dirname, "operator-logs", zipper)
+			return streamOperatorLogsToZip(ctx, operatorPods, dirname, "operator-logs", zipper)
 		}
 		sections = append(sections, logZipper)
 	}

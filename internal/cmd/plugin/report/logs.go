@@ -37,8 +37,8 @@ var podLogOptions = &corev1.PodLogOptions{
 	Timestamps: true, // NOTE: when activated, lines are no longer JSON
 }
 
-// streamPodLogsToZip streams the pod logs to a new section in the ZIP
-func streamPodLogsToZip(
+// streamOperatorLogsToZip streams the operator pod logs to a new section in the ZIP
+func streamOperatorLogsToZip(
 	ctx context.Context,
 	pods []corev1.Pod,
 	dirName string,
@@ -102,7 +102,7 @@ func streamClusterLogsToZip(
 	}
 	streamPodLogs := &logs.StreamingRequest{
 		Options:  podLogOptions,
-		Previous: false,
+		Previous: true,
 	}
 
 	for _, pod := range podList.Items {
@@ -113,6 +113,13 @@ func streamClusterLogsToZip(
 		}
 		podPointer := pod
 		streamPodLogs.Pod = &podPointer
+
+		fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n")
+		// We ignore the error because it will error if there are no previous logs
+		_ = streamPodLogs.Stream(ctx, writer)
+		fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n")
+
+		streamPodLogs.Previous = false
 
 		err = streamPodLogs.Stream(ctx, writer)
 		if err != nil {
