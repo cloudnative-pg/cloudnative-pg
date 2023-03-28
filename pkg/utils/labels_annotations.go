@@ -21,8 +21,6 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 const (
@@ -124,6 +122,18 @@ func SetOperatorVersion(object *metav1.ObjectMeta, version string) {
 	object.Annotations[OperatorVersionAnnotationName] = version
 }
 
+// InheritanceController controls if a label or an annotation should be
+// inherited
+type InheritanceController interface {
+	// IsAnnotationInherited checks if a certain annotation should be
+	// inherited
+	IsAnnotationInherited(name string) bool
+
+	// IsLabelInherited checks if a certain label should be
+	// inherited
+	IsLabelInherited(name string) bool
+}
+
 // InheritAnnotations puts into the object metadata the passed annotations if
 // the annotations are supposed to be inherited. The passed configuration is
 // used to determine whenever a certain annotation is inherited or not
@@ -131,7 +141,7 @@ func InheritAnnotations(
 	object *metav1.ObjectMeta,
 	annotations map[string]string,
 	fixedAnnotations map[string]string,
-	config *configuration.Data,
+	controller InheritanceController,
 ) {
 	if object.Annotations == nil {
 		object.Annotations = make(map[string]string)
@@ -142,7 +152,7 @@ func InheritAnnotations(
 	}
 
 	for key, value := range annotations {
-		if config.IsAnnotationInherited(key) {
+		if controller.IsAnnotationInherited(key) {
 			object.Annotations[key] = value
 		}
 	}
@@ -155,7 +165,7 @@ func InheritLabels(
 	object *metav1.ObjectMeta,
 	labels map[string]string,
 	fixedLabels map[string]string,
-	config *configuration.Data,
+	controller InheritanceController,
 ) {
 	if object.Labels == nil {
 		object.Labels = make(map[string]string)
@@ -166,7 +176,7 @@ func InheritLabels(
 	}
 
 	for key, value := range labels {
-		if config.IsLabelInherited(key) {
+		if controller.IsLabelInherited(key) {
 			object.Labels[key] = value
 		}
 	}

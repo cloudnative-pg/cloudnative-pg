@@ -19,12 +19,24 @@ package utils
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"k8s.io/utils/strings/slices"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+type fakeInhericanceController struct {
+	labels      []string
+	annotations []string
+}
+
+func (ctrl *fakeInhericanceController) IsLabelInherited(key string) bool {
+	return slices.Contains(ctrl.labels, key)
+}
+
+func (ctrl *fakeInhericanceController) IsAnnotationInherited(key string) bool {
+	return slices.Contains(ctrl.annotations, key)
+}
 
 var _ = Describe("Operator version annotation management", func() {
 	pod := corev1.Pod{}
@@ -50,8 +62,13 @@ var _ = Describe("Operator version annotation management", func() {
 
 // nolint:dupl
 var _ = Describe("Annotation management", func() {
-	config := &configuration.Data{}
-	config.ReadConfigMap(map[string]string{"INHERITED_ANNOTATIONS": "one,two"})
+	config := &fakeInhericanceController{
+		annotations: []string{
+			"one",
+			"two",
+		},
+	}
+
 	toBeMatchedMap := map[string]string{"one": "1", "two": "2", "three": "3"}
 	fixedMap := map[string]string{"four": "4", "five": "5"}
 
@@ -70,8 +87,12 @@ var _ = Describe("Annotation management", func() {
 
 // nolint:dupl
 var _ = Describe("Label management", func() {
-	config := &configuration.Data{}
-	config.ReadConfigMap(map[string]string{"INHERITED_LABELS": "alpha,beta"})
+	config := &fakeInhericanceController{
+		labels: []string{
+			"alpha",
+			"beta",
+		},
+	}
 	toBeMatchedMap := map[string]string{"alpha": "1", "beta": "2", "gamma": "3"}
 	fixedMap := map[string]string{"delta": "4", "epsilon": "5"}
 
