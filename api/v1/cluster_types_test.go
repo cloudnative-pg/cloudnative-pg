@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -873,5 +874,39 @@ var _ = Describe("Managed Roles", func() {
 		}
 		Expect(cluster.ContainsManagedRolesConfiguration()).To(BeFalse())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeFalse())
+	})
+})
+
+var _ = Describe("SeccompProfile usages", func() {
+	It("return a RuntimeDefault profile by default", func() {
+		cluster := Cluster{}
+		runtimeProfile := &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		}
+		seccompProfile := cluster.GetSeccompProfile()
+		Expect(seccompProfile).To(BeEquivalentTo(runtimeProfile))
+	})
+
+	It("return the specified unconfined seccomprofile", func() {
+		profile := &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeUnconfined,
+		}
+		cluster := Cluster{Spec: ClusterSpec{SeccompProfile: profile}}
+
+		returnedProfile := cluster.GetSeccompProfile()
+		Expect(returnedProfile).To(BeEquivalentTo(profile))
+	})
+
+	It("return a localhost profile with a path set", func() {
+		profilePath := "/path/to/profile"
+		profile := &corev1.SeccompProfile{
+			Type:             corev1.SeccompProfileTypeLocalhost,
+			LocalhostProfile: &profilePath,
+		}
+		cluster := Cluster{Spec: ClusterSpec{SeccompProfile: profile}}
+
+		returnedProfile := cluster.GetSeccompProfile()
+		Expect(returnedProfile).To(BeEquivalentTo(profile))
+		Expect(returnedProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
 	})
 })
