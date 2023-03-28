@@ -17,8 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -57,62 +55,70 @@ var _ = Describe("Testing Annotations and labels subset", func() {
 	}
 
 	It("should make sure that a contained annotations subset is recognized", func() {
-		isSubset := IsAnnotationSubset(set, subSet, nil, &config.Data{
-			InheritedAnnotations: []string{environment},
-		})
+		ctrl := &fakeInhericanceController{
+			annotations: []string{environment},
+		}
+		isSubset := IsAnnotationSubset(set, subSet, nil, ctrl)
 		Expect(isSubset).To(BeTrue())
 	})
 
 	It("should make sure that a annotations non-subset is recognized", func() {
-		isSubset := IsAnnotationSubset(set, subSet, nil, &config.Data{
-			InheritedAnnotations: []string{environment, department},
-		})
+		ctrl := &fakeInhericanceController{
+			annotations: []string{environment, department},
+		}
+		isSubset := IsAnnotationSubset(set, subSet, nil, ctrl)
 		Expect(isSubset).To(BeFalse())
 	})
 
 	It("should make sure fixed annotation is considered in subset", func() {
+		ctrl := &fakeInhericanceController{
+			annotations: []string{environment},
+		}
 		isSubset := IsAnnotationSubset(set, subSet,
-			map[string]string{"application": "game-history"}, &config.Data{
-				InheritedAnnotations: []string{environment},
-			})
+			map[string]string{"application": "game-history"}, ctrl)
 		Expect(isSubset).To(BeTrue())
 	})
 
 	It("should make sure fixed annotation is considered in non-subset", func() {
+		ctrl := &fakeInhericanceController{
+			annotations: []string{environment},
+		}
 		isSubset := IsAnnotationSubset(set, subSet,
-			map[string]string{department: "finance"}, &config.Data{
-				InheritedAnnotations: []string{environment},
-			})
+			map[string]string{department: "finance"}, ctrl)
 		Expect(isSubset).To(BeFalse())
 	})
 
 	It("should make sure that a contained labels subset is recognized", func() {
-		isSubset := IsLabelSubset(set, subSet, nil, &config.Data{
-			InheritedLabels: []string{environment},
-		})
+		ctrl := &fakeInhericanceController{
+			labels: []string{environment},
+		}
+		isSubset := IsLabelSubset(set, subSet, nil, ctrl)
 		Expect(isSubset).To(BeTrue())
 	})
 
 	It("should make sure that a labels non-subset is recognized", func() {
-		isSubset := IsLabelSubset(set, subSet, nil, &config.Data{
-			InheritedLabels: []string{environment, department},
-		})
+		ctrl := &fakeInhericanceController{
+			labels: []string{environment, department},
+		}
+		isSubset := IsLabelSubset(set, subSet, nil, ctrl)
 		Expect(isSubset).To(BeFalse())
 	})
 
 	It("should make sure fixed label is considered in subset", func() {
+		ctrl := &fakeInhericanceController{
+			labels: []string{environment},
+		}
 		isSubset := IsLabelSubset(set, subSet,
-			map[string]string{"application": "game-history"}, &config.Data{
-				InheritedLabels: []string{environment},
-			})
+			map[string]string{"application": "game-history"}, ctrl)
 		Expect(isSubset).To(BeTrue())
 	})
 
 	It("should make sure fixed label is considered in non-subset", func() {
+		ctrl := &fakeInhericanceController{
+			labels: []string{environment},
+		}
 		isSubset := IsLabelSubset(set, subSet,
-			map[string]string{department: "finance"}, &config.Data{
-				InheritedLabels: []string{environment},
-			})
+			map[string]string{department: "finance"}, ctrl)
 		Expect(isSubset).To(BeFalse())
 	})
 })
