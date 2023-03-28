@@ -59,16 +59,15 @@ func streamPodLogsToZip(
 
 		streamPodLogs := &logs.StreamingRequest{
 			Pod:      &pod,
-			Writer:   writer,
 			Options:  podLogOptions,
 			Previous: true,
 		}
-		fmt.Fprint(streamPodLogs.Writer, "\n====== Begin of Previous Log =====\n")
-		_ = streamPodLogs.Stream(ctx)
-		fmt.Fprint(streamPodLogs.Writer, "\n====== End of Previous Log =====\n")
+		fmt.Fprint(writer, "\n====== Begin of Previous Log =====\n")
+		_ = streamPodLogs.Stream(ctx, writer)
+		fmt.Fprint(writer, "\n====== End of Previous Log =====\n")
 
 		streamPodLogs.Previous = false
-		if err := streamPodLogs.Stream(ctx); err != nil {
+		if err := streamPodLogs.Stream(ctx, writer); err != nil {
 			return err
 		}
 	}
@@ -109,9 +108,8 @@ func streamClusterLogsToZip(ctx context.Context, clusterName, namespace string,
 		}
 		podPointer := pod
 		streamPodLogs.Pod = &podPointer
-		streamPodLogs.Writer = writer
 
-		err = streamPodLogs.Stream(ctx)
+		err = streamPodLogs.Stream(ctx, writer)
 		if err != nil {
 			return err
 		}
@@ -163,8 +161,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			}
 			podPointer := pod
 			streamPodLogs.Pod = &podPointer
-			streamPodLogs.Writer = writer
-			err = streamPodLogs.Stream(ctx)
+			err = streamPodLogs.Stream(ctx, writer)
 			if err != nil {
 				return err
 			}

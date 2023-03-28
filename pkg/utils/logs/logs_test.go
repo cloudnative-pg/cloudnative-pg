@@ -17,10 +17,9 @@ limitations under the License.
 package logs
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"io"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,21 +40,42 @@ var _ = Describe("StreamingRequest default options", func() {
 	}
 
 	podLogOptions := &v1.PodLogOptions{}
-	streamPodLog := StreamingRequest{
-		Pod:     pod,
-		Options: podLogOptions,
-	}
 
 	It("should return the proper podName", func() {
+		streamPodLog := StreamingRequest{
+			Pod:     pod,
+			Options: podLogOptions,
+		}
 		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(podName))
 		Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(podNamespace))
 	})
 
-	It("previous options must be false by default", func() {
-		Expect(streamPodLog.Previous).To(BeFalse())
+	It("should be able to handle the nil Pod", func(ctx context.Context) {
+		streamPodLog := StreamingRequest{
+			Pod:     nil,
+			Options: podLogOptions,
+		}
+		var logBuffer bytes.Buffer
+		err := streamPodLog.Stream(ctx, &logBuffer)
+		Expect(err).To(HaveOccurred())
+		Expect(logBuffer.String()).To(BeEmpty())
+		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(""))
+		Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(""))
 	})
 
-	It("get PodLogOptions properly when setting Previous", func() {
+	It("previous option must be false by default", func() {
+		streamPodLog := StreamingRequest{
+			Pod:     pod,
+			Options: podLogOptions,
+		}
+		Expect(streamPodLog.getLogOptions().Previous).To(BeFalse())
+	})
+
+	It("getLogOptions respects the Previous field setting", func() {
+		streamPodLog := StreamingRequest{
+			Pod:     pod,
+			Options: podLogOptions,
+		}
 		options := streamPodLog.getLogOptions()
 		Expect(options.Previous).To(BeFalse())
 
@@ -64,39 +84,59 @@ var _ = Describe("StreamingRequest default options", func() {
 		Expect(options.Previous).To(BeTrue())
 	})
 
-	It("it should provide the proper client", func(ctx context.Context) {
-		streamPodLog.Previous = false
+	It("should read the logs with the provided k8s client", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
-		streamPodLog.client = client
+		streamPodLog := StreamingRequest{
+			Pod:      pod,
+			Options:  podLogOptions,
+			Previous: false,
+			client:   client,
+		}
 
-		logBuffer := new(bytes.Buffer)
-		writer := bufio.NewWriter(logBuffer)
-		streamPodLog.Writer = writer
-
-		pods := streamPodLog.getStreamToPod()
-		err := streamPodLog.Stream(ctx)
+		var logBuffer bytes.Buffer
+		err := streamPodLog.Stream(ctx, &logBuffer)
 		Expect(err).ToNot(HaveOccurred())
-		logs, err := pods.Stream(ctx)
-		Expect(err).ToNot(HaveOccurred())
 
-		rd := bufio.NewReader(logs)
-		fakeLog, err := rd.ReadString('\n')
-		Expect(err).To(BeEquivalentTo(io.EOF))
-		Expect(fakeLog).To(BeEquivalentTo("fake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 
-	It("stream logs with a non set length", func(ctx context.Context) {
-		pod := v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: podNamespace,
-				Name:      podName,
-			},
-		}
-		client := fake.NewSimpleClientset(&pod)
-		streamPodLog.client = client
-		logBuffer := new(bytes.Buffer)
-		writer := bufio.NewWriter(logBuffer)
-		_, err := GetPodLogs(ctx, client, pod, false, writer, 0)
+	It("GetPodLogs correctly streams and provides output lines", func(ctx context.Context) {
+		client := fake.NewSimpleClientset(pod)
+		var logBuffer bytes.Buffer
+		lines, err := GetPodLogs(ctx, client, *pod, false, &logBuffer, 2)
 		Expect(err).ToNot(HaveOccurred())
+		Expect(lines).To(HaveLen(2))
+		Expect(lines[0]).To(BeEquivalentTo("fake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+	})
+
+	It("GetPodLogs defaults to non-zero lines shown if set to zero", func(ctx context.Context) {
+		client := fake.NewSimpleClientset(pod)
+		var logBuffer bytes.Buffer
+		lines, err := GetPodLogs(ctx, client, *pod, false, &logBuffer, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(lines).To(HaveLen(10))
+		Expect(lines[0]).To(BeEquivalentTo("fake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+	})
+
+	It("TailPodLogs defaults to non-zero lines shown if set to zero", func() {
+		client := fake.NewSimpleClientset(pod)
+		var logBuffer bytes.Buffer
+		ctx := context.TODO()
+		var wait sync.WaitGroup
+		wait.Add(1)
+		go func() {
+			defer GinkgoRecover()
+			err := TailPodLogs(ctx, client, *pod, &logBuffer, true)
+			Expect(err).ToNot(HaveOccurred())
+			wait.Done()
+		}()
+		// calling ctx.Done is not strictly necessary because the fake client
+		// will terminate TailPodLogs anyway. But in use, TailPodLogs will follow
+		// the pod logs until the context, or the logs, are over
+		ctx.Done()
+		wait.Wait()
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 })
