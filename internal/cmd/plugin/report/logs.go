@@ -63,9 +63,9 @@ func streamPodLogsToZip(
 			Options:  podLogOptions,
 			Previous: true,
 		}
-		fmt.Fprint(writer, "\n====== Begin of Previous Log =====\n")
+		fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n")
 		_ = streamPodLogs.Stream(ctx, writer)
-		fmt.Fprint(writer, "\n====== End of Previous Log =====\n")
+		fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n")
 
 		streamPodLogs.Previous = false
 		if err := streamPodLogs.Stream(ctx, writer); err != nil {
