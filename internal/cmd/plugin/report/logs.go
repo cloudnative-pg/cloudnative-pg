@@ -41,7 +41,8 @@ var podLogOptions = &corev1.PodLogOptions{
 func streamPodLogsToZip(
 	ctx context.Context,
 	pods []corev1.Pod,
-	dirName, name string,
+	dirName string,
+	name string,
 	zipper *zip.Writer,
 ) error {
 	logsDir := filepath.Join(dirName, name)
@@ -77,8 +78,12 @@ func streamPodLogsToZip(
 
 // streamClusterLogsToZip streams the logs from the pods in the cluster, one by
 // one, each in a new file, within  a folder
-func streamClusterLogsToZip(ctx context.Context, clusterName, namespace string,
-	dirname string, zipper *zip.Writer,
+func streamClusterLogsToZip(
+	ctx context.Context,
+	clusterName string,
+	namespace string,
+	dirname string,
+	zipper *zip.Writer,
 ) error {
 	logsdir := filepath.Join(dirname, "logs")
 	_, err := zipper.Create(logsdir + "/")

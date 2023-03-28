@@ -51,14 +51,19 @@ var _ = Describe("StreamingRequest default options", func() {
 	})
 
 	It("should be able to handle the nil Pod", func(ctx context.Context) {
+		// the nil pod passed will still default to the empty pod name
+		client := fake.NewSimpleClientset()
 		streamPodLog := StreamingRequest{
 			Pod:     nil,
 			Options: podLogOptions,
+			client:  client,
 		}
 		var logBuffer bytes.Buffer
 		err := streamPodLog.Stream(ctx, &logBuffer)
-		Expect(err).To(HaveOccurred())
-		Expect(logBuffer.String()).To(BeEmpty())
+		Expect(err).NotTo(HaveOccurred())
+		// The fake client will be given a pod name of "", but it will still
+		// go on along. In production, we'd have an error when pod not found
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(""))
 		Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(""))
 	})
@@ -128,12 +133,13 @@ var _ = Describe("StreamingRequest default options", func() {
 		wait.Add(1)
 		go func() {
 			defer GinkgoRecover()
+			defer wait.Done()
 			err := TailPodLogs(ctx, client, *pod, &logBuffer, true)
-			Expect(err).ToNot(HaveOccurred())
-			wait.Done()
+			Expect(err).NotTo(HaveOccurred())
 		}()
 		// calling ctx.Done is not strictly necessary because the fake client
-		// will terminate TailPodLogs anyway. But in use, TailPodLogs will follow
+		// will terminate the pod stream anyway, ending TailPodLogs.
+		// But in "production", TailPodLogs will follow
 		// the pod logs until the context, or the logs, are over
 		ctx.Done()
 		wait.Wait()
