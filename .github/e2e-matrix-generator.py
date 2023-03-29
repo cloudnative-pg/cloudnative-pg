@@ -114,6 +114,7 @@ class E2EJob(dict):
                 "id": name,
                 "k8s_version": k8s_version,
                 "postgres_version": postgres_version,
+                "postgres_kind": "PostgreSQL",
                 "postgres_img": f"{repo}:{postgres_version}",
                 "postgres_pre_img": f"{repo}:{postgres_version_pre}",
             }
