@@ -3630,6 +3630,12 @@ spec:
                 items:
                   type: string
                 type: array
+              roleConfigurationsRejected:
+                additionalProperties:
+                  type: string
+                description: RolesConfigurationsRejected lists roles that cannot be
+                  reconciled in PostgreSQL, with an explanation of the cause
+                type: object
               rolePasswordStatus:
                 additionalProperties:
                   description: PasswordState represents the state of the password

@@ -18,6 +18,7 @@ package roles
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -142,7 +143,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	if rolePasswords == nil {
 		rolePasswords = map[string]apiv1.PasswordState{}
 	}
-	appliedState, err := sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
+	appliedState, irreconcilableRoles, err := sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
 	if err != nil {
 		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
@@ -155,6 +156,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 	updatedCluster := remoteCluster.DeepCopy()
 	updatedCluster.Status.RolePasswordStatus = appliedState
+	updatedCluster.Status.RoleConfigurationsRejected = irreconcilableRoles
 	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(&remoteCluster))
 }
 
@@ -166,18 +168,22 @@ func getRoleNames(roles []apiv1.RoleConfiguration) []string {
 	return names
 }
 
+// dropRolesFromSpec tries to drop a list of roles
+// It will carry on if there are errors, trying to do as much as possible,
+// and will return the errors due to actions that cannot be applied
 func (sr *RoleSynchronizer) dropRolesFromSpec(
 	ctx context.Context,
 	roleManager RoleManager,
 	roles []apiv1.RoleConfiguration,
-) error {
+) map[string]error {
+	errs := make(map[string]error)
 	for _, role := range roles {
 		err := roleManager.Delete(ctx, newDatabaseRoleBuilder().withRole(role).build())
-		if err != nil {
-			return fmt.Errorf("while delete role %s: %w", role.Name, err)
+		if err != nil && errors.As(err, &RoleError{}) {
+			errs[role.Name] = err
 		}
 	}
-	return nil
+	return errs
 }
 
 func (sr *RoleSynchronizer) updateRoleCommentFromSpec(
@@ -228,49 +234,51 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	roleManager RoleManager,
 	config *apiv1.ManagedConfiguration,
 	storedPasswordState map[string]apiv1.PasswordState,
-) (map[string]apiv1.PasswordState, error) {
+) (map[string]apiv1.PasswordState, map[string]string, error) {
 	latestSecretResourceVersion, err := getPasswordSecretResourceVersion(
 		ctx, sr.client, config.Roles, sr.instance.Namespace)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rolesByAction := evaluateNextRoleActions(
 		ctx, config, rolesInDB, storedPasswordState, latestSecretResourceVersion)
 	if err != nil {
-		return nil, fmt.Errorf("while syncrhonizing managed roles: %w", err)
+		return nil, nil, fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
 
-	res, err := sr.applyRoleActions(
+	passwordStates, irreconcilableRoles, err := sr.applyRoleActions(
 		ctx,
 		roleManager,
 		rolesByAction,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("while synchronizing roles in primary: %w", err)
+		return nil, nil, fmt.Errorf("while synchronizing roles in primary: %w", err)
 	}
 
 	// Merge the status from database into spec. We should keep all the status
 	// otherwise in the next loop the user without status will be marked as need update
-	for role, stateInDatabase := range res {
+	for role, stateInDatabase := range passwordStates {
 		storedPasswordState[role] = stateInDatabase
 	}
-	return storedPasswordState, nil
+	return storedPasswordState, irreconcilableRoles, nil
 }
 
 // applyRoleActions applies the actions to reconcile roles in the DB with the Spec
-// nolint: gocognit
+// It returns the apiv1.PasswordState for each role, as well as the roles that
+// it is not possible to reconcile for expectable errors, e.g. dropping a role owning content
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	roleManager RoleManager,
 	rolesByAction rolesByAction,
-) (map[string]apiv1.PasswordState, error) {
+) (map[string]apiv1.PasswordState, map[string]string, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("applying role actions")
 
+	irreconcilableRoles := make(map[string]string)
 	appliedChanges := make(map[string]apiv1.PasswordState)
 	for action, roles := range rolesByAction {
 		switch action {
@@ -287,25 +295,25 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			for _, role := range roles {
 				pass, version, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				databaseRole := newDatabaseRoleBuilder().withRole(role).withPassword(pass).build()
 				switch action {
 				case roleCreate:
 					if err := roleManager.Create(ctx, databaseRole); err != nil {
-						return nil, err
+						return nil, nil, err
 					}
 				case roleUpdate:
 					if err := roleManager.Update(ctx, databaseRole); err != nil {
-						return nil, err
+						return nil, nil, err
 					}
 				default:
-					return nil, fmt.Errorf("unsupported roleAction %s", action)
+					return nil, nil, fmt.Errorf("unsupported roleAction %s", action)
 				}
 
 				transactionID, err := roleManager.GetLastTransactionID(ctx, databaseRole)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 
 				appliedChanges[role.Name] = apiv1.PasswordState{
@@ -314,12 +322,15 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				}
 			}
 		case roleDelete:
-			if err := sr.dropRolesFromSpec(ctx, roleManager, roles); err != nil {
-				return nil, err
+			errs := sr.dropRolesFromSpec(ctx, roleManager, roles)
+			if len(errs) >= 0 {
+				for roleName, err := range errs {
+					irreconcilableRoles[roleName] = err.Error()
+				}
 			}
 		case roleSetComment:
 			if err := sr.updateRoleCommentFromSpec(ctx, roleManager, roles); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		case roleUpdateMembers:
 			if err := sr.updateInRoleFromSpec(ctx, roleManager, roles); err != nil {
@@ -328,7 +339,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 		}
 	}
 
-	return appliedChanges, nil
+	return appliedChanges, irreconcilableRoles, nil
 }
 
 // getPassword retrieves the password stored in the Kubernetes secret for the

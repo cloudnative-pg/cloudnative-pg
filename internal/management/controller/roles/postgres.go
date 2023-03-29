@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -164,10 +165,24 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	return nil
 }
 
+// getRoleError matches an error to one of the expectable RoleError's
+// If it does not match, it will simply pass the original error along
+func getRoleError(err error, roleName string, action roleAction) (bool, error) {
+	errPGX, ok := err.(*pgconn.PgError)
+	if ok {
+		switch errPGX.Code {
+		case "2BP01":
+			return true, RoleError{
+				Action:   string(roleDelete),
+				RoleName: roleName,
+				Cause:    errPGX.Detail,
+			}
+		}
+	}
+	return false, err
+}
+
 // Delete the role
-// TODO: we need to do something better here. We should not delete a user that
-// has created tables or other objects. That should be blocked at the validation
-// webhook level, otherwise it will be very poor UX and the operator may not notice
 func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
@@ -176,7 +191,11 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 	contextLog.Debug("Dropping", "query", query)
 	_, err := sm.superUserDB.ExecContext(ctx, query)
 	if err != nil {
-		return fmt.Errorf("could not delete role %s: %w", role.Name, err)
+		isExpectable, betErr := getRoleError(err, role.Name, roleDelete)
+		if !isExpectable {
+			contextLog.Error(err, "while dropping Role", "role", role.Name)
+		}
+		return betErr
 	}
 
 	return nil

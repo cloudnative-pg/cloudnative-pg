@@ -19,12 +19,31 @@ package roles
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
 	"sort"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
+
+// RoleError is an EXPECTABLE error when performing role-related actions on the
+// database. For example, we might try to drop a role that owns objects.
+//
+// RoleError is NOT meant to represent unexpected errors such as a panic or a
+// connection interruption
+type RoleError struct {
+	RoleName string
+	Cause    string
+	Action   string
+}
+
+// Error returns a description for the error,
+// … and lets RoleError comply with the `error` interface
+func (re RoleError) Error() string {
+	return fmt.Sprintf("could not perform action '%s' on role %s: %s",
+		re.Action, re.RoleName, re.Cause)
+}
 
 // DatabaseRole represents the role information read from / written to the Database
 // The password management in the apiv1.RoleConfiguration assumes the use of Secrets,
