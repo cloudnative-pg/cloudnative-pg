@@ -62,6 +62,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		"log_temp_files":              "1024",
 		"log_autovacuum_min_duration": "1s",
 		"log_replication_commands":    "on",
+		"wal_receiver_timeout":        "2s",
 	}
 	updateClusterPostgresParams := func(paramsMap map[string]string) {
 		cluster := apiv1.Cluster{}

@@ -17,7 +17,7 @@ spec:
 
   storage:
     size: 1Gi
-    storageClass: 
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
   bootstrap:
     recovery:

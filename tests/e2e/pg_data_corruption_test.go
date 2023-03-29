@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,6 +61,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+
 		By("gather current primary pod and pvc", func() {
 			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -75,12 +77,14 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimaryPVCName = pvc.GetName()
 		})
+
 		By("corrupting primary pod by removing PGDATA", func() {
 			cmd := fmt.Sprintf("kubectl exec %v -n %v postgres -- /bin/bash -c 'rm -fr %v/base/*'",
 				oldPrimaryPodName, namespace, specs.PgDataPath)
 			_, _, err = testsUtils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
 		By("verify failover happened after the primary pod PGDATA got corrupted", func() {
 			Eventually(func() string {
 				newPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
@@ -91,6 +95,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			}, 120, 5).ShouldNot(BeEquivalentTo(oldPrimaryPodName),
 				"operator did not perform the failover")
 		})
+
 		By("verify the old primary pod health", func() {
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
@@ -110,6 +115,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				return int32(-1), nil
 			}, 120).Should(BeNumerically(">", 0))
 		})
+
 		By("removing the old primary pod and its pvc", func() {
 			// Check if walStorage is enabled
 			walStorageEnabled, err := testsUtils.IsWalStorageEnabled(namespace, clusterName, env)
@@ -159,8 +165,8 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				oldPrimaryPod := &corev1.Pod{}
 				return env.Client.Get(env.Ctx, namespacedName, oldPrimaryPod)
 			}, 300).Should(HaveOccurred())
-
 		})
+
 		By("verify new pod should join as standby", func() {
 			newPodName := clusterName + "-4"
 			newPodNamespacedName := types.NamespacedName{
