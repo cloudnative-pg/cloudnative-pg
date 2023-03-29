@@ -33,7 +33,9 @@ import (
 	"github.com/thoas/go-funk"
 	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -188,7 +190,9 @@ var _ = BeforeEach(func() {
 	var buf bytes.Buffer
 	go func() {
 		// get logs without timestamp parsing; for JSON parseability
-		err = logs.TailPodLogs(context.TODO(), operatorPod, &buf, false)
+		conf := ctrl.GetConfigOrDie()
+		client := kubernetes.NewForConfigOrDie(conf)
+		err = logs.TailPodLogs(context.TODO(), client, operatorPod, &buf, false)
 		if err != nil {
 			_, _ = fmt.Fprintf(&buf, "Error tailing logs, dumping operator logs: %v\n", err)
 		}

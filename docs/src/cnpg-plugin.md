@@ -525,7 +525,36 @@ Archive:  reportRedacted.zip
   inflating: report_operator_<TIMESTAMP>/manifests/cnpg-webhook-cert.yaml
 ```
 
-You can verify that the confidential information is REDACTED:
+If you activated the `--logs` option, you'd see an extra subdirectory:
+
+```shell
+Archive:  report_operator_<TIMESTAMP>.zip
+  <snipped …>
+  creating: report_operator_<TIMESTAMP>/operator-logs/
+  inflating: report_operator_<TIMESTAMP>/operator-logs/cnpg-controller-manager-66fb98dbc5-pxkmh-logs.jsonl
+```
+
+!!! Note
+    The plugin will try to get the PREVIOUS operator's logs, which is helpful
+    when investigating restarted operators.
+    In all cases, it will also try to get the CURRENT operator logs. If current
+    and previous logs are available, it will show them both.
+
+``` json
+====== Begin of Previous Log =====
+2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.19.1","build":{"Version":"1.19.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:56:41.251851909Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
+  <snipped …>
+
+====== End of Previous Log =====
+2023-03-28T12:57:09.854306024Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.19.1","build":{"Version":"1.19.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:57:09.854363943Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
+```
+
+If the operator hasn't been restarted, you'll still see the `====== Begin …`
+and  `====== End …` guards, with no content inside.
+
+You can verify that the confidential information is REDACTED by default:
 
 ```shell
 cd report_operator_<TIMESTAMP>/manifests/
