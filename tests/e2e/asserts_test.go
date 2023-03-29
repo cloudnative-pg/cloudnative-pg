@@ -2671,10 +2671,8 @@ func AssertPVCCount(namespace, clusterName string, pvcCount, timeout int) {
 	})
 }
 
-// AssertClusterPhase checks phase of a cluster asserted by user. It checks for cluster
-// phase consistently for certain time to phase out any error in between. Very useful in case
-// we are upgrading cluster.
-func AssertClusterPhase(namespace, clusterName, phase string, timeout int) {
+// AssertClusterConsistentPhase expects the phase of a cluster to be consistent for a given number of seconds.
+func AssertClusterConsistentPhase(namespace, clusterName, phase string, timeout int) {
 	By(fmt.Sprintf("verifying cluster '%v' phase '%v' consistency", clusterName, phase), func() {
 		Consistently(func() (string, error) {
 			cluster, err := env.GetCluster(namespace, clusterName)
@@ -2683,5 +2681,19 @@ func AssertClusterPhase(namespace, clusterName, phase string, timeout int) {
 			}
 			return cluster.Status.Phase, nil
 		}, timeout, 2).Should(BeEquivalentTo(phase))
+	})
+}
+
+// AssertClusterEventualPhase checks for a given time the phase of a cluster to eventually become the one
+// declared by the user.
+func AssertClusterEventualPhase(namespace, clusterName, phase string, timeout int) {
+	By(fmt.Sprintf("verifying cluster '%v' phase should eventually become '%v'", clusterName, phase), func() {
+		Eventually(func() (string, error) {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			if err != nil {
+				return "", err
+			}
+			return cluster.Status.Phase, nil
+		}, timeout).Should(BeEquivalentTo(phase))
 	})
 }
