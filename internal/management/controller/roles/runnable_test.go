@@ -103,6 +103,31 @@ func (m *mockRoleManager) GetLastTransactionID(_ context.Context, _ DatabaseRole
 	return 0, nil
 }
 
+func (m *mockRoleManager) UpdateMembership(
+	_ context.Context,
+	role DatabaseRole,
+	_ []string,
+	_ []string,
+) error {
+	m.callHistory = append(m.callHistory, funcCall{"updateMembership", role.Name})
+	_, found := m.roles[role.Name]
+	if !found {
+		return fmt.Errorf("trying to update Role Members of unknown role: %s", role.Name)
+	}
+	m.roles[role.Name] = role
+	return nil
+}
+
+func (m *mockRoleManager) GetParentRoles(_ context.Context, role DatabaseRole) ([]string, error) {
+	m.callHistory = append(m.callHistory, funcCall{"getParentRoles", role.Name})
+	_, found := m.roles[role.Name]
+	if !found {
+		return nil, fmt.Errorf("trying to get parent of unknown role: %s", role.Name)
+	}
+	m.roles[role.Name] = role
+	return nil, nil
+}
+
 var _ = Describe("Role synchronizer tests", func() {
 	It("it will Create ensure:present roles in spec missing from DB", func(ctx context.Context) {
 		managedConf := apiv1.ManagedConfiguration{
@@ -188,6 +213,37 @@ var _ = Describe("Role synchronizer tests", func() {
 		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
+	})
+
+	It("it will call the updateMembership method", func(ctx context.Context) {
+		trueValue := true
+		managedConf := apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name:      "edb_test",
+					Superuser: true,
+					Inherit:   &trueValue,
+					InRoles: []string{
+						"role1",
+						"role2",
+					},
+				},
+			},
+		}
+		rm := mockRoleManager{
+			roles: map[string]DatabaseRole{
+				"edb_test": {
+					Name:      "edb_test",
+					Superuser: true,
+					Inherit:   true,
+				},
+			},
+		}
+		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""},
+			funcCall{"getParentRoles", "edb_test"},
+			funcCall{"updateMembership", "edb_test"}))
 	})
 
 	It("it will Delete ensure:absent roles that are in the DB", func(ctx context.Context) {
