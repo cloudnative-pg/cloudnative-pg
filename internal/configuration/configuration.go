@@ -86,7 +86,7 @@ type Data struct {
 	MonitoringQueriesSecret string `json:"monitoringQueriesSecret" env:"MONITORING_QUERIES_SECRET"`
 
 	// CreateAnyService is true when the user wants the operator to create
-	// the <cluster-name>-any service. Defaults to true.
+	// the <cluster-name>-any service. Defaults to false.
 	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
 }
 
@@ -99,7 +99,7 @@ func newDefaultConfig() *Data {
 		OperatorPullSecretName: DefaultOperatorPullSecretName,
 		OperatorImageName:      versions.DefaultOperatorImageName,
 		PostgresImageName:      versions.DefaultImageName,
-		CreateAnyService:       true,
+		CreateAnyService:       false,
 	}
 }
 
