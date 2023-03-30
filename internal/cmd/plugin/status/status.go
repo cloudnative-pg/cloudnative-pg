@@ -30,6 +30,8 @@ import (
 	"github.com/cheynewallace/tabby"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -100,6 +103,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	}
 
 	status.printBasicInfo()
+	status.printHibernationInfo()
 	var nonFatalError error
 	if verbose {
 		err = status.printPostgresConfiguration(ctx)
@@ -232,6 +236,32 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	}
 
 	summary.Print()
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printHibernationInfo() {
+	cluster := fullStatus.Cluster
+
+	hibernationCondition := meta.FindStatusCondition(
+		cluster.Status.Conditions,
+		hibernation.HibernationConditionType,
+	)
+	if hibernationCondition == nil {
+		return
+	}
+
+	hibernationStatus := tabby.New()
+	if hibernationCondition.Status == metav1.ConditionTrue {
+		hibernationStatus.AddLine("Status", "Hibernated")
+	} else {
+		hibernationStatus.AddLine("Status", "Active")
+	}
+	hibernationStatus.AddLine("Message", hibernationCondition.Message)
+	hibernationStatus.AddLine("Time", hibernationCondition.LastTransitionTime.Time.UTC())
+
+	fmt.Println(aurora.Green("Hibernation"))
+	hibernationStatus.Print()
+
 	fmt.Println()
 }
 

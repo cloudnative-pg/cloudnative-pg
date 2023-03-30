@@ -68,8 +68,6 @@ def convert_ginkgo_test(t, matrix):
     ):
         state = "ignoreFailed"
 
-    kind = "PostgreSQL"
-
     branch = matrix["branch"]
     if branch == "":
         branch = matrix["refname"]
@@ -85,7 +83,7 @@ def convert_ginkgo_test(t, matrix):
         "error_file": errFile,
         "error_line": errLine,
         "platform": matrix["runner"],
-        "postgres_kind": kind,
+        "postgres_kind": matrix["postgres_kind"],
         "matrix_id": matrix["id"],
         "postgres_version": matrix["postgres"],
         "k8s_version": matrix["kubernetes"],
@@ -127,7 +125,6 @@ def create_artifact(matrix, name, state, error):
     branch = matrix["branch"]
     if branch == "":
         branch = matrix["refname"]
-    kind = "PostgreSQL"
 
     return {
         "name": name,
@@ -139,7 +136,7 @@ def create_artifact(matrix, name, state, error):
         "error_line": 0,
         "platform": matrix["runner"],
         "matrix_id": matrix["id"],
-        "postgres_kind": kind,
+        "postgres_kind": matrix["postgres_kind"],
         "postgres_version": matrix["postgres"],
         "k8s_version": matrix["kubernetes"],
         "workflow_id": matrix["runid"],

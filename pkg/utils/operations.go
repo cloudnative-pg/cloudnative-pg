@@ -18,8 +18,6 @@ package utils
 
 import (
 	corev1 "k8s.io/api/core/v1"
-
-	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // CollectDifferencesFromMaps returns a map of the differences (as slice of strings) of the values of two given maps.
@@ -95,8 +93,11 @@ func isResourceListSubset(resourceList, subResourceList corev1.ResourceList) boo
 // NOTE: there are two parameters for the labels to check. The `fixed` one
 // is for labels that certainly should be inherited (`inheritedMetadata` in the spec)
 // The other labels may or may not be inherited depending on the configuration
-func IsLabelSubset(mapSet, clusterLabels, fixedInheritedLabels map[string]string,
-	configuration *config.Data,
+func IsLabelSubset(
+	mapSet,
+	clusterLabels,
+	fixedInheritedLabels map[string]string,
+	controller InheritanceController,
 ) bool {
 	mapToEvaluate := map[string]string{}
 
@@ -105,7 +106,7 @@ func IsLabelSubset(mapSet, clusterLabels, fixedInheritedLabels map[string]string
 	}
 
 	for key, value := range clusterLabels {
-		if configuration.IsLabelInherited(key) {
+		if controller.IsLabelInherited(key) {
 			mapToEvaluate[key] = value
 		}
 	}
@@ -118,8 +119,9 @@ func IsLabelSubset(mapSet, clusterLabels, fixedInheritedLabels map[string]string
 // NOTE: there are two parameters for the annotations to check. The `fixed` one
 // is for annotations that certainly should be inherited (`inheritedMetadata` in the spec)
 // The other annotations may or may not be inherited depending on the configuration
-func IsAnnotationSubset(mapSet, clusterAnnotations, fixedInheritedAnnotations map[string]string,
-	configuration *config.Data,
+func IsAnnotationSubset(
+	mapSet, clusterAnnotations, fixedInheritedAnnotations map[string]string,
+	controller InheritanceController,
 ) bool {
 	mapToEvaluate := map[string]string{}
 
@@ -128,7 +130,7 @@ func IsAnnotationSubset(mapSet, clusterAnnotations, fixedInheritedAnnotations ma
 	}
 
 	for key, value := range clusterAnnotations {
-		if configuration.IsAnnotationInherited(key) {
+		if controller.IsAnnotationInherited(key) {
 			mapToEvaluate[key] = value
 		}
 	}
