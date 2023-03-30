@@ -19,7 +19,7 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo/v2 v2.9.2
 	github.com/onsi/gomega v1.27.5
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.64.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.2.0
