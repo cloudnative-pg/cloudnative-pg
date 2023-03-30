@@ -9,7 +9,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/davecgh/go-spew v1.1.1
-	github.com/go-logr/logr v1.2.3
+	github.com/go-logr/logr v1.2.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v5 v5.3.1
@@ -18,7 +18,7 @@ require (
 	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo/v2 v2.9.2
-	github.com/onsi/gomega v1.27.5
+	github.com/onsi/gomega v1.27.6
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.64.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron v1.2.0
