@@ -221,7 +221,7 @@ func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRo
 // UpdateMembership of the role
 //
 // IMPORTANT: the various REVOKE and GRANT commands that may be required to
-// reconconcile the role will be done in a single transaction. So, if any one
+// reconcile the role will be done in a single transaction. So, if any one
 // of them fails, the role will not get updated
 func (sm PostgresRoleManager) UpdateMembership(
 	ctx context.Context,

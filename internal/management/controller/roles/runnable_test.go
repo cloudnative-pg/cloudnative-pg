@@ -112,7 +112,7 @@ func (m *mockRoleManager) UpdateMembership(
 	m.callHistory = append(m.callHistory, funcCall{"updateMembership", role.Name})
 	_, found := m.roles[role.Name]
 	if !found {
-		return fmt.Errorf("tring to update Role Members of unknown role: %s", role.Name)
+		return fmt.Errorf("trying to update Role Members of unknown role: %s", role.Name)
 	}
 	m.roles[role.Name] = role
 	return nil
