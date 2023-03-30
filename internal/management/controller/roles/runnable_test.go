@@ -150,7 +150,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+		_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			[]funcCall{
@@ -184,7 +184,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			},
 		}
 
-		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+		_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -210,7 +210,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+		_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 	})
@@ -267,7 +267,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+		_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},
@@ -298,7 +298,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+		_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(
 			funcCall{"list", ""},

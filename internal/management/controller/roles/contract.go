@@ -41,7 +41,7 @@ type RoleError struct {
 // Error returns a description for the error,
 // … and lets RoleError comply with the `error` interface
 func (re RoleError) Error() string {
-	return fmt.Sprintf("could not perform action '%s' on role %s: %s",
+	return fmt.Sprintf("could not perform %s on role %s: %s",
 		re.Action, re.RoleName, re.Cause)
 }
 
