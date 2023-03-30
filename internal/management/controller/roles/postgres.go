@@ -53,7 +53,7 @@ func (sm PostgresRoleManager) List(
 				pg_catalog.shobj_description(oid, 'pg_authid') as comment, auth.xmin, 
 				mem.inroles
 		FROM pg_catalog.pg_authid as auth
-		LEFT JOIN LATERAL (
+		LEFT JOIN (
 			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
 			FROM pg_auth_members GROUP BY member
 		) mem ON member = oid
@@ -279,7 +279,7 @@ func (sm PostgresRoleManager) GetParentRoles(
 	contextLog.Trace("Invoked", "role", role)
 	query := `SELECT mem.inroles 
 		FROM pg_catalog.pg_authid as auth
-		LEFT JOIN LATERAL (
+		LEFT JOIN (
 			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
 			FROM pg_auth_members GROUP BY member
 		) mem ON member = oid

@@ -111,7 +111,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				var rolesInDB []string
 				query := `SELECT mem.inroles 
 					FROM pg_catalog.pg_authid as auth
-					LEFT JOIN LATERAL (
+					LEFT JOIN (
 						SELECT string_agg(pg_get_userbyid(roleid), ',') as inroles, member
 						FROM pg_auth_members GROUP BY member
 					) mem ON member = oid
