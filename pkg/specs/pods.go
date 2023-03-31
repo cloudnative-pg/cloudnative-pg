@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -350,8 +351,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 			Namespace: cluster.Namespace,
 		},
 		Spec: corev1.PodSpec{
-			Hostname:  podName,
-			Subdomain: cluster.GetServiceAnyName(),
+			Hostname: podName,
 			InitContainers: []corev1.Container{
 				createBootstrapContainer(cluster),
 			},
@@ -364,6 +364,10 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 			NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 			TerminationGracePeriodSeconds: &gracePeriod,
 		},
+	}
+
+	if configuration.Current.CreateAnyService {
+		pod.Spec.Subdomain = cluster.GetServiceAnyName()
 	}
 
 	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
