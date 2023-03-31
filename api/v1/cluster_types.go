@@ -427,7 +427,7 @@ type ClusterStatus struct {
 
 	// RolesConfigurationsRejected lists roles that cannot be reconciled in PostgreSQL,
 	// with an explanation of the cause
-	RoleConfigurationsRejected map[string]string `json:"roleConfigurationsRejected,omitempty"`
+	RoleConfigurationsRejected map[string][]string `json:"roleConfigurationsRejected,omitempty"`
 
 	// The timeline of the Postgres cluster
 	TimelineID int `json:"timelineID,omitempty"`

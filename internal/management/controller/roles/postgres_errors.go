@@ -17,9 +17,28 @@ limitations under the License.
 package roles
 
 import (
+	"fmt"
+
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/lib/pq"
 )
+
+// RoleError is an EXPECTABLE error when performing role-related actions on the
+// database. For example, we might try to drop a role that owns objects.
+//
+// RoleError is NOT meant to represent unexpected errors such as a panic or a
+// connection interruption
+type RoleError struct {
+	RoleName string
+	Cause    string
+	Action   string
+}
+
+// Error returns a description for the error,
+// … and lets RoleError comply with the `error` interface
+func (re RoleError) Error() string {
+	return fmt.Sprintf("could not perform %s on role %s: %s",
+		re.Action, re.RoleName, re.Cause)
+}
 
 // getRoleError matches an error to one of the expectable RoleError's
 // If it does not match, it will simply pass the original error along
@@ -28,20 +47,20 @@ import (
 func getRoleError(err error, roleName string, action roleAction) (bool, error) {
 	errPGX, ok := err.(*pgconn.PgError)
 	if !ok {
-		return false, err
+		return false, fmt.Errorf("while trying to %s: %T %#v", action, err, err)
 	}
-	switch pq.ErrorCode(errPGX.Code).Name() {
-	case "dependent_objects_still_exist":
-		// code 2BP01
-		fallthrough
-	case "undefined_object":
-		// code 42704
+
+	knownCauses := map[string]string{
+		"2BP01": errPGX.Detail,
+		"42704": errPGX.Message,
+	}
+
+	if cause, known := knownCauses[errPGX.Code]; known {
 		return true, RoleError{
 			Action:   string(action),
 			RoleName: roleName,
-			Cause:    errPGX.Detail,
+			Cause:    cause,
 		}
-	default:
-		return false, err
 	}
+	return false, fmt.Errorf("while trying to %s: %T %#v", action, err, err)
 }

@@ -3632,7 +3632,9 @@ spec:
                 type: array
               roleConfigurationsRejected:
                 additionalProperties:
-                  type: string
+                  items:
+                    type: string
+                  type: array
                 description: RolesConfigurationsRejected lists roles that cannot be
                   reconciled in PostgreSQL, with an explanation of the cause
                 type: object

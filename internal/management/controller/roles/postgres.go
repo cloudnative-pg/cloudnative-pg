@@ -173,7 +173,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 	contextLog.Debug("Dropping", "query", query)
 	_, err := sm.superUserDB.ExecContext(ctx, query)
 	if err != nil {
-		return fmt.Errorf("could not Delete role %s: %w", role.Name, err)
+		return err
 	}
 
 	return nil

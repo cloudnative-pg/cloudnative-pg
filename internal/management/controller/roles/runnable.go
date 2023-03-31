@@ -173,7 +173,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	roleManager RoleManager,
 	config *apiv1.ManagedConfiguration,
 	storedPasswordState map[string]apiv1.PasswordState,
-) (map[string]apiv1.PasswordState, map[string]string, error) {
+) (map[string]apiv1.PasswordState, map[string][]string, error) {
 	latestSecretResourceVersion, err := getPasswordSecretResourceVersion(
 		ctx, sr.client, config.Roles, sr.instance.Namespace)
 	if err != nil {
@@ -214,11 +214,11 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	roleManager RoleManager,
 	rolesByAction rolesByAction,
-) (map[string]apiv1.PasswordState, map[string]string) {
+) (map[string]apiv1.PasswordState, map[string][]string) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("applying role actions")
 
-	irreconcilableRoles := make(map[string]string)
+	irreconcilableRoles := make(map[string][]string)
 	appliedChanges := make(map[string]apiv1.PasswordState)
 	handleRoleError := func(err error, roleName string, action roleAction) {
 		// log unexpected errors, collect expectable PostgreSQL errors
@@ -226,10 +226,11 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			return
 		}
 		isExpectable, newErr := getRoleError(err, roleName, action)
-		if !isExpectable {
-			contextLog.Error(err, "while performing "+string(action), "role", roleName)
+		if isExpectable {
+			irreconcilableRoles[roleName] = append(irreconcilableRoles[roleName], newErr.Error())
+		} else {
+			contextLog.Error(newErr, "while performing "+string(action), "role", roleName)
 		}
-		irreconcilableRoles[roleName] = newErr.Error()
 	}
 
 	for action, roles := range rolesByAction {
