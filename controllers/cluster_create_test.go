@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -87,6 +88,24 @@ var _ = Describe("cluster_create unit tests", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
+
+		By("executing createPostgresServices", func() {
+			err := clusterReconciler.createPostgresServices(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("making sure that the services have been created", func() {
+			expectResourceExistsWithDefaultClient(cluster.GetServiceReadOnlyName(), namespace, &corev1.Service{})
+			expectResourceExistsWithDefaultClient(cluster.GetServiceReadWriteName(), namespace, &corev1.Service{})
+			expectResourceExistsWithDefaultClient(cluster.GetServiceReadName(), namespace, &corev1.Service{})
+		})
+	})
+
+	It("should make sure that createPostgresServices works correctly if create any service is enabled", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace()
+		cluster := newFakeCNPGCluster(namespace)
+		configuration.Current.CreateAnyService = true
 
 		By("executing createPostgresServices", func() {
 			err := clusterReconciler.createPostgresServices(ctx, cluster)

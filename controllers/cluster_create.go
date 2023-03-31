@@ -274,12 +274,14 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 }
 
 func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
-	anyService := specs.CreateClusterAnyService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
+	if configuration.Current.CreateAnyService {
+		anyService := specs.CreateClusterAnyService(*cluster)
+		cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
 
-	if err := resources.CreateIfNotFound(ctx, r.Client, anyService); err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			return err
+		if err := resources.CreateIfNotFound(ctx, r.Client, anyService); err != nil {
+			if !apierrs.IsAlreadyExists(err) {
+				return err
+			}
 		}
 	}
 
