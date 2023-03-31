@@ -99,6 +99,9 @@ func (m *mockRoleManager) Delete(
 	return nil
 }
 
+//mock.ExpectExec(unWantedRoleExpectedDelStmt).
+//WillReturnError(&pgconn.PgError{Code: "2BP01"})
+
 func (m *mockRoleManager) GetLastTransactionID(_ context.Context, _ DatabaseRole) (int64, error) {
 	return 0, nil
 }
