@@ -249,24 +249,23 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				if err == nil {
 					appliedChanges[role.Name] = appliedState
 				}
-
 				handleRoleError(err, role.Name, action)
 			case roleDelete:
-				err := roleManager.Delete(ctx, newDatabaseRoleBuilder().withRole(role).build())
+				err := roleManager.Delete(ctx, roleFromSpec(role))
 				handleRoleError(err, role.Name, action)
 			case roleSetComment:
-				err := roleManager.UpdateComment(ctx, newDatabaseRoleBuilder().withRole(role).build())
+				// NOTE: adding/updating a comment on a role does not alter its TransactionID
+				err := roleManager.UpdateComment(ctx, roleFromSpec(role))
 				handleRoleError(err, role.Name, action)
 			case roleUpdateMembers:
-				dbRole := newDatabaseRoleBuilder().withRole(role).build()
-				inRoleInDB, err := roleManager.GetParentRoles(ctx, dbRole)
+				// NOTE: revoking / granting to a role does not alter its TransactionID
+				dbRole := roleFromSpec(role)
+				grants, revokes, err := getRoleMembershipDiff(ctx, roleManager, role, dbRole)
 				if err != nil {
 					contextLog.Error(err, "while performing "+string(action), "role", role.Name)
 					continue
 				}
-				rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
-				rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
-				err = roleManager.UpdateMembership(ctx, dbRole, rolesToGrant, rolesToRevoke)
+				err = roleManager.UpdateMembership(ctx, dbRole, grants, revokes)
 				handleRoleError(err, role.Name, action)
 			}
 		}
@@ -275,9 +274,24 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	return appliedChanges, irreconcilableRoles
 }
 
+func getRoleMembershipDiff(
+	ctx context.Context,
+	roleManager RoleManager,
+	role apiv1.RoleConfiguration,
+	dbRole DatabaseRole,
+) ([]string, []string, error) {
+	inRoleInDB, err := roleManager.GetParentRoles(ctx, dbRole)
+	if err != nil {
+		return nil, nil, err
+	}
+	rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
+	rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
+	return rolesToGrant, rolesToRevoke, nil
+}
+
 // applyRoleCreateUpdate creates/updates a role, getting the password from Kubernetes
 // secrets if so set.
-// Returns the PasswordState as well as any error
+// Returns the PasswordState, as well as any error encountered
 func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	ctx context.Context,
 	roleManager RoleManager,
@@ -289,7 +303,7 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 		return apiv1.PasswordState{}, err
 	}
 
-	databaseRole := newDatabaseRoleBuilder().withRole(role).withPassword(pass).build()
+	databaseRole := roleFromSpecWithPassword(role, pass)
 	switch action {
 	case roleCreate:
 		err = roleManager.Create(ctx, databaseRole)

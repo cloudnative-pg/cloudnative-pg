@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -163,31 +162,6 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	}
 
 	return nil
-}
-
-// getRoleError matches an error to one of the expectable RoleError's
-// If it does not match, it will simply pass the original error along
-//
-// For PostgreSQL codes see https://www.postgresql.org/docs/current/errcodes-appendix.html
-func getRoleError(err error, roleName string, action roleAction) (bool, error) {
-	errPGX, ok := err.(*pgconn.PgError)
-	if !ok {
-		return false, err
-	}
-	switch pq.ErrorCode(errPGX.Code).Name() {
-	case "dependent_objects_still_exist":
-		// code 2BP01
-		fallthrough
-	case "undefined_object":
-		// code 42704
-		return true, RoleError{
-			Action:   string(action),
-			RoleName: roleName,
-			Cause:    errPGX.Detail,
-		}
-	default:
-		return false, err
-	}
 }
 
 // Delete the role
