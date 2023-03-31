@@ -99,8 +99,8 @@ func (m *mockRoleManager) Delete(
 	return nil
 }
 
-//mock.ExpectExec(unWantedRoleExpectedDelStmt).
-//WillReturnError(&pgconn.PgError{Code: "2BP01"})
+// mock.ExpectExec(unWantedRoleExpectedDelStmt).
+// WillReturnError(&pgconn.PgError{Code: "2BP01"})
 
 func (m *mockRoleManager) GetLastTransactionID(_ context.Context, _ DatabaseRole) (int64, error) {
 	return 0, nil
@@ -242,7 +242,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			},
 		}
-		_, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+		_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""},
 			funcCall{"getParentRoles", "edb_test"},

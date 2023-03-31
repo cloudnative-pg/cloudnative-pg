@@ -167,34 +167,6 @@ func getRoleNames(roles []apiv1.RoleConfiguration) []string {
 	return names
 }
 
-// updateInRoleFromSpec aligns a role's memberships in the database, by applying
-// any required GRANT or REVOKE commands
-//
-// NOTE: while in the CREATE statement we can use IN ROLE, this is not available for ALTER
-// and so reconciliation of role memberships needs to be done in a separate stage
-func (sr *RoleSynchronizer) updateInRoleFromSpec(
-	ctx context.Context,
-	roleManager RoleManager,
-	roles []apiv1.RoleConfiguration,
-) error {
-	for _, role := range roles {
-		inRoleInDB, err := roleManager.GetParentRoles(
-			ctx,
-			newDatabaseRoleBuilder().withRole(role).build(),
-		)
-		if err != nil {
-			return fmt.Errorf("while updating membership for role %s: %w", role.Name, err)
-		}
-		rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
-		rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
-		err = roleManager.UpdateMembership(ctx, newDatabaseRoleBuilder().withRole(role).build(), rolesToGrant, rolesToRevoke)
-		if err != nil {
-			return fmt.Errorf("while update membership for role %s: %w", role.Name, err)
-		}
-	}
-	return nil
-}
-
 // synchronizeRoles aligns roles in the database to the spec
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
@@ -281,15 +253,20 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				handleRoleError(err, role.Name, action)
 			case roleDelete:
 				err := roleManager.Delete(ctx, newDatabaseRoleBuilder().withRole(role).build())
-				if err == nil {
-					delete(appliedChanges, role.Name)
-				}
 				handleRoleError(err, role.Name, action)
 			case roleSetComment:
 				err := roleManager.UpdateComment(ctx, newDatabaseRoleBuilder().withRole(role).build())
 				handleRoleError(err, role.Name, action)
 			case roleUpdateMembers:
-				err := sr.updateInRoleFromSpec(ctx, roleManager, roles)
+				dbRole := newDatabaseRoleBuilder().withRole(role).build()
+				inRoleInDB, err := roleManager.GetParentRoles(ctx, dbRole)
+				if err != nil {
+					contextLog.Error(err, "while performing "+string(action), "role", role.Name)
+					continue
+				}
+				rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
+				rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
+				err = roleManager.UpdateMembership(ctx, dbRole, rolesToGrant, rolesToRevoke)
 				handleRoleError(err, role.Name, action)
 			}
 		}
