@@ -79,10 +79,12 @@ by the CloudNativePG maintainers).
 
 The list of supported Postgres versions in the above table generally depends on
 what PostgreSQL versions were supported by the Community at the time the minor
-version was released. Starting from November 10, 2022, Postgres 10 released its 
-final release and no longer supported anymore. Please refer to the 
-[Versioning Policy](https://www.postgresql.org/support/versioning/) page for more 
-information about supported versions.
+version was released. Please refer to the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
+page for more information about supported versions.
+
+!!! Info
+    Starting by November 10, 2022, Postgres 10 reached its final release and
+    is no longer supported.
 
 ## Upcoming releases
 
