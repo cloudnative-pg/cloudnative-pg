@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -266,8 +267,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 					},
 				},
 				Spec: corev1.PodSpec{
-					Hostname:  jobName,
-					Subdomain: cluster.GetServiceAnyName(),
+					Hostname: jobName,
 					InitContainers: []corev1.Container{
 						createBootstrapContainer(cluster),
 					},
@@ -294,6 +294,10 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 				},
 			},
 		},
+	}
+
+	if configuration.Current.CreateAnyService {
+		job.Spec.Template.Spec.Subdomain = cluster.GetServiceAnyName()
 	}
 
 	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
