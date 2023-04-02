@@ -271,6 +271,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 					InitContainers: []corev1.Container{
 						createBootstrapContainer(cluster),
 					},
+					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
 						{
 							Name:            string(role),
