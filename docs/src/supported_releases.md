@@ -66,7 +66,7 @@ Git tags for versions are prepended with `v`.
 | Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported | Supported Postgres Versions |
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|-----------------------------|
 | 1.19.x          | Yes                  | February 14, 2023 | ~ July 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
-| 1.18.x          | Yes                  | November 10, 2022 | ~ May 13, 2023           | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 10 - 15                     |
+| 1.18.x          | Yes                  | November 10, 2022 | ~ May 13, 2023           | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
 | main            | No, development only |                   |                          |                               |                           | 11 - 15                     |
 
 The list of supported Kubernetes versions in the above table depends on what
@@ -79,7 +79,12 @@ by the CloudNativePG maintainers).
 
 The list of supported Postgres versions in the above table generally depends on
 what PostgreSQL versions were supported by the Community at the time the minor
-version was released.
+version was released. Please refer to the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
+page for more information about supported versions.
+
+!!! Info
+    Starting by November 10, 2022, Postgres 10 reached its final release and
+    is no longer supported.
 
 ## Upcoming releases
 
