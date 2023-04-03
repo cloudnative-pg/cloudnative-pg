@@ -293,7 +293,7 @@ type ClusterSpec struct {
 	// The configuration that is used by the portions of PostgreSQL that are managed by the instance manager
 	Managed *ManagedConfiguration `json:"managed,omitempty"`
 
-	// The SeccompProfile applied to every Pod and Container
+	// The SeccompProfile applied to every Pod and Container. If not specified, `RuntimeDefault` type will be used
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 }
 
