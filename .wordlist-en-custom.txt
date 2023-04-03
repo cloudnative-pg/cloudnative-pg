@@ -283,7 +283,6 @@ RoleBinding
 RoleConfiguration
 RolePasswordStatus
 RoleStatus
-RolesConfigurationsRejected
 RollingUpdateStatus
 Ruocco
 SAS

@@ -19,8 +19,6 @@ spec:
     - name: petrarca
       ensure: present
       comment: Francesco Petrarca
-      ensure: present
-      comment: Dante Alighieri
       login: true
       superuser: false
       createdb: true
