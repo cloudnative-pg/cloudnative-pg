@@ -53,6 +53,7 @@ Below you will find a description of the defined resources:
 - [LDAPConfig](#LDAPConfig)
 - [LocalObjectReference](#LocalObjectReference)
 - [ManagedConfiguration](#ManagedConfiguration)
+- [ManagedRoles](#ManagedRoles)
 - [Metadata](#Metadata)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
@@ -405,9 +406,7 @@ Name                                | Description                               
 `readyInstances                     ` | The total number of ready instances in the cluster. It is equal to the number of ready instance pods.                                                                              | int                                                        
 `instancesStatus                    ` | InstancesStatus indicates in which status the instances are                                                                                                                        | map[utils.PodStatus][]string                               
 `instancesReportedState             ` | The reported state of the instances during the last reconciliation loop                                                                                                            | [map[PodName]InstanceReportedState](#InstanceReportedState)
-`roleStatus                         ` | RoleStatus gives the list of roles in each state                                                                                                                                   | map[RoleStatus][]string                                    
-`rolePasswordStatus                 ` | RolePasswordStatus gives the last transaction id and hash for each managed role                                                                                                    | [map[string]PasswordState](#PasswordState)                 
-`roleConfigurationsRejected         ` | RolesConfigurationsRejected lists roles that cannot be reconciled in PostgreSQL, with an explanation of the cause                                                                  | map[string][]string                                        
+`managedRolesStatus                 ` | ManagedRolesStatus reports the state of the managed roles in the cluster                                                                                                           - *mandatory*  | [ManagedRoles](#ManagedRoles)                              
 `timelineID                         ` | The timeline of the Postgres cluster                                                                                                                                               | int                                                        
 `topology                           ` | Instances topology.                                                                                                                                                                | [Topology](#Topology)                                      
 `latestGeneratedNode                ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                        
@@ -617,6 +616,18 @@ ManagedConfiguration represents the portions of PostgreSQL that are managed by t
 Name  | Description                             | Type                                     
 ----- | --------------------------------------- | -----------------------------------------
 `roles` | Database roles managed by the `Cluster` | [[]RoleConfiguration](#RoleConfiguration)
+
+<a id='ManagedRoles'></a>
+
+## ManagedRoles
+
+ManagedRoles tracks the status of a cluster's managed roles
+
+Name            | Description                                                                                           | Type                                      
+--------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------
+`byStatus       ` | ByStatus gives the list of roles in each state                                                        | map[RoleStatus][]string                   
+`cannotReconcile` | CannotReconcile lists roles that cannot be reconciled in PostgreSQL, with an explanation of the cause | map[string][]string                       
+`passwordStatus ` | PasswordStatus gives the last transaction id and password secret version for each managed role        | [map[string]PasswordState](#PasswordState)
 
 <a id='Metadata'></a>
 

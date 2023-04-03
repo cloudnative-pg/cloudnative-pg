@@ -66,7 +66,7 @@ func Reconcile(
 		ctx,
 		cluster.Spec.Managed,
 		rolesInDB,
-		cluster.Status.RolePasswordStatus,
+		cluster.Status.ManagedRolesStatus.PasswordStatus,
 		latestPasswordResourceVersion,
 	).convertToRolesByStatus()
 
@@ -82,6 +82,6 @@ func Reconcile(
 	}
 
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Status.RoleStatus = roleNamesByStatus
+	updatedCluster.Status.ManagedRolesStatus.ByStatus = roleNamesByStatus
 	return reconcile.Result{}, c.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
 }

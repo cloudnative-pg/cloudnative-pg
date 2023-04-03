@@ -138,7 +138,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		return err
 	}
 
-	rolePasswords := remoteCluster.Status.RolePasswordStatus
+	rolePasswords := remoteCluster.Status.ManagedRolesStatus.PasswordStatus
 	if rolePasswords == nil {
 		rolePasswords = map[string]apiv1.PasswordState{}
 	}
@@ -154,8 +154,8 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		return err
 	}
 	updatedCluster := remoteCluster.DeepCopy()
-	updatedCluster.Status.RolePasswordStatus = appliedState
-	updatedCluster.Status.RoleConfigurationsRejected = irreconcilableRoles
+	updatedCluster.Status.ManagedRolesStatus.PasswordStatus = appliedState
+	updatedCluster.Status.ManagedRolesStatus.CannotReconcile = irreconcilableRoles
 	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(&remoteCluster))
 }
 

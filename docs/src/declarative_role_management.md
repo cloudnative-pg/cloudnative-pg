@@ -59,9 +59,9 @@ cycle.
 ## Unrealizable role configurations
 
 In PostgreSQL, in some cases, commands cannot be honored by the database and
-will be rejected. Please see the
+will be rejected. Please refer to the
 [PostgreSQL documentation on error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html)
-for reference.
+for details.
 
 Role operations can produce such fundamental errors.
 Two examples:
@@ -85,15 +85,29 @@ them in the cluster Status. Which segues into…
 The CRD status includes a section for the managed roles' status, as shown below:
 
 ```yaml
-  roleStatus:
-    not-managed:
-    - app
-    pending-reconciliation:
-    - dante
-    reserved:
-    - postgres
-    - streaming_replica
+status:
+  […snipped…]
+  managedRolesStatus:
+    byStatus:
+      not-managed:
+      - app
+      pending-reconciliation:
+      - dante
+      - petrarca
+      reconciled:
+      - ariosto
+      reserved:
+      - postgres
+      - streaming_replica
+    cannotReconcile:
+      dante:
+      - 'could not perform DELETE on role dante: owner of database inferno'
+      petrarca:
+      - 'could not perform UPDATE_MEMBERS on role petrarca: role "poets" does not exist'
 ```
+
+Note the special sub-section `cannotReconcile` for operations the database (and
+CloudNativePG) cannot honor, and which require human intervention.
 
 This section covers roles reserved for operator use and those that are **not**
 under declarative management, providing a comprehensive view of the roles in

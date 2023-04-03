@@ -33,6 +33,7 @@ BootstrapInitDB
 BootstrapPgBaseBackup
 BootstrapRecovery
 Burstable
+ByStatus
 CIS
 CKA
 CN
@@ -45,6 +46,7 @@ CRD
 CRDs
 CSV
 CSVs
+CannotReconcile
 Canovai
 Cecchi
 CertificatesConfiguration
@@ -171,6 +173,8 @@ LocalObjectReference
 MAPPEDMETRIC
 MVCC
 ManagedConfiguration
+ManagedRoles
+ManagedRolesStatus
 MetricDescription
 MetricName
 MetricType
@@ -212,6 +216,7 @@ PV
 PVCs
 PasswordConfiguration
 PasswordState
+PasswordStatus
 Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec

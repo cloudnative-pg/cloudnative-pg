@@ -1,0 +1,32 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-with-roles
+spec:
+  instances: 1 # this feature only requires a primary
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  managed:
+    roles:
+    - name: dante
+      ensure: present
+      comment: Dante Alighieri
+      inRoles:
+        - foobar
+    - name: petrarca
+      ensure: present
+      comment: Francesco Petrarca
+      ensure: present
+      comment: Dante Alighieri
+      login: true
+      superuser: false
+      createdb: true
+      createrole: false
+      inherit: false
+      replication: false
+      bypassrls: false
+      connectionLimit: 4
+      validUntil: "2023-04-12T15:04:05Z"
