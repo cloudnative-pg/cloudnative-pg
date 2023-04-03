@@ -187,10 +187,11 @@ func (m *mockRoleManagerWithError) Delete(
 	if !found {
 		return fmt.Errorf("tring to delete unknown role: %s", role.Name)
 	}
-	return &pgconn.PgError{
-		Code: "2BP01", Detail: "owner of database edbDatabase",
-		Message: `role "dante" cannot be dropped because some objects depend on it`,
-	}
+	return fmt.Errorf("could not delete role 'foo': %w",
+		&pgconn.PgError{
+			Code: "2BP01", Detail: "owner of database edbDatabase",
+			Message: `role "dante" cannot be dropped because some objects depend on it`,
+		})
 }
 
 func (m *mockRoleManagerWithError) GetLastTransactionID(_ context.Context, _ DatabaseRole) (int64, error) {
@@ -530,6 +531,60 @@ var _ = Describe("Role synchronizer tests", func() {
 			Expect(unrealizable["edb_test"][0]).To(BeEquivalentTo(
 				"could not perform DELETE on role edb_test: owner of database edbDatabase"))
 		})
+
+		It("it will continue the synchronization even if it finds errors", func(ctx context.Context) {
+			trueValue := true
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:   "edb_test",
+						Ensure: apiv1.EnsureAbsent,
+					},
+					{
+						Name:      "another_test",
+						Ensure:    apiv1.EnsurePresent,
+						Superuser: true,
+						Inherit:   &trueValue,
+						InRoles: []string{
+							"role1",
+							"role2",
+						},
+					},
+				},
+			}
+			rm := mockRoleManagerWithError{
+				roles: map[string]DatabaseRole{
+					"postgres": {
+						Name:      "postgres",
+						Superuser: true,
+					},
+					"edb_test": {
+						Name:      "edb_test",
+						Superuser: true,
+					},
+					"another_test": {
+						Name:      "another_test",
+						Superuser: true,
+						Inherit:   true,
+					},
+				},
+			}
+			_, unrealizable, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(rm.callHistory).To(ConsistOf(
+				funcCall{"list", ""},
+				funcCall{"delete", "edb_test"},
+				funcCall{"getParentRoles", "another_test"},
+				funcCall{"updateMembership", "another_test"},
+			))
+			Expect(unrealizable).To(HaveLen(2))
+			Expect(unrealizable["edb_test"]).To(HaveLen(1))
+			Expect(unrealizable["edb_test"][0]).To(BeEquivalentTo(
+				"could not perform DELETE on role edb_test: owner of database edbDatabase"))
+			Expect(unrealizable["another_test"]).To(HaveLen(1))
+			Expect(unrealizable["another_test"][0]).To(BeEquivalentTo(
+				"could not perform UPDATE_MEMBERS on role another_test: unknown role 'blah'"))
+		})
 	})
 })
 
@@ -540,7 +595,20 @@ var _ = DescribeTable("Role status getter tests",
 		roles, err := db.List(ctx)
 		Expect(err).ToNot(HaveOccurred())
 
-		statusMap := evaluateNextRoleActions(ctx, spec, roles, map[string]apiv1.PasswordState{}, nil).
+		statusMap := evaluateNextRoleActions(ctx, spec, roles, map[string]apiv1.PasswordState{
+			"roleWithChangedPassInSpec": {
+				TransactionID:         101,
+				SecretResourceVersion: "101B",
+			},
+			"roleWithChangedPassInDB": {
+				TransactionID:         101,
+				SecretResourceVersion: "101B",
+			},
+		},
+			map[string]string{
+				"roleWithChangedPassInSpec": "102B",
+				"roleWithChangedPassInDB":   "101B",
+			}).
 			convertToRolesByStatus()
 
 		// pivot the result to have a map: roleName -> Status, which is easier to compare for Ginkgo
@@ -576,13 +644,12 @@ var _ = DescribeTable("Role status getter tests",
 				"ensurePresent": {
 					Name:      "ensurePresent",
 					Superuser: true,
+					Inherit:   true,
 				},
 			},
 		},
 		map[string]apiv1.RoleStatus{
-			// TODO: at the moment, any role in DB and Spec will get reconciled
-			// Once we can read SCRAM-SHA-256 and reconcile only on drift, this will change
-			"ensurePresent": apiv1.RoleStatusPendingReconciliation,
+			"ensurePresent": apiv1.RoleStatusReconciled,
 			"ensureAbsent":  apiv1.RoleStatusReconciled,
 			"postgres":      apiv1.RoleStatusReserved,
 		},
@@ -649,6 +716,7 @@ var _ = DescribeTable("Role status getter tests",
 				"edb_admin": {
 					Name:      "edb_admin",
 					Superuser: true,
+					Inherit:   true,
 				},
 				"missingFromSpec": {
 					Name:      "missingFromSpec",
@@ -657,11 +725,68 @@ var _ = DescribeTable("Role status getter tests",
 			},
 		},
 		map[string]apiv1.RoleStatus{
-			"postgres": apiv1.RoleStatusReserved,
-			// TODO: at the moment, any role in DB and Spec will get reconciled
-			// Once we can read SCRAM-SHA-256 and reconcile only on drift, this will change
-			"edb_admin":       apiv1.RoleStatusPendingReconciliation,
+			"postgres":        apiv1.RoleStatusReserved,
+			"edb_admin":       apiv1.RoleStatusReconciled,
 			"missingFromSpec": apiv1.RoleStatusNotManaged,
+		},
+	),
+
+	Entry("detects roles with changed passwords in the Database",
+		&apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name:      "roleWithChangedPassInDB",
+					Superuser: true,
+					Ensure:    apiv1.EnsurePresent,
+				},
+			},
+		},
+		mockRoleManager{
+			roles: map[string]DatabaseRole{
+				"postgres": {
+					Name:      "postgres",
+					Superuser: true,
+				},
+				"roleWithChangedPassInDB": {
+					Name:          "roleWithChangedPassInDB",
+					Superuser:     true,
+					transactionID: 102,
+					Inherit:       true,
+				},
+			},
+		},
+		map[string]apiv1.RoleStatus{
+			"postgres":                apiv1.RoleStatusReserved,
+			"roleWithChangedPassInDB": apiv1.RoleStatusPendingReconciliation,
+		},
+	),
+	Entry("detects roles with changed passwords in the Spec",
+		&apiv1.ManagedConfiguration{
+			Roles: []apiv1.RoleConfiguration{
+				{
+					Name:      "roleWithChangedPassInSpec",
+					Superuser: true,
+					Ensure:    apiv1.EnsurePresent,
+				},
+			},
+		},
+		mockRoleManager{
+			roles: map[string]DatabaseRole{
+				"postgres": {
+					Name:      "postgres",
+					Superuser: true,
+				},
+				"roleWithChangedPassInSpec": {
+					Name:          "roleWithChangedPassInSpec",
+					Superuser:     true,
+					transactionID: 101,
+					Inherit:       true,
+				},
+			},
+		},
+		map[string]apiv1.RoleStatus{
+			"postgres":                  apiv1.RoleStatusReserved,
+			"roleWithChangedPassInSpec": apiv1.RoleStatusPendingReconciliation,
 		},
 	),
 )

@@ -206,7 +206,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		err = prm.Delete(ctx, roleFromSpec(unWantedRole))
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeEquivalentTo(dbError))
+		coreErr := errors.Unwrap(err)
+		Expect(coreErr).To(BeEquivalentTo(dbError))
 	})
 	// Testing Alter
 	It("Update will send a correct ALTER to the DB", func(ctx context.Context) {

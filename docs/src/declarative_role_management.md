@@ -32,6 +32,9 @@ spec:
       comment: Dante Alighieri
       login: true
       superuser: false
+      inRoles:
+        - pg_monitor
+        - pg_signal_backend
 ```
 
 The role specification in `spec.managed.roles` adheres to the
@@ -46,11 +49,38 @@ A few points are worth noting:
    `present` (the default) and `absent`.
 2. The `inherit` attribute is true by default, following PostgreSQL conventions.
 3. The `connectionLimit` attribute defaults to -1, in line with PostgreSQL conventions.
+4. Role membership with `inRoles` defaults to no memberships.
 
 Declarative role management ensures that PostgreSQL instances align with the
 spec. If a user modifies role attributes directly in the database, the
 CloudNativePG operator will revert those changes during the next reconciliation
 cycle.
+
+## Unrealizable role configurations
+
+In PostgreSQL, in some cases, commands cannot be honored by the database and
+will be rejected. Please see the
+[PostgreSQL documentation on error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html)
+for reference.
+
+Role operations can produce such fundamental errors.
+Two examples:
+
+- We ask PostgreSQL to create the role `petrarca` as a member of the role
+  (group) `poets`, but `poets` does not exist.
+- We ask PostgreSQL to drop the role `dante`, but the role `dante` is the owner
+  of the database `inferno`.
+
+These fundamental errors cannot be fixed by the database, nor the CloudNativePG
+operator, without clarification from the human administrator. The two examples
+above could be fixed by creating the role `poets` or dropping the database
+`inferno` respectively, but they might have originated due to human error, and
+in such case, the "fix" proposed might be the wrong thing to do.
+
+CloudNativePG  will record when such fundamental errors occur, and will display
+them in the cluster Status. Which segues into…
+
+## Status of managed roles
 
 The CRD status includes a section for the managed roles' status, as shown below:
 

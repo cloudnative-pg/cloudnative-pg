@@ -17,6 +17,7 @@ limitations under the License.
 package roles
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -34,7 +35,7 @@ type RoleError struct {
 }
 
 // Error returns a description for the error,
-// … and lets RoleError comply with the `error` interface
+// … and lets RoleError comply with the `error` interface
 func (re RoleError) Error() string {
 	return fmt.Sprintf("could not perform %s on role %s: %s",
 		re.Action, re.RoleName, re.Cause)
@@ -47,7 +48,12 @@ func (re RoleError) Error() string {
 func getRoleError(err error, roleName string, action roleAction) (bool, error) {
 	errPGX, ok := err.(*pgconn.PgError)
 	if !ok {
-		return false, fmt.Errorf("while trying to %s: %T %#v", action, err, err)
+		// before giving up, let's see if there is an un-wrapped error
+		coreErr := errors.Unwrap(err)
+		errPGX, ok = coreErr.(*pgconn.PgError)
+		if !ok {
+			return false, fmt.Errorf("while trying to %s: %w", action, err)
+		}
 	}
 
 	knownCauses := map[string]string{
@@ -62,5 +68,5 @@ func getRoleError(err error, roleName string, action roleAction) (bool, error) {
 			Cause:    cause,
 		}
 	}
-	return false, fmt.Errorf("while trying to %s: %T %#v", action, err, err)
+	return false, fmt.Errorf("while trying to %s: %w", action, err)
 }
