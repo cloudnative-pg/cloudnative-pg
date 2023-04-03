@@ -141,8 +141,8 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
 	appendRoleOptions(role, &query)
 	appendInRoleOptions(role, &query)
-	contextLog.Debug("Creating", "query", query.String())
 	appendPasswordOption(role, &query)
+	contextLog.Debug("Creating", "query", query.String())
 
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
@@ -357,7 +357,7 @@ func appendPasswordOption(role DatabaseRole,
 		query.WriteString(fmt.Sprintf(" PASSWORD %s", pq.QuoteLiteral(role.password.String)))
 	}
 
-	if role.password.Valid && role.ValidUntil != nil {
+	if role.ValidUntil != nil {
 		ts := string(pq.FormatTimestamp(*role.ValidUntil))
 		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(ts)))
 	}

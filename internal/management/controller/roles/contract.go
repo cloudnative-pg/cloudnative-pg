@@ -73,12 +73,19 @@ func (d *DatabaseRole) isInSameRolesAs(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(d.InRoles, inSpec.InRoles)
 }
 
+func (d *DatabaseRole) hasSameValidUntilAs(inSpec apiv1.RoleConfiguration) bool {
+	if inSpec.ValidUntil == nil && d.ValidUntil == nil {
+		return true
+	}
+	if inSpec.ValidUntil != nil && d.ValidUntil != nil {
+		return d.ValidUntil.Equal(inSpec.ValidUntil.Time)
+	}
+
+	return false
+}
+
 // isEquivalentTo checks a subset of the attributes of roles in DB and Spec
 // leaving passwords and role membership (InRoles) to be done separately
-//
-// TODO: timestamp parsing is necessary here, as we may have non-identical
-// strings back from Postgres.
-// And, in the Spec, do we use Postgres timestamp format?
 func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	type reducedEntries struct {
 		Name            string
@@ -90,7 +97,6 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 		Replication     bool
 		BypassRLS       bool
 		ConnectionLimit int64
-		ValidUntil      string
 	}
 	role := reducedEntries{
 		Name:            d.Name,
@@ -102,7 +108,6 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 		Replication:     d.Replication,
 		BypassRLS:       d.BypassRLS,
 		ConnectionLimit: d.ConnectionLimit,
-		// ValidUntil:      inDB.ValidUntil,
 	}
 	spec := reducedEntries{
 		Name:            inSpec.Name,
@@ -114,10 +119,9 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 		Replication:     inSpec.Replication,
 		BypassRLS:       inSpec.BypassRLS,
 		ConnectionLimit: inSpec.ConnectionLimit,
-		// ValidUntil:      inSpec.ValidUntil,
 	}
 
-	return reflect.DeepEqual(role, spec)
+	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
 }
 
 func roleFromSpec(role apiv1.RoleConfiguration) DatabaseRole {
@@ -134,7 +138,6 @@ func roleFromSpec(role apiv1.RoleConfiguration) DatabaseRole {
 		ConnectionLimit: role.ConnectionLimit,
 		InRoles:         role.InRoles,
 	}
-
 	if role.ValidUntil != nil {
 		dbRole.ValidUntil = &role.ValidUntil.Time
 	}
