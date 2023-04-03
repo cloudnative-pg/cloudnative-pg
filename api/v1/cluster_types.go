@@ -138,7 +138,6 @@ type ClusterSpec struct {
 	// Name for custom sheduler when the default one cannot be used
 	// If not defined, it defaults to `default-scheduler`.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/
-	// 			: https://kubernetes.io/docs/tasks/extend-kubernetes/configure-multiple-schedulers/
 	// +optional
 	SchedulerName string `json:"schedulerName,omitempty"`
 
