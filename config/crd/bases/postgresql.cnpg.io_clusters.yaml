@@ -2847,8 +2847,8 @@ spec:
                     type: object
                 type: object
               seccompProfile:
-                description: The SeccompProfile applied to every Pod and Container.
-                  If not specified, `RuntimeDefault` type will be used
+                description: 'The SeccompProfile applied to every Pod and Container.
+                  Defaults to: `RuntimeDefault`'
                 properties:
                   localhostProfile:
                     description: localhostProfile indicates a profile defined in a

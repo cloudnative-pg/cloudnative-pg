@@ -58,7 +58,7 @@ func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container
 	container.Command = append(container.Command, log.GetFieldsRemapFlags()...)
 }
 
-// CreateContainerSecurityContext initializes container security context
+// CreateContainerSecurityContext initializes container security context. It applies the seccomp profile if supported.
 func CreateContainerSecurityContext(seccompProfile *corev1.SeccompProfile) *corev1.SecurityContext {
 	trueValue := true
 	falseValue := false
