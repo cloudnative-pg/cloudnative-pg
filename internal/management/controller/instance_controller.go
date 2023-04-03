@@ -285,7 +285,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 
 	// Reconcile PostgreSQL configuration
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
-	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster)
+	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster, false)
 	if err != nil {
 		return false, err
 	}
