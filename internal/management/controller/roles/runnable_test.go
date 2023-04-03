@@ -496,7 +496,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			Expect(unrealizable).To(HaveLen(1))
 			Expect(unrealizable["edb_test"]).To(HaveLen(1))
 			Expect(unrealizable["edb_test"][0]).To(BeEquivalentTo(
-				"could not perform UPDATE_MEMBERS on role edb_test: unknown role 'blah'"))
+				"could not perform UPDATE_MEMBERSHIPS on role edb_test: unknown role 'blah'"))
 		})
 
 		It("it will record that Delete could not succeed", func(ctx context.Context) {
@@ -583,7 +583,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				"could not perform DELETE on role edb_test: owner of database edbDatabase"))
 			Expect(unrealizable["another_test"]).To(HaveLen(1))
 			Expect(unrealizable["another_test"][0]).To(BeEquivalentTo(
-				"could not perform UPDATE_MEMBERS on role another_test: unknown role 'blah'"))
+				"could not perform UPDATE_MEMBERSHIPS on role another_test: unknown role 'blah'"))
 		})
 	})
 })

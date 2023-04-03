@@ -38,14 +38,14 @@ type roleAction string
 
 // possible role actions
 const (
-	roleIsReconciled  roleAction = "RECONCILED"
-	roleCreate        roleAction = "CREATE"
-	roleDelete        roleAction = "DELETE"
-	roleUpdate        roleAction = "UPDATE"
-	roleIgnore        roleAction = "IGNORE"
-	roleIsReserved    roleAction = "RESERVED"
-	roleSetComment    roleAction = "SET_COMMENT"
-	roleUpdateMembers roleAction = "UPDATE_MEMBERS"
+	roleIsReconciled      roleAction = "RECONCILED"
+	roleCreate            roleAction = "CREATE"
+	roleDelete            roleAction = "DELETE"
+	roleUpdate            roleAction = "UPDATE"
+	roleIgnore            roleAction = "IGNORE"
+	roleIsReserved        roleAction = "RESERVED"
+	roleSetComment        roleAction = "SET_COMMENT"
+	roleUpdateMemberships roleAction = "UPDATE_MEMBERSHIPS"
 )
 
 // A RoleSynchronizer is a Kubernetes manager.Runnable
@@ -258,7 +258,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				// NOTE: adding/updating a comment on a role does not alter its TransactionID
 				err := roleManager.UpdateComment(ctx, roleFromSpec(role))
 				handleRoleError(err, role.Name, action)
-			case roleUpdateMembers:
+			case roleUpdateMemberships:
 				// NOTE: revoking / granting to a role does not alter its TransactionID
 				dbRole := roleFromSpec(role)
 				grants, revokes, err := getRoleMembershipDiff(ctx, roleManager, role, dbRole)

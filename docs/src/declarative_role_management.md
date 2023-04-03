@@ -103,7 +103,7 @@ status:
       dante:
       - 'could not perform DELETE on role dante: owner of database inferno'
       petrarca:
-      - 'could not perform UPDATE_MEMBERS on role petrarca: role "poets" does not exist'
+      - 'could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist'
 ```
 
 Note the special sub-section `cannotReconcile` for operations the database (and
