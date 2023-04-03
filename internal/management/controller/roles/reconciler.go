@@ -40,6 +40,14 @@ func Reconcile(
 		return reconcile.Result{}, nil
 	}
 
+	isPrimary, err := instance.IsPrimary()
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if !isPrimary {
+		return reconcile.Result{}, nil
+	}
+
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Debug("Updating managed roles information")
 

@@ -180,11 +180,9 @@ func (r *InstanceReconciler) Reconcile(
 		return result, err
 	}
 
-	if r.instance.PodName == cluster.Status.CurrentPrimary {
-		result, err := roles.Reconcile(ctx, r.instance, cluster, r.client)
-		if err != nil || !result.IsZero() {
-			return result, err
-		}
+	result, err := roles.Reconcile(ctx, r.instance, cluster, r.client)
+	if err != nil || !result.IsZero() {
+		return result, err
 	}
 
 	restarted, err := r.reconcilePrimary(ctx, cluster)
