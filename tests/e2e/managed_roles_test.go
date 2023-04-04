@@ -54,10 +54,11 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
-			namespace   = "managed-roles"
-			username    = "dante"
-			password    = "dante"
-			newUserName = "new_role"
+			namespace        = "managed-roles"
+			username         = "dante"
+			password         = "dante"
+			newUserName      = "new_role"
+			unrealizableUser = "petrarca"
 		)
 		var clusterName, secretName string
 		var secretNameSpacedName *types.NamespacedName
@@ -106,7 +107,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			}, 60).Should(Succeed())
 		}
 
-		assertInRoles := func(namespace, primaryPod string, expectedRoles []string) {
+		assertInRoles := func(namespace, primaryPod, roleName string, expectedRoles []string) {
 			slices.Sort(expectedRoles)
 			Eventually(func() []string {
 				var rolesInDB []string
@@ -116,7 +117,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						SELECT string_agg(pg_get_userbyid(roleid), ',') as inroles, member
 						FROM pg_auth_members GROUP BY member
 					) mem ON member = oid
-					WHERE rolname =` + pq.QuoteLiteral(newUserName)
+					WHERE rolname =` + pq.QuoteLiteral(roleName)
 				cmd := "psql -U postgres postgres -tAc " + fmt.Sprintf("\"%s\"", query)
 				stdout, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
@@ -142,11 +143,12 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			rolByPassRLSInSpec := false
 			rolConnLimitInSpec := 4
 
-			By("ensuring the role created in the managed stanza is in the database", func() {
+			By("ensuring the role created in the managed stanza is in the database with correct attributes", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				assertUserExists(namespace, primaryPodInfo.Name, username, true)
+				assertUserExists(namespace, primaryPodInfo.Name, unrealizableUser, false)
 
 				cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
 					"\"SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
@@ -168,6 +170,27 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				// assert connectable use username and password defined in secrets
 				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 30, env)
+			})
+
+			By("Verify show unrealizable role configurations in the status", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				// Eventually the number of ready instances should be equal to the
+				// amount of instances defined in the cluster and
+				// the cluster status should be in healthy state
+				cluster := &apiv1.Cluster{}
+
+				Eventually(func(g Gomega) {
+					err := env.Client.Get(env.Ctx, namespacedName, cluster)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).Should(Succeed())
+
+				Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(HaveLen(1))
+				Expect(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizableUser]).To(HaveLen(1))
+				Expect(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizableUser][0]).
+					To(ContainSubstring("role \"foobar\" does not exist"))
 			})
 		})
 
@@ -362,13 +385,10 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							username,
 						}
 					}
-					if r.Name == username {
-						updated.Spec.Managed.Roles[i].Comment = ""
-					}
 				}
 				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
-				assertInRoles(namespace, primaryPodInfo.Name, []string{"postgres", username})
+				assertInRoles(namespace, primaryPodInfo.Name, newUserName, []string{"postgres", username})
 			})
 
 			By("Remove parent role from InRole for role new_role and verify in database", func() {
@@ -382,13 +402,26 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							username,
 						}
 					}
-					if r.Name == username {
-						updated.Spec.Managed.Roles[i].Comment = ""
+				}
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+				assertInRoles(namespace, primaryPodInfo.Name, newUserName, []string{username})
+			})
+
+			By("Remove invalid parent role from unrealizableUser and verify user in database", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				updated := cluster.DeepCopy()
+				for i, r := range updated.Spec.Managed.Roles {
+					if r.Name == unrealizableUser {
+						updated.Spec.Managed.Roles[i].InRoles = []string{username}
 					}
 				}
 				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
-				assertInRoles(namespace, primaryPodInfo.Name, []string{username})
+				assertUserExists(namespace, primaryPodInfo.Name, unrealizableUser, true)
+				assertInRoles(namespace, primaryPodInfo.Name, newUserName, []string{username})
 			})
 		})
 
@@ -455,83 +488,4 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 		})
 	})
 
-	Context("cluster with unrealizable role", Ordered, func() {
-		const (
-			namespace    = "managed-roles-with-errors"
-			username     = "petrarca"
-			unrealizable = "dante"
-		)
-		var clusterName string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
-		BeforeAll(func() {
-			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
-
-			clusterName, err = env.GetResourceNameFromYAML(clusterManifestWithError)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("setting up cluster with managed roles", func() {
-				AssertCreateCluster(namespace, clusterName, clusterManifestWithError, env)
-			})
-		})
-
-		assertUserExists := func(namespace, primaryPod, username string, shouldExists bool) {
-			cmd := `psql -U postgres postgres -tAc '\du'`
-			Eventually(func(g Gomega) {
-				stdout, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryPod,
-					cmd))
-				g.Expect(err).ToNot(HaveOccurred())
-				if shouldExists {
-					g.Expect(stdout).To(ContainSubstring(username))
-				} else {
-					g.Expect(stdout).NotTo(ContainSubstring(username))
-				}
-			}, 60).Should(Succeed())
-		}
-
-		It("can create realizable roles specified in the managed roles stanza", func() {
-			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-
-			assertUserExists(namespace, primaryPodInfo.Name, username, true)
-		})
-		It("will not create the unrealizable role in the database", func() {
-			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-
-			assertUserExists(namespace, primaryPodInfo.Name, unrealizable, false)
-		})
-		It("will show unrealizable role configurations in the status", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-			// Eventually the number of ready instances should be equal to the
-			// amount of instances defined in the cluster and
-			// the cluster status should be in healthy state
-			cluster := &apiv1.Cluster{}
-
-			Eventually(func(g Gomega) {
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				g.Expect(err).ToNot(HaveOccurred())
-			}).Should(Succeed())
-
-			Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(HaveLen(1))
-			Expect(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizable]).To(HaveLen(1))
-			Expect(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizable][0]).
-				To(ContainSubstring("role \"foobar\" does not exist"))
-		})
-	})
 })
