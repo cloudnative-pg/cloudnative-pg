@@ -59,6 +59,7 @@ func getRoleError(err error, roleName string, action roleAction) (bool, error) {
 	knownCauses := map[string]string{
 		"2BP01": errPGX.Detail,  // 2BP01 -> dependent_objects_still_exist
 		"42704": errPGX.Message, // 42704 -> undefined_object
+		"0LP01": errPGX.Message, // 0LP01 -> invalid_grant_operation
 	}
 
 	if cause, known := knownCauses[errPGX.Code]; known {
