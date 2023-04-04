@@ -21,10 +21,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -34,6 +37,7 @@ import (
 
 var _ = Describe("Postgres RoleManager implementation test", func() {
 	falseValue := false
+	validUntil := metav1.Date(2100, 0o1, 0o1, 0o0, 0o0, 0o0, 0o0, time.UTC)
 	wantedRole := apiv1.RoleConfiguration{
 		Name:            "foo",
 		BypassRLS:       true,
@@ -43,13 +47,14 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Inherit:         &falseValue,
 		ConnectionLimit: 2,
 		Comment:         "this user is a test",
+		ValidUntil:      &validUntil,
 	}
 	unWantedRole := apiv1.RoleConfiguration{
 		Name: "foo",
 	}
 	wantedRoleExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
-			"NOSUPERUSER CONNECTION LIMIT 2  PASSWORD NULL",
+			"NOSUPERUSER CONNECTION LIMIT 2 PASSWORD NULL",
 		wantedRole.Name)
 
 	wantedRoleCommentStmt := fmt.Sprintf(
@@ -330,5 +335,95 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		err = prm.UpdateMembership(ctx, DatabaseRole{Name: "foo"}, []string{"pg_monitor", "quux"}, []string{"bar"})
 		Expect(err).Should(HaveOccurred())
+	})
+
+	It("All the roles are false", func() {
+		roleWithNo := DatabaseRole{
+			BypassRLS:       false,
+			CreateDB:        false,
+			CreateRole:      false,
+			Inherit:         false,
+			Login:           false,
+			Replication:     false,
+			Superuser:       false,
+			ConnectionLimit: 0,
+		}
+		var query strings.Builder
+		query.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize()))
+		appendRoleOptions(roleWithNo, &query)
+
+		expectedQuery := "ALTER ROLE \"alighieri\" NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT NOLOGIN " +
+			"NOREPLICATION NOSUPERUSER CONNECTION LIMIT 0"
+		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
+	})
+
+	It("All the roles are true", func() {
+		roles := DatabaseRole{
+			BypassRLS:       true,
+			CreateDB:        true,
+			CreateRole:      true,
+			Inherit:         true,
+			Login:           true,
+			Replication:     true,
+			Superuser:       true,
+			ConnectionLimit: 10,
+		}
+		var query strings.Builder
+		expectedQuery := "ALTER ROLE \"alighieri\" BYPASSRLS CREATEDB CREATEROLE INHERIT LOGIN " +
+			"REPLICATION SUPERUSER CONNECTION LIMIT 10"
+
+		query.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize()))
+		appendRoleOptions(roles, &query)
+		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
+	})
+
+	It("Password with null and with valid until password", func() {
+		role := apiv1.RoleConfiguration{}
+		dbRole := roleFromSpecWithPassword(role, "divine comedy")
+		Expect(dbRole.password.Valid).To(BeTrue())
+
+		var query strings.Builder
+		expectedQuery := "ALTER ROLE \"alighieri\" PASSWORD 'divine comedy'"
+
+		query.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize()))
+		appendPasswordOption(dbRole, &query)
+		Expect(query.String()).To(BeEquivalentTo(expectedQuery))
+	})
+
+	It("password with valid until", func() {
+		role := apiv1.RoleConfiguration{}
+		var queryValidUntil strings.Builder
+		queryValidUntil.WriteString(fmt.Sprintf("ALTER ROLE %s", pgx.Identifier{"alighieri"}.Sanitize()))
+		expectedQueryValidUntil := "ALTER ROLE \"alighieri\" PASSWORD 'divine comedy' VALID UNTIL '2100-01-01 01:01:00Z'"
+		validUntil := metav1.Date(2100, 0o1, 0o1, 0o1, 0o1, 0o0, 0o0, time.UTC)
+		role.ValidUntil = &validUntil
+
+		dbRole := roleFromSpecWithPassword(role, "divine comedy")
+		appendPasswordOption(dbRole, &queryValidUntil)
+		Expect(queryValidUntil.String()).To(BeEquivalentTo(expectedQueryValidUntil))
+	})
+
+	It("Getting the proper TransactionID per rol", func() {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		rows := mock.NewRows([]string{"xmin"})
+		lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
+		dbRole := roleFromSpec(wantedRole)
+
+		mock.ExpectQuery(lastTransactionQuery).WillReturnError(errors.New("Kaboom"))
+		_, err = prm.GetLastTransactionID(context.TODO(), dbRole)
+		Expect(err).To(HaveOccurred())
+
+		mock.ExpectQuery(lastTransactionQuery).WillReturnError(sql.ErrNoRows)
+		_, err = prm.GetLastTransactionID(context.TODO(), dbRole)
+		Expect(err).To(HaveOccurred())
+
+		rows.AddRow("1321")
+		mock.ExpectQuery(lastTransactionQuery).WillReturnRows(rows)
+		transID, err := prm.GetLastTransactionID(context.TODO(), dbRole)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(transID).To(BeEquivalentTo(1321))
 	})
 })
