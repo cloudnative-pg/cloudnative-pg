@@ -76,7 +76,7 @@ func resourceExist(client discovery.DiscoveryInterface, groupVersion, kind strin
 
 // DetectSecurityContextConstraints connects to the discovery API and find out if
 // we're running under a system that implements OpenShift Security Context Constraints
-func DetectSecurityContextConstraints(client *discovery.DiscoveryClient) (err error) {
+func DetectSecurityContextConstraints(client discovery.DiscoveryInterface) (err error) {
 	haveSCC, err = resourceExist(client, "security.openshift.io/v1", "securitycontextconstraints")
 	if err != nil {
 		return err
@@ -108,6 +108,11 @@ func HaveSeccompSupport() bool {
 	return supportSeccomp
 }
 
+// SetSeccompSupport set the supportSeccomp variable to a specific value for testing purposes
+func SetSeccompSupport(value bool) {
+	supportSeccomp = value
+}
+
 // extractK8sMinorVersion extracts and parses the Kubernetes minor version from
 // the version info that's been  detected by discovery client
 func extractK8sMinorVersion(info *version.Info) (int, error) {
@@ -122,7 +127,7 @@ func extractK8sMinorVersion(info *version.Info) (int, error) {
 
 // DetectSeccompSupport checks the version of Kubernetes in the cluster to determine
 // whether Seccomp is supported
-func DetectSeccompSupport(client *discovery.DiscoveryClient) (err error) {
+func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
 	supportSeccomp = false
 	kubernetesVersion, err := client.ServerVersion()
 	if err != nil {

@@ -298,6 +298,7 @@ ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
 Scorsolini
+SeccompProfile
 SecretKeySelector
 SecretRefs
 SecretVersion
