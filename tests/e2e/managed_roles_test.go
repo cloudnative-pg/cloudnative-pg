@@ -173,24 +173,18 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("Verify show unrealizable role configurations in the status", func() {
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      clusterName,
-				}
-				// Eventually the number of ready instances should be equal to the
-				// amount of instances defined in the cluster and
-				// the cluster status should be in healthy state
-				cluster := &apiv1.Cluster{}
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
 
-				Eventually(func(g Gomega) {
-					err := env.Client.Get(env.Ctx, namespacedName, cluster)
-					g.Expect(err).ToNot(HaveOccurred())
-				}).Should(Succeed())
-
-				Expect(cluster.Status.ManagedRolesStatus.CannotReconcile).To(HaveLen(1))
-				Expect(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizableUser]).To(HaveLen(1))
-				Expect(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizableUser][0]).
-					To(ContainSubstring("role \"foobar\" does not exist"))
+				Eventually(func() int {
+					return len(cluster.Status.ManagedRolesStatus.CannotReconcile)
+				}, 30).Should(Equal(1))
+				Eventually(func() int {
+					return len(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizableUser])
+				}, 30).Should(Equal(1))
+				Eventually(func() string {
+					return cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizableUser][0]
+				}, 30).Should(ContainSubstring("role \"foobar\" does not exist"))
 			})
 		})
 
@@ -373,6 +367,27 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 		It("Can update role membership and verify changes in db ", func() {
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
+
+			By("Remove invalid parent role from unrealizableUser and verify user in database", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				updated := cluster.DeepCopy()
+				for i, r := range updated.Spec.Managed.Roles {
+					if r.Name == unrealizableUser {
+						updated.Spec.Managed.Roles[i].InRoles = []string{username}
+					}
+				}
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() int {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					return len(cluster.Status.ManagedRolesStatus.CannotReconcile)
+				}, 30).Should(Equal(0))
+				assertUserExists(namespace, primaryPodInfo.Name, unrealizableUser, true)
+			})
+
 			By("Add role in InRole for role new_role and verify in database", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
@@ -388,6 +403,11 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				}
 				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() int {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					return len(cluster.Status.ManagedRolesStatus.CannotReconcile)
+				}, 30).Should(Equal(0))
 				assertInRoles(namespace, primaryPodInfo.Name, newUserName, []string{"postgres", username})
 			})
 
@@ -405,23 +425,44 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				}
 				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() int {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					return len(cluster.Status.ManagedRolesStatus.CannotReconcile)
+				}, 30).Should(Equal(0))
 				assertInRoles(namespace, primaryPodInfo.Name, newUserName, []string{username})
 			})
 
-			By("Remove invalid parent role from unrealizableUser and verify user in database", func() {
+			By("Mock the error for unrealizable User and verify user in database", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				updated := cluster.DeepCopy()
 				for i, r := range updated.Spec.Managed.Roles {
 					if r.Name == unrealizableUser {
-						updated.Spec.Managed.Roles[i].InRoles = []string{username}
+						updated.Spec.Managed.Roles[i].InRoles = []string{unrealizableUser}
 					}
 				}
 				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
+				// user not changed
 				assertUserExists(namespace, primaryPodInfo.Name, unrealizableUser, true)
-				assertInRoles(namespace, primaryPodInfo.Name, newUserName, []string{username})
+				Eventually(func() int {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					return len(cluster.Status.ManagedRolesStatus.CannotReconcile)
+				}, 30).Should(Equal(1))
+				Eventually(func() int {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					return len(cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizableUser])
+				}, 30).Should(Equal(1))
+				Eventually(func() string {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					return cluster.Status.ManagedRolesStatus.CannotReconcile[unrealizableUser][0]
+				}, 30).Should(ContainSubstring(fmt.Sprintf("role \"%s\" is a member of role \"%s\"",
+					unrealizableUser, unrealizableUser)))
 			})
 		})
 
@@ -487,5 +528,4 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 		})
 	})
-
 })
