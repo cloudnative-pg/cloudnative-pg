@@ -50,7 +50,7 @@ func (sm PostgresRoleManager) List(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
-				pg_catalog.shobj_description(oid, 'pg_authid') as comment, auth.xmin, 
+				pg_catalog.shobj_description(auth.oid, 'pg_authid') as comment, auth.xmin,
 				mem.inroles
 		FROM pg_catalog.pg_authid as auth
 		LEFT JOIN (
