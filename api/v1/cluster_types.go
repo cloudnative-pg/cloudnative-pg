@@ -289,6 +289,10 @@ type ClusterSpec struct {
 	// sources to the pods to be used by Env
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// The SeccompProfile applied to every Pod and Container.
+	// Defaults to: `RuntimeDefault`
+	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 }
 
 const (
@@ -2286,6 +2290,17 @@ func (cluster *Cluster) ShouldForceLegacyBackup() bool {
 	const legacyBackupAnnotationName = "cnpg.io/forceLegacyBackup"
 
 	return cluster.Annotations[legacyBackupAnnotationName] == "true"
+}
+
+// GetSeccompProfile return the proper SeccompProfile set in the cluster for Pods and Containers
+func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
+	if cluster.Spec.SeccompProfile != nil {
+		return cluster.Spec.SeccompProfile
+	}
+
+	return &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

@@ -24,6 +24,7 @@ import (
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -58,11 +59,43 @@ var (
 	}
 )
 
-var _ = Describe("The PostgreSQL security context", func() {
-	securityContext := CreatePodSecurityContext(26, 26)
+var _ = Describe("The PostgreSQL security context with nil SeccompProfile", func() {
+	cluster := v1.Cluster{}
+	utils.SetSeccompSupport(false)
+	securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
 
 	It("allows the container to create its own PGDATA", func() {
 		Expect(securityContext.RunAsUser).To(Equal(securityContext.FSGroup))
+	})
+
+	It("by default it should be nil", func() {
+		Expect(securityContext.SeccompProfile).To(BeNil())
+	})
+})
+
+var _ = Describe("The PostgreSQL security context with", func() {
+	It("default RuntimeDefault profile", func() {
+		cluster := v1.Cluster{}
+		utils.SetSeccompSupport(true)
+		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
+
+		Expect(securityContext.SeccompProfile).ToNot(BeNil())
+		Expect(securityContext.SeccompProfile.Type).To(BeEquivalentTo(corev1.SeccompProfileTypeRuntimeDefault))
+	})
+
+	It("defined SeccompProfile profile", func() {
+		profilePath := "/path/to/profile"
+		localhostProfile := &corev1.SeccompProfile{
+			Type:             corev1.SeccompProfileTypeLocalhost,
+			LocalhostProfile: &profilePath,
+		}
+		cluster := v1.Cluster{Spec: v1.ClusterSpec{SeccompProfile: localhostProfile}}
+		utils.SetSeccompSupport(true)
+		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
+
+		Expect(securityContext.SeccompProfile).ToNot(BeNil())
+		Expect(securityContext.SeccompProfile).To(BeEquivalentTo(localhostProfile))
+		Expect(securityContext.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
 	})
 })
 
