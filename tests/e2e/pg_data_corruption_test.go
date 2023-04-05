@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -161,10 +162,10 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				Namespace: namespace,
 				Name:      oldPrimaryPodName,
 			}
-			Eventually(func() error {
-				oldPrimaryPod := &corev1.Pod{}
-				return env.Client.Get(env.Ctx, namespacedName, oldPrimaryPod)
-			}, 300).Should(HaveOccurred())
+			Eventually(func() bool {
+				err := env.Client.Get(env.Ctx, namespacedName, &corev1.Pod{})
+				return apierrs.IsNotFound(err)
+			}, 300).Should(BeTrue())
 		})
 
 		By("verifying new pod should join as standby", func() {

@@ -2674,13 +2674,8 @@ func AssertPVCCount(namespace, clusterName string, pvcCount, timeout int) {
 // AssertClusterPhaseIsConsistent expects the phase of a cluster to be consistent for a given number of seconds.
 func AssertClusterPhaseIsConsistent(namespace, clusterName, phase string, timeout int) {
 	By(fmt.Sprintf("verifying cluster '%v' phase '%v' is consistent", clusterName, phase), func() {
-		Consistently(func() (string, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			if err != nil {
-				return "", err
-			}
-			return cluster.Status.Phase, nil
-		}, timeout, 2).Should(BeEquivalentTo(phase))
+		assert := assertPredicateClusterHasPhase(namespace, clusterName, phase)
+		Consistently(assert, timeout, 2).Should(Succeed())
 	})
 }
 
@@ -2688,12 +2683,15 @@ func AssertClusterPhaseIsConsistent(namespace, clusterName, phase string, timeou
 // within the specified timeout
 func AssertClusterEventuallyReachesPhase(namespace, clusterName, phase string, timeout int) {
 	By(fmt.Sprintf("verifying cluster '%v' phase should eventually become '%v'", clusterName, phase), func() {
-		Eventually(func() (string, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			if err != nil {
-				return "", err
-			}
-			return cluster.Status.Phase, nil
-		}, timeout).Should(BeEquivalentTo(phase))
+		assert := assertPredicateClusterHasPhase(namespace, clusterName, phase)
+		Eventually(assert, timeout).Should(Succeed())
 	})
+}
+
+func assertPredicateClusterHasPhase(namespace, clusterName, phase string) func(g Gomega) {
+	return func(g Gomega) {
+		cluster, err := env.GetCluster(namespace, clusterName)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(cluster.Status.Phase).To(BeEquivalentTo(phase))
+	}
 }
