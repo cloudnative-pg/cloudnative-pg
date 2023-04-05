@@ -50,7 +50,7 @@ func Reconcile(
 
 	// get current passwords from spec/secrets
 	latestPasswordResourceVersion, err := getPasswordSecretResourceVersion(
-		ctx, c, cluster.Spec.Managed.Roles, instance.Namespace)
+		ctx, c, cluster.Spec.Managed.Roles, cluster.Namespace)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -66,7 +66,7 @@ func Reconcile(
 		ctx,
 		cluster.Spec.Managed,
 		rolesInDB,
-		cluster.Status.RolePasswordStatus,
+		cluster.Status.ManagedRolesStatus.PasswordStatus,
 		latestPasswordResourceVersion,
 	).convertToRolesByStatus()
 
@@ -82,6 +82,6 @@ func Reconcile(
 	}
 
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Status.RoleStatus = roleNamesByStatus
+	updatedCluster.Status.ManagedRolesStatus.ByStatus = roleNamesByStatus
 	return reconcile.Result{}, c.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
 }

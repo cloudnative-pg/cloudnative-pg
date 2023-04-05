@@ -38,14 +38,14 @@ type roleAction string
 
 // possible role actions
 const (
-	roleIsReconciled  roleAction = "RECONCILED"
-	roleCreate        roleAction = "CREATE"
-	roleDelete        roleAction = "DELETE"
-	roleUpdate        roleAction = "UPDATE"
-	roleIgnore        roleAction = "IGNORE"
-	roleIsReserved    roleAction = "RESERVED"
-	roleSetComment    roleAction = "SET_COMMENT"
-	roleUpdateMembers roleAction = "UPDATE_MEMBERS"
+	roleIsReconciled      roleAction = "RECONCILED"
+	roleCreate            roleAction = "CREATE"
+	roleDelete            roleAction = "DELETE"
+	roleUpdate            roleAction = "UPDATE"
+	roleIgnore            roleAction = "IGNORE"
+	roleIsReserved        roleAction = "RESERVED"
+	roleSetComment        roleAction = "SET_COMMENT"
+	roleUpdateMemberships roleAction = "UPDATE_MEMBERSHIPS"
 )
 
 // A RoleSynchronizer is a Kubernetes manager.Runnable
@@ -138,11 +138,11 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		return err
 	}
 
-	rolePasswords := remoteCluster.Status.RolePasswordStatus
+	rolePasswords := remoteCluster.Status.ManagedRolesStatus.PasswordStatus
 	if rolePasswords == nil {
 		rolePasswords = map[string]apiv1.PasswordState{}
 	}
-	appliedState, err := sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
+	appliedState, irreconcilableRoles, err := sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
 	if err != nil {
 		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
@@ -154,7 +154,8 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		return err
 	}
 	updatedCluster := remoteCluster.DeepCopy()
-	updatedCluster.Status.RolePasswordStatus = appliedState
+	updatedCluster.Status.ManagedRolesStatus.PasswordStatus = appliedState
+	updatedCluster.Status.ManagedRolesStatus.CannotReconcile = irreconcilableRoles
 	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(&remoteCluster))
 }
 
@@ -166,112 +167,72 @@ func getRoleNames(roles []apiv1.RoleConfiguration) []string {
 	return names
 }
 
-func (sr *RoleSynchronizer) dropRolesFromSpec(
-	ctx context.Context,
-	roleManager RoleManager,
-	roles []apiv1.RoleConfiguration,
-) error {
-	for _, role := range roles {
-		err := roleManager.Delete(ctx, newDatabaseRoleBuilder().withRole(role).build())
-		if err != nil {
-			return fmt.Errorf("while delete role %s: %w", role.Name, err)
-		}
-	}
-	return nil
-}
-
-func (sr *RoleSynchronizer) updateRoleCommentFromSpec(
-	ctx context.Context,
-	roleManager RoleManager,
-	roles []apiv1.RoleConfiguration,
-) error {
-	for _, role := range roles {
-		err := roleManager.UpdateComment(ctx, newDatabaseRoleBuilder().withRole(role).build())
-		if err != nil {
-			return fmt.Errorf("while update comments for role %s: %w", role.Name, err)
-		}
-	}
-	return nil
-}
-
-// updateInRoleFromSpec aligns a role's memberships in the database, by applying
-// any required GRANT or REVOKE commands
-//
-// NOTE: while in the CREATE statement we can use IN ROLE, this is not available for ALTER
-// and so reconciliation of role memberships needs to be done in a separate stage
-func (sr *RoleSynchronizer) updateInRoleFromSpec(
-	ctx context.Context,
-	roleManager RoleManager,
-	roles []apiv1.RoleConfiguration,
-) error {
-	for _, role := range roles {
-		inRoleInDB, err := roleManager.GetParentRoles(
-			ctx,
-			newDatabaseRoleBuilder().withRole(role).build(),
-		)
-		if err != nil {
-			return fmt.Errorf("while updating membership for role %s: %w", role.Name, err)
-		}
-		rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
-		rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
-		err = roleManager.UpdateMembership(ctx, newDatabaseRoleBuilder().withRole(role).build(), rolesToGrant, rolesToRevoke)
-		if err != nil {
-			return fmt.Errorf("while update membership for role %s: %w", role.Name, err)
-		}
-	}
-	return nil
-}
-
 // synchronizeRoles aligns roles in the database to the spec
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
 	roleManager RoleManager,
 	config *apiv1.ManagedConfiguration,
 	storedPasswordState map[string]apiv1.PasswordState,
-) (map[string]apiv1.PasswordState, error) {
+) (map[string]apiv1.PasswordState, map[string][]string, error) {
 	latestSecretResourceVersion, err := getPasswordSecretResourceVersion(
 		ctx, sr.client, config.Roles, sr.instance.Namespace)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rolesInDB, err := roleManager.List(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rolesByAction := evaluateNextRoleActions(
 		ctx, config, rolesInDB, storedPasswordState, latestSecretResourceVersion)
 	if err != nil {
-		return nil, fmt.Errorf("while syncrhonizing managed roles: %w", err)
+		return nil, nil, fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
 
-	res, err := sr.applyRoleActions(
+	passwordStates, irreconcilableRoles := sr.applyRoleActions(
 		ctx,
 		roleManager,
 		rolesByAction,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("while synchronizing roles in primary: %w", err)
-	}
 
 	// Merge the status from database into spec. We should keep all the status
 	// otherwise in the next loop the user without status will be marked as need update
-	for role, stateInDatabase := range res {
+	for role, stateInDatabase := range passwordStates {
 		storedPasswordState[role] = stateInDatabase
 	}
-	return storedPasswordState, nil
+	return storedPasswordState, irreconcilableRoles, nil
 }
 
 // applyRoleActions applies the actions to reconcile roles in the DB with the Spec
-// nolint: gocognit
+// It returns the apiv1.PasswordState for each role, as well as a map of roles that
+// cannot be reconciled for expectable errors, e.g. dropping a role owning content
+//
+// NOTE: applyRoleActions will not error out if a single role operation fails.
+// This is designed so that a role configuration that cannot be honored by PostgreSQL
+// cannot stop the reconciliation loop and prevent other roles from being applied
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	roleManager RoleManager,
 	rolesByAction rolesByAction,
-) (map[string]apiv1.PasswordState, error) {
+) (map[string]apiv1.PasswordState, map[string][]string) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("applying role actions")
 
+	irreconcilableRoles := make(map[string][]string)
 	appliedChanges := make(map[string]apiv1.PasswordState)
+	handleRoleError := func(err error, roleName string, action roleAction) {
+		// log unexpected errors, collect expectable PostgreSQL errors
+		if err == nil {
+			return
+		}
+		isExpectable, newErr := getRoleError(err, roleName, action)
+		if isExpectable {
+			irreconcilableRoles[roleName] = append(irreconcilableRoles[roleName], newErr.Error())
+		} else {
+			contextLog.Error(newErr, "while performing "+string(action), "role", roleName)
+		}
+	}
+
 	for action, roles := range rolesByAction {
 		switch action {
 		case roleIgnore, roleIsReconciled, roleIsReserved:
@@ -282,53 +243,87 @@ func (sr *RoleSynchronizer) applyRoleActions(
 		contextLog.Info("roles in DB out of sync with Spec, evaluating action",
 			"roles", getRoleNames(roles), "action", action)
 
-		switch action {
-		case roleCreate, roleUpdate:
-			for _, role := range roles {
-				pass, version, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
+		for _, role := range roles {
+			switch action {
+			case roleCreate, roleUpdate:
+				appliedState, err := sr.applyRoleCreateUpdate(ctx, roleManager, role, action)
+				if err == nil {
+					appliedChanges[role.Name] = appliedState
+				}
+				handleRoleError(err, role.Name, action)
+			case roleDelete:
+				err := roleManager.Delete(ctx, roleFromSpec(role))
+				handleRoleError(err, role.Name, action)
+			case roleSetComment:
+				// NOTE: adding/updating a comment on a role does not alter its TransactionID
+				err := roleManager.UpdateComment(ctx, roleFromSpec(role))
+				handleRoleError(err, role.Name, action)
+			case roleUpdateMemberships:
+				// NOTE: revoking / granting to a role does not alter its TransactionID
+				dbRole := roleFromSpec(role)
+				grants, revokes, err := getRoleMembershipDiff(ctx, roleManager, role, dbRole)
 				if err != nil {
-					return nil, err
+					contextLog.Error(err, "while performing "+string(action), "role", role.Name)
+					continue
 				}
-				databaseRole := newDatabaseRoleBuilder().withRole(role).withPassword(pass).build()
-				switch action {
-				case roleCreate:
-					if err := roleManager.Create(ctx, databaseRole); err != nil {
-						return nil, err
-					}
-				case roleUpdate:
-					if err := roleManager.Update(ctx, databaseRole); err != nil {
-						return nil, err
-					}
-				default:
-					return nil, fmt.Errorf("unsupported roleAction %s", action)
-				}
-
-				transactionID, err := roleManager.GetLastTransactionID(ctx, databaseRole)
-				if err != nil {
-					return nil, err
-				}
-
-				appliedChanges[role.Name] = apiv1.PasswordState{
-					TransactionID:         transactionID,
-					SecretResourceVersion: version,
-				}
-			}
-		case roleDelete:
-			if err := sr.dropRolesFromSpec(ctx, roleManager, roles); err != nil {
-				return nil, err
-			}
-		case roleSetComment:
-			if err := sr.updateRoleCommentFromSpec(ctx, roleManager, roles); err != nil {
-				return nil, err
-			}
-		case roleUpdateMembers:
-			if err := sr.updateInRoleFromSpec(ctx, roleManager, roles); err != nil {
-				return nil, err
+				err = roleManager.UpdateMembership(ctx, dbRole, grants, revokes)
+				handleRoleError(err, role.Name, action)
 			}
 		}
 	}
 
-	return appliedChanges, nil
+	return appliedChanges, irreconcilableRoles
+}
+
+func getRoleMembershipDiff(
+	ctx context.Context,
+	roleManager RoleManager,
+	role apiv1.RoleConfiguration,
+	dbRole DatabaseRole,
+) ([]string, []string, error) {
+	inRoleInDB, err := roleManager.GetParentRoles(ctx, dbRole)
+	if err != nil {
+		return nil, nil, err
+	}
+	rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
+	rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
+	return rolesToGrant, rolesToRevoke, nil
+}
+
+// applyRoleCreateUpdate creates/updates a role, getting the password from Kubernetes
+// secrets if so set.
+// Returns the PasswordState, as well as any error encountered
+func (sr *RoleSynchronizer) applyRoleCreateUpdate(
+	ctx context.Context,
+	roleManager RoleManager,
+	role apiv1.RoleConfiguration,
+	action roleAction,
+) (apiv1.PasswordState, error) {
+	pass, version, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
+	if err != nil {
+		return apiv1.PasswordState{}, err
+	}
+
+	databaseRole := roleFromSpecWithPassword(role, pass)
+	switch action {
+	case roleCreate:
+		err = roleManager.Create(ctx, databaseRole)
+	case roleUpdate:
+		err = roleManager.Update(ctx, databaseRole)
+	}
+	if err != nil {
+		return apiv1.PasswordState{}, err
+	}
+
+	transactionID, err := roleManager.GetLastTransactionID(ctx, databaseRole)
+	if err != nil {
+		return apiv1.PasswordState{}, err
+	}
+
+	return apiv1.PasswordState{
+		TransactionID:         transactionID,
+		SecretResourceVersion: version,
+	}, nil
 }
 
 // getPassword retrieves the password stored in the Kubernetes secret for the
