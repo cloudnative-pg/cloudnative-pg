@@ -51,7 +51,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 		}
 	})
 
-	It("cluster can be recovered after pgdata corruption on primary", func() {
+	It("can recover cluster after pgdata corruption on primary", func() {
 		var oldPrimaryPodName, oldPrimaryPVCName string
 		tableName := "test_pg_data_corruption"
 		err := env.CreateNamespace(namespace)
@@ -62,7 +62,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
 
-		By("gather current primary pod and pvc", func() {
+		By("gathering current primary pod and pvc", func() {
 			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimaryPodName = oldPrimaryPod.GetName()
@@ -85,7 +85,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("verify failover happened after the primary pod PGDATA got corrupted", func() {
+		By("verifying failover happened after the primary pod PGDATA got corrupted", func() {
 			Eventually(func() string {
 				newPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				if err != nil {
@@ -96,7 +96,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				"operator did not perform the failover")
 		})
 
-		By("verify the old primary pod health", func() {
+		By("verifying the old primary pod health", func() {
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      oldPrimaryPodName,
@@ -156,7 +156,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			err = env.DeletePod(namespace, oldPrimaryPodName, forceDelete)
 			Expect(err).ToNot(HaveOccurred())
 
-			// checking that the old primary pod is now eventually gone
+			// checking that the old primary pod is eventually gone
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      oldPrimaryPodName,
@@ -167,7 +167,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			}, 300).Should(HaveOccurred())
 		})
 
-		By("verify new pod should join as standby", func() {
+		By("verifying new pod should join as standby", func() {
 			newPodName := clusterName + "-4"
 			newPodNamespacedName := types.NamespacedName{
 				Namespace: namespace,

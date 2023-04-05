@@ -2671,9 +2671,9 @@ func AssertPVCCount(namespace, clusterName string, pvcCount, timeout int) {
 	})
 }
 
-// AssertClusterConsistentPhase expects the phase of a cluster to be consistent for a given number of seconds.
-func AssertClusterConsistentPhase(namespace, clusterName, phase string, timeout int) {
-	By(fmt.Sprintf("verifying cluster '%v' phase '%v' consistency", clusterName, phase), func() {
+// AssertClusterPhaseIsConsistent expects the phase of a cluster to be consistent for a given number of seconds.
+func AssertClusterPhaseIsConsistent(namespace, clusterName, phase string, timeout int) {
+	By(fmt.Sprintf("verifying cluster '%v' phase '%v' is consistent", clusterName, phase), func() {
 		Consistently(func() (string, error) {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			if err != nil {
@@ -2684,9 +2684,9 @@ func AssertClusterConsistentPhase(namespace, clusterName, phase string, timeout 
 	})
 }
 
-// AssertClusterEventualPhase checks for a given time the phase of a cluster to eventually become the one
-// declared by the user.
-func AssertClusterEventualPhase(namespace, clusterName, phase string, timeout int) {
+// AssertClusterEventuallyReachesPhase checks the phase of a cluster reaches the phase argument
+// within the specified timeout
+func AssertClusterEventuallyReachesPhase(namespace, clusterName, phase string, timeout int) {
 	By(fmt.Sprintf("verifying cluster '%v' phase should eventually become '%v'", clusterName, phase), func() {
 		Eventually(func() (string, error) {
 			cluster, err := env.GetCluster(namespace, clusterName)
