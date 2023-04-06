@@ -1684,6 +1684,7 @@ type RoleConfiguration struct {
 	// Date and time after which the role's password is no longer valid.
 	// When omitted, the password will never expire (default).
 	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
+
 	// List of one or more existing roles to which this role will be
 	// immediately added as a new member. Default empty.
 	InRoles []string `json:"inRoles,omitempty"`

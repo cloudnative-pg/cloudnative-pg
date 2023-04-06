@@ -54,7 +54,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	}
 	wantedRoleExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
-			"NOSUPERUSER CONNECTION LIMIT 2 PASSWORD NULL",
+			"NOSUPERUSER CONNECTION LIMIT 2 PASSWORD NULL VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 
 	wantedRoleCommentStmt := fmt.Sprintf(

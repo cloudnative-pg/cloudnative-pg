@@ -24,6 +24,7 @@ import (
 	"github.com/lib/pq"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,9 +42,9 @@ import (
 // Set of tests in which we check that the initdb options are really applied
 var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic), func() {
 	const (
-		clusterManifest          = fixturesDir + "/managed_roles/cluster-managed-roles.yaml.template"
-		clusterManifestWithError = fixturesDir + "/managed_roles/cluster-managed-roles-errored.yaml.template"
-		level                    = tests.Medium
+		clusterManifest = fixturesDir + "/managed_roles/cluster-managed-roles.yaml.template"
+		level           = tests.Medium
+		ERROR           = "error"
 	)
 
 	BeforeEach(func() {
@@ -125,7 +126,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					primaryPod,
 					cmd))
 				if err != nil {
-					return []string{"error"}
+					return []string{ERROR}
 				}
 				rolesInDB = strings.Split(strings.TrimSuffix(stdout, "\n"), ",")
 				slices.Sort(rolesInDB)
@@ -338,7 +339,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						primaryPodInfo.Name,
 						cmd))
 					if err != nil {
-						return "error"
+						return ERROR
 					}
 					return stdout
 				}, 30).Should(Equal(fmt.Sprintf("This is user %s\n", newUserName)))
@@ -357,7 +358,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						primaryPodInfo.Name,
 						cmd))
 					if err != nil {
-						return "error"
+						return ERROR
 					}
 					return stdout
 				}, 30).Should(Equal("\n"))
@@ -503,6 +504,70 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By("Verify password in secrets could still valid", func() {
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				AssertConnection(rwService, username, "postgres", newPassword, *psqlClientPod, 60, env)
+			})
+		})
+
+		It("Can update role password validUntil and verify in the database", func() {
+			newValidUntilString := "2023-04-04T00:00:00.000000Z"
+			By("Update comment for role new_role", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				updated := cluster.DeepCopy()
+				for i, r := range updated.Spec.Managed.Roles {
+					if r.Name == newUserName {
+						updated.Spec.Managed.Roles[i].ValidUntil = &v1.Time{}
+					}
+					if r.Name == username {
+						tt, err := time.Parse(time.RFC3339Nano, newValidUntilString)
+						Expect(err).ToNot(HaveOccurred())
+						nt := v1.NewTime(tt)
+						updated.Spec.Managed.Roles[i].ValidUntil = &nt
+					}
+				}
+
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("Verify valid until is removed in db for %s", newUserName), func() {
+				Eventually(func() string {
+					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
+						"\"SELECT 1 FROM pg_catalog.pg_authid"+
+						" WHERE rolname='%s' and (rolvaliduntil is NULL or rolevaliduntil='infinity')\"",
+						newUserName)
+
+					stdout, _, err := utils.Run(fmt.Sprintf(
+						"kubectl exec -n %v %v -- %v",
+						namespace,
+						primaryPodInfo.Name,
+						cmd))
+					if err != nil {
+						return ERROR
+					}
+					return stdout
+				})
+			})
+
+			By(fmt.Sprintf("Verify valid until update in db for %s", username), func() {
+				Eventually(func() string {
+					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
+						"\"SELECT 1 FROM pg_catalog.pg_authid "+
+						" WHERE rolname='%s' and rolvaliduntil='%s'\"",
+						username, newValidUntilString)
+
+					stdout, _, err := utils.Run(fmt.Sprintf(
+						"kubectl exec -n %v %v -- %v",
+						namespace,
+						primaryPodInfo.Name,
+						cmd))
+					if err != nil {
+						return ERROR
+					}
+					return stdout
+				}, 30).Should(Equal("1\n"))
 			})
 		})
 
