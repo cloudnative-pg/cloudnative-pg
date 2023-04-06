@@ -16,8 +16,6 @@ spec:
       log_replication_commands: 'on'
       wal_receiver_timeout: '2s'
 
-  logLevel: trace
-
   replicationSlots:
     updateInterval: 10
     highAvailability:
