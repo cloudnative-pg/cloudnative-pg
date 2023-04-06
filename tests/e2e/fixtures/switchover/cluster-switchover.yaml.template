@@ -1,9 +1,8 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-three-instances
+  name: cluster-switchover
 spec:
-  imageName: ${E2E_PRE_ROLLING_UPDATE_IMG}
   instances: 3
 
   postgresql:

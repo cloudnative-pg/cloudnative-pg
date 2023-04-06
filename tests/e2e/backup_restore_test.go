@@ -303,7 +303,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				targetDBTwo              = "test1"
 				targetDBSecret           = "secret_test"
 				testTableName            = "test_table"
-				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore-custom.yaml"
+				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore-custom.yaml.template"
 				// clusterWithMinioCustomSampleFile has metadata.name != backup.barmanObjectStore.serverName
 				clusterWithMinioCustomSampleFile = fixturesDir +
 					"/backup/minio/cluster-with-backup-minio-custom-servername.yaml.template"

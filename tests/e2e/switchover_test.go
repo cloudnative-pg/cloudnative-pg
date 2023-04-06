@@ -26,9 +26,8 @@ import (
 var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	const (
 		namespace                         = "switchover-e2e"
-		sampleFileWithoutReplicationSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		sampleFileWithReplicationSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
-		clusterName                       = "postgresql-storage-class"
+		sampleFileWithoutReplicationSlots = fixturesDir + "/switchover/cluster-switchover.yaml.template"
+		sampleFileWithReplicationSlots    = fixturesDir + "/switchover/cluster-switchover-with-rep-slots.yaml.template"
 		level                             = tests.Medium
 	)
 
@@ -51,6 +50,8 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 				}
 				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
+			clusterName, err := env.GetResourceNameFromYAML(sampleFileWithReplicationSlots)
+			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 			AssertSwitchover(namespace, clusterName, env)
@@ -69,6 +70,8 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 				}
 				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
+			clusterName, err := env.GetResourceNameFromYAML(sampleFileWithoutReplicationSlots)
+			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 			AssertSwitchover(namespace, clusterName, env)
