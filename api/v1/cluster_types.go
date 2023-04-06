@@ -409,6 +409,19 @@ type PasswordState struct {
 	SecretResourceVersion string `json:"resourceVersion,omitempty"`
 }
 
+// ManagedRoles tracks the status of a cluster's managed roles
+type ManagedRoles struct {
+	// ByStatus gives the list of roles in each state
+	ByStatus map[RoleStatus][]string `json:"byStatus,omitempty"`
+
+	// CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
+	// with an explanation of the cause
+	CannotReconcile map[string][]string `json:"cannotReconcile,omitempty"`
+
+	// PasswordStatus gives the last transaction id and password secret version for each managed role
+	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -423,11 +436,8 @@ type ClusterStatus struct {
 	// The reported state of the instances during the last reconciliation loop
 	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
 
-	// RoleStatus gives the list of roles in each state
-	RoleStatus map[RoleStatus][]string `json:"roleStatus,omitempty"`
-
-	// RolePasswordStatus gives the last transaction id and hash for each managed role
-	RolePasswordStatus map[string]PasswordState `json:"rolePasswordStatus,omitempty"`
+	// ManagedRolesStatus reports the state of the managed roles in the cluster
+	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus"`
 
 	// The timeline of the Postgres cluster
 	TimelineID int `json:"timelineID,omitempty"`

@@ -41,7 +41,7 @@ jobs:
           done | jq -Rs 'split("\n") | map(select(length>0))' | tee .github/kind_versions.json
       -
         name: Create Pull Request if kind k8s versions have been updated
-        uses: peter-evans/create-pull-request@v4
+        uses: peter-evans/create-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
