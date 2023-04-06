@@ -165,9 +165,6 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 }
 
 // Delete the role
-// TODO: we need to do something better here. We should not delete a user that
-// has created tables or other objects. That should be blocked at the validation
-// webhook level, otherwise it will be very poor UX and the operator may not notice
 func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
@@ -305,49 +302,49 @@ func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
 
 func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 	if role.BypassRLS {
-		query.WriteString("BYPASSRLS ")
+		query.WriteString(" BYPASSRLS")
 	} else {
-		query.WriteString("NOBYPASSRLS ")
+		query.WriteString(" NOBYPASSRLS")
 	}
 
 	if role.CreateDB {
-		query.WriteString("CREATEDB ")
+		query.WriteString(" CREATEDB")
 	} else {
-		query.WriteString("NOCREATEDB ")
+		query.WriteString(" NOCREATEDB")
 	}
 
 	if role.CreateRole {
-		query.WriteString("CREATEROLE ")
+		query.WriteString(" CREATEROLE")
 	} else {
-		query.WriteString("NOCREATEROLE ")
+		query.WriteString(" NOCREATEROLE")
 	}
 
 	if role.Inherit {
-		query.WriteString("INHERIT ")
+		query.WriteString(" INHERIT")
 	} else {
-		query.WriteString("NOINHERIT ")
+		query.WriteString(" NOINHERIT")
 	}
 
 	if role.Login {
-		query.WriteString("LOGIN ")
+		query.WriteString(" LOGIN")
 	} else {
-		query.WriteString("NOLOGIN ")
+		query.WriteString(" NOLOGIN")
 	}
 
 	if role.Replication {
-		query.WriteString("REPLICATION ")
+		query.WriteString(" REPLICATION")
 	} else {
-		query.WriteString("NOREPLICATION ")
+		query.WriteString(" NOREPLICATION")
 	}
 
 	if role.Superuser {
-		query.WriteString("SUPERUSER ")
+		query.WriteString(" SUPERUSER")
 	} else {
-		query.WriteString("NOSUPERUSER ")
+		query.WriteString(" NOSUPERUSER")
 	}
 
 	if role.ConnectionLimit > -1 {
-		query.WriteString(fmt.Sprintf("CONNECTION LIMIT %d ", role.ConnectionLimit))
+		query.WriteString(fmt.Sprintf(" CONNECTION LIMIT %d", role.ConnectionLimit))
 	}
 }
 
@@ -355,9 +352,9 @@ func appendPasswordOption(role DatabaseRole,
 	query *strings.Builder,
 ) {
 	if !role.password.Valid {
-		query.WriteString("PASSWORD NULL")
+		query.WriteString(" PASSWORD NULL")
 	} else {
-		query.WriteString(fmt.Sprintf("PASSWORD %s", pq.QuoteLiteral(role.password.String)))
+		query.WriteString(fmt.Sprintf(" PASSWORD %s", pq.QuoteLiteral(role.password.String)))
 	}
 
 	if role.password.Valid && role.ValidUntil != nil {

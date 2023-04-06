@@ -120,17 +120,8 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(role, spec)
 }
 
-type databaseRoleBuilder struct {
-	role DatabaseRole
-}
-
-// newDatabaseRoleBuilder creates a new databaseRoleBuilder
-func newDatabaseRoleBuilder() *databaseRoleBuilder {
-	return &databaseRoleBuilder{}
-}
-
-func (d *databaseRoleBuilder) withRole(role apiv1.RoleConfiguration) *databaseRoleBuilder {
-	d.role = DatabaseRole{
+func roleFromSpec(role apiv1.RoleConfiguration) DatabaseRole {
+	dbRole := DatabaseRole{
 		Name:            role.Name,
 		Comment:         role.Comment,
 		Superuser:       role.Superuser,
@@ -141,23 +132,19 @@ func (d *databaseRoleBuilder) withRole(role apiv1.RoleConfiguration) *databaseRo
 		Replication:     role.Replication,
 		BypassRLS:       role.BypassRLS,
 		ConnectionLimit: role.ConnectionLimit,
-		password:        d.role.password,
 		InRoles:         role.InRoles,
 	}
 
 	if role.ValidUntil != nil {
-		d.role.ValidUntil = &role.ValidUntil.Time
+		dbRole.ValidUntil = &role.ValidUntil.Time
 	}
-	return d
+	return dbRole
 }
 
-func (d *databaseRoleBuilder) withPassword(password string) *databaseRoleBuilder {
-	d.role.password = sql.NullString{String: password, Valid: password != ""}
-	return d
-}
-
-func (d *databaseRoleBuilder) build() DatabaseRole {
-	return d.role
+func roleFromSpecWithPassword(role apiv1.RoleConfiguration, pass string) DatabaseRole {
+	dbRole := roleFromSpec(role)
+	dbRole.password = sql.NullString{Valid: true, String: pass}
+	return dbRole
 }
 
 // RoleManager abstracts the functionality of reconciling with PostgreSQL roles

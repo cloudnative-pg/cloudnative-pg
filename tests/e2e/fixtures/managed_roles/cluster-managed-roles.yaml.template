@@ -28,6 +28,12 @@ spec:
         - pg_signal_backend
       passwordSecret:
         name: cluster-example-dante
+    - name: petrarca
+      ensure: present
+      comment: Dante Alighieri
+      inRoles:
+        - foobar
+
 ---
 apiVersion: v1
 data:
