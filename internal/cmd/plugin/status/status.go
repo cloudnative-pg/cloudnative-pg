@@ -281,7 +281,7 @@ func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *api
 }
 
 func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) error {
-	timeout := time.Second * 2
+	timeout := time.Second * 10
 	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
 
 	// Read PostgreSQL configuration from custom.conf
