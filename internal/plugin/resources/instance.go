@@ -96,7 +96,7 @@ func getReplicaStatusFromPodViaExec(
 	postgresContainerName string,
 ) postgres.PostgresqlStatus {
 	var result postgres.PostgresqlStatus
-	timeout := time.Second * 2
+	timeout := time.Second * 10
 	clientInterface := kubernetes.NewForConfigOrDie(config)
 	stdout, _, err := utils.ExecCommand(
 		ctx,
@@ -182,7 +182,7 @@ func IsInstanceRunning(
 	pod v1.Pod,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx).WithName("plugin.IsInstanceRunning")
-	timeout := time.Second * 2
+	timeout := time.Second * 10
 	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
 	stdout, stderr, err := utils.ExecCommand(
 		ctx,
