@@ -99,6 +99,9 @@ func ImportDatabasesMonolith(
 	roles []string,
 	env *TestingEnvironment,
 ) error {
+	if imageName == "" {
+		imageName = os.Getenv("POSTGRES_IMG")
+	}
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	host := fmt.Sprintf("%v-rw.%v.svc", sourceClusterName, namespace)
 	superUserSecretName := fmt.Sprintf("%v-superuser", sourceClusterName)
