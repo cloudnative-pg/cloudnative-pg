@@ -115,7 +115,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			err := env.Client.Get(env.Ctx, podNamespacedName, pod)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Get the UID of the pod
+			// Get the UID of the PVC
 			pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
 			pvc := &corev1.PersistentVolumeClaim{}
 			namespacedPVCName := types.NamespacedName{
@@ -130,22 +130,31 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			walStorageEnabled, err := testsUtils.IsWalStorageEnabled(namespace, clusterName, env)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Delete the PVC and the Pod
-			_, _, err = testsUtils.Run(
-				fmt.Sprintf("kubectl delete pvc %v -n %v --wait=false", pvcName, namespace))
-			Expect(err).ToNot(HaveOccurred())
-
-			// removing WalStorage PVC if needed
-			if walStorageEnabled {
-				_, _, err = testsUtils.Run(
-					fmt.Sprintf("kubectl delete pvc %v-wal -n %v --wait=false", pvcName, namespace))
-				Expect(err).ToNot(HaveOccurred())
-			}
-			// Deleting primary pod
+			// Force delete setting
 			zero := int64(0)
 			forceDelete := &ctrlclient.DeleteOptions{
 				GracePeriodSeconds: &zero,
 			}
+
+			// Delete the PVC and the Pod
+			err = env.Client.Delete(env.Ctx, pvc, forceDelete)
+			Expect(err).ToNot(HaveOccurred())
+
+			// removing WalStorage PVC if needed
+			if walStorageEnabled {
+				walPvcName := fmt.Sprintf("%v-wal", pvcName)
+				namespacedWalPVCName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      walPvcName,
+				}
+				walPVC := &corev1.PersistentVolumeClaim{}
+				err = env.Client.Get(env.Ctx, namespacedWalPVCName, walPVC)
+				Expect(err).ToNot(HaveOccurred())
+				err = env.Client.Delete(env.Ctx, walPVC, forceDelete)
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			// Deleting primary pod
 			err = env.DeletePod(namespace, podName, forceDelete)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -161,6 +170,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 				err := env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
 				return utils.IsPodActive(*newPod) && utils.IsPodReady(*newPod), err
 			}, timeout).Should(BeTrue())
+
 			// The pod should have a different PVC
 			newPod := &corev1.Pod{}
 			err = env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
