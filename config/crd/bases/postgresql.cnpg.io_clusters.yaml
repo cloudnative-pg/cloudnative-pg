@@ -3773,8 +3773,6 @@ spec:
               writeService:
                 description: Current write pod
                 type: string
-            required:
-            - managedRolesStatus
             type: object
         type: object
     served: true

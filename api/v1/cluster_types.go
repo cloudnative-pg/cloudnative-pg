@@ -437,7 +437,7 @@ type ClusterStatus struct {
 	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
 
 	// ManagedRolesStatus reports the state of the managed roles in the cluster
-	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus"`
+	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	TimelineID int `json:"timelineID,omitempty"`
