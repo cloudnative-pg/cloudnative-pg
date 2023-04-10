@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Require labels
-        uses: docker://agilepathway/pull-request-label-checker:v1.4.25
+        uses: docker://agilepathway/pull-request-label-checker:v1.4.26
         with:
           any_of: "ok to merge :ok_hand:"
           none_of: do not merge
