@@ -296,7 +296,7 @@ func (sm PostgresRoleManager) GetParentRoles(
 
 func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
 	if len(role.InRoles) > 0 {
-		query.WriteString(fmt.Sprintf("IN ROLE %s ", strings.Join(role.InRoles, ",")))
+		query.WriteString(fmt.Sprintf(" IN ROLE %s ", strings.Join(role.InRoles, ",")))
 	}
 }
 
