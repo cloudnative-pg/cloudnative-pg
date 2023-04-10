@@ -48,13 +48,14 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		ConnectionLimit: 2,
 		Comment:         "this user is a test",
 		ValidUntil:      &validUntil,
+		InRoles:         []string{"pg_monitoring"},
 	}
 	unWantedRole := apiv1.RoleConfiguration{
 		Name: "foo",
 	}
 	wantedRoleExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
-			"NOSUPERUSER CONNECTION LIMIT 2 PASSWORD NULL VALID UNTIL '2100-01-01 00:00:00Z'",
+			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD NULL VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 
 	wantedRoleCommentStmt := fmt.Sprintf(
