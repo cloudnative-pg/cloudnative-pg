@@ -89,7 +89,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
-			namespace = "primary-failover-time"
+			namespace = "primary-failover-time-async"
 			clusterName = "cluster-fast-failover"
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
@@ -109,7 +109,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
-			namespace = "primary-failover-time"
+			namespace = "primary-failover-time-async-with-slots"
 			clusterName = "cluster-fast-failover"
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
