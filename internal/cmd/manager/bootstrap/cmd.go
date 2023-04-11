@@ -39,9 +39,17 @@ func NewCmd() *cobra.Command {
 				"destination", dest,
 				"version", versions.Version,
 				"build", versions.Info)
-			err := fileutils.CopyFile(cmd.Root().Name(), dest)
+			exists, err := fileutils.FileExists(dest)
 			if err != nil {
 				panic(err)
+			}
+			if !exists {
+				err = fileutils.CopyFile(cmd.Root().Name(), dest)
+				if err != nil {
+					panic(err)
+				}
+			} else {
+				log.Info(dest + "already exist")
 			}
 
 			log.Info("Setting 0750 permissions")
