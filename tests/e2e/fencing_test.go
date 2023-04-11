@@ -75,7 +75,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	}
 
 	checkInstanceIsStreaming := func(instanceName, namespace string) {
-		timeout := time.Second
+		timeout := time.Second * 10
 		Eventually(func() (int, error) {
 			err := env.Client.Get(env.Ctx,
 				ctrlclient.ObjectKey{Namespace: namespace, Name: instanceName},
@@ -90,13 +90,13 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			}
 			value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 			return value, atoiErr
-		}, 60).Should(BeEquivalentTo(1))
+		}, 120).Should(BeEquivalentTo(1))
 	}
 
 	checkPostgresConnection := func(podName, namespace string) {
 		err := testUtils.GetObject(env, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, &pod)
 		Expect(err).ToNot(HaveOccurred())
-		timeout := time.Second * 2
+		timeout := time.Second * 10
 		dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
 			testUtils.PGLocalSocketDir, "postgres", "postgres", "")
 		stdOut, stdErr, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, pod,
@@ -158,7 +158,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 				Expect(beforeFencingPodName).Should(BeEquivalentTo(currentPrimaryPodInfo.GetName()))
 			})
 			By("all followers should be streaming again from the primary instance", func() {
-				assertClusterStandbysAreStreaming(namespace, clusterName)
+				AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 			})
 			checkFencingAnnotationSet(fencingMethod, nil)
 		})

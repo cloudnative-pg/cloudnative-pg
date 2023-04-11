@@ -71,6 +71,9 @@ Additionally, it supports the creation of clusters with a separate PVC
 on which to store PostgreSQL Write-Ahead Log (WAL), as explained in the
 ["Volume for WAL" section](#volume-for-wal) below.
 
+In CloudNativePG, the volumes attached to a single PostgreSQL instance
+are defined as **PVC group**.
+
 ## Configuration via a storage class
 
 The easier way to configure the storage for a PostgreSQL class is to just
@@ -190,7 +193,8 @@ spec:
 ```
 
 !!! Important
-    `walStorage` initialization is only supported during cluster creation.
+    Removing `walStorage` is not supported: once added, a separate volume for
+    WALs cannot be removed from an existing Postgres cluster.
 
 ## Volume expansion
 

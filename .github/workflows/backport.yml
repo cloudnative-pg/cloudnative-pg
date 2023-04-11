@@ -8,14 +8,16 @@ on:
     branches:
       - main
 
+env:
+  GOLANG_VERSION: "1.20.x"
+
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
   # we backport everything
   label-source-pr:
     name: label the source pr
     if: github.event.pull_request.merged == false &&
-        !startsWith(github.event.pull_request.title, 'feat:') &&
-        !contains(github.event.pull_request.labels.*.name, 'do not backport')
+        !contains(github.event.pull_request.labels.*.name, 'backport-requested')
     runs-on: ubuntu-20.04
     steps:
       -
@@ -26,12 +28,11 @@ jobs:
           number:  ${{ github.event.pull_request.number }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.16
-            release-1.17
             release-1.18
+            release-1.19
       -
         name: Create comment
-        uses: peter-evans/create-or-update-comment@v2
+        uses: peter-evans/create-or-update-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -58,9 +59,8 @@ jobs:
       fail-fast: false
       matrix:
         branch:
-          -  release-1.16
-          -  release-1.17
           -  release-1.18
+          -  release-1.19
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
@@ -74,6 +74,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ matrix.branch }}
           token: ${{ secrets.REPO_GHA_PAT }}
+      -
+        name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Check commits
         if: contains( github.event.pull_request.labels.*.name, matrix.branch )
@@ -104,6 +109,12 @@ jobs:
           git config user.name "${{ env.AUTHOR_NAME }}"
           git fetch
           git cherry-pick -x --mainline 1 ${{ env.COMMIT }}
+          make fmt vet generate apidoc wordlist-ordered
+          if ! git diff --exit-code --quiet
+          then
+            echo "!!! Generated files need manually handling"
+            exit 1
+          fi
           git push
 
   create-tickets:

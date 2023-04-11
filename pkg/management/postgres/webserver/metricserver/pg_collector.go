@@ -20,13 +20,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -41,9 +41,6 @@ const PrometheusNamespace = "cnpg"
 
 var synchronousStandbyNamesRegex = regexp.MustCompile(`ANY ([0-9]+) \(.*\)`)
 
-// The wal_segment_size value in bytes
-var walSegmentSize *int
-
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
 	instance *postgres.Instance
@@ -54,20 +51,22 @@ type Exporter struct {
 // metrics here are related to the exporter itself, which is instrumented to
 // expose them
 type metrics struct {
-	CollectionsTotal         prometheus.Counter
-	PgCollectionErrors       *prometheus.CounterVec
-	Error                    prometheus.Gauge
-	PostgreSQLUp             *prometheus.GaugeVec
-	CollectionDuration       *prometheus.GaugeVec
-	SwitchoverRequired       prometheus.Gauge
-	SyncReplicas             *prometheus.GaugeVec
-	ReplicaCluster           prometheus.Gauge
-	PgWALArchiveStatus       *prometheus.GaugeVec
-	PgWALDirectory           *prometheus.GaugeVec
-	PgVersion                *prometheus.GaugeVec
-	FirstRecoverabilityPoint prometheus.Gauge
-	FencingOn                prometheus.Gauge
-	PgStatWalMetrics         PgStatWalMetrics
+	CollectionsTotal             prometheus.Counter
+	PgCollectionErrors           *prometheus.CounterVec
+	Error                        prometheus.Gauge
+	PostgreSQLUp                 *prometheus.GaugeVec
+	CollectionDuration           *prometheus.GaugeVec
+	SwitchoverRequired           prometheus.Gauge
+	SyncReplicas                 *prometheus.GaugeVec
+	ReplicaCluster               prometheus.Gauge
+	PgWALArchiveStatus           *prometheus.GaugeVec
+	PgWALDirectory               *prometheus.GaugeVec
+	PgVersion                    *prometheus.GaugeVec
+	FirstRecoverabilityPoint     prometheus.Gauge
+	LastAvailableBackupTimestamp prometheus.Gauge
+	LastFailedBackupTimestamp    prometheus.Gauge
+	FencingOn                    prometheus.Gauge
+	PgStatWalMetrics             PgStatWalMetrics
 }
 
 // PgStatWalMetrics is available from PG14+
@@ -169,6 +168,18 @@ func newMetrics() *metrics {
 			Name:      "first_recoverability_point",
 			Help:      "The first point of recoverability for the cluster as a unix timestamp",
 		}),
+		LastAvailableBackupTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "last_available_backup_timestamp",
+			Help:      "The last available backup as a unix timestamp",
+		}),
+		LastFailedBackupTimestamp: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "last_failed_backup_timestamp",
+			Help:      "The last failed backup as a unix timestamp",
+		}),
 		FencingOn: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
@@ -250,6 +261,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.PgVersion.Describe(ch)
 	e.Metrics.FirstRecoverabilityPoint.Describe(ch)
 	e.Metrics.FencingOn.Describe(ch)
+	e.Metrics.LastFailedBackupTimestamp.Describe(ch)
+	e.Metrics.LastAvailableBackupTimestamp.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -284,6 +297,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.Metrics.PgWALDirectory.Collect(ch)
 	e.Metrics.PgVersion.Collect(ch)
 	e.Metrics.FirstRecoverabilityPoint.Collect(ch)
+	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
+	e.Metrics.LastFailedBackupTimestamp.Collect(ch)
 
 	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
 		e.Metrics.PgStatWalMetrics.WalSync.Collect(ch)
@@ -357,6 +372,11 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 
 		// getting the first point of recoverability
 		e.collectFromPrimaryFirstPointOnTimeRecovery()
+
+		// getting the last available backup timestamp
+		e.collectFromPrimaryLastAvailableBackupTimestamp()
+
+		e.collectFromPrimaryLastFailedBackupTimestamp()
 	}
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
@@ -366,10 +386,10 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		e.Metrics.PgWALArchiveStatus.Reset()
 	}
 
-	if err := collectPGWalMetric(e, db); err != nil {
-		log.Error(err, "while collecting WAL metrics", "path", specs.PgWalPath)
+	if err := collectPGWalSettings(e, db); err != nil {
+		log.Error(err, "while collecting WAL settings", "path", specs.PgWalPath)
 		e.Metrics.Error.Set(1)
-		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PgWALStats").Inc()
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGWalSettings").Inc()
 		e.Metrics.PgWALDirectory.Reset()
 	}
 
@@ -389,9 +409,11 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
-	const errorLabel = "Collect.FirstRecoverabilityPoint"
-
+func (e *Exporter) setTimestampMetric(
+	gauge prometheus.Gauge,
+	errorLabel string,
+	getTimestampFunc func(cluster *apiv1.Cluster) string,
+) {
 	cluster, err := cache.LoadCluster()
 	// there isn't a cached object yet
 	if errors.Is(err, cache.ErrCacheMiss) {
@@ -404,24 +426,23 @@ func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 		e.Metrics.PgCollectionErrors.WithLabelValues(errorLabel).Inc()
 		// if there is a programmatic error in the cache we should reset any potential data because it cannot be
 		// trusted as still valid
-		e.Metrics.FirstRecoverabilityPoint.Set(0)
+		gauge.Set(0)
 		return
 	}
 
-	ts := cluster.Status.FirstRecoverabilityPoint
-	// means no First recoverability point yet
+	ts := getTimestampFunc(cluster)
 	if ts == "" {
+		// if there is no timestamp we report the timestamp metric with the zero value
+		gauge.Set(0)
 		return
 	}
 
 	parsedTS, err := time.Parse(time.RFC3339, ts)
 	if err != nil {
-		log.Error(err, "while collecting parsing first recoverability point timestamp")
+		log.Error(err, "while collecting timestamp", "errorLabel", errorLabel)
 		e.Metrics.Error.Set(1)
 		e.Metrics.PgCollectionErrors.WithLabelValues(errorLabel).Inc()
-		// if we cannot parse FirstRecoverabilityPoint we should reset the potential existing value because it cannot be
-		// trusted as still valid
-		e.Metrics.FirstRecoverabilityPoint.Set(0)
+		gauge.Set(0)
 		return
 	}
 
@@ -429,7 +450,28 @@ func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 	// exposing timestamps using the relative Unix timestamp
 	// number. See:
 	// https://prometheus.io/docs/practices/instrumentation/#timestamps-not-time-since
-	e.Metrics.FirstRecoverabilityPoint.Set(float64(parsedTS.Unix()))
+	gauge.Set(float64(parsedTS.Unix()))
+}
+
+func (e *Exporter) collectFromPrimaryLastFailedBackupTimestamp() {
+	const errorLabel = "Collect.LastFailedBackupTimestamp"
+	e.setTimestampMetric(e.Metrics.LastFailedBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
+		return cluster.Status.LastFailedBackup
+	})
+}
+
+func (e *Exporter) collectFromPrimaryLastAvailableBackupTimestamp() {
+	const errorLabel = "Collect.LastAvailableBackupTimestamp"
+	e.setTimestampMetric(e.Metrics.LastAvailableBackupTimestamp, errorLabel, func(cluster *apiv1.Cluster) string {
+		return cluster.Status.LastSuccessfulBackup
+	})
+}
+
+func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
+	const errorLabel = "Collect.FirstRecoverabilityPoint"
+	e.setTimestampMetric(e.Metrics.FirstRecoverabilityPoint, errorLabel, func(cluster *apiv1.Cluster) string {
+		return cluster.Status.FirstRecoverabilityPoint
+	})
 }
 
 func (e *Exporter) collectFromPrimarySynchronousStandbysNumber(db *sql.DB) {
@@ -461,82 +503,6 @@ func collectPGVersion(e *Exporter) error {
 	e.Metrics.PgVersion.WithLabelValues(majorMinorPatch, e.instance.ClusterName).Set(version)
 
 	return nil
-}
-
-func collectPGWalArchiveMetric(exporter *Exporter) error {
-	ready, done, err := postgres.GetWALArchiveCounters()
-	if err != nil {
-		return err
-	}
-
-	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("ready").Set(float64(ready))
-	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("done").Set(float64(done))
-	return nil
-}
-
-func collectPGWALStat(e *Exporter) error {
-	walStat, err := e.instance.TryGetPgStatWAL()
-	if walStat == nil || err != nil {
-		return err
-	}
-	walMetrics := e.Metrics.PgStatWalMetrics
-	walMetrics.WalSync.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSync))
-	walMetrics.WalSyncTime.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSyncTime))
-	walMetrics.WALBuffersFull.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WALBuffersFull))
-	walMetrics.WalFpi.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalFpi))
-	walMetrics.WalWrite.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWrite))
-	walMetrics.WalBytes.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalBytes))
-	walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWriteTime))
-	walMetrics.WalRecords.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalRecords))
-
-	return nil
-}
-
-var regexPGWalFileName = regexp.MustCompile("^[0-9A-F]{24}")
-
-func collectPGWalMetric(exporter *Exporter, db *sql.DB) error {
-	pgWalDir, err := os.Open(specs.PgWalPath)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = pgWalDir.Close()
-	}()
-	files, err := pgWalDir.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
-	var count int
-	for _, file := range files {
-		if !regexPGWalFileName.MatchString(file) {
-			continue
-		}
-		count++
-	}
-
-	exporter.Metrics.PgWALDirectory.WithLabelValues("count").Set(float64(count))
-	WALSegmentSize, err := getWALSegmentSize(db)
-	if err != nil {
-		return err
-	}
-	exporter.Metrics.PgWALDirectory.WithLabelValues("size").Set(float64(count * WALSegmentSize))
-	return nil
-}
-
-// We cache the value of wal_segment_size the first time we retrieve it from the database
-func getWALSegmentSize(db *sql.DB) (int, error) {
-	if walSegmentSize != nil {
-		return *walSegmentSize, nil
-	}
-	var size int
-	err := db.QueryRow("SELECT setting FROM pg_settings WHERE name='wal_segment_size'").
-		Scan(&size)
-	if err != nil {
-		log.Error(err, "while getting the wal_segment_size value from the database")
-		return 0, err
-	}
-	walSegmentSize = &size
-	return *walSegmentSize, nil
 }
 
 func getSynchronousStandbysNumber(db *sql.DB) (int, error) {

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -34,17 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -59,6 +58,7 @@ var (
 	poolerReconciler  *PoolerReconciler
 	clusterReconciler *ClusterReconciler
 	scheme            *runtime.Scheme
+	discoveryClient   discovery.DiscoveryInterface
 )
 
 func init() {
@@ -72,9 +72,7 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
-
 	testEnv = buildTestEnv()
-
 	var err error
 	cfg, err = testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
@@ -87,13 +85,16 @@ var _ = BeforeSuite(func() {
 	utilruntime.Must(apiv1.AddToScheme(scheme))
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	Expect(err).To(BeNil())
 
+	discoveryClient, err = discovery.NewDiscoveryClientForConfig(cfg)
 	Expect(err).To(BeNil())
 
 	clusterReconciler = &ClusterReconciler{
-		Client:   k8sClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
+		Client:          k8sClient,
+		Scheme:          scheme,
+		Recorder:        record.NewFakeRecorder(120),
+		DiscoveryClient: discoveryClient,
 	}
 
 	poolerReconciler = &PoolerReconciler{
@@ -153,7 +154,7 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	return pooler
 }
 
-func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
+func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluster)) *apiv1.Cluster {
 	const instances int = 3
 	name := "cluster-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
@@ -174,22 +175,37 @@ func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
 				Size: "1G",
 			},
 		},
-		Status: apiv1.ClusterStatus{
-			Instances:                instances,
-			SecretsResourceVersion:   apiv1.SecretsResourceVersion{},
-			ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{},
-			Certificates: apiv1.CertificatesStatus{
-				CertificatesConfiguration: apiv1.CertificatesConfiguration{
-					ServerCASecret: caServer,
-					ClientCASecret: caClient,
-				},
-			},
-		},
 	}
 
 	cluster.SetDefaults()
 
+	for _, mutator := range mutators {
+		mutator(cluster)
+	}
+
 	err := k8sClient.Create(context.Background(), cluster)
+	Expect(err).To(BeNil())
+
+	cluster.Status = apiv1.ClusterStatus{
+		Instances:                instances,
+		SecretsResourceVersion:   apiv1.SecretsResourceVersion{},
+		ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{},
+		Certificates: apiv1.CertificatesStatus{
+			CertificatesConfiguration: apiv1.CertificatesConfiguration{
+				ServerCASecret: caServer,
+				ClientCASecret: caClient,
+			},
+		},
+	}
+	// nolint: lll
+	// https://github.com/kubernetes-sigs/controller-runtime/blob/c3c1f058a9a080581e8fe99c004fcc792b2aff07/pkg/client/fake/doc.go#L30
+	for _, mutator := range mutators {
+		mutator(cluster)
+	}
+
+	err = k8sClient.Status().Update(context.Background(), cluster)
+	Expect(err).To(BeNil())
+	err = k8sClient.Update(context.Background(), cluster)
 	Expect(err).To(BeNil())
 
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
@@ -280,13 +296,17 @@ func getPoolerDeployment(ctx context.Context, pooler *apiv1.Pooler) *appsv1.Depl
 	return deployment
 }
 
-func generateFakeClusterPods(c client.Client, cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
+func generateFakeClusterPods(
+	c client.Client,
+	cluster *apiv1.Cluster,
+	markAsReady bool,
+) []corev1.Pod {
 	var idx int
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {
 		idx++
 		pod := specs.PodWithExistingStorage(*cluster, idx)
-		SetClusterOwnerAnnotationsAndLabels(&pod.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
 
 		err := c.Create(context.Background(), pod)
 		Expect(err).To(BeNil())
@@ -295,6 +315,7 @@ func generateFakeClusterPods(c client.Client, cluster *apiv1.Cluster, markAsRead
 		// 'Pending'
 		if markAsReady {
 			pod.Status = corev1.PodStatus{
+				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
 					{
 						Type:   corev1.ContainersReady,
@@ -318,7 +339,7 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	for idx < cluster.Spec.Instances {
 		idx++
 		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
-		SetClusterOwnerAnnotationsAndLabels(&job.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 
 		err := c.Create(context.Background(), job)
 		Expect(err).To(BeNil())
@@ -331,65 +352,64 @@ func generateFakeInitDBJobsWithDefaultClient(cluster *apiv1.Cluster) []batchv1.J
 	return generateFakeInitDBJobs(k8sClient, cluster)
 }
 
-func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
+func generateClusterPVC(
+	c client.Client,
+	cluster *apiv1.Cluster,
+	status persistentvolumeclaim.PVCStatus, // nolint:unparam
+) []corev1.PersistentVolumeClaim {
 	var idx int
 	var pvcs []corev1.PersistentVolumeClaim
 	for idx < cluster.Spec.Instances {
 		idx++
-
-		pvc, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, *cluster, idx, utils.PVCRolePgData)
-		Expect(err).To(BeNil())
-		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
-
-		err = c.Create(context.Background(), pvc)
-		Expect(err).To(BeNil())
-		pvcs = append(pvcs, *pvc)
-		if cluster.ShouldCreateWalArchiveVolume() {
-			pvcWal, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, *cluster, idx, utils.PVCRolePgWal)
-			Expect(err).To(BeNil())
-			SetClusterOwnerAnnotationsAndLabels(&pvcWal.ObjectMeta, cluster)
-			err = c.Create(context.Background(), pvcWal)
-			Expect(err).To(BeNil())
-			pvcs = append(pvcs, *pvcWal)
-		}
+		pvcs = append(pvcs, newFakePVC(c, cluster, idx, status)...)
 	}
 	return pvcs
 }
 
-func generateFakePVCWithDefaultClient(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
-	return generateFakePVC(k8sClient, cluster)
+func newFakePVC(
+	c client.Client,
+	cluster *apiv1.Cluster,
+	serial int,
+	status persistentvolumeclaim.PVCStatus,
+) []corev1.PersistentVolumeClaim {
+	var pvcGroup []corev1.PersistentVolumeClaim
+	pvc, err := persistentvolumeclaim.Build(
+		cluster,
+		&persistentvolumeclaim.CreateConfiguration{
+			Status:     status,
+			NodeSerial: serial,
+			Role:       utils.PVCRolePgData,
+			Storage:    cluster.Spec.StorageConfiguration,
+		})
+	Expect(err).To(BeNil())
+	cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+
+	err = c.Create(context.Background(), pvc)
+	Expect(err).To(BeNil())
+	pvcGroup = append(pvcGroup, *pvc)
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		pvcWal, err := persistentvolumeclaim.Build(
+			cluster,
+			&persistentvolumeclaim.CreateConfiguration{
+				Status:     status,
+				NodeSerial: serial,
+				Role:       utils.PVCRolePgWal,
+				Storage:    cluster.Spec.StorageConfiguration,
+			},
+		)
+		Expect(err).To(BeNil())
+		cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta)
+		err = c.Create(context.Background(), pvcWal)
+		Expect(err).To(BeNil())
+		pvcGroup = append(pvcGroup, *pvcWal)
+	}
+
+	return pvcGroup
 }
 
-func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *PoolerReconciler, manager.Manager) {
-	mgr, err := controllerruntime.NewManager(cfg, controllerruntime.Options{
-		Scheme:             scheme,
-		LeaderElection:     false,
-		MetricsBindAddress: "0",
-		Port:               testEnv.WebhookInstallOptions.LocalServingPort,
-		Host:               testEnv.WebhookInstallOptions.LocalServingHost,
-		CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
-	})
-	Expect(err).To(BeNil())
-
-	clusterRec := &ClusterReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
-	}
-
-	err = clusterRec.SetupWithManager(ctx, mgr)
-	Expect(err).To(BeNil())
-
-	poolerRec := &PoolerReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
-	}
-
-	err = poolerRec.SetupWithManager(ctx, mgr)
-	Expect(err).To(BeNil())
-
-	return clusterRec, poolerRec, mgr
+func generateFakePVCWithDefaultClient(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
+	return generateClusterPVC(k8sClient, cluster, persistentvolumeclaim.StatusReady)
 }
 
 // generateFakeCASecret follows the conventions established by cert.GenerateCASecret
@@ -444,35 +464,67 @@ func expectResourceDoesntExistWithDefaultClient(name, namespace string, resource
 	expectResourceDoesntExist(k8sClient, name, namespace, resource)
 }
 
-// withManager bootstraps a manager.Manager inside a ginkgo.It statement
-func withManager(callback func(context.Context, *ClusterReconciler, *PoolerReconciler, manager.Manager)) {
-	ctx, ctxCancel := context.WithCancel(context.TODO())
+type (
+	indexAdapter               func(list client.ObjectList, opts ...client.ListOption) client.ObjectList
+	fakeClientWithIndexAdapter struct {
+		client.Client
+		indexerAdapters []indexAdapter
+	}
+)
 
-	crReconciler, poolerReconciler, mgr := createManagerWithReconcilers(ctx)
+func (f fakeClientWithIndexAdapter) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	var optsWithoutMatchingFields []client.ListOption
+	// matchingFields rely on indexes that we don't have on the default kube client
+	var matchingFields []client.ListOption // nolint:prealloc
+	for _, opt := range opts {
+		_, ok := opt.(client.MatchingFields)
+		if !ok {
+			optsWithoutMatchingFields = append(optsWithoutMatchingFields, opt)
+			continue
+		}
+		matchingFields = append(matchingFields, opt)
+	}
 
-	wg := sync.WaitGroup{}
+	err := f.Client.List(ctx, list, optsWithoutMatchingFields...)
 
-	By("starting the manager", func() {
-		wg.Add(1)
-		go func() {
-			defer GinkgoRecover()
-			defer wg.Done()
-			err := mgr.Start(ctx)
-			Expect(err).ShouldNot(HaveOccurred())
-		}()
-	})
+	// we try to process the index filters
+	for _, filter := range f.indexerAdapters {
+		list = filter(list, matchingFields...)
+	}
 
-	callback(ctx, crReconciler, poolerReconciler, mgr)
-
-	By("stopping the manager", func() {
-		ctxCancel()
-		wg.Wait()
-	})
+	return err
 }
 
-func assertRefreshManagerCache(ctx context.Context, manager manager.Manager) {
-	By("waiting the cache to sync", func() {
-		syncDone := manager.GetCache().WaitForCacheSync(ctx)
-		Expect(syncDone).To(BeTrue())
-	})
+func clusterDefaultQueriesFalsePathIndexAdapter(list client.ObjectList, opts ...client.ListOption) client.ObjectList {
+	var matchesFilter bool
+	for _, opt := range opts {
+		res, ok := opt.(client.MatchingFields)
+		if !ok {
+			continue
+		}
+		if res[disableDefaultQueriesSpecPath] == "false" {
+			matchesFilter = true
+		}
+	}
+
+	if !matchesFilter {
+		return list
+	}
+
+	clusterList, ok := list.(*apiv1.ClusterList)
+	if !ok {
+		return list
+	}
+
+	var filteredClusters []apiv1.Cluster
+	for _, cluster := range clusterList.Items {
+		if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.DisableDefaultQueries != nil {
+			if !*cluster.Spec.Monitoring.DisableDefaultQueries {
+				filteredClusters = append(filteredClusters, cluster)
+			}
+		}
+	}
+
+	clusterList.Items = filteredClusters
+	return clusterList
 }

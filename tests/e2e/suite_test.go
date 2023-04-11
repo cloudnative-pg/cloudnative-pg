@@ -33,7 +33,9 @@ import (
 	"github.com/thoas/go-funk"
 	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -97,17 +99,17 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 var _ = SynchronizedAfterSuite(func() {
 }, func() {
-	err := env.DeleteNamespace(psqlClientNamespace)
+	err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
 	Expect(err).ToNot(HaveOccurred())
 })
 
 // saveOperatorLogs does 2 things:
-//   - displays the non-DEBUG operator logs on the `output` io.Writer (likely GinkgoWriter)
+//   - displays the last `capLines` of non-DEBUG operator logs on the `output` io.Writer (likely GinkgoWriter)
 //   - saves the full logs to a file
 //
 // along the way it parses the timestamps for convenience, BUT the lines
 // of output are not legal JSON
-func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer) {
+func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer, capLines int) {
 	scanner := bufio.NewScanner(&buf)
 	filename := "out/operator_logs_" + specName + ".log"
 	f, err := os.Create(filepath.Clean(filename))
@@ -125,8 +127,17 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer) {
 			fmt.Fprintln(output, "ERROR while closing file:", err)
 		}
 	}()
+
+	// circular buffer to hold the last `capLines` of non-DEBUG operator logs
+	lineBuffer := make([]string, capLines)
+	// count of non-DEBUG operator log lines read
+	nonDebugLines := 0
+	// insertion point in the lineBuffer: values 0 to capLines - 1 (i.e. modulo capLines)
+	bufferIdx := 0
+
 	for scanner.Scan() {
 		lg := scanner.Text()
+
 		var js map[string]interface{}
 		err = json.Unmarshal([]byte(lg), &js)
 		if err != nil {
@@ -138,11 +149,26 @@ func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer) {
 			lg = ts.Format(time.Stamp) + " - " + lg
 		}
 
+		// store the latest line of non-DEBUG operator logs to the slice
 		if js["level"] != "debug" {
-			fmt.Fprintln(output, lg)
+			lineBuffer[bufferIdx] = lg
+			nonDebugLines++
+			// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
+			bufferIdx = nonDebugLines % capLines
 		}
+		// write every line to the file stream
 		fmt.Fprintln(f, lg)
 	}
+
+	// print the last `capLines` lines of logs to the `output`
+	if nonDebugLines <= capLines || bufferIdx == 0 {
+		// if bufferIdx == 0, the buffer just finished filling and is in order
+		fmt.Fprintln(output, strings.Join(lineBuffer, "\n"))
+	} else {
+		// the line buffer cycled back and the items 0 to bufferIdx - 1 are newer than the rest
+		fmt.Fprintln(output, strings.Join(append(lineBuffer[bufferIdx:], lineBuffer[:bufferIdx]...), "\n"))
+	}
+
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(output, "ERROR while scanning:", err)
 	}
@@ -164,7 +190,9 @@ var _ = BeforeEach(func() {
 	var buf bytes.Buffer
 	go func() {
 		// get logs without timestamp parsing; for JSON parseability
-		err = logs.TailPodLogs(context.TODO(), operatorPod, &buf, false)
+		conf := ctrl.GetConfigOrDie()
+		client := kubernetes.NewForConfigOrDie(conf)
+		err = logs.TailPodLogs(context.TODO(), client, operatorPod, &buf, false)
 		if err != nil {
 			_, _ = fmt.Fprintf(&buf, "Error tailing logs, dumping operator logs: %v\n", err)
 		}
@@ -172,9 +200,12 @@ var _ = BeforeEach(func() {
 	DeferCleanup(func(ctx SpecContext) {
 		if CurrentSpecReport().Failed() {
 			specName := CurrentSpecReport().FullText()
-			GinkgoWriter.Println("DUMPING tailed Operator Logs. Failed Spec:",
-				specName)
-			saveOperatorLogs(buf, strings.ReplaceAll(specName, " ", "_"), GinkgoWriter)
+			capLines := 50
+			GinkgoWriter.Printf("DUMPING tailed Operator Logs (at most %v lines). Failed Spec: %v\n",
+				capLines, specName)
+			GinkgoWriter.Println("================================================================================")
+			saveOperatorLogs(buf, strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
+			GinkgoWriter.Println("================================================================================")
 		}
 	})
 

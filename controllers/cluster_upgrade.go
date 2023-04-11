@@ -23,8 +23,9 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"reflect"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -107,7 +109,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	podList *postgres.PostgresqlStatusList,
-	primaryPod v1.Pod,
+	primaryPod corev1.Pod,
 	inPlacePossible bool,
 	reason string,
 ) (bool, error) {
@@ -187,7 +189,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 func (r *ClusterReconciler) updateRestartAnnotation(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	primaryPod v1.Pod,
+	primaryPod corev1.Pod,
 ) error {
 	contextLogger := log.FromContext(ctx)
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok &&
@@ -240,10 +242,15 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, pvcName := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC begins with the name of the pod using it.
-			if specs.DoesPVCBelongToInstance(cluster, status.Pod.Name, pvcName) {
+			if persistentvolumeclaim.BelongToInstance(cluster, status.Pod.Name, pvcName) {
 				return true, false, fmt.Sprintf("rebooting pod to complete resizing %s", pvcName)
 			}
 		}
+	}
+
+	// Check if there is a change in the projected volume configuration
+	if needsUpdate, reason := isPodNeedingUpdateOfProjectedVolume(cluster, status.Pod); needsUpdate {
+		return true, false, reason
 	}
 
 	// check if the pod requires an image upgrade
@@ -270,6 +277,15 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		}
 	}
 
+	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, &status.Pod) {
+		return true, false, string(apiv1.DetachedVolume)
+	}
+
+	// Check if there is a change in the environment section
+	if restartRequired, reason := isPodNeedingUpdatedEnvironment(*cluster, status.Pod); restartRequired {
+		return true, false, reason
+	}
+
 	// Detect changes in the postgres container configuration
 	for _, container := range status.Pod.Spec.Containers {
 		// we go to the next array element if it isn't the postgres container
@@ -290,10 +306,40 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		true, "configuration needs a restart to apply some configuration changes"
 }
 
+func isPodNeedingUpdateOfProjectedVolume(cluster *apiv1.Cluster, pod corev1.Pod) (needsUpdate bool, reason string) {
+	currentProjectedVolumeConfiguration := getProjectedVolumeConfigurationFromPod(pod)
+
+	desiredProjectedVolumeConfiguration := cluster.Spec.ProjectedVolumeTemplate.DeepCopy()
+	if desiredProjectedVolumeConfiguration != nil && desiredProjectedVolumeConfiguration.DefaultMode == nil {
+		defaultMode := corev1.ProjectedVolumeSourceDefaultMode
+		desiredProjectedVolumeConfiguration.DefaultMode = &defaultMode
+	}
+
+	if reflect.DeepEqual(currentProjectedVolumeConfiguration, desiredProjectedVolumeConfiguration) {
+		return false, ""
+	}
+
+	return true, fmt.Sprintf("projected volume configuration changed, old: %+v, new: %+v",
+		currentProjectedVolumeConfiguration,
+		desiredProjectedVolumeConfiguration)
+}
+
+func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVolumeSource {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name != "projected" {
+			continue
+		}
+
+		return volume.Projected
+	}
+
+	return nil
+}
+
 // isPodNeedingUpgradedImage checks whether an image in a pod has to be changed
 func isPodNeedingUpgradedImage(
 	cluster *apiv1.Cluster,
-	pod v1.Pod,
+	pod corev1.Pod,
 ) (oldImage string, targetImage string, err error) {
 	targetImageName := cluster.GetImageName()
 
@@ -321,7 +367,7 @@ func isPodNeedingUpgradedImage(
 
 // isPodNeedingUpgradedInitContainerImage checks whether an image in init container has to be changed
 func isPodNeedingUpgradedInitContainerImage(
-	pod v1.Pod,
+	pod corev1.Pod,
 ) (oldImage string, targetImage string, err error) {
 	opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
 	if err != nil {
@@ -355,8 +401,44 @@ func isPodNeedingRestart(
 	return instanceStatus.PendingRestart
 }
 
+func isPodNeedingUpdatedEnvironment(cluster apiv1.Cluster, pod corev1.Pod) (bool, string) {
+	envConfig := specs.CreatePodEnvConfig(cluster, pod.Name)
+
+	// Use the hash to detect if the environment needs a refresh
+	podEnvHash, hasPodEnvhash := pod.Annotations[utils.PodEnvHashAnnotationName]
+	if hasPodEnvhash {
+		if podEnvHash != envConfig.Hash {
+			return true, "environment variable configuration hash changed"
+		}
+
+		return false, ""
+	}
+
+	// Fall back to comparing the container environment configuration
+	for _, container := range pod.Spec.Containers {
+		// we go to the next array element if it isn't the postgres container
+		if container.Name != specs.PostgresContainerName {
+			continue
+		}
+
+		if !envConfig.IsEnvEqual(container) {
+			return true, fmt.Sprintf("environment variable configuration changed, "+
+				"oldEnv: %+v, oldEnvFrom: %+v, newEnv: %+v, newEnvFrom: %+v",
+				container.Env,
+				container.EnvFrom,
+				envConfig.EnvVars,
+				envConfig.EnvFrom,
+			)
+		}
+
+		break
+	}
+
+	return false, ""
+}
+
 // upgradePod updates an instance to a newer image version
-func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Cluster, pod *v1.Pod) error {
+func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Cluster, pod *corev1.Pod) error {
 	log.FromContext(ctx).Info("Deleting old Pod",
 		"pod", pod.Name,
 		"to", cluster.Spec.ImageName)
@@ -452,7 +534,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 }
 
 // upgradeInstanceManagerOnPod upgrades an instance manager of a Pod via an HTTP PUT request.
-func upgradeInstanceManagerOnPod(ctx context.Context, pod v1.Pod) error {
+func upgradeInstanceManagerOnPod(ctx context.Context, pod corev1.Pod) error {
 	binaryFileStream, err := executablehash.Stream()
 	if err != nil {
 		return err

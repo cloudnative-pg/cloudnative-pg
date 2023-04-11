@@ -14,6 +14,7 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
+      wal_receiver_timeout: '2s'
 
   bootstrap:
     initdb:

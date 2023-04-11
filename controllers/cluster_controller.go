@@ -21,8 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"reflect"
 	goruntime "runtime"
 	"time"
@@ -31,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,6 +46,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -67,31 +66,17 @@ var apiGVString = apiv1.GroupVersion.String()
 type ClusterReconciler struct {
 	client.Client
 
-	DiscoveryClient *discovery.DiscoveryClient
+	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 
-	timeoutHTTPClient *http.Client
+	*instanceStatusClient
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
 func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
-	const connectionTimeout = 2 * time.Second
-	const requestTimeout = 30 * time.Second
-
-	// We want a connection timeout to prevent waiting for the default
-	// TCP connection timeout (30 seconds) on lost SYN packets
-	timeoutClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: connectionTimeout,
-			}).DialContext,
-		},
-		Timeout: requestTimeout,
-	}
-
 	return &ClusterReconciler{
-		timeoutHTTPClient: timeoutClient,
+		instanceStatusClient: newInstanceStatusClient(),
 
 		DiscoveryClient: discoveryClient,
 		Client:          mgr.GetClient(),
@@ -100,9 +85,8 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 	}
 }
 
-// ErrNextLoop is not a real error. It forces the current reconciliation loop to stop
-// and return the associated Result object
-var ErrNextLoop = errors.New("stop this loop and return the associated Result object")
+// ErrNextLoop see utils.ErrNextLoop
+var ErrNextLoop = utils.ErrNextLoop
 
 // Alphabetical order to not repeat or miss permissions
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list;patch
@@ -235,7 +219,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Get the replication status
-	instancesStatus := r.getStatusFromInstances(ctx, resources.instances)
+	instancesStatus := r.instanceStatusClient.getStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
@@ -287,6 +271,19 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 				"isPodReady", isPodReady)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
+	}
+
+	// If the user has requested to hibernate the cluster, we do that before
+	// ensuring the primary to be healthy. The hibernation starts from the
+	// primary Pod to ensure the replicas are in sync and doing it here avoids
+	// any unwanted switchover.
+	if result, err := hibernation.Reconcile(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+	); result != nil || err != nil {
+		return *result, err
 	}
 
 	// We have already updated the status in updateResourceStatus call,
@@ -349,6 +346,10 @@ func (r *ClusterReconciler) handleSwitchover(
 	// This means issuing a failover or switchover when needed.
 	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
 	if err != nil {
+		if err == ErrWaitingOnFailOverDelay {
+			contextLogger.Info("Waiting for the failover delay to expire")
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		}
 		if err == ErrWalReceiversRunning {
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
@@ -364,6 +365,16 @@ func (r *ClusterReconciler) handleSwitchover(
 			"newPrimary", selectedPrimary)
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
+
+	// Primary is healthy, No switchover in progress.
+	// If we have a currentPrimaryFailingSince timestamp, let's unset it.
+	if cluster.Status.CurrentPrimaryFailingSinceTimestamp != "" {
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp = ""
+		if err := r.Status().Update(ctx, cluster); err != nil {
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }
 
@@ -436,11 +447,6 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{}, fmt.Errorf("cannot update instance labels on pods: %w", err)
 	}
 
-	// updated any labels that are coming from the operator
-	if err := r.updateOperatorLabelsOnPVC(ctx, resources.instances, resources.pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
-	}
-
 	// Update any modified/new labels coming from the cluster resource
 	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pods: %w", err)
@@ -451,16 +457,6 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pods: %w", err)
 	}
 
-	// Update any modified/new labels coming from the cluster resource
-	if err := r.updateClusterLabelsOnPVCs(ctx, cluster, resources.pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
-	}
-
-	// Update any modified/new annotations coming from the cluster resource
-	if err := r.updateClusterAnnotationsOnPVCs(ctx, cluster, resources.pvcs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pvcs: %w", err)
-	}
-
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
 		contextLogger.Debug("A job is currently running. Waiting", "count", runningJobs)
@@ -468,7 +464,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Delete Pods which have been evicted by the Kubelet
-	result, err := r.deleteEvictedPods(ctx, cluster, resources)
+	result, err := r.deleteEvictedOrUnscheduledInstances(ctx, cluster, resources)
 	if err != nil {
 		contextLogger.Error(err, "While deleting evicted pods")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -477,18 +473,29 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
+	// TODO: move into a central waiting phase
+	// If we are joining a node, we should wait for the process to finish
+	if resources.countRunningJobs() > 0 {
+		contextLogger.Debug("Waiting for jobs to finish",
+			"clusterName", cluster.Name,
+			"namespace", cluster.Namespace,
+			"jobs", len(resources.jobs.Items))
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
 	if !resources.allInstancesAreActive() {
 		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Reconcile PVC resource requirements
-	if err := r.ReconcilePVCs(ctx, cluster, resources); err != nil {
-		if apierrs.IsConflict(err) {
-			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
-			return ctrl.Result{Requeue: true}, nil
-		}
-		return ctrl.Result{}, err
+	if res, err := persistentvolumeclaim.Reconcile(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+		resources.pvcs.Items,
+	); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	// Reconcile Pods
@@ -516,31 +523,58 @@ func (r *ClusterReconciler) reconcileResources(
 	return ctrl.Result{}, nil
 }
 
-// deleteEvictedPods will delete the Pods that the Kubelet has evicted
-func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv1.Cluster,
+// deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
+func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 	deletedPods := false
 
 	for idx := range resources.instances.Items {
-		if utils.IsPodEvicted(resources.instances.Items[idx]) {
-			contextLogger.Warning("Deleting evicted pod",
-				"pod", resources.instances.Items[idx].Name,
-				"podStatus", resources.instances.Items[idx].Status)
-			if err := r.Delete(ctx, &resources.instances.Items[idx]); err != nil {
-				if apierrs.IsConflict(err) {
-					contextLogger.Debug("Conflict error while deleting instances item", "error", err)
-					return &ctrl.Result{Requeue: true}, nil
-				}
-				return nil, err
-			}
-			deletedPods = true
-			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
-				"Deleted evicted Pod %v",
-				resources.instances.Items[idx].Name)
+		instance := &resources.instances.Items[idx]
+
+		// we process unscheduled pod only if we are in IsNodeMaintenanceWindow, and we can delete the PVC Group
+		// This will be better handled in a next patch
+		if !utils.IsPodEvicted(instance) && !(utils.IsPodUnscheduled(instance) &&
+			cluster.IsNodeMaintenanceWindowInProgress() &&
+			!cluster.IsReusePVCEnabled()) {
+			continue
 		}
+		contextLogger.Warning("Deleting evicted/unscheduled pod",
+			"pod", instance.Name,
+			"podStatus", instance.Status)
+		if err := r.Delete(ctx, instance); err != nil {
+			if apierrs.IsConflict(err) {
+				contextLogger.Debug("Conflict error while deleting instances item", "error", err)
+				return &ctrl.Result{Requeue: true}, nil
+			}
+			return nil, err
+		}
+		deletedPods = true
+
+		r.Recorder.Eventf(cluster, "Normal", "DeletePod",
+			"Deleted evicted/unscheduled Pod %v",
+			instance.Name)
+
+		// we never delete the pvc unless we are in node Maintenance Window and the Reuse PVC is false
+		if !cluster.IsNodeMaintenanceWindowInProgress() || cluster.IsReusePVCEnabled() {
+			continue
+		}
+
+		if err := persistentvolumeclaim.EnsureInstancePVCGroupIsDeleted(
+			ctx,
+			r.Client,
+			cluster,
+			instance.Name,
+			instance.Namespace,
+		); err != nil {
+			return nil, err
+		}
+		r.Recorder.Eventf(cluster, "Normal", "DeletePVCs",
+			"Deleted evicted/unscheduled Pod %v PVCs",
+			instance.Name)
 	}
+
 	if deletedPods {
 		// We cleaned up Pods which were evicted.
 		// Let's wait for the informer cache to notice that
@@ -582,83 +616,18 @@ func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *p
 	return isConsistent
 }
 
-// ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
-func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cluster,
-	resources *managedResources,
-) error {
-	contextLogger := log.FromContext(ctx)
-	if !cluster.ShouldResizeInUseVolumes() {
-		return nil
-	}
-
-	// Size is empty would due to size is defined through request and not changed yet
-	if cluster.Spec.StorageConfiguration.Size == "" {
-		return nil
-	}
-	quantity, err := resource.ParseQuantity(cluster.Spec.StorageConfiguration.Size)
-	if err != nil {
-		return fmt.Errorf("while parsing PVC size %v: %w", cluster.Spec.StorageConfiguration.Size, err)
-	}
-
-	for idx := range resources.pvcs.Items {
-		oldPVC := resources.pvcs.Items[idx].DeepCopy()
-		oldQuantity, ok := resources.pvcs.Items[idx].Spec.Resources.Requests["storage"]
-
-		switch {
-		case !ok:
-			// Missing storage requirement for PVC
-			fallthrough
-
-		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == -1:
-			// Increasing storage resources
-			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = quantity
-			if err = r.Patch(ctx, &resources.pvcs.Items[idx], client.MergeFrom(oldPVC)); err != nil {
-				// Decreasing resources is not possible
-				contextLogger.Error(err, "error while changing PVC storage requirement",
-					"from", oldQuantity, "to", quantity,
-					"pvcName", resources.pvcs.Items[idx].Name)
-
-				// We are reaching two errors in two different conditions:
-				//
-				// 1. we hit a Conflict => a successive reconciliation loop will fix it
-				// 2. the StorageClass we used don't support PVC resizing => there's nothing we can do
-				//    about it
-			}
-
-		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == 1:
-			// Decreasing resources is not possible
-			contextLogger.Info("cannot decrease storage requirement",
-				"from", oldQuantity, "to", quantity,
-				"pvcName", resources.pvcs.Items[idx].Name)
-		}
-	}
-
-	return nil
-}
-
 // ReconcilePods decides when to create, scale up/down or wait for pods
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// If we are joining a node, we should wait for the process to finish
-	if resources.countRunningJobs() > 0 {
-		contextLogger.Debug("Waiting for jobs to finish",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"jobs", len(resources.jobs.Items))
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
 	if err := r.markPVCReadyForCompletedJobs(ctx, resources); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Work on the PVCs we currently have
-	pvcNeedingMaintenance := len(cluster.Status.DanglingPVC) + len(cluster.Status.InitializingPVC)
-	if pvcNeedingMaintenance > 0 {
-		return r.reconcilePVCs(ctx, cluster, resources, instancesStatus)
+	if res, err := r.ensureInstancesAreCreated(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
+		return res, err
 	}
 
 	if err := r.ensureHealthyPVCsAnnotation(ctx, cluster, resources); err != nil {
@@ -735,7 +704,7 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 			)
 		}
 
-		if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+		if pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusReady {
 			continue
 		}
 
@@ -1098,8 +1067,10 @@ func (r *ClusterReconciler) mapNodeToClusters(ctx context.Context) handler.MapFu
 		// get all the pods handled by the operator on that node
 		err := r.List(ctx, &childPods,
 			client.MatchingFields{".spec.nodeName": node.Name},
-			client.MatchingLabels{specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
-			client.HasLabels{utils.ClusterLabelName},
+			client.MatchingLabels{
+				specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+				utils.PodRoleLabelName:     string(utils.PodRoleInstance),
+			},
 		)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "while getting primary instances for node")
@@ -1129,7 +1100,7 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	completeJobs := utils.FilterCompleteJobs(resources.jobs.Items)
+	completeJobs := utils.FilterJobsWithOneCompletion(resources.jobs.Items)
 	if len(completeJobs) == 0 {
 		return nil
 	}
@@ -1137,7 +1108,7 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	for _, job := range completeJobs {
 		for _, pvc := range resources.pvcs.Items {
 			pvc := pvc
-			if !specs.IsPodSpecUsingPVCs(job.Spec.Template.Spec, pvc.Name) {
+			if !persistentvolumeclaim.IsUsedByPodSpec(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
 

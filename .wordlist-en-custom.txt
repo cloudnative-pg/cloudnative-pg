@@ -22,6 +22,7 @@ BackupPhase
 BackupSource
 BackupSpec
 BackupStatus
+BackupTarget
 BarmanCredentials
 BarmanObjectStoreConfiguration
 Bartolini
@@ -32,6 +33,7 @@ BootstrapInitDB
 BootstrapPgBaseBackup
 BootstrapRecovery
 Burstable
+ByStatus
 CIS
 CKA
 CN
@@ -44,6 +46,7 @@ CRD
 CRDs
 CSV
 CSVs
+CannotReconcile
 Canovai
 Cecchi
 CertificatesConfiguration
@@ -73,6 +76,7 @@ ConfigMapKeySelector
 ConfigMapRefs
 ConfigMapResourceVersion
 ConfigMaps
+ConnectionLimit
 ContinuousArchiving
 ContinuousArchivingFailing
 Coverity
@@ -100,8 +104,12 @@ EOF
 EmbeddedObjectMetadata
 EncryptionType
 EndpointCA
+EnsureOption
 EnterpriseDB
 EnterpriseDB's
+EnvFrom
+EnvFromSource
+EnvVar
 ExternalCluster
 Fei
 Filesystem
@@ -143,6 +151,7 @@ JSON
 Jihyuk
 Jitendra
 Krew
+KubeCon
 Kumar
 LDAP
 LDAPBindAsAuth
@@ -155,6 +164,7 @@ LTS
 LastBackupFailed
 LastBackupSucceeded
 Lifecycle
+Linkerd
 Linode
 ListMeta
 Liveness
@@ -162,10 +172,14 @@ LoadBalancer
 LocalObjectReference
 MAPPEDMETRIC
 MVCC
+ManagedConfiguration
+ManagedRoles
+ManagedRolesStatus
 MetricDescription
 MetricName
 MetricType
 MiB
+Milsted
 MinIO
 Minikube
 MonitoringConfiguration
@@ -200,6 +214,9 @@ PODNAME
 PPROF
 PV
 PVCs
+PasswordConfiguration
+PasswordState
+PasswordStatus
 Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
@@ -238,6 +255,7 @@ Postgres
 PostgresConfiguration
 PrimaryUpdateMethod
 PrimaryUpdateStrategy
+ProjectedVolumeSource
 PullPolicy
 QoS
 Quaresima
@@ -245,6 +263,7 @@ QuickStart
 RBAC
 README
 RHSA
+RLS
 RPO
 RTO
 RUNTIME
@@ -261,6 +280,9 @@ ResourceRequirements
 ResourceVersion
 RetentionPolicy
 RoleBinding
+RoleConfiguration
+RolePasswordStatus
+RoleStatus
 RollingUpdateStatus
 Ruocco
 SAS
@@ -270,6 +292,7 @@ SDK
 SELinux
 SHA
 SLA
+SPoF
 SQLQuery
 SSL
 SSZ
@@ -280,6 +303,7 @@ ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
 Scorsolini
+SeccompProfile
 SecretKeySelector
 SecretRefs
 SecretVersion
@@ -310,6 +334,7 @@ TimelineId
 TopologyKey
 UID
 Uncomment
+Unrealizable
 VLDB
 VM
 VMs
@@ -514,6 +539,7 @@ externalClusters
 externalclusters
 facto
 failover
+failoverDelay
 failovers
 faq
 fastpath
@@ -525,6 +551,7 @@ findstr
 fio
 freddie
 fuzzystrmatch
+gapped
 gc
 gcc
 gce
@@ -772,6 +799,9 @@ recoveryTarget
 recoverytarget
 recv
 redhat
+rehydrate
+rehydrated
+rehydration
 relatime
 replicationSlots
 replicationTLSSecret

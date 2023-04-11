@@ -160,12 +160,12 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
-	if err := fileutils.EnsureDirectoryExist(info.PgWal); err != nil {
+	if err := fileutils.EnsureDirectoryExists(info.PgWal); err != nil {
 		return false, err
 	}
 
 	contextLogger.Info("restoring WAL volume symlink and transferring data")
-	if err := fileutils.EnsureDirectoryExist(pgDataWal); err != nil {
+	if err := fileutils.EnsureDirectoryExists(pgDataWal); err != nil {
 		return false, err
 	}
 
@@ -269,7 +269,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		return nil, nil, err
 	}
 
-	backupCatalog, err := barman.GetBackupList(server.BarmanObjectStore, serverName, env)
+	backupCatalog, err := barman.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -482,7 +482,7 @@ func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
 // a new bootstrapped instance as reference
 func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
-	if err := fileutils.EnsureDirectoryExist(postgresSpec.RecoveryTemporaryDirectory); err != nil {
+	if err := fileutils.EnsureDirectoryExists(postgresSpec.RecoveryTemporaryDirectory); err != nil {
 		return err
 	}
 
@@ -667,11 +667,7 @@ func (info *InitInfo) checkBackupDestination(
 	}
 
 	// Check if we're ok to archive in the desired destination
-	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {
-		return err
-	}
-
-	return nil
+	return walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions)
 }
 
 // waitUntilRecoveryFinishes periodically checks the underlying

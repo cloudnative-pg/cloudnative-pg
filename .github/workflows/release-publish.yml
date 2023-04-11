@@ -8,7 +8,7 @@ on:
       - v*
 
 env:
-  GOLANG_VERSION: "1.19.x"
+  GOLANG_VERSION: "1.20.x"
 
 permissions:
   contents: write
@@ -64,19 +64,9 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
       -
         name: Build meta
         id: build-meta
@@ -128,7 +118,7 @@ jobs:
       -
         name: Publish Krew
         if: ${{ env.SKIP_KREW == 'false' }}
-        uses: rajatjindal/krew-release-bot@v0.0.43
+        uses: rajatjindal/krew-release-bot@v0.0.46
         with:
           krew_template_file: dist/cnpg.yaml
       -
@@ -141,7 +131,6 @@ jobs:
             type=semver,pattern={{version}}
       -
         name: Detect platforms
-        id: docker-platforms
         run: |
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
@@ -155,7 +144,6 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        id: buildx
         uses: docker/setup-buildx-action@v2
       -
         name: Login to ghcr.io
@@ -166,8 +154,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        id: build
-        uses: docker/build-push-action@v3.2.0
+        uses: docker/build-push-action@v4
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .

@@ -19,7 +19,6 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -108,6 +107,10 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	if (r.Spec.Affinity.EnablePodAntiAffinity == nil || *r.Spec.Affinity.EnablePodAntiAffinity) &&
 		r.Spec.Affinity.PodAntiAffinityType == "" {
 		r.Spec.Affinity.PodAntiAffinityType = PodAntiAffinityTypePreferred
+	}
+
+	if r.Spec.Backup != nil && r.Spec.Backup.Target == "" {
+		r.Spec.Backup.Target = DefaultBackupTarget
 	}
 
 	psqlVersion, err := r.GetPostgresqlVersion()
@@ -293,6 +296,8 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateConfiguration,
 		r.validateLDAP,
 		r.validateReplicationSlots,
+		r.validateEnv,
+		r.validateManagedRoles,
 	}
 
 	for _, validate := range validations {
@@ -375,6 +380,46 @@ func (r *Cluster) validateLDAP() field.ErrorList {
 	}
 
 	return result
+}
+
+// validateEnv validate the environment variables settings proposed by the user
+func (r *Cluster) validateEnv() field.ErrorList {
+	var result field.ErrorList
+
+	for i := range r.Spec.Env {
+		if isReservedEnvironmentVariable(r.Spec.Env[i].Name) {
+			result = append(
+				result,
+				field.Invalid(field.NewPath("spec", "postgresql", "env").Index(i).Child("name"),
+					r.Spec.Env[i].Name,
+					"the usage of this environment variable is reserved for the operator",
+				))
+		}
+	}
+
+	return result
+}
+
+// isReservedEnvironmentVariable detects if a certain environment variable
+// is reserved for the usage of the operator
+func isReservedEnvironmentVariable(name string) bool {
+	name = strings.ToUpper(name)
+
+	switch {
+	case strings.HasPrefix(name, "PG"):
+		return true
+
+	case name == "POD_NAME":
+		return true
+
+	case name == "NAMESPACE":
+		return true
+
+	case name == "CLUSTER_NAME":
+		return true
+	}
+
+	return false
 }
 
 // validateInitDB validate the bootstrapping options when initdb
@@ -817,15 +862,22 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 func (r *Cluster) validateConfiguration() field.ErrorList {
 	var result field.ErrorList
 
-	psqlVersion, err := r.GetPostgresqlVersion()
+	pgVersion, err := r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
+	if pgVersion < 110000 {
+		result = append(result,
+			field.Invalid(
+				field.NewPath("spec", "imageName"),
+				r.Spec.ImageName,
+				"Unsupported PostgreSQL version. Versions 11 or newer are supported"))
+	}
 	info := postgres.ConfigurationInfo{
 		Settings:         postgres.CnpgConfigurationSettings,
-		MajorVersion:     psqlVersion,
+		MajorVersion:     pgVersion,
 		UserSettings:     r.Spec.PostgresConfiguration.Parameters,
 		IsReplicaCluster: r.IsReplica(),
 	}
@@ -844,6 +896,10 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	// verify the postgres setting min_wal_size < max_wal_size < volume size
+	result = append(result, validateWalSizeConfiguration(
+		r.Spec.PostgresConfiguration, r.Spec.WalStorage.GetSizeOrNil())...)
+
 	if err := validateSyncReplicaElectionConstraint(
 		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
 	); err != nil {
@@ -851,6 +907,122 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	}
 
 	return result
+}
+
+// validateWalSizeConfiguration verifies that min_wal_size < max_wal_size < wal volume size
+func validateWalSizeConfiguration(
+	postgresConfig PostgresConfiguration, walVolumeSize *resource.Quantity,
+) field.ErrorList {
+	const (
+		minWalSizeKey     = "min_wal_size"
+		minWalSizeDefault = "80MB"
+		maxWalSizeKey     = "max_wal_size"
+		maxWalSizeDefault = "1GB"
+	)
+
+	var result field.ErrorList
+
+	minWalSize, hasMinWalSize := postgresConfig.Parameters[minWalSizeKey]
+	if minWalSize == "" {
+		minWalSize = minWalSizeDefault
+		hasMinWalSize = false
+	}
+	minWalSizeValue, err := parseWalSettingValue(minWalSize)
+	if err != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid value for configuration parameter %s", minWalSizeKey)))
+	}
+
+	maxWalSize, hasMaxWalSize := postgresConfig.Parameters[maxWalSizeKey]
+	if maxWalSize == "" {
+		maxWalSize = maxWalSizeDefault
+		hasMaxWalSize = false
+	}
+	maxWalSizeValue, err := parseWalSettingValue(maxWalSize)
+	if err != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", maxWalSizeKey),
+				maxWalSize,
+				fmt.Sprintf("Invalid value for configuration parameter %s", maxWalSizeKey)))
+	}
+
+	if !minWalSizeValue.IsZero() && !maxWalSizeValue.IsZero() &&
+		minWalSizeValue.Cmp(maxWalSizeValue) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid vale. Parameter %s (default %s) should be smaller than parameter %s (default %s)",
+					minWalSizeKey, minWalSizeDefault, maxWalSizeKey, maxWalSizeDefault)))
+	}
+
+	if walVolumeSize == nil {
+		return result
+	}
+
+	if hasMinWalSize &&
+		!minWalSizeValue.IsZero() &&
+		minWalSizeValue.Cmp(*walVolumeSize) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", minWalSizeKey),
+				minWalSize,
+				fmt.Sprintf("Invalid value. Parameter %s (default %s) should be smaller than WAL volume size",
+					minWalSizeKey, minWalSizeDefault)))
+	}
+
+	if hasMaxWalSize &&
+		!maxWalSizeValue.IsZero() &&
+		maxWalSizeValue.Cmp(*walVolumeSize) >= 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", maxWalSizeKey),
+				maxWalSize,
+				fmt.Sprintf("Invalid value. Parameter %s (default %s) should be smaller than WAL volume size",
+					maxWalSizeKey, maxWalSizeDefault)))
+	}
+
+	return result
+}
+
+// parseWalSettingValue converts the WAL sizes in the PostgreSQL configuration
+// into kubernetes resource.Quantity values
+// Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
+func parseWalSettingValue(value string) (resource.Quantity, error) {
+	// If no suffix, default is MB
+	if _, err := strconv.Atoi(value); err == nil {
+		value += "MB"
+	}
+
+	// If there is a suffix it must be "B"
+	if value[len(value)-1:] != "B" {
+		return resource.Quantity{}, resource.ErrFormatWrong
+	}
+
+	// Kubernetes uses Mi rather than MB, Gi rather than GB. Drop the "B"
+	value = strings.TrimSuffix(value, "B")
+
+	// Spaces are allowed in postgres between number and unit in Postgres, but not in Kubernetes
+	value = strings.ReplaceAll(value, " ", "")
+
+	// Add the 'i' suffix unless it is a bare number (it was 'B' before)
+	if _, err := strconv.Atoi(value); err != nil {
+		value += "i"
+
+		// 'kB' must translate to 'Ki'
+		value = strings.ReplaceAll(value, "ki", "Ki")
+	}
+
+	return resource.ParseQuantity(value)
 }
 
 // validateConfigurationChange determines whether a PostgreSQL configuration
@@ -1125,66 +1297,34 @@ func validateStorageConfigurationSize(structPath string, storageConfiguration St
 			storageConfiguration.Size,
 			"Size not configured. Please add it, or a storage request in the pvcTemplate."))
 	}
+
 	return result
 }
 
 // Validate a change in the storage
 func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
-	var result field.ErrorList
-
-	return append(
-		result,
-		validateStorageConfigurationChange(
-			"storage",
-			old.Spec.StorageConfiguration,
-			r.Spec.StorageConfiguration,
-		)...,
+	return validateStorageConfigurationChange(
+		"storage",
+		old.Spec.StorageConfiguration,
+		r.Spec.StorageConfiguration,
 	)
 }
 
 func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
-	if old.Spec.WalStorage == nil && r.Spec.WalStorage == nil {
+	if old.Spec.WalStorage == nil {
 		return nil
 	}
 
-	var result field.ErrorList
-
-	if old.Spec.WalStorage == nil && r.Spec.WalStorage != nil {
-		return append(result,
-			field.Invalid(
-				field.NewPath("spec", "walStorage"),
-				r.Spec.WalStorage,
-				"walStorage can only be set at cluster creation"),
-		)
-	}
-
 	if old.Spec.WalStorage != nil && r.Spec.WalStorage == nil {
-		return append(result,
+		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "walStorage"),
 				r.Spec.WalStorage,
 				"walStorage cannot be disabled once the cluster is created"),
-		)
+		}
 	}
 
-	// We need to make sure that only the size of the volume can change
-	oldNormalized := old.Spec.WalStorage.DeepCopy()
-	oldNormalized.Size = ""
-	newNormalized := r.Spec.WalStorage.DeepCopy()
-	newNormalized.Size = ""
-
-	if !reflect.DeepEqual(oldNormalized, newNormalized) {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "walStorage"),
-			r.Spec.WalStorage,
-			"cannot change walStorage parameter after initialization"),
-		)
-	}
-
-	// we validate the size change
-	storageErrs := validateStorageConfigurationChange("walStorage", *old.Spec.WalStorage, *r.Spec.WalStorage)
-
-	return append(result, storageErrs...)
+	return validateStorageConfigurationChange("walStorage", *old.Spec.WalStorage, *r.Spec.WalStorage)
 }
 
 // validateStorageConfigurationChange generates an error list by comparing two StorageConfiguration
@@ -1193,33 +1333,29 @@ func validateStorageConfigurationChange(
 	oldStorage StorageConfiguration,
 	newStorage StorageConfiguration,
 ) field.ErrorList {
-	var result field.ErrorList
-
-	oldSize, err := resource.ParseQuantity(oldStorage.Size)
-	if err != nil {
+	oldSize := oldStorage.GetSizeOrNil()
+	if oldSize == nil {
 		// Can't read the old size, so can't tell if the new size is greater
 		// or less
-		return result
+		return nil
 	}
 
-	result = append(result, validateStorageConfigurationSize(structPath, newStorage)...)
-	if len(result) != 0 {
-		return result
+	newSize := newStorage.GetSizeOrNil()
+	if newSize == nil {
+		// Can't read the new size, so can't tell if it is increasing
+		return nil
 	}
 
-	newSize, _ := resource.ParseQuantity(newStorage.Size)
-
-	if oldSize.AsDec().Cmp(newSize.AsDec()) == 1 {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", structPath, "size"),
-			newStorage.Size,
-			fmt.Sprintf(
-				"can't shrink existing storage from %v to %v",
-				oldStorage.Size,
-				newStorage.Size)))
+	if oldSize.AsDec().Cmp(newSize.AsDec()) < 1 {
+		return nil
 	}
 
-	return result
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("spec", structPath),
+			newSize,
+			fmt.Sprintf("can't shrink existing storage from %v to %v", oldSize, newSize)),
+	}
 }
 
 // Validate the cluster name. This is important to avoid issues
@@ -1684,4 +1820,45 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 	}
 
 	return allErrors
+}
+
+// validateManagedRoles validate the environment variables settings proposed by the user
+func (r *Cluster) validateManagedRoles() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.Managed == nil {
+		return nil
+	}
+
+	managedRoles := make(map[string]interface{})
+	for _, role := range r.Spec.Managed.Roles {
+		_, found := managedRoles[role.Name]
+		if found {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "managed", "roles"),
+					role.Name,
+					"Role name is duplicate of another"))
+		}
+		managedRoles[role.Name] = nil
+		if role.ConnectionLimit != -1 && role.ConnectionLimit < 0 {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "managed", "roles"),
+					role.ConnectionLimit,
+					"Connection limit should be positive, unless defaulting to -1"))
+		}
+		if postgres.IsRoleReserved(role.Name) {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "managed", "roles"),
+					role.Name,
+					"This role is reserved for operator use"))
+		}
+	}
+
+	return result
 }

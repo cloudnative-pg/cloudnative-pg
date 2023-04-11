@@ -344,7 +344,9 @@ There are two ways to achieve this result in CloudNativePG:
 Both recovery methods enable either full recovery (up to the last
 available WAL) or up to a [point in time](#point-in-time-recovery).
 When performing a full recovery, the cluster can also be started
-in replica mode.
+in replica mode. Also, make sure that the PostgreSQL configuration
+(`.spec.postgresql.parameters`) of the recovered cluster is
+compatible, from a physical replication standpoint, with the original one.
 
 !!! Note
     You can find more information about backup and recovery of a running cluster
@@ -779,7 +781,7 @@ file on the source PostgreSQL instance:
 host replication streaming_replica all md5
 ```
 
-The following manifest creates a new PostgreSQL 15.1 cluster,
+The following manifest creates a new PostgreSQL 15.2 cluster,
 called `target-db`, using the `pg_basebackup` bootstrap method
 to clone an external PostgreSQL cluster defined as `source-db`
 (in the `externalClusters` array). As you can see, the `source-db`
@@ -794,7 +796,7 @@ metadata:
   name: target-db
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:15.1
+  imageName: ghcr.io/cloudnative-pg/postgresql:15.2
 
   bootstrap:
     pg_basebackup:
@@ -814,7 +816,7 @@ spec:
 ```
 
 All the requirements must be met for the clone operation to work, including
-the same PostgreSQL version (in our case 15.1).
+the same PostgreSQL version (in our case 15.2).
 
 #### TLS certificate authentication
 
@@ -829,7 +831,7 @@ in the same Kubernetes cluster.
     This example can be easily adapted to cover an instance that resides
     outside the Kubernetes cluster.
 
-The manifest defines a new PostgreSQL 15.1 cluster called `cluster-clone-tls`,
+The manifest defines a new PostgreSQL 15.2 cluster called `cluster-clone-tls`,
 which is bootstrapped using the `pg_basebackup` method from the `cluster-example`
 external cluster. The host is identified by the read/write service
 in the same cluster, while the `streaming_replica` user is authenticated
@@ -844,7 +846,7 @@ metadata:
   name: cluster-clone-tls
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:15.1
+  imageName: ghcr.io/cloudnative-pg/postgresql:15.2
 
   bootstrap:
     pg_basebackup:

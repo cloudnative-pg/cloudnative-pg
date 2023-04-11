@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package controller contains the function in PGK that reacts to events in
-// the cluster.
+// Package controller contains the functions in PostgreSQL instance manager
+// that reacts to changes to the Cluster resource.
 package controller
 
 import (
@@ -33,8 +33,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 )
 
-// InstanceReconciler can reconcile the status of the PostgreSQL cluster with
-// the one of this PostgreSQL instance. Also the configuration in the
+// InstanceReconciler reconciles the status of the Cluster resource with
+// the one of this PostgreSQL instance. Also, the configuration in the
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
 	client   ctrl.Client

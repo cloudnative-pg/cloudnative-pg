@@ -173,7 +173,7 @@ func (env TestingEnvironment) ExecCommandWithPsqlClient(
 	dbname string,
 	query string,
 ) (string, string, error) {
-	timeout := time.Second * 2
+	timeout := time.Second * 10
 	username, password, err := GetCredentials(clusterName, namespace, secretSuffix, &env)
 	if err != nil {
 		return "", "", err

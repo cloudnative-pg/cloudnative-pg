@@ -55,7 +55,7 @@ func GetDiscoveryClient() (*discovery.DiscoveryClient, error) {
 	return discoveryClient, nil
 }
 
-func resourceExist(client *discovery.DiscoveryClient, groupVersion, kind string) (bool, error) {
+func resourceExist(client discovery.DiscoveryInterface, groupVersion, kind string) (bool, error) {
 	apiResourceList, err := client.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -76,7 +76,7 @@ func resourceExist(client *discovery.DiscoveryClient, groupVersion, kind string)
 
 // DetectSecurityContextConstraints connects to the discovery API and find out if
 // we're running under a system that implements OpenShift Security Context Constraints
-func DetectSecurityContextConstraints(client *discovery.DiscoveryClient) (err error) {
+func DetectSecurityContextConstraints(client discovery.DiscoveryInterface) (err error) {
 	haveSCC, err = resourceExist(client, "security.openshift.io/v1", "securitycontextconstraints")
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func HaveSecurityContextConstraints() bool {
 }
 
 // PodMonitorExist tries to find the PodMonitor resource in the current cluster
-func PodMonitorExist(client *discovery.DiscoveryClient) (bool, error) {
+func PodMonitorExist(client discovery.DiscoveryInterface) (bool, error) {
 	exist, err := resourceExist(client, "monitoring.coreos.com/v1", "podmonitors")
 	if err != nil {
 		return false, err
@@ -106,6 +106,11 @@ func PodMonitorExist(client *discovery.DiscoveryClient) (bool, error) {
 // set the SeccompProfile in the pods
 func HaveSeccompSupport() bool {
 	return supportSeccomp
+}
+
+// SetSeccompSupport set the supportSeccomp variable to a specific value for testing purposes
+func SetSeccompSupport(value bool) {
+	supportSeccomp = value
 }
 
 // extractK8sMinorVersion extracts and parses the Kubernetes minor version from
@@ -122,7 +127,7 @@ func extractK8sMinorVersion(info *version.Info) (int, error) {
 
 // DetectSeccompSupport checks the version of Kubernetes in the cluster to determine
 // whether Seccomp is supported
-func DetectSeccompSupport(client *discovery.DiscoveryClient) (err error) {
+func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
 	supportSeccomp = false
 	kubernetesVersion, err := client.ServerVersion()
 	if err != nil {

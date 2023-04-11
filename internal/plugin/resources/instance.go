@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -95,7 +96,7 @@ func getReplicaStatusFromPodViaExec(
 	postgresContainerName string,
 ) postgres.PostgresqlStatus {
 	var result postgres.PostgresqlStatus
-	timeout := time.Second * 2
+	timeout := time.Second * 10
 	clientInterface := kubernetes.NewForConfigOrDie(config)
 	stdout, _, err := utils.ExecCommand(
 		ctx,
@@ -127,21 +128,21 @@ func GetInstancePVCs(
 	clusterName string,
 	instanceName string,
 ) ([]v1.PersistentVolumeClaim, error) {
-	var cluster corev1.Cluster
+	cluster := &corev1.Cluster{}
 	if err := plugin.Client.Get(
 		ctx,
 		types.NamespacedName{
 			Name:      clusterName,
 			Namespace: plugin.Namespace,
 		},
-		&cluster,
+		cluster,
 	); err != nil {
 		return nil, err
 	}
 
 	var pvcs []v1.PersistentVolumeClaim
 
-	pgDataName := specs.GetPVCName(cluster, instanceName, utils.PVCRolePgData)
+	pgDataName := persistentvolumeclaim.GetName(instanceName, utils.PVCRolePgData)
 	pgData, err := getPVC(ctx, pgDataName)
 	if err != nil {
 		return nil, err
@@ -150,7 +151,7 @@ func GetInstancePVCs(
 		pvcs = append(pvcs, *pgData)
 	}
 
-	pgWalName := specs.GetPVCName(cluster, instanceName, utils.PVCRolePgWal)
+	pgWalName := persistentvolumeclaim.GetName(instanceName, utils.PVCRolePgWal)
 	pgWal, err := getPVC(ctx, pgWalName)
 	if err != nil {
 		return nil, err
@@ -181,7 +182,7 @@ func IsInstanceRunning(
 	pod v1.Pod,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx).WithName("plugin.IsInstanceRunning")
-	timeout := time.Second * 2
+	timeout := time.Second * 10
 	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
 	stdout, stderr, err := utils.ExecCommand(
 		ctx,

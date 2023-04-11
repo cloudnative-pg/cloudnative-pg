@@ -26,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -103,7 +104,11 @@ func NewCmd() *cobra.Command {
 			return initSubCommand(ctx, info)
 		},
 		PostRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.TryInvokeQuitEndpoint(cmd.Context())
+			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
+				return err
+			}
+
+			return linkerd.TryInvokeShutdownEndpoint(cmd.Context())
 		},
 	}
 

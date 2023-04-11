@@ -4,7 +4,13 @@ CloudNativePG provides a plugin for `kubectl` to manage a cluster in Kubernetes.
 
 ## Install
 
-You can install the cnpg plugin system either running the provided install script:
+You can install the `cnpg` plugin using a variety of methods.
+
+!!! Note
+    For air-gapped systems, installation via package managers, using previously
+    downloaded files, may be a good option.
+
+### Via the installation script
 
 ```sh
 curl -sSfL \
@@ -12,7 +18,71 @@ curl -sSfL \
   sudo sh -s -- -b /usr/local/bin
 ```
 
-Or, if you already have [Krew](https://krew.sigs.k8s.io/) installed, you can simply run:
+### Using the Debian or RedHat packages
+
+In the
+[releases section of the GitHub repository](https://github.com/cloudnative-pg/cloudnative-pg/releases),
+you can navigate to any release of interest (pick the same or newer release
+than your CloudNativePG operator), and in it you will find an **Assets**
+section. In that section are pre-built packages for a variety of systems.
+As a result, you can follow standard practices and instructions to install
+them in your systems.
+
+#### Debian packages
+
+For example, let's install the 1.18.1 release of the plugin, for an Intel based
+64 bit server. First, we download the right `.deb` file.
+
+``` sh
+$ wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.18.1/kubectl-cnpg_1.18.1_linux_x86_64.deb
+```
+
+Then, install from the local file using `dpkg`:
+
+``` sh
+$ dpkg -i kubectl-cnpg_1.18.1_linux_x86_64.deb 
+(Reading database ... 16102 files and directories currently installed.)
+Preparing to unpack kubectl-cnpg_1.18.1_linux_x86_64.deb ...
+Unpacking cnpg (1.18.1) over (1.18.1) ...
+Setting up cnpg (1.18.1) ...
+```
+
+#### RPM packages
+
+As in the example for `.deb` packages, let's install the 1.18.1 release for an
+Intel 64 bit machine. Note the `--output` flag to provide a file name.
+
+``` sh
+curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.18.1/kubectl-cnpg_1.18.1_linux_x86_64.rpm \
+  --output kube-plugin.rpm
+```
+
+Then install with `yum`, and you're ready to use:
+
+``` sh
+$ yum --disablerepo=* localinstall kube-plugin.rpm
+yum --disablerepo=* localinstall kube-plugin.rpm    
+Failed to set locale, defaulting to C.UTF-8
+Dependencies resolved.
+====================================================================================================
+ Package            Architecture         Version                   Repository                  Size
+====================================================================================================
+Installing:
+ cnpg               x86_64               1.18.1-1                  @commandline                14 M
+
+Transaction Summary
+====================================================================================================
+Install  1 Package
+
+Total size: 14 M
+Installed size: 43 M
+Is this ok [y/N]: y
+```
+
+### Using Krew
+
+If you already have [Krew](https://krew.sigs.k8s.io/) installed, you can simply
+run:
 
 ```sh
 kubectl krew install cnpg
@@ -20,7 +90,7 @@ kubectl krew install cnpg
 
 ### Supported Architectures
 
-CloudNativePG Plugin is currently build for the following
+CloudNativePG Plugin is currently built for the following
 operating system and architectures:
 
 * Linux
@@ -122,7 +192,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.1
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.2
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -167,7 +237,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.1
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.2
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -455,7 +525,36 @@ Archive:  reportRedacted.zip
   inflating: report_operator_<TIMESTAMP>/manifests/cnpg-webhook-cert.yaml
 ```
 
-You can verify that the confidential information is REDACTED:
+If you activated the `--logs` option, you'd see an extra subdirectory:
+
+```shell
+Archive:  report_operator_<TIMESTAMP>.zip
+  <snipped …>
+  creating: report_operator_<TIMESTAMP>/operator-logs/
+  inflating: report_operator_<TIMESTAMP>/operator-logs/cnpg-controller-manager-66fb98dbc5-pxkmh-logs.jsonl
+```
+
+!!! Note
+    The plugin will try to get the PREVIOUS operator's logs, which is helpful
+    when investigating restarted operators.
+    In all cases, it will also try to get the CURRENT operator logs. If current
+    and previous logs are available, it will show them both.
+
+``` json
+====== Begin of Previous Log =====
+2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.19.1","build":{"Version":"1.19.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:56:41.251851909Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
+  <snipped …>
+
+====== End of Previous Log =====
+2023-03-28T12:57:09.854306024Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.19.1","build":{"Version":"1.19.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:57:09.854363943Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
+```
+
+If the operator hasn't been restarted, you'll still see the `====== Begin …`
+and  `====== End …` guards, with no content inside.
+
+You can verify that the confidential information is REDACTED by default:
 
 ```shell
 cd report_operator_<TIMESTAMP>/manifests/
@@ -685,3 +784,64 @@ kubectl cnpg fio <fio-job-name> -n <namespace>
 
 Refer to the [Benchmarking fio section](benchmarking.md#fio) for more details.
 
+### Requesting a new base backup
+
+The `kubectl cnpg backup` command requests a new physical base backup for
+an existing Postgres cluster by creating a new `Backup` resource.
+
+The following example requests an on-demand backup for a given cluster:
+
+```shell
+kubectl cnpg backup [cluster_name]
+```
+
+The created backup will be named after the request time:
+
+```shell
+kubectl cnpg backup cluster-example
+backup/cluster-example-20230121002300 created
+```
+By default, new created backup will use the backup target policy defined
+in cluster to choose which instance to run on. You can also use `--backup-target` 
+option to override this policy. please refer to [Backup and Recovery](backup_recovery.md)
+for more information about backup target.
+
+### Launching psql
+
+The `kubectl cnpg psql` command starts a new PostgreSQL interactive front-end
+process (psql) connected to an existing Postgres cluster, as if you were running
+it from the actual pod. This means that you will be using the `postgres` user.
+
+!!! Important
+    As you will be connecting as `postgres` user, in production environments this
+    method should be used with extreme care, by authorized personnel only.
+
+```shell
+kubectl cnpg psql cluster-example
+
+psql (15.2 (Debian 15.2-1.pgdg110+1))
+Type "help" for help.
+
+postgres=#
+```
+
+By default, the command will connect to the primary instance. The user can
+select to work against a replica by using the `--replica` option:
+
+```shell
+kubectl cnpg psql --replica cluster-example
+psql (15.2 (Debian 15.2-1.pgdg110+1))
+
+Type "help" for help.
+
+postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ t
+(1 row)
+
+postgres=# \q
+```
+
+This command will start `kubectl exec`, and the `kubectl` executable must be
+reachable in your `PATH` variable to correctly work.

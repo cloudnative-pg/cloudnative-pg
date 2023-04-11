@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -41,7 +42,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
-	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -213,11 +213,7 @@ func RunController(
 		return err
 	}
 
-	if err = (&controllers.BackupReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-backup"),
-	}).SetupWithManager(ctx, mgr); err != nil {
+	if err = controllers.NewBackupReconciler(mgr).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}
@@ -330,7 +326,7 @@ func loadConfiguration(
 }
 
 // readinessProbeHandler is used to implement the readiness probe handler
-func readinessProbeHandler(w http.ResponseWriter, _r *http.Request) {
+func readinessProbeHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprint(w, "OK")
 }
 

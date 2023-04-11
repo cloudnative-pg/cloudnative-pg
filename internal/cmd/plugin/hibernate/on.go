@@ -371,7 +371,7 @@ func removePVCannotations(
 func getPGControlData(ctx context.Context,
 	pod corev1.Pod,
 ) (string, error) {
-	timeout := time.Second * 2
+	timeout := time.Second * 10
 	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
 	stdout, _, err := utils.ExecCommand(
 		ctx,

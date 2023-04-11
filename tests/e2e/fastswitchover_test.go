@@ -137,8 +137,8 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	})
 	By("preparing the db for the test scenario", func() {
 		// Create the table used by the scenario
-		query := "CREATE SCHEMA tps; " +
-			"CREATE TABLE tps.tl ( " +
+		query := "CREATE SCHEMA IF NOT EXISTS tps; " +
+			"CREATE TABLE IF NOT EXISTS tps.tl ( " +
 			"id BIGSERIAL" +
 			", timeline TEXT DEFAULT (substring(pg_walfile_name(" +
 			"    pg_current_wal_lsn()), 1, 8))" +
@@ -147,7 +147,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			", PRIMARY KEY (id)" +
 			")"
 
-		commandTimeout := time.Second * 5
+		commandTimeout := time.Second * 10
 		primaryPod := &corev1.Pod{}
 		primaryPodNamespacedName := types.NamespacedName{
 			Namespace: namespace,
@@ -173,7 +173,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			" -f " + webTestJob)
 		Expect(err).ToNot(HaveOccurred())
 
-		commandTimeout := time.Second * 2
+		commandTimeout := time.Second * 10
 		timeout := 60
 		primaryPodNamespacedName := types.NamespacedName{
 			Namespace: namespace,

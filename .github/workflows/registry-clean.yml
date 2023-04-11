@@ -16,7 +16,7 @@ jobs:
     # once issue https://github.com/snok/container-retention-policy/issues/33 is fixed
     # we can merge the two steps into one
       - name: Delete '-testing' images for cloudnative-pg
-        uses: snok/container-retention-policy@v1
+        uses: snok/container-retention-policy@v2
         with:
           image-names: cloudnative-pg-testing
           cut-off: 5 days ago UTC
@@ -26,9 +26,9 @@ jobs:
           # use the GITHUB_TOKEN when issue https://github.com/snok/container-retention-policy/issues/27 is fixed
           token: ${{ secrets.REPO_GHA_PAT }}
       - name: Delete '-testing' images for containers
-        uses: snok/container-retention-policy@v1
+        uses: snok/container-retention-policy@v2
         with:
-          image-names: pgbouncer-testing, postgresql-testing
+          image-names: pgbouncer-testing, postgresql-testing, postgis-testing
           cut-off: A week ago UTC
           keep-at-least: 1
           account-type: org

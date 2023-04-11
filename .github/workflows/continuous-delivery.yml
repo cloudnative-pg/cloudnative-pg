@@ -34,7 +34,7 @@ on:
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.19.x"
+  GOLANG_VERSION: "1.20.x"
   KUBEBUILDER_VERSION: "2.3.1"
   KIND_VERSION: "v0.17.0"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
@@ -45,6 +45,26 @@ defaults:
     shell: 'bash -Eeuo pipefail -x {0}'
 
 jobs:
+  # Trigger the workflow on release-* branches for smoke testing whenever it's a scheduled run.
+  # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
+  smoke_test_release_branches:
+    runs-on: ubuntu-20.04
+    name: smoke test release-* branches when it's a scheduled run
+    if: github.event_name == 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - release-1.18
+          - release-1.19
+    steps:
+      - name: Invoke workflow with inputs
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: continuous-delivery
+          ref: ${{ matrix.branch }}
+          inputs: '{ "depth": "push", "test_level": "4", "build_plugin": "true", "log_level": "debug" }'
+
   check_commenter:
     if: |
       github.event_name == 'issue_comment' &&
@@ -112,11 +132,11 @@ jobs:
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
-        uses: xt0rted/pull-request-comment-branch@v1
+        uses: xt0rted/pull-request-comment-branch@v2
         id: refs
 
       - name: Create comment
-        uses: peter-evans/create-or-update-comment@v2
+        uses: peter-evans/create-or-update-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
@@ -232,22 +252,14 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
-        name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      -
         name: Build meta
         id: build-meta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           images='${{ env.CNPG_IMAGE_NAME }}'
           tags=''
@@ -271,11 +283,13 @@ jobs:
           author_email=$(git show -s --format='%ae' "${commit_sha}")
 
           # extract branch name
-          if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
+          if [[ ${{ github.event_name }} == 'workflow_dispatch' ]] || [[ ${{ github.event_name }} == 'schedule' ]]
           then
             branch_name=${GITHUB_REF#refs/heads/}
-          else
-            branch_name=${GITHUB_HEAD_REF}
+          fi
+          if [[ ${{ github.event_name }} == 'issue_comment' ]]
+          then
+            branch_name=$(gh pr view "${{ github.event.issue.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
           fi
 
           upload_artifacts=false
@@ -371,7 +385,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -414,7 +428,7 @@ jobs:
       (always() && !cancelled()) &&
       needs.buildx.result == 'success' &&
       needs.buildx.outputs.upload_artifacts == 'true' &&
-      github.organization == 'cloudnative-pg'
+      github.repository_owner == 'cloudnative-pg'
     runs-on: ubuntu-20.04
     steps:
       -
@@ -522,6 +536,7 @@ jobs:
 
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
+      POSTGRES_KIND: ${{ matrix.postgres_kind }}
       MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       # The version of operator to upgrade FROM, in the rolling upgrade E2E test
@@ -541,7 +556,14 @@ jobs:
     steps:
       -
         name: Cleanup Disk
-        uses: curoky/cleanup-disk-action@v2.0
+        uses: jlumbroso/free-disk-space@main
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          tool-cache: true
+          large-packages: false
+          swap-storage: false
       -
         name: Cleanup docker cache
         run: |
@@ -559,19 +581,9 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
       -
         # 'Retry' preparing the E2E test ENV
         name: Prepare the environment
@@ -618,16 +630,16 @@ jobs:
         if: (always() && !cancelled())
         run: |
           set +x
-          echo '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+          echo '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
           python .github/generate-test-artifacts.py \
             -o testartifacts-${{ env.MATRIX }} \
             -f tests/e2e/out/report.json \
-            -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+            -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
           if [ -f tests/e2e/out/upgrade_report.json ]; then
             python .github/generate-test-artifacts.py \
               -o testartifacts-${{ env.MATRIX }} \
               -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+              -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
           fi
       -
         name: Archive test artifacts
@@ -707,7 +719,7 @@ jobs:
         run: ls -R test-artifacts/data
 
       - name: Compute the E2E test summary
-        uses: cloudnative-pg/ciclops@main
+        uses: cloudnative-pg/ciclops@v1.1.0
         with:
           artifact_directory: test-artifacts/data
           output_file: test-summary.md
@@ -718,17 +730,18 @@ jobs:
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
 
-# Adds the 'ok-to-merge' label to workflows that have run successfully and
-# have adequate test and matrix coverage.
-# This label is a prerequisite to be able to merge a PR.
-# Also see to 'require-labels.yml'
+  # Adds the 'ok-to-merge' label to workflows that have run successfully and
+  # have adequate test and matrix coverage.
+  # This label is a prerequisite to be able to merge a PR.
+  # Also see to 'require-labels.yml'
   ok-to-merge:
     name: Label the PR as "ok to merge :ok_hand:"
     needs:
-      - e2e-local
       - evaluate_options
+      - e2e-local
     if: |
-      success() && !cancelled() &&
+      always() &&
+      needs.e2e-local.result == 'success' &&
       github.event_name == 'issue_comment' &&
       needs.evaluate_options.outputs.test_level == '4'
     runs-on: ubuntu-20.04
@@ -738,7 +751,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
+          ok_label=$(gh pr view "${{ github.event.issue.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
 
       - name: Label the PR as "ok to merge :ok_hand:"
@@ -754,9 +767,10 @@ jobs:
   unlabel-ok-to-merge:
     name: Remove the "ok to merge :ok_hand:" label from the PR
     needs:
-      - e2e-local
       - evaluate_options
+      - e2e-local
     if: |
+      always() &&
       needs.e2e-local.result == 'failure' &&
       github.event_name == 'issue_comment'
     runs-on: ubuntu-20.04
@@ -766,7 +780,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
+          ok_label=$(gh pr view "${{ github.event.issue.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
 
       - name: Remove "ok to merge :ok_hand:" label from PR

@@ -53,10 +53,12 @@ type generateExecutor struct {
 	replicas             int32
 	userRequestedVersion string
 	postgresImage        string
+	logFieldLevel        string
+	logFieldTimestamp    string
 }
 
 func newGenerateCmd() *cobra.Command {
-	var version, watchNamespaces, postgresImage string
+	var version, watchNamespaces, postgresImage, logFieldLevel, logFieldTimestamp string
 	var replicas int32
 	cmd := &cobra.Command{
 		Use:   "generate",
@@ -75,6 +77,8 @@ func newGenerateCmd() *cobra.Command {
 				replicas:             replicas,
 				userRequestedVersion: version,
 				postgresImage:        postgresImage,
+				logFieldLevel:        logFieldLevel,
+				logFieldTimestamp:    logFieldTimestamp,
 			}
 			return command.execute()
 		},
@@ -108,6 +112,20 @@ func newGenerateCmd() *cobra.Command {
 		"image",
 		"",
 		"Optional flag to specify a PostgreSQL image to use. If not specified, the default image is used",
+	)
+
+	cmd.Flags().StringVar(
+		&logFieldLevel,
+		"log-field-level",
+		"level",
+		"JSON log field to report severity in (default: level)",
+	)
+
+	cmd.Flags().StringVar(
+		&logFieldTimestamp,
+		"log-field-timestamp",
+		"ts",
+		"JSON log field to report timestamp in (default: ts)",
 	)
 
 	return cmd
@@ -254,10 +272,17 @@ func (cmd *generateExecutor) getResourceFromDocument(document []byte) (installat
 }
 
 func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment) error {
+	args := dep.Spec.Template.Spec.Containers[0].Args
+	args = append(args, fmt.Sprintf("--log-field-level=%s", cmd.logFieldLevel))
+	args = append(args, fmt.Sprintf("--log-field-timestamp=%s", cmd.logFieldTimestamp))
+
+	dep.Spec.Template.Spec.Containers[0].Args = args
+
 	if cmd.replicas == 0 {
 		return nil
 	}
 	dep.Spec.Replicas = &cmd.replicas
+
 	return nil
 }
 

@@ -19,10 +19,8 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"reflect"
 	"sort"
@@ -34,18 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -72,7 +69,7 @@ type managedResources struct {
 // Count the number of jobs that are still running
 func (resources *managedResources) countRunningJobs() int {
 	jobCount := len(resources.jobs.Items)
-	completeJobs := utils.CountCompleteJobs(resources.jobs.Items)
+	completeJobs := utils.CountJobsWithOneCompletion(resources.jobs.Items)
 	return jobCount - completeJobs
 }
 
@@ -169,6 +166,11 @@ func (r *ClusterReconciler) getManagedInstances(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (corev1.PodList, error) {
+	return GetManagedInstances(ctx, cluster, r.Client)
+}
+
+// GetManagedInstances gets all the instances associated with the given Cluster
+func GetManagedInstances(ctx context.Context, cluster *apiv1.Cluster, r client.Client) (corev1.PodList, error) {
 	var childPods corev1.PodList
 	if err := r.List(ctx, &childPods,
 		client.InNamespace(cluster.Namespace),
@@ -233,7 +235,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+	if pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusReady {
 		return nil
 	}
 
@@ -244,7 +246,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 	if pvc.Annotations == nil {
 		pvc.Annotations = make(map[string]string, 1)
 	}
-	pvc.Annotations[specs.PVCStatusAnnotationName] = specs.PVCStatusReady
+	pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] = persistentvolumeclaim.StatusReady
 
 	return r.Patch(ctx, pvc, client.MergeFrom(oldPvc))
 }
@@ -258,37 +260,22 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	existingClusterStatus := cluster.Status
 
-	newPVCCount := int32(len(resources.pvcs.Items))
-	cluster.Status.PVCCount = newPVCCount
-	pvcClassification := specs.DetectPVCs(
+	persistentvolumeclaim.EnrichStatus(
 		ctx,
 		cluster,
 		resources.instances.Items,
 		resources.jobs.Items,
 		resources.pvcs.Items,
 	)
-	cluster.Status.InstanceNames = pvcClassification.InstanceNames
-	cluster.Status.DanglingPVC = pvcClassification.Dangling
-	cluster.Status.HealthyPVC = pvcClassification.Healthy
-	cluster.Status.InitializingPVC = pvcClassification.Initializing
-	cluster.Status.ResizingPVC = pvcClassification.Resizing
-	cluster.Status.UnusablePVC = pvcClassification.Unusable
-
-	// From now on, we'll consider only Active pods: those Pods
-	// that will possibly work. Let's forget about the failed ones
-	filteredPods := utils.FilterActivePods(resources.instances.Items)
-
-	// Count pods
-	newInstances := len(filteredPods)
-	cluster.Status.Instances = newInstances
-	cluster.Status.ReadyInstances = utils.CountReadyPods(filteredPods)
+	hibernation.EnrichStatus(
+		ctx,
+		cluster,
+		resources.instances.Items,
+	)
 
 	// Count jobs
 	newJobs := int32(len(resources.jobs.Items))
 	cluster.Status.JobCount = newJobs
-
-	// Instances status
-	cluster.Status.InstancesStatus = utils.ListStatusPods(resources.instances.Items)
 
 	cluster.Status.Topology = getPodsTopology(
 		ctx,
@@ -415,16 +402,6 @@ func (r *ClusterReconciler) updateOnlineUpdateEnabled(
 
 	cluster.Status.OnlineUpdateEnabled = onlineUpdateEnabled
 	return r.Status().Update(ctx, cluster)
-}
-
-// SetClusterOwnerAnnotationsAndLabels sets the cluster as owner of the passed object and then
-// sets all the needed annotations and labels
-func SetClusterOwnerAnnotationsAndLabels(obj *metav1.ObjectMeta, cluster *apiv1.Cluster) {
-	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.LabelClusterName(obj, cluster.GetName())
-	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
-	utils.SetOperatorVersion(obj, versions.Version)
 }
 
 // getPoolerIntegrationsNeeded returns a struct with all the pooler integrations needed
@@ -629,6 +606,18 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 	}
 	versions.ApplicationSecretVersion = version
 
+	if cluster.ContainsManagedRolesConfiguration() {
+		for _, role := range cluster.Spec.Managed.Roles {
+			if role.PasswordSecret != nil {
+				version, err = r.getSecretResourceVersion(ctx, cluster, role.PasswordSecret.Name)
+				if err != nil {
+					return err
+				}
+				versions.SetManagedRoleSecretVersion(role.PasswordSecret.Name, &version)
+			}
+		}
+	}
+
 	certificates := cluster.Status.Certificates
 
 	// Reset the content of the unused CASecretVersion field
@@ -804,62 +793,6 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		return r.Status().Update(ctx, cluster)
 	}
 	return nil
-}
-
-// extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
-// the requested Pod, via the instance manager. In case of failure, errors are passed
-// in the result list
-func (r *ClusterReconciler) extractInstancesStatus(
-	ctx context.Context,
-	activePods []corev1.Pod,
-) postgres.PostgresqlStatusList {
-	var result postgres.PostgresqlStatusList
-
-	for idx := range activePods {
-		instanceStatus := r.getReplicaStatusFromPodViaHTTP(ctx, activePods[idx])
-		result.Items = append(result.Items, instanceStatus)
-	}
-	return result
-}
-
-// getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pod via HTTP, retrying
-// the request if some communication error is encountered
-func (r *ClusterReconciler) getReplicaStatusFromPodViaHTTP(
-	ctx context.Context,
-	pod corev1.Pod,
-) (result postgres.PostgresqlStatus) {
-	isErrorRetryable := func(err error) bool {
-		contextLog := log.FromContext(ctx)
-
-		// If it's a timeout, we do not want to retry
-		var netError net.Error
-		if errors.As(err, &netError) && netError.Timeout() {
-			return false
-		}
-
-		// If the pod answered with a not ok status, it is pointless to retry
-		var instanceStatusError InstanceStatusError
-		if errors.As(err, &instanceStatusError) {
-			return false
-		}
-
-		contextLog.Debug("Error while requesting the status of an instance, retrying",
-			"pod", pod.Name,
-			"error", err)
-		return true
-	}
-
-	// The retry here is to support restarting the instance manager during
-	// online upgrades. It is not intended to wait for recovering from any
-	// other remote failure.
-	_ = retry.OnError(StatusRequestRetry, isErrorRetryable, func() error {
-		result = rawInstanceStatusRequest(ctx, r.timeoutHTTPClient, pod)
-		return result.Error
-	})
-
-	result.AddPod(pod)
-
-	return result
 }
 
 // rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.

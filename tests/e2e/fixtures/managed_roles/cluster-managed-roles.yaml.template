@@ -1,0 +1,48 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-with-roles
+spec:
+  instances: 1 # this feature only requires a primary
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  managed:
+    roles:
+    - name: dante
+      ensure: present
+      comment: Dante Alighieri
+      login: true
+      superuser: false
+      createdb: true
+      createrole: false
+      inherit: false
+      replication: false
+      bypassrls: false
+      connectionLimit: 4
+      validUntil: "2023-04-12T15:04:05Z"
+      inRoles:
+        - pg_monitor
+        - pg_signal_backend
+      passwordSecret:
+        name: cluster-example-dante
+    - name: petrarca
+      ensure: present
+      comment: Dante Alighieri
+      inRoles:
+        - foobar
+
+---
+apiVersion: v1
+data:
+  username: ZGFudGU=
+  password: ZGFudGU=
+kind: Secret
+metadata:
+  name: cluster-example-dante
+  labels:
+    cnpg.io/reload: "true"
+type: kubernetes.io/basic-auth
+

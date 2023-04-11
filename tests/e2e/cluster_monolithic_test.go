@@ -21,9 +21,6 @@ import (
 	"os"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -143,7 +140,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 
 			// create test data and insert some records in both databases
 			for _, database := range sourceDatabases {
-				query := fmt.Sprintf("CREATE TABLE %v AS VALUES (1), (2);", tableName)
+				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
 				_, _, err = testsUtils.RunQueryFromPod(
 					psqlClientPod,
 					sourceClusterHost,
@@ -163,12 +160,13 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			expectedImageName, err := testsUtils.BumpPostgresImageMajorVersion(postgresImage)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(expectedImageName).ShouldNot(BeEmpty(), "imageName could not be empty")
-			err = importDatabasesMonolith(namespace,
+			err = testsUtils.ImportDatabasesMonolith(namespace,
 				sourceClusterName,
 				targetClusterName,
 				expectedImageName,
 				sourceDatabases,
-				sourceRoles)
+				sourceRoles,
+				env)
 			Expect(err).ToNot(HaveOccurred())
 			AssertClusterIsReady(namespace, targetClusterName, 600, env)
 		})
@@ -229,61 +227,3 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		})
 	})
 })
-
-// importDatabasesMonolith creates a new cluster spec importing from a sourceCluster
-// using the Monolith approach.
-// Imports all the specified `databaseNames` and `roles` from the source cluster
-func importDatabasesMonolith(
-	namespace,
-	sourceClusterName,
-	importedClusterName,
-	imageName string,
-	databaseNames []string,
-	roles []string,
-) error {
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-	host := fmt.Sprintf("%v-rw.%v.svc", sourceClusterName, namespace)
-	superUserSecretName := fmt.Sprintf("%v", sourceClusterName) + "-superuser"
-	targetCluster := &apiv1.Cluster{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      importedClusterName,
-			Namespace: namespace,
-		},
-		Spec: apiv1.ClusterSpec{
-			Instances: 3,
-			ImageName: imageName,
-
-			StorageConfiguration: apiv1.StorageConfiguration{
-				Size:         "1Gi",
-				StorageClass: &storageClassName,
-			},
-
-			Bootstrap: &apiv1.BootstrapConfiguration{
-				InitDB: &apiv1.BootstrapInitDB{
-					Import: &apiv1.Import{
-						Type:      "monolith",
-						Databases: databaseNames,
-						Roles:     roles,
-						Source: apiv1.ImportSource{
-							ExternalCluster: sourceClusterName,
-						},
-					},
-				},
-			},
-			ExternalClusters: []apiv1.ExternalCluster{
-				{
-					Name:                 sourceClusterName,
-					ConnectionParameters: map[string]string{"host": host, "user": "postgres", "dbname": "postgres"},
-					Password: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: superUserSecretName,
-						},
-						Key: "password",
-					},
-				},
-			},
-		},
-	}
-
-	return testsUtils.CreateObject(env, targetCluster)
-}

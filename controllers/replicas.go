@@ -19,8 +19,9 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"sort"
+	"time"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -35,6 +36,10 @@ import (
 // ErrWalReceiversRunning is raised when a new primary server can't be elected
 // because there is a WAL receiver running in our Pod list
 var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
+
+// ErrWaitingOnFailOverDelay is raised when the primary server can't be elected because the .spec.failoverDelay hasn't
+// elapsed yet
+var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
 
 // updateTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion
@@ -97,6 +102,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	// we have nothing to do here.
 	if cluster.Status.TargetPrimary == status.Items[0].Pod.Name {
 		return "", nil
+	}
+
+	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
+		return "", err
 	}
 
 	// The current primary is not correctly working, and we need to elect a new one
@@ -264,6 +273,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 		}
 	}
 
+	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
+		return "", err
+	}
+
 	// The designated primary is not correctly working, and we need to elect a new one
 	// but before doing that we need to wait for all the WAL receivers to be
 	// terminated. This is needed to avoid losing the WAL data that is being received
@@ -304,30 +317,53 @@ func GetPodsNotOnPrimaryNode(
 	return podsOnOtherNodes
 }
 
-// getStatusFromInstances gets the replication status from the PostgreSQL instances,
-// the returned list is sorted in order to have the primary as the first element
-// and the other instances in their election order
-func (r *ClusterReconciler) getStatusFromInstances(
-	ctx context.Context,
-	pods corev1.PodList,
-) postgres.PostgresqlStatusList {
-	// Only work on Pods which can still become active in the future
-	filteredPods := utils.FilterActivePods(pods.Items)
-	if len(filteredPods) == 0 {
-		// No instances to control
-		return postgres.PostgresqlStatusList{}
-	}
-
-	status := r.extractInstancesStatus(ctx, filteredPods)
-	sort.Sort(&status)
-	for idx := range status.Items {
-		if status.Items[idx].Error != nil {
-			log.FromContext(ctx).Info("Cannot extract Pod status",
-				"name", status.Items[idx].Pod.Name,
-				"error", status.Items[idx].Error.Error())
+// If the cluster is not in the online upgrading phase, enforceFailoverDelay will evaluate the failover delay specified
+// in the cluster's specification.
+// If the user has set a custom failoverDelay value and the cluster is in the OnlineUpgrading phase, the function will
+// wait for the remaining time of the custom delay, as long as it is greater than the fixed delay of
+// 30 seconds for online upgrades.
+// enforceFailoverDelay checks if the cluster is in the online upgrading phase and enforces a failover delay of
+// 30 seconds if it is. enforceFailoverDelay will return an error if there is an issue with evaluating the failover
+// delay.
+func (r *ClusterReconciler) enforceFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Status.Phase == apiv1.PhaseOnlineUpgrading {
+		const onlineUpgradeFailOverDelay = 30
+		if err := r.evaluateFailoverDelay(ctx, cluster, onlineUpgradeFailOverDelay); err != nil {
+			return err
 		}
 	}
-	return status
+
+	return r.evaluateFailoverDelay(ctx, cluster, cluster.Spec.FailoverDelay)
+}
+
+func (r *ClusterReconciler) evaluateFailoverDelay(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	failOverDelay int32,
+) error {
+	if failOverDelay == 0 {
+		return nil
+	}
+
+	if cluster.Status.CurrentPrimaryFailingSinceTimestamp == "" {
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp = utils.GetCurrentTimestamp()
+		if err := r.Status().Update(ctx, cluster); err != nil {
+			return err
+		}
+	}
+	primaryFailingSince, err := utils.DifferenceBetweenTimestamps(
+		utils.GetCurrentTimestamp(),
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp,
+	)
+	if err != nil {
+		return err
+	}
+	delay := time.Duration(failOverDelay) * time.Second
+	if delay > primaryFailingSince {
+		return ErrWaitingOnFailOverDelay
+	}
+
+	return nil
 }
 
 // updateClusterAnnotationsOnPods we check if we need to add or modify existing annotations specified in the cluster but
@@ -406,90 +442,6 @@ func (r *ClusterReconciler) updateClusterLabelsOnPods(
 		if err := r.Patch(ctx, pod, patch); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-// updateClusterAnnotationsOnPVCs we check if we need to add or modify existing annotations specified in the cluster but
-// not existing in the PVCs. We do not support the case of removed annotations from the cluster resource.
-func (r *ClusterReconciler) updateClusterAnnotationsOnPVCs(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	pvcs corev1.PersistentVolumeClaimList,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	for i := range pvcs.Items {
-		pvc := &pvcs.Items[i]
-
-		// if all the required annotations are already set and with the correct value,
-		// we proceed to the next item
-		if utils.IsAnnotationSubset(pvc.Annotations,
-			cluster.Annotations,
-			cluster.GetFixedInheritedLabels(),
-			configuration.Current) &&
-			utils.IsAnnotationAppArmorPresentInObject(&pvc.ObjectMeta, cluster.Annotations) {
-			contextLogger.Debug(
-				"Skipping cluster annotations reconciliation, because they are already present on pvc",
-				"pvc", pvc.Name,
-				"pvcAnnotations", pvc.Annotations,
-				"clusterAnnotations", cluster.Annotations,
-			)
-			continue
-		}
-
-		// otherwise, we add the modified/new annotations to the pvc
-		patch := client.MergeFrom(pvc.DeepCopy())
-		utils.InheritAnnotations(&pvc.ObjectMeta, cluster.Annotations,
-			cluster.GetFixedInheritedAnnotations(), configuration.Current)
-
-		contextLogger.Info("Updating cluster annotations on pvc", "pvc", pvc.Name)
-		if err := r.Patch(ctx, pvc, patch); err != nil {
-			return err
-		}
-		continue
-	}
-
-	return nil
-}
-
-// updateClusterAnnotationsOnPVCs we check if we need to add or modify existing labels specified in the cluster but
-// not existing in the PVCs. We do not support the case of removed labels from the cluster resource.
-func (r *ClusterReconciler) updateClusterLabelsOnPVCs(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	pvcs corev1.PersistentVolumeClaimList,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	for i := range pvcs.Items {
-		pvc := &pvcs.Items[i]
-
-		// if all the required labels are already set and with the correct value,
-		// we proceed to the next item
-		if utils.IsLabelSubset(pvc.Labels,
-			cluster.Labels,
-			cluster.GetFixedInheritedAnnotations(),
-			configuration.Current) {
-			contextLogger.Debug(
-				"Skipping cluster label reconciliation, because they are already present on pvc",
-				"pvc", pvc.Name,
-				"pvcLabels", pvc.Labels,
-				"clusterLabels", cluster.Labels,
-			)
-			continue
-		}
-
-		// otherwise, we add the modified/new labels to the pvc
-		patch := client.MergeFrom(pvc.DeepCopy())
-		utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
-
-		contextLogger.Debug("Updating cluster labels on pvc", "pvc", pvc.Name)
-		if err := r.Patch(ctx, pvc, patch); err != nil {
-			return err
-		}
-		contextLogger.Info("Updated cluster label on pvc", "pvc", pvc.Name)
 	}
 
 	return nil
@@ -586,52 +538,18 @@ func (r *ClusterReconciler) updateOperatorLabelsOnInstances(
 	return nil
 }
 
-// updateOperatorLabelsOnPVC ensures that the PVCs have the correct labels
-func (r *ClusterReconciler) updateOperatorLabelsOnPVC(
-	ctx context.Context,
-	instances corev1.PodList,
-	pvcs corev1.PersistentVolumeClaimList,
-) error {
-	for _, pod := range instances.Items {
-		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
-
-		instancePVCs := specs.FilterInstancePVCs(pvcs.Items, pod.Spec)
-		for i := range instancePVCs {
-			pvc := &instancePVCs[i]
-			var modified bool
-			// this is needed, because on older versions pvc.labels could be nil
-			if pvc.Labels == nil {
-				pvc.Labels = map[string]string{}
-			}
-
-			origPvc := pvc.DeepCopy()
-			if podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole {
-				pvc.Labels[specs.ClusterRoleLabelName] = podRole
-				modified = true
-			}
-			if pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] != pod.Name {
-				pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] = pod.Name
-				modified = true
-			}
-			if !modified {
-				continue
-			}
-			if err := r.Client.Patch(ctx, pvc, client.MergeFrom(origPvc)); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// getSacrificialPod get the Pod who is supposed to be deleted
-// when the cluster is scaled down
-func getSacrificialInstance(podList []corev1.Pod) *corev1.Pod {
+// findDeletableInstance get the Pod who is supposed to be deleted when the cluster is scaled down
+func findDeletableInstance(cluster *apiv1.Cluster, instances []corev1.Pod) string {
 	resultIdx := -1
 	var lastFoundSerial int
 
-	for idx, pod := range podList {
+	instancesNotRunning := cluster.Status.InstanceNames
+
+	for idx, pod := range instances {
+		if nameIndex := slices.Index(instancesNotRunning, pod.Name); nameIndex != -1 {
+			instancesNotRunning = slices.Delete(instancesNotRunning, nameIndex, nameIndex+1)
+		}
+
 		// Avoid parting non ready nodes, non active nodes, or primary nodes
 		if !utils.IsPodReady(pod) || !utils.IsPodActive(pod) || specs.IsPodPrimary(pod) {
 			continue
@@ -649,8 +567,13 @@ func getSacrificialInstance(podList []corev1.Pod) *corev1.Pod {
 		}
 	}
 
-	if resultIdx == -1 {
-		return nil
+	if len(instancesNotRunning) > 0 {
+		return instancesNotRunning[len(instancesNotRunning)-1]
 	}
-	return &podList[resultIdx]
+
+	if resultIdx == -1 {
+		return ""
+	}
+
+	return instances[resultIdx].Name
 }

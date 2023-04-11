@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package postgres contains the function about starting up,
-// shutting down and managing a PostgreSQL instance. This functions
-// are primarily used by PGK
+// shutting down and managing a PostgreSQL instance. These functions
+// are primarily used by the instance manager
 package postgres
 
 import (
@@ -264,7 +264,7 @@ func (info InitInfo) executePostInitApplicationSQLRefs(sqlUser *sql.DB) error {
 		return nil
 	}
 
-	if err := fileutils.EnsureDirectoryExist(info.PostInitApplicationSQLRefsFolder); err != nil {
+	if err := fileutils.EnsureDirectoryExists(info.PostInitApplicationSQLRefsFolder); err != nil {
 		return fmt.Errorf("could not find directory: %s, err: %w", info.PostInitApplicationSQLRefsFolder, err)
 	}
 

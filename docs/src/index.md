@@ -79,7 +79,8 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * In-place or rolling updates for operator upgrades
 * TLS connections and client certificate authentication
 * Support for custom TLS certificates (including integration with cert-manager)
-* Continuous backup to an object store  (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
+* Continuous backup to an object store (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
+* Backup from a standby
 * Backup retention policies (based on recovery window)
 * Full recovery and Point-In-Time recovery from an existing backup in an object store
 * Offline import of existing PostgreSQL databases, including major upgrades of PostgreSQL

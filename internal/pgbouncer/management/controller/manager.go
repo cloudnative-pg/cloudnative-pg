@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package controller contains the function in PGK that reacts to events in
-// the cluster.
+// Package controller contains the functions in pgbouncer instance manager
+// that reacts to changes in the Pooler resource.
 package controller
 
 import (
@@ -38,9 +38,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 )
 
-// PgBouncerReconciler can reconcile the status of the PostgreSQL cluster with
-// the one of this PostgreSQL instance. Also the configuration in the
-// ConfigMap is applied when needed
+// PgBouncerReconciler reconciles the status of the Pooler resource with
+// the one of this pgbouncer instance
 type PgBouncerReconciler struct {
 	client               ctrl.WithWatch
 	poolerWatch          watch.Interface
@@ -228,7 +227,7 @@ func (r *PgBouncerReconciler) Init(ctx context.Context) error {
 	}
 
 	// Ensure we have the directory to store the controlling socket
-	if err := fileutils.EnsureDirectoryExist(config.PgBouncerSocketDir); err != nil {
+	if err := fileutils.EnsureDirectoryExists(config.PgBouncerSocketDir); err != nil {
 		log.Error(err, "while checking socket directory existed", "dir", config.PgBouncerSocketDir)
 		return err
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package controllers
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -89,5 +91,22 @@ var _ = Describe("Pod upgrade", func() {
 		Expect(needRollout).To(BeTrue())
 		Expect(inplacePossible).To(BeTrue())
 		Expect(reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
+	})
+
+	When("there's a custom environment variable set", func() {
+		It("detects when a new custom environment variable is set", func() {
+			pod := specs.PodWithExistingStorage(cluster, 1)
+
+			cluster := cluster.DeepCopy()
+			cluster.Spec.Env = []corev1.EnvVar{
+				{
+					Name:  "TEST",
+					Value: "test",
+				},
+			}
+
+			needRollout, _ := isPodNeedingUpdatedEnvironment(*cluster, *pod)
+			Expect(needRollout).To(BeTrue())
+		})
 	})
 })

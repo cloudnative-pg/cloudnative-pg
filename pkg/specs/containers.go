@@ -41,7 +41,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 		},
 		VolumeMounts:    createPostgresVolumeMounts(cluster),
 		Resources:       cluster.Spec.Resources,
-		SecurityContext: CreateContainerSecurityContext(),
+		SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 	}
 
 	addManagerLoggingOptions(cluster, &container)
@@ -58,14 +58,11 @@ func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container
 	container.Command = append(container.Command, log.GetFieldsRemapFlags()...)
 }
 
-// CreateContainerSecurityContext initializes container security context
-func CreateContainerSecurityContext() *corev1.SecurityContext {
+// CreateContainerSecurityContext initializes container security context. It applies the seccomp profile if supported.
+func CreateContainerSecurityContext(seccompProfile *corev1.SeccompProfile) *corev1.SecurityContext {
 	trueValue := true
 	falseValue := false
 
-	seccompProfile := &corev1.SeccompProfile{
-		Type: corev1.SeccompProfileTypeRuntimeDefault,
-	}
 	if !utils.HaveSeccompSupport() {
 		seccompProfile = nil
 	}

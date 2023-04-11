@@ -25,8 +25,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
-// pgWalVolumePath its the path used by the WAL volume when present
-const pgWalVolumePath = "/var/lib/postgresql/wal"
+// PgWalVolumePath its the path used by the WAL volume when present
+const PgWalVolumePath = "/var/lib/postgresql/wal"
+
+// PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
+const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
@@ -86,12 +89,15 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 				Name: "pg-wal",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: podName + cluster.GetWalArchiveVolumeSuffix(),
+						ClaimName: podName + apiv1.WalArchiveVolumeSuffix,
 					},
 				},
 			})
 	}
 
+	if cluster.ShouldCreateProjectedVolume() {
+		result = append(result, createProjectedVolume(cluster))
+	}
 	return result
 }
 
@@ -198,10 +204,28 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
 				Name:      "pg-wal",
-				MountPath: pgWalVolumePath,
+				MountPath: PgWalVolumePath,
+			},
+		)
+	}
+
+	if cluster.ShouldCreateProjectedVolume() {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      "projected",
+				MountPath: postgres.ProjectedVolumeDirectory,
 			},
 		)
 	}
 
 	return volumeMounts
+}
+
+func createProjectedVolume(cluster apiv1.Cluster) corev1.Volume {
+	return corev1.Volume{
+		Name: "projected",
+		VolumeSource: corev1.VolumeSource{
+			Projected: cluster.Spec.ProjectedVolumeTemplate.DeepCopy(),
+		},
+	}
 }

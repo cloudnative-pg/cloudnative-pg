@@ -24,6 +24,7 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -31,6 +32,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	k8slices "k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,6 +41,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -178,7 +181,7 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			"*",
 			"postgres",
 			postgresPassword)
-		SetClusterOwnerAnnotationsAndLabels(&postgresSecret.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&postgresSecret.ObjectMeta)
 
 		if err := resources.CreateIfNotFound(ctx, r.Client, postgresSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
@@ -223,7 +226,7 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 			cluster.GetApplicationDatabaseOwner(),
 			appPassword)
 
-		SetClusterOwnerAnnotationsAndLabels(&appSecret.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta)
 		if err := resources.CreateIfNotFound(ctx, r.Client, appSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
 				return err
@@ -271,17 +274,19 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 }
 
 func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
-	anyService := specs.CreateClusterAnyService(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&anyService.ObjectMeta, cluster)
+	if configuration.Current.CreateAnyService {
+		anyService := specs.CreateClusterAnyService(*cluster)
+		cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
 
-	if err := resources.CreateIfNotFound(ctx, r.Client, anyService); err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			return err
+		if err := resources.CreateIfNotFound(ctx, r.Client, anyService); err != nil {
+			if !apierrs.IsAlreadyExists(err) {
+				return err
+			}
 		}
 	}
 
 	readService := specs.CreateClusterReadService(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&readService.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
 
 	if err := resources.CreateIfNotFound(ctx, r.Client, readService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -290,7 +295,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	}
 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&readOnlyService.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
 
 	if err := resources.CreateIfNotFound(ctx, r.Client, readOnlyService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -299,7 +304,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	}
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&readWriteService.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
 
 	if err := resources.CreateIfNotFound(ctx, r.Client, readWriteService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
@@ -326,7 +331,7 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("while getting PodDisruptionBudget: %w", err)
 		}
-		SetClusterOwnerAnnotationsAndLabels(&pdb.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
 
 		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBudget",
 			fmt.Sprintf("Creating PodDisruptionBudget %s", pdb.Name))
@@ -422,7 +427,7 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 		return fmt.Errorf("while generating service account: %w", err)
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&sa.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&sa.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
 
 	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
@@ -455,7 +460,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		return fmt.Errorf("while creating new ServiceAccount: %w", err)
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&serviceAccount.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&serviceAccount.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(serviceAccount)
 
 	err = r.Create(ctx, serviceAccount)
@@ -524,7 +529,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 		Data: operatorSecret.Data,
 		Type: operatorSecret.Type,
 	}
-	SetClusterOwnerAnnotationsAndLabels(&secret.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&secret.ObjectMeta)
 
 	// Another sync loop may have already created the service. Let's check that
 	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
@@ -765,11 +770,19 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
-	// Checking for the PodMonitor resource in the cluster
-	havePodMonitor, err := utils.PodMonitorExist(r.DiscoveryClient)
-	if err != nil || !havePodMonitor {
-		contextLogger.Debug("Kind PodMonitor not detected", "err", err)
+	// Checking for the PodMonitor Custom Resource Definition in the Kubernetes cluster
+	havePodMonitorCRD, err := utils.PodMonitorExist(r.DiscoveryClient)
+	if err != nil {
 		return err
+	}
+
+	if !havePodMonitorCRD {
+		if cluster.IsPodMonitorEnabled() {
+			// If the PodMonitor CRD does not exist, but the cluster has monitoring enabled,
+			// the controller cannot do anything until the CRD is installed
+			contextLogger.Warning("PodMonitor CRD not present. Cannot create the PodMonitor object")
+		}
+		return nil
 	}
 
 	// We get the current pod monitor
@@ -805,7 +818,7 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 	case cluster.IsPodMonitorEnabled() && podMonitor == nil:
 		contextLogger.Debug("Creating PodMonitor")
 		newPodMonitor := specs.CreatePodMonitor(cluster)
-		SetClusterOwnerAnnotationsAndLabels(&newPodMonitor.ObjectMeta, cluster)
+		cluster.SetInheritedDataAndOwnership(&newPodMonitor.ObjectMeta)
 		return r.Create(ctx, newPodMonitor)
 	// Pod monitor enabled and pod monitor present - update it
 	default:
@@ -826,7 +839,7 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 // createRole creates the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
 	role := specs.CreateRole(*cluster, backupOrigin)
-	SetClusterOwnerAnnotationsAndLabels(&role.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&role.ObjectMeta)
 
 	err := r.Create(ctx, &role)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -840,7 +853,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 // createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
 	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
-	SetClusterOwnerAnnotationsAndLabels(&roleBinding.ObjectMeta, cluster)
+	cluster.SetInheritedDataAndOwnership(&roleBinding.ObjectMeta)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -893,26 +906,13 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	if err := r.createPVC(
+	if err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
+		r.Client,
 		cluster,
-		cluster.Spec.StorageConfiguration,
 		nodeSerial,
-		utils.PVCRolePgData,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
-	}
-
-	if cluster.ShouldCreateWalArchiveVolume() {
-		if err := r.createPVC(
-			ctx,
-			cluster,
-			*cluster.Spec.WalStorage,
-			nodeSerial,
-			utils.PVCRolePgWal,
-		); err != nil {
-			return ctrl.Result{RequeueAfter: time.Minute}, err
-		}
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
@@ -1070,33 +1070,20 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createPVC(
+	if err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
+		r.Client,
 		cluster,
-		cluster.Spec.StorageConfiguration,
 		nodeSerial,
-		utils.PVCRolePgData,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
-	}
-
-	if cluster.ShouldCreateWalArchiveVolume() {
-		if err := r.createPVC(
-			ctx,
-			cluster,
-			*cluster.Spec.WalStorage,
-			nodeSerial,
-			utils.PVCRolePgWal,
-		); err != nil {
-			return ctrl.Result{RequeueAfter: time.Minute}, err
-		}
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
 }
 
-// reconcilePVCs reattaches a dangling PVC
-func (r *ClusterReconciler) reconcilePVCs(
+// ensureInstancesAreCreated recreates any missing instance
+func (r *ClusterReconciler) ensureInstancesAreCreated(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	resources *managedResources,
@@ -1104,187 +1091,124 @@ func (r *ClusterReconciler) reconcilePVCs(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
+	instanceToCreate, err := findInstancePodToCreate(cluster, instancesStatus, resources.pvcs.Items)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if instanceToCreate == nil {
+		contextLogger.Debug(
+			"haven't found any instance to create",
+			"instances", instancesStatus.GetNames(),
+			"dangling", cluster.Status.DanglingPVC,
+			"unusable", cluster.Status.UnusablePVC,
+		)
+		return ctrl.Result{}, nil
+	}
+
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&
-		instancesStatus.InstancesReportingStatus() != cluster.Status.Instances {
+		instancesStatus.InstancesReportingStatus() != cluster.Status.ReadyInstances {
 		// A pod is not ready, let's retry
 		contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	pvcToReattach := electPvcToReattach(cluster)
-	if pvcToReattach == "" {
-		// This should never happen. This function should be invoked
-		// only when there is something to reattach.
-		contextLogger.Debug("Impossible to elect a PVC to reattach",
-			"danglingPVCs", cluster.Status.DanglingPVC,
-			"initializingPVCs", cluster.Status.InitializingPVC)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
-	if len(cluster.Status.DanglingPVC) > 0 {
-		if (cluster.IsNodeMaintenanceWindowInProgress() && !cluster.IsReusePVCEnabled()) ||
-			cluster.Spec.Instances <= cluster.Status.Instances {
-			contextLogger.Info(
-				"Detected unneeded PVCs, removing them",
-				"statusInstances", cluster.Status.Instances,
-				"specInstances", cluster.Spec.Instances,
-				"maintenanceWindow", cluster.Spec.NodeMaintenanceWindow,
-				"danglingPVCs", cluster.Status.DanglingPVC)
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.removeDanglingPVCs(ctx, cluster)
+	// TODO: this logic eventually should be moved elsewhere
+	instancePVCs := persistentvolumeclaim.FilterByPodSpec(resources.pvcs.Items, instanceToCreate.Spec)
+	for _, instancePVC := range instancePVCs {
+		// This should not happen. However, we put this guard here
+		// as an assertion to catch unexpected events.
+		pvcStatus := instancePVC.Annotations[persistentvolumeclaim.StatusAnnotationName]
+		if pvcStatus != persistentvolumeclaim.StatusReady {
+			contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
+				"pvc", instancePVC.Name,
+				"status", pvcStatus,
+				"instance", instanceToCreate.Name,
+			)
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 		}
-	}
 
-	pvc := resources.getPVC(pvcToReattach)
-	if pvc == nil {
-		return ctrl.Result{}, fmt.Errorf(
-			"the pvc: %s was nominated to be reattached but it could not be found from the pvc list",
-			pvcToReattach,
-		)
-	}
-
-	// This should not happen. However, we put this guard here
-	// as an assertion to catch unexpected events.
-	pvcStatus := pvc.Annotations[specs.PVCStatusAnnotationName]
-	if pvcStatus != specs.PVCStatusReady {
-		contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
-			"pvc", pvc.Name,
-			"status", pvcStatus)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
-	nodeSerial, err := specs.GetNodeSerial(pvc.ObjectMeta)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot detect serial from PVC %v: %v", pvc.Name, err)
-	}
-
-	pod := specs.PodWithExistingStorage(*cluster, nodeSerial)
-
-	if configuration.Current.EnableAzurePVCUpdates {
-		for _, pvcName := range cluster.Status.ResizingPVC {
-			// if the pvc is in resizing state we requeue and wait
-			if pvcName == pvc.Name {
-				contextLogger.Info("PVC is in resizing status, retrying in 5 seconds", "pod", pod.Name)
-				return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
+		if configuration.Current.EnableAzurePVCUpdates {
+			for _, resizingPVC := range cluster.Status.ResizingPVC {
+				// if the pvc is in resizing state we requeue and wait
+				if resizingPVC == instancePVC.Name {
+					contextLogger.Info(
+						"PVC is in resizing status, retrying in 5 seconds",
+						"instance", instanceToCreate.Name,
+					)
+					return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
+				}
 			}
 		}
 	}
 
 	// If this cluster has been restarted, mark the Pod with the latest restart time
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
+		if instanceToCreate.Annotations == nil {
+			instanceToCreate.Annotations = make(map[string]string)
 		}
-		pod.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
+		instanceToCreate.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
 	}
 
 	contextLogger.Info("Creating new Pod to reattach a PVC",
-		"pod", pod.Name,
-		"pvc", pvc.Name)
+		"pod", instanceToCreate.Name,
+		"pvc", instanceToCreate.Name)
 
-	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(cluster, instanceToCreate, r.Scheme); err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to set the owner reference for the Pod: %w", err)
 	}
 
-	utils.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
-	utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations,
+	utils.SetOperatorVersion(&instanceToCreate.ObjectMeta, versions.Version)
+	utils.InheritAnnotations(&instanceToCreate.ObjectMeta, cluster.Annotations,
 		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(&pod.ObjectMeta, cluster.Labels,
+	utils.InheritLabels(&instanceToCreate.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
-	if err := r.Create(ctx, pod); err != nil {
+	if err := r.Create(ctx, instanceToCreate); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			contextLogger.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
+			contextLogger.Info("Instance already exist, maybe the cache is stale", "instance", instanceToCreate.Name)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 		}
 
 		return ctrl.Result{}, fmt.Errorf("unable to create Pod: %w", err)
 	}
 
-	// Do another reconcile cycle after handling a dangling PVC
 	return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 }
 
-// electPvcToReattach chooses a PVC between the initializing and the dangling ones that should be reattached
-// to the cluster, giving precedence to the target primary if existing in the set. If the target primary is fine,
-// let's start using the PVC we have initialized. After that we use the PVC that are initializing or dangling
-func electPvcToReattach(cluster *apiv1.Cluster) string {
-	pvcs := make([]string, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.DanglingPVC))
-	pvcs = append(pvcs, cluster.Status.InitializingPVC...)
-	pvcs = append(pvcs, cluster.Status.DanglingPVC...)
-	if len(pvcs) == 0 {
-		return ""
-	}
-
-	for _, pvc := range pvcs {
-		if specs.DoesPVCBelongToInstance(cluster, cluster.Status.TargetPrimary, pvc) {
-			return pvc
-		}
-	}
-
-	return pvcs[0]
-}
-
-// removeDanglingPVCs will remove dangling PVCs
-func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *apiv1.Cluster) error {
-	for _, pvcName := range cluster.Status.DanglingPVC {
-		var pvc corev1.PersistentVolumeClaim
-
-		err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}, &pvc)
-		if err != nil {
-			// Ignore if NotFound, otherwise report the error
-			if apierrs.IsNotFound(err) {
-				return nil
-			}
-			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
-		}
-
-		err = r.Delete(ctx, &pvc)
-		if err != nil {
-			// Ignore if NotFound, otherwise report the error
-			if apierrs.IsNotFound(err) {
-				return nil
-			}
-			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
-		}
-	}
-
-	return nil
-}
-
-func (r *ClusterReconciler) createPVC(
-	ctx context.Context,
+// we elect a current instance that doesn't exist for creation
+func findInstancePodToCreate(
 	cluster *apiv1.Cluster,
-	storageConfiguration apiv1.StorageConfiguration,
-	nodeSerial int,
-	role utils.PVCRole,
-) error {
-	contextLogger := log.FromContext(ctx)
+	instancesStatus postgres.PostgresqlStatusList,
+	pvcs []corev1.PersistentVolumeClaim,
+) (*corev1.Pod, error) {
+	instanceThatHavePods := instancesStatus.GetNames()
 
-	pvc, err := specs.CreatePVC(storageConfiguration, *cluster, nodeSerial, role)
-	if err != nil {
-		if err == specs.ErrorInvalidSize {
-			// This error should have been caught by the validating
-			// webhook, but since we are here the user must have disabled server-side
-			// validation, and we must react.
-			contextLogger.Info("The size specified for the cluster is not valid",
-				"size",
-				storageConfiguration.Size)
-			return ErrNextLoop
+	iterablePVCs := cluster.Status.DanglingPVC
+	// appending unusablePVC ensures that some corner cases are covered. (EX: an instance is deleted manually while
+	// new type of PVCs were enabled)
+	iterablePVCs = append(iterablePVCs, cluster.Status.UnusablePVC...)
+	for _, name := range iterablePVCs {
+		idx := slices.IndexFunc(pvcs, func(claim corev1.PersistentVolumeClaim) bool {
+			return claim.Name == name
+		})
+		if idx == -1 {
+			return nil, fmt.Errorf("programmatic error, pvc not found")
 		}
-		return fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
+
+		serial, err := specs.GetNodeSerial(pvcs[idx].ObjectMeta)
+		if err != nil {
+			return nil, err
+		}
+
+		instanceName := specs.GetInstanceName(cluster.Name, serial)
+		if k8slices.Contains(instanceThatHavePods, instanceName) {
+			continue
+		}
+
+		return specs.PodWithExistingStorage(*cluster, serial), nil
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
-
-	if err = r.Create(ctx, pvc); err != nil && !apierrs.IsAlreadyExists(err) {
-		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
-			pvc.Name,
-			nodeSerial,
-			err,
-		)
-	}
-
-	return nil
+	return nil, nil
 }

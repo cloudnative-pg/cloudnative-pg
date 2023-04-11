@@ -299,10 +299,10 @@ failover and switchover operations. This area includes enhancements in:
 - connection pooling, to improve performance and control through a
   connection pooling layer with pgBouncer.
 
-### PostgreSQL Backups
+### PostgreSQL Hot Backups
 
 The operator has been designed to provide application-level backups using
-PostgreSQL’s native continuous backup technology based on
+PostgreSQL’s native continuous hot backup technology based on
 physical base backups and continuous WAL archiving. Specifically,
 the operator currently supports only backups on object stores (AWS S3 and
 S3-compatible, Azure Blob Storage, Google Cloud Storage, and gateways like
@@ -329,6 +329,12 @@ container image) to relay backups in the same endpoint, alongside WAL files.
 
 Both `barman-cloud-wal-restore` and `barman-cloud-backup` are distributed in
 the application container image under GNU GPL 3 terms.
+
+### Backups from a standby
+
+The operator supports offloading base backups onto a standby without impacting
+the RPO of the database. This allows to preserve resources on the primary, in
+particular I/O, for standard database operations.
 
 ### Full restore from a backup
 

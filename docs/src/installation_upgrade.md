@@ -7,12 +7,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.18/releases/cnpg-1.18.0.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.19/releases/cnpg-1.19.1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.18/releases/cnpg-1.18.0.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.19/releases/cnpg-1.19.1.yaml
 ```
 
 You can verify that with:
@@ -38,7 +38,19 @@ kubectl cnpg install generate \
 Please refer to ["`cnpg` plugin"](./cnpg-plugin.md#generation-of-installation-manifests) documentation
 for a more comprehensive example. 
 
-#### Testing the latest development snapshot
+!!! Warning
+    If you are deploying CloudNativePG on GKE and get an error (`... failed to
+    call webhook...`), be aware that by default traffic between worker nodes
+    and control plane is blocked by the firewall except for a few specific
+    ports, as explained in the official
+    [docs](https://cloud.google.com/kubernetes-engine/docs/how-to/private-clusters#add_firewall_rules)
+    and by this
+    [issue](https://github.com/cloudnative-pg/cloudnative-pg/issues/1360).
+    You'll need to either change the `targetPort` in the webhook service, to be
+    one of the allowed ones, or open the webhooks' port (`9443`) on the
+    firewall.
+
+### Testing the latest development snapshot
 
 If you want to test or evaluate the latest development snapshot of
 CloudNativePG before the next official patch release, you can download the
@@ -52,7 +64,7 @@ this minor release with:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.18/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.19/manifests/operator-manifest.yaml | \
   kubectl apply -f -
 ```
 
@@ -63,16 +75,31 @@ curl -sSfL \
 
 The operator can be installed using the provided [Helm chart](https://github.com/cloudnative-pg/charts).
 
-
 ## Details about the deployment
 
-In Kubernetes, the operator is by default installed in the `cnpg-system` namespace as a Kubernetes
-`Deployment` called `cnpg-controller-manager`. You can get more information by running:
+In Kubernetes, the operator is by default installed in the `cnpg-system`
+namespace as a Kubernetes `Deployment`. The name of this deployment
+depends on the installation method.
+When installed through the manifest or the `cnpg` plugin, it is called
+`cnpg-controller-manager` by default. When installed via Helm, the default name
+is `cnpg-cloudnative-pg`.
+
+!!! Note
+    With Helm you can customize the name of the deployment via the
+    `fullnameOverride` field in the [*"values.yaml"* file](https://helm.sh/docs/chart_template_guide/values_files/).
+
+You can get more information using the `describe` command in `kubectl`:
+
+```sh
+$ kubectl get deployments -n cnpg-system
+NAME                READY   UP-TO-DATE   AVAILABLE   AGE
+<deployment-name>   1/1     1            1           18m
+```
 
 ```sh
 kubectl describe deploy \
   -n cnpg-system \
-  cnpg-controller-manager
+  <deployment-name>
 ```
 
 As with any Deployment, it sits on top of a ReplicaSet and supports rolling

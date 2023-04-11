@@ -84,6 +84,10 @@ type Data struct {
 	// MonitoringQueriesSecret is the name of the secret in the operator namespace which contain
 	// the monitoring queries. The queries will be read from the data key: "queries".
 	MonitoringQueriesSecret string `json:"monitoringQueriesSecret" env:"MONITORING_QUERIES_SECRET"`
+
+	// CreateAnyService is true when the user wants the operator to create
+	// the <cluster-name>-any service. Defaults to false.
+	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
 }
 
 // Current is the configuration used by the operator
@@ -95,6 +99,7 @@ func newDefaultConfig() *Data {
 		OperatorPullSecretName: DefaultOperatorPullSecretName,
 		OperatorImageName:      versions.DefaultOperatorImageName,
 		PostgresImageName:      versions.DefaultImageName,
+		CreateAnyService:       false,
 	}
 }
 

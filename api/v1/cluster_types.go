@@ -24,12 +24,14 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 const (
@@ -81,6 +83,10 @@ const (
 	// ClusterSecretSuffix is the suffix appended to the cluster name to
 	// get the name of the pull secret
 	ClusterSecretSuffix = "-pull-secret"
+
+	// WalArchiveVolumeSuffix is the suffix appended to the instance name to
+	// get the name of the PVC dedicated to WAL files.
+	WalArchiveVolumeSuffix = "-wal"
 
 	// StreamingReplicationUser is the name of the user we'll use for
 	// streaming replication purposes
@@ -220,6 +226,12 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=40000000
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
+	// The amount of time (in seconds) to wait before triggering a failover
+	// after the primary PostgreSQL instance in the cluster was detected
+	// to be unhealthy
+	// +kubebuilder:default:=0
+	FailoverDelay int32 `json:"failoverDelay,omitempty"`
+
 	// Affinity/Anti-affinity rules for Pods
 	// +optional
 	Affinity AffinityConfiguration `json:"affinity,omitempty"`
@@ -260,6 +272,30 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=info
 	// +kubebuilder:validation:Enum:=error;warning;info;debug;trace
 	LogLevel string `json:"logLevel,omitempty"`
+
+	// Template to be used to define projected volumes, projected volumes will be mounted
+	// under `/projected` base folder
+	// +optional
+	ProjectedVolumeTemplate *corev1.ProjectedVolumeSource `json:"projectedVolumeTemplate,omitempty"`
+
+	// Env follows the Env format to pass environment variables
+	// to the pods created in the cluster
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// EnvFrom follows the EnvFrom format to pass environment variables
+	// sources to the pods to be used by Env
+	// +optional
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// The configuration that is used by the portions of PostgreSQL that are managed by the instance manager
+	Managed *ManagedConfiguration `json:"managed,omitempty"`
+
+	// The SeccompProfile applied to every Pod and Container.
+	// Defaults to: `RuntimeDefault`
+	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 }
 
 const (
@@ -351,19 +387,57 @@ type Topology struct {
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
 }
 
+// RoleStatus represents the status of a managed role in the cluster
+type RoleStatus string
+
+const (
+	// RoleStatusReconciled indicates the role in DB matches the Spec
+	RoleStatusReconciled RoleStatus = "reconciled"
+	// RoleStatusNotManaged indicates the role is not in the Spec, therefore not managed
+	RoleStatusNotManaged RoleStatus = "not-managed"
+	// RoleStatusPendingReconciliation indicates the role in Spec requires updated/creation in DB
+	RoleStatusPendingReconciliation RoleStatus = "pending-reconciliation"
+	// RoleStatusReserved indicates this is one of the roles reserved by the operator. E.g. `postgres`
+	RoleStatusReserved RoleStatus = "reserved"
+)
+
+// PasswordState represents the state of the password of a managed RoleConfiguration
+type PasswordState struct {
+	// the last transaction ID to affect the role definition in PostgreSQL
+	TransactionID int64 `json:"transactionID,omitempty"`
+	// the resource version of the password secret
+	SecretResourceVersion string `json:"resourceVersion,omitempty"`
+}
+
+// ManagedRoles tracks the status of a cluster's managed roles
+type ManagedRoles struct {
+	// ByStatus gives the list of roles in each state
+	ByStatus map[RoleStatus][]string `json:"byStatus,omitempty"`
+
+	// CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
+	// with an explanation of the cause
+	CannotReconcile map[string][]string `json:"cannotReconcile,omitempty"`
+
+	// PasswordStatus gives the last transaction id and password secret version for each managed role
+	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
-	// Total number of instances in the cluster
+	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
 	Instances int `json:"instances,omitempty"`
 
-	// Total number of ready instances in the cluster
+	// The total number of ready instances in the cluster. It is equal to the number of ready instance pods.
 	ReadyInstances int `json:"readyInstances,omitempty"`
 
 	// InstancesStatus indicates in which status the instances are
 	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
 
-	// the reported state of the instances during the last reconciliation loop
+	// The reported state of the instances during the last reconciliation loop
 	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
+
+	// ManagedRolesStatus reports the state of the managed roles in the cluster
+	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	TimelineID int `json:"timelineID,omitempty"`
@@ -433,11 +507,21 @@ type ClusterStatus struct {
 	// The first recoverability point, stored as a date in RFC3339 format
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
+	// Stored as a date in RFC3339 format
+	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
+
+	// Stored as a date in RFC3339 format
+	LastFailedBackup string `json:"lastFailedBackup,omitempty"`
+
 	// The commit hash number of which this operator running
 	CommitHash string `json:"cloudNativePGCommitHash,omitempty"`
 
 	// The timestamp when the last actual promotion to primary has occurred
 	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
+
+	// The timestamp when the primary was detected to be unhealthy
+	// This field is reported when spec.failoverDelay is populated or during online upgrades
+	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 
 	// The timestamp when the last request for a new primary has occurred
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
@@ -526,6 +610,9 @@ const (
 
 	// ClusterIsNotReady means that the condition changed because the cluster is not ready
 	ClusterIsNotReady ConditionReason = "ClusterIsNotReady"
+
+	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
+	DetachedVolume ConditionReason = "DetachedVolume"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
@@ -1108,6 +1195,28 @@ type StorageConfiguration struct {
 	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
 }
 
+// GetSizeOrNil returns the requests storage size
+func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
+	if s == nil {
+		return nil
+	}
+
+	if s.Size != "" {
+		quantity, err := resource.ParseQuantity(s.Size)
+		if err != nil {
+			return nil
+		}
+
+		return &quantity
+	}
+
+	if s.PersistentVolumeClaimTemplate != nil {
+		return s.PersistentVolumeClaimTemplate.Resources.Requests.Storage()
+	}
+
+	return nil
+}
+
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.
 //
 // For anti-affinity parameters two instances are considered in the same location
@@ -1180,6 +1289,20 @@ type RollingUpdateStatus struct {
 	// When the update has been started
 	StartedAt metav1.Time `json:"startedAt,omitempty"`
 }
+
+// BackupTarget describes the preferred targets for a backup
+type BackupTarget string
+
+const (
+	// BackupTargetPrimary means backups will be performed on the primary instance
+	BackupTargetPrimary = BackupTarget("primary")
+
+	// BackupTargetStandby means backups will be performed on a standby instance if available
+	BackupTargetStandby = BackupTarget("prefer-standby")
+
+	// DefaultBackupTarget is the default BackupTarget
+	DefaultBackupTarget = BackupTargetPrimary
+)
 
 // CompressionType encapsulates the available types of compression
 type CompressionType string
@@ -1290,6 +1413,14 @@ type BackupConfiguration struct {
 	// +kubebuilder:validation:Pattern=^[1-9][0-9]*[dwm]$
 	// +optional
 	RetentionPolicy string `json:"retentionPolicy,omitempty"`
+
+	// The policy to decide which instance should perform backups. Available
+	// options are empty string, which will default to `primary` policy, `primary`
+	// to have backups run always on primary instances, `prefer-standby` to have
+	// backups run preferably on the most updated standby, if available.
+	// +kubebuilder:validation:Enum=primary;prefer-standby
+	// +kubebuilder:default:=primary
+	Target BackupTarget `json:"target,omitempty"`
 }
 
 // WalBackupConfiguration is the configuration of the backup of the
@@ -1473,6 +1604,108 @@ func (in ExternalCluster) GetServerName() string {
 	return in.Name
 }
 
+// EnsureOption represents whether we should enforce the presence or absence of
+// a Role in a PostgreSQL instance
+type EnsureOption string
+
+// values taken by EnsureOption
+const (
+	EnsurePresent EnsureOption = "present"
+	EnsureAbsent  EnsureOption = "absent"
+)
+
+// ManagedConfiguration represents the portions of PostgreSQL that are managed
+// by the instance manager
+type ManagedConfiguration struct {
+	// Database roles managed by the `Cluster`
+	Roles []RoleConfiguration `json:"roles,omitempty"`
+}
+
+// RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
+// with the additional field Ensure specifying whether to ensure the presence or
+// absence of the role in the database
+//
+// The defaults of the CREATE ROLE command are applied
+// Reference: https://www.postgresql.org/docs/current/sql-createrole.html
+type RoleConfiguration struct {
+	// Name of the role
+	Name string `json:"name"`
+	// Description of the role
+	Comment string `json:"comment,omitempty"`
+
+	// Ensure the role is `present` or `absent` - defaults to "present"
+	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
+	Ensure EnsureOption `json:"ensure,omitempty"`
+
+	// Secret containing the password of the role (if present)
+	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
+	// Whether the role is a `superuser` who can override all access
+	// restrictions within the database - superuser status is dangerous and
+	// should be used only when really needed. You must yourself be a
+	// superuser to create a new superuser. Defaults is `false`.
+	Superuser bool `json:"superuser,omitempty"`
+	// When set to `true`, the role being defined will be allowed to create
+	// new databases. Specifying `false` (default) will deny a role the
+	// ability to create databases.
+	CreateDB bool `json:"createdb,omitempty"`
+	// Whether the role will be permitted to create, alter, drop, comment
+	// on, change the security label for, and grant or revoke membership in
+	// other roles. Default is `false`.
+	CreateRole bool `json:"createrole,omitempty"`
+
+	// Whether a role "inherits" the privileges of roles it is a member of.
+	// Defaults is `true`.
+	// +kubebuilder:default:=true
+	Inherit *bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
+
+	// Whether the role is allowed to log in. A role having the `login`
+	// attribute can be thought of as a user. Roles without this attribute
+	// are useful for managing database privileges, but are not users in
+	// the usual sense of the word. Default is `false`.
+	Login bool `json:"login,omitempty"`
+	// Whether a role is a replication role. A role must have this
+	// attribute (or be a superuser) in order to be able to connect to the
+	// server in replication mode (physical or logical replication) and in
+	// order to be able to create or drop replication slots. A role having
+	// the `replication` attribute is a very highly privileged role, and
+	// should only be used on roles actually used for replication. Default
+	// is `false`.
+	Replication bool `json:"replication,omitempty"`
+	// Whether a role bypasses every row-level security (RLS) policy.
+	// Default is `false`.
+	BypassRLS bool `json:"bypassrls,omitempty"` // Row-Level Security
+
+	// If the role can log in, this specifies how many concurrent
+	// connections the role can make. `-1` (the default) means no limit.
+	// +kubebuilder:default:=-1
+	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
+
+	// Date and time after which the role's password is no longer valid.
+	// When omitted, the password will never expire (default).
+	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
+
+	// List of one or more existing roles to which this role will be
+	// immediately added as a new member. Default empty.
+	InRoles []string `json:"inRoles,omitempty"`
+}
+
+// GetRoleSecretsName gets the name of the secret which is used to store the role's password
+func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
+	if roleConfiguration.PasswordSecret != nil {
+		return roleConfiguration.PasswordSecret.Name
+	}
+	return ""
+}
+
+// GetRoleInherit return the inherit attribute of a roleConfiguration
+func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
+	if roleConfiguration.Inherit != nil {
+		return *roleConfiguration.Inherit
+	}
+	return true
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
@@ -1521,6 +1754,9 @@ type SecretsResourceVersion struct {
 	// The resource version of the "app" user secret
 	ApplicationSecretVersion string `json:"applicationSecretVersion,omitempty"`
 
+	// The resource versions of the managed roles secrets
+	ManagedRoleSecretVersions map[string]string `json:"managedRoleSecretVersion,omitempty"`
+
 	// Unused. Retained for compatibility with old versions.
 	CASecretVersion string `json:"caSecretVersion,omitempty"`
 
@@ -1547,6 +1783,18 @@ type ConfigMapResourceVersion struct {
 	// A map with the versions of all the config maps used to pass metrics.
 	// Map keys are the config map names, map values are the versions
 	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// SetManagedRoleSecretVersion Add or update or delete the resource version of the managed role secret
+func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion(secret string, version *string) {
+	if secretResourceVersion.ManagedRoleSecretVersions == nil {
+		secretResourceVersion.ManagedRoleSecretVersions = make(map[string]string)
+	}
+	if version == nil {
+		delete(secretResourceVersion.ManagedRoleSecretVersions, secret)
+	} else {
+		secretResourceVersion.ManagedRoleSecretVersions[secret] = *version
+	}
 }
 
 // GetImageName get the name of the image that should be used
@@ -1609,13 +1857,22 @@ func (cluster *Cluster) GetLDAPSecretName() string {
 	return ""
 }
 
-// GetEnableSuperuserAccess returns if the superuser access is enabled or not
-func (cluster *Cluster) GetEnableSuperuserAccess() bool {
-	if cluster.Spec.EnableSuperuserAccess != nil {
-		return *cluster.Spec.EnableSuperuserAccess
-	}
+// ContainsManagedRolesConfiguration returns true iff there are managed roles configured
+func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
+	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
+}
 
-	return true
+// UsesSecretInManagedRoles checks if the given secret name is used in a managed role
+func (cluster *Cluster) UsesSecretInManagedRoles(secretName string) bool {
+	if !cluster.ContainsManagedRolesConfiguration() {
+		return false
+	}
+	for _, role := range cluster.Spec.Managed.Roles {
+		if role.PasswordSecret != nil && role.PasswordSecret.Name == secretName {
+			return true
+		}
+	}
+	return false
 }
 
 // GetApplicationSecretName get the name of the application secret for any bootstrap type
@@ -1970,14 +2227,14 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
 }
 
+// ShouldCreateProjectedVolume returns whether we should create the projected all in one volume
+func (cluster *Cluster) ShouldCreateProjectedVolume() bool {
+	return cluster.Spec.ProjectedVolumeTemplate != nil
+}
+
 // ShouldCreateWalArchiveVolume returns whether we should create the wal archive volume
 func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
-}
-
-// GetWalArchiveVolumeSuffix gets the wal archive volume name suffix
-func (cluster *Cluster) GetWalArchiveVolumeSuffix() string {
-	return "-wal"
 }
 
 // GetPostgresUID returns the UID that is being used for the "postgres"
@@ -2082,6 +2339,10 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		return true
 	}
 
+	if cluster.UsesSecretInManagedRoles(secret) {
+		return true
+	}
+
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() && cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name == secret {
 		return true
 	}
@@ -2116,6 +2377,15 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	}
 
 	return false
+}
+
+// GetEnableSuperuserAccess returns if the superuser access is enabled or not
+func (cluster *Cluster) GetEnableSuperuserAccess() bool {
+	if cluster.Spec.EnableSuperuserAccess != nil {
+		return *cluster.Spec.EnableSuperuserAccess
+	}
+
+	return true
 }
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout
@@ -2182,6 +2452,35 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	}
 
 	contextLogger.Info(logMessage, keysAndValues...)
+}
+
+// SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
+// sets all the needed annotations and labels
+func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
+	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.LabelClusterName(obj, cluster.GetName())
+	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
+	utils.SetOperatorVersion(obj, versions.Version)
+}
+
+// ShouldForceLegacyBackup if present takes a backup without passing the name argument even on barman version 3.3.0+.
+// This is needed to test both backup system in the E2E suite
+func (cluster *Cluster) ShouldForceLegacyBackup() bool {
+	const legacyBackupAnnotationName = "cnpg.io/forceLegacyBackup"
+
+	return cluster.Annotations[legacyBackupAnnotationName] == "true"
+}
+
+// GetSeccompProfile return the proper SeccompProfile set in the cluster for Pods and Containers
+func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
+	if cluster.Spec.SeccompProfile != nil {
+		return cluster.Spec.SeccompProfile
+	}
+
+	return &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

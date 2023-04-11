@@ -47,6 +47,11 @@ func Detect() (*Capabilities, error) {
 	newCapabilities.Version = version
 
 	switch {
+	case version.GE(semver.Version{Major: 3, Minor: 4}):
+		// The --name flag was added to Barman in version 3.3 but we also require the
+		// barman-cloud-backup-show command which was not added until Barman version 3.4
+		newCapabilities.hasName = true
+		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 18}):
 		// Tags, added in Barman >= 2.18
 		newCapabilities.HasTags = true

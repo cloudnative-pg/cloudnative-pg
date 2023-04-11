@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.2
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: scheduledbackups.postgresql.cnpg.io
 spec:
@@ -79,6 +79,16 @@ spec:
               suspend:
                 description: If this backup is suspended or not
                 type: boolean
+              target:
+                description: The policy to decide which instance should perform this
+                  backup. If empty, it defaults to `cluster.spec.backup.target`. Available
+                  options are empty string, which will default to `primary` policy,
+                  `primary` to have backups run always on primary instances, `prefer-standby`
+                  to have backups run preferably on the most updated standby, if available.
+                enum:
+                - primary
+                - prefer-standby
+                type: string
             required:
             - schedule
             type: object

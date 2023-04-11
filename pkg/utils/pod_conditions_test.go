@@ -135,7 +135,7 @@ var _ = Describe("Pod conditions test suite", func() {
 	})
 
 	Describe("Must detect if a pod has been evicted or not", func() {
-		pod := corev1.Pod{
+		pod := &corev1.Pod{
 			Status: corev1.PodStatus{
 				Phase:  corev1.PodFailed,
 				Reason: PodReasonEvicted,
@@ -145,7 +145,7 @@ var _ = Describe("Pod conditions test suite", func() {
 		}
 		Expect(IsPodEvicted(pod)).To(BeTrue())
 
-		pod = corev1.Pod{
+		pod = &corev1.Pod{
 			Status: corev1.PodStatus{
 				Conditions: []corev1.PodCondition{
 					{

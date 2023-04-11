@@ -47,6 +47,15 @@ const (
 type BackupSpec struct {
 	// The cluster to backup
 	Cluster LocalObjectReference `json:"cluster,omitempty"`
+
+	// The policy to decide which instance should perform this backup. If empty,
+	// it defaults to `cluster.spec.backup.target`.
+	// Available options are empty string, which will default to `primary`
+	// policy, `primary` to have backups run always on primary instances,
+	// `prefer-standby` to have backups run preferably on the most updated
+	// standby, if available.
+	// +kubebuilder:validation:Enum=primary;prefer-standby
+	Target BackupTarget `json:"target,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
@@ -65,8 +74,8 @@ type BackupStatus struct {
 
 	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
 	// this path, with different destination folders, will be used for WALs
-	// and for data
-	DestinationPath string `json:"destinationPath"`
+	// and for data. This may not be populated in case of errors.
+	DestinationPath string `json:"destinationPath,omitempty"`
 
 	// The server name on S3, the cluster name is used if this
 	// parameter is omitted
@@ -77,6 +86,9 @@ type BackupStatus struct {
 
 	// The ID of the Barman backup
 	BackupID string `json:"backupId,omitempty"`
+
+	// The Name of the Barman backup
+	BackupName string `json:"backupName,omitempty"`
 
 	// The last backup status
 	Phase BackupPhase `json:"phase,omitempty"`

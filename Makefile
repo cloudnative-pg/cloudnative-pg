@@ -36,11 +36,13 @@ OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v4.5.2
+KUSTOMIZE_VERSION ?= v5.0.1
 KIND_CLUSTER_NAME ?= pg
-KIND_CLUSTER_VERSION ?= v1.25.0
-CONTROLLER_TOOLS_VERSION ?= v0.9.2
-GORELEASER_VERSION ?= v1.10.3
+KIND_CLUSTER_VERSION ?= v1.26.3
+CONTROLLER_TOOLS_VERSION ?= v0.11.3
+GORELEASER_VERSION ?= v1.17.0
+SPELLCHECK_VERSION ?= 0.30.0
+WOKE_VERSION ?= 0.19.0
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -88,8 +90,8 @@ test: generate fmt vet manifests ## Run tests.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest ;\
 	source <(setup-envtest use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
-	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=50s ;\
-	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=50s ;\
+	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
+	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
 	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils ;
 
 e2e-test-kind: ## Run e2e tests locally using kind.
@@ -107,8 +109,8 @@ run: generate fmt vet manifests ## Run against the configured Kubernetes cluster
 	go run ./cmd/manager
 
 docker-build: go-releaser ## Build the docker image.
-	GOOS=linux GOARCH=${ARCH} DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
-	  $(GO_RELEASER) build --skip-validate --rm-dist --single-target
+	GOOS=linux GOARCH=${ARCH} GOPATH=$(go env GOPATH) DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
+	  $(GO_RELEASER) build --skip-validate --clean --single-target
 	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
 
 docker-push: ## Push the docker image.
@@ -169,16 +171,20 @@ shellcheck: ## Shellcheck for the hack directory.
 	}
 
 spellcheck: ## Runs the spellcheck on the project.
-	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.25.0
+	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:$(SPELLCHECK_VERSION)
 
 woke: ## Runs the woke checks on project.
-	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.18.1 woke -c .woke.yaml
+	docker run --rm -v $(PWD):/src -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
 
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
 	mv -f .wordlist-en-custom.txt.new .wordlist-en-custom.txt
 
-checks: generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint ## Runs all the checks on the project.
+go-mod-check: ## Check if there's any dirty change after `go mod tidy`
+	go mod tidy ;\
+	git diff --exit-code go.mod go.sum
+
+checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint ## Runs all the checks on the project.
 
 ##@ Documentation
 
@@ -219,7 +225,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 
 KUSTOMIZE = $(LOCALBIN)/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@$(KUSTOMIZE_VERSION))
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION))
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

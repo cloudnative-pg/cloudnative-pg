@@ -1,5 +1,12 @@
 # Backup and Recovery
 
+CloudNativePG natively supports **online/hot backup** of PostgreSQL
+clusters through continuous physical backup and WAL archiving.
+This means that the database is always up (no downtime required)
+and that you can recover at any point in time from the first
+available base backup in your system. The latter is normally
+referred to as "Point In Time Recovery" (PITR).
+
 The operator can orchestrate a continuous backup infrastructure
 that is based on the [Barman](https://pgbarman.org) tool. Instead
 of using the classical architecture with a Barman server, which
@@ -23,7 +30,8 @@ as it is composed of a community PostgreSQL image and the latest
 A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
 [replica clusters](replica_cluster.md)
-for more information about designated primary instances).
+for more information about designated primary instances), or alternatively
+on a [standby](#backup-from-a-standby).
 
 ## Cloud provider support
 
@@ -120,11 +128,11 @@ spec:
 
 ### Other S3-compatible Object Storages providers
 
-In case you're using S3-compatible object storage, like MinIO or
-Linode Object Storage, you can specify an endpoint instead of using the
+In case you're using S3-compatible object storage, like **MinIO** or
+**Linode Object Storage**, you can specify an endpoint instead of using the
 default S3 one.
 
-In this example, it will use the `bucket` bucket of Linode in the region
+In this example, it will use the `bucket` of **Linode** in the region
 `us-east1`.
 
 ```yaml
@@ -135,7 +143,22 @@ spec:
   backup:
     barmanObjectStore:
       destinationPath: "<destination path here>"
-      endpointURL: bucket.us-east1.linodeobjects.com
+      endpointURL: "https://bucket.us-east1.linodeobjects.com"
+      s3Credentials:
+        [...]
+```
+
+In case you're using **Digital Ocean Spaces**, you will have to use the Path-style syntax.
+In this example, it will use the `bucket` from **Digital Ocean Spaces** in the region `SFO3`.
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://[your-bucket-name]/[your-backup-folder]/"
+      endpointURL: "https://sfo3.digitaloceanspaces.com"
       s3Credentials:
         [...]
 ```
@@ -160,7 +183,7 @@ Specifically, the CloudNativePG cluster can directly point to a local
 MinIO Gateway as an endpoint, using previously created credentials and service.
 
 MinIO secrets will be used by both the PostgreSQL cluster and the MinIO instance.
-Therefore you must create them in the same namespace:
+Therefore, you must create them in the same namespace:
 
 ```sh
 kubectl create secret generic minio-creds \
@@ -630,6 +653,61 @@ When PostgreSQL will request the archiving of a WAL that has
 already been archived by the instance manager as an optimization,
 that archival request will be just dismissed with a positive status.
 
+## Backup from a standby
+
+By default, backups will run on the primary instance of a `Cluster`.
+
+Taking a base backup requires to scrape the whole data content of the
+PostgreSQL instance on disk, possibly resulting in I/O contention with the
+actual workload of the database.
+
+For this reason, CloudNativePG allows you to take advantage of a
+feature which is directly available in PostgreSQL: **backup from a standby**.
+
+!!! Info
+    Although the standby might not always be up to date with the primary,
+    in the time continuum from the first available backup to the last
+    archived WAL this is normally irrelevant. The base backup indeed
+    represents the starting point from which to begin a recovery operation,
+    including PITR.
+
+You can use set backup target to `prefer-standby` as outlined in the
+example below:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  [...]
+spec:
+  backup:
+    target: "prefer-standby"
+```
+
+The `prefer-standby` policy will ensure backups are run on the most up-to-date
+available secondary instance, falling back to the primary instance if no other
+instance is available.
+
+By default, when not specified, target is automatically set to take backups
+from a primary.
+
+The backup target specified in the `Cluster` can be overridden in the `Backup`
+and `ScheduledBackup` types, like in the following example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  [...]
+spec:
+  cluster:
+    name: [...]
+  target: "primary"
+```
+
+In the previous example, CloudNativePG will invariably choose the primary
+instance even if the `Cluster` is set to prefer replicas.
+
 ## Recovery
 
 Cluster restores are not performed "in-place" on an existing cluster.
@@ -642,6 +720,12 @@ requested).
 
 For details and instructions on the `recovery` bootstrap method, please refer
 to the ["Bootstrap from a backup" section](bootstrap.md#bootstrap-from-a-backup-recovery).
+
+!!! Important
+    If you are not familiar with how [PostgreSQL PITR](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-PITR-RECOVERY)
+    works, we suggest that you configure the recovery cluster as the original
+    one when it comes to `.spec.postgresql.parameters`. Once the new cluster is
+    restored, you can then change the settings as desired.
 
 Under the hood, the operator will inject an init container in the first
 instance of the new cluster, and the init container will start recovering the

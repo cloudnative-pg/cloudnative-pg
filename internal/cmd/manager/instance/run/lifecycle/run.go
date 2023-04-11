@@ -143,7 +143,7 @@ func configureInstancePermissions(instance *postgres.Instance) error {
 	return tx.Commit()
 }
 
-// configureStreamingReplicaUser makes sure the the streaming replication user exists
+// configureStreamingReplicaUser makes sure the streaming replication user exists
 // and has the required rights
 func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 	var hasLoginRight, hasReplicationRight, hasSuperuser bool
@@ -151,15 +151,22 @@ func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 		apiv1.StreamingReplicationUser)
 	err := row.Scan(&hasLoginRight, &hasReplicationRight, &hasSuperuser)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			_, err = tx.Exec(fmt.Sprintf(
-				"CREATE USER %v REPLICATION",
-				identifierStreamingReplicationUser))
-			if err != nil {
-				return false, fmt.Errorf("CREATE USER %v error: %w", apiv1.StreamingReplicationUser, err)
-			}
-		} else {
+		if err != sql.ErrNoRows {
 			return false, fmt.Errorf("while creating streaming replication user: %w", err)
+		}
+
+		_, err = tx.Exec(fmt.Sprintf(
+			"CREATE USER %v REPLICATION",
+			identifierStreamingReplicationUser))
+		if err != nil {
+			return false, fmt.Errorf("CREATE USER %v error: %w", apiv1.StreamingReplicationUser, err)
+		}
+
+		_, err = tx.Exec(fmt.Sprintf(
+			"COMMENT ON ROLE %v IS 'Special user for streaming replication created by CloudNativePG'",
+			identifierStreamingReplicationUser))
+		if err != nil {
+			return false, fmt.Errorf("COMMENT ON ROLE %v error: %w", apiv1.StreamingReplicationUser, err)
 		}
 	}
 
@@ -251,9 +258,5 @@ func verifyPgDataCoherence(ctx context.Context, instance *postgres.Instance) err
 		return err
 	}
 
-	if err := postgres.WritePostgresUserMaps(instance.PgData); err != nil {
-		return err
-	}
-
-	return nil
+	return postgres.WritePostgresUserMaps(instance.PgData)
 }

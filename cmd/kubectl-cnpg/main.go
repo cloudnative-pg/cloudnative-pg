@@ -26,6 +26,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/backup"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
@@ -35,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/psql"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/report"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/restart"
@@ -76,6 +78,8 @@ func main() {
 	rootCmd.AddCommand(restart.NewCmd())
 	rootCmd.AddCommand(status.NewCmd())
 	rootCmd.AddCommand(versions.NewCmd())
+	rootCmd.AddCommand(backup.NewCmd())
+	rootCmd.AddCommand(psql.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

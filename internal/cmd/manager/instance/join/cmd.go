@@ -27,6 +27,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -71,7 +72,11 @@ func NewCmd() *cobra.Command {
 			return joinSubCommand(ctx, instance, info)
 		},
 		PostRunE: func(cmd *cobra.Command, args []string) error {
-			return istio.TryInvokeQuitEndpoint(cmd.Context())
+			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
+				return err
+			}
+
+			return linkerd.TryInvokeShutdownEndpoint(cmd.Context())
 		},
 	}
 

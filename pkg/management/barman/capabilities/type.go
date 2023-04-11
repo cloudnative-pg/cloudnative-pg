@@ -19,10 +19,14 @@ package capabilities
 
 import (
 	"github.com/blang/semver"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // Capabilities collects a set of boolean values that shows the possible capabilities of Barman and the version
 type Capabilities struct {
+	// this is not exported because the consumers have to use ShouldExecuteBackupWithName
+	hasName                    bool
 	HasAzure                   bool
 	HasS3                      bool
 	HasGoogle                  bool
@@ -33,4 +37,13 @@ type Capabilities struct {
 	HasErrorCodesForWALRestore bool
 	HasAzureManagedIdentity    bool
 	Version                    *semver.Version
+}
+
+// ShouldExecuteBackupWithName returns true if the new backup logic should be executed
+func (c *Capabilities) ShouldExecuteBackupWithName(cluster *apiv1.Cluster) bool {
+	if cluster != nil && cluster.ShouldForceLegacyBackup() {
+		return false
+	}
+
+	return c.hasName
 }

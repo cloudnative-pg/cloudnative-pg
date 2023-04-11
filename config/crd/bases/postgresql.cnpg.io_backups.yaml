@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.2
+    controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
   name: backups.postgresql.cnpg.io
 spec:
@@ -58,6 +58,16 @@ spec:
                 required:
                 - name
                 type: object
+              target:
+                description: The policy to decide which instance should perform this
+                  backup. If empty, it defaults to `cluster.spec.backup.target`. Available
+                  options are empty string, which will default to `primary` policy,
+                  `primary` to have backups run always on primary instances, `prefer-standby`
+                  to have backups run preferably on the most updated standby, if available.
+                enum:
+                - primary
+                - prefer-standby
+                type: string
             type: object
           status:
             description: 'Most recently observed status of the backup. This data may
@@ -128,6 +138,9 @@ spec:
               backupId:
                 description: The ID of the Barman backup
                 type: string
+              backupName:
+                description: The Name of the Barman backup
+                type: string
               beginLSN:
                 description: The starting xlog
                 type: string
@@ -143,7 +156,7 @@ spec:
               destinationPath:
                 description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
                   this path, with different destination folders, will be used for
-                  WALs and for data
+                  WALs and for data. This may not be populated in case of errors.
                 type: string
               encryption:
                 description: Encryption method required to S3 API
@@ -286,8 +299,6 @@ spec:
                 description: When the backup was terminated
                 format: date-time
                 type: string
-            required:
-            - destinationPath
             type: object
         type: object
     served: true

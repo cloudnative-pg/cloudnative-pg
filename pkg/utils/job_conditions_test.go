@@ -37,14 +37,14 @@ var _ = Describe("Job conditions", func() {
 	}
 
 	It("detects if a certain job is completed", func() {
-		Expect(IsJobComplete(nonCompleteJob)).To(BeFalse())
-		Expect(IsJobComplete(completeJob)).To(BeTrue())
+		Expect(JobHasOneCompletion(nonCompleteJob)).To(BeFalse())
+		Expect(JobHasOneCompletion(completeJob)).To(BeTrue())
 	})
 
 	It("can count the number of complete jobs", func() {
-		Expect(CountCompleteJobs([]batchv1.Job{nonCompleteJob, completeJob})).To(Equal(1))
-		Expect(CountCompleteJobs([]batchv1.Job{nonCompleteJob})).To(Equal(0))
-		Expect(CountCompleteJobs([]batchv1.Job{completeJob})).To(Equal(1))
-		Expect(CountCompleteJobs([]batchv1.Job{})).To(Equal(0))
+		Expect(CountJobsWithOneCompletion([]batchv1.Job{nonCompleteJob, completeJob})).To(Equal(1))
+		Expect(CountJobsWithOneCompletion([]batchv1.Job{nonCompleteJob})).To(Equal(0))
+		Expect(CountJobsWithOneCompletion([]batchv1.Job{completeJob})).To(Equal(1))
+		Expect(CountJobsWithOneCompletion([]batchv1.Job{})).To(Equal(0))
 	})
 })

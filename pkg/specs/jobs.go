@@ -18,7 +18,6 @@ package specs
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/kballard/go-shellquote"
 	batchv1 "k8s.io/api/batch/v1"
@@ -26,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -78,7 +78,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
-		return createPrimaryJob(cluster, nodeSerial, "import", initCommand)
+		return createPrimaryJob(cluster, nodeSerial, jobRoleImport, initCommand)
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
@@ -86,7 +86,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--post-init-application-sql-refs-folder", postInitApplicationSQLRefsFolder)
 	}
 
-	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
+	return createPrimaryJob(cluster, nodeSerial, jobRoleInitDB, initCommand)
 }
 
 func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
@@ -110,6 +110,10 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 	if config.DataChecksums != nil &&
 		*config.DataChecksums {
 		options = append(options, "-k")
+	}
+	if logLevel := cluster.Spec.LogLevel; log.DebugLevelString == logLevel ||
+		log.TraceLevelString == logLevel {
+		options = append(options, "-d")
 	}
 	if encoding := config.Encoding; encoding != "" {
 		options = append(options, fmt.Sprintf("--encoding=%s", encoding))
@@ -141,7 +145,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
+	job := createPrimaryJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
@@ -182,7 +186,7 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	return createPrimaryJob(cluster, nodeSerial, "pgbasebackup", initCommand)
+	return createPrimaryJob(cluster, nodeSerial, jobRolePGBaseBackup, initCommand)
 }
 
 // JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
@@ -196,24 +200,53 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	return createPrimaryJob(cluster, nodeSerial, "join", initCommand)
+	return createPrimaryJob(cluster, nodeSerial, jobRoleJoin, initCommand)
 }
 
 func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 	var flags []string
 
 	if cluster.ShouldCreateWalArchiveVolume() {
-		flags = append(flags, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
+		flags = append(flags, "--pg-wal", PgWalVolumePgWalPath)
 	}
 
 	return flags
 }
 
+// jobRole describe a possible type of job
+type jobRole string
+
+const (
+	jobRoleImport       jobRole = "import"
+	jobRoleInitDB       jobRole = "initdb"
+	jobRolePGBaseBackup jobRole = "pgbasebackup"
+	jobRoleFullRecovery jobRole = "full-recovery"
+	jobRoleJoin         jobRole = "join"
+)
+
+var jobRoleList = []jobRole{jobRoleImport, jobRoleInitDB, jobRolePGBaseBackup, jobRoleFullRecovery, jobRoleJoin}
+
+// getJobName returns a string indicating the job name
+func (role jobRole) getJobName(instanceName string) string {
+	return fmt.Sprintf("%s-%s", instanceName, role)
+}
+
+// GetPossibleJobNames get all the possible job names for a given instance
+func GetPossibleJobNames(instanceName string) []string {
+	res := make([]string, len(jobRoleList))
+	for idx, role := range jobRoleList {
+		res[idx] = role.getJobName(instanceName)
+	}
+	return res
+}
+
 // createPrimaryJob create a job that executes the provided command.
 // The role should describe the purpose of the executed job
-func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCommand []string) *batchv1.Job {
+func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
-	jobName := GetJobName(cluster.Name, nodeSerial, role)
+	jobName := role.getJobName(instanceName)
+
+	envConfig := CreatePodEnvConfig(cluster, jobName)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -230,28 +263,32 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 					Labels: map[string]string{
 						utils.InstanceNameLabelName: instanceName,
 						utils.ClusterLabelName:      cluster.Name,
+						utils.JobRoleLabelName:      string(role),
 					},
 				},
 				Spec: corev1.PodSpec{
-					Hostname:  jobName,
-					Subdomain: cluster.GetServiceAnyName(),
+					Hostname: jobName,
 					InitContainers: []corev1.Container{
 						createBootstrapContainer(cluster),
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            role,
+							Name:            string(role),
 							Image:           cluster.GetImageName(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             createEnvVarPostgresContainer(cluster, instanceName),
+							Env:             envConfig.EnvVars,
+							EnvFrom:         envConfig.EnvFrom,
 							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,
-							SecurityContext: CreateContainerSecurityContext(),
+							SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 						},
 					},
-					Volumes:            createPostgresVolumes(cluster, instanceName),
-					SecurityContext:    CreatePodSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
+					Volumes: createPostgresVolumes(cluster, instanceName),
+					SecurityContext: CreatePodSecurityContext(
+						cluster.GetSeccompProfile(),
+						cluster.GetPostgresUID(),
+						cluster.GetPostgresGID()),
 					Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:        cluster.Spec.Affinity.Tolerations,
 					ServiceAccountName: cluster.Name,
@@ -262,8 +299,11 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 		},
 	}
 
-	utils.LabelJobRole(&job.ObjectMeta, role)
-	utils.LabelClusterName(&job.ObjectMeta, cluster.Name)
+	if configuration.Current.CreateAnyService {
+		job.Spec.Template.Spec.Subdomain = cluster.GetServiceAnyName()
+	}
+
+	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
@@ -279,9 +319,4 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 	}
 
 	return job
-}
-
-// GetJobName returns a string indicating the job name
-func GetJobName(clusterName string, nodeSerial int, role string) string {
-	return fmt.Sprintf("%s-%v-%s", clusterName, nodeSerial, role)
 }

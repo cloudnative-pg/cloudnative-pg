@@ -18,6 +18,7 @@ limitations under the License.
 package catalog
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -33,6 +34,26 @@ import (
 type Catalog struct {
 	// The list of backups
 	List []BarmanBackup `json:"backups_list"`
+}
+
+// NewCatalogFromBarmanCloudBackupList parses the output of barman-cloud-backup-list
+func NewCatalogFromBarmanCloudBackupList(rawJSON string) (*Catalog, error) {
+	result := &Catalog{}
+	err := json.Unmarshal([]byte(rawJSON), result)
+	if err != nil {
+		return nil, err
+	}
+
+	for idx := range result.List {
+		if err := result.List[idx].deserializeBackupTimeStrings(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Sort the list of backups in order of time
+	sort.Sort(result)
+
+	return result, nil
 }
 
 var currentTLIRegex = regexp.MustCompile("^(|latest)$")
@@ -188,6 +209,10 @@ func (catalog *Catalog) findBackupFromID(backupID string) (*BarmanBackup, error)
 // BarmanBackup represent a backup as created
 // by Barman
 type BarmanBackup struct {
+	// The backup name, can be used as a way to identify a backup.
+	// Populated only if the backup was executed with barman 3.3.0+.
+	BackupName string `json:"backup_name,omitempty"`
+
 	// The backup label
 	Label string `json:"backup_label"`
 
@@ -226,6 +251,50 @@ type BarmanBackup struct {
 
 	// The TimeLine
 	TimeLine int `json:"timeline"`
+}
+
+type barmanBackupShow struct {
+	Cloud BarmanBackup `json:"cloud,omitempty"`
+}
+
+// NewBackupFromBarmanCloudBackupShow parses the output of barman-cloud-backup-show
+func NewBackupFromBarmanCloudBackupShow(rawJSON string) (*BarmanBackup, error) {
+	result := &barmanBackupShow{}
+	err := json.Unmarshal([]byte(rawJSON), result)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := result.Cloud.deserializeBackupTimeStrings(); err != nil {
+		return nil, err
+	}
+
+	return &result.Cloud, nil
+}
+
+func (b *BarmanBackup) deserializeBackupTimeStrings() error {
+	// barmanTimeLayout is the format that is being used to parse
+	// the backupInfo from barman-cloud-backup-list
+	const (
+		barmanTimeLayout = "Mon Jan 2 15:04:05 2006"
+	)
+
+	var err error
+	if b.BeginTimeString != "" {
+		b.BeginTime, err = time.Parse(barmanTimeLayout, b.BeginTimeString)
+		if err != nil {
+			return err
+		}
+	}
+
+	if b.EndTimeString != "" {
+		b.EndTime, err = time.Parse(barmanTimeLayout, b.EndTimeString)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (b *BarmanBackup) isBackupDone() bool {

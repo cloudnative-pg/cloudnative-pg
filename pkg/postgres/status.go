@@ -45,21 +45,17 @@ type PostgresqlStatus struct {
 	// populated when MightBeUnavailable reported a healthy status even if it found an error
 	MightBeUnavailableMaskedError string `json:"mightBeUnavailableMaskedError,omitempty"`
 
-	// WAL Status
-	// SELECT
-	//		last_archived_wal,
-	// 		last_archived_time,
-	// 		last_failed_wal,
-	// 		last_failed_time,
-	// 		COALESCE(last_archived_time,'-infinity') > COALESCE(last_failed_time, '-infinity') AS is_archiving,
-	// 		pg_walfile_name(pg_current_wal_lsn()) as current_wal
-	// FROM pg_stat_archiver;
+	// Archiver status
+
 	LastArchivedWAL     string `json:"lastArchivedWAL,omitempty"`
 	LastArchivedWALTime string `json:"lastArchivedWALTime,omitempty"`
 	LastFailedWAL       string `json:"lastFailedWAL,omitempty"`
 	LastFailedWALTime   string `json:"lastFailedWALTime,omitempty"`
 	IsArchivingWAL      bool   `json:"isArchivingWAL,omitempty"`
-	CurrentWAL          string `json:"currentWAL,omitempty"`
+
+	// WAL Status
+
+	CurrentWAL string `json:"currentWAL,omitempty"`
 
 	// Is the number of '.ready' wal files contained in the wal archive folder
 	ReadyWALFiles int `json:"readyWalFiles,omitempty"`
@@ -198,10 +194,20 @@ func (list PgStatReplicationList) Less(i, j int) bool {
 	return list[i].ApplicationName < list[j].ApplicationName
 }
 
-// PostgresqlStatusList is a list of PostgreSQL instances status, useful to
-// be easily sorted
+// PostgresqlStatusList is a list of PostgreSQL status received from the Pods
+// that can be sorted considering the replication status
 type PostgresqlStatusList struct {
 	Items []PostgresqlStatus `json:"items"`
+}
+
+// GetNames returns a list of names of Pods
+func (list *PostgresqlStatusList) GetNames() []string {
+	names := make([]string, len(list.Items))
+	for idx, item := range list.Items {
+		names[idx] = item.Pod.Name
+	}
+
+	return names
 }
 
 // LogStatus logs the current status of the instances
@@ -210,7 +216,7 @@ func (list *PostgresqlStatusList) LogStatus(ctx context.Context) {
 
 	total := len(list.Items)
 	for idx, item := range list.Items {
-		message := fmt.Sprintf("instance status (%d of %d)", idx+1, total)
+		message := fmt.Sprintf("pod status (%d of %d)", idx+1, total)
 		contextLogger.Info(message,
 			"name", item.Pod.Name,
 			"currentLsn", item.CurrentLsn,
@@ -224,7 +230,7 @@ func (list *PostgresqlStatusList) LogStatus(ctx context.Context) {
 	}
 
 	contextLogger.Debug(
-		`detailed instances status`,
+		`detailed pod status`,
 		"data", list,
 	)
 }

@@ -16,8 +16,8 @@ on:
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.19.x"
-  GOLANGCI_LINT_VERSION: "v1.50"
+  GOLANG_VERSION: "1.20.x"
+  GOLANGCI_LINT_VERSION: "v1.52"
   KUBEBUILDER_VERSION: "2.3.1"
 
 defaults:
@@ -26,6 +26,25 @@ defaults:
     shell: 'bash -Eeuo pipefail -x {0}'
 
 jobs:
+  # Trigger the workflow on release-* branches for smoke testing whenever it's a scheduled run.
+  # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
+  smoke_test_release_branches:
+    runs-on: ubuntu-20.04
+    name: smoke test release-* branches when it's a scheduled run
+    if: github.event_name == 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - release-1.18
+          - release-1.19
+    steps:
+      - name: Invoke workflow with inputs
+        uses: benc-uk/workflow-dispatch@v121
+        with:
+          workflow: continuous-integration
+          ref: ${{ matrix.branch }}
+
   # Detects if we should skip the workflow due to being duplicated. Exceptions:
   #   1. it's on 'main' branch
   #   2. it's triggered by events in the 'do_not_skip' list
@@ -97,7 +116,7 @@ jobs:
               - '**/*.go'
               - '.golangci.yml'
 
-  golangci:
+  go-linters:
     name: Run linters
     needs:
       - duplicate_runs
@@ -112,7 +131,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
@@ -121,6 +140,10 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout 4m
+
+      - name: Check go mod tidy has no pending changes
+        run: |
+          make go-mod-check
 
   shellcheck:
     name: Run shellcheck linter
@@ -139,7 +162,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@1.1.0
+        uses: ludeeus/action-shellcheck@2.0.0
 
   generate-unit-tests-jobs:
     name: Generate jobs for unit tests
@@ -202,21 +225,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
-
-      # Cache Go modules on GitHub runners to be reused across jobs
-      # See to: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Run unit tests
         env:
@@ -252,7 +263,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
@@ -283,7 +294,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
@@ -302,7 +313,7 @@ jobs:
   buildx:
     name: Build containers
     needs:
-      - golangci
+      - go-linters
       - shellcheck
       - tests
       - apidoc
@@ -324,7 +335,7 @@ jobs:
           needs.change-triage.outputs.go-code-changed == 'true'
         )
       ) &&
-      (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
+      (needs.go-linters.result == 'success' || needs.go-linters.result == 'skipped') &&
       (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
       (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
@@ -341,19 +352,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
-
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Build meta
         run: |
@@ -412,7 +413,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build and load
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .

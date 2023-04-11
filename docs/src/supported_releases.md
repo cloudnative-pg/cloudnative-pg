@@ -63,12 +63,11 @@ Git tags for versions are prepended with `v`.
 
 ## Support status of CloudNativePG releases
 
-| Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported |
-|-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|
-| 1.18.x          | Yes                  | November 10, 2022 | ~ April 13, 2023         | 1.23, 1.24, 1.25              | 1.22                      |
-| 1.17.x          | Yes                  | September 6, 2022 | ~ February 12, 2023      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
-| 1.16.x          | Yes                  | July 7, 2022      | ~ December 10, 2022      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
-| main            | No, development only |                   |                          |                               |                           |
+| Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported | Supported Postgres Versions |
+|-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|-----------------------------|
+| 1.19.x          | Yes                  | February 14, 2023 | ~ July 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
+| 1.18.x          | Yes                  | November 10, 2022 | ~ May 13, 2023           | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
+| main            | No, development only |                   |                          |                               |                           | 11 - 15                     |
 
 The list of supported Kubernetes versions in the above table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
@@ -78,13 +77,21 @@ Kubernetes distribution, like Red Hat OpenShift (this might change in the
 future. If it did change, that would be reflected in an official policy written
 by the CloudNativePG maintainers).
 
+The list of supported Postgres versions in the above table generally depends on
+what PostgreSQL versions were supported by the Community at the time the minor
+version was released. Please refer to the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
+page for more information about supported versions.
+
+!!! Info
+    Starting by November 10, 2022, Postgres 10 reached its final release and
+    is no longer supported.
+
 ## Upcoming releases
 
-| Version         | Release Date     | End of Life               | Supported Kubernetes Versions  |
-|-----------------|------------------|---------------------------|--------------------------------|
-| 1.19.0          | January 12, 2023 | June 15, 2023             | 1.23, 1.24, 1.25               |
-| 1.20.0          | March 13, 2023   | -                         | -                              |
-| 1.21.0          | May 15, 2023     | -                         | -                              |
+| Version         | Release Date     | End of Life               | Supported Kubernetes Versions |
+|-----------------|------------------|---------------------------|-------------------------------|
+| 1.20.0          | April 13, 2023   | -                         | -                             |
+| 1.21.0          | June 15, 2023    | -                         | -                             |
 
 !!! Note
     Feature freeze happens one week before the release
@@ -100,6 +107,8 @@ by the CloudNativePG maintainers).
 | Version         | Release Date      | End of Life              | Compatible Kubernetes Versions |
 |-----------------|-------------------|--------------------------|--------------------------------|
 | 1.15.x          | April 21, 2022    | October 6, 2022          | 1.21, 1.22, 1.23               |
+| 1.16.x          | July 7, 2022      | December 21, 2022        | 1.22, 1.23, 1.24               |
+| 1.17.x          | September 6, 2022 | March 20, 2023           | 1.22, 1.23, 1.24               |
 
 ## What we mean by support
 
@@ -147,4 +156,3 @@ If you are looking for professional support, please refer to the
 ["Support" page in the website](https://cloudnative-pg.io/support/).
 The vendors listed there might provide service level agreements that included
 extended support timeframes.
-

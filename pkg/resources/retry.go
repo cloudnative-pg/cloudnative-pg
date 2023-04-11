@@ -17,4 +17,4 @@ limitations under the License.
 package resources
 
 // RetryAlways is a function that always returns true on any error encountered
-func RetryAlways(err error) bool { return true }
+func RetryAlways(_ error) bool { return true }
