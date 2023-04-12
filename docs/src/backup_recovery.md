@@ -554,7 +554,7 @@ kind: ScheduledBackup
 metadata:
   name: backup-example
 spec:
-  schedule: "0 0 0 * * *"
+  schedule: "0 0 * * *"
   backupOwnerReference: self
   cluster:
     name: pg-backup
