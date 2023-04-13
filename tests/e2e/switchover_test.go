@@ -25,7 +25,6 @@ import (
 
 var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	const (
-		namespace                         = "switchover-e2e"
 		sampleFileWithoutReplicationSlots = fixturesDir + "/switchover/cluster-switchover.yaml.template"
 		sampleFileWithReplicationSlots    = fixturesDir + "/switchover/cluster-switchover-with-rep-slots.yaml.template"
 		level                             = tests.Medium
@@ -39,6 +38,7 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	Context("with HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
 			// Create a cluster in a namespace we'll delete after the test
+			namespace := "switchover-e2e-with-slots"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
@@ -59,6 +59,7 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	Context("without HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
 			// Create a cluster in a namespace we'll delete after the test
+			namespace := "switchover-e2e"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
