@@ -28,7 +28,6 @@ import (
 
 var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplication), func() {
 	const (
-		namespace                         = "cluster-scale-e2e-storage-class"
 		sampleFileWithoutReplicationSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		sampleFileWithReplicationSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
 		clusterName                       = "postgresql-storage-class"
@@ -46,7 +45,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			if env.PostgresVersion == 10 {
 				Skip("replication slots are not available for PostgreSQL 10 or older")
 			}
-
+			namespace := "cluster-scale-e2e-with-slots"
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
@@ -89,6 +88,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 	Context("without HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
 			// Create a cluster in a namespace we'll delete after the test
+			namespace := "cluster-scale-e2e"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
