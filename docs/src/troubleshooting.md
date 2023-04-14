@@ -655,7 +655,7 @@ To check whether hugepages are enabled, run `cat /proc/meminfo` and check if hug
 ```
   postgresql:
     parameters:
-      huge_pages: off
+      huge_pages: "off"
 ```
 If they are enabled, you need to define how much memory should be allocated on them.
 Example:
