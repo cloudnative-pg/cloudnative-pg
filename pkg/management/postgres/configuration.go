@@ -56,8 +56,9 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 // function will return "true" if the configuration has been really changed.
 func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	cluster *apiv1.Cluster,
+	preserveUserSettings bool,
 ) (bool, error) {
-	postgresConfiguration, sha256, err := createPostgresqlConfiguration(cluster)
+	postgresConfiguration, sha256, err := createPostgresqlConfiguration(cluster, preserveUserSettings)
 	if err != nil {
 		return false, err
 	}
@@ -288,7 +289,7 @@ func RemoveArchiveModeFromPostgresAutoConf(pgData string) (changed bool, err err
 
 // createPostgresqlConfiguration creates the PostgreSQL configuration to be
 // used for this cluster and return it and its sha256 checksum
-func createPostgresqlConfiguration(cluster *apiv1.Cluster) (string, string, error) {
+func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings bool) (string, string, error) {
 	// Extract the PostgreSQL major version
 	fromVersion, err := cluster.GetPostgresqlVersion()
 	if err != nil {
@@ -299,10 +300,15 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster) (string, string, erro
 		Settings:                         postgres.CnpgConfigurationSettings,
 		MajorVersion:                     fromVersion,
 		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
-		IncludingMandatory:               true,
 		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
 		IsReplicaCluster:                 cluster.IsReplica(),
+	}
+
+	if preserveUserSettings {
+		info.PreserveFixedSettingsFromUser = true
+	} else {
+		info.IncludingMandatory = true
 	}
 
 	// Compute the actual number of sync replicas
