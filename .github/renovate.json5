@@ -50,7 +50,7 @@
       // We want a PR to bump kind node version in the Makefile
       "fileMatch": [
         "^Makefile$",
-        "^hack/setup-cluster.sh^",
+        "^hack/setup-cluster.sh$",
       ],
       "matchStrings": [
         "KIND_CLUSTER_VERSION \\?= (?<currentValue>.*?)\\n",
