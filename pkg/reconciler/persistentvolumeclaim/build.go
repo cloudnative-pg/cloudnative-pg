@@ -34,6 +34,7 @@ type CreateConfiguration struct {
 	NodeSerial int
 	Role       utils.PVCRole
 	Storage    apiv1.StorageConfiguration
+	Source     *corev1.TypedLocalObjectReference
 }
 
 // Build spec of a PVC, given its name and the storage configuration
@@ -59,6 +60,7 @@ func Build(
 		WithClusterInheritance(cluster).
 		EndMetadata().
 		WithSpec(configuration.Storage.PersistentVolumeClaimTemplate).
+		WithSource(configuration.Source).
 		WithAccessModes(corev1.ReadWriteOnce)
 
 	// If the customer specified a storage class, let's use it

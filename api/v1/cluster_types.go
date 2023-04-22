@@ -1098,6 +1098,10 @@ type BootstrapRecovery struct {
 	// so it must be set to the name of the source cluster
 	Source string `json:"source,omitempty"`
 
+	// The following PVC data source will be used to restore
+	// data
+	VolumeSnapshots *DataSource `json:"volumeSnapshots,omitempty"`
+
 	// By default, the recovery process applies all the available
 	// WAL files in the archive (full recovery). However, you can also
 	// end the recovery as soon as a consistent state is reached or
@@ -1120,6 +1124,16 @@ type BootstrapRecovery struct {
 	// created from scratch
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
+}
+
+// DataSource contains the configuration required to bootstrap a
+// PostgreSQL cluster from an existing storage
+type DataSource struct {
+	// Configuration of the storage of the instances
+	Storage corev1.TypedLocalObjectReference `json:"storage"`
+
+	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
+	WalStorage *corev1.TypedLocalObjectReference `json:"walStorage,omitempty"`
 }
 
 // BackupSource contains the backup we need to restore from, plus some

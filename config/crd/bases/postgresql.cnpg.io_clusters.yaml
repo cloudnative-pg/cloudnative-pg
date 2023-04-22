@@ -1540,6 +1540,54 @@ spec:
                           the backup is stored, so it must be set to the name of the
                           source cluster
                         type: string
+                      volumeSnapshots:
+                        description: The following PVC data source will be used to
+                          restore data
+                        properties:
+                          storage:
+                            description: Configuration of the storage of the instances
+                            properties:
+                              apiGroup:
+                                description: APIGroup is the group for the resource
+                                  being referenced. If APIGroup is not specified,
+                                  the specified Kind must be in the core API group.
+                                  For any other third-party types, APIGroup is required.
+                                type: string
+                              kind:
+                                description: Kind is the type of resource being referenced
+                                type: string
+                              name:
+                                description: Name is the name of resource being referenced
+                                type: string
+                            required:
+                            - kind
+                            - name
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          walStorage:
+                            description: Configuration of the storage for PostgreSQL
+                              WAL (Write-Ahead Log)
+                            properties:
+                              apiGroup:
+                                description: APIGroup is the group for the resource
+                                  being referenced. If APIGroup is not specified,
+                                  the specified Kind must be in the core API group.
+                                  For any other third-party types, APIGroup is required.
+                                type: string
+                              kind:
+                                description: Kind is the type of resource being referenced
+                                type: string
+                              name:
+                                description: Name is the name of resource being referenced
+                                type: string
+                            required:
+                            - kind
+                            - name
+                            type: object
+                            x-kubernetes-map-type: atomic
+                        required:
+                        - storage
+                        type: object
                     type: object
                 type: object
               certificates:

@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -289,6 +290,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateName,
 		r.validateBootstrapPgBaseBackupSource,
 		r.validateBootstrapRecoverySource,
+		r.validateBootstrapRecoveryDataSource,
 		r.validateExternalClusters,
 		r.validateTolerations,
 		r.validateAntiAffinity,
@@ -798,6 +800,101 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 	}
 
 	return result
+}
+
+// validateBootstrapRecoveryDataSource is used to ensure that the data
+// source is correctly defined
+func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
+	var result field.ErrorList
+
+	// This validation is only applicable for datasource-based recovery based bootstrap
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+		return result
+	}
+
+	recoveryStanzaPath := field.NewPath("spec", "bootstrap", "recovery")
+	recoveryStanza := r.Spec.Bootstrap.Recovery
+	if recoveryStanza.Source != "" {
+		result = append(
+			result,
+			field.Invalid(
+				recoveryStanzaPath.Child("dataSource"),
+				r.Spec.Bootstrap.Recovery.VolumeSnapshots,
+				"Recovery from dataSource is not compatible with other types of recovery"))
+		return result
+	}
+
+	if recoveryStanza.Backup != nil {
+		result = append(
+			result,
+			field.Invalid(
+				recoveryStanzaPath.Child("backup"),
+				r.Spec.Bootstrap.Recovery.Backup,
+				"Recovery from dataSource is not compatible with other types of recovery"))
+		return result
+	}
+
+	if recoveryStanza.RecoveryTarget != nil {
+		result = append(
+			result,
+			field.Invalid(
+				recoveryStanzaPath.Child("recoveryTarget"),
+				r.Spec.Bootstrap.Recovery.RecoveryTarget,
+				"A recovery target cannot be set while recovering from a DataSource"))
+	}
+
+	if recoveryStanza.VolumeSnapshots.WalStorage != nil && r.Spec.WalStorage == nil {
+		walStoragePath := recoveryStanzaPath.Child("dataSource", "walStorage")
+		result = append(
+			result,
+			field.Invalid(
+				walStoragePath,
+				r.Spec.Bootstrap.Recovery.VolumeSnapshots.WalStorage,
+				"A WAL storage configuration is required when recovering using a DataSource for WALs"))
+		result = append(
+			result,
+			validateVolumeSnapshotSource(
+				*recoveryStanza.VolumeSnapshots.WalStorage, walStoragePath)...)
+	}
+
+	if recoveryStanza.VolumeSnapshots.WalStorage != nil {
+		result = append(
+			result,
+			validateVolumeSnapshotSource(
+				*recoveryStanza.VolumeSnapshots.WalStorage,
+				recoveryStanzaPath.Child("dataSource", "walStorage"))...)
+	}
+
+	result = append(
+		result,
+		validateVolumeSnapshotSource(
+			recoveryStanza.VolumeSnapshots.Storage,
+			recoveryStanzaPath.Child("storage"))...)
+
+	return result
+}
+
+// validateVolumeSnapshotSource validates a source of a recovery snapshot.
+// The supported resources are VolumeSnapshots and PersistentVolumeClaim
+func validateVolumeSnapshotSource(
+	value v1.TypedLocalObjectReference,
+	path *field.Path,
+) field.ErrorList {
+	apiGroup := ""
+	if value.APIGroup != nil {
+		apiGroup = *value.APIGroup
+	}
+
+	switch {
+	case apiGroup == storagesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
+	case apiGroup == "" && value.Kind == "PersistentVolumeClaim":
+	default:
+		return field.ErrorList{
+			field.Invalid(path, value, "Only VolumeSnapshots and PersistentVolumeClaims are supported"),
+		}
+	}
+
+	return nil
 }
 
 // validateImageName validates the image name ensuring we aren't

@@ -41,6 +41,7 @@ Below you will find a description of the defined resources:
 - [ConfigMapKeySelector](#ConfigMapKeySelector)
 - [ConfigMapResourceVersion](#ConfigMapResourceVersion)
 - [DataBackupConfiguration](#DataBackupConfiguration)
+- [DataSource](#DataSource)
 - [EmbeddedObjectMetadata](#EmbeddedObjectMetadata)
 - [ExternalCluster](#ExternalCluster)
 - [GoogleCredentials](#GoogleCredentials)
@@ -297,6 +298,7 @@ Name           | Description                                                    
 -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------
 `backup        ` | The backup we need to restore                                                                                                                                                                                                                                                                                                                                                                                                                           | [*BackupSource](#BackupSource)                
 `source        ` | The external cluster whose backup we will restore. This is also used as the name of the folder under which the backup is stored, so it must be set to the name of the source cluster                                                                                                                                                                                                                                                                    | string                                        
+`dataSource    ` | The following PVC data source will be used to restore data                                                                                                                                                                                                                                                                                                                                                                                              | [*DataSource](#DataSource)                    
 `recoveryTarget` | By default, the recovery process applies all the available WAL files in the archive (full recovery). However, you can also end the recovery as soon as a consistent state is reached or recover to a point-in-time (PITR) by specifying a `RecoveryTarget` object, as expected by PostgreSQL (i.e., timestamp, transaction Id, LSN, ...). More info: https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET | [*RecoveryTarget](#RecoveryTarget)            
 `database      ` | Name of the database used by the application. Default: `app`.                                                                                                                                                                                                                                                                                                                                                                                           - *mandatory*  | string                                        
 `owner         ` | Name of the owner of the database in the instance to be used by applications. Defaults to the value of the `database` key.                                                                                                                                                                                                                                                                                                                              - *mandatory*  | string                                        
@@ -475,6 +477,17 @@ Name                | Description                                               
 `encryption         ` | Whenever to force the encryption of files (if the bucket is not already configured for that). Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms`                                                                                                                              | EncryptionType 
 `immediateCheckpoint` | Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default. | bool           
 `jobs               ` | The number of parallel jobs to be used to upload the backup, defaults to 2                                                                                                                                                                                                                                           | *int32         
+
+<a id='DataSource'></a>
+
+## DataSource
+
+DataSource contains the configuration required to bootstrap a PostgreSQL cluster from an existing storage
+
+Name       | Description                                                       | Type                             
+---------- | ----------------------------------------------------------------- | ---------------------------------
+`storage   ` | Configuration of the storage of the instances                     | corev1.TypedLocalObjectReference 
+`walStorage` | Configuration of the storage for PostgreSQL WAL (Write-Ahead Log) | *corev1.TypedLocalObjectReference
 
 <a id='EmbeddedObjectMetadata'></a>
 

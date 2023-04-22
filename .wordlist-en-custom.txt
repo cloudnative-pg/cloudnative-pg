@@ -92,6 +92,7 @@ DISA
 DNS
 DataBackupConfiguration
 DataBase
+DataSource
 DeploymentStrategy
 DevOps
 DevSecOps
@@ -341,6 +342,7 @@ TOC
 TODO
 TimelineId
 TopologyKey
+TypedLocalObjectReference
 UID
 Uncomment
 Unrealizable
