@@ -42,7 +42,7 @@ func ReconcileReplicationSlots(
 
 	// if the replication slots feature was deactivated, ensure any existing
 	// replication slots get cleaned up
-	if !cluster.Spec.ReplicationSlots.HighAvailability.Enabled {
+	if !cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
 		return dropReplicationSlots(ctx, manager, cluster)
 	}
 

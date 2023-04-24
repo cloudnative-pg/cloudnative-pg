@@ -369,7 +369,7 @@ func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
 func (fullStatus *PostgresqlStatus) areReplicationSlotsEnabled() bool {
 	return fullStatus.Cluster.Spec.ReplicationSlots != nil &&
 		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability != nil &&
-		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability.Enabled
+		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled()
 }
 
 func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.Tabby, verbose bool) {

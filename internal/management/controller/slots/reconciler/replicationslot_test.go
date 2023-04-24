@@ -19,6 +19,8 @@ package reconciler
 import (
 	"context"
 
+	"k8s.io/utils/pointer"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 
@@ -72,7 +74,7 @@ func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.
 		Spec: apiv1.ClusterSpec{
 			ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 				HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-					Enabled:    true,
+					Enabled:    pointer.Bool(true),
 					SlotPrefix: slotPrefix,
 				},
 			},
