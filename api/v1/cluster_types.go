@@ -691,7 +691,7 @@ type ReplicationSlotsHAConfiguration struct {
 	// from the designated primary to its cascading replicas. This can only
 	// be set at creation time.
 	// +optional
-	// +kubebuilder:default:=false
+	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled"`
 
 	// Prefix for replication slots managed by the operator for HA.
