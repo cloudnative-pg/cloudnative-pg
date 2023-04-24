@@ -1310,7 +1310,7 @@ const (
 	BackupTargetStandby = BackupTarget("prefer-standby")
 
 	// DefaultBackupTarget is the default BackupTarget
-	DefaultBackupTarget = BackupTargetPrimary
+	DefaultBackupTarget = BackupTargetStandby
 )
 
 // CompressionType encapsulates the available types of compression
@@ -1424,11 +1424,11 @@ type BackupConfiguration struct {
 	RetentionPolicy string `json:"retentionPolicy,omitempty"`
 
 	// The policy to decide which instance should perform backups. Available
-	// options are empty string, which will default to `primary` policy, `primary`
-	// to have backups run always on primary instances, `prefer-standby` to have
-	// backups run preferably on the most updated standby, if available.
+	// options are empty string, which will default to `prefer-standby` policy,
+	// `primary` to have backups run always on primary instances, `prefer-standby`
+	// to have backups run preferably on the most updated standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
-	// +kubebuilder:default:=primary
+	// +kubebuilder:default:=prefer-standby
 	Target BackupTarget `json:"target,omitempty"`
 }
 
