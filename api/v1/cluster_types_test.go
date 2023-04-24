@@ -19,6 +19,7 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -814,12 +815,11 @@ var _ = Describe("Replication slots names for instances", func() {
 	})
 
 	It("returns the name of the slot for an instance when they are configured", func() {
-		trueValue := true
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: &trueValue,
+						Enabled: pointer.Bool(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -830,12 +830,11 @@ var _ = Describe("Replication slots names for instances", func() {
 	})
 
 	It("sanitizes the name of replication slots", func() {
-		trueValue := true
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    &trueValue,
+						Enabled:    pointer.Bool(true),
 						SlotPrefix: "%232'test_",
 					},
 					UpdateInterval: 0,
