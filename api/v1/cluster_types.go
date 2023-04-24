@@ -251,8 +251,8 @@ type ClusterSpec struct {
 
 	// Method to follow to upgrade the primary server during a rolling
 	// update procedure, after all replicas have been successfully updated:
-	// it can be with a switchover (`switchover` - default) or in-place (`restart`)
-	// +kubebuilder:default:=switchover
+	// it can be with a switchover (`switchover`) or in-place (`restart` - default)
+	// +kubebuilder:default:=restart
 	// +kubebuilder:validation:Enum:=switchover;restart
 	PrimaryUpdateMethod PrimaryUpdateMethod `json:"primaryUpdateMethod,omitempty"`
 
@@ -2065,11 +2065,11 @@ func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
 }
 
 // GetPrimaryUpdateMethod get the cluster primary update method,
-// defaulting to switchover
+// defaulting to restart
 func (cluster *Cluster) GetPrimaryUpdateMethod() PrimaryUpdateMethod {
 	strategy := cluster.Spec.PrimaryUpdateMethod
 	if strategy == "" {
-		return PrimaryUpdateMethodSwitchover
+		return PrimaryUpdateMethodRestart
 	}
 
 	return strategy
