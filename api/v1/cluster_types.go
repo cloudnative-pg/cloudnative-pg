@@ -691,6 +691,7 @@ type ReplicationSlotsHAConfiguration struct {
 	// from the designated primary to its cascading replicas. This can only
 	// be set at creation time.
 	// +optional
+	// +kubebuilder:default:=false
 	Enabled *bool `json:"enabled"`
 
 	// Prefix for replication slots managed by the operator for HA.
@@ -712,7 +713,7 @@ func (r *ReplicationSlotsHAConfiguration) GetSlotPrefix() string {
 // GetSlotNameFromInstanceName returns the slot name, given the instance name.
 // It returns an empty string if High Availability Replication Slots are disabled
 func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceName string) string {
-	if r == nil || !r.GetSlotEnabled() {
+	if r == nil || !r.GetEnabled() {
 		return ""
 	}
 
@@ -726,8 +727,8 @@ func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceNa
 	return sanitizedName
 }
 
-// GetSlotEnabled returns whether replication slot is enabled
-func (r *ReplicationSlotsHAConfiguration) GetSlotEnabled() bool {
+// GetEnabled returns true if replication slots are enabled
+func (r *ReplicationSlotsHAConfiguration) GetEnabled() bool {
 	if r != nil && r.Enabled != nil {
 		return *r.Enabled
 	}
@@ -2287,7 +2288,7 @@ var slotNameNegativeRegex = regexp.MustCompile("[^a-z0-9_]+")
 func (cluster Cluster) GetSlotNameFromInstanceName(instanceName string) string {
 	if cluster.Spec.ReplicationSlots == nil ||
 		cluster.Spec.ReplicationSlots.HighAvailability == nil ||
-		!cluster.Spec.ReplicationSlots.HighAvailability.GetSlotEnabled() {
+		!cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
 		return ""
 	}
 
