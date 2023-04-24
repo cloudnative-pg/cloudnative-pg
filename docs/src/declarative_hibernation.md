@@ -10,7 +10,15 @@ In batch-driven solutions, the database needs to be up only when the batch
 process is running.
 
 The declarative hibernation feature enables saving CPU power by removing the
-database Pods, while keeping the data PVCs.
+database Pods, while keeping the database PVCs.
+
+!!! Note
+    Declarative hibernation is different from the existing implementation
+    of [imperative hibernation via the `cnpg` plugin](cnpg-plugin.md#cluster-hibernation).
+    The imperative hibernation shuts down all Postgres instances in the High
+    Availability cluster, and keeps a static copy of the PVCs of the primary that
+    contain `PGDATA` and WALs. The plugin enables to exit the hibernation phase, by
+    resuming the primary and then recreating all the replicas - where they exist.
 
 ## Hibernation
 

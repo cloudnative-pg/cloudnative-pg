@@ -125,6 +125,12 @@ Although no configuration is required to run the cluster, you can customize
 both PostgreSQL run-time configuration and PostgreSQL Host-Based
 Authentication rules in the `postgresql` section of the CR.
 
+### Configuration of Postgres roles, users and groups
+
+CloudNativePG supports
+[management through declarative configuration of roles, users, and groups in a PostgreSQL database](declarative_role_management.md)
+through the `.spec.managed.roles` stanza.
+
 ### Pod Security Policies
 
 For InfoSec requirements, the operator does not require privileged mode for
@@ -442,14 +448,21 @@ that, until the fence is lifted, data on the pod is not modified by PostgreSQL
 and that the file system can be investigated for debugging and troubleshooting
 purposes.
 
-### Hibernation
+### Hibernation (declarative)
+
+CloudNativePG supports [hibernation of a running PostgreSQL cluster](declarative_hibernation.md)
+in a declarative manner, through the `cnpg.io/hibernation` annotation.
+Hibernation enables saving CPU power by removing the database Pods, while
+keeping the database PVCs. This feature simulates scaling to 0 instances.
+
+### Hibernation (imperative)
 
 CloudNativePG supports [hibernation of a running PostgreSQL cluster](cnpg-plugin.md#cluster-hibernation)
 via the `cnpg` plugin. Hibernation shuts down all Postgres instances in the
-High Availability cluster, and keep a static copy of the PVCs of the primary
-that contain `PGDATA` and WALs. The plugin enables to exit the hibernation
-phase, by resuming the primary and then recreating all the replicas - where they
-exist.
+High Availability cluster, and keeps a static copy of the PVC group of the
+primary, containing `PGDATA` and WALs. The plugin enables to exit the
+hibernation phase, by resuming the primary and then recreating all the
+replicas - where they exist.
 
 ### Reuse of Persistent Volumes storage in Pods
 
