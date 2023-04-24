@@ -127,6 +127,10 @@ plane for self-managed Kubernetes installations).
     before performing an upgrade as some versions might require
     extra steps.
 
+!!! Warning
+    If you are upgrading to version 1.20, please read carefully
+    the [dedicated section below](#upgrading-to-120-from-a-previous-minor-version).
+
 Upgrading CloudNativePG operator is a two-step process:
 
 1. upgrade the controller and the related Kubernetes resources
@@ -222,3 +226,75 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
+### Upgrading to 1.20 from a previous minor version
+
+CloudNativePG 1.20 introduces some changes from previous versions of the
+operator in the default behaviour of a few features, with the goal to improve
+resilience and usability of a Postgres cluster out of the box, through
+convention over configuration.
+
+These changes all involve cases where at least one replica is present.
+
+#### Replication slots for High Availability
+
+[Replication slots for High Availability](replication.md#replication-slots-for-high-availability)
+were introduced in CloudNativePG in version 1.18, but disabled by default.
+
+From version 1.20, they will be enabled by default in all Postgres clusters
+that have one or more replicas, as they enhance the default resilience and
+robustness of a High Availability cluster.
+
+If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
+this feature might impact your production environment, you can explicitly
+disable replication slots management by adding the following lines to your
+`Cluster` resources, before upgrading:
+
+```yaml
+spec:
+   ...
+   replicationSlots:
+     highAvailability:
+       enabled: false
+```
+
+#### Backup from a standby
+
+[Backup from a standby](backup_recovery.md#backup-from-a-standby)
+was introduced in CloudNativePG 1.19, but disabled by default - meaning that
+the base backup is taken from the primary unless explicitly stated.
+
+From version 1.20, if any or more replicas are available, the operator
+will prefer the most aligned standby to take a full base backup.
+
+If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
+this feature might impact your production environment, you can explicitly
+set the target to the primary by adding the following line to all your `Cluster`
+resources, before upgrading:
+
+```yaml
+spec:
+   ...
+   backup:
+     target: "primary"
+```
+
+#### Restart of a primary after a rolling update
+
+[Automated rolling updates](rolling_update.md#automated-updates-unsupervised)
+have been always available in CloudNativePG, and by default they update the
+primary after having performed a switchover to the most aligned replica.
+
+From version 1.20, the default we are changing the default update method
+of the primary, from switchover to restart as, in most cases, this is
+the fastest and safest way.
+
+If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
+this feature might impact your production environment, you can explicitly
+revert the update method of the primary to switchover by adding the following
+line to all your `Cluster` resources, before upgrading:
+
+```yaml
+spec:
+   ...
+   primaryUpdateMethod: switchover
+```

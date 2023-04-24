@@ -45,13 +45,13 @@ on the primary. This is the default behavior.
 
 The `primaryUpdateMethod` option accepts one of the following values:
 
-- `switchover`: a switchover operation is automatically performed, setting the
-  most aligned replica as the new target primary, and shutting down the former
-  primary pod (default).
-
 - `restart`: if possible, perform an automated restart of the pod where the
   primary instance is running. Otherwise, the restart request is ignored and a
-  switchover issued.
+  switchover issued. This is the default behaviour.
+
+- `switchover`: a switchover operation is automatically performed, setting the
+  most aligned replica as the new target primary, and shutting down the former
+  primary pod.
 
 There's no one-size-fits-all configuration for the update method, as that
 depends on several factors like the actual workload of your database, the
