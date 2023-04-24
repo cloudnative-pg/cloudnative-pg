@@ -814,11 +814,12 @@ var _ = Describe("Replication slots names for instances", func() {
 	})
 
 	It("returns the name of the slot for an instance when they are configured", func() {
+		trueValue := true
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: true,
+						Enabled: &trueValue,
 					},
 					UpdateInterval: 0,
 				},
@@ -829,11 +830,12 @@ var _ = Describe("Replication slots names for instances", func() {
 	})
 
 	It("sanitizes the name of replication slots", func() {
+		trueValue := true
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    true,
+						Enabled:    &trueValue,
 						SlotPrefix: "%232'test_",
 					},
 					UpdateInterval: 0,

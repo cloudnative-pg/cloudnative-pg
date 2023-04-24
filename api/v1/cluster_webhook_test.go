@@ -2572,12 +2572,13 @@ var _ = Describe("validation of imports", func() {
 
 var _ = Describe("validation of replication slots configuration", func() {
 	It("prevents using replication slots on PostgreSQL 10 and older", func() {
+		trueValue := true
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: true,
+						Enabled: &trueValue,
 					},
 					UpdateInterval: 0,
 				},
@@ -2590,12 +2591,13 @@ var _ = Describe("validation of replication slots configuration", func() {
 	})
 
 	It("can be enabled on the default PostgreSQL image", func() {
+		trueValue := true
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: true,
+						Enabled: &trueValue,
 					},
 					UpdateInterval: 0,
 				},
@@ -2608,6 +2610,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 	})
 
 	It("allows enabling replication slots on the fly", func() {
+		trueValue := true
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: versions.DefaultImageName,
@@ -2618,7 +2621,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster := oldCluster.DeepCopy()
 		newCluster.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{
 			HighAvailability: &ReplicationSlotsHAConfiguration{
-				Enabled:    true,
+				Enabled:    &trueValue,
 				SlotPrefix: "_test_",
 			},
 		}
@@ -2627,12 +2630,13 @@ var _ = Describe("validation of replication slots configuration", func() {
 	})
 
 	It("prevents changing the slot prefix while replication slots are enabled", func() {
+		trueValue := true
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    true,
+						Enabled:    &trueValue,
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2646,12 +2650,13 @@ var _ = Describe("validation of replication slots configuration", func() {
 	})
 
 	It("prevents removing the replication slot section when replication slots are enabled", func() {
+		trueValue := true
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    true,
+						Enabled:    &trueValue,
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2665,12 +2670,14 @@ var _ = Describe("validation of replication slots configuration", func() {
 	})
 
 	It("allows disabling the replication slots", func() {
+		trueValue := true
+		falseValue := false
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    true,
+						Enabled:    &trueValue,
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2679,7 +2686,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		oldCluster.Default()
 
 		newCluster := oldCluster.DeepCopy()
-		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = false
+		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = &falseValue
 		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
 	})
 })

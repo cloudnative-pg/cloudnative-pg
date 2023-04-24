@@ -68,11 +68,12 @@ func (fk fakeReplicationSlotManager) List(
 }
 
 func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.Cluster {
+	trueValue := true
 	return apiv1.Cluster{
 		Spec: apiv1.ClusterSpec{
 			ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 				HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-					Enabled:    true,
+					Enabled:    &trueValue,
 					SlotPrefix: slotPrefix,
 				},
 			},

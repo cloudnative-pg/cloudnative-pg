@@ -170,7 +170,7 @@ func ToggleReplicationSlots(namespace, clusterName string, enable bool, env *Tes
 		return err
 	}
 	clusterToggle := cluster.DeepCopy()
-	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = enable
+	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = &enable
 	err = env.Client.Patch(env.Ctx, clusterToggle, ctrlclient.MergeFrom(cluster))
 	if err != nil {
 		return err
