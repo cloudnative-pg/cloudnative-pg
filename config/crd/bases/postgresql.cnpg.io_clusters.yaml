@@ -1232,11 +1232,11 @@ spec:
                     pattern: ^[1-9][0-9]*[dwm]$
                     type: string
                   target:
-                    default: primary
+                    default: prefer-standby
                     description: The policy to decide which instance should perform
                       backups. Available options are empty string, which will default
-                      to `primary` policy, `primary` to have backups run always on
-                      primary instances, `prefer-standby` to have backups run preferably
+                      to `prefer-standby` policy, `primary` to have backups run always
+                      on primary instances, `prefer-standby` to have backups run preferably
                       on the most updated standby, if available.
                     enum:
                     - primary
@@ -2485,11 +2485,11 @@ spec:
                     type: object
                 type: object
               primaryUpdateMethod:
-                default: switchover
+                default: restart
                 description: 'Method to follow to upgrade the primary server during
                   a rolling update procedure, after all replicas have been successfully
-                  updated: it can be with a switchover (`switchover` - default) or
-                  in-place (`restart`)'
+                  updated: it can be with a switchover (`switchover`) or in-place
+                  (`restart` - default)'
                 enum:
                 - switchover
                 - restart
@@ -2771,11 +2771,11 @@ spec:
                     description: Replication slots for high availability configuration
                     properties:
                       enabled:
-                        default: false
-                        description: If enabled, the operator will automatically manage
-                          replication slots on the primary instance and use them in
-                          streaming replication connections with all the standby instances
-                          that are part of the HA cluster. If disabled (default),
+                        default: true
+                        description: If enabled (default), the operator will automatically
+                          manage replication slots on the primary instance and use
+                          them in streaming replication connections with all the standby
+                          instances that are part of the HA cluster. If disabled,
                           the operator will not take advantage of replication slots
                           in streaming connections with the replicas. This feature
                           also controls replication slots in replica cluster, from
