@@ -1653,7 +1653,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 	replicationSlots := r.Spec.ReplicationSlots
 	if replicationSlots == nil ||
 		replicationSlots.HighAvailability == nil ||
-		!replicationSlots.HighAvailability.Enabled {
+		!replicationSlots.HighAvailability.GetEnabled() {
 		return nil
 	}
 
@@ -1671,7 +1671,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 	return field.ErrorList{
 		field.Invalid(
 			field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
-			replicationSlots.HighAvailability.Enabled,
+			replicationSlots.HighAvailability.GetEnabled(),
 			"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
 	}
 }
@@ -1681,7 +1681,7 @@ func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
 	oldReplicationSlots := old.Spec.ReplicationSlots
 
 	if oldReplicationSlots == nil || oldReplicationSlots.HighAvailability == nil ||
-		!oldReplicationSlots.HighAvailability.Enabled {
+		!oldReplicationSlots.HighAvailability.GetEnabled() {
 		return nil
 	}
 

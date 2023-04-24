@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/pointer"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -2577,7 +2578,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: true,
+						Enabled: pointer.Bool(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -2595,7 +2596,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: true,
+						Enabled: pointer.Bool(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -2618,7 +2619,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster := oldCluster.DeepCopy()
 		newCluster.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{
 			HighAvailability: &ReplicationSlotsHAConfiguration{
-				Enabled:    true,
+				Enabled:    pointer.Bool(true),
 				SlotPrefix: "_test_",
 			},
 		}
@@ -2627,12 +2628,13 @@ var _ = Describe("validation of replication slots configuration", func() {
 	})
 
 	It("prevents changing the slot prefix while replication slots are enabled", func() {
+		trueValue := true
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    true,
+						Enabled:    &trueValue,
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2651,7 +2653,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    true,
+						Enabled:    pointer.Bool(true),
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2670,7 +2672,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    true,
+						Enabled:    pointer.Bool(true),
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2679,7 +2681,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		oldCluster.Default()
 
 		newCluster := oldCluster.DeepCopy()
-		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = false
+		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = pointer.Bool(false)
 		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
 	})
 })

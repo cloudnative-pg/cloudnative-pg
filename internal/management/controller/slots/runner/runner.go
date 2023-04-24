@@ -63,7 +63,7 @@ func (sr *Replicator) Start(ctx context.Context) error {
 
 			// If replication is disabled stop the timer,
 			// the process will resume through the wakeUp channel if necessary
-			if config == nil || config.HighAvailability == nil || !config.HighAvailability.Enabled {
+			if config == nil || config.HighAvailability == nil || !config.HighAvailability.GetEnabled() {
 				ticker.Stop()
 				// we set updateInterval to 0 to make sure the Ticker will be reset
 				// if the feature is enabled again
