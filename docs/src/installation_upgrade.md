@@ -229,7 +229,7 @@ only the operator itself.
 ### Upgrading to 1.20 from a previous minor version
 
 CloudNativePG 1.20 introduces some changes from previous versions of the
-operator in the default behaviour of a few features, with the goal to improve
+operator in the default behavior of a few features, with the goal to improve
 resilience and usability of a Postgres cluster out of the box, through
 convention over configuration.
 
@@ -261,9 +261,10 @@ spec:
 
 [Backup from a standby](backup_recovery.md#backup-from-a-standby)
 was introduced in CloudNativePG 1.19, but disabled by default - meaning that
-the base backup is taken from the primary unless explicitly stated.
+the base backup is taken from the primary unless the target is explicitly
+set to prefer standby.
 
-From version 1.20, if any or more replicas are available, the operator
+From version 1.20, if one or more replicas are available, the operator
 will prefer the most aligned standby to take a full base backup.
 
 If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
@@ -284,13 +285,13 @@ spec:
 have been always available in CloudNativePG, and by default they update the
 primary after having performed a switchover to the most aligned replica.
 
-From version 1.20, the default we are changing the default update method
-of the primary, from switchover to restart as, in most cases, this is
+From version 1.20, we are changing the default update method
+of the primary from switchover to restart as, in most cases, this is
 the fastest and safest way.
 
 If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
 this feature might impact your production environment, you can explicitly
-revert the update method of the primary to switchover by adding the following
+set the update method of the primary to switchover by adding the following
 line to all your `Cluster` resources, before upgrading:
 
 ```yaml

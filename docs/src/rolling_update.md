@@ -47,7 +47,7 @@ The `primaryUpdateMethod` option accepts one of the following values:
 
 - `restart`: if possible, perform an automated restart of the pod where the
   primary instance is running. Otherwise, the restart request is ignored and a
-  switchover issued. This is the default behaviour.
+  switchover issued. This is the default behavior.
 
 - `switchover`: a switchover operation is automatically performed, setting the
   most aligned replica as the new target primary, and shutting down the former

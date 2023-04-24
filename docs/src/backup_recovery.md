@@ -662,8 +662,8 @@ actual workload of the database.
 For this reason, CloudNativePG allows you to take advantage of a
 feature which is directly available in PostgreSQL: **backup from a standby**.
 
-By default, backups will run on the most aligned replica of a `Cluster`, if
-available. Otherwise, they will run on the primary instance.
+By default, backups will run on the most aligned replica of a `Cluster`. If
+no replicas are available, backups will run on the primary instance.
 
 !!! Info
     Although the standby might not always be up to date with the primary,
@@ -686,8 +686,8 @@ spec:
 ```
 
 When the backup target is set to `prefer-standby`, such policy will ensure
-backups are run on the most up-to-date available secondary instance, falling
-back to the primary instance if no other instance is available.
+backups are run on the most up-to-date available secondary instance, or if no
+other instance is available, on the primary instance.
 
 By default, when not otherwise specified, target is automatically set to take
 backups from a standby.
