@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -170,7 +171,7 @@ func ToggleReplicationSlots(namespace, clusterName string, enable bool, env *Tes
 		return err
 	}
 	clusterToggle := cluster.DeepCopy()
-	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = enable
+	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = pointer.Bool(enable)
 	err = env.Client.Patch(env.Ctx, clusterToggle, ctrlclient.MergeFrom(cluster))
 	if err != nil {
 		return err

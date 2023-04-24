@@ -2665,6 +2665,7 @@ spec:
                     description: Replication slots for high availability configuration
                     properties:
                       enabled:
+                        default: false
                         description: If enabled, the operator will automatically manage
                           replication slots on the primary instance and use them in
                           streaming replication connections with all the standby instances

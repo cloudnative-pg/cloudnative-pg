@@ -62,7 +62,7 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 				if err != nil {
 					return false, err
 				}
-				return cluster.Spec.ReplicationSlots.HighAvailability.Enabled, nil
+				return cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled(), nil
 			}, 10, 2).Should(BeTrue())
 		})
 
@@ -107,7 +107,7 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 				if err != nil {
 					return false, err
 				}
-				return cluster.Spec.ReplicationSlots.HighAvailability.Enabled, nil
+				return cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled(), nil
 			}, 10, 2).Should(BeFalse())
 		})
 
