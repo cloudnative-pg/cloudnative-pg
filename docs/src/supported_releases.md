@@ -78,14 +78,23 @@ additional Kubernetes distribution, like Red Hat OpenShift. This might change
 in the future and, in that case, that would be reflected in an official policy
 written by the CloudNativePG maintainers.
 
+### Supported PostgreSQL versions
+
 The list of supported Postgres versions in the above table generally depends on
 what PostgreSQL versions were supported by the Community at the time the minor
-version was released. Please refer to the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
+version of CloudNativePG was released.
+
+Please refer to the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
 page for more information about supported versions.
 
 !!! Info
     Starting by November 10, 2022, Postgres 10 reached its final release and
     is no longer supported.
+
+**We also recommend that you regularly update your PostgreSQL operand images and
+use the latest minor release for the major version you have in use**, as not upgrading
+is riskier than upgrading. As a result, when opening an issue with an older minor
+version of PostgreSQL, we might not be able to help you.
 
 ## Upcoming releases
 
