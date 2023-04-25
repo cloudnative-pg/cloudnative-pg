@@ -21,6 +21,7 @@ spec:
   # - supervised: requires manual supervision to perform
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
 
   # Persistent storage configuration
   storage:
