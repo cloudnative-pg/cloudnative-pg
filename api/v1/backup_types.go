@@ -50,8 +50,8 @@ type BackupSpec struct {
 
 	// The policy to decide which instance should perform this backup. If empty,
 	// it defaults to `cluster.spec.backup.target`.
-	// Available options are empty string, which will default to `primary`
-	// policy, `primary` to have backups run always on primary instances,
+	// Available options are empty string, `primary` and `prefer-standby`.
+	// `primary` to have backups run always on primary instances,
 	// `prefer-standby` to have backups run preferably on the most updated
 	// standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
