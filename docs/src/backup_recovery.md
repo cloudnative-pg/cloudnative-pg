@@ -673,8 +673,8 @@ no replicas are available, backups will run on the primary instance.
     including PITR. Similarly to what happens with
     [`pg_basebackup`](https://www.postgresql.org/docs/current/app-pgbasebackup.html),
     when backing up from a standby we do not force a switch of the WAL on the
-    primary, which might produce unexpected results in the short term (before
-    `archive_timeout` kicks in) in low volumes deployments.
+    primary. This might produce unexpected results in the short term (before
+    `archive_timeout` kicks in) in deployments with low write activity.
 
 If you prefer to always run backups on the primary, you can set the backup
 target to `primary` as outlined in the example below:

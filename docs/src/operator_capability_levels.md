@@ -128,8 +128,8 @@ Authentication rules in the `postgresql` section of the CR.
 ### Configuration of Postgres roles, users and groups
 
 CloudNativePG supports
-[management through declarative configuration of roles, users, and groups in a PostgreSQL database](declarative_role_management.md)
-through the `.spec.managed.roles` stanza.
+[management of PostgreSQL roles, users, and groups through declarative configuration](declarative_role_management.md)
+using the `.spec.managed.roles` stanza.
 
 ### Pod Security Policies
 
@@ -462,7 +462,7 @@ via the `cnpg` plugin. Hibernation shuts down all Postgres instances in the
 High Availability cluster, and keeps a static copy of the PVC group of the
 primary, containing `PGDATA` and WALs. The plugin enables to exit the
 hibernation phase, by resuming the primary and then recreating all the
-replicas - where they exist.
+replicas - if they exist.
 
 ### Reuse of Persistent Volumes storage in Pods
 

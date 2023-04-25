@@ -38,8 +38,9 @@ guarantees higher and more predictable performance.
 
 !!! Info
     CloudNativePG does not use `StatefulSet`s for managing data persistence.
-    Rather, it manages persistent volume claims (PVCs) directly. If you are
-    curious, read ["Custom Pod Controller"](controller.md) to know more.
+    Rather, it manages persistent volume claims (PVCs) directly. If you want
+    to know more, please read the
+    ["Custom Pod Controller"](controller.md) document.
 
 ## Benchmarking CloudNativePG
 
@@ -90,7 +91,7 @@ are defined as **PVC group**.
 !!! Important
     CloudNativePG has been designed to be storage class agnostic.
     As usual, our recommendation is to properly benchmark the storage class
-    in a controlled environment, before hitting production.
+    in a controlled environment, before deploying to production.
 
 The easier way to configure the storage for a PostgreSQL class is to just
 request storage of a certain size, like in the following example:
