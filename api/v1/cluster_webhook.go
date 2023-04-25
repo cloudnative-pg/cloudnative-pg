@@ -805,46 +805,43 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 // validateBootstrapRecoveryDataSource is used to ensure that the data
 // source is correctly defined
 func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
-	var result field.ErrorList
-
 	// This validation is only applicable for datasource-based recovery based bootstrap
 	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
-		return result
+		return nil
 	}
 
-	recoveryStanzaPath := field.NewPath("spec", "bootstrap", "recovery")
-	recoveryStanza := r.Spec.Bootstrap.Recovery
-	if recoveryStanza.Source != "" {
-		result = append(
-			result,
+	recoveryPath := field.NewPath("spec", "bootstrap", "recovery")
+	recoverySection := r.Spec.Bootstrap.Recovery
+	if recoverySection.Source != "" {
+		return field.ErrorList{
 			field.Invalid(
-				recoveryStanzaPath.Child("dataSource"),
+				recoveryPath.Child("dataSource"),
 				r.Spec.Bootstrap.Recovery.VolumeSnapshots,
-				"Recovery from dataSource is not compatible with other types of recovery"))
-		return result
+				"Recovery from dataSource is not compatible with other types of recovery"),
+		}
 	}
 
-	if recoveryStanza.Backup != nil {
-		result = append(
-			result,
+	if recoverySection.Backup != nil {
+		return field.ErrorList{
 			field.Invalid(
-				recoveryStanzaPath.Child("backup"),
+				recoveryPath.Child("backup"),
 				r.Spec.Bootstrap.Recovery.Backup,
-				"Recovery from dataSource is not compatible with other types of recovery"))
-		return result
+				"Recovery from dataSource is not compatible with other types of recovery"),
+		}
 	}
 
-	if recoveryStanza.RecoveryTarget != nil {
+	result := validateVolumeSnapshotSource(recoverySection.VolumeSnapshots.Storage, recoveryPath.Child("storage"))
+	if recoverySection.RecoveryTarget != nil {
 		result = append(
 			result,
 			field.Invalid(
-				recoveryStanzaPath.Child("recoveryTarget"),
+				recoveryPath.Child("recoveryTarget"),
 				r.Spec.Bootstrap.Recovery.RecoveryTarget,
 				"A recovery target cannot be set while recovering from a DataSource"))
 	}
 
-	if recoveryStanza.VolumeSnapshots.WalStorage != nil && r.Spec.WalStorage == nil {
-		walStoragePath := recoveryStanzaPath.Child("dataSource", "walStorage")
+	if recoverySection.VolumeSnapshots.WalStorage != nil && r.Spec.WalStorage == nil {
+		walStoragePath := recoveryPath.Child("dataSource", "walStorage")
 		result = append(
 			result,
 			field.Invalid(
@@ -854,22 +851,16 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 		result = append(
 			result,
 			validateVolumeSnapshotSource(
-				*recoveryStanza.VolumeSnapshots.WalStorage, walStoragePath)...)
+				*recoverySection.VolumeSnapshots.WalStorage, walStoragePath)...)
 	}
 
-	if recoveryStanza.VolumeSnapshots.WalStorage != nil {
+	if recoverySection.VolumeSnapshots.WalStorage != nil {
 		result = append(
 			result,
 			validateVolumeSnapshotSource(
-				*recoveryStanza.VolumeSnapshots.WalStorage,
-				recoveryStanzaPath.Child("dataSource", "walStorage"))...)
+				*recoverySection.VolumeSnapshots.WalStorage,
+				recoveryPath.Child("dataSource", "walStorage"))...)
 	}
-
-	result = append(
-		result,
-		validateVolumeSnapshotSource(
-			recoveryStanza.VolumeSnapshots.Storage,
-			recoveryStanzaPath.Child("storage"))...)
 
 	return result
 }

@@ -217,6 +217,7 @@ OperatorHub
 PGAudit
 PGDATA
 PGDG
+PGData
 PGSQL
 PKI
 PODNAME
@@ -352,6 +353,7 @@ VMs
 VOLNAME
 Valerio
 VirtualBox
+VolumeSnapshot
 WAL
 WAL's
 WALBackupConfiguration

@@ -93,12 +93,7 @@ func reconcileSingleInstanceMissingPVCs(
 			return ctrl.Result{}, err
 		}
 
-		createConfiguration := expectedPVC.toCreateConfiguration(serial, conf)
-
-		if source != nil {
-			createConfiguration.Source = source
-			createConfiguration.Status = StatusReady
-		}
+		createConfiguration := expectedPVC.toCreateConfiguration(serial, conf, source)
 
 		if err := createIfNotExists(ctx, c, cluster, createConfiguration); err != nil {
 			return ctrl.Result{}, err

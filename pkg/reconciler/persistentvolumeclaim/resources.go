@@ -129,13 +129,24 @@ type expectedPVC struct {
 	initialStatus PVCStatus
 }
 
-func (e *expectedPVC) toCreateConfiguration(serial int, storage apiv1.StorageConfiguration) *CreateConfiguration {
-	return &CreateConfiguration{
+func (e *expectedPVC) toCreateConfiguration(
+	serial int,
+	storage apiv1.StorageConfiguration,
+	source *corev1.TypedLocalObjectReference,
+) *CreateConfiguration {
+	cc := &CreateConfiguration{
 		Status:     e.initialStatus,
 		NodeSerial: serial,
 		Role:       e.role,
 		Storage:    storage,
 	}
+
+	if source != nil {
+		cc.Source = source
+		cc.Status = StatusReady
+	}
+
+	return cc
 }
 
 func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
