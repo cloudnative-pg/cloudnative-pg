@@ -9,6 +9,7 @@ spec:
   startDelay: 300
   stopDelay: 300
   primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
 
   postgresql:
     parameters:
