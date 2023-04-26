@@ -36,6 +36,7 @@ spec:
     name: cluster-superuser
 
   backup:
+    target: primary
     barmanObjectStore:
       destinationPath: s3://cluster2-full-backup/
       endpointURL: http://minio-service:9000
