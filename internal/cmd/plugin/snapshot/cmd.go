@@ -49,16 +49,16 @@ var snapshotBackoff = wait.Backoff{
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "snapshot <cluster-name>",
-		Short: "Take a snapshot of a CloudNative-PG cluster",
+		Short: "Take a snapshot of a CloudNativePG cluster",
 		Long: `This command will take a snapshot of an existing CNPG cluster as a set of VolumeSnapshot
 resources. The created resources can be used later to create a new CloudNativePG cluster
 containing the snapshotted data.
 
 The command will:
 
-1. select a PostgreSQL replica Pod and fence it
-2. take a snapshot of the PVCs
-3. unfence the replica Pod.
+1. Select a PostgreSQL replica Pod and fence it
+2. Take a snapshot of the PVCs
+3. Unfence the replica Pod
 
 Fencing the Pod will result in a temporary out-of-service of the selected replica.
 The other replicas will continue working.`,
@@ -68,7 +68,7 @@ The other replicas will continue working.`,
 
 			snapshotClassName, _ := cmd.Flags().GetString("volume-snapshot-class-name")
 
-			snapshotCmd, err := newShapshotCommand(cmd.Context(), clusterName, snapshotClassName)
+			snapshotCmd, err := newSnapshotCommand(cmd.Context(), clusterName, snapshotClassName)
 			if err != nil {
 				return err
 			}
@@ -82,7 +82,7 @@ The other replicas will continue working.`,
 		"c",
 		"",
 		`The VolumeSnapshotClass name to be used for the snapshot
-(defaults to empty, which will trigger the default SnapshotClass)`)
+(defaults to empty, which will make use of the default VolumeSnapshotClass)`)
 
 	return cmd
 }
@@ -96,8 +96,8 @@ type snapshotCommand struct {
 	snapshotTime      time.Time
 }
 
-// newShapshotCommand creates the snapshot command
-func newShapshotCommand(ctx context.Context, clusterName, snapshotClassName string) (*snapshotCommand, error) {
+// newSnapshotCommand creates the snapshot command
+func newSnapshotCommand(ctx context.Context, clusterName, snapshotClassName string) (*snapshotCommand, error) {
 	var cluster apiv1.Cluster
 
 	cmd := &snapshotCommand{
@@ -222,7 +222,7 @@ func (cmd *snapshotCommand) rollbackFencePod() {
 	}
 }
 
-// waitPodToBeFencedStep waits for the tartet Pod to be shut down
+// waitPodToBeFencedStep waits for the target Pod to be shut down
 func (cmd *snapshotCommand) waitPodToBeFencedStep() error {
 	cmd.printAdvancement("waiting for %s to be fenced", cmd.targetPod.Name)
 
@@ -295,7 +295,7 @@ func (cmd *snapshotCommand) createSnapshot(pvc *corev1.PersistentVolumeClaim) er
 	return nil
 }
 
-// waitSnapshot waits for a certain shapshot to be ready to use
+// waitSnapshot waits for a certain snapshot to be ready to use
 func (cmd *snapshotCommand) waitSnapshot(name string) error {
 	cmd.printAdvancement("waiting for VolumeSnapshot %s to be ready to use", name)
 

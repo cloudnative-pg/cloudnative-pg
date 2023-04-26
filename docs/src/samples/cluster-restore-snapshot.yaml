@@ -10,7 +10,7 @@ spec:
 
   bootstrap:
     recovery:
-      dataSource:
+      volumeSnapshots:
         storage:
           name: my-backup
           kind: VolumeSnapshot

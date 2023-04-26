@@ -330,6 +330,7 @@ ServiceMonitor
 Silvela
 Slonik
 SnapshotType
+Snapshotting
 StatefulSets
 StorageClass
 StorageConfiguration
@@ -873,6 +874,8 @@ shmmax
 sig
 sigs
 singlenamespace
+snapshotted
+snapshotting
 sourceNamespace
 specificities
 sql
@@ -947,6 +950,8 @@ ul
 un
 uncordon
 unencrypted
+unfence
+unfencing
 unix
 upgradable
 usename
@@ -959,6 +964,7 @@ virtualized
 virtualxid
 volumeMode
 volumeMounts
+volumesnapshot
 wal
 walSegmentSize
 walStorage

@@ -3,7 +3,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.0
+    controller-gen.kubebuilder.io/version: v0.9.2
+  creationTimestamp: null
   name: clusters.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -1448,7 +1449,9 @@ spec:
                     description: Bootstrap the cluster from a backup
                     properties:
                       backup:
-                        description: The backup we need to restore
+                        description: The backup object containing the physical base
+                          backup from which to initiate the recovery procedure. Mutually
+                          exclusive with `source` and `volumeSnapshots`.
                         properties:
                           endpointCA:
                             description: EndpointCA store the CA bundle of the barman
@@ -1538,11 +1541,16 @@ spec:
                         description: The external cluster whose backup we will restore.
                           This is also used as the name of the folder under which
                           the backup is stored, so it must be set to the name of the
-                          source cluster
+                          source cluster Mutually exclusive with `backup` and `volumeSnapshots`.
                         type: string
                       volumeSnapshots:
-                        description: The following PVC data source will be used to
-                          restore data
+                        description: The static PVC data source(s) from which to initiate
+                          the recovery procedure. Currently supporting `VolumeSnapshot`
+                          and `PersistentVolumeClaim` resources that map an existing
+                          PVC group, compatible with CloudNativePG, and taken with
+                          a cold backup copy on a fenced Postgres instance (limitation
+                          which will be removed in the future when online backup will
+                          be implemented). Mutually exclusive with `backup` and `source`.
                         properties:
                           storage:
                             description: Configuration of the storage of the instances
