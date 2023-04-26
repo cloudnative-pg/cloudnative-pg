@@ -32,6 +32,7 @@ spec:
       source: pg-backup-minio
 
   backup:
+    target: primary
     barmanObjectStore:
       destinationPath: s3://cluster-backups/test/
       endpointURL: http://minio-service.backup-safety-1.svc.cluster.local:9000
