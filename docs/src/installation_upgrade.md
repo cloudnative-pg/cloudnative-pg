@@ -233,29 +233,9 @@ operator in the default behavior of a few features, with the goal to improve
 resilience and usability of a Postgres cluster out of the box, through
 convention over configuration.
 
-These changes all involve cases where at least one replica is present.
-
-#### Replication slots for High Availability
-
-[Replication slots for High Availability](replication.md#replication-slots-for-high-availability)
-were introduced in CloudNativePG in version 1.18, but disabled by default.
-
-From version 1.20, they will be enabled by default in all Postgres clusters
-that have one or more replicas, as they enhance the default resilience and
-robustness of a High Availability cluster.
-
-If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
-this feature might impact your production environment, you can explicitly
-disable replication slots management by adding the following lines to your
-`Cluster` resources, before upgrading:
-
-```yaml
-spec:
-   ...
-   replicationSlots:
-     highAvailability:
-       enabled: false
-```
+!!! Important
+    These changes all involve cases where at least one replica is present, and
+    **only affect new `Cluster` resources**.
 
 #### Backup from a standby
 
@@ -268,9 +248,9 @@ From version 1.20, if one or more replicas are available, the operator
 will prefer the most aligned standby to take a full base backup.
 
 If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
-this feature might impact your production environment, you can explicitly
-set the target to the primary by adding the following line to all your `Cluster`
-resources, before upgrading:
+this feature might impact your production environment for the new `Cluster` resources
+that you create, you can explicitly set the target to the primary by adding the
+following line to all your `Cluster` resources:
 
 ```yaml
 spec:
@@ -290,12 +270,35 @@ of the primary from switchover to restart as, in most cases, this is
 the fastest and safest way.
 
 If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
-this feature might impact your production environment, you can explicitly
-set the update method of the primary to switchover by adding the following
-line to all your `Cluster` resources, before upgrading:
+this feature might impact your production environment for the new `Cluster`
+resources that you create, you can explicitly set the update method of the
+primary to switchover by adding the following line to all your `Cluster`
+resources:
 
 ```yaml
 spec:
    ...
    primaryUpdateMethod: switchover
 ```
+
+#### Replication slots for High Availability
+
+[Replication slots for High Availability](replication.md#replication-slots-for-high-availability)
+were introduced in CloudNativePG in version 1.18, but disabled by default.
+
+In version 1.20 we are preparing to enable this feature by default from version
+1.21, as replication slots enhance the resilience and robustness of a High
+Availability cluster.
+
+For future compatibility, if you already know that your environments won't ever
+need replication slots, our recommendation is that you explicitly disable their
+management by adding from now the following lines to your `Cluster` resources:
+
+```yaml
+spec:
+   ...
+   replicationSlots:
+     highAvailability:
+       enabled: false
+```
+
