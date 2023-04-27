@@ -36,6 +36,12 @@ guarantees higher and more predictable performance.
     first benchmarking the storage using tools such as [fio](https://fio.readthedocs.io/en/latest/fio_doc.html),
     and then the database using [pgbench](https://www.postgresql.org/docs/current/pgbench.html).
 
+!!! Info
+    CloudNativePG does not use `StatefulSet`s for managing data persistence.
+    Rather, it manages persistent volume claims (PVCs) directly. If you want
+    to know more, please read the
+    ["Custom Pod Controller"](controller.md) document.
+
 ## Benchmarking CloudNativePG
 
 EDB maintains [cnp-bench](https://github.com/EnterpriseDB/cnp-bench),
@@ -62,6 +68,12 @@ Briefly, `cnp-bench` is designed to operate at two levels:
     shared-nothing contexts, where results do not vary due to the influence of external workloads.
     **Know your system, benchmark it.**
 
+## Encryption at rest
+
+Encryption at rest is possible with CloudNativePG. The operator delegates that
+to the underlying storage class. Please refer to the storage class for
+information about this important security feature.
+
 ## Persistent Volume Claim
 
 The operator creates a persistent volume claim (PVC) for each PostgreSQL
@@ -75,6 +87,11 @@ In CloudNativePG, the volumes attached to a single PostgreSQL instance
 are defined as **PVC group**.
 
 ## Configuration via a storage class
+
+!!! Important
+    CloudNativePG has been designed to be storage class agnostic.
+    As usual, our recommendation is to properly benchmark the storage class
+    in a controlled environment, before deploying to production.
 
 The easier way to configure the storage for a PostgreSQL class is to just
 request storage of a certain size, like in the following example:
@@ -105,11 +122,6 @@ spec:
     storageClass: standard
     size: 1Gi
 ```
-
-!!! Important
-    CloudNativePG has been designed to be storage class agnostic.
-    As usual, our recommendation is to properly benchmark the storage class
-    in a controlled environment, before hitting production.
 
 ## Configuration via a PVC template
 
