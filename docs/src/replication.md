@@ -226,13 +226,13 @@ In CloudNativePG, we use the terms:
   content of the `pg_replication_slots` view in the primary, and updated at regular
   intervals using `pg_replication_slot_advance()`.
 
-This feature, introduced in CloudNativePG 1.18, can be enabled via configuration.
-For details, please refer to the
+This feature, introduced in CloudNativePG 1.18, is now enabled by default and
+can be disabled via configuration. For details, please refer to the
 ["replicationSlots" section in the API reference](api_reference.md#ReplicationSlotsConfiguration).
 Here follows a brief description of the main options:
 
 `.spec.replicationSlots.highAvailability.enabled`
-: if true, the feature is enabled (`false` is the default)
+: if true, the feature is enabled (`true` is the default - since 1.20)
 
 `.spec.replicationSlots.highAvailability.slotPrefix`
 : the prefix that identifies replication slots managed by the operator
@@ -257,8 +257,8 @@ Here follows a brief description of the main options:
 Although it is not recommended, if you desire a different behavior, you can
 customize the above options.
 
-For example, the following manifest will create a cluster with replication slots
-enabled.
+For example, the following manifest will create a cluster without replication
+slots enabled.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -267,10 +267,10 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  # Enable replication slots for HA in the cluster
+  # Disable replication slots for HA in the cluster
   replicationSlots:
     highAvailability:
-      enabled: true
+      enabled: false
 
   storage:
     size: 1Gi

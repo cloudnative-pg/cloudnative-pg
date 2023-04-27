@@ -32,6 +32,7 @@ spec:
       owner: app
 
   backup:
+    target: primary
     barmanObjectStore:
       destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/pg-backup-azure-blob/
       azureCredentials:

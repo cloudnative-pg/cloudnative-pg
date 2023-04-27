@@ -36,6 +36,7 @@ spec:
       owner: app
 
   backup:
+    target: primary
     barmanObjectStore:
       destinationPath: s3://cluster-backups/
       endpointURL: http://minio-service:9000
