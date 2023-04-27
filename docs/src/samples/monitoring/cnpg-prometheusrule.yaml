@@ -2,13 +2,6 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: cnpg-default-alerts
-  labels:
-    grafana_dashboard: "1"
-    app.kubernetes.io/instance: prometheus-community
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: grafana
-    app.kubernetes.io/version: 9.1.7
-    helm.sh/chart: grafana-6.40.4
 spec:
   groups:
   - name: cnp-default.rules
