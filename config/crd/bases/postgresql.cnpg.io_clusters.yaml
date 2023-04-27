@@ -2771,11 +2771,11 @@ spec:
                     description: Replication slots for high availability configuration
                     properties:
                       enabled:
-                        default: true
-                        description: If enabled (default), the operator will automatically
-                          manage replication slots on the primary instance and use
-                          them in streaming replication connections with all the standby
-                          instances that are part of the HA cluster. If disabled,
+                        default: false
+                        description: If enabled, the operator will automatically manage
+                          replication slots on the primary instance and use them in
+                          streaming replication connections with all the standby instances
+                          that are part of the HA cluster. If disabled (default),
                           the operator will not take advantage of replication slots
                           in streaming connections with the replicas. This feature
                           also controls replication slots in replica cluster, from

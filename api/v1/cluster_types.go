@@ -682,16 +682,16 @@ func (r *ReplicationSlotsConfiguration) GetUpdateInterval() time.Duration {
 // when a streaming client (in this specific case a replica that
 // is part of the HA cluster) gets disconnected.
 type ReplicationSlotsHAConfiguration struct {
-	// If enabled (default), the operator will automatically manage replication slots
+	// If enabled, the operator will automatically manage replication slots
 	// on the primary instance and use them in streaming replication
 	// connections with all the standby instances that are part of the HA
-	// cluster. If disabled, the operator will not take advantage
+	// cluster. If disabled (default), the operator will not take advantage
 	// of replication slots in streaming connections with the replicas.
 	// This feature also controls replication slots in replica cluster,
 	// from the designated primary to its cascading replicas. This can only
 	// be set at creation time.
 	// +optional
-	// +kubebuilder:default:=true
+	// +kubebuilder:default:=false
 	Enabled *bool `json:"enabled"`
 
 	// Prefix for replication slots managed by the operator for HA.
@@ -727,12 +727,12 @@ func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceNa
 	return sanitizedName
 }
 
-// GetEnabled returns true if replication slots are enabled, default is true
+// GetEnabled returns true if replication slots are enabled, default is false
 func (r *ReplicationSlotsHAConfiguration) GetEnabled() bool {
 	if r != nil && r.Enabled != nil {
 		return *r.Enabled
 	}
-	return true
+	return false
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
