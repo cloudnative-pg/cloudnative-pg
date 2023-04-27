@@ -299,7 +299,7 @@ go_threads 18
 
 !!! Note
     `cnpg_collector_first_recoverability_point` will be zero until
-    your first backup to the object store. This is seperate from
+    your first backup to the object store. This is separate from
     the WAL archival.
 
 ### User defined metrics
