@@ -669,7 +669,11 @@ feature which is directly available in PostgreSQL: **backup from a standby**.
     in the time continuum from the first available backup to the last
     archived WAL this is normally irrelevant. The base backup indeed
     represents the starting point from which to begin a recovery operation,
-    including PITR.
+    including PITR. Similarly to what happens with
+    [`pg_basebackup`](https://www.postgresql.org/docs/current/app-pgbasebackup.html),
+    when backing up from a standby we do not force a switch of the WAL on the
+    primary. This might produce unexpected results in the short term (before
+    `archive_timeout` kicks in) in deployments with low write activity.
 
 You can use set backup target to `prefer-standby` as outlined in the
 example below:

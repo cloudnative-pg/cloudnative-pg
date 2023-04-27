@@ -2,6 +2,7 @@ matrix:
 - name: markdown
   sources:
   - 'docs/src/*.md'
+  - 'docs/src/release_notes/*.md'
   default_encoding: utf-8
   aspell:
     lang: en

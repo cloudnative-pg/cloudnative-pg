@@ -206,10 +206,6 @@ least monthly. If you are unable to apply updates as each version becomes
 available, we recommend upgrading through each version in sequential order to
 come current periodically and not skipping versions.
 
-!!! Important
-    In 2022, EDB plans an LTS release for CloudNativePG in
-    environments where frequent online updates are not possible.
-
 The [release notes](release_notes.md) page contains a detailed list of the
 changes introduced in every released version of CloudNativePG,
 and it must be read before upgrading to a newer version of the software.
