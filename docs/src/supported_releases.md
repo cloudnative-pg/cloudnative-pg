@@ -65,33 +65,43 @@ Git tags for versions are prepended with `v`.
 
 | Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported | Supported Postgres Versions |
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.19.x          | Yes                  | February 14, 2023 | ~ July 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
-| 1.18.x          | Yes                  | November 10, 2022 | ~ May 13, 2023           | 1.23, 1.24, 1.25, 1.26        | 1.22                      | 11 - 15                     |
+| 1.20.x          | Yes                  | April 27, 2023    | ~ July 15, 2023          | 1.24, 1.25, 1.26, 1.27        | 1.22, 1.23                | 11 - 15                     |
+| 1.19.x          | Yes                  | February 14, 2023 | ~ July 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.22, 1.27                | 11 - 15                     |
+| 1.18.x          | Yes                  | November 10, 2022 | May 27, 2023             | 1.23, 1.24, 1.25, 1.26        | 1.22, 1.27                | 11 - 15                     |
 | main            | No, development only |                   |                          |                               |                           | 11 - 15                     |
 
 The list of supported Kubernetes versions in the above table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
 
-At the moment, the CloudNativePG community does not support any additional
-Kubernetes distribution, like Red Hat OpenShift (this might change in the
-future. If it did change, that would be reflected in an official policy written
-by the CloudNativePG maintainers).
+At the moment, the CloudNativePG community doesn't support nor test any
+additional Kubernetes distribution, like Red Hat OpenShift. This might change
+in the future and, in that case, that would be reflected in an official policy
+written by the CloudNativePG maintainers.
+
+### Supported PostgreSQL versions
 
 The list of supported Postgres versions in the above table generally depends on
 what PostgreSQL versions were supported by the Community at the time the minor
-version was released. Please refer to the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
+version of CloudNativePG was released.
+
+Please refer to the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
 page for more information about supported versions.
 
 !!! Info
     Starting by November 10, 2022, Postgres 10 reached its final release and
     is no longer supported.
 
+**We also recommend that you regularly update your PostgreSQL operand images and
+use the latest minor release for the major version you have in use**, as not upgrading
+is riskier than upgrading. As a result, when opening an issue with an older minor
+version of PostgreSQL, we might not be able to help you.
+
 ## Upcoming releases
 
 | Version         | Release Date     | End of Life               | Supported Kubernetes Versions |
 |-----------------|------------------|---------------------------|-------------------------------|
-| 1.20.0          | April 13, 2023   | -                         | -                             |
-| 1.21.0          | June 15, 2023    | -                         | -                             |
+| 1.21.0          | June 27, 2023    | -                         | -                             |
+| 1.22.0          | Aug 29, 2023     | -                         | -                             |
 
 !!! Note
     Feature freeze happens one week before the release
