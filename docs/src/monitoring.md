@@ -297,6 +297,11 @@ go_threads 18
     `Major.Minor.Patch` can be found inside one of its label field
     named `full`.
 
+!!! Note
+    `cnpg_collector_first_recoverability_point` will be zero until
+    your first backup to the object store. This is seperate from
+    the WAL archival.
+
 ### User defined metrics
 
 This feature is currently in *beta* state and the format is inspired by the
