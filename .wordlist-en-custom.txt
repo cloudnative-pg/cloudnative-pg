@@ -92,6 +92,7 @@ DISA
 DNS
 DataBackupConfiguration
 DataBase
+DeploymentStrategy
 DevOps
 DevSecOps
 Dhilip
@@ -382,6 +383,7 @@ apiserver
 apparmor
 appdb
 applicationCredentials
+appsv
 appuser
 archiver
 args

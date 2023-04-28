@@ -242,7 +242,7 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// Strategy to follow to upgrade the primary server during a rolling
+	// Deployment strategy to follow to upgrade the primary server during a rolling
 	// update procedure, after all replicas have been successfully updated:
 	// it can be automated (`unsupervised` - default) or manual (`supervised`)
 	// +kubebuilder:default:=unsupervised
