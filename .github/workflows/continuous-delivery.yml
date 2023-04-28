@@ -733,7 +733,7 @@ jobs:
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: cnpg-bot
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_MESSAGE: "${{steps.generate-summary.outputs.alerts}} \n head_ref: ${{github.head_ref}} ref_name ${{github.ref_name}}"
+          SLACK_MESSAGE: ":warning: ${{steps.generate-summary.outputs.alerts}}"
 
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
