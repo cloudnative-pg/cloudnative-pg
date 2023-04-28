@@ -61,6 +61,11 @@ func (r *ClusterReconciler) reconcileRestoredCluster(ctx context.Context, cluste
 		primarySerial = highestSerial
 	}
 
+	contextLogger.Debug("proceeding to remove the fencing annotation if present")
+	if err := ensureClusterIsNotFenced(ctx, r.Client, cluster); err != nil {
+		return err
+	}
+
 	contextLogger.Debug("proceeding to restore the cluster status")
 	if err := restoreClusterStatus(ctx, r.Client, cluster, highestSerial, primarySerial); err != nil {
 		return err
@@ -68,6 +73,29 @@ func (r *ClusterReconciler) reconcileRestoredCluster(ctx context.Context, cluste
 
 	contextLogger.Debug("restored the cluster status, proceeding to restore the orphan PVCS")
 	return restoreOrphanPVCs(ctx, r.Client, cluster, pvcs)
+}
+
+func ensureClusterIsNotFenced(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+) error {
+	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
+	if err != nil {
+		return err
+	}
+	if fencedInstances.Len() == 0 {
+		return nil
+	}
+
+	clusterOrig := cluster.DeepCopy()
+
+	// we remove the fenced instances this way to ensure that the patch method will work
+	if err := utils.RemoveFencedInstance(utils.FenceAllServers, &cluster.ObjectMeta); err != nil {
+		return err
+	}
+
+	return cli.Patch(ctx, cluster, client.MergeFrom(clusterOrig))
 }
 
 // restoreClusterStatus bootstraps the status needed to make the restored cluster work
