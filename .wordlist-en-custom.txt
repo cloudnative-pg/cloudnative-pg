@@ -92,6 +92,7 @@ DISA
 DNS
 DataBackupConfiguration
 DataBase
+DeploymentStrategy
 DevOps
 DevSecOps
 Dhilip

@@ -787,6 +787,7 @@ Name      | Description                                                         
 `instances` | The number of replicas we want                                                                                                               - *mandatory*  | int32                                        
 `template ` | The template of the Pod to be created                                                                                                        | [*PodTemplateSpec](#PodTemplateSpec)         
 `pgbouncer` | The PgBouncer configuration                                                                                                                  - *mandatory*  | [*PgBouncerSpec](#PgBouncerSpec)             
+`strategy ` | The deployment strategy for pgbouncer rolling update                                                                                         | *v1.DeploymentStrategy                       
 
 <a id='PoolerStatus'></a>
 
