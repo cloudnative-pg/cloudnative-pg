@@ -383,6 +383,7 @@ apiserver
 apparmor
 appdb
 applicationCredentials
+appsv
 appuser
 archiver
 args

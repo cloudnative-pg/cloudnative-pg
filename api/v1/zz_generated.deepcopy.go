@@ -1475,8 +1475,8 @@ func (in *PoolerSpec) DeepCopyInto(out *PoolerSpec) {
 		*out = new(PgBouncerSpec)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Strategy != nil {
-		in, out := &in.Strategy, &out.Strategy
+	if in.DeploymentStrategy != nil {
+		in, out := &in.DeploymentStrategy, &out.DeploymentStrategy
 		*out = new(appsv1.DeploymentStrategy)
 		(*in).DeepCopyInto(*out)
 	}

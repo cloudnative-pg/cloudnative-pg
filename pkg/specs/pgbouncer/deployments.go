@@ -146,14 +146,14 @@ func Deployment(pooler *apiv1.Pooler,
 				},
 				Spec: podTemplate.Spec,
 			},
-			Strategy: *getDeploymentStrategy(pooler.Spec.Strategy),
+			Strategy: getDeploymentStrategy(pooler.Spec.DeploymentStrategy),
 		},
 	}, nil
 }
 
-func getDeploymentStrategy(strategy *appsv1.DeploymentStrategy) *appsv1.DeploymentStrategy {
+func getDeploymentStrategy(strategy *appsv1.DeploymentStrategy) appsv1.DeploymentStrategy {
 	if strategy != nil {
-		return strategy.DeepCopy()
+		return *strategy.DeepCopy()
 	}
-	return &appsv1.DeploymentStrategy{}
+	return appsv1.DeploymentStrategy{}
 }

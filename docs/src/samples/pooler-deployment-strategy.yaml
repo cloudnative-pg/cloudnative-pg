@@ -8,10 +8,12 @@ spec:
 
   instances: 1
   type: rw
-  strategy:
+
+  deploymentStrategy:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 0
       maxUnavailable: 10%
+
   pgbouncer:
     poolMode: session

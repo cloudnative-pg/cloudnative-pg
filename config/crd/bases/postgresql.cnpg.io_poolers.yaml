@@ -56,6 +56,54 @@ spec:
                 required:
                 - name
                 type: object
+              deploymentStrategy:
+                description: The deployment strategy to use for pgbouncer to replace
+                  existing pods with new ones
+                properties:
+                  rollingUpdate:
+                    description: 'Rolling update config params. Present only if DeploymentStrategyType
+                      = RollingUpdate. --- TODO: Update this to follow our convention
+                      for oneOf, whatever we decide it to be.'
+                    properties:
+                      maxSurge:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: 'The maximum number of pods that can be scheduled
+                          above the desired number of pods. Value can be an absolute
+                          number (ex: 5) or a percentage of desired pods (ex: 10%).
+                          This can not be 0 if MaxUnavailable is 0. Absolute number
+                          is calculated from percentage by rounding up. Defaults to
+                          25%. Example: when this is set to 30%, the new ReplicaSet
+                          can be scaled up immediately when the rolling update starts,
+                          such that the total number of old and new pods do not exceed
+                          130% of desired pods. Once old pods have been killed, new
+                          ReplicaSet can be scaled up further, ensuring that total
+                          number of pods running at any time during the update is
+                          at most 130% of desired pods.'
+                        x-kubernetes-int-or-string: true
+                      maxUnavailable:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: 'The maximum number of pods that can be unavailable
+                          during the update. Value can be an absolute number (ex:
+                          5) or a percentage of desired pods (ex: 10%). Absolute number
+                          is calculated from percentage by rounding down. This can
+                          not be 0 if MaxSurge is 0. Defaults to 25%. Example: when
+                          this is set to 30%, the old ReplicaSet can be scaled down
+                          to 70% of desired pods immediately when the rolling update
+                          starts. Once new pods are ready, old ReplicaSet can be scaled
+                          down further, followed by scaling up the new ReplicaSet,
+                          ensuring that the total number of pods available at all
+                          times during the update is at least 70% of desired pods.'
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  type:
+                    description: Type of deployment. Can be "Recreate" or "RollingUpdate".
+                      Default is RollingUpdate.
+                    type: string
+                type: object
               instances:
                 default: 1
                 description: The number of replicas we want
@@ -114,53 +162,6 @@ spec:
                     type: string
                 required:
                 - poolMode
-                type: object
-              strategy:
-                description: The deployment strategy for pgbouncer rolling update
-                properties:
-                  rollingUpdate:
-                    description: 'Rolling update config params. Present only if DeploymentStrategyType
-                      = RollingUpdate. --- TODO: Update this to follow our convention
-                      for oneOf, whatever we decide it to be.'
-                    properties:
-                      maxSurge:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        description: 'The maximum number of pods that can be scheduled
-                          above the desired number of pods. Value can be an absolute
-                          number (ex: 5) or a percentage of desired pods (ex: 10%).
-                          This can not be 0 if MaxUnavailable is 0. Absolute number
-                          is calculated from percentage by rounding up. Defaults to
-                          25%. Example: when this is set to 30%, the new ReplicaSet
-                          can be scaled up immediately when the rolling update starts,
-                          such that the total number of old and new pods do not exceed
-                          130% of desired pods. Once old pods have been killed, new
-                          ReplicaSet can be scaled up further, ensuring that total
-                          number of pods running at any time during the update is
-                          at most 130% of desired pods.'
-                        x-kubernetes-int-or-string: true
-                      maxUnavailable:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        description: 'The maximum number of pods that can be unavailable
-                          during the update. Value can be an absolute number (ex:
-                          5) or a percentage of desired pods (ex: 10%). Absolute number
-                          is calculated from percentage by rounding down. This can
-                          not be 0 if MaxSurge is 0. Defaults to 25%. Example: when
-                          this is set to 30%, the old ReplicaSet can be scaled down
-                          to 70% of desired pods immediately when the rolling update
-                          starts. Once new pods are ready, old ReplicaSet can be scaled
-                          down further, followed by scaling up the new ReplicaSet,
-                          ensuring that the total number of pods available at all
-                          times during the update is at least 70% of desired pods.'
-                        x-kubernetes-int-or-string: true
-                    type: object
-                  type:
-                    description: Type of deployment. Can be "Recreate" or "RollingUpdate".
-                      Default is RollingUpdate.
-                    type: string
                 type: object
               template:
                 description: The template of the Pod to be created
