@@ -6,8 +6,15 @@ spec:
   cluster:
     name: cluster-pgbouncer
 
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 24%
+      maxUnavailable: 24%
+
   instances: 1
   type: ro
+
   pgbouncer:
     poolMode: session
     authQuerySecret:

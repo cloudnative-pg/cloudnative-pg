@@ -2496,10 +2496,10 @@ spec:
                 type: string
               primaryUpdateStrategy:
                 default: unsupervised
-                description: 'Strategy to follow to upgrade the primary server during
-                  a rolling update procedure, after all replicas have been successfully
-                  updated: it can be automated (`unsupervised` - default) or manual
-                  (`supervised`)'
+                description: 'Deployment strategy to follow to upgrade the primary
+                  server during a rolling update procedure, after all replicas have
+                  been successfully updated: it can be automated (`unsupervised` -
+                  default) or manual (`supervised`)'
                 enum:
                 - unsupervised
                 - supervised

@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -68,6 +69,9 @@ type PoolerSpec struct {
 
 	// The PgBouncer configuration
 	PgBouncer *PgBouncerSpec `json:"pgbouncer"`
+
+	// The deployment strategy to use for pgbouncer to replace existing pods with new ones
+	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
 }
 
 // PodTemplateSpec is a structure allowing the user to set
