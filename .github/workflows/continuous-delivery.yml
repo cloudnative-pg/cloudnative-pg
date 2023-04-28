@@ -57,6 +57,7 @@ jobs:
         branch:
           - release-1.18
           - release-1.19
+          - release-1.20
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@v1

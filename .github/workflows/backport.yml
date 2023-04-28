@@ -30,6 +30,7 @@ jobs:
             backport-requested :arrow_backward:
             release-1.18
             release-1.19
+            release-1.20
       -
         name: Create comment
         uses: peter-evans/create-or-update-comment@v3
@@ -61,6 +62,7 @@ jobs:
         branch:
           -  release-1.18
           -  release-1.19
+          -  release-1.20
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
