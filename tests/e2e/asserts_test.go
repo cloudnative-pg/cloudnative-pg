@@ -1927,6 +1927,29 @@ func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string,
 	assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath, expectedInstanceCount)
 }
 
+func assertPgBouncerPoolerDeploymentStrategy(
+	namespace, poolerYamlFilePath string,
+	expectedMaxSurge, expectedMaxUnavailable string,
+) {
+	By("verify pooler deployment has expected rolling update configuration", func() {
+		Eventually(func() bool {
+			poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
+			Expect(err).ToNot(HaveOccurred())
+			// Wait for the deployment to be ready
+			deployment := &appsv1.Deployment{}
+			err = env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: poolerName}, deployment)
+			if err != nil {
+				return false
+			}
+			if expectedMaxSurge == deployment.Spec.Strategy.RollingUpdate.MaxSurge.String() &&
+				expectedMaxUnavailable == deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.String() {
+				return true
+			}
+			return false
+		}, 300).Should(BeTrue())
+	})
+}
+
 // assertPGBouncerPodsAreReady verifies if PGBouncer pooler pods are ready
 func assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath string, expectedPodCount int) {
 	Eventually(func() (bool, error) {

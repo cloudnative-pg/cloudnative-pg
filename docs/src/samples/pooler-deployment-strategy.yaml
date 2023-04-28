@@ -1,0 +1,19 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-deployment-strategy
+spec:
+  cluster:
+    name: cluster-example
+
+  instances: 1
+  type: rw
+
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 10%
+
+  pgbouncer:
+    poolMode: session

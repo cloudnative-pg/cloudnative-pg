@@ -65,10 +65,12 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 		It("can connect to Postgres via pgbouncer service using basic authentication", func() {
 			By("setting up read write type pgbouncer pooler", func() {
 				createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
+				assertPgBouncerPoolerDeploymentStrategy(namespace, poolerBasicAuthRWSampleFile, "25%", "25%")
 			})
 
 			By("setting up read only type pgbouncer pooler", func() {
 				createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthROSampleFile, 1)
+				assertPgBouncerPoolerDeploymentStrategy(namespace, poolerBasicAuthROSampleFile, "24%", "24%")
 			})
 
 			By("verifying read and write connections using pgbouncer service", func() {
