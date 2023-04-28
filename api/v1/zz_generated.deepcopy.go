@@ -23,6 +23,7 @@ package v1
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1377,6 +1378,11 @@ func (in *PoolerSpec) DeepCopyInto(out *PoolerSpec) {
 	if in.PgBouncer != nil {
 		in, out := &in.PgBouncer, &out.PgBouncer
 		*out = new(PgBouncerSpec)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.DeploymentStrategy != nil {
+		in, out := &in.DeploymentStrategy, &out.DeploymentStrategy
+		*out = new(appsv1.DeploymentStrategy)
 		(*in).DeepCopyInto(*out)
 	}
 }
