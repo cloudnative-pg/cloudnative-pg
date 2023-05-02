@@ -16,9 +16,10 @@ on:
         required: false
         default: '1'
       feature_type:
-        description: 'Feature Type (disruptive, performance, upgrade, smoke, basic, service-connectivity, self-healing,
-        backup-restore, operator, observability, replication, plugin, postgres-configuration, pod-scheduling,
-        cluster-metadata, recovery, importing-databases, storage, security, maintenance)'
+        description: >
+          Feature Type (disruptive, performance, upgrade, smoke, basic, service-connectivity, self-healing,
+          backup-restore, operator, observability, replication, plugin, postgres-configuration, pod-scheduling,
+          cluster-metadata, recovery, importing-databases, storage, security, maintenance)
         required: false
       log_level:
         description: 'Log level for operator (error, warning, info(default), debug, trace)'
@@ -727,13 +728,18 @@ jobs:
       
       - name: If there are alerts, send them over Slack
         uses: rtCamp/action-slack-notify@v2
-        if: ${{steps.generate-summary.outputs.alerts}}
+        if: |
+          steps.generate-summary.outputs.alerts &&
+          github.ref == 'refs/heads/main'
         env:
-          SLACK_COLOR: ${{ job.status }}
+          SLACK_COLOR: "danger"
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: cnpg-bot
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_MESSAGE: ":warning: ${{steps.generate-summary.outputs.alerts}}\nhttps://github.com/${{github.repository}}/actions/runs/${{ github.run_id }}"
+          SLACK_TITLE: CIclops found systematic failures in the E2E tests
+          SLACK_MESSAGE: |
+            :warning: ${{steps.generate-summary.outputs.alerts}}
+            <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|See full CI run>
 
       - name: Delete the downloaded files
         run: rm -rf test-artifacts

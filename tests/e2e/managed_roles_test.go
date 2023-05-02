@@ -211,7 +211,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By("Verify the role has been updated in the database", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).To(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(func() string {
 					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
