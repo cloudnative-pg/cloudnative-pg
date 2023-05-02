@@ -61,7 +61,7 @@ func main() {
 			// If we're invoking the completion command we shouldn't try to create
 			// a Kubernetes client and we just let the Cobra flow to continue
 			if cmd.Name() == "completion" || cmd.Name() == "version" ||
-				cmd.Parent().Name() == "completion" {
+				cmd.HasParent() && cmd.Parent().Name() == "completion" {
 				return nil
 			}
 
