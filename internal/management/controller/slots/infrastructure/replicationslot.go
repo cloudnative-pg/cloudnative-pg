@@ -22,7 +22,7 @@ type SlotType string
 // SlotTypePhysical represents the physical replication slot
 const SlotTypePhysical SlotType = "physical"
 
-// SlotTypeLogical represents the physical replication slot
+// SlotTypeLogical represents the logical replication slot
 const SlotTypeLogical SlotType = "logical"
 
 // ReplicationSlot represents a single replication slot
