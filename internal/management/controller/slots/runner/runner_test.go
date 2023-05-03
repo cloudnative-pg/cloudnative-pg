@@ -29,8 +29,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ infrastructure.Manager = (*fakeSlotManager)(nil)
+
 type fakeSlot struct {
 	name       string
+	slotType   infrastructure.SlotType
 	restartLSN string
 }
 
@@ -47,10 +50,29 @@ func (sm *fakeSlotManager) List(
 ) (infrastructure.ReplicationSlotList, error) {
 	var slotList infrastructure.ReplicationSlotList
 	for _, slot := range sm.slots {
+		if slot.slotType != infrastructure.SlotTypePhysical {
+			continue
+		}
 		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
 			SlotName:   slot.name,
 			RestartLSN: slot.restartLSN,
-			Type:       infrastructure.SlotTypePhysical,
+			Type:       slot.slotType,
+			Active:     false,
+		})
+	}
+	return slotList, nil
+}
+
+func (sm *fakeSlotManager) ListLogical(ctx context.Context, config *apiv1.ReplicationSlotsConfiguration) (infrastructure.ReplicationSlotList, error) {
+	var slotList infrastructure.ReplicationSlotList
+	for _, slot := range sm.slots {
+		if slot.slotType != infrastructure.SlotTypeLogical {
+			continue
+		}
+		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
+			SlotName:   slot.name,
+			RestartLSN: slot.restartLSN,
+			Type:       slot.slotType,
 			Active:     false,
 		})
 	}
@@ -78,6 +100,10 @@ func (sm *fakeSlotManager) Create(_ context.Context, slot infrastructure.Replica
 	return nil
 }
 
+func (sm *fakeSlotManager) GetState(ctx context.Context, slot infrastructure.ReplicationSlot) ([]byte, error) {
+	return []byte("repl"), nil
+}
+
 func (sm *fakeSlotManager) Delete(_ context.Context, slot infrastructure.ReplicationSlot) error {
 	if _, found := sm.slots[slot.SlotName]; !found {
 		return fmt.Errorf("while deleting slot: Slot %s not found", slot.SlotName)
@@ -96,9 +122,9 @@ var _ = Describe("Slot synchronization", func() {
 
 	primary := &fakeSlotManager{
 		slots: map[string]fakeSlot{
-			localSlotName: {name: localSlotName, restartLSN: "0/301C4D8"},
-			slot3:         {name: slot3, restartLSN: "0/302C4D8"},
-			slot4:         {name: slot4, restartLSN: "0/303C4D8"},
+			localSlotName: {name: localSlotName, slotType: infrastructure.SlotTypePhysical, restartLSN: "0/301C4D8"},
+			slot3:         {name: slot3, slotType: infrastructure.SlotTypePhysical, restartLSN: "0/302C4D8"},
+			slot4:         {name: slot4, slotType: infrastructure.SlotTypePhysical, restartLSN: "0/303C4D8"},
 		},
 	}
 	local := &fakeSlotManager{

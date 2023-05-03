@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -93,6 +94,26 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			}
 		})
 
+		By("creating logical replication slot on Primary", func() {
+			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			CreateLogicalReplicationSlotOnPod(namespace, clusterName, *primaryPod)
+		})
+
+		By("checking standbys HA logical replication slots exist", func() {
+			var replicaPods *corev1.PodList
+			var err error
+			before := time.Now()
+			Eventually(func(g Gomega) {
+				replicaPods, err = env.GetClusterReplicas(namespace, clusterName)
+				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
+			}, 90, 2).Should(Succeed())
+			GinkgoWriter.Println("standby slot check succeeded in", time.Since(before))
+			for _, pod := range replicaPods.Items {
+				HasLogicalReplicationSlotOnPod(namespace, clusterName, pod)
+			}
+		})
+
 		By("checking all the slots restart_lsn's are aligned", func() {
 			AssertClusterReplicationSlotsAligned(namespace, clusterName)
 		})
@@ -118,12 +139,31 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			AssertClusterRollingRestart(namespace, clusterName)
 		}
 
-		By("verifying slots have been removed from the cluster's pods", func() {
+		By("verifying physical slots have been removed from the cluster's pods", func() {
 			pods, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range pods.Items {
 				Eventually(func() (int, error) {
-					slotOnPod, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
+					slotOnPod, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env, infrastructure.SlotTypePhysical)
+					if err != nil {
+						return -1, err
+					}
+					return len(slotOnPod), nil
+				}, 90, 2).Should(BeEquivalentTo(0))
+			}
+		})
+
+		By("verifying logical slots have been removed from the cluster's standby pods", func() {
+			pods, err := env.GetClusterPodList(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range pods.Items {
+				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				if pod.Name == primaryPod.Name {
+					continue
+				}
+				Eventually(func() (int, error) {
+					slotOnPod, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env, infrastructure.SlotTypeLogical)
 					if err != nil {
 						return -1, err
 					}

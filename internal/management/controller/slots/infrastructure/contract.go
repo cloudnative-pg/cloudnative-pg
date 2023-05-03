@@ -27,10 +27,14 @@ import (
 type Manager interface {
 	// List the available replication slots
 	List(ctx context.Context, config *apiv1.ReplicationSlotsConfiguration) (ReplicationSlotList, error)
+	// ListLogical lists the available logical replication slots
+	ListLogical(ctx context.Context, config *apiv1.ReplicationSlotsConfiguration) (ReplicationSlotList, error)
 	// Update the replication slot
 	Update(ctx context.Context, slot ReplicationSlot) error
 	// Create the replication slot
 	Create(ctx context.Context, slot ReplicationSlot) error
 	// Delete the replication slot
 	Delete(ctx context.Context, slot ReplicationSlot) error
+	// GetState returns the raw state of a replication slot
+	GetState(ctx context.Context, slot ReplicationSlot) ([]byte, error)
 }

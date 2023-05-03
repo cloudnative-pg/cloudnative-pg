@@ -35,6 +35,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
@@ -2586,7 +2587,7 @@ func AssertReplicationSlotsOnPod(
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() ([]string, error) {
-		currentSlots, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
+		currentSlots, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env, infrastructure.SlotTypePhysical)
 		return currentSlots, err
 	}, 300).Should(BeEquivalentTo(expectedSlots),
 		func() string {
@@ -2648,6 +2649,38 @@ func AssertClusterReplicationSlots(namespace, clusterName string) {
 		}
 		AssertClusterReplicationSlotsAligned(namespace, clusterName)
 	})
+}
+
+// CreateLogicalReplicationSlotOnPod creates a test logical replication slot using pgoutput plugin on a given pod
+// and verifies creation was successful
+func CreateLogicalReplicationSlotOnPod(
+	namespace,
+	clusterName string,
+	pod corev1.Pod,
+) {
+	const replicationSlotName = "test_pgoutput_repl"
+	_, _, err := testsUtils.RunQueryFromPod(&pod, testsUtils.PGLocalSocketDir,
+		"app", "postgres", "''", fmt.Sprintf("select pg_create_logical_replication_slot('%s','pgoutput')", replicationSlotName), env)
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() ([]string, error) {
+		currentSlots, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env, infrastructure.SlotTypeLogical)
+		return currentSlots, err
+	}, 30).Should(ContainElement(replicationSlotName))
+}
+
+// HasLogicalReplicationSlotOnPod verifies whether the test logical replication slot has been created on a given pod
+func HasLogicalReplicationSlotOnPod(
+	namespace,
+	clusterName string,
+	pod corev1.Pod,
+) {
+	const replicationSlotName = "test_pgoutput_repl"
+	Eventually(func() (string, error) {
+		stdout, _, err := testsUtils.RunQueryFromPod(&pod, testsUtils.PGLocalSocketDir,
+			"app", "postgres", "''", fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '%s')", replicationSlotName), env)
+		return strings.TrimSpace(stdout), err
+	}, 300).Should(BeEquivalentTo("t"))
 }
 
 // AssertClusterRollingRestart restart given cluster

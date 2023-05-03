@@ -26,6 +26,7 @@ import (
 	"k8s.io/utils/pointer"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
@@ -41,7 +42,7 @@ func PrintReplicationSlots(
 	}
 	var output strings.Builder
 	for i, pod := range podList.Items {
-		slots, err := GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
+		slots, err := GetReplicationSlotsOnPod(namespace, pod.GetName(), env, infrastructure.SlotTypePhysical)
 		if err != nil {
 			return fmt.Sprintf("Couldn't retrieve slots for pod %v: %v\n", pod.GetName(), err)
 		}
@@ -111,7 +112,7 @@ func GetExpectedReplicationSlotsOnPod(
 
 // GetReplicationSlotsOnPod returns a slice containing the names of the current replication slots present in
 // a given pod
-func GetReplicationSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]string, error) {
+func GetReplicationSlotsOnPod(namespace, podName string, env *TestingEnvironment, slotType infrastructure.SlotType) ([]string, error) {
 	namespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      podName,
@@ -124,7 +125,7 @@ func GetReplicationSlotsOnPod(namespace, podName string, env *TestingEnvironment
 
 	stdout, _, err := RunQueryFromPod(targetPod, PGLocalSocketDir,
 		"app", "postgres", "''",
-		"SELECT slot_name FROM pg_replication_slots  WHERE temporary = 'f' AND slot_type = 'physical'", env)
+		fmt.Sprintf("SELECT slot_name FROM pg_replication_slots  WHERE temporary = 'f' AND slot_type = '%s'", slotType), env)
 	if err != nil {
 		return nil, err
 	}

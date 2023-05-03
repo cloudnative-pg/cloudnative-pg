@@ -28,6 +28,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ infrastructure.Manager = (*fakeReplicationSlotManager)(nil)
+
 type fakeSlot struct {
 	name   string
 	active bool
@@ -67,6 +69,14 @@ func (fk fakeReplicationSlotManager) List(
 		})
 	}
 	return slotList, nil
+}
+
+func (fk fakeReplicationSlotManager) ListLogical(ctx context.Context, config *apiv1.ReplicationSlotsConfiguration) (infrastructure.ReplicationSlotList, error) {
+	return infrastructure.ReplicationSlotList{}, nil
+}
+
+func (fk fakeReplicationSlotManager) GetState(ctx context.Context, slot infrastructure.ReplicationSlot) ([]byte, error) {
+	return nil, nil
 }
 
 func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.Cluster {

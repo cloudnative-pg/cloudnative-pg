@@ -19,12 +19,14 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // A Replicator is a runner that keeps replication slots in sync between the primary and this replica
@@ -107,6 +109,17 @@ func (sr *Replicator) reconcile(ctx context.Context, config *apiv1.ReplicationSl
 		sr.instance.PodName,
 		config,
 	)
+	if err != nil {
+		return err
+	}
+
+	err = sr.synchronizeLogicalReplicationSlots(
+		ctx,
+		infrastructure.NewPostgresManager(primaryPool),
+		infrastructure.NewPostgresManager(localPool),
+		config,
+	)
+
 	return err
 }
 
@@ -167,4 +180,127 @@ func synchronizeReplicationSlots(
 	}
 
 	return nil
+}
+
+// synchronizeReplicationSlots aligns the slots in the local instance with those in the primary
+func (sr *Replicator) synchronizeLogicalReplicationSlots(
+	ctx context.Context,
+	primarySlotManager infrastructure.Manager,
+	localSlotManager infrastructure.Manager,
+	config *apiv1.ReplicationSlotsConfiguration,
+) error {
+	contextLog := log.FromContext(ctx).WithName("synchronizeLogicalReplicationSlots")
+	contextLog.Trace("Invoked",
+		"primary", primarySlotManager,
+		"local", localSlotManager,
+		"podName", sr.instance.PodName,
+		"config", config)
+
+	logicalSlotsInPrimary, err := primarySlotManager.ListLogical(ctx, config)
+	if err != nil {
+		return fmt.Errorf("getting logical replication slot status from primary: %v", err)
+	}
+	contextLog.Trace("primary logical slot status", "logicalSlotsInPrimary", logicalSlotsInPrimary)
+
+	logicalSlotsInLocal, err := localSlotManager.ListLogical(ctx, config)
+	if err != nil {
+		return fmt.Errorf("getting logical replication slot status from local: %v", err)
+	}
+	contextLog.Trace("local logical slot status", "logicalSlotsInLocal", logicalSlotsInLocal)
+
+	restart := false
+	for _, slot := range logicalSlotsInPrimary.Items {
+		if !logicalSlotsInLocal.Has(slot.SlotName) {
+			requireRestart, err := sr.createLogicalReplicationSlot(ctx, primarySlotManager, localSlotManager, slot)
+			if err != nil {
+				return err
+			}
+			restart = restart || requireRestart
+		}
+	}
+
+	// Instance requires a restart for logical replication slots to be picked up if they were created through cloning
+	if restart {
+		err := sr.instance.RequestAndWaitRestartSmartFast()
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, slot := range logicalSlotsInPrimary.Items {
+		if slot.RestartLSN == "" {
+			continue
+		}
+
+		err := localSlotManager.Update(ctx, slot)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, slot := range logicalSlotsInLocal.Items {
+		if !logicalSlotsInPrimary.Has(slot.SlotName) {
+			err := localSlotManager.Delete(ctx, slot)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (sr *Replicator) createLogicalReplicationSlot(
+	ctx context.Context,
+	primarySlotManager infrastructure.Manager,
+	localSlotManager infrastructure.Manager,
+	slot infrastructure.ReplicationSlot) (bool, error) {
+	contextLog := log.FromContext(ctx).WithName("createLogicalReplicationSlot")
+	contextLog.Trace("Invoked",
+		"primary", primarySlotManager,
+		"local", localSlotManager)
+
+	pgVersion, err := sr.instance.GetPgVersion()
+	if err != nil {
+		return false, err
+	}
+
+	// Since the introduction of logical replication slot creation in v16 we can just create the slot via the SQL layer
+	if pgVersion.Major >= 16 {
+		err := localSlotManager.Create(ctx, slot)
+		return false, err
+	}
+
+	// Ensure the instance is fully ready before performing state cloning to create the replication slot
+	err = sr.instance.IsServerReady()
+	if err != nil {
+		contextLog.Warning("skipping logical replication slot cloning - server is not ready", err)
+		return false, err
+	}
+
+	// In version <16 we cannot create logical replication slots via the sql layer,
+	// we have to clone the state from the primary directly into the standby
+	state, err := primarySlotManager.GetState(ctx, slot)
+	if err != nil {
+		return false, err
+	}
+	pgDataPath := specs.PgDataPath
+	if envDataPath, ok := os.LookupEnv("PGDATA"); ok {
+		pgDataPath = envDataPath
+	}
+	contextLog.Trace("State",
+		"primary", primarySlotManager,
+		"pgDataPath", pgDataPath,
+		"state", state)
+	err = os.MkdirAll(fmt.Sprintf("%s/pg_replslot/%s", pgDataPath, slot.SlotName), 0o700)
+	if err != nil && !os.IsExist(err) {
+		return false, err
+	}
+
+	err = os.WriteFile(fmt.Sprintf("%s/pg_replslot/%s/state", pgDataPath, slot.SlotName), state, 0o600)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }

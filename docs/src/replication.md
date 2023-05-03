@@ -212,16 +212,16 @@ primary and have lost their slot.
 
 CloudNativePG fills this gap by introducing the concept of cluster-managed
 replication slots, starting with high availability clusters. This feature
-automatically manages physical replication slots for each hot standby replica
+automatically manages replication slots for each hot standby replica
 in the High Availability cluster, both in the primary and the standby.
 
 In CloudNativePG, we use the terms:
 
-- **Primary HA slot**: a physical replication slot whose lifecycle is entirely
+- **Primary HA slot**: a replication slot whose lifecycle is entirely
   managed by the current primary of the cluster and whose purpose is to map to
   a specific standby in streaming replication. Such a slot lives on the primary
   only.
-- **Standby HA slot**: a physical replication slot for a standby whose
+- **Standby HA slot**: a replication slot for a standby whose
   lifecycle is entirely managed by another standby in the cluster, based on the
   content of the `pg_replication_slots` view in the primary, and updated at regular
   intervals using `pg_replication_slot_advance()`.

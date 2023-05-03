@@ -44,7 +44,7 @@ export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.
 export AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT:-''}
 
 # Getting the operator images need a pull secret
-kubectl create namespace cnpg-system
+kubectl create namespace cnpg-system --dry-run=client -o yaml | kubectl apply -f -
 if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
   kubectl create secret docker-registry \
     -n cnpg-system \
