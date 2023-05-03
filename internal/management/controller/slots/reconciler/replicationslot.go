@@ -43,7 +43,7 @@ func ReconcileReplicationSlots(
 	// if the replication slots feature was deactivated, ensure any existing
 	// replication slots get cleaned up
 	if !cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
-		return dropReplicationSlots(ctx, manager, cluster)
+		return dropReplicationSlots(ctx, manager, cluster, instanceName)
 	}
 
 	if cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName {
@@ -82,7 +82,7 @@ func reconcilePrimaryReplicationSlots(
 		}
 
 		// at this point, the cluster instance does not have a replication slot
-		if err := manager.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotName}); err != nil {
+		if err := manager.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotName, Type: infrastructure.SlotTypePhysical}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("creating primary HA replication slots: %w", err)
 		}
 	}
@@ -117,11 +117,7 @@ func reconcilePrimaryReplicationSlots(
 	return reconcile.Result{}, nil
 }
 
-func dropReplicationSlots(
-	ctx context.Context,
-	manager infrastructure.Manager,
-	cluster *apiv1.Cluster,
-) (reconcile.Result, error) {
+func dropReplicationSlots(ctx context.Context, manager infrastructure.Manager, cluster *apiv1.Cluster, instanceName string) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// we fetch all replication slots
@@ -142,6 +138,28 @@ func dropReplicationSlots(
 			"slot", slot)
 		if err := manager.Delete(ctx, slot); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while disabling standby HA replication slots: %w", err)
+		}
+	}
+
+	// clean up HA logical replication slots on standbys
+	if cluster.Status.CurrentPrimary != instanceName && cluster.Status.TargetPrimary != instanceName {
+		// we fetch all logical replication slots
+		logicalSlots, err := manager.ListLogical(ctx, cluster.Spec.ReplicationSlots)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		for _, logicalSlot := range logicalSlots.Items {
+			if logicalSlot.Active {
+				contextLogger.Trace("Skipping deletion of logical replication slot because it is active",
+					"slot", logicalSlot)
+				needToReschedule = true
+				continue
+			}
+			contextLogger.Trace("Attempt to delete logical replication slot",
+				"slot", logicalSlot)
+			if err := manager.Delete(ctx, logicalSlot); err != nil {
+				return reconcile.Result{}, fmt.Errorf("while disabling standby HA logical replication slots: %w", err)
+			}
 		}
 	}
 

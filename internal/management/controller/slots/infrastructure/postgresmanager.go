@@ -19,7 +19,7 @@ package infrastructure
 import (
 	"context"
 	"database/sql"
-
+	"errors"
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
@@ -46,7 +46,7 @@ func (sm PostgresManager) String() string {
 	return sm.pool.GetDsn("postgres")
 }
 
-// List the available replication slots
+// List the available managed physical replication slots
 func (sm PostgresManager) List(
 	ctx context.Context,
 	config *v1.ReplicationSlotsConfiguration,
@@ -92,6 +92,53 @@ func (sm PostgresManager) List(
 	return status, nil
 }
 
+// ListLogical lists the available logical replication slots
+func (sm PostgresManager) ListLogical(
+	ctx context.Context,
+	config *v1.ReplicationSlotsConfiguration,
+) (ReplicationSlotList, error) {
+	db, err := sm.pool.Connection("postgres")
+	if err != nil {
+		return ReplicationSlotList{}, err
+	}
+
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT slot_name, plugin, slot_type, active, coalesce(restart_lsn::TEXT, ''), two_phase AS restart_lsn FROM pg_replication_slots 
+		   WHERE NOT temporary AND slot_type = 'logical'`,
+	)
+	if err != nil {
+		return ReplicationSlotList{}, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var status ReplicationSlotList
+	for rows.Next() {
+		var slot ReplicationSlot
+		err := rows.Scan(
+			&slot.SlotName,
+			&slot.Plugin,
+			&slot.Type,
+			&slot.Active,
+			&slot.RestartLSN,
+			&slot.TwoPhase,
+		)
+		if err != nil {
+			return ReplicationSlotList{}, err
+		}
+
+		status.Items = append(status.Items, slot)
+	}
+
+	if rows.Err() != nil {
+		return ReplicationSlotList{}, rows.Err()
+	}
+
+	return status, nil
+}
+
 // Update the replication slot
 func (sm PostgresManager) Update(ctx context.Context, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("updateSlot")
@@ -118,9 +165,38 @@ func (sm PostgresManager) Create(ctx context.Context, slot ReplicationSlot) erro
 		return err
 	}
 
-	_, err = db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
-		slot.SlotName, slot.RestartLSN != "")
+	switch slot.Type {
+	case SlotTypePhysical:
+		_, err = db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
+			slot.SlotName, slot.RestartLSN != "")
+	case SlotTypeLogical:
+		_, err = db.ExecContext(ctx, "SELECT pg_create_logical_replication_slot($1, $2, $3, $4)",
+			slot.SlotName, slot.Plugin, false, slot.TwoPhase)
+	default:
+		return errors.New("unsupported replication slot type")
+	}
+
 	return err
+}
+
+// GetState returns the state of the replication slot
+func (sm PostgresManager) GetState(ctx context.Context, slot ReplicationSlot) ([]byte, error) {
+	contextLog := log.FromContext(ctx).WithName("createSlot")
+	contextLog.Trace("Invoked", "slot", slot)
+
+	db, err := sm.pool.Connection("postgres")
+	if err != nil {
+		return nil, err
+	}
+
+	var state []byte
+	err = db.QueryRowContext(
+		ctx,
+		`SELECT pg_catalog.pg_read_binary_file('pg_replslot/' || slot_name || '/state') FROM pg_catalog.pg_get_replication_slots() WHERE slot_name = $1`,
+		slot.SlotName,
+	).Scan(&state)
+
+	return state, err
 }
 
 // Delete the replication slot

@@ -22,12 +22,17 @@ type SlotType string
 // SlotTypePhysical represents the physical replication slot
 const SlotTypePhysical SlotType = "physical"
 
+// SlotTypeLogical represents the physical replication slot
+const SlotTypeLogical SlotType = "logical"
+
 // ReplicationSlot represents a single replication slot
 type ReplicationSlot struct {
 	SlotName   string   `json:"slotName,omitempty"`
+	Plugin     string   `json:"plugin,omitempty"`
 	Type       SlotType `json:"type,omitempty"`
 	Active     bool     `json:"active"`
 	RestartLSN string   `json:"restartLSN,omitempty"`
+	TwoPhase   bool     `json:"twoPhase,omitempty"`
 }
 
 // ReplicationSlotList contains a list of replication slots

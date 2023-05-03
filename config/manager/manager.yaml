@@ -58,11 +58,11 @@ spec:
           value: $(DEFAULT_MONITORING_CONFIGMAP)
         resources:
           limits:
-            cpu: 100m
-            memory: 200Mi
+            cpu: 500m
+            memory: 512Mi
           requests:
-            cpu: 100m
-            memory: 100Mi
+            cpu: 250m
+            memory: 256Mi
         livenessProbe:
           httpGet:
             port: 9443
