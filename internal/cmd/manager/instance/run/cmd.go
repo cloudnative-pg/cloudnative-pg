@@ -115,20 +115,26 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		"build", versions.Info)
 
 	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
-		Scheme:    scheme,
-		Namespace: instance.Namespace,
-		NewCache: cache.BuilderWithOptions(cache.Options{
-			SelectorsByObject: cache.SelectorsByObject{
+		Scheme: scheme,
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
 				&apiv1.Cluster{}: {
 					Field: fields.OneTermEqualSelector("metadata.name", instance.ClusterName),
 				},
 			},
-		}),
+			Namespaces: []string{
+				instance.Namespace,
+			},
+		},
 		// We don't need a cache for secrets and configmap, as all reloads
 		// should be driven by changes in the Cluster we are watching
-		ClientDisableCacheFor: []client.Object{
-			&corev1.Secret{},
-			&corev1.ConfigMap{},
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{
+					&corev1.Secret{},
+					&corev1.ConfigMap{},
+				},
+			},
 		},
 		MetricsBindAddress: "0", // TODO: merge metrics to the manager one
 	})

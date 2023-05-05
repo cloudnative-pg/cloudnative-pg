@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
@@ -49,19 +50,19 @@ func (r *Backup) Default() {
 var _ webhook.Validator = &Backup{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Backup) ValidateCreate() error {
+func (r *Backup) ValidateCreate() (admission.Warnings, error) {
 	backupLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Backup) ValidateUpdate(_ runtime.Object) error {
+func (r *Backup) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
 	backupLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *Backup) ValidateDelete() error {
+func (r *Backup) ValidateDelete() (admission.Warnings, error) {
 	backupLog.Info("validate delete", "name", r.Name, "namespace", r.Namespace)
-	return nil
+	return nil, nil
 }
