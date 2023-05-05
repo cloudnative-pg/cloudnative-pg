@@ -38,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
@@ -323,15 +322,15 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Backup{}).
-		Watches(&source.Kind{Type: &apiv1.Cluster{}},
-			handler.EnqueueRequestsFromMapFunc(r.mapClustersToBackup(ctx)),
+		Watches(&apiv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClustersToBackup()),
 			builder.WithPredicates(clustersWithBackupPredicate),
 		).
 		Complete(r)
 }
 
-func (r *BackupReconciler) mapClustersToBackup(ctx context.Context) handler.MapFunc {
-	return func(obj client.Object) []reconcile.Request {
+func (r *BackupReconciler) mapClustersToBackup() handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) []reconcile.Request {
 		cluster, ok := obj.(*apiv1.Cluster)
 		if !ok {
 			return nil
