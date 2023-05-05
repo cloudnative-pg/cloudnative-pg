@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -109,12 +110,14 @@ func RunController(
 	managerOptions := ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
-		Port:               port,
 		LeaderElection:     leaderConfig.enable,
 		LeaseDuration:      &leaderConfig.leaseDuration,
 		RenewDeadline:      &leaderConfig.renewDeadline,
 		LeaderElectionID:   LeaderElectionID,
-		CertDir:            defaultWebhookCertDir,
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    port,
+			CertDir: defaultWebhookCertDir,
+		}),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -141,7 +144,7 @@ func RunController(
 	if configuration.Current.WebhookCertDir != "" {
 		// If OLM will generate certificates for us, let's just
 		// use those
-		managerOptions.CertDir = configuration.Current.WebhookCertDir
+		managerOptions.WebhookServer.(*webhook.DefaultServer).Options.CertDir = configuration.Current.WebhookCertDir
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
@@ -152,11 +155,11 @@ func RunController(
 
 	if configuration.Current.WebhookCertDir != "" {
 		// Use certificate names compatible with OLM
-		mgr.GetWebhookServer().CertName = "apiserver.crt"
-		mgr.GetWebhookServer().KeyName = "apiserver.key"
+		mgr.GetWebhookServer().(*webhook.DefaultServer).Options.CertName = "apiserver.crt"
+		mgr.GetWebhookServer().(*webhook.DefaultServer).Options.KeyName = "apiserver.key"
 	} else {
-		mgr.GetWebhookServer().CertName = "tls.crt"
-		mgr.GetWebhookServer().KeyName = "tls.key"
+		mgr.GetWebhookServer().(*webhook.DefaultServer).Options.CertName = "tls.crt"
+		mgr.GetWebhookServer().(*webhook.DefaultServer).Options.KeyName = "tls.key"
 	}
 
 	// kubeClient is the kubernetes client set with
@@ -204,7 +207,7 @@ func RunController(
 		"haveSCC", utils.HaveSecurityContextConstraints(),
 		"haveSeccompProfile", utils.HaveSeccompSupport())
 
-	if err := ensurePKI(ctx, kubeClient, mgr.GetWebhookServer().CertDir); err != nil {
+	if err := ensurePKI(ctx, kubeClient, mgr.GetWebhookServer().(*webhook.DefaultServer).Options.CertDir); err != nil {
 		return err
 	}
 
@@ -235,7 +238,7 @@ func RunController(
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-pooler"),
-	}).SetupWithManager(ctx, mgr); err != nil {
+	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
 	}
@@ -271,7 +274,7 @@ func RunController(
 	//
 	// 2. the webhook service and/or the CNI are being updated, e.g. when a POD is
 	//    deleted. In that case we could get a "Connection refused" error message.
-	mgr.GetWebhookServer().WebhookMux.HandleFunc("/readyz", readinessProbeHandler)
+	mgr.GetWebhookServer().WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
 
 	// +kubebuilder:scaffold:builder
 

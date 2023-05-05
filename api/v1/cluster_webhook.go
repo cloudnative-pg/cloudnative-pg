@@ -33,6 +33,7 @@ import (
 	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -250,14 +251,14 @@ func (r *Cluster) defaultPgBaseBackup() {
 var _ webhook.Validator = &Cluster{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateCreate() error {
+func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	clusterLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 	allErrs := r.Validate()
 	if len(allErrs) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return apierrors.NewInvalid(
+	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
 		r.Name, allErrs)
 }
@@ -303,7 +304,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateUpdate(old runtime.Object) error {
+func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	clusterLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 	oldCluster := old.(*Cluster)
 
@@ -316,10 +317,10 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	)
 
 	if len(allErrs) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return apierrors.NewInvalid(
+	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "cluster.cnpg.io", Kind: "Cluster"},
 		r.Name, allErrs)
 }
@@ -343,11 +344,11 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateDelete() error {
+func (r *Cluster) ValidateDelete() (admission.Warnings, error) {
 	clusterLog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
-	return nil
+	return nil, nil
 }
 
 // validateLDAP validates the ldap postgres configuration
