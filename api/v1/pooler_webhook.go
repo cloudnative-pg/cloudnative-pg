@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
@@ -87,39 +88,39 @@ func (r *Pooler) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &Pooler{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Pooler) ValidateCreate() error {
+func (r *Pooler) ValidateCreate() (admission.Warnings, error) {
 	var allErrs field.ErrorList
 	poolerLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 
 	allErrs = r.Validate()
 	if len(allErrs) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return apierrors.NewInvalid(
+	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		r.Name, allErrs)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Pooler) ValidateUpdate(_ runtime.Object) error {
+func (r *Pooler) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
 	var allErrs field.ErrorList
 	poolerLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 
 	allErrs = r.Validate()
 	if len(allErrs) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return apierrors.NewInvalid(
+	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		r.Name, allErrs)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *Pooler) ValidateDelete() error {
+func (r *Pooler) ValidateDelete() (admission.Warnings, error) {
 	poolerLog.Info("validate delete", "name", r.Name, "namespace", r.Namespace)
-	return nil
+	return nil, nil
 }
 
 func (r *Pooler) validatePgBouncer() field.ErrorList {

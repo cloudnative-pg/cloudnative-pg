@@ -47,14 +47,15 @@ var _ cache.Cache = &multiNamespaceCache{}
 // ones.
 func DelegatingMultiNamespacedCacheBuilder(namespaces []string, operatorNamespace string) cache.NewCacheFunc {
 	return func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-		multiCache, err := cache.MultiNamespacedCacheBuilder(namespaces)(config, opts)
+		opts.Namespaces = namespaces
+		multiCache, err := cache.New(config, opts)
 		if err != nil {
 			return nil, err
 		}
 
 		// create a cache for external resources
 		externalOpts := opts
-		externalOpts.Namespace = operatorNamespace
+		externalOpts.Namespaces = []string{operatorNamespace}
 		externalCache, err := cache.New(config, externalOpts)
 		if err != nil {
 			return nil, fmt.Errorf("error creating global cache %v", err)

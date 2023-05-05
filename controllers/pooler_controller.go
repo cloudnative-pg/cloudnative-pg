@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -120,7 +119,7 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // SetupWithManager setup this controller inside the controller manager
-func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *PoolerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Pooler{}).
 		Owns(&v1.Deployment{}).
@@ -129,8 +128,8 @@ func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
-			handler.EnqueueRequestsFromMapFunc(r.mapSecretToPooler(ctx)),
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.mapSecretToPooler()),
 			builder.WithPredicates(secretsPoolerPredicate),
 		).
 		Complete(r)
@@ -156,8 +155,8 @@ func isOwnedByPooler(obj client.Object) (string, bool) {
 }
 
 // mapSecretToPooler returns a function mapping secrets events to the poolers using them
-func (r *PoolerReconciler) mapSecretToPooler(ctx context.Context) handler.MapFunc {
-	return func(obj client.Object) (result []reconcile.Request) {
+func (r *PoolerReconciler) mapSecretToPooler() handler.MapFunc {
+	return func(ctx context.Context, obj client.Object) (result []reconcile.Request) {
 		secret, ok := obj.(*corev1.Secret)
 		if !ok {
 			return nil
