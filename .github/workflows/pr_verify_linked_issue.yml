@@ -6,7 +6,7 @@ name: VerifyIssue
 on:
   pull_request:
     branches-ignore:
-      - 'dependabot/**'
+      - 'renovate/**'
     types:
     - edited
     - synchronize
