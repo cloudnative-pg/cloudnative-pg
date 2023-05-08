@@ -44,7 +44,11 @@ func DisableSuperuserPassword(db *sql.DB) error {
 	}
 
 	_, err = tx.Exec("ALTER ROLE postgres WITH PASSWORD NULL")
-	return err
+	if err != nil {
+		return fmt.Errorf("while running ALTER ROLE %v WITH PASSWORD: %w", "postgres", err)
+	}
+
+	return tx.Commit()
 }
 
 // SetUserPassword change the password of a user in the PostgreSQL database
