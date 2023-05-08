@@ -27,8 +27,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1187,43 +1185,29 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		return err
 	}
 
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		// This has no effect if the transaction
-		// is committed
-		_ = tx.Rollback()
-	}()
-
-	_, err = tx.Exec("SET LOCAL synchronous_commit to LOCAL")
-	if err != nil {
-		return err
-	}
-
 	if cluster.GetEnableSuperuserAccess() {
-		err = r.reconcileUser(ctx, "postgres", cluster.GetSuperuserSecretName(), tx)
+		err = r.reconcileUser(ctx, "postgres", cluster.GetSuperuserSecretName(), db)
 		if err != nil {
 			return err
 		}
 	} else {
-		err = r.disableSuperuserPassword(tx)
+		err = postgresutils.DisableSuperuserPassword(db)
 		if err != nil {
 			return err
 		}
 	}
 
 	if cluster.ShouldCreateApplicationDatabase() {
-		err = r.reconcileUser(ctx, cluster.GetApplicationDatabaseOwner(), cluster.GetApplicationSecretName(), tx)
+		err = r.reconcileUser(ctx, cluster.GetApplicationDatabaseOwner(), cluster.GetApplicationSecretName(), db)
 		if err != nil {
 			return err
 		}
 	}
-	return tx.Commit()
+
+	return nil
 }
 
-func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string, secretName string, tx *sql.Tx) error {
+func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string, secretName string, db *sql.DB) error {
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
@@ -1250,21 +1234,14 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 		return fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, username)
 	}
 
-	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
-		pgx.Identifier{username}.Sanitize(),
-		pq.QuoteLiteral(password)))
-	if err == nil {
-		r.secretVersions[secret.Name] = secret.ResourceVersion
-	} else {
-		err = fmt.Errorf("while running ALTER ROLE %v WITH PASSWORD", username)
+	err = postgresutils.SetUserPassword(username, password, db)
+	if err != nil {
+		return err
 	}
 
-	return err
-}
+	r.secretVersions[secret.Name] = secret.ResourceVersion
 
-func (r *InstanceReconciler) disableSuperuserPassword(tx *sql.Tx) error {
-	_, err := tx.Exec("ALTER ROLE postgres WITH PASSWORD NULL")
-	return err
+	return nil
 }
 
 func (r *InstanceReconciler) refreshPGHBA(ctx context.Context, cluster *apiv1.Cluster) (
