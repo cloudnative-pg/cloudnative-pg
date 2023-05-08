@@ -36,6 +36,7 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectCommit()
 
 		Expect(DisableSuperuserPassword(db)).To(Succeed())
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 
 	It("can set the password for a PostgreSQL role", func() {
@@ -50,6 +51,7 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectCommit()
 
 		Expect(SetUserPassword("testuser", "testpassword", db)).To(Succeed())
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 
 	It("will correctly escape the password if needed", func() {
@@ -64,5 +66,6 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectCommit()
 
 		Expect(SetUserPassword("testuser", "this \"is\" weird but 'possible'", db)).To(Succeed())
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 })
