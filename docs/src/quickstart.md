@@ -19,7 +19,7 @@ cluster on your local Kubernetes installation and experiment with it.
     to connect to the Kubernetes cluster. Please follow the Kubernetes documentation
     on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 
-## Part 1 - Setup the local Kubernetes playground
+## Part 1: Setup the local Kubernetes playground
 
 The first part is about installing Minikube or Kind. Please spend some time
 reading about the systems and decide which one to proceed with.
@@ -64,7 +64,7 @@ then create a Kubernetes cluster with:
 kind create cluster --name pg
 ```
 
-## Part 2 - Install CloudNativePG
+## Part 2: Install CloudNativePG
 
 Now that you have a Kubernetes installation up and running
 on your laptop, you can proceed with CloudNativePG installation.
@@ -72,7 +72,7 @@ on your laptop, you can proceed with CloudNativePG installation.
 Please refer to the ["Installation"](installation_upgrade.md) section and then proceed
 with the deployment of a PostgreSQL cluster.
 
-## Part 3 - Deploy a PostgreSQL cluster
+## Part 3: Deploy a PostgreSQL cluster
 
 As with any other deployment in Kubernetes, to deploy a PostgreSQL cluster
 you need to apply a configuration file that defines your desired `Cluster`.
@@ -162,7 +162,7 @@ spec:
     There are some examples cluster configurations bundled with the operator.
     Please refer to the ["Examples" section](samples.md).
 
-## Part 4 - Monitor clusters with Prometheus and Grafana
+## Part 4: Monitor clusters with Prometheus and Grafana
 
 !!! Important
     Installing Prometheus and Grafana is beyond the scope of this project.
