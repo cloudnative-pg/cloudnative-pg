@@ -142,7 +142,8 @@
       ],
       "matchPackagePrefixes": [
         "k8s.io",
-        "sigs.k8s.io"
+        "sigs.k8s.io",
+        "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
       ],
       "excludeDepNames": [
         "sigs.k8s.io/kustomize/kustomize/v5",
@@ -160,7 +161,8 @@
       ],
       "matchPackagePrefixes": [
         "k8s.io",
-        "sigs.k8s.io"
+        "sigs.k8s.io",
+        "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
       ]
     }, {
 // We want dedicated PRs for each bump to non-kubernetes Go dependencies.
@@ -172,7 +174,8 @@
       ],
       "excludePackagePrefixes": [
         "k8s.io",
-        "sigs.k8s.io"
+        "sigs.k8s.io",
+        "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
       ],
       "matchUpdateTypes": [
         "major",
@@ -188,7 +191,8 @@
       ],
       "excludePackagePrefixes": [
         "k8s.io",
-        "sigs.k8s.io"
+        "sigs.k8s.io",
+        "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
       ],
       "matchUpdateTypes": [
         "minor",
