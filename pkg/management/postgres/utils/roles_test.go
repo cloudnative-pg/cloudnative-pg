@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"database/sql"
+
 	"github.com/DATA-DOG/go-sqlmock"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -24,10 +26,22 @@ import (
 )
 
 var _ = Describe("Credentials management functions", func() {
-	It("can disable the password for the PostgreSQL user", func() {
-		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-		Expect(err).ToNot(HaveOccurred())
+	var (
+		db   *sql.DB
+		mock sqlmock.Sqlmock
+	)
 
+	BeforeEach(func() {
+		var err error
+		db, mock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("can disable the password for the PostgreSQL user", func() {
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL synchronous_commit to LOCAL").
 			WillReturnResult(sqlmock.NewResult(0, 0))
@@ -36,13 +50,9 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectCommit()
 
 		Expect(DisableSuperuserPassword(db)).To(Succeed())
-		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 
 	It("can set the password for a PostgreSQL role", func() {
-		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-		Expect(err).ToNot(HaveOccurred())
-
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL synchronous_commit to LOCAL").
 			WillReturnResult(sqlmock.NewResult(0, 0))
@@ -51,13 +61,9 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectCommit()
 
 		Expect(SetUserPassword("testuser", "testpassword", db)).To(Succeed())
-		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 
 	It("will correctly escape the password if needed", func() {
-		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-		Expect(err).ToNot(HaveOccurred())
-
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL synchronous_commit to LOCAL").
 			WillReturnResult(sqlmock.NewResult(0, 0))
@@ -66,6 +72,5 @@ var _ = Describe("Credentials management functions", func() {
 		mock.ExpectCommit()
 
 		Expect(SetUserPassword("testuser", "this \"is\" weird but 'possible'", db)).To(Succeed())
-		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 })
