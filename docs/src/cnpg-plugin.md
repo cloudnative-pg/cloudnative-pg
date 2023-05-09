@@ -88,6 +88,14 @@ run:
 kubectl krew install cnpg
 ```
 
+When a new version of the plugin is released, you can update the existing
+installation with:
+
+```sh
+kubectl krew update
+kubectl krew upgrade cnpg
+```
+
 ### Supported Architectures
 
 CloudNativePG Plugin is currently built for the following
