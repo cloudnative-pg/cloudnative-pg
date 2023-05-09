@@ -736,7 +736,7 @@ jobs:
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: cnpg-bot
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_TITLE: CIclops found systematic failures in the E2E tests
+          SLACK_TITLE: CIclops found systematic failures in the E2E tests in CNPG repository
           SLACK_MESSAGE: |
             :warning: ${{steps.generate-summary.outputs.alerts}}
             <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|See full CI run>
