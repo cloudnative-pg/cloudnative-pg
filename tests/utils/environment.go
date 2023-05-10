@@ -20,11 +20,13 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -75,6 +78,25 @@ type TestingEnvironment struct {
 	PreserveNamespaces []string
 	Log                logr.Logger
 	PostgresVersion    int
+	createdNamespaces  *uniqueStringSlice
+}
+
+type uniqueStringSlice struct {
+	values []string
+	mu     sync.RWMutex
+}
+
+func (a *uniqueStringSlice) add(value string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if slices.Contains(a.values, value) {
+		return errors.New("value already exists, cannot add to the string slice")
+	}
+
+	a.values = append(a.values, value)
+
+	return nil
 }
 
 // NewTestingEnvironment creates the environment for testing
@@ -87,6 +109,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
 	env.Log = ctrl.Log.WithName("e2e")
+	env.createdNamespaces = &uniqueStringSlice{}
 
 	postgresImage := versions.DefaultImageName
 

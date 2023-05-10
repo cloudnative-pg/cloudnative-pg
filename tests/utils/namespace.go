@@ -25,7 +25,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// CreateNamespace creates a namespace
+// CreateNamespaceIfUniqueOrFail ensures that the namespace that is being created is unique otherwise returns an error
+func (env TestingEnvironment) CreateNamespaceIfUniqueOrFail(name string, opts ...client.CreateOption) error {
+	if err := env.createdNamespaces.add(name); err != nil {
+		return errors.New("cannot create the namespace because one with the same name was already created")
+	}
+
+	return env.CreateNamespace(name, opts...)
+}
+
+// CreateNamespace creates a namespace.
+// Deprecated.
+// Use CreateNamespaceIfUniqueOrFail instead
 func (env TestingEnvironment) CreateNamespace(name string, opts ...client.CreateOption) error {
 	// Exit immediately if the name is empty
 	if name == "" {
