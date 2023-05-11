@@ -50,10 +50,10 @@ data:
             description: "Number of streaming replicas connected to the instance"
 
     pg_postmaster:
-      query: "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()"
+      query: "SELECT pg_postmaster_start_time as start_time from pg_postmaster_start_time()"
       primary: true
       metrics:
-        - start_time_seconds:
+        - start_time:
             usage: "GAUGE"
             description: "Time at which postgres started"
 
