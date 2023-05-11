@@ -41,6 +41,7 @@ spec:
         key: additional-queries
 
   backup:
+    target: primary
     barmanObjectStore:
         destinationPath: s3://cluster-backups/
         endpointURL: http://minio-service.backup-safety-1.svc.cluster.local:9000

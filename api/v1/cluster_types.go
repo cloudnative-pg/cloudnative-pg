@@ -242,7 +242,7 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// Strategy to follow to upgrade the primary server during a rolling
+	// Deployment strategy to follow to upgrade the primary server during a rolling
 	// update procedure, after all replicas have been successfully updated:
 	// it can be automated (`unsupervised` - default) or manual (`supervised`)
 	// +kubebuilder:default:=unsupervised
@@ -251,8 +251,8 @@ type ClusterSpec struct {
 
 	// Method to follow to upgrade the primary server during a rolling
 	// update procedure, after all replicas have been successfully updated:
-	// it can be with a switchover (`switchover` - default) or in-place (`restart`)
-	// +kubebuilder:default:=switchover
+	// it can be with a switchover (`switchover`) or in-place (`restart` - default)
+	// +kubebuilder:default:=restart
 	// +kubebuilder:validation:Enum:=switchover;restart
 	PrimaryUpdateMethod PrimaryUpdateMethod `json:"primaryUpdateMethod,omitempty"`
 
@@ -727,7 +727,7 @@ func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceNa
 	return sanitizedName
 }
 
-// GetEnabled returns true if replication slots are enabled
+// GetEnabled returns true if replication slots are enabled, default is false
 func (r *ReplicationSlotsHAConfiguration) GetEnabled() bool {
 	if r != nil && r.Enabled != nil {
 		return *r.Enabled
@@ -1310,7 +1310,7 @@ const (
 	BackupTargetStandby = BackupTarget("prefer-standby")
 
 	// DefaultBackupTarget is the default BackupTarget
-	DefaultBackupTarget = BackupTargetPrimary
+	DefaultBackupTarget = BackupTargetStandby
 )
 
 // CompressionType encapsulates the available types of compression
@@ -1424,11 +1424,11 @@ type BackupConfiguration struct {
 	RetentionPolicy string `json:"retentionPolicy,omitempty"`
 
 	// The policy to decide which instance should perform backups. Available
-	// options are empty string, which will default to `primary` policy, `primary`
-	// to have backups run always on primary instances, `prefer-standby` to have
-	// backups run preferably on the most updated standby, if available.
+	// options are empty string, which will default to `prefer-standby` policy,
+	// `primary` to have backups run always on primary instances, `prefer-standby`
+	// to have backups run preferably on the most updated standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
-	// +kubebuilder:default:=primary
+	// +kubebuilder:default:=prefer-standby
 	Target BackupTarget `json:"target,omitempty"`
 }
 
@@ -2065,11 +2065,11 @@ func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
 }
 
 // GetPrimaryUpdateMethod get the cluster primary update method,
-// defaulting to switchover
+// defaulting to restart
 func (cluster *Cluster) GetPrimaryUpdateMethod() PrimaryUpdateMethod {
 	strategy := cluster.Spec.PrimaryUpdateMethod
 	if strategy == "" {
-		return PrimaryUpdateMethodSwitchover
+		return PrimaryUpdateMethodRestart
 	}
 
 	return strategy

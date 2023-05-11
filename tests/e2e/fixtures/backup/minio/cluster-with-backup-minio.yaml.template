@@ -21,6 +21,7 @@ spec:
   # - supervised: requires manual supervision to perform
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
 
   # Persistent storage configuration
   storage:
@@ -44,6 +45,7 @@ spec:
         key: additional-queries
 
   backup:
+    target: primary
     barmanObjectStore:
         destinationPath: s3://cluster-backups/
         endpointURL: https://minio-service:9000

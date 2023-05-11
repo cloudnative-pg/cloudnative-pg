@@ -1232,11 +1232,11 @@ spec:
                     pattern: ^[1-9][0-9]*[dwm]$
                     type: string
                   target:
-                    default: primary
+                    default: prefer-standby
                     description: The policy to decide which instance should perform
                       backups. Available options are empty string, which will default
-                      to `primary` policy, `primary` to have backups run always on
-                      primary instances, `prefer-standby` to have backups run preferably
+                      to `prefer-standby` policy, `primary` to have backups run always
+                      on primary instances, `prefer-standby` to have backups run preferably
                       on the most updated standby, if available.
                     enum:
                     - primary
@@ -2485,21 +2485,21 @@ spec:
                     type: object
                 type: object
               primaryUpdateMethod:
-                default: switchover
+                default: restart
                 description: 'Method to follow to upgrade the primary server during
                   a rolling update procedure, after all replicas have been successfully
-                  updated: it can be with a switchover (`switchover` - default) or
-                  in-place (`restart`)'
+                  updated: it can be with a switchover (`switchover`) or in-place
+                  (`restart` - default)'
                 enum:
                 - switchover
                 - restart
                 type: string
               primaryUpdateStrategy:
                 default: unsupervised
-                description: 'Strategy to follow to upgrade the primary server during
-                  a rolling update procedure, after all replicas have been successfully
-                  updated: it can be automated (`unsupervised` - default) or manual
-                  (`supervised`)'
+                description: 'Deployment strategy to follow to upgrade the primary
+                  server during a rolling update procedure, after all replicas have
+                  been successfully updated: it can be automated (`unsupervised` -
+                  default) or manual (`supervised`)'
                 enum:
                 - unsupervised
                 - supervised

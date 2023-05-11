@@ -655,8 +655,6 @@ that archival request will be just dismissed with a positive status.
 
 ## Backup from a standby
 
-By default, backups will run on the primary instance of a `Cluster`.
-
 Taking a base backup requires to scrape the whole data content of the
 PostgreSQL instance on disk, possibly resulting in I/O contention with the
 actual workload of the database.
@@ -664,15 +662,22 @@ actual workload of the database.
 For this reason, CloudNativePG allows you to take advantage of a
 feature which is directly available in PostgreSQL: **backup from a standby**.
 
+By default, backups will run on the most aligned replica of a `Cluster`. If
+no replicas are available, backups will run on the primary instance.
+
 !!! Info
     Although the standby might not always be up to date with the primary,
     in the time continuum from the first available backup to the last
     archived WAL this is normally irrelevant. The base backup indeed
     represents the starting point from which to begin a recovery operation,
-    including PITR.
+    including PITR. Similarly to what happens with
+    [`pg_basebackup`](https://www.postgresql.org/docs/current/app-pgbasebackup.html),
+    when backing up from a standby we do not force a switch of the WAL on the
+    primary. This might produce unexpected results in the short term (before
+    `archive_timeout` kicks in) in deployments with low write activity.
 
-You can use set backup target to `prefer-standby` as outlined in the
-example below:
+If you prefer to always run backups on the primary, you can set the backup
+target to `primary` as outlined in the example below:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -681,15 +686,15 @@ metadata:
   [...]
 spec:
   backup:
-    target: "prefer-standby"
+    target: "primary"
 ```
 
-The `prefer-standby` policy will ensure backups are run on the most up-to-date
-available secondary instance, falling back to the primary instance if no other
-instance is available.
+When the backup target is set to `prefer-standby`, such policy will ensure
+backups are run on the most up-to-date available secondary instance, or if no
+other instance is available, on the primary instance.
 
-By default, when not specified, target is automatically set to take backups
-from a primary.
+By default, when not otherwise specified, target is automatically set to take
+backups from a standby.
 
 The backup target specified in the `Cluster` can be overridden in the `Backup`
 and `ScheduledBackup` types, like in the following example:

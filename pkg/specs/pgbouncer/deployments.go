@@ -43,7 +43,7 @@ const (
 	PgbouncerNameLabel = specs.MetadataNamespace + "/poolerName"
 
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.18.0"
+	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.19.0"
 )
 
 // Deployment create the deployment of pgbouncer, given
@@ -146,6 +146,14 @@ func Deployment(pooler *apiv1.Pooler,
 				},
 				Spec: podTemplate.Spec,
 			},
+			Strategy: getDeploymentStrategy(pooler.Spec.DeploymentStrategy),
 		},
 	}, nil
+}
+
+func getDeploymentStrategy(strategy *appsv1.DeploymentStrategy) appsv1.DeploymentStrategy {
+	if strategy != nil {
+		return *strategy.DeepCopy()
+	}
+	return appsv1.DeploymentStrategy{}
 }

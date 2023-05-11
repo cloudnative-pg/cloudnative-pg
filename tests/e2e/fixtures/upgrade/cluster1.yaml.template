@@ -9,6 +9,7 @@ spec:
   startDelay: 300
   stopDelay: 300
   primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
 
   postgresql:
     parameters:
@@ -35,6 +36,7 @@ spec:
     name: cluster-superuser
 
   backup:
+    target: primary
     barmanObjectStore:
       destinationPath: s3://cluster-full-backup/
       endpointURL: http://minio-service:9000

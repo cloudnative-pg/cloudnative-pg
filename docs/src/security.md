@@ -334,3 +334,9 @@ For further detail on how `pg_hba.conf` is managed by the operator, see the
 
 !!! Important
     Examples assume that the Kubernetes cluster runs in a private and secure network.
+
+### Storage
+
+CloudNativePG delegates encryption at rest to the underlying storage class. For
+data protection in production environments, we highly recommend that you choose
+a storage class that supports encryption at rest.

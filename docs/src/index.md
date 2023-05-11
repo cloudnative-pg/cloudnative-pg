@@ -72,6 +72,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Declarative management of PostgreSQL configuration, including certain popular
   Postgres extensions through the cluster `spec`: `pg_audit`, `auto_explain`,
   and `pg_stat_statements`
+* Declarative management of Postgres roles, users and groups
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
 * Separate volume for WAL files
@@ -80,28 +81,33 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * TLS connections and client certificate authentication
 * Support for custom TLS certificates (including integration with cert-manager)
 * Continuous backup to an object store (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
-* Backup from a standby
-* Backup retention policies (based on recovery window)
 * Full recovery and Point-In-Time recovery from an existing backup in an object store
 * Offline import of existing PostgreSQL databases, including major upgrades of PostgreSQL
+* Fencing of an entire PostgreSQL cluster, or a subset of the instances in a declarative way
+* Hibernation of a PostgreSQL cluster in a declarative way
+* Support for Synchronous Replicas
+* Support for HA physical replication slots at cluster level
+* Backup from a standby
+* Backup retention policies (based on recovery window)
 * Parallel WAL archiving and restore to allow the database to keep up with WAL
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
   retention management at the object store layer Replica clusters for
 * PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
-* Support for Synchronous Replicas
-* Support for HA physical replication slots at cluster level
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)
 * Standard output logging of PostgreSQL error messages in JSON format
 * Automatically set `readOnlyRootFilesystem` security context for pods
 * `cnpg` plugin for `kubectl`
-* Fencing of an entire PostgreSQL cluster, or a subset of the instances
 * Simple bind and search+bind LDAP client authentication
 * Multi-arch format container images
-* Postgres cluster hibernation
+
+!!! Info
+    CloudNativePG does not use `StatefulSet`s for managing data persistence.
+    Rather, it manages persistent volume claims (PVCs) directly. If you are
+    curious, read ["Custom Pod Controller"](controller.md) to know more.
 
 ## About this guide
 

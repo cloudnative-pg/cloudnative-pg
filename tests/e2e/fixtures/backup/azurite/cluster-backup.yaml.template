@@ -12,6 +12,7 @@ spec:
 
   # Backup properties
   backup:
+    target: primary
     barmanObjectStore:
       destinationPath: https://azurite:10000/storageaccountname/pg-backup-azurite
       endpointCA:

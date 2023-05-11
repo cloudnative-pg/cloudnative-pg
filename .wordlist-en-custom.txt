@@ -1,6 +1,7 @@
 AES
 API's
 APIs
+ARMv
 AcolumnName
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
@@ -91,9 +92,11 @@ DISA
 DNS
 DataBackupConfiguration
 DataBase
+DeploymentStrategy
 DevOps
 DevSecOps
 Dhilip
+DigitalOcean
 DoD
 DockerHub
 Dockle
@@ -101,6 +104,7 @@ EBS
 EDB
 EKS
 EOF
+EOL
 EmbeddedObjectMetadata
 EncryptionType
 EndpointCA
@@ -138,6 +142,7 @@ Huß
 IAM
 INPLACE
 IOPS
+IPv
 IRSA
 Ibryam
 IfNotPresent
@@ -147,6 +152,7 @@ Innocenti
 InstanceID
 InstanceReportedState
 Istio
+Istio's
 JSON
 Jihyuk
 Jitendra
@@ -201,6 +207,7 @@ OOM
 OU
 ObjectMeta
 OnlineUpdateEnabled
+OnlineUpgrading
 OpenShift
 Openshift
 OperatorGroup
@@ -376,9 +383,11 @@ apiserver
 apparmor
 appdb
 applicationCredentials
+appsv
 appuser
 archiver
 args
+armru
 async
 auth
 authQuerySecret
@@ -393,6 +402,7 @@ azurite
 ba
 backend
 backends
+backport
 backupID
 backupId
 backupOwnerReference
@@ -428,6 +438,7 @@ ce
 cheatsheet
 checksums
 chmod
+ciclops
 cioni
 cisecurity
 claimRef
@@ -590,6 +601,7 @@ imagePullPolicy
 imagePullSecrets
 img
 immediateCheckpoint
+impactful
 inProgress
 indistinctively
 inheritFromAzureAD
@@ -693,6 +705,7 @@ nextScheduleTime
 nginx
 nodeMaintenanceWindow
 nodeSelector
+nodeToClusters
 nodemaintenancewindow
 nodev
 noexec
@@ -887,6 +900,7 @@ storageclasses
 storageconfiguration
 strflocaltime
 subcommand
+subcommands
 subdirectory
 subresource
 substatement
