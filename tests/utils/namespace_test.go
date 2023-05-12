@@ -13,23 +13,20 @@ var _ = Describe("testing uniqueStringSlice", func() {
 		slice = uniqueStringSlice{}
 	})
 
-	It("should add a new string slice without returning errors", func() {
-		err := slice.add(testNamespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("should return an error if the name already exists", func() {
-		slice.values = append(slice.values, testNamespace)
-
-		err := slice.add(testNamespace)
-		Expect(err).To(HaveOccurred())
+	It("should generate a new string slice without returning errors", func() {
+		name := slice.generateUniqueName(testNamespace)
+		Expect(name).ToNot(Equal(testNamespace))
+		Expect(name).To(HavePrefix(testNamespace))
 	})
 
 	It("should work when invoked multiple times", func() {
-		err := slice.add(testNamespace)
-		Expect(err).ToNot(HaveOccurred())
+		name := slice.generateUniqueName(testNamespace)
+		Expect(name).ToNot(Equal(testNamespace))
+		Expect(name).To(HavePrefix(testNamespace))
 
-		err = slice.add("new-namespace")
-		Expect(err).ToNot(HaveOccurred())
+		nameTwo := slice.generateUniqueName(testNamespace)
+		Expect(nameTwo).ToNot(Equal(testNamespace))
+		Expect(nameTwo).To(HavePrefix(testNamespace))
+		Expect(nameTwo).ToNot(Equal(name))
 	})
 })

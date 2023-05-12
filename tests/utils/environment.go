@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,6 +29,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -86,17 +86,20 @@ type uniqueStringSlice struct {
 	mu     sync.RWMutex
 }
 
-func (a *uniqueStringSlice) add(value string) error {
+func (a *uniqueStringSlice) generateUniqueName(prefix string) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if slices.Contains(a.values, value) {
-		return errors.New("value already exists, cannot add to the string slice")
+	var uniqueName string
+	for {
+		uniqueName = fmt.Sprintf("%s-%d", prefix, funk.RandomInt(0, 9999))
+		if !slices.Contains(a.values, uniqueName) {
+			a.values = append(a.values, uniqueName)
+			break
+		}
 	}
 
-	a.values = append(a.values, value)
-
-	return nil
+	return uniqueName
 }
 
 // NewTestingEnvironment creates the environment for testing
