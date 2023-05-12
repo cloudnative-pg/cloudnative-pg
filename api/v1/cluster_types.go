@@ -139,6 +139,7 @@ type ClusterSpec struct {
 	// If not defined, it defaults to `default-scheduler`.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/
 	// +optional
+	// +kubebuilder:default:=none
 	SchedulerName string `json:"schedulerName,omitempty"`
 
 	// The UID of the `postgres` user inside the image, defaults to `26`
