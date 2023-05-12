@@ -90,16 +90,13 @@ func (a *uniqueStringSlice) generateUniqueName(prefix string) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	var uniqueName string
 	for {
-		uniqueName = fmt.Sprintf("%s-%d", prefix, funk.RandomInt(0, 9999))
-		if !slices.Contains(a.values, uniqueName) {
-			a.values = append(a.values, uniqueName)
-			break
+		potentialUniqueName := fmt.Sprintf("%s-%d", prefix, funk.RandomInt(0, 9999))
+		if !slices.Contains(a.values, potentialUniqueName) {
+			a.values = append(a.values, potentialUniqueName)
+			return potentialUniqueName
 		}
 	}
-
-	return uniqueName
 }
 
 // NewTestingEnvironment creates the environment for testing

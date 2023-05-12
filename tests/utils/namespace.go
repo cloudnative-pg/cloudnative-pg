@@ -27,7 +27,10 @@ import (
 
 // CreateUniqueNamespace creates a namespace by using the passed prefix.
 // Return the namespace name and any errors encountered.
-func (env TestingEnvironment) CreateUniqueNamespace(namespacePrefix string, opts ...client.CreateOption) (string, error) {
+func (env TestingEnvironment) CreateUniqueNamespace(
+	namespacePrefix string,
+	opts ...client.CreateOption,
+) (string, error) {
 	name := env.createdNamespaces.generateUniqueName(namespacePrefix)
 
 	return name, env.CreateNamespace(name, opts...)
