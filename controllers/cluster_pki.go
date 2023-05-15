@@ -310,7 +310,7 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 
 	utils.SetAsOwnedBy(&serverSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	for k, v := range additionalLabels {
-		if serverSecret.Annotations == nil {
+		if serverSecret.Labels == nil {
 			serverSecret.Labels = make(map[string]string)
 		}
 		serverSecret.Labels[k] = v
