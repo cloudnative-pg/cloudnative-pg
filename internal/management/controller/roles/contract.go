@@ -43,6 +43,7 @@ type DatabaseRole struct {
 	ValidUntil      *time.Time     `json:"validUntil,omitempty"`
 	InRoles         []string       `json:"inRoles,omitempty"`
 	password        sql.NullString `json:"-"`
+	ignorePassword  bool           `json:"-"`
 	transactionID   int64          `json:"-"`
 }
 
@@ -124,6 +125,10 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
 }
 
+// roleFromSpec converts an apiv1.RoleConfiguration into the equivalent DatabaseRole
+//
+// NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
+// provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
 func roleFromSpec(role apiv1.RoleConfiguration) DatabaseRole {
 	dbRole := DatabaseRole{
 		Name:            role.Name,
@@ -141,12 +146,12 @@ func roleFromSpec(role apiv1.RoleConfiguration) DatabaseRole {
 	if role.ValidUntil != nil {
 		dbRole.ValidUntil = &role.ValidUntil.Time
 	}
-	return dbRole
-}
-
-func roleFromSpecWithPassword(role apiv1.RoleConfiguration, pass string) DatabaseRole {
-	dbRole := roleFromSpec(role)
-	dbRole.password = sql.NullString{Valid: true, String: pass}
+	switch {
+	case role.PasswordSecret == nil && !role.DisablePassword:
+		dbRole.ignorePassword = true
+	case role.PasswordSecret == nil && role.DisablePassword:
+		dbRole.password = sql.NullString{}
+	}
 	return dbRole
 }
 

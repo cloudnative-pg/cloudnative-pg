@@ -351,9 +351,14 @@ func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 func appendPasswordOption(role DatabaseRole,
 	query *strings.Builder,
 ) {
-	if !role.password.Valid {
+	switch {
+	case role.ignorePassword:
+		// Postgres may allow to set the VALID UNTIL of a role independently of
+		// having a password or not, so we mimic the behavior by not returning
+		// directly
+	case !role.password.Valid:
 		query.WriteString(" PASSWORD NULL")
-	} else {
+	default:
 		query.WriteString(fmt.Sprintf(" PASSWORD %s", pq.QuoteLiteral(role.password.String)))
 	}
 
