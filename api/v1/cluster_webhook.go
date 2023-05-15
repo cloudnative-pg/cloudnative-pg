@@ -1858,6 +1858,14 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 					role.Name,
 					"This role is reserved for operator use"))
 		}
+		if role.DisablePassword && role.PasswordSecret != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "managed", "roles"),
+					role.Name,
+					"This role both sets and disables a password"))
+		}
 	}
 
 	return result

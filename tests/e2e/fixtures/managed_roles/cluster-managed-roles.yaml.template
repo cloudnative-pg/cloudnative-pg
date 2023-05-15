@@ -32,6 +32,9 @@ spec:
       comment: Dante Alighieri
       inRoles:
         - foobar
+    - name: app
+      createdb: true
+      login: true
 
 ---
 apiVersion: v1
