@@ -50,10 +50,48 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		ValidUntil:      &validUntil,
 		InRoles:         []string{"pg_monitoring"},
 	}
+	wantedRoleWithPass := apiv1.RoleConfiguration{
+		Name:            "foo",
+		BypassRLS:       true,
+		CreateDB:        false,
+		CreateRole:      true,
+		Login:           true,
+		Inherit:         &falseValue,
+		ConnectionLimit: 2,
+		Comment:         "this user is a test",
+		ValidUntil:      &validUntil,
+		InRoles:         []string{"pg_monitoring"},
+		PasswordSecret: &apiv1.LocalObjectReference{
+			Name: "mySecret",
+		},
+	}
+	wantedRoleWithPassDeletion := apiv1.RoleConfiguration{
+		Name:            "foo",
+		BypassRLS:       true,
+		CreateDB:        false,
+		CreateRole:      true,
+		Login:           true,
+		Inherit:         &falseValue,
+		ConnectionLimit: 2,
+		Comment:         "this user is a test",
+		ValidUntil:      &validUntil,
+		InRoles:         []string{"pg_monitoring"},
+		DisablePassword: true,
+	}
 	unWantedRole := apiv1.RoleConfiguration{
 		Name: "foo",
 	}
 	wantedRoleExpectedCrtStmt := fmt.Sprintf(
+		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
+			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring VALID UNTIL '2100-01-01 00:00:00Z'",
+		wantedRole.Name)
+
+	wantedRoleWithPassExpectedCrtStmt := fmt.Sprintf(
+		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
+			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
+		wantedRole.Name)
+
+	wantedRoleWithPassDeletionExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD NULL VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
@@ -188,6 +226,36 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		err = prm.Create(ctx, roleFromSpec(wantedRole))
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
+	})
+	It("Create will send a correct CREATE with password to the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		mock.ExpectExec(wantedRoleWithPassExpectedCrtStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+
+		mock.ExpectExec(wantedRoleCommentStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+		dbRole := roleFromSpec(wantedRoleWithPass)
+		// In this unit test we are not testing the retrieval of secrets, so let's
+		// fetch the password content by hand
+		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		err = prm.Create(ctx, dbRole)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+	It("Create will send a correct CREATE with password deletion to the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		mock.ExpectExec(wantedRoleWithPassDeletionExpectedCrtStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+
+		mock.ExpectExec(wantedRoleCommentStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+		err = prm.Create(ctx, roleFromSpec(wantedRoleWithPassDeletion))
+		Expect(err).ShouldNot(HaveOccurred())
 	})
 	// Testing Delete
 	It("Delete will send a correct DROP to the DB", func(ctx context.Context) {
@@ -380,7 +448,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 	It("Password with null and with valid until password", func() {
 		role := apiv1.RoleConfiguration{}
-		dbRole := roleFromSpecWithPassword(role, "divine comedy")
+		dbRole := roleFromSpec(role)
+		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
+		dbRole.ignorePassword = false
 		Expect(dbRole.password.Valid).To(BeTrue())
 
 		var query strings.Builder
@@ -399,7 +469,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		validUntil := metav1.Date(2100, 0o1, 0o1, 0o1, 0o1, 0o0, 0o0, time.UTC)
 		role.ValidUntil = &validUntil
 
-		dbRole := roleFromSpecWithPassword(role, "divine comedy")
+		dbRole := roleFromSpec(role)
+		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
+		dbRole.ignorePassword = false
 		appendPasswordOption(dbRole, &queryValidUntil)
 		Expect(queryValidUntil.String()).To(BeEquivalentTo(expectedQueryValidUntil))
 	})
