@@ -293,7 +293,6 @@ func getRoleMembershipDiff(
 
 // applyRoleCreateUpdate creates/updates a role, getting the password from Kubernetes
 // secrets if so set.
-// If the
 // Returns the PasswordState, as well as any error encountered
 func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	ctx context.Context,
