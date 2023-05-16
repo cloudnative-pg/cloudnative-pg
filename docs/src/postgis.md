@@ -100,7 +100,7 @@ values from the ones in this document):
 ```console
 $ kubectl exec -ti postgis-example-1 -- psql app
 Defaulted container "postgres" out of: postgres, bootstrap-controller (init)
-psql (15.2 (Debian 15.2-1.pgdg110+1))
+psql (15.3 (Debian 15.3-1.pgdg110+1))
 Type "help" for help.
 
 app=# SELECT * FROM pg_available_extensions WHERE name ~ '^postgis' ORDER BY 1;
