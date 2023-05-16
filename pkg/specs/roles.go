@@ -309,7 +309,10 @@ func managedRolesSecrets(cluster apiv1.Cluster) []string {
 	}
 	secretNames := make([]string, 0, len(managedRoles))
 	for _, role := range managedRoles {
-		secretName := role.GetRoleSecretsName()
+		if role.DisablePassword || role.PasswordSecret == nil {
+			continue
+		}
+		secretName := role.PasswordSecret.Name
 		if secretName != "" {
 			secretNames = append(secretNames, secretName)
 		}

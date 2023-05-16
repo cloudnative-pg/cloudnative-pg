@@ -57,6 +57,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 		const (
 			namespace        = "managed-roles"
 			username         = "dante"
+			appUsername      = "app"
 			password         = "dante"
 			newUserName      = "new_role"
 			unrealizableUser = "petrarca"
@@ -167,10 +168,47 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(stdout).To(Equal("1\n"))
 			})
 
-			By("Verify connectivity of use", func() {
+			By("Verifying connectivity of new managed role", func() {
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				// assert connectable use username and password defined in secrets
 				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 30, env)
+			})
+
+			By("ensuring the app role has been granted createdb in the managed stanza", func() {
+				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				assertUserExists(namespace, primaryPodInfo.Name, appUsername, true)
+
+				cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
+					"\"SELECT rolcreatedb FROM pg_roles WHERE rolname='%s'\"", appUsername)
+
+				stdout, _, err := utils.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryPodInfo.Name,
+					cmd))
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(stdout).To(Equal("t\n"))
+			})
+
+			By("verifying connectivity of app user", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).NotTo(HaveOccurred())
+
+				appUserSecret := corev1.Secret{}
+				err = utils.GetObject(
+					env,
+					types.NamespacedName{Name: cluster.GetApplicationSecretName(), Namespace: namespace},
+					&appUserSecret,
+				)
+				Expect(err).NotTo(HaveOccurred())
+
+				pass := string(appUserSecret.Data["password"])
+				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
+				// assert connectable use username and password defined in secrets
+				AssertConnection(rwService, appUsername, "postgres", pass, *psqlClientPod, 30, env)
 			})
 
 			By("Verify show unrealizable role configurations in the status", func() {

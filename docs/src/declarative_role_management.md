@@ -56,6 +56,80 @@ spec. If a user modifies role attributes directly in the database, the
 CloudNativePG operator will revert those changes during the next reconciliation
 cycle.
 
+## Password management
+
+The declarative role management feature includes reconciling of role passwords.
+Passwords are managed in fundamentally different ways in the Kubernetes world
+and in PostgreSQL, and as a result there are a few things to note.
+
+Managed role configurations may optionally specify the name of a
+**Secret** where the username and password are stored (encoded in Base64
+as is usual in Kubernetes). For example:
+
+``` yaml
+  managed:
+    roles:
+    - name: dante
+      ensure: present
+      [… snipped …]
+      passwordSecret:
+        name: cluster-example-dante
+```
+
+This would assume the existence of a Secret called `cluster-example-dante`,
+containing a username and password. The username should match the role we
+are setting the password for. For example, :
+
+``` yaml
+apiVersion: v1
+data:
+  username: ZGFudGU=
+  password: ZGFudGU=
+kind: Secret
+metadata:
+  name: cluster-example-dante
+  labels:
+    cnpg.io/reload: "true"
+type: kubernetes.io/basic-auth
+```
+
+If there is no `passwordSecret` specified for a role, the instance manager will
+not try to CREATE / ALTER the role with a password. This keeps with PostgreSQL
+conventions, where ALTER will not update passwords unless directed to with
+`WITH PASSWORD`.
+
+If a role was initially created with a password, and we would like to set the
+password to NULL in PostgreSQL, this necessitates being explicit on the part of
+the user of CloudNativePG.
+To distinguish "no password provided in spec" from "set the password to NULL",
+the field `DisablePassword` should be used.
+
+Imagine we decided we would like to have no password on the `dante` role in the
+database. In such case we would specify the following:
+
+``` yaml
+  managed:
+    roles:
+    - name: dante
+      ensure: present
+      [… snipped …]
+      disablePassword: true
+```
+
+NOTE: it is considered an error to set both `passwordSecret` and
+`disablePassword` on a given role.
+This configuration will be rejected by the validation webhook.
+
+!!! Warning
+    The declarative role management feature has changed behavior since its
+    initial version (1.20.0). In 1.20.0, a role without a `passwordSecret` would
+    lead to setting the password to NULL in PostgreSQL.
+    In practice there is little difference from 1.20.0.
+    New roles created without `passwordSecret` will have a NULL password.
+    The relevant change is when using the managed roles to manage roles that
+    had been previously created. In 1.20.0, doing this might inadvertently
+    result in setting existing passwords to NULL.
+
 ## Unrealizable role configurations
 
 In PostgreSQL, in some cases, commands cannot be honored by the database and

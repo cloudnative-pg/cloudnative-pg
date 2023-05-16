@@ -246,6 +246,16 @@ var _ = Describe("Managed Roles", func() {
 							Name: "my_secret3",
 						},
 					},
+					{
+						Name: "role4",
+						// This combination is prevented by the webhook, but it
+						// can be forced. In this case, the instance manager
+						// will not use this secret at all.
+						PasswordSecret: &apiv1.LocalObjectReference{
+							Name: "my_secret4",
+						},
+						DisablePassword: true,
+					},
 				},
 			},
 		},
