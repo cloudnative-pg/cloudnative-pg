@@ -72,6 +72,10 @@ type PoolerSpec struct {
 
 	// The deployment strategy to use for pgbouncer to replace existing pods with new ones
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
+
+	// Enable or disable the `PodMonitor`
+	// +kubebuilder:default:=false
+	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 }
 
 // PodTemplateSpec is a structure allowing the user to set

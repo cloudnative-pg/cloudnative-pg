@@ -789,6 +789,7 @@ Name               | Description                                                
 `template          ` | The template of the Pod to be created                                                                                                        | [*PodTemplateSpec](#PodTemplateSpec)         
 `pgbouncer         ` | The PgBouncer configuration                                                                                                                  - *mandatory*  | [*PgBouncerSpec](#PgBouncerSpec)             
 `deploymentStrategy` | The deployment strategy to use for pgbouncer to replace existing pods with new ones                                                          | *appsv1.DeploymentStrategy                   
+`enablePodMonitor  ` | Enable or disable the `PodMonitor`                                                                                                           | bool                                         
 
 <a id='PoolerStatus'></a>
 
