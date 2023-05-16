@@ -302,16 +302,16 @@ var _ = Describe("Set cluster metadata of service account", func() {
 	})
 })
 
-type MockPodMonitorManager struct {
+type mockPodMonitorManager struct {
 	isEnabled  bool
 	podMonitor *v1.PodMonitor
 }
 
-func (m *MockPodMonitorManager) IsPodMonitorEnabled() bool {
+func (m *mockPodMonitorManager) IsPodMonitorEnabled() bool {
 	return m.isEnabled
 }
 
-func (m *MockPodMonitorManager) BuildPodMonitor() *v1.PodMonitor {
+func (m *mockPodMonitorManager) BuildPodMonitor() *v1.PodMonitor {
 	return m.podMonitor
 }
 
@@ -320,12 +320,12 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		ctx                 context.Context
 		fakeCli             k8client.Client
 		fakeDiscoveryClient discovery.DiscoveryInterface
-		manager             *MockPodMonitorManager
+		manager             *mockPodMonitorManager
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		manager = &MockPodMonitorManager{}
+		manager = &mockPodMonitorManager{}
 		manager.isEnabled = true
 		manager.podMonitor = &v1.PodMonitor{
 			ObjectMeta: metav1.ObjectMeta{

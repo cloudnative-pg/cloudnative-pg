@@ -831,12 +831,11 @@ func createOrPatchPodMonitor(
 	// Pod monitor enabled and no pod monitor - create it
 	case manager.IsPodMonitorEnabled() && podMonitor == nil:
 		contextLogger.Debug("Creating PodMonitor")
-		newPodMonitor := manager.BuildPodMonitor()
-		return cli.Create(ctx, newPodMonitor)
+		return cli.Create(ctx, expectedPodMonitor)
 	// Pod monitor enabled and pod monitor present - update it
 	default:
 		origPodMonitor := podMonitor.DeepCopy()
-		podMonitor.Spec = manager.BuildPodMonitor().Spec
+		podMonitor.Spec = expectedPodMonitor.Spec
 
 		// If there's no changes we are done
 		if reflect.DeepEqual(origPodMonitor, podMonitor) {

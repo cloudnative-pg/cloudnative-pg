@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // ClusterPodMonitorManager builds the PodMonitor for the cluster resource
@@ -40,7 +39,6 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Namespace: c.cluster.Namespace,
 		Name:      c.cluster.Name,
 	}
-	utils.LabelClusterName(&meta, c.cluster.Name)
 	c.cluster.SetInheritedDataAndOwnership(&meta)
 
 	spec := monitoringv1.PodMonitorSpec{
