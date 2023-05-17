@@ -23,7 +23,7 @@ Each capability level is associated with a certain set of management features th
 !!! Note
     We consider this framework as a guide for future work and implementations in the operator.
 
-## Level 1 - Basic Install
+## Level 1: Basic Install
 
 Capability level 1 involves **installation** and **configuration** of the
 operator. This category includes usability and user experience
@@ -240,7 +240,7 @@ standard default values while allowing you to override them and customize
 them. You can specify a deployment of a PostgreSQL cluster using
 the `Cluster` CRD in a couple of YAML code lines.
 
-## Level 2 - Seamless Upgrades
+## Level 2: Seamless Upgrades
 
 Capability level 2 is about enabling **updates of the operator and the actual
 workload**, in our case PostgreSQL servers. This includes **PostgreSQL minor
@@ -282,7 +282,7 @@ At any time, convey the cluster's high availability status, for example,
 `Setting up primary`, `Creating a new replica`, `Cluster in healthy state`,
 `Switchover in progress`, `Failing over`, `Upgrading cluster`, etc.
 
-## Level 3 - Full Lifecycle
+## Level 3: Full Lifecycle
 
 Capability level 3 requires the operator to manage aspects of **business
 continuity** and **scalability**.
@@ -469,7 +469,7 @@ and makes the usage of the underlying PostgreSQL resources more efficient.
 Instead of connecting directly to a PostgreSQL service, applications can now
 connect to the PgBouncer service and start reusing any existing connection.
 
-## Level 4 - Deep Insights
+## Level 4: Deep Insights
 
 Capability level 4 is about **observability**: in particular, monitoring,
 alerting, trending, log processing. This might involve the use of external tools
@@ -526,7 +526,7 @@ Record major events as expected by the Kubernetes API, such as creating resource
 removing nodes, upgrading, and so on. Events can be displayed through
 the `kubectl describe` and `kubectl get events` command.
 
-## Level 5 - Auto Pilot
+## Level 5: Auto Pilot
 
 Capability level 5 is focused on **automated scaling**, **healing** and
 **tuning** - through the discovery of anomalies and insights that emerged
