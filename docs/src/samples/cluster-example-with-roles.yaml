@@ -9,6 +9,8 @@ spec:
 
   managed:
     roles:
+    - name: app
+      createdb: true
     - name: dante
       ensure: present
       comment: my database-side comment

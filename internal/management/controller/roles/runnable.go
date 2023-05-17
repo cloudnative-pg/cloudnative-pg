@@ -18,6 +18,7 @@ package roles
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -299,12 +300,30 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	role apiv1.RoleConfiguration,
 	action roleAction,
 ) (apiv1.PasswordState, error) {
-	pass, version, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
-	if err != nil {
-		return apiv1.PasswordState{}, err
+	var passVersion string
+	databaseRole := roleFromSpec(role)
+	switch {
+	case role.PasswordSecret == nil && !role.DisablePassword:
+		databaseRole.ignorePassword = true
+	case role.PasswordSecret == nil && role.DisablePassword:
+		databaseRole.password = sql.NullString{}
+	case role.PasswordSecret != nil && role.DisablePassword:
+		// this case should be prevented by the validation webhook,
+		// and is an error
+		return apiv1.PasswordState{},
+			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
+				role.PasswordSecret.Name)
+	case role.PasswordSecret != nil && !role.DisablePassword:
+		pass, version, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
+		if err != nil {
+			return apiv1.PasswordState{}, err
+		}
+
+		databaseRole.password = sql.NullString{Valid: true, String: pass}
+		passVersion = version
 	}
 
-	databaseRole := roleFromSpecWithPassword(role, pass)
+	var err error
 	switch action {
 	case roleCreate:
 		err = roleManager.Create(ctx, databaseRole)
@@ -322,7 +341,7 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 
 	return apiv1.PasswordState{
 		TransactionID:         transactionID,
-		SecretResourceVersion: version,
+		SecretResourceVersion: passVersion,
 	}, nil
 }
 
@@ -371,6 +390,9 @@ func getPasswordSecretResourceVersion(
 ) (map[string]string, error) {
 	re := make(map[string]string)
 	for _, role := range rolesInSpec {
+		if role.PasswordSecret == nil || role.DisablePassword {
+			continue
+		}
 		_, version, err := getPassword(ctx, client, role, namespace)
 		if err != nil {
 			return nil, err

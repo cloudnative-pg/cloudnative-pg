@@ -2864,4 +2864,25 @@ var _ = Describe("Role management validation", func() {
 		}
 		Expect(cluster.validateManagedRoles()).To(HaveLen(1))
 	})
+	It("should produce an error if we have a password secret AND DisablePassword in a role", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name:            "my_test",
+							Superuser:       true,
+							BypassRLS:       true,
+							DisablePassword: true,
+							PasswordSecret: &LocalObjectReference{
+								Name: "myPassword",
+							},
+							ConnectionLimit: -1,
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateManagedRoles()).To(HaveLen(1))
+	})
 })

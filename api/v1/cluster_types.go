@@ -1648,7 +1648,10 @@ type RoleConfiguration struct {
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
 	// Secret containing the password of the role (if present)
+	// If null, the password will be ignored unless DisablePassword is set
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
+	// DisablePassword indicates that a role's password should be set to NULL in Postgres
+	DisablePassword bool `json:"disablePassword,omitempty"`
 	// Whether the role is a `superuser` who can override all access
 	// restrictions within the database - superuser status is dangerous and
 	// should be used only when really needed. You must yourself be a
