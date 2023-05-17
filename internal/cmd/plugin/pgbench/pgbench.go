@@ -115,7 +115,6 @@ func (cmd *pgBenchCommand) getCluster(ctx context.Context) (apiv1.Cluster, error
 
 func (cmd *pgBenchCommand) buildJob(cluster apiv1.Cluster) *batchv1.Job {
 	clusterImageName := cluster.Spec.ImageName
-	clusterShedulerName := cluster.Spec.SchedulerName
 	labels := map[string]string{
 		"pbBenchJob": cluster.Name,
 	}
@@ -162,7 +161,7 @@ func (cmd *pgBenchCommand) buildJob(cluster apiv1.Cluster) *batchv1.Job {
 							},
 						},
 					},
-					SchedulerName: clusterShedulerName,
+					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
 						{
 							Name:            "pgbench",
