@@ -1278,13 +1278,13 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-
-			namespacePrefix := "backup-safety-1"
+			// This name is used in yaml file, keep it as const
+			namespace = "backup-safety-1"
 			namespacePrefix2 := "backup-safety-2"
 			clusterName, err = env.GetResourceNameFromYAML(clusterSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
