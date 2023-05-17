@@ -75,7 +75,8 @@ When `primaryUpdateStrategy` is set to `supervised`, the rolling update process
 is suspended immediately after all replicas have been upgraded.
 
 This phase can only be completed with either a manual switchover or an in-place
-restart.
+restart. Keep in mind that image upgrades can not be applied with an in-place restart, 
+so a switchover is required in such cases.
 
 You can trigger a switchover with:
 
