@@ -286,6 +286,10 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		return true, false, reason
 	}
 
+	if restartRequired, reason := isPodNeedingUpdatedScheduler(cluster, status.Pod); restartRequired {
+		return restartRequired, false, reason
+	}
+
 	// Detect changes in the postgres container configuration
 	for _, container := range status.Pod.Spec.Containers {
 		// we go to the next array element if it isn't the postgres container
@@ -304,6 +308,20 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	// check if pod needs to be restarted because of some config requiring it
 	return isPodNeedingRestart(cluster, status),
 		true, "configuration needs a restart to apply some configuration changes"
+}
+
+// isPodNeedingUpdatedScheduler returns a boolean indicating if a restart is required and the relative message
+func isPodNeedingUpdatedScheduler(cluster *apiv1.Cluster, pod corev1.Pod) (bool, string) {
+	if pod.Spec.SchedulerName == cluster.Spec.SchedulerName {
+		return false, ""
+	}
+
+	message := fmt.Sprintf(
+		"scheduler name changed from: '%s', to '%s'",
+		pod.Spec.SchedulerName,
+		cluster.Spec.SchedulerName,
+	)
+	return true, message
 }
 
 func isPodNeedingUpdateOfProjectedVolume(cluster *apiv1.Cluster, pod corev1.Pod) (needsUpdate bool, reason string) {

@@ -98,11 +98,13 @@ var _ = Describe("Pod upgrade", func() {
 		Expect(reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
 	})
 
-	It("should NOT trigger a rollout when the scheduler changes", func() {
+	It("should trigger a rollout when the scheduler changes", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		cluster.Spec.SchedulerName = "newScheduler"
 
-		Expect(isPodNeedingRestart(&cluster, postgres.PostgresqlStatus{Pod: *pod})).To(BeFalse())
+		rollout, reason := isPodNeedingUpdatedScheduler(&cluster, *pod)
+		Expect(rollout).To(BeTrue())
+		Expect(reason).ToNot(BeEmpty())
 	})
 
 	When("there's a custom environment variable set", func() {
