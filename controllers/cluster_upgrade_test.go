@@ -28,11 +28,16 @@ import (
 )
 
 var _ = Describe("Pod upgrade", func() {
-	cluster := apiv1.Cluster{
-		Spec: apiv1.ClusterSpec{
-			ImageName: "postgres:13.0",
-		},
-	}
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.0",
+			},
+		}
+	})
+
 	It("will not require a restart for just created Pods", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		Expect(isPodNeedingRestart(&cluster, postgres.PostgresqlStatus{Pod: *pod})).
@@ -91,6 +96,15 @@ var _ = Describe("Pod upgrade", func() {
 		Expect(needRollout).To(BeTrue())
 		Expect(inplacePossible).To(BeTrue())
 		Expect(reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
+	})
+
+	It("should trigger a rollout when the scheduler changes", func() {
+		pod := specs.PodWithExistingStorage(cluster, 1)
+		cluster.Spec.SchedulerName = "newScheduler"
+
+		rollout, reason := isPodNeedingUpdatedScheduler(&cluster, *pod)
+		Expect(rollout).To(BeTrue())
+		Expect(reason).ToNot(BeEmpty())
 	})
 
 	When("there's a custom environment variable set", func() {
