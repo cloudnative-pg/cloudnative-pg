@@ -66,13 +66,13 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 	It("can import a database with large objects", func() {
 		var err error
-		namespace = "microservice-large-object"
+		namespacePrefix := "microservice-large-object"
 		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
 		oid := 16393
 		data := "large object test"
-		err = env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -89,11 +89,11 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 	It("can import a database", func() {
 		var err error
-		namespace = "microservice"
+		namespacePrefix := "microservice"
 		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		err = env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -108,10 +108,11 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 	})
 
 	It("can select one from several databases to import", func() {
-		namespace = "microservice-different-db"
+		var err error
+		namespacePrefix := "microservice-different-db"
 		importedClusterName = "cluster-pgdump-different-db"
 		// create namespace
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -124,10 +125,10 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		// Test case which will check cluster is not created when we use a
 		// nonexistent database in cluster definition while importing
 		var err error
-		namespace = "cnpg-microservice-error"
+		namespacePrefix := "cnpg-microservice-error"
 		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		err = env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -154,7 +155,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 	})
 
 	It("can import to a cluster with a different major version", func() {
-		namespace = "microservice-different-db-version"
+		namespacePrefix := "microservice-different-db-version"
 		importedClusterName = "cluster-pgdump-different-db-version"
 
 		// Gather the current image
@@ -172,8 +173,9 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		Expect(targetImage).ShouldNot(BeEmpty(), "targetImage could not be empty")
 
 		By(fmt.Sprintf("import cluster with different major, target version is %s", targetImage), func() {
+			var err error
 			// create namespace
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)

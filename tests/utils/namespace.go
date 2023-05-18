@@ -25,7 +25,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// CreateNamespace creates a namespace
+// CreateUniqueNamespace creates a namespace by using the passed prefix.
+// Return the namespace name and any errors encountered.
+func (env TestingEnvironment) CreateUniqueNamespace(
+	namespacePrefix string,
+	opts ...client.CreateOption,
+) (string, error) {
+	name := env.createdNamespaces.generateUniqueName(namespacePrefix)
+
+	return name, env.CreateNamespace(name, opts...)
+}
+
+// CreateNamespace creates a namespace.
+// Deprecated.
+// Use CreateUniqueNamespace instead
 func (env TestingEnvironment) CreateNamespace(name string, opts ...client.CreateOption) error {
 	// Exit immediately if the name is empty
 	if name == "" {

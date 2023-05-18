@@ -41,7 +41,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 		poolerServiceRW               = "cluster-pgbouncer-rw"
 		poolerServiceRO               = "cluster-pgbouncer-ro"
 	)
-
+	var err error
 	var namespace, clusterName string
 
 	BeforeEach(func() {
@@ -59,8 +59,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 	BeforeAll(func() {
 		// Create a cluster in a namespace we'll delete after the test
 		// This cluster will be shared by the next tests
-		namespace = "pgbouncer-types"
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace("pgbouncer-types")
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -71,7 +70,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 	})
 
 	It("should have proper service ip and host details for ro and rw with default installation", func() {
-		By("setting up read write type pgbouncer pooler", func() {
+		By(fmt.Sprintf("setting up read write type pgbouncer pooler in %s", namespace), func() {
 			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateRWSampleFile, 2)
 		})
 

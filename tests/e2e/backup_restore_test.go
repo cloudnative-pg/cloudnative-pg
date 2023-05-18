@@ -99,12 +99,12 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-			namespace = "cluster-backup-minio"
+			namespacePrefix := "cluster-backup-minio"
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -450,12 +450,12 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			}
 			azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 			azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
-			namespace = "cluster-backup-azure-blob"
+			namespacePrefix := "cluster-backup-azure-blob"
 			clusterName, err = env.GetResourceNameFromYAML(azureBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			err = env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -582,12 +582,12 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-			namespace = "cluster-backup-azurite"
+			namespacePrefix := "cluster-backup-azurite"
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			err = env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -720,11 +720,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-			namespace = "recovery-barman-object-minio"
+			namespacePrefix := "recovery-barman-object-minio"
 			clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileMinio)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
-			err = env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -891,12 +891,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				}
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
-				namespace = "recovery-barman-object-azure"
+				namespacePrefix := "recovery-barman-object-azure"
 				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzure)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create a cluster in a namespace we'll delete after the test
-				err = env.CreateNamespace(namespace)
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
 					return env.DeleteNamespace(namespace)
@@ -967,12 +967,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				}
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
-				namespace = "cluster-backup-azure-blob-sas"
+				namespacePrefix := "cluster-backup-azure-blob-sas"
 				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzureSAS)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create a cluster in a namespace we'll delete after the test
-				err = env.CreateNamespace(namespace)
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
 					return env.DeleteNamespace(namespace)
@@ -1046,12 +1046,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-			namespace = "recovery-barman-object-azurite"
+			namespacePrefix := "recovery-barman-object-azurite"
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			err = env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -1156,9 +1156,9 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-
+			// This name is used in yaml file, keep it as const
 			namespace = "backup-safety-1"
-			namespace2 = "backup-safety-2"
+			namespacePrefix2 := "backup-safety-2"
 			clusterName, err = env.GetResourceNameFromYAML(clusterSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1168,7 +1168,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 				return env.DeleteNamespace(namespace)
 			})
 
-			err = env.CreateNamespace(namespace2)
+			namespace2, err = env.CreateUniqueNamespace(namespacePrefix2)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace2)
