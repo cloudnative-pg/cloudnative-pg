@@ -312,7 +312,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 
 // isPodNeedingUpdatedScheduler returns a boolean indicating if a restart is required and the relative message
 func isPodNeedingUpdatedScheduler(cluster *apiv1.Cluster, pod corev1.Pod) (bool, string) {
-	if pod.Spec.SchedulerName == cluster.Spec.SchedulerName {
+	if cluster.Spec.SchedulerName == "" || cluster.Spec.SchedulerName == pod.Spec.SchedulerName {
 		return false, ""
 	}
 
