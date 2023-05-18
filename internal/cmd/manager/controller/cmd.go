@@ -34,7 +34,8 @@ func NewCmd() *cobra.Command {
 	var leaderRenewDeadline int
 
 	cmd := cobra.Command{
-		Use: "controller [flags]",
+		Use:           "controller [flags]",
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunController(
 				metricsAddr,
