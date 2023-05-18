@@ -32,10 +32,11 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 	const (
 		clusterName         = "cluster-apparmor"
 		clusterAppArmorFile = fixturesDir + "/apparmor/cluster-apparmor.yaml"
-		namespace           = "cluster-apparmor-e2e"
+		namespacePrefix     = "cluster-apparmor-e2e"
 		level               = tests.Low
 	)
 	var err error
+	var namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -49,7 +50,7 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 	})
 
 	It("sets up a cluster enabling AppArmor annotation feature", func() {
-		err = env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
