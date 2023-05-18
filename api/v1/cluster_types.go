@@ -135,6 +135,13 @@ type ClusterSpec struct {
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
+	// If specified, the pod will be dispatched by specified Kubernetes
+	// scheduler. If not specified, the pod will be dispatched by the default
+	// scheduler. More info:
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/
+	// +optional
+	SchedulerName string `json:"schedulerName,omitempty"`
+
 	// The UID of the `postgres` user inside the image, defaults to `26`
 	// +kubebuilder:default:=26
 	PostgresUID int64 `json:"postgresUID,omitempty"`

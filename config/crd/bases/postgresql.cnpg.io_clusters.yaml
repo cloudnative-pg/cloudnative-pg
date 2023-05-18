@@ -2852,6 +2852,11 @@ spec:
                       to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
+              schedulerName:
+                description: 'If specified, the pod will be dispatched by specified
+                  Kubernetes scheduler. If not specified, the pod will be dispatched
+                  by the default scheduler. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/'
+                type: string
               seccompProfile:
                 description: 'The SeccompProfile applied to every Pod and Container.
                   Defaults to: `RuntimeDefault`'
