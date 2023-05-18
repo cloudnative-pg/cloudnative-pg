@@ -255,6 +255,12 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// Name of the priority class which will be used in every generated Pod, if the PriorityClass
+	// specified does not exist, the pod will not be able to schedule.  Please refer to
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
+	// for more information
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
 	// Deployment strategy to follow to upgrade the primary server during a rolling
 	// update procedure, after all replicas have been successfully updated:
 	// it can be automated (`unsupervised` - default) or manual (`supervised`)

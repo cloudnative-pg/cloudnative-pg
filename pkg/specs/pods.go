@@ -368,6 +368,10 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 		},
 	}
 
+	if cluster.Spec.PriorityClassName != "" {
+		pod.Spec.PriorityClassName = cluster.Spec.PriorityClassName
+	}
+
 	if configuration.Current.CreateAnyService {
 		pod.Spec.Subdomain = cluster.GetServiceAnyName()
 	}
