@@ -352,8 +352,9 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 			InitContainers: []corev1.Container{
 				createBootstrapContainer(cluster),
 			},
-			Containers: createPostgresContainers(cluster, envConfig),
-			Volumes:    createPostgresVolumes(cluster, podName),
+			SchedulerName: cluster.Spec.SchedulerName,
+			Containers:    createPostgresContainers(cluster, envConfig),
+			Volumes:       createPostgresVolumes(cluster, podName),
 			SecurityContext: CreatePodSecurityContext(
 				cluster.GetSeccompProfile(),
 				cluster.GetPostgresUID(),

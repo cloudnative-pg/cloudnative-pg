@@ -161,6 +161,7 @@ func (cmd *pgBenchCommand) buildJob(cluster apiv1.Cluster) *batchv1.Job {
 							},
 						},
 					},
+					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
 						{
 							Name:            "pgbench",
