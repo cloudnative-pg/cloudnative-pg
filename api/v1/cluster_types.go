@@ -550,9 +550,6 @@ type ClusterStatus struct {
 
 	// List of instance names in the cluster
 	InstanceNames []string `json:"instanceNames,omitempty"`
-
-	// LastObservedSchedulerName the last schedulerName reconciled from the spec
-	LastObservedSchedulerName string `json:"lastObservedSchedulerName,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
