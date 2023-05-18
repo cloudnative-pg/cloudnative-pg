@@ -32,6 +32,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 		poolerCertificateROSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-tls-ro.yaml"
 		level                         = tests.Low
 	)
+	var err error
 	var namespace, clusterName string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -48,8 +49,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 	Context("no user-defined certificates", Ordered, func() {
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace = "pgbouncer-auth-no-user-certs"
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace("pgbouncer-auth-no-user-certs")
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -148,8 +148,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 				caSecNameClient               = "my-postgresql-client-ca"
 			)
 			// Create a cluster in a namespace that will be deleted after the test
-			namespace = "pgbouncer-separate-certificates"
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace("pgbouncer-separate-certificates")
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
