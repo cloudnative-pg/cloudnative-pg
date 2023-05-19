@@ -82,9 +82,9 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			originalPVCUID := pvc.GetUID()
 
 			// Delete the pod
-			zero := int64(0)
+			one := int64(1)
 			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
+				GracePeriodSeconds: &one,
 			}
 			err = env.DeletePod(namespace, podName, forceDelete)
 			Expect(err).ToNot(HaveOccurred())
@@ -133,9 +133,9 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Force delete setting
-			zero := int64(0)
+			one := int64(1)
 			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
+				GracePeriodSeconds: &one,
 			}
 
 			// Delete the PVC and the Pod

@@ -528,9 +528,9 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimary := currentPrimary.GetName()
 			// Force-delete the primary
-			zero := int64(0)
+			one := int64(1)
 			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
+				GracePeriodSeconds: &one,
 			}
 			err = env.DeletePod(namespace, currentPrimary.GetName(), forceDelete)
 			Expect(err).ToNot(HaveOccurred())

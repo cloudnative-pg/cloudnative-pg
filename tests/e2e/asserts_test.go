@@ -1044,9 +1044,9 @@ func AssertFastFailOver(
 
 	By("deleting the primary", func() {
 		// The primary is force-deleted.
-		zero := int64(0)
+		one := int64(1)
 		forceDelete := &ctrlclient.DeleteOptions{
-			GracePeriodSeconds: &zero,
+			GracePeriodSeconds: &one,
 		}
 		lm := clusterName + "-1"
 		err = env.DeletePod(namespace, lm, forceDelete)
@@ -2255,9 +2255,9 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		currentPrimaryWalStorageName := currentPrimary.Name + "-wal"
-		zero := int64(0)
+		one := int64(1)
 		forceDelete := &ctrlclient.DeleteOptions{
-			GracePeriodSeconds: &zero,
+			GracePeriodSeconds: &one,
 		}
 
 		podList, err := env.GetClusterPodList(namespace, clusterName)

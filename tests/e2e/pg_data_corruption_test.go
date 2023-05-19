@@ -124,9 +124,9 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Force delete setting
-			zero := int64(0)
+			one := int64(1)
 			forceDelete := &client.DeleteOptions{
-				GracePeriodSeconds: &zero,
+				GracePeriodSeconds: &one,
 			}
 
 			// removing old primary pod attached pvc

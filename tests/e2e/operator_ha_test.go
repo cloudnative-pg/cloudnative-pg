@@ -118,9 +118,9 @@ var _ = Describe("Operator High Availability", Serial,
 
 			By("deleting current leader", func() {
 				// Force delete former Operator leader Pod
-				zero := int64(0)
+				one := int64(1)
 				forceDelete := &ctrlclient.DeleteOptions{
-					GracePeriodSeconds: &zero,
+					GracePeriodSeconds: &one,
 				}
 				err = env.DeletePod(operatorNamespace, oldLeaderPodName, forceDelete)
 				Expect(err).ToNot(HaveOccurred())
@@ -151,9 +151,9 @@ var _ = Describe("Operator High Availability", Serial,
 				oldPrimary := currentPrimary.GetName()
 
 				// Force-delete the primary
-				zero := int64(0)
+				one := int64(1)
 				forceDelete := &ctrlclient.DeleteOptions{
-					GracePeriodSeconds: &zero,
+					GracePeriodSeconds: &one,
 				}
 				err = env.DeletePod(namespace, currentPrimary.GetName(), forceDelete)
 				Expect(err).ToNot(HaveOccurred())

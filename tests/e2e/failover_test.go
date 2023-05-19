@@ -182,9 +182,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			zero := int64(0)
+			one := int64(1)
 			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
+				GracePeriodSeconds: &one,
 			}
 			err := env.DeletePod(namespace, currentPrimary, forceDelete)
 			Expect(err).ToNot(HaveOccurred())
