@@ -284,12 +284,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		return env.DeleteNamespaceAndWait(operatorNamespace, 60)
 	}
 
-	assertCreateNamespace := func(namespace string) {
+	assertCreateNamespace := func(namespacePrefix string) string {
+		var namespace string
 		By(fmt.Sprintf(
 			"having a '%s' upgradeNamespace",
-			namespace), func() {
+			namespacePrefix), func() {
 			// Create a upgradeNamespace for all the resources
-			err := env.CreateNamespace(namespace)
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Creating a upgradeNamespace should be quick
@@ -304,6 +305,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return namespaceResource.GetName(), err
 			}, 20).Should(BeEquivalentTo(namespace))
 		})
+		return namespace
 	}
 
 	applyUpgrade := func(upgradeNamespace string) {
@@ -573,20 +575,20 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 	It("works after an upgrade with rolling upgrade ", func() {
 		// set upgradeNamespace for log naming
-		upgradeNamespace := rollingUpgradeNamespace
+		upgradeNamespacePrefix := rollingUpgradeNamespace
 		mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
 		Expect(err).NotTo(HaveOccurred())
 
 		GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
-		assertCreateNamespace(upgradeNamespace)
+		upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 		DeferCleanup(cleanupNamespace, upgradeNamespace)
 		applyUpgrade(upgradeNamespace)
 	})
 
 	It("works after an upgrade with online upgrade", func() {
 		// set upgradeNamespace for log naming
-		upgradeNamespace := onlineUpgradeNamespace
+		upgradeNamespacePrefix := onlineUpgradeNamespace
 		By("applying environment changes for current upgrade to be performed", func() {
 			testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
 		})
@@ -597,7 +599,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
 
-		assertCreateNamespace(upgradeNamespace)
+		upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 		DeferCleanup(cleanupNamespace, upgradeNamespace)
 		applyUpgrade(upgradeNamespace)
 

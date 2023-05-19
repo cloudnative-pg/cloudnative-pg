@@ -124,8 +124,9 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 			if isIBM || isAKS || isGKE {
 				Skip("Test runs only on local")
 			}
-			namespace = "single-instance-pod-eviction"
-			err := env.CreateNamespace(namespace)
+			namespacePrefix := "single-instance-pod-eviction"
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -190,8 +191,9 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 			}
 		})
 		BeforeAll(func() {
-			namespace = "multi-instance-pod-eviction"
-			err := env.CreateNamespace(namespace)
+			namespacePrefix := "multi-instance-pod-eviction"
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)

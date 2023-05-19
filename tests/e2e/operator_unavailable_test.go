@@ -50,15 +50,17 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 	})
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
-		const namespace = "op-unavailable-e2e-zero-replicas"
+		const namespacePrefix = "op-unavailable-e2e-zero-replicas"
+		var namespace string
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		It("can survive operator failures", func() {
+			var err error
 			// Create the cluster namespace
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -164,7 +166,8 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 	})
 
 	Context("Delete primary and operator concurrently", func() {
-		const namespace = "op-unavailable-e2e-delete-operator"
+		const namespacePrefix = "op-unavailable-e2e-delete-operator"
+		var namespace string
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
@@ -172,8 +175,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		})
 		It("can survive operator failures", func() {
 			var operatorPodName string
+			var err error
 			// Create the cluster namespace
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)

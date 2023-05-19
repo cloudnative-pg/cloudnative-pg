@@ -42,9 +42,9 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 
 	Context("with HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
-			namespace := "cluster-scale-e2e-with-slots"
+			namespacePrefix := "cluster-scale-e2e-with-slots"
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -85,8 +85,8 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 	Context("without HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace := "cluster-scale-e2e"
-			err := env.CreateNamespace(namespace)
+			namespacePrefix := "cluster-scale-e2e"
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {

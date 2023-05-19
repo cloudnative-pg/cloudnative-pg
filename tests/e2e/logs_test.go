@@ -53,11 +53,12 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 	})
 
 	It("correctly produces logs in JSON format", func() {
-		namespace = "json-logs-e2e"
+		namespacePrefix := "json-logs-e2e"
 		clusterName = "postgresql-json-logs"
 		const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml.template"
+		var namespaceErr error
 		// Create a cluster in a namespace we'll delete after the test
-		namespaceErr := env.CreateNamespace(namespace)
+		namespace, namespaceErr = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(namespaceErr).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)

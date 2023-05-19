@@ -55,14 +55,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
-			namespace        = "managed-roles"
+			namespacePrefix  = "managed-roles"
 			username         = "dante"
 			appUsername      = "app"
 			password         = "dante"
 			newUserName      = "new_role"
 			unrealizableUser = "petrarca"
 		)
-		var clusterName, secretName string
+		var clusterName, secretName, namespace string
 		var secretNameSpacedName *types.NamespacedName
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
@@ -71,8 +71,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 		})
 
 		BeforeAll(func() {
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)

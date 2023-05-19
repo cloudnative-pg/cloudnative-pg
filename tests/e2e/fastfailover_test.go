@@ -89,10 +89,11 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
-			namespace = "primary-failover-time-async"
+			namespacePrefix := "primary-failover-time-async"
 			clusterName = "cluster-fast-failover"
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespaceAndWait(namespace, 120)
@@ -109,10 +110,11 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
-			namespace = "primary-failover-time-async-with-slots"
+			namespacePrefix := "primary-failover-time-async-with-slots"
 			clusterName = "cluster-fast-failover"
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespaceAndWait(namespace, 120)
@@ -125,10 +127,11 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 
 	Context("with sync replicas cluster", func() {
 		It("can do a fast failover", func() {
-			namespace = "primary-failover-time-sync-replicas"
+			namespacePrefix := "primary-failover-time-sync-replicas"
 			clusterName = "cluster-syncreplicas-fast-failover"
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespaceAndWait(namespace, 120)

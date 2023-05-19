@@ -36,10 +36,10 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 	const (
 		cnpgCluster                 = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
 		poolerBasicAuthRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"
-		namespace                   = "pgbouncer-metrics-e2e"
+		namespacePrefix             = "pgbouncer-metrics-e2e"
 		level                       = tests.Low
 	)
-
+	var namespace string
 	var clusterName, curlPodName string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -49,7 +49,8 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 
 	It("should retrieve the metrics exposed by a freshly created pooler of type pgBouncer and validate its content",
 		func() {
-			err := env.CreateNamespace(namespace)
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {

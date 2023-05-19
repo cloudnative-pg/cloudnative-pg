@@ -249,11 +249,11 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	Context("using kubectl-cnpg plugin", Ordered, func() {
 		var err error
 		BeforeAll(func() {
-			namespace = "fencing-using-plugin"
+			namespacePrefix := "fencing-using-plugin"
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
-			err = env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -268,11 +268,11 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	Context("using annotation", Ordered, func() {
 		var err error
 		BeforeAll(func() {
-			namespace = "fencing-using-annotation"
+			namespacePrefix := "fencing-using-annotation"
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
-			err = env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)

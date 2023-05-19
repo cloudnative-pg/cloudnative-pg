@@ -41,7 +41,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		}
 	})
 	// Initializing a global namespace variable to be used in each test case
-	var namespace string
+	var namespace, namespacePrefix string
 	// Gathering default storage class requires to check whether the value
 	// of 'allowVolumeExpansion' is true or false
 	defaultStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
@@ -49,7 +49,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 	Context("can be expanded", func() {
 		BeforeEach(func() {
 			// Initializing namespace variable to be used in test case
-			namespace = "storage-expansion-true"
+			namespacePrefix = "storage-expansion-true"
 			// Extracting bool value of AllowVolumeExpansion
 			allowExpansion, err := utils.GetStorageAllowExpansion(defaultStorageClass, env)
 			Expect(err).ToNot(HaveOccurred())
@@ -59,8 +59,9 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		})
 
 		It("expands PVCs via online resize", func() {
+			var err error
 			// Creating namespace
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -75,9 +76,10 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 	})
 
 	Context("can not be expanded", func() {
+		var namespace string
 		BeforeEach(func() {
 			// Initializing namespace variable to be used in test case
-			namespace = "storage-expansion-false"
+			namespacePrefix = "storage-expansion-false"
 			// Extracting bool value of AllowVolumeExpansion
 			allowExpansion, err := utils.GetStorageAllowExpansion(defaultStorageClass, env)
 			Expect(err).ToNot(HaveOccurred())
@@ -87,8 +89,9 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		})
 
 		It("expands PVCs via offline resize", func() {
+			var err error
 			// Creating namespace
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
