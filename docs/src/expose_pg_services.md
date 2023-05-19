@@ -108,11 +108,11 @@ On Minikube you can setup the ingress controller running:
 minikube addons enable ingress
 ```
 
-Then, patch the `tcp-service` ConfigMap to redirect to the primary the
+Then, patch the `tcp-services` ConfigMap to redirect to the primary the
 connections on port 5432 of the Ingress:
 
 ```sh
-kubectl patch configmap tcp-services -n kube-system \
+kubectl patch configmap tcp-services -n ingress-nginx \
   --patch '{"data":{"5432":"default/cluster-example-rw:5432"}}'
 ```
 
@@ -124,16 +124,16 @@ spec:
   template:
     spec:
       containers:
-      - name: nginx-ingress-controller
+      - name: controller
         ports:
          - containerPort: 5432
            hostPort: 5432
 ```
 
-and apply it to the `nginx-ingress-controller deployment`:
+and apply it to the `ingress-nginx-controller` deployment:
 
 ```sh
-kubectl patch deployment nginx-ingress-controller --patch "$(cat patch.yaml)" -n kube-system
+kubectl patch deployment ingress-nginx-controller --patch "$(cat patch.yaml)" -n ingress-nginx
 ```
 
 You can access the primary from your machine running:
