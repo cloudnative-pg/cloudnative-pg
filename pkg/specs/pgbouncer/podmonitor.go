@@ -36,7 +36,7 @@ func NewPoolerPodMonitorManager(pooler *apiv1.Pooler) *PoolerPodMonitorManager {
 
 // IsPodMonitorEnabled returns a boolean indicating if the PodMonitor should exists or not
 func (c PoolerPodMonitorManager) IsPodMonitorEnabled() bool {
-	return c.pooler.Spec.EnablePodMonitor
+	return c.pooler.Spec.Monitoring != nil && c.pooler.Spec.Monitoring.EnablePodMonitor
 }
 
 // BuildPodMonitor builds a new PodMonitor object

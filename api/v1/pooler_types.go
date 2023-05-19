@@ -73,6 +73,16 @@ type PoolerSpec struct {
 	// The deployment strategy to use for pgbouncer to replace existing pods with new ones
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
 
+	// The configuration of the monitoring infrastructure of this pooler.
+	Monitoring *PoolerMonitoringConfiguration `json:"monitoring,omitempty"`
+}
+
+// PoolerMonitoringConfiguration is the type containing all the monitoring
+// configuration for a certain Pooler.
+//
+// Mirrors the Cluster's MonitoringConfiguration but without the custom queries
+// part for now.
+type PoolerMonitoringConfiguration struct {
 	// Enable or disable the `PodMonitor`
 	// +kubebuilder:default:=false
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
