@@ -119,7 +119,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 
 	It("creates a cluster", func() {
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
