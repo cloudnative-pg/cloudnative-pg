@@ -198,8 +198,7 @@ create_cluster_k3d() {
   local cluster_name=$2
 
   local latest_k3s_tag
-  latest_k3s_tag=$(curl -sL "https://registry.hub.docker.com/v1/repositories/rancher/k3s/tags" |
-    jq -r '.[].name' | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
+  latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
 
   local volumes=()
   if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
