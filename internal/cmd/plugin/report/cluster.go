@@ -53,8 +53,8 @@ func clusterCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&output, "output", "o", "yaml",
 		"Output format for manifests (yaml or json)")
 	cmd.Flags().BoolVarP(&includeLogs, "logs", "l", false, "include logs")
-	cmd.Flags().BoolVarP(&logTimeStamp, "timestamp", "t", false,
-		"Append timestamp before each line in logs, this will make logs no longer JSON")
+	cmd.Flags().BoolVarP(&logTimeStamp, "timestamps", "t", false,
+		"Prepend human-readable timestamp to each log line")
 
 	return cmd
 }
