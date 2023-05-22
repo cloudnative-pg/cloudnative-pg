@@ -92,7 +92,7 @@ func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputForm
 //   - operator's Validating/MutatingWebhookConfiguration and their associated services
 //   - operator pod's logs (if `includeLogs` is true)
 func operator(ctx context.Context, format plugin.OutputFormat,
-	file string, stopRedaction, includeLogs bool, now time.Time,
+	file string, stopRedaction, includeLogs, logTimeStamp bool, now time.Time,
 ) error {
 	secretRedactor := redactSecret
 	configMapRedactor := redactConfigMap
@@ -170,7 +170,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 
 	if includeLogs {
 		logZipper := func(zipper *zip.Writer, dirname string) error {
-			return streamOperatorLogsToZip(ctx, operatorPods, dirname, "operator-logs", zipper)
+			return streamOperatorLogsToZip(ctx, operatorPods, dirname, "operator-logs", logTimeStamp, zipper)
 		}
 		sections = append(sections, logZipper)
 	}
