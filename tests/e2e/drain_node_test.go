@@ -391,7 +391,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			nodes.DrainPrimaryNode(namespace, clusterName, env)
 
 			// Expect pods to be recreated and to be ready
-			AssertClusterIsReady(namespace, clusterName, 600, env)
+			AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReady], env)
 
 			// Expect pods to be running on the uncordoned node and to have new names
 			By("verifying cluster pods changed names", func() {

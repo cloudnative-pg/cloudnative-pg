@@ -179,24 +179,22 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 func AssertCreateCluster(namespace string, clusterName string, sampleFile string, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a %v namespace", namespace), func() {
 		// Creating a namespace should be quick
-		timeout := 20
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      namespace,
 		}
-
 		Eventually(func() (string, error) {
 			namespaceResource := &corev1.Namespace{}
 			err := env.Client.Get(env.Ctx, namespacedName, namespaceResource)
 			return namespaceResource.GetName(), err
-		}, timeout).Should(BeEquivalentTo(namespace))
+		}, TestTimeouts[testsUtils.NamespaceCreation]).Should(BeEquivalentTo(namespace))
 	})
 
 	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
 		CreateResourceFromFile(namespace, sampleFile)
 	})
 	// Setting up a cluster with three pods is slow, usually 200-600s
-	AssertClusterIsReady(namespace, clusterName, 600, env)
+	AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReady], env)
 }
 
 // AssertClusterIsReady checks the cluster has as many pods as in spec, that
@@ -596,7 +594,7 @@ func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout
 	})
 
 	By("having all the instances ready", func() {
-		AssertClusterIsReady(namespace, clusterName, 600, env)
+		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReady], env)
 	})
 
 	By(fmt.Sprintf("restoring full cluster functionality within %v seconds", timeout), func() {
@@ -962,7 +960,7 @@ func AssertFastFailOver(
 	})
 
 	By("having a Cluster with three instances ready", func() {
-		AssertClusterIsReady(namespace, clusterName, 600, env)
+		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReady], env)
 	})
 
 	// Node 1 should be the primary, so the -rw service should
@@ -1328,7 +1326,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		Expect(err).ToNot(HaveOccurred())
 		CreateResourceFromFile(namespace, restoreClusterFile)
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+		AssertClusterIsReady(namespace, restoredClusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
 		primary, err := env.GetClusterPrimary(namespace, restoredClusterName)
@@ -1367,7 +1365,7 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 		CreateResourceFromFile(namespace, restoreClusterFile)
 
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+		AssertClusterIsReady(namespace, restoredClusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
 		primary := restoredClusterName + "-1"
@@ -1423,7 +1421,7 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string, pod *
 		CreateResourceFromFile(namespace, restoreClusterFile)
 
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+		AssertClusterIsReady(namespace, restoredClusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
 		primary := restoredClusterName + "-1"
@@ -1576,7 +1574,7 @@ func AssertClusterRestorePITRWithApplicationDB(namespace, clusterName, tableName
 
 	By("restoring a backup cluster with PITR in a new cluster", func() {
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, clusterName, 800, env)
+		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -1641,7 +1639,7 @@ func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string, pod
 
 	By("restoring a backup cluster with PITR in a new cluster", func() {
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, clusterName, 800, env)
+		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
 		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -2677,7 +2675,7 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 			return cluster.Status.Phase == apiv1.PhaseUpgrade, err
 		}, 120, 3).Should(BeTrue())
 	})
-	AssertClusterIsReady(namespace, clusterName, 300, env)
+	AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadyQuick], env)
 }
 
 // AssertPVCCount matches count and pvc List.

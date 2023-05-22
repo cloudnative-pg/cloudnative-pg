@@ -117,7 +117,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		CreateResourceFromFile(namespace, sampleFile)
 	})
 	By("having a Cluster with three instances ready", func() {
-		AssertClusterIsReady(namespace, clusterName, 600, env)
+		AssertClusterIsReady(namespace, clusterName, TestTimeouts[utils.ClusterIsReady], env)
 	})
 	// Node 1 should be the primary, so the -rw service should
 	// point there. We verify this.

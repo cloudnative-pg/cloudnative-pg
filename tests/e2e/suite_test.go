@@ -63,6 +63,7 @@ var (
 	operatorWasRestarted    bool
 	operatorLogDumped       bool
 	quickDeletionPeriod     = int64(1)
+	TestTimeouts            map[utils.Timeout]int
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
@@ -70,8 +71,15 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
+	TestTimeouts, err = utils.Timeouts()
+	Expect(err).ShouldNot(HaveOccurred())
+
 	pod, err := utils.GetPsqlClient(psqlClientNamespace, env)
 	Expect(err).ShouldNot(HaveOccurred())
+	DeferCleanup(func() {
+		err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
+		Expect(err).ToNot(HaveOccurred())
+	})
 	// here we serialized psql client pod object info and will be
 	// accessible to all nodes (specs)
 	psqlPodJSONObj, err := json.Marshal(pod)
@@ -100,8 +108,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 var _ = SynchronizedAfterSuite(func() {
 }, func() {
-	err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
-	Expect(err).ToNot(HaveOccurred())
 })
 
 // saveOperatorLogs does 2 things:
