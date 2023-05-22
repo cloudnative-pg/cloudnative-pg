@@ -273,6 +273,12 @@ var (
 			Namespaces:             []string{"auto_explain"},
 			SharedPreloadLibraries: []string{"auto_explain"},
 		},
+		{
+			Name:                   "pg_failover_slots",
+			SkipCreateExtension:    true,
+			Namespaces:             []string{"pg_failover_slots"},
+			SharedPreloadLibraries: []string{"pg_failover_slots"},
+		},
 	}
 
 	// FixedConfigurationParameters contains the parameters that can't be

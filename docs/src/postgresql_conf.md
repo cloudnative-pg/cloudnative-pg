@@ -191,6 +191,7 @@ supported extensions. The current list includes:
 - `auto_explain`
 - `pg_stat_statements`
 - `pgaudit`
+- `pg_failover_slots`
 
 Some of these libraries also require additional objects in a database before
 using them, normally views and/or functions managed via the `CREATE EXTENSION`
@@ -275,6 +276,21 @@ postgresql:
     pgaudit.log_relation: "on"
 #
 ```
+
+#### Enabling `auto_explain`
+
+The [`pg_failover_slots`](https://github.com/EnterpriseDB/pg_failover_slots)
+extension by EDB ensures that logical replication slots can survive a
+failover scenario. Failovers are normally implemented using physical
+streaming replication, like in the case of CloudNativePG.
+
+You can enable `pg_failover_slots` by adding to the configuration a parameter
+that starts with `pg_failover_slots.`: as explained above, the operator will
+transparently manage the `pg_failover_slots` entry in the
+`shared_preload_libraries` option depending on this.
+
+Please refer to [`the `pg_failover_slots`  documentation`](https://www.postgresql.org/docs/current/auto-explain.html)
+for details on this extension.
 
 ## The `pg_hba` section
 
