@@ -26,8 +26,8 @@ import (
 
 func clusterCmd() *cobra.Command {
 	var (
-		file, output string
-		includeLogs  bool
+		file, output              string
+		includeLogs, logTimeStamp bool
 	)
 
 	const filePlaceholder = "report_cluster_<name>_<timestamp>.zip"
@@ -44,15 +44,17 @@ func clusterCmd() *cobra.Command {
 				file = reportName("cluster", now, clusterName) + ".zip"
 			}
 			return cluster(cmd.Context(), clusterName, plugin.Namespace,
-				plugin.OutputFormat(output), file, includeLogs, now)
+				plugin.OutputFormat(output), file, includeLogs, logTimeStamp, now)
 		},
 	}
 
 	cmd.Flags().StringVarP(&file, "file", "f", filePlaceholder,
 		"Output file")
 	cmd.Flags().StringVarP(&output, "output", "o", "yaml",
-		"Output format (yaml or json)")
+		"Output format for manifests (yaml or json)")
 	cmd.Flags().BoolVarP(&includeLogs, "logs", "l", false, "include logs")
+	cmd.Flags().BoolVarP(&logTimeStamp, "timestamps", "t", false,
+		"Prepend human-readable timestamp to each log line")
 
 	return cmd
 }
