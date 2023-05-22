@@ -78,7 +78,7 @@ func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputForma
 //   - logs from the cluster pods (optional - activated with `includeLogs`)
 //   - logs from the cluster jobs (optional - activated with `includeLogs`)
 func cluster(ctx context.Context, clusterName, namespace string, format plugin.OutputFormat,
-	file string, includeLogs bool, timestamp time.Time,
+	file string, includeLogs, logTimeStamp bool, timestamp time.Time,
 ) error {
 	var events corev1.EventList
 	err := plugin.Client.List(ctx, &events, client.InNamespace(namespace))
@@ -125,11 +125,11 @@ func cluster(ctx context.Context, clusterName, namespace string, format plugin.O
 
 	if includeLogs {
 		logsZipper := func(zipper *zip.Writer, dirname string) error {
-			return streamClusterLogsToZip(ctx, clusterName, plugin.Namespace, dirname, zipper)
+			return streamClusterLogsToZip(ctx, clusterName, plugin.Namespace, dirname, logTimeStamp, zipper)
 		}
 
 		jobLogsZipper := func(zipper *zip.Writer, dirname string) error {
-			return streamClusterJobLogsToZip(ctx, clusterName, plugin.Namespace, dirname, zipper)
+			return streamClusterJobLogsToZip(ctx, clusterName, plugin.Namespace, dirname, logTimeStamp, zipper)
 		}
 
 		sections = append(sections, logsZipper, jobLogsZipper)
