@@ -33,23 +33,22 @@ import (
 
 const jobMatcherLabel = "job-name"
 
-var podLogOptions = &corev1.PodLogOptions{
-	Timestamps: true, // NOTE: when activated, lines are no longer JSON
-}
-
 // streamOperatorLogsToZip streams the operator pod logs to a new section in the ZIP
 func streamOperatorLogsToZip(
 	ctx context.Context,
 	pods []corev1.Pod,
 	dirName string,
 	name string,
+	logTimeStamp bool,
 	zipper *zip.Writer,
 ) error {
 	logsDir := filepath.Join(dirName, name)
 	if _, err := zipper.Create(logsDir + "/"); err != nil {
 		return fmt.Errorf("could not add '%s' to zip: %w", logsDir, err)
 	}
-
+	podLogOptions := &corev1.PodLogOptions{
+		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
+	}
 	for i := range pods {
 		pod := pods[i]
 		path := filepath.Join(logsDir, fmt.Sprintf("%s-logs.jsonl", pod.Name))
@@ -83,6 +82,7 @@ func streamClusterLogsToZip(
 	clusterName string,
 	namespace string,
 	dirname string,
+	logTimeStamp bool,
 	zipper *zip.Writer,
 ) error {
 	logsdir := filepath.Join(dirname, "logs")
@@ -93,6 +93,10 @@ func streamClusterLogsToZip(
 
 	matchClusterName := client.MatchingLabels{
 		utils.ClusterLabelName: clusterName,
+	}
+
+	podLogOptions := &corev1.PodLogOptions{
+		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
 	}
 
 	var podList corev1.PodList
@@ -133,7 +137,7 @@ func streamClusterLogsToZip(
 // streamClusterJobLogsToZip checks for jobs in the cluster, and streams
 // the logs from the pods created by those jobs, one by one, each in a new file
 func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace string,
-	dirname string, zipper *zip.Writer,
+	dirname string, logTimeStamp bool, zipper *zip.Writer,
 ) error {
 	logsdir := filepath.Join(dirname, "job-logs")
 	_, err := zipper.Create(logsdir + "/")
@@ -143,6 +147,10 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 
 	matchClusterName := client.MatchingLabels{
 		utils.ClusterLabelName: clusterName,
+	}
+
+	podLogOptions := &corev1.PodLogOptions{
+		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
 	}
 
 	var jobList batchv1.JobList
