@@ -36,7 +36,7 @@ OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v5.0.1
+KUSTOMIZE_VERSION ?= v5.0.3
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.27.1
 CONTROLLER_TOOLS_VERSION ?= v0.11.3
