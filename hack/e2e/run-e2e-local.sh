@@ -19,23 +19,38 @@
 # standard bash error handling
 set -eEuo pipefail
 
+ROOT_DIR=$(realpath "$(dirname "$0")/../../")
+readonly ROOT_DIR
+
 if [ "${DEBUG-}" = true ]; then
   set -x
 fi
 
-ROOT_DIR=$(realpath "$(dirname "$0")/../../")
+function get_default_storage_class() {
+  kubectl get storageclass -o json | jq  -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)'
+}
 
-DEFAULT_STORAGE_CLASS=$(kubectl get storageclass -o json | jq  -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)')
-export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-${DEFAULT_STORAGE_CLASS}}
-export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+function get_postgres_image() {
+  grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
+}
+
+export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_storage_class)}
+export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
 
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
 
-LABEL_FILTERS=""
-if [ "${FEATURE_TYPE-}" ]; then
-  LABEL_FILTERS="${FEATURE_TYPE//,/ || }"
-fi
+function get_label_filters() {
+  if [[ -n "${FEATURE_TYPE:-}" ]]; then
+    echo "${FEATURE_TYPE//,/ || }"
+  else
+    echo ""
+  fi
+}
+
+LABEL_FILTERS=$(get_label_filters)
+readonly LABEL_FILTERS
+
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
@@ -47,7 +62,6 @@ ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interv
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO=$?
 
 # Report if there are any tests that failed and did NOT have an "ignore-fails" label
-RC=0
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
 
 # The exit code reported depends on the two `jq` filter calls. In case we have
