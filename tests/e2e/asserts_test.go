@@ -2724,7 +2724,7 @@ func AssertClusterEventuallyReachesPhase(namespace, clusterName, phase string, t
 // within the specified timeout
 func AssertClusterEventuallyDepartsPhase(namespace, clusterName, phase string, timeout int) {
 	By(fmt.Sprintf("verifying cluster '%v' phase should eventually away from '%v'", clusterName, phase), func() {
-		assert := assertPredicateClusterNotHasPhase(namespace, clusterName, phase)
+		assert := assertClusterNotInPhase(namespace, clusterName, phase)
 		Eventually(assert, timeout).Should(Succeed())
 	})
 }
@@ -2737,7 +2737,7 @@ func assertPredicateClusterHasPhase(namespace, clusterName, phase string) func(g
 	}
 }
 
-func assertPredicateClusterNotHasPhase(namespace, clusterName, phase string) func(g Gomega) {
+func assertClusterNotInPhase(namespace, clusterName, phase string) func(g Gomega) {
 	return func(g Gomega) {
 		cluster, err := env.GetCluster(namespace, clusterName)
 		g.Expect(err).ToNot(HaveOccurred())
