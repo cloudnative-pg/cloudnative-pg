@@ -147,7 +147,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			}
 
 			// Drain the node containing the primary pod and store the list of running pods
-			podsOnPrimaryNode := nodes.DrainPrimaryNode(namespace, clusterName, env)
+			podsOnPrimaryNode := nodes.DrainPrimaryNode(namespace, clusterName,
+				TestTimeouts[testsUtils.DrainNode], env)
 
 			By("verifying failover after drain", func() {
 				timeout := 180
@@ -274,7 +275,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 
 				// Drain the node containing the primary pod and store the list of running pods
-				podsOnPrimaryNode := nodes.DrainPrimaryNode(namespace, clusterName, env)
+				podsOnPrimaryNode := nodes.DrainPrimaryNode(namespace, clusterName,
+					TestTimeouts[testsUtils.DrainNode], env)
 
 				By("verifying failover after drain", func() {
 					timeout := 180
@@ -388,7 +390,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			// Drain the node containing the primary pod. Pods should be moved
 			// to the node we've just uncordoned
-			nodes.DrainPrimaryNode(namespace, clusterName, env)
+			nodes.DrainPrimaryNode(namespace, clusterName, TestTimeouts[testsUtils.DrainNode], env)
 
 			// Expect pods to be recreated and to be ready
 			AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReady], env)

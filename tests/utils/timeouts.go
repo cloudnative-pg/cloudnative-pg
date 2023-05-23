@@ -45,6 +45,8 @@ const (
 	LargeObject               Timeout = "largeObject"
 	WalsInMinio               Timeout = "walsInMinio"
 	MinioInstallation         Timeout = "minioInstallation"
+	BackupIsReady             Timeout = "backupIsReady"
+	DrainNode                 Timeout = "drainNode"
 )
 
 // DefaultTestTimeouts contains the default timeout in seconds for various events
@@ -61,6 +63,8 @@ var DefaultTestTimeouts = map[Timeout]int{
 	LargeObject:               300,
 	WalsInMinio:               60,
 	MinioInstallation:         300,
+	BackupIsReady:             180,
+	DrainNode:                 900,
 }
 
 // Timeouts returns the map of timeouts, where each event gets the timeout specificed
