@@ -398,14 +398,22 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 // MinioSSLClient returns the Pod definition for a minio client using SSL
 func MinioSSLClient(namespace string) corev1.Pod {
 	const (
-		minioServerCASecret = "minio-server-ca-secret" // #nosec
-		tlsVolumeName       = "secret-volume"
-		tlsVolumeMountPath  = "/mc/.mc/certs/CAs"
+		configVolumeMountPath = "/mc/.mc"
+		configVolumeName      = "mc-config"
+		minioServerCASecret   = "minio-server-ca-secret" // #nosec
+		tlsVolumeName         = "secret-volume"
+		tlsVolumeMountPath    = configVolumeMountPath + "/certs/CAs"
 	)
 	var secretMode int32 = 0o600
 
 	minioClient := MinioDefaultClient(namespace)
 	minioClient.Spec.Volumes = append(minioClient.Spec.Volumes,
+		corev1.Volume{
+			Name: configVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
 		corev1.Volume{
 			Name: tlsVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -414,13 +422,19 @@ func MinioSSLClient(namespace string) corev1.Pod {
 					DefaultMode: &secretMode,
 				},
 			},
-		})
+		},
+	)
 	minioClient.Spec.Containers[0].VolumeMounts = append(
 		minioClient.Spec.Containers[0].VolumeMounts,
 		corev1.VolumeMount{
+			Name:      configVolumeName,
+			MountPath: configVolumeMountPath,
+		},
+		corev1.VolumeMount{
 			Name:      tlsVolumeName,
 			MountPath: tlsVolumeMountPath,
-		})
+		},
+	)
 	minioClient.Spec.Containers[0].Env[0].Value = "https://minio:minio123@minio-service:9000"
 
 	return minioClient
