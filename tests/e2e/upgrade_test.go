@@ -328,7 +328,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("setting up minio", func() {
 			setup, err := testsUtils.MinioDefaultSetup(upgradeNamespace)
 			Expect(err).ToNot(HaveOccurred())
-			err = testsUtils.InstallMinio(env, setup, 300)
+			err = testsUtils.InstallMinio(env, setup, uint(TestTimeouts[testsUtils.MinioInstallation]))
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -367,7 +367,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		// Cluster ready happens after minio is ready
 		By("having a Cluster with three instances ready", func() {
-			AssertClusterIsReady(upgradeNamespace, clusterName1, 600, env)
+			AssertClusterIsReady(upgradeNamespace, clusterName1, TestTimeouts[testsUtils.ClusterIsReady], env)
 		})
 
 		// Now that everything is in place, we add a bit of data we'll use to
@@ -524,7 +524,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		By("installing a second Cluster on the upgraded operator", func() {
 			CreateResourceFromFile(upgradeNamespace, sampleFile2)
-			AssertClusterIsReady(upgradeNamespace, clusterName2, 600, env)
+			AssertClusterIsReady(upgradeNamespace, clusterName2, TestTimeouts[testsUtils.ClusterIsReady], env)
 		})
 
 		AssertConfUpgrade(clusterName2, upgradeNamespace)
@@ -534,7 +534,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("restoring the backup taken from the first Cluster in a new cluster", func() {
 			restoredClusterName := "cluster-restore"
 			CreateResourceFromFile(upgradeNamespace, restoreFile)
-			AssertClusterIsReady(upgradeNamespace, restoredClusterName, 800, env)
+			AssertClusterIsReady(upgradeNamespace, restoredClusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"

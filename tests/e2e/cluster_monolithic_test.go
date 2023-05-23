@@ -168,7 +168,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				sourceRoles,
 				env)
 			Expect(err).ToNot(HaveOccurred())
-			AssertClusterIsReady(namespace, targetClusterName, 600, env)
+			AssertClusterIsReady(namespace, targetClusterName, TestTimeouts[testsUtils.ClusterIsReady], env)
 		})
 
 		By("verifying that the specified source databases were imported", func() {

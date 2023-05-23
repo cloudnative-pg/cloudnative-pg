@@ -132,7 +132,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			By("setting up minio", func() {
 				setup, err := testUtils.MinioSSLSetup(namespace)
 				Expect(err).ToNot(HaveOccurred())
-				err = testUtils.InstallMinio(env, setup, 300)
+				err = testUtils.InstallMinio(env, setup, uint(TestTimeouts[testUtils.MinioInstallation]))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -870,7 +870,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			By("setting up minio", func() {
 				setup, err := testUtils.MinioSSLSetup(namespace)
 				Expect(err).ToNot(HaveOccurred())
-				err = testUtils.InstallMinio(env, setup, 300)
+				err = testUtils.InstallMinio(env, setup, uint(TestTimeouts[testUtils.MinioInstallation]))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -1304,7 +1304,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 				minio, err := testUtils.MinioDefaultSetup(namespace)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = testUtils.InstallMinio(env, minio, 300)
+				err = testUtils.InstallMinio(env, minio, uint(TestTimeouts[testUtils.MinioInstallation]))
 				Expect(err).ToNot(HaveOccurred())
 			})
 

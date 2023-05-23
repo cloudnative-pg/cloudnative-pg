@@ -67,53 +67,6 @@ const (
 	PollingTime = 5
 )
 
-// Timeout represents an event whose time we want to limit in the test suite
-type Timeout string
-
-const (
-	Failover              Timeout = "failover"
-	Switchover            Timeout = "switchover"
-	NamespaceCreation     Timeout = "namespaceCreation"
-	ThreeNodeClusterReady Timeout = "threeNodeClusterReady"
-	ClusterIsReady        Timeout = "clusterIsReady"
-	ClusterIsReadyQuick   Timeout = "clusterIsReadyQuick"
-	ClusterIsReadySlow    Timeout = "clusterIsReadySlow"
-)
-
-var DefaultTestTimeouts = map[Timeout]int{
-	Failover:              240,
-	Switchover:            120,
-	NamespaceCreation:     30,
-	ThreeNodeClusterReady: 120,
-	ClusterIsReady:        600,
-	ClusterIsReadyQuick:   300,
-	ClusterIsReadySlow:    800,
-}
-
-// TestLevel creates the environment for testing
-func Timeouts() (map[Timeout]int, error) {
-	testTimeoutsEnvVar := "TEST_TIMEOUTS"
-	if timeoutsEnv, exists := os.LookupEnv(testTimeoutsEnvVar); exists {
-		var timeouts map[Timeout]int
-		err := json.Unmarshal([]byte(timeoutsEnv), &timeouts)
-		if err != nil {
-			return map[Timeout]int{},
-				fmt.Errorf("TEST_TIMEOUTS env variable is not valid: %v", err)
-		}
-		for k, def := range DefaultTestTimeouts {
-			val, found := timeouts[k]
-			if found {
-				timeouts[k] = val
-			} else {
-				timeouts[k] = def
-			}
-		}
-		return timeouts, nil
-	}
-
-	return DefaultTestTimeouts, nil
-}
-
 // TestingEnvironment struct for operator testing
 type TestingEnvironment struct {
 	RestClientConfig   *rest.Config

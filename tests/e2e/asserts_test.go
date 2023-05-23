@@ -100,12 +100,11 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 			Namespace: namespace,
 			Name:      clusterName,
 		}
-		timeout := 45
 		Eventually(func() (string, error) {
 			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
 			return cluster.Status.CurrentPrimary, err
-		}, timeout).Should(BeEquivalentTo(targetPrimary))
+		}, TestTimeouts[testsUtils.NewPrimaryAfterSwitchover]).Should(BeEquivalentTo(targetPrimary))
 	})
 
 	By("waiting that the old primary become ready", func() {
@@ -358,7 +357,7 @@ func AssertOperatorIsReady() {
 		// Waiting a bit to avoid overloading the API server
 		time.Sleep(1 * time.Second)
 		return ready, err
-	}, 120).Should(BeTrue(), "Operator pod is not ready")
+	}, TestTimeouts[testsUtils.OperatorIsReady]).Should(BeTrue(), "Operator pod is not ready")
 }
 
 // AssertCreateTestData create test data.
@@ -525,7 +524,7 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string,
 				return "", err
 			}
 			return strings.Trim(stdout, "\n"), nil
-		}, 300).Should(BeEquivalentTo(data))
+		}, TestTimeouts[testsUtils.LargeObject]).Should(BeEquivalentTo(data))
 	})
 }
 
@@ -722,7 +721,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
 			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
-		}, 60).Should(BeEquivalentTo(1))
+		}, TestTimeouts[testsUtils.WalsInMinio]).Should(BeEquivalentTo(1))
 	})
 }
 
@@ -1449,7 +1448,8 @@ func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName,
 			clusterWithExternalClusterName, "", databaseName, env)
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, clusterWithExternalClusterName, 800, env)
+		AssertClusterIsReady(namespace, clusterWithExternalClusterName,
+			TestTimeouts[testsUtils.ClusterIsReadySlow], env)
 		// Restored standby should be attached to restored primary
 		AssertClusterStandbysAreStreaming(namespace, clusterWithExternalClusterName, 120)
 	})

@@ -97,7 +97,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		By("setting up minio", func() {
 			setup, err := testUtils.MinioDefaultSetup(namespace)
 			Expect(err).ToNot(HaveOccurred())
-			err = testUtils.InstallMinio(env, setup, 300)
+			err = testUtils.InstallMinio(env, setup, uint(TestTimeouts[testUtils.MinioInstallation]))
 			Expect(err).ToNot(HaveOccurred())
 		})
 
