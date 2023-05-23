@@ -38,7 +38,7 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	Context("with HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespacePrefix := "switchover-e2e-with-slots"
+			const namespacePrefix = "switchover-e2e-with-slots"
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
@@ -60,7 +60,7 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	Context("without HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespacePrefix := "switchover-e2e"
+			const namespacePrefix = "switchover-e2e"
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())

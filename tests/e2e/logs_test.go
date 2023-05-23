@@ -53,7 +53,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 	})
 
 	It("correctly produces logs in JSON format", func() {
-		namespacePrefix := "json-logs-e2e"
+		const namespacePrefix = "json-logs-e2e"
 		clusterName = "postgresql-json-logs"
 		const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml.template"
 		var namespaceErr error

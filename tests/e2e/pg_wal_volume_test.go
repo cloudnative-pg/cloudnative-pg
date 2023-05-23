@@ -115,7 +115,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 	// ensuring WAL files are archived to the correct location and a symlink
 	// to the PATH is present inside the PGDATA.
 	It("having a dedicated WAL volume", func() {
-		namespacePrefix := "pg-wal-volume-e2e"
+		const namespacePrefix = "pg-wal-volume-e2e"
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -131,7 +131,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 	})
 
 	It("adding a dedicated WAL volume after cluster is created", func() {
-		namespacePrefix := "add-pg-wal-volume-e2e"
+		const namespacePrefix = "add-pg-wal-volume-e2e"
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)

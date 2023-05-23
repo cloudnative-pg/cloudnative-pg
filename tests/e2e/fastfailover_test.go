@@ -89,7 +89,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
-			namespacePrefix := "primary-failover-time-async"
+			const namespacePrefix = "primary-failover-time-async"
 			clusterName = "cluster-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
@@ -110,7 +110,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
-			namespacePrefix := "primary-failover-time-async-with-slots"
+			const namespacePrefix = "primary-failover-time-async-with-slots"
 			clusterName = "cluster-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
@@ -127,7 +127,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 
 	Context("with sync replicas cluster", func() {
 		It("can do a fast failover", func() {
-			namespacePrefix := "primary-failover-time-sync-replicas"
+			const namespacePrefix = "primary-failover-time-sync-replicas"
 			clusterName = "cluster-syncreplicas-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test

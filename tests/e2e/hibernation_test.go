@@ -261,7 +261,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 		When("cluster setup with PG-WAL volume", func() {
 			It("hibernation process should work", func() {
-				namespacePrefix := "hibernation-on-with-pg-wal"
+				const namespacePrefix = "hibernation-on-with-pg-wal"
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
@@ -281,7 +281,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			It("hibernation process should work", func() {
 				var beforeHibernationPgDataPvcUID types.UID
 
-				namespacePrefix := "hibernation-without-pg-wal"
+				const namespacePrefix = "hibernation-without-pg-wal"
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithOutPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
@@ -338,7 +338,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		})
 		When("cluster hibernation after switchover", func() {
 			It("hibernation process should work", func() {
-				namespacePrefix := "hibernation-with-switchover"
+				const namespacePrefix = "hibernation-with-switchover"
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test

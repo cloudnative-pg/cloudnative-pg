@@ -249,7 +249,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	Context("using kubectl-cnpg plugin", Ordered, func() {
 		var err error
 		BeforeAll(func() {
-			namespacePrefix := "fencing-using-plugin"
+			const namespacePrefix = "fencing-using-plugin"
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
@@ -268,7 +268,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	Context("using annotation", Ordered, func() {
 		var err error
 		BeforeAll(func() {
-			namespacePrefix := "fencing-using-annotation"
+			const namespacePrefix = "fencing-using-annotation"
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test

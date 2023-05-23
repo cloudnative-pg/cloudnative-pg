@@ -76,7 +76,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 	It("can gather metrics", func() {
 		// Create the cluster namespace
-		namespacePrefix := "cluster-metrics-e2e"
+		const namespacePrefix = "cluster-metrics-e2e"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -113,7 +113,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	})
 
 	It("can gather metrics with multiple target databases", func() {
-		namespacePrefix := "metrics-target-databases-e2e"
+		const namespacePrefix = "metrics-target-databases-e2e"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsDBFile)
 		Expect(err).ToNot(HaveOccurred())
 		// Create the cluster namespace
@@ -149,7 +149,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 	It("can gather default metrics details", func() {
 		const clusterWithDefaultMetricsFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		namespacePrefix := "default-metrics-details"
+		const namespacePrefix = "default-metrics-details"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -187,7 +187,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		"when disableDefaultQueries field set to be true", func() {
 		const defaultMonitoringQueriesDisableSampleFile = fixturesDir +
 			"/metrics/cluster-disable-default-metrics.yaml.template"
-		namespacePrefix := "disable-default-metrics"
+		const namespacePrefix = "disable-default-metrics"
 		metricsClusterName, err = env.GetResourceNameFromYAML(defaultMonitoringQueriesDisableSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -219,7 +219,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			checkQuery               = "SELECT count(*) FROM test_replica"
 		)
 
-		namespacePrefix := "metrics-with-replica-mode"
+		const namespacePrefix = "metrics-with-replica-mode"
 
 		// Fetching the source cluster name
 		srcClusterName, err := env.GetResourceNameFromYAML(srcClusterSampleFile)

@@ -77,7 +77,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				"/backup/minio/cluster-with-backup-minio-with-wal-max-parallel.yaml.template"
 		)
 
-		namespacePrefix := "pg-backup-minio-wal-max-parallel"
+		const namespacePrefix = "pg-backup-minio-wal-max-parallel"
 		clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 

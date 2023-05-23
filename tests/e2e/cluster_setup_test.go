@@ -40,7 +40,6 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		level       = tests.Highest
 	)
 	var namespace string
-	var err error
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -48,7 +47,9 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 	})
 
 	It("sets up a cluster", func() {
-		namespacePrefix := "cluster-storageclass-e2e"
+		const namespacePrefix = "cluster-storageclass-e2e"
+		var err error
+
 		// Create a cluster in a namespace we'll delete after the test
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
@@ -138,7 +139,9 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 	})
 
 	It("tests cluster readiness conditions work", func() {
-		namespacePrefix := "cluster-conditions"
+		const namespacePrefix = "cluster-conditions"
+
+		var err error
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {

@@ -31,7 +31,7 @@ import (
 var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, tests.LabelPodScheduling), func() {
 	var taintedNodes []string
 	var namespace string
-	namespacePrefix := "test-tolerations"
+	const namespacePrefix = "test-tolerations"
 	const (
 		sampleFile    = fixturesDir + "/tolerations/cluster-tolerations.yaml.template"
 		clusterName   = "cluster-tolerations"

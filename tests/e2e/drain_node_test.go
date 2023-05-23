@@ -95,7 +95,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		// PVC(s).
 
 		It("can drain the primary pod's node with 3 pods on 2 nodes", func() {
-			namespacePrefix := "drain-node-e2e-pvc-on-two-nodes"
+			const namespacePrefix = "drain-node-e2e-pvc-on-two-nodes"
 			By("leaving only two nodes uncordoned", func() {
 				// mark a node unschedulable so the pods will be distributed only on two nodes
 				for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-2] {
@@ -213,7 +213,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}
 			})
 			It("can drain the primary pod's node with 3 pods on 1 nodes", func() {
-				namespacePrefix := "drain-node-e2e-pvc-on-one-nodes"
+				const namespacePrefix = "drain-node-e2e-pvc-on-one-nodes"
 				var cordonNodes []string
 				By("leaving only one node uncordoned", func() {
 					// cordon all nodes but one

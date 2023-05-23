@@ -42,7 +42,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 		}
 	})
 	It("can manage sync replicas", func() {
-		namespacePrefix := "sync-replicas-e2e"
+		const namespacePrefix = "sync-replicas-e2e"
 		clusterName = "cluster-syncreplicas"
 		const sampleFile = fixturesDir + "/sync_replicas/cluster-syncreplicas.yaml.template"
 		var err error
@@ -153,7 +153,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	})
 
 	It("will not prevent a cluster with pg_stat_statements from being created", func() {
-		namespacePrefix := "sync-replicas-statstatements"
+		const namespacePrefix = "sync-replicas-statstatements"
 		clusterName = "cluster-pgstatstatements"
 		const sampleFile = fixturesDir + "/sync_replicas/cluster-pgstatstatements.yaml.template"
 		var err error

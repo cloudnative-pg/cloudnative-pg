@@ -28,9 +28,9 @@ var _ = Describe("Cluster declarative hibernation", func() {
 	})
 
 	It("hibernates an existing cluster", func(ctx SpecContext) {
-		var cluster apiv1.Cluster
+		const namespacePrefix = "declarative-hibernation"
 
-		namespacePrefix := "declarative-hibernation"
+		var cluster apiv1.Cluster
 		clusterName, err := env.GetResourceNameFromYAML(sampleFileCluster)
 		Expect(err).ToNot(HaveOccurred())
 		// Create a cluster in a namespace we'll delete after the test

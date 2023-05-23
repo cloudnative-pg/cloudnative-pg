@@ -444,7 +444,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 		})
 
 		BeforeAll(func() {
-			namespacePrefix := "config-change-primary-update-restart"
+			const namespacePrefix = "config-change-primary-update-restart"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)

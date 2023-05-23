@@ -64,7 +64,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 	Context("without HA Replication Slots", func() {
 		It("can do a fast switchover", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespacePrefix := "primary-switchover-time"
+			const namespacePrefix = "primary-switchover-time"
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
@@ -80,7 +80,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 	Context("with HA Replication Slots", func() {
 		It("can do a fast switchover", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespacePrefix := "primary-switchover-time-with-slots"
+			const namespacePrefix = "primary-switchover-time-with-slots"
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())

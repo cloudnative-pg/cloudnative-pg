@@ -345,7 +345,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var namespace, clusterName string
 
 		It("can do rolling update", func() {
-			namespacePrefix := "cluster-rolling-with-primary-update-method"
+			const namespacePrefix = "cluster-rolling-with-primary-update-method"
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())

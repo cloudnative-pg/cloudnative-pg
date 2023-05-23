@@ -72,7 +72,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		sourceRoles := []string{databaseSuperUser, databaseUserTwo}
 
 		By("creating the source cluster", func() {
-			namespacePrefix := "cluster-monolith"
+			const namespacePrefix = "cluster-monolith"
 			sourceClusterName, err = env.GetResourceNameFromYAML(sourceClusterFile)
 			Expect(err).ToNot(HaveOccurred())
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
