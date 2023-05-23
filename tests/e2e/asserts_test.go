@@ -2281,10 +2281,16 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 				// Deleting standby and replica pods
 				err = env.DeletePod(namespace, pod.Name, forceDelete)
 				Expect(err).ToNot(HaveOccurred())
-				// Ensuring cluster is healthy with three pods
-				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			}
 		}
+		// Make sure the cluster phase changed first
+		AssertClusterEventuallyDepartsPhase(namespace, clusterName, apiv1.PhaseHealthy, timeout)
+		// Ensuring cluster is healthy with three pods, we only need verify here once to safe time,
+		// but we need to make sure the cluster changed to un-health first, otherwise, it will be too
+		// quick, the status of the cluster did not have time to change from healthy to un-health, but
+		// the code reach to deleting primary pod.
+		AssertClusterIsReady(namespace, clusterName, timeout, env)
+
 		// Deleting primary pvc
 		_, _, err = testsUtils.Run(
 			"kubectl delete pvc " + currentPrimary.Name + " -n " + namespace + " --wait=false")
@@ -2299,6 +2305,9 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		err = env.DeletePod(namespace, currentPrimary.Name, forceDelete)
 		Expect(err).ToNot(HaveOccurred())
 	})
+
+	// Make sure the cluster phase changed first
+	AssertClusterEventuallyDepartsPhase(namespace, clusterName, apiv1.PhaseHealthy, timeout)
 	// Ensuring cluster is healthy, after failover of the primary pod and new pod is recreated
 	AssertClusterIsReady(namespace, clusterName, timeout, env)
 	By("verifying Cluster storage is expanded", func() {
@@ -2711,10 +2720,27 @@ func AssertClusterEventuallyReachesPhase(namespace, clusterName, phase string, t
 	})
 }
 
+// AssertClusterEventuallyNotInPhase checks the phase of a cluster not in the specified one
+// within the specified timeout
+func AssertClusterEventuallyDepartsPhase(namespace, clusterName, phase string, timeout int) {
+	By(fmt.Sprintf("verifying cluster '%v' phase should eventually away from '%v'", clusterName, phase), func() {
+		assert := assertPredicateClusterNotHasPhase(namespace, clusterName, phase)
+		Eventually(assert, timeout).Should(Succeed())
+	})
+}
+
 func assertPredicateClusterHasPhase(namespace, clusterName, phase string) func(g Gomega) {
 	return func(g Gomega) {
 		cluster, err := env.GetCluster(namespace, clusterName)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(cluster.Status.Phase).To(BeEquivalentTo(phase))
+	}
+}
+
+func assertPredicateClusterNotHasPhase(namespace, clusterName, phase string) func(g Gomega) {
+	return func(g Gomega) {
+		cluster, err := env.GetCluster(namespace, clusterName)
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(cluster.Status.Phase).ToNot(BeEquivalentTo(phase))
 	}
 }
