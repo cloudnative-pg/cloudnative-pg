@@ -71,9 +71,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	TestTimeouts, err = utils.Timeouts()
-	Expect(err).ShouldNot(HaveOccurred())
-
 	pod, err := utils.GetPsqlClient(psqlClientNamespace, env)
 	Expect(err).ShouldNot(HaveOccurred())
 	DeferCleanup(func() {
@@ -98,6 +95,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
 	testLevelEnv, err = tests.TestLevel()
+	if err != nil {
+		panic(err)
+	}
+	TestTimeouts, err = utils.Timeouts()
 	if err != nil {
 		panic(err)
 	}
