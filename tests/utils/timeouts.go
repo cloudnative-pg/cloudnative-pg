@@ -25,7 +25,7 @@ import (
 // Timeout represents an event whose time we want to limit in the test suite
 type Timeout string
 
-// the events we're setting timeuts for
+// the events we're setting timeouts for
 // NOTE: the text representation will be used as the fields in the JSON representation
 // of the timeout object passed to the ginkgo command as an environment variable
 const (
