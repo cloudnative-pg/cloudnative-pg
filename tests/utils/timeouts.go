@@ -22,6 +22,10 @@ import (
 	"os"
 )
 
+// TestTimeoutsEnvVar is the environment variable where specific timeouts can be
+// set for the E2E test suite
+const TestTimeoutsEnvVar = "TEST_TIMEOUTS"
+
 // Timeout represents an event whose time we want to limit in the test suite
 type Timeout string
 
@@ -63,8 +67,7 @@ var DefaultTestTimeouts = map[Timeout]int{
 // in the `TEST_TIMEOUTS` environment variable, or if not specified, takes the default
 // value
 func Timeouts() (map[Timeout]int, error) {
-	testTimeoutsEnvVar := "TEST_TIMEOUTS"
-	if timeoutsEnv, exists := os.LookupEnv(testTimeoutsEnvVar); exists {
+	if timeoutsEnv, exists := os.LookupEnv(TestTimeoutsEnvVar); exists {
 		var timeouts map[Timeout]int
 		err := json.Unmarshal([]byte(timeoutsEnv), &timeouts)
 		if err != nil {
