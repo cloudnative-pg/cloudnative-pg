@@ -233,16 +233,12 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			By("verifying the operator pod is now back", func() {
 				timeout := 120
-				Eventually(func() (int, error) {
+				Eventually(func() (bool, error) {
 					podList := &corev1.PodList{}
 					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return utils.CountReadyPods(podList.Items), err
-				}, timeout).Should(BeEquivalentTo(1))
-				// Check that the new operator pod has been created with a different name
-				podList := &corev1.PodList{}
-				err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-				Expect(err).ToNot(HaveOccurred())
-				Expect(podList.Items[0].ObjectMeta.Name).ShouldNot(BeEquivalentTo(operatorPodName))
+					return utils.CountReadyPods(podList.Items) == 1 &&
+						podList.Items[0].ObjectMeta.Name != operatorPodName, err
+				}, timeout).Should(BeTrue())
 			})
 
 			// Expect a new primary to be elected and promoted
