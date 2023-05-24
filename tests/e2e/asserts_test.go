@@ -239,6 +239,30 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 	})
 }
 
+func AssertClusterUnderSpecInstances(namespace string, clusterName string, timeout int,
+	env *testsUtils.TestingEnvironment,
+) {
+	By(fmt.Sprintf("checking the Cluster %s has fewer instances than spec", clusterName), func() {
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
+		cluster := &apiv1.Cluster{}
+		Eventually(func(g Gomega) {
+			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			g.Expect(err).ToNot(HaveOccurred())
+		}).Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			podList, err := env.GetClusterPodList(namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(
+				utils.CountReadyPods(podList.Items) < cluster.Spec.Instances,
+			).To(BeTrue())
+		}, timeout).Should(Succeed())
+	})
+}
+
 func AssertClusterDefault(namespace string, clusterName string,
 	isExpectedToDefault bool, env *testsUtils.TestingEnvironment,
 ) {
@@ -2250,7 +2274,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			}, 60, 5).Should(BeNil())
 		}
 	})
-	By("deleting Pod and PVCs", func() {
+	By("deleting Pod and PVCs, first replicas then the primary", func() {
 		// Gathering cluster primary
 		currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -2283,12 +2307,12 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 				Expect(err).ToNot(HaveOccurred())
 			}
 		}
-		// Make sure the cluster phase changed first
-		AssertClusterEventuallyDepartsPhase(namespace, clusterName, apiv1.PhaseHealthy, timeout)
-		// Ensuring cluster is healthy with three pods, we only need verify here once to safe time,
-		// but we need to make sure the cluster changed to un-health first, otherwise, it will be too
-		// quick, the status of the cluster did not have time to change from healthy to un-health, but
-		// the code reach to deleting primary pod.
+		// Make sure the cluster detects missing pods
+		waitForMissingInstances := 10
+		AssertClusterUnderSpecInstances(namespace, clusterName, waitForMissingInstances, env)
+		// We should ensure the cluster is back to 3 healthy instances, but only
+		// after it has had fewer than 3 instances at some point. Otherwise we
+		// may have a false positive on the healthy status
 		AssertClusterIsReady(namespace, clusterName, timeout, env)
 
 		// Deleting primary pvc
@@ -2306,8 +2330,8 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	// Make sure the cluster phase changed first
-	AssertClusterEventuallyDepartsPhase(namespace, clusterName, apiv1.PhaseHealthy, timeout)
+	// Make sure the cluster fails over first
+	AssertClusterEventuallyReachesPhase(namespace, clusterName, apiv1.PhaseFailOver, timeout)
 	// Ensuring cluster is healthy, after failover of the primary pod and new pod is recreated
 	AssertClusterIsReady(namespace, clusterName, timeout, env)
 	By("verifying Cluster storage is expanded", func() {
@@ -2720,27 +2744,10 @@ func AssertClusterEventuallyReachesPhase(namespace, clusterName, phase string, t
 	})
 }
 
-// AssertClusterEventuallyNotInPhase checks the phase of a cluster not in the specified one
-// within the specified timeout
-func AssertClusterEventuallyDepartsPhase(namespace, clusterName, phase string, timeout int) {
-	By(fmt.Sprintf("verifying cluster '%v' phase should eventually away from '%v'", clusterName, phase), func() {
-		assert := assertClusterNotInPhase(namespace, clusterName, phase)
-		Eventually(assert, timeout).Should(Succeed())
-	})
-}
-
 func assertPredicateClusterHasPhase(namespace, clusterName, phase string) func(g Gomega) {
 	return func(g Gomega) {
 		cluster, err := env.GetCluster(namespace, clusterName)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(cluster.Status.Phase).To(BeEquivalentTo(phase))
-	}
-}
-
-func assertClusterNotInPhase(namespace, clusterName, phase string) func(g Gomega) {
-	return func(g Gomega) {
-		cluster, err := env.GetCluster(namespace, clusterName)
-		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(cluster.Status.Phase).ToNot(BeEquivalentTo(phase))
 	}
 }
