@@ -68,7 +68,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 	})
 
 	It("checks if webhook works as expected", func() {
-		webhookNamespace = "webhook-test"
+		webhookNamespacePrefix := "webhook-test"
 		clusterIsDefaulted = true
 		By("having a deployment for the operator in state ready", func() {
 			deployment, err := env.GetOperatorDeployment()
@@ -77,7 +77,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		err := env.CreateNamespace(webhookNamespace)
+		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
@@ -91,7 +91,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 	})
 
 	It("Does not crash the operator when disabled", func() {
-		webhookNamespace = "no-webhook-test"
+		webhookNamespacePrefix := "no-webhook-test"
 		clusterIsDefaulted = true
 
 		mWebhook, admissionNumber, err := utils.GetCNPGsMutatingWebhookByName(env, mutatingWebhook)
@@ -121,7 +121,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		err = env.CreateNamespace(webhookNamespace)
+		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {

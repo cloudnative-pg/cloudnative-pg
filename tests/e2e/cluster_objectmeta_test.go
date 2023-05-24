@@ -28,9 +28,10 @@ var _ = Describe("Cluster object metadata", Label(tests.LabelClusterMetadata), f
 	const (
 		level                 = tests.Low
 		clusterWithObjectMeta = fixturesDir + "/cluster_objectmeta/cluster-level-objectMeta.yaml.template"
-		namespace             = "objectmeta-inheritance"
+		namespacePrefix       = "objectmeta-inheritance"
 	)
-
+	var namespace string
+	var err error
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -39,7 +40,7 @@ var _ = Describe("Cluster object metadata", Label(tests.LabelClusterMetadata), f
 
 	It("verify label's and annotation's inheritance when per-cluster objectmeta changed ", func() {
 		clusterName := "objectmeta-inheritance"
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {

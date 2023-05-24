@@ -30,7 +30,8 @@ import (
 // replicas when we drain node
 var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, tests.LabelPodScheduling), func() {
 	var taintedNodes []string
-	namespace := "test-tolerations"
+	var namespace string
+	const namespacePrefix = "test-tolerations"
 	const (
 		sampleFile    = fixturesDir + "/tolerations/cluster-tolerations.yaml.template"
 		clusterName   = "cluster-tolerations"
@@ -54,8 +55,9 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 	})
 
 	It("can create a cluster with tolerations", func() {
+		var err error
 		// Initialize empty global namespace variable
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).To(BeNil())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {

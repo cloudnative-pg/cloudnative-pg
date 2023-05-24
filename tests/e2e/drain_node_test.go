@@ -95,7 +95,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		// PVC(s).
 
 		It("can drain the primary pod's node with 3 pods on 2 nodes", func() {
-			namespace = "drain-node-e2e-pvc-on-two-nodes"
+			const namespacePrefix = "drain-node-e2e-pvc-on-two-nodes"
 			By("leaving only two nodes uncordoned", func() {
 				// mark a node unschedulable so the pods will be distributed only on two nodes
 				for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-2] {
@@ -104,9 +104,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					Expect(err).ToNot(HaveOccurred())
 				}
 			})
-
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -213,7 +213,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}
 			})
 			It("can drain the primary pod's node with 3 pods on 1 nodes", func() {
-				namespace = "drain-node-e2e-pvc-on-one-nodes"
+				const namespacePrefix = "drain-node-e2e-pvc-on-one-nodes"
 				var cordonNodes []string
 				By("leaving only one node uncordoned", func() {
 					// cordon all nodes but one
@@ -224,9 +224,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 						Expect(err).ToNot(HaveOccurred())
 					}
 				})
-
+				var err error
 				// Create a cluster in a namespace we'll delete after the test
-				err := env.CreateNamespace(namespace)
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
 					return env.DeleteNamespace(namespace)
@@ -320,10 +320,11 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 	Context("Maintenance on, reuse pvc off", func() {
 		// Set unique namespace
-		const namespace = "drain-node-e2e-pvc-off-single-node"
+		const namespacePrefix = "drain-node-e2e-pvc-off-single-node"
 		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node-pvc-off.yaml.template"
 		const clusterName = "cluster-drain-node"
 
+		var namespace string
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
@@ -343,9 +344,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					Expect(err).ToNot(HaveOccurred())
 				}
 			})
-
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)

@@ -35,17 +35,17 @@ import (
 
 var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 	const (
-		namespace   = "pg-data-corruption"
-		sampleFile  = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"
-		clusterName = "cluster-pg-data-corruption"
-		level       = tests.Medium
+		namespacePrefix = "pg-data-corruption"
+		sampleFile      = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"
+		clusterName     = "cluster-pg-data-corruption"
+		level           = tests.Medium
 	)
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-
+	var namespace string
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
@@ -54,8 +54,9 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 
 	It("can recover cluster after pgdata corruption on primary", func() {
 		var oldPrimaryPodName, oldPrimaryPVCName string
+		var err error
 		tableName := "test_pg_data_corruption"
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)

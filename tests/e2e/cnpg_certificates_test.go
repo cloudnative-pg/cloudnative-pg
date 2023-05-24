@@ -92,10 +92,11 @@ var _ = Describe("Certificates", func() {
 		}
 
 		BeforeAll(func() {
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace = "postgresql-cert"
+			const namespacePrefix = "postgresql-cert"
 			fmt.Println(namespace + " BeforeAll")
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -258,14 +259,16 @@ var _ = Describe("Certificates", func() {
 		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-certificates.yaml.template"
 
 		BeforeEach(func() {
-			namespace = "server-certificates-e2e"
 			clusterName = "postgresql-server-cert"
 		})
 
 		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin "+
 			"and verify-ca the provided server certificate", Label(tests.LabelPlugin), func() {
+			const namespacePrefix = "server-certificates-e2e"
+
+			var err error
 			// Create a cluster in a namespace that will be deleted after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -305,14 +308,16 @@ var _ = Describe("Certificates", func() {
 		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-client-certificates.yaml.template"
 
 		BeforeEach(func() {
-			namespace = "client-certificates-e2e"
 			clusterName = "postgresql-cert"
 		})
 
 		It("can authenticate custom CA to verify client certificates for a cluster",
 			Label(tests.LabelServiceConnectivity), func() {
+				const namespacePrefix = "client-certificates-e2e"
+
+				var err error
 				// Create a cluster in a namespace that will be deleted after the test
-				err := env.CreateNamespace(namespace)
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
 					return env.DeleteNamespace(namespace)
@@ -339,14 +344,16 @@ var _ = Describe("Certificates", func() {
 		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-client-server-certificates.yaml.template"
 
 		BeforeEach(func() {
-			namespace = "client-server-certificates-e2e"
 			clusterName = "postgresql-client-server-cert"
 		})
 
 		It("can authenticate custom CA to verify both client and server certificates for a cluster",
 			Label(tests.LabelServiceConnectivity), func() {
+				const namespacePrefix = "client-server-certificates-e2e"
+
 				// Create a cluster in a namespace that will be deleted after the test
-				err := env.CreateNamespace(namespace)
+				var err error
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
 					return env.DeleteNamespace(namespace)

@@ -37,12 +37,12 @@ import (
 
 var _ = Describe("Update user and superuser password", Label(tests.LabelServiceConnectivity), func() {
 	const (
-		namespace   = "cluster-update-user-password"
-		sampleFile  = fixturesDir + "/base/cluster-basic.yaml"
-		clusterName = "cluster-basic"
-		level       = tests.Low
+		namespacePrefix = "cluster-update-user-password"
+		sampleFile      = fixturesDir + "/base/cluster-basic.yaml"
+		clusterName     = "cluster-basic"
+		level           = tests.Low
 	)
-
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -50,8 +50,9 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 	})
 
 	It("can update the user application password", func() {
+		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
@@ -112,12 +113,12 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 
 var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnectivity), func() {
 	const (
-		namespace   = "cluster-superuser-enable"
-		sampleFile  = fixturesDir + "/base/cluster-basic.yaml"
-		clusterName = "cluster-basic"
-		level       = tests.Low
+		namespacePrefix = "cluster-superuser-enable"
+		sampleFile      = fixturesDir + "/base/cluster-basic.yaml"
+		clusterName     = "cluster-basic"
+		level           = tests.Low
 	)
-
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -126,8 +127,9 @@ var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnect
 
 	It("enable disable superuser access", func() {
 		var secret corev1.Secret
+		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
@@ -224,12 +226,12 @@ var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnect
 
 var _ = Describe("Creating a cluster without superuser password", Label(tests.LabelServiceConnectivity), func() {
 	const (
-		namespace   = "no-postgres-pwd"
-		sampleFile  = fixturesDir + "/secrets/cluster-no-postgres-pwd.yaml.template"
-		clusterName = "cluster-no-postgres-pwd"
-		level       = tests.Low
+		namespacePrefix = "no-postgres-pwd"
+		sampleFile      = fixturesDir + "/secrets/cluster-no-postgres-pwd.yaml.template"
+		clusterName     = "cluster-no-postgres-pwd"
+		level           = tests.Low
 	)
-
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -239,10 +241,11 @@ var _ = Describe("Creating a cluster without superuser password", Label(tests.La
 	It("create a cluster without postgres password", func() {
 		var secret corev1.Secret
 		var cluster clusterv1.Cluster
+		var err error
 		const secretName = clusterName + "-superuser"
 
 		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
