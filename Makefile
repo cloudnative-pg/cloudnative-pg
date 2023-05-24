@@ -100,6 +100,9 @@ e2e-test-kind: ## Run e2e tests locally using kind.
 e2e-test-k3d: ## Run e2e tests locally using k3d.
 	hack/e2e/run-e2e-k3d.sh
 
+e2e-test-local: ## Run e2e tests locally using the default kubernetes context.
+	hack/e2e/run-e2e-local.sh
+
 ##@ Build
 build: generate fmt vet ## Build binaries.
 	go build -o bin/manager -ldflags ${LDFLAGS} ./cmd/manager
