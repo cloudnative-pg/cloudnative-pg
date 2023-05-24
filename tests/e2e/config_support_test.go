@@ -39,10 +39,10 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		secretFile                     = fixturesDir + "/configmap-support/secret.yaml"
 		configName                     = "cnpg-controller-manager-config"
 		clusterName                    = "configmap-support"
-		namespace                      = "configmap-support-e2e"
+		namespacePrefix                = "configmap-support-e2e"
 		level                          = tests.Low
 	)
-	var operatorNamespace, curlPodName string
+	var operatorNamespace, curlPodName, namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -118,7 +118,8 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	})
 
 	It("creates a cluster", func() {
-		err := env.CreateNamespace(namespace)
+		var err error
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)

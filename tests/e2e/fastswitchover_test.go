@@ -44,6 +44,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 		clusterName                       = "cluster-fast-switchover"
 		level                             = tests.Highest
 	)
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -63,8 +64,9 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 	Context("without HA Replication Slots", func() {
 		It("can do a fast switchover", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace := "primary-switchover-time"
-			err := env.CreateNamespace(namespace)
+			const namespacePrefix = "primary-switchover-time"
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -82,8 +84,9 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			}
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace := "primary-switchover-time-with-slots"
-			err := env.CreateNamespace(namespace)
+			const namespacePrefix = "primary-switchover-time-with-slots"
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {

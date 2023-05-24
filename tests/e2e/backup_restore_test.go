@@ -99,7 +99,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-			namespacePrefix := "cluster-backup-minio"
+			const namespacePrefix = "cluster-backup-minio"
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -450,7 +450,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			}
 			azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 			azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
-			namespacePrefix := "cluster-backup-azure-blob"
+			const namespacePrefix = "cluster-backup-azure-blob"
 			clusterName, err = env.GetResourceNameFromYAML(azureBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -582,7 +582,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-			namespacePrefix := "cluster-backup-azurite"
+			const namespacePrefix = "cluster-backup-azurite"
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -720,7 +720,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-			namespacePrefix := "recovery-barman-object-minio"
+			const namespacePrefix = "recovery-barman-object-minio"
 			clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileMinio)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
@@ -891,7 +891,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				}
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
-				namespacePrefix := "recovery-barman-object-azure"
+				const namespacePrefix = "recovery-barman-object-azure"
 				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzure)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -967,7 +967,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				}
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
-				namespacePrefix := "cluster-backup-azure-blob-sas"
+				const namespacePrefix = "cluster-backup-azure-blob-sas"
 				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzureSAS)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1046,7 +1046,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
-			namespacePrefix := "recovery-barman-object-azurite"
+			const namespacePrefix = "recovery-barman-object-azurite"
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 

@@ -57,9 +57,10 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		const replicaClusterSampleTLS = fixturesDir + replicaModeClusterDir + "cluster-replica-tls.yaml.template"
 
 		It("should work", func() {
-			replicaNamespace = "replica-mode-tls-auth"
+			replicaNamespacePrefix := "replica-mode-tls-auth"
 			replicaClusterName = "cluster-replica-tls"
-			err := env.CreateNamespace(replicaNamespace)
+			var err error
+			replicaNamespace, err = env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -85,10 +86,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		var err error
 
 		It("still works detached from remote server promoting the designated primary", func() {
-			replicaNamespace = "replica-mode-basic-auth"
+			replicaNamespacePrefix := "replica-mode-basic-auth"
 			replicaClusterName = "cluster-replica-basicauth"
-
-			err = env.CreateNamespace(replicaNamespace)
+			replicaNamespace, err = env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -152,8 +152,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			const replicaClusterSample = fixturesDir + replicaModeClusterDir +
 				"cluster-replica-archive-mode-always.yaml.template"
 
-			replicaNamespace = "replica-mode-archive"
-			err := env.CreateNamespace(replicaNamespace)
+			replicaNamespacePrefix := "replica-mode-archive"
+			var err error
+			replicaNamespace, err = env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {

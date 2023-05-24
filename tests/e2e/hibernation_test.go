@@ -272,11 +272,11 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 		When("cluster setup with PG-WAL volume", func() {
 			It("hibernation process should work", func() {
-				namespace = "hibernation-on-with-pg-wal"
+				const namespacePrefix = "hibernation-on-with-pg-wal"
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				err = env.CreateNamespace(namespace)
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				assertHibernation(namespace, clusterName, tableName)
@@ -286,11 +286,11 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			It("hibernation process should work", func() {
 				var beforeHibernationPgDataPvcUID types.UID
 
-				namespace = "hibernation-without-pg-wal"
+				const namespacePrefix = "hibernation-without-pg-wal"
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithOutPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				err = env.CreateNamespace(namespace)
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
@@ -337,11 +337,11 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		})
 		When("cluster hibernation after switchover", func() {
 			It("hibernation process should work", func() {
-				namespace = "hibernation-with-switchover"
+				const namespacePrefix = "hibernation-with-switchover"
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				err = env.CreateNamespace(namespace)
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				AssertSwitchover(namespace, clusterName, env)

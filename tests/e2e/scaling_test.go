@@ -45,9 +45,9 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			if env.PostgresVersion == 10 {
 				Skip("replication slots are not available for PostgreSQL 10 or older")
 			}
-			namespace := "cluster-scale-e2e-with-slots"
+			const namespacePrefix = "cluster-scale-e2e-with-slots"
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -88,8 +88,8 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 	Context("without HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace := "cluster-scale-e2e"
-			err := env.CreateNamespace(namespace)
+			const namespacePrefix = "cluster-scale-e2e"
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {

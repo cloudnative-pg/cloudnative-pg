@@ -30,11 +30,12 @@ import (
 
 var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 	const (
-		namespace   = "replication-slot-e2e"
-		clusterName = "cluster-pg-replication-slot"
-		sampleFile  = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
-		level       = tests.High
+		namespacePrefix = "replication-slot-e2e"
+		clusterName     = "cluster-pg-replication-slot"
+		sampleFile      = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
+		level           = tests.High
 	)
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -46,7 +47,8 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 	})
 
 	It("Can enable and disable replication slots", func() {
-		err := env.CreateNamespace(namespace)
+		var err error
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
