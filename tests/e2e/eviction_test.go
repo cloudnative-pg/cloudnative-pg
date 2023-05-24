@@ -162,7 +162,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadyQuick], env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 			})
 		})
 	})
@@ -263,7 +263,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadyQuick], env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 			})
 		})
 
@@ -307,7 +307,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 
 			// Pod need rejoin, need more time
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadyQuick], env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 			})
 		})
 	})

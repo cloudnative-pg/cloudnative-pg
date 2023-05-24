@@ -227,7 +227,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.TargetPrimary, err
-			}, TestTimeouts[utils.NewTargetOnFailover]).
+			}, testTimeouts[utils.NewTargetOnFailover]).
 				ShouldNot(
 					Or(BeEquivalentTo(currentPrimary),
 						BeEquivalentTo(apiv1.PendingFailoverMarker)))
@@ -248,7 +248,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.CurrentPrimary, err
-			}, TestTimeouts[utils.NewPrimaryAfterFailover]).Should(BeEquivalentTo(targetPrimary))
+			}, testTimeouts[utils.NewPrimaryAfterFailover]).Should(BeEquivalentTo(targetPrimary))
 		})
 	}
 

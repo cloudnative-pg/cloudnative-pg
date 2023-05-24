@@ -63,7 +63,7 @@ var (
 	operatorWasRestarted    bool
 	operatorLogDumped       bool
 	quickDeletionPeriod     = int64(1)
-	TestTimeouts            map[utils.Timeout]int
+	testTimeouts            map[utils.Timeout]int
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
@@ -98,7 +98,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	if err != nil {
 		panic(err)
 	}
-	TestTimeouts, err = utils.Timeouts()
+	testTimeouts, err = utils.Timeouts()
 	if err != nil {
 		panic(err)
 	}

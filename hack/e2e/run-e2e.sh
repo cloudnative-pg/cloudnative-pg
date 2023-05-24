@@ -123,7 +123,7 @@ mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # would create CPUs-1 nodes and saturate the testing server
 RC_GINKGO2=0
 export TEST_SKIP_UPGRADE=true
-TEST_TIMEOUTS='{"clusterIsReady": 1}' ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
+ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
        ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
        --output-dir "${ROOT_DIR}/tests/e2e/out/" \
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?

@@ -104,7 +104,7 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
 			return cluster.Status.CurrentPrimary, err
-		}, TestTimeouts[testsUtils.NewPrimaryAfterSwitchover]).Should(BeEquivalentTo(targetPrimary))
+		}, testTimeouts[testsUtils.NewPrimaryAfterSwitchover]).Should(BeEquivalentTo(targetPrimary))
 	})
 
 	By("waiting that the old primary become ready", func() {
@@ -186,14 +186,14 @@ func AssertCreateCluster(namespace string, clusterName string, sampleFile string
 			namespaceResource := &corev1.Namespace{}
 			err := env.Client.Get(env.Ctx, namespacedName, namespaceResource)
 			return namespaceResource.GetName(), err
-		}, TestTimeouts[testsUtils.NamespaceCreation]).Should(BeEquivalentTo(namespace))
+		}, testTimeouts[testsUtils.NamespaceCreation]).Should(BeEquivalentTo(namespace))
 	})
 
 	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
 		CreateResourceFromFile(namespace, sampleFile)
 	})
 	// Setting up a cluster with three pods is slow, usually 200-600s
-	AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReady], env)
+	AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 }
 
 // AssertClusterIsReady checks the cluster has as many pods as in spec, that
@@ -357,7 +357,7 @@ func AssertOperatorIsReady() {
 		// Waiting a bit to avoid overloading the API server
 		time.Sleep(1 * time.Second)
 		return ready, err
-	}, TestTimeouts[testsUtils.OperatorIsReady]).Should(BeTrue(), "Operator pod is not ready")
+	}, testTimeouts[testsUtils.OperatorIsReady]).Should(BeTrue(), "Operator pod is not ready")
 }
 
 // AssertCreateTestData create test data.
@@ -524,7 +524,7 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string,
 				return "", err
 			}
 			return strings.Trim(stdout, "\n"), nil
-		}, TestTimeouts[testsUtils.LargeObject]).Should(BeEquivalentTo(data))
+		}, testTimeouts[testsUtils.LargeObject]).Should(BeEquivalentTo(data))
 	})
 }
 
@@ -593,7 +593,7 @@ func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout
 	})
 
 	By("having all the instances ready", func() {
-		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReady], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 	})
 
 	By(fmt.Sprintf("restoring full cluster functionality within %v seconds", timeout), func() {
@@ -721,7 +721,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
 			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
-		}, TestTimeouts[testsUtils.WalsInMinio]).Should(BeEquivalentTo(1))
+		}, testTimeouts[testsUtils.WalsInMinio]).Should(BeEquivalentTo(1))
 	})
 }
 
@@ -959,7 +959,7 @@ func AssertFastFailOver(
 	})
 
 	By("having a Cluster with three instances ready", func() {
-		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReady], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 	})
 
 	// Node 1 should be the primary, so the -rw service should
@@ -1325,7 +1325,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		Expect(err).ToNot(HaveOccurred())
 		CreateResourceFromFile(namespace, restoreClusterFile)
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, restoredClusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
+		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
 		primary, err := env.GetClusterPrimary(namespace, restoredClusterName)
@@ -1364,7 +1364,7 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 		CreateResourceFromFile(namespace, restoreClusterFile)
 
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, restoredClusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
+		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
 		primary := restoredClusterName + "-1"
@@ -1420,7 +1420,7 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string, pod *
 		CreateResourceFromFile(namespace, restoreClusterFile)
 
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, restoredClusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
+		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
 		primary := restoredClusterName + "-1"
@@ -1449,7 +1449,7 @@ func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName,
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, clusterWithExternalClusterName,
-			TestTimeouts[testsUtils.ClusterIsReadySlow], env)
+			testTimeouts[testsUtils.ClusterIsReadySlow], env)
 		// Restored standby should be attached to restored primary
 		AssertClusterStandbysAreStreaming(namespace, clusterWithExternalClusterName, 120)
 	})
@@ -1574,7 +1574,7 @@ func AssertClusterRestorePITRWithApplicationDB(namespace, clusterName, tableName
 
 	By("restoring a backup cluster with PITR in a new cluster", func() {
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -1639,7 +1639,7 @@ func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string, pod
 
 	By("restoring a backup cluster with PITR in a new cluster", func() {
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadySlow], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
 		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -1744,7 +1744,7 @@ func prepareClusterForPITROnMinio(
 	const tableNamePitr = "for_restore"
 
 	By("backing up a cluster and verifying it exists on minio", func() {
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, TestTimeouts[testsUtils.BackupIsReady], env)
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
 		latestTar := minioPath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
@@ -1789,7 +1789,7 @@ func prepareClusterForPITROnAzureBlob(
 ) {
 	const tableNamePitr = "for_restore"
 	By("backing up a cluster and verifying it exists on Azure Blob", func() {
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, TestTimeouts[testsUtils.BackupIsReady], env)
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
 
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
@@ -1861,7 +1861,7 @@ func prepareClusterBackupOnAzurite(
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
-		testsUtils.ExecuteBackup(namespace, backupFile, false, TestTimeouts[testsUtils.BackupIsReady], env)
+		testsUtils.ExecuteBackup(namespace, backupFile, false, testTimeouts[testsUtils.BackupIsReady], env)
 		// Verifying file called data.tar should be available on Azurite blob storage
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
@@ -1886,7 +1886,7 @@ func prepareClusterForPITROnAzurite(
 ) {
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, TestTimeouts[testsUtils.BackupIsReady], env)
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
 		// Verifying file called data.tar should be available on Azurite blob storage
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
@@ -2675,7 +2675,7 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 			return cluster.Status.Phase == apiv1.PhaseUpgrade, err
 		}, 120, 3).Should(BeTrue())
 	})
-	AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadyQuick], env)
+	AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 }
 
 // AssertPVCCount matches count and pvc List.

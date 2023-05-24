@@ -186,7 +186,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				return false, nil
 			}, 300).Should(BeTrue())
 		})
-		AssertClusterIsReady(namespace, clusterName, TestTimeouts[testsUtils.ClusterIsReadyQuick], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 		AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 	})
