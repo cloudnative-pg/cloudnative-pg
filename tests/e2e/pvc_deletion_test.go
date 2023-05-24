@@ -33,11 +33,12 @@ import (
 
 var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 	const (
-		namespace   = "cluster-pvc-deletion"
-		sampleFile  = fixturesDir + "/pvc_deletion/cluster-pvc-deletion.yaml.template"
-		clusterName = "cluster-pvc-deletion"
-		level       = tests.Medium
+		namespacePrefix = "cluster-pvc-deletion"
+		sampleFile      = fixturesDir + "/pvc_deletion/cluster-pvc-deletion.yaml.template"
+		clusterName     = "cluster-pvc-deletion"
+		level           = tests.Medium
 	)
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -45,8 +46,9 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 	})
 
 	It("correctly manages PVCs", func() {
+		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {

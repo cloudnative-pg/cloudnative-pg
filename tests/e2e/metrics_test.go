@@ -76,10 +76,10 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 	It("can gather metrics", func() {
 		// Create the cluster namespace
-		namespace = "cluster-metrics-e2e"
+		const namespacePrefix = "cluster-metrics-e2e"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -113,11 +113,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	})
 
 	It("can gather metrics with multiple target databases", func() {
-		namespace = "metrics-target-databases-e2e"
+		const namespacePrefix = "metrics-target-databases-e2e"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsDBFile)
 		Expect(err).ToNot(HaveOccurred())
 		// Create the cluster namespace
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -149,10 +149,10 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 	It("can gather default metrics details", func() {
 		const clusterWithDefaultMetricsFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		namespace = "default-metrics-details"
+		const namespacePrefix = "default-metrics-details"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
-		err = env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -187,10 +187,10 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		"when disableDefaultQueries field set to be true", func() {
 		const defaultMonitoringQueriesDisableSampleFile = fixturesDir +
 			"/metrics/cluster-disable-default-metrics.yaml.template"
-		namespace = "disable-default-metrics"
+		const namespacePrefix = "disable-default-metrics"
 		metricsClusterName, err = env.GetResourceNameFromYAML(defaultMonitoringQueriesDisableSampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		err = env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
@@ -219,7 +219,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			checkQuery               = "SELECT count(*) FROM test_replica"
 		)
 
-		namespace = "metrics-with-replica-mode"
+		const namespacePrefix = "metrics-with-replica-mode"
 
 		// Fetching the source cluster name
 		srcClusterName, err := env.GetResourceNameFromYAML(srcClusterSampleFile)
@@ -230,7 +230,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// create namespace
-		err = env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)

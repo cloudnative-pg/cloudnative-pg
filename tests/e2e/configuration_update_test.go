@@ -41,16 +41,13 @@ import (
 var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetadata), func() {
 	const (
 		clusterName          = "postgresql-storage-class"
-		namespace            = "cluster-update-config-e2e"
+		namespacePrefix      = "cluster-update-config-e2e"
 		sampleFile           = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		level                = tests.High
 		autoVacuumMaxWorkers = 4
 		timeout              = 60
 	)
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      clusterName,
-	}
+	var namespace string
 	commandTimeout := time.Second * 10
 	postgresParams := map[string]string{
 		"work_mem":                    "8MB",
@@ -64,8 +61,12 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		"log_replication_commands":    "on",
 		"wal_receiver_timeout":        "2s",
 	}
-	updateClusterPostgresParams := func(paramsMap map[string]string) {
+	updateClusterPostgresParams := func(paramsMap map[string]string, namespace string) {
 		cluster := apiv1.Cluster{}
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			err := utils.GetObject(env, namespacedName, &cluster)
 			Expect(err).ToNot(HaveOccurred())
@@ -75,8 +76,12 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		Expect(err).ToNot(HaveOccurred())
 	}
 
-	updateClusterPostgresPgHBA := func() {
+	updateClusterPostgresPgHBA := func(namespace string) {
 		cluster := apiv1.Cluster{}
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			err := utils.GetObject(env, namespacedName, &cluster)
 			Expect(err).ToNot(HaveOccurred())
@@ -86,9 +91,13 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		Expect(err).ToNot(HaveOccurred())
 	}
 
-	checkErrorOutFixedAndBlockedConfigurationParameter := func(params map[string]string) {
+	checkErrorOutFixedAndBlockedConfigurationParameter := func(params map[string]string, namespace string) {
 		// Update the configuration
 		cluster := apiv1.Cluster{}
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			err := utils.GetObject(env, namespacedName, &cluster)
 			Expect(err).NotTo(HaveOccurred())
@@ -122,7 +131,8 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		}
 
 		By("create cluster with default configuration", func() {
-			err := env.CreateNamespace(namespace)
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -144,7 +154,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			updateClusterPostgresParams(postgresParams)
+			updateClusterPostgresParams(postgresParams, namespace)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, 300)
 		})
 
@@ -184,7 +194,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			updateClusterPostgresPgHBA()
+			updateClusterPostgresPgHBA(namespace)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, 300)
 		})
 
@@ -217,6 +227,10 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		Expect(err).ToNot(HaveOccurred())
 
 		cluster := &apiv1.Cluster{}
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
 		err = env.Client.Get(env.Ctx, namespacedName, cluster)
 		Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 		oldPrimary := cluster.Status.CurrentPrimary
@@ -224,7 +238,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		By("apply configuration update", func() {
 			// Update the configuration
 			postgresParams["shared_buffers"] = "256MB"
-			updateClusterPostgresParams(postgresParams)
+			updateClusterPostgresParams(postgresParams, namespace)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 		})
 
@@ -256,6 +270,10 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		Expect(err).ToNot(HaveOccurred())
 
 		cluster := &apiv1.Cluster{}
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
 		err = env.Client.Get(env.Ctx, namespacedName, cluster)
 		Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 		oldPrimary := cluster.Status.CurrentPrimary
@@ -264,7 +282,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			// Update the configuration
 			postgresParams["max_replication_slots"] = "16"
 			postgresParams["maintenance_work_mem"] = "128MB"
-			updateClusterPostgresParams(postgresParams)
+			updateClusterPostgresParams(postgresParams, namespace)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 		})
 
@@ -299,13 +317,13 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 
 	It("05. error out when a fixedConfigurationParameter is modified", func() {
 		postgresParams["cluster_name"] = "Setting this parameter is not allowed"
-		checkErrorOutFixedAndBlockedConfigurationParameter(postgresParams)
+		checkErrorOutFixedAndBlockedConfigurationParameter(postgresParams, namespace)
 	})
 
 	It("06. error out when a blockedConfigurationParameter is modified", func() {
 		delete(postgresParams, "cluster_name")
 		postgresParams["port"] = "5433"
-		checkErrorOutFixedAndBlockedConfigurationParameter(postgresParams)
+		checkErrorOutFixedAndBlockedConfigurationParameter(postgresParams, namespace)
 	})
 
 	// nolint:dupl
@@ -318,6 +336,10 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := &apiv1.Cluster{}
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      clusterName,
+			}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
@@ -326,7 +348,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 				// Update the configuration
 				delete(postgresParams, "port")
 				postgresParams["max_connections"] = "105"
-				updateClusterPostgresParams(postgresParams)
+				updateClusterPostgresParams(postgresParams, namespace)
 				AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 			})
 
@@ -362,6 +384,10 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			Expect(err).ToNot(HaveOccurred())
 
 			cluster := &apiv1.Cluster{}
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      clusterName,
+			}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
@@ -369,7 +395,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			By("apply configuration update", func() {
 				// Update the configuration
 				delete(postgresParams, "max_connections")
-				updateClusterPostgresParams(postgresParams)
+				updateClusterPostgresParams(postgresParams, namespace)
 				AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 			})
 
@@ -418,9 +444,10 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 		})
 
 		BeforeAll(func() {
-			namespace = "config-change-primary-update-restart"
+			const namespacePrefix = "config-change-primary-update-restart"
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)

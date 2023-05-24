@@ -47,9 +47,11 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 	})
 
 	It("sets up a cluster", func() {
-		namespace = "cluster-storageclass-e2e"
+		const namespacePrefix = "cluster-storageclass-e2e"
+		var err error
+
 		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
@@ -137,8 +139,10 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 	})
 
 	It("tests cluster readiness conditions work", func() {
-		namespace = "cluster-conditions"
-		err := env.CreateNamespace(namespace)
+		const namespacePrefix = "cluster-conditions"
+
+		var err error
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
