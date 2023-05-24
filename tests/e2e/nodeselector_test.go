@@ -40,8 +40,9 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 	})
 
 	Context("The label doesn't exist", func() {
-		const namespace = "nodeselector-e2e-missing-label"
+		const namespacePrefix = "nodeselector-e2e-missing-label"
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-not-exists.yaml.template"
+		var namespace string
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
@@ -50,7 +51,8 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 		It("verifies that pods can't be scheduled", func() {
 			// We create a namespace and verify it exists
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
-				err := env.CreateNamespace(namespace)
+				var err error
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
 					return env.DeleteNamespace(namespace)
@@ -103,9 +105,10 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 	})
 
 	Context("The label exists", func() {
-		const namespace = "nodeselector-e2e-existing-label"
+		const namespacePrefix = "nodeselector-e2e-existing-label"
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-exists.yaml.template"
 		const clusterName = "postgresql-nodeselector"
+		var namespace string
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
@@ -114,8 +117,9 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 
 		It("verifies the pods run on the labeled node", func() {
 			var nodeName string
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)

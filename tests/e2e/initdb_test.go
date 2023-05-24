@@ -53,8 +53,9 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 		It("can find the tables created by the post-init SQL queries", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace = "initdb-postqueries"
-			err := env.CreateNamespace(namespace)
+			const namespacePrefix = "initdb-postqueries"
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -139,8 +140,9 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 		It("use the custom default locale specified", func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace = "initdb-locale"
-			err := env.CreateNamespace(namespace)
+			const namespacePrefix = "initdb-locale"
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {

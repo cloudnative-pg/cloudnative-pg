@@ -29,14 +29,15 @@ import (
 
 var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.LabelRecovery), func() {
 	const (
-		namespace      = "cluster-pg-basebackup-basic-auth"
-		srcCluster     = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
-		srcClusterName = "pg-basebackup-src"
-		dstCluster     = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml.template"
-		dstClusterName = "pg-basebackup-dst-basic-auth"
-		checkQuery     = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
-		level          = tests.High
+		namespacePrefix = "cluster-pg-basebackup-basic-auth"
+		srcCluster      = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
+		srcClusterName  = "pg-basebackup-src"
+		dstCluster      = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml.template"
+		dstClusterName  = "pg-basebackup-dst-basic-auth"
+		checkQuery      = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
+		level           = tests.High
 	)
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -44,7 +45,8 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.La
 	})
 
 	It("can bootstrap with pg_basebackup using basic auth", func() {
-		err := env.CreateNamespace(namespace)
+		var err error
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
@@ -109,7 +111,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.La
 })
 
 var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.LabelRecovery), func() {
-	const namespace = "cluster-pg-basebackup-tls-auth"
+	const namespacePrefix = "cluster-pg-basebackup-tls-auth"
 
 	const srcCluster = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
 	const srcClusterName = "pg-basebackup-src"
@@ -118,9 +120,10 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.Labe
 	const dstClusterName = "pg-basebackup-dst-tls-auth"
 
 	const checkQuery = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
-
+	var namespace string
 	It("can bootstrap with pg_basebackup using TLS auth", func() {
-		err := env.CreateNamespace(namespace)
+		var err error
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {

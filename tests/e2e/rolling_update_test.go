@@ -293,16 +293,18 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	}
 
 	Context("Three Instances", func() {
-		const namespace = "cluster-rolling-e2e-three-instances"
+		const namespacePrefix = "cluster-rolling-e2e-three-instances"
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml.template"
 		const clusterName = "postgresql-three-instances"
+		var namespace string
 		It("can do a rolling update", func() {
+			var err error
 			// We set up a cluster with a previous release of the same PG major
 			// The yaml has been previously generated from a template and
 			// the image name has to be tagged as foo:MAJ.MIN. We'll update
 			// it to foo:MAJ, representing the latest minor.
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -315,16 +317,18 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	})
 
 	Context("Single Instance", func() {
-		const namespace = "cluster-rolling-e2e-single-instance"
+		const namespacePrefix = "cluster-rolling-e2e-single-instance"
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-single-instance.yaml.template"
 		const clusterName = "postgresql-single-instance"
+		var namespace string
 		It("can do a rolling updates on a single instance", func() {
+			var err error
 			// We set up a cluster with a previous release of the same PG major
 			// The yaml has been previously generated from a template and
 			// the image name has to be tagged as foo:MAJ.MIN. We'll update
 			// it to foo:MAJ, representing the latest minor.
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -341,8 +345,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var namespace, clusterName string
 
 		It("can do rolling update", func() {
-			namespace = "cluster-rolling-with-primary-update-method"
-			err := env.CreateNamespace(namespace)
+			const namespacePrefix = "cluster-rolling-with-primary-update-method"
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {

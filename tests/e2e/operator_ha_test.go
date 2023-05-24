@@ -33,13 +33,13 @@ import (
 var _ = Describe("Operator High Availability", Serial,
 	Label(tests.LabelDisruptive, tests.LabelNoOpenshift, tests.LabelOperator), func() {
 		const (
-			namespace   = "operator-ha-e2e"
-			sampleFile  = fixturesDir + "/operator-ha/operator-ha.yaml.template"
-			clusterName = "operator-ha"
-			level       = tests.Lowest
+			namespacePrefix = "operator-ha-e2e"
+			sampleFile      = fixturesDir + "/operator-ha/operator-ha.yaml.template"
+			clusterName     = "operator-ha"
+			level           = tests.Lowest
 		)
 		var operatorPodNames []string
-		var oldLeaderPodName string
+		var oldLeaderPodName, namespace string
 
 		BeforeEach(func() {
 			if testLevelEnv.Depth < int(level) {
@@ -68,7 +68,7 @@ var _ = Describe("Operator High Availability", Serial,
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster namespace
-			err = env.CreateNamespace(namespace)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {

@@ -270,13 +270,14 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 	// before deciding which instance to promote (which should be the third).
 	It("reacts to primary failure", func() {
 		const (
-			sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
-			clusterName = "postgresql-storage-class"
-			namespace   = "failover-e2e"
+			sampleFile      = fixturesDir + "/base/cluster-storage-class.yaml.template"
+			clusterName     = "postgresql-storage-class"
+			namespacePrefix = "failover-e2e"
 		)
-
+		var namespace string
+		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
@@ -292,11 +293,13 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 	It("reacts to primary failure while respecting the delay", func() {
 		const (
-			sampleFile  = fixturesDir + "/failover/cluster-failover-delay.yaml.template"
-			clusterName = "failover-delay"
-			namespace   = "failover-e2e-delay"
+			sampleFile      = fixturesDir + "/failover/cluster-failover-delay.yaml.template"
+			clusterName     = "failover-delay"
+			namespacePrefix = "failover-e2e-delay"
 		)
-		err := env.CreateNamespace(namespace)
+		var namespace string
+		var err error
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
