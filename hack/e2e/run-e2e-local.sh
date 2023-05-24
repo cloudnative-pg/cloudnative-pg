@@ -20,6 +20,7 @@
 set -eEuo pipefail
 
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
+FEATURE_TYPE=${FEATURE_TYPE:-""}
 readonly ROOT_DIR
 
 if [ "${DEBUG-}" = true ]; then
@@ -40,15 +41,7 @@ export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
 
-function get_label_filters() {
-  if [[ -n "${FEATURE_TYPE:-}" ]]; then
-    echo "${FEATURE_TYPE//,/ || }"
-  else
-    echo ""
-  fi
-}
-
-LABEL_FILTERS=$(get_label_filters)
+LABEL_FILTERS=${FEATURE_TYPE//,/ ||}
 readonly LABEL_FILTERS
 
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
