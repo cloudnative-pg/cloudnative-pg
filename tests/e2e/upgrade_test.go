@@ -19,6 +19,7 @@ package e2e
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -84,6 +85,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	)
 
 	BeforeEach(func() {
+		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
+			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
+		}
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}

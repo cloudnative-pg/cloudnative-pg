@@ -44,6 +44,7 @@ export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.
 export AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT:-''}
 
 # Getting the operator images need a pull secret
+kubectl delete namespace cnpg-system || :
 kubectl create namespace cnpg-system
 if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
   kubectl create secret docker-registry \
@@ -93,6 +94,7 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
+  unset TEST_SKIP_UPGRADE
   ginkgo --nodes=1 --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
    --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
    --json-report  "upgrade_report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO1=$?
@@ -116,12 +118,14 @@ make build
 export PATH=${ROOT_DIR}/bin/:${PATH}
 
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
+
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
 RC_GINKGO2=0
-
-ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
-       --skip-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out/" \
+export TEST_SKIP_UPGRADE=true
+ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
+       ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
+       --output-dir "${ROOT_DIR}/tests/e2e/out/" \
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
 
 # Report if there are any tests that failed and did NOT have an "ignore-fails" label
