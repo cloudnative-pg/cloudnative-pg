@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
@@ -53,31 +54,31 @@ func (r *ScheduledBackup) Default() {
 var _ webhook.Validator = &ScheduledBackup{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ScheduledBackup) ValidateCreate() error {
+func (r *ScheduledBackup) ValidateCreate() (admission.Warnings, error) {
 	var allErrs field.ErrorList
 	scheduledBackupLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 
 	allErrs = append(allErrs, r.validateSchedule()...)
 
 	if len(allErrs) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return apierrors.NewInvalid(
+	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "scheduledbackup.cnpg.io", Kind: "Backup"},
 		r.Name, allErrs)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ScheduledBackup) ValidateUpdate(_ runtime.Object) error {
+func (r *ScheduledBackup) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
 	scheduledBackupLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ScheduledBackup) ValidateDelete() error {
+func (r *ScheduledBackup) ValidateDelete() (admission.Warnings, error) {
 	scheduledBackupLog.Info("validate delete", "name", r.Name, "namespace", r.Namespace)
-	return nil
+	return nil, nil
 }
 
 func (r *ScheduledBackup) validateSchedule() field.ErrorList {
