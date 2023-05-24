@@ -153,13 +153,14 @@ func RunController(
 		return err
 	}
 
+	webhookServer := mgr.GetWebhookServer().(*webhook.DefaultServer)
 	if configuration.Current.WebhookCertDir != "" {
 		// Use certificate names compatible with OLM
-		mgr.GetWebhookServer().(*webhook.DefaultServer).Options.CertName = "apiserver.crt"
-		mgr.GetWebhookServer().(*webhook.DefaultServer).Options.KeyName = "apiserver.key"
+		webhookServer.Options.CertName = "apiserver.crt"
+		webhookServer.Options.KeyName = "apiserver.key"
 	} else {
-		mgr.GetWebhookServer().(*webhook.DefaultServer).Options.CertName = "tls.crt"
-		mgr.GetWebhookServer().(*webhook.DefaultServer).Options.KeyName = "tls.key"
+		webhookServer.Options.CertName = "tls.crt"
+		webhookServer.Options.KeyName = "tls.key"
 	}
 
 	// kubeClient is the kubernetes client set with
@@ -207,7 +208,7 @@ func RunController(
 		"haveSCC", utils.HaveSecurityContextConstraints(),
 		"haveSeccompProfile", utils.HaveSeccompSupport())
 
-	if err := ensurePKI(ctx, kubeClient, mgr.GetWebhookServer().(*webhook.DefaultServer).Options.CertDir); err != nil {
+	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir); err != nil {
 		return err
 	}
 
@@ -270,7 +271,7 @@ func RunController(
 	//
 	// 2. the webhook service and/or the CNI are being updated, e.g. when a POD is
 	//    deleted. In that case we could get a "Connection refused" error message.
-	mgr.GetWebhookServer().WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
+	webhookServer.WebhookMux().HandleFunc("/readyz", readinessProbeHandler)
 
 	// +kubebuilder:scaffold:builder
 
