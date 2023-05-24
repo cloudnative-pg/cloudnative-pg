@@ -1068,12 +1068,11 @@ func AssertFastFailOver(
 
 	By("deleting the primary", func() {
 		// The primary is force-deleted.
-		one := int64(1)
-		forceDelete := &ctrlclient.DeleteOptions{
-			GracePeriodSeconds: &one,
+		quickDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &quickDeletionPeriod,
 		}
 		lm := clusterName + "-1"
-		err = env.DeletePod(namespace, lm, forceDelete)
+		err = env.DeletePod(namespace, lm, quickDelete)
 
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -2279,9 +2278,8 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		currentPrimaryWalStorageName := currentPrimary.Name + "-wal"
-		one := int64(1)
-		forceDelete := &ctrlclient.DeleteOptions{
-			GracePeriodSeconds: &one,
+		quickDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &quickDeletionPeriod,
 		}
 
 		podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -2303,7 +2301,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 					Expect(err).ToNot(HaveOccurred())
 				}
 				// Deleting standby and replica pods
-				err = env.DeletePod(namespace, pod.Name, forceDelete)
+				err = env.DeletePod(namespace, pod.Name, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 			}
 		}
@@ -2326,7 +2324,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			Expect(err).ToNot(HaveOccurred())
 		}
 		// Deleting primary pod
-		err = env.DeletePod(namespace, currentPrimary.Name, forceDelete)
+		err = env.DeletePod(namespace, currentPrimary.Name, quickDelete)
 		Expect(err).ToNot(HaveOccurred())
 	})
 

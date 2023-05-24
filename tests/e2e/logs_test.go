@@ -174,13 +174,12 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 		By("verifying pg_rewind logs after deleting the old primary pod", func() {
 			// Force-delete the primary
-			one := int64(1)
 			currentPrimary, _ := env.GetClusterPrimary(namespace, clusterName)
-			forceDelete := &client.DeleteOptions{
-				GracePeriodSeconds: &one,
+			quickDelete := &client.DeleteOptions{
+				GracePeriodSeconds: &quickDeletionPeriod,
 			}
 
-			deletePodError := env.DeletePod(namespace, currentPrimary.GetName(), forceDelete)
+			deletePodError := env.DeletePod(namespace, currentPrimary.GetName(), quickDelete)
 			Expect(deletePodError).ToNot(HaveOccurred())
 
 			// Expect a new primary to be elected

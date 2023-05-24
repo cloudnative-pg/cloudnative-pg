@@ -95,11 +95,10 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			By("deleting primary pod", func() {
 				// Force-delete the primary
-				one := int64(1)
-				forceDelete := &ctrlclient.DeleteOptions{
-					GracePeriodSeconds: &one,
+				quickDelete := &ctrlclient.DeleteOptions{
+					GracePeriodSeconds: &quickDeletionPeriod,
 				}
-				err = env.DeletePod(namespace, currentPrimary, forceDelete)
+				err = env.DeletePod(namespace, currentPrimary, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect only 2 instances to be up and running
@@ -201,20 +200,19 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				operatorPodName = podList.Items[0].ObjectMeta.Name
 
 				// Force-delete the operator and the primary
-				one := int64(1)
-				forceDelete := &ctrlclient.DeleteOptions{
-					GracePeriodSeconds: &one,
+				quickDelete := &ctrlclient.DeleteOptions{
+					GracePeriodSeconds: &quickDeletionPeriod,
 				}
 
 				wg := sync.WaitGroup{}
 				wg.Add(1)
 				wg.Add(1)
 				go func() {
-					_ = env.DeletePod(operatorNamespace, operatorPodName, forceDelete)
+					_ = env.DeletePod(operatorNamespace, operatorPodName, quickDelete)
 					wg.Done()
 				}()
 				go func() {
-					_ = env.DeletePod(namespace, currentPrimary, forceDelete)
+					_ = env.DeletePod(namespace, currentPrimary, quickDelete)
 					wg.Done()
 				}()
 				wg.Wait()
