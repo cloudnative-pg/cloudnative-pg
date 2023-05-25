@@ -39,7 +39,8 @@ var _ = Describe("PodMonitor test", func() {
 				Name:      clusterName,
 			},
 		}
-		monitor := CreatePodMonitor(&cluster)
+		mgr := NewClusterPodMonitorManager(&cluster)
+		monitor := mgr.BuildPodMonitor()
 		Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(clusterName))
 		Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(clusterName))
 		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(monitoringv1.PodMetricsEndpoint{Port: "metrics"}))

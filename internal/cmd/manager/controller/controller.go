@@ -236,9 +236,10 @@ func RunController(
 	}
 
 	if err = (&controllers.PoolerReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-pooler"),
+		Client:          mgr.GetClient(),
+		DiscoveryClient: discoveryClient,
+		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
