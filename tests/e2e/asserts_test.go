@@ -223,12 +223,12 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			if err != nil {
 				return "", err
 			}
-			for _, pod := range podList.Items {
-				if pod.DeletionTimestamp != nil {
-					return fmt.Sprintf("Pod '%s' is waiting for deletion", pod.Name), nil
-				}
-			}
 			if cluster.Spec.Instances == utils.CountReadyPods(podList.Items) {
+				for _, pod := range podList.Items {
+					if pod.DeletionTimestamp != nil {
+						return fmt.Sprintf("Pod '%s' is waiting for deletion", pod.Name), nil
+					}
+				}
 				err = env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.Phase, err
 			}
