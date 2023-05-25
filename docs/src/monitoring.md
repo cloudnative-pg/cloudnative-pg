@@ -408,7 +408,7 @@ in the returned labels, for example using the `current_database()` function
 as in the following example:
 
 ```yaml
-some_query:
+some_query: |
   query: |
     SELECT
      current_database() as datname,
@@ -440,7 +440,7 @@ runs on the `template1` database (otherwise not returned by the
 aforementioned query):
 
 ```yaml
-some_query:
+some_query: |
   query: |
     SELECT
      current_database() as datname,
