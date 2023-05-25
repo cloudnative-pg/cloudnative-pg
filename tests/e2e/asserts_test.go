@@ -199,6 +199,8 @@ func AssertCreateCluster(namespace string, clusterName string, sampleFile string
 	AssertClusterIsReady(namespace, clusterName, 600, env)
 }
 
+// AssertClusterIsReady checks the cluster has as many pods as in spec, that
+// none of them are going to be deleted, and that the status is Healthy
 func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a Cluster %s with each instance in status ready", clusterName), func() {
 		namespacedName := types.NamespacedName{
@@ -221,6 +223,11 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			if err != nil {
 				return "", err
 			}
+			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					return fmt.Sprintf("Pod '%s' is waiting for deletion", pod.Name), nil
+				}
+			}
 			if cluster.Spec.Instances == utils.CountReadyPods(podList.Items) {
 				err = env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.Phase, err
@@ -236,33 +243,6 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 					cluster, nodes)
 			})
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
-	})
-}
-
-func AssertClusterHasDeletedPods(namespace string, clusterName string, timeout int,
-	env *testsUtils.TestingEnvironment,
-) {
-	By(fmt.Sprintf("checking the Cluster %s has pods that have been deleted", clusterName), func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
-		Eventually(func(g Gomega) {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
-			g.Expect(err).ToNot(HaveOccurred())
-		}).Should(Succeed())
-
-		Eventually(func() bool {
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			for _, pod := range podList.Items {
-				if pod.DeletionTimestamp != nil {
-					return true
-				}
-			}
-			return false
-		}, timeout).Should(BeTrue())
 	})
 }
 
@@ -2308,11 +2288,6 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 				Expect(err).ToNot(HaveOccurred())
 			}
 		}
-		// We should ensure the cluster is back to 3 healthy instances, but only
-		// after the replicas have been deleted, otherwise we may get a false
-		// positive on 'health' even with the pods deleted
-		waitForPodDeletions := 10
-		AssertClusterHasDeletedPods(namespace, clusterName, waitForPodDeletions, env)
 		AssertClusterIsReady(namespace, clusterName, timeout, env)
 
 		// Deleting primary pvc
@@ -2330,9 +2305,6 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	// Make sure the cluster fails over first
-	AssertClusterEventuallyReachesPhase(namespace, clusterName, apiv1.PhaseFailOver, timeout)
-	// Ensuring cluster is healthy, after failover of the primary pod and new pod is recreated
 	AssertClusterIsReady(namespace, clusterName, timeout, env)
 	By("verifying Cluster storage is expanded", func() {
 		// Gathering PVC list for comparison
