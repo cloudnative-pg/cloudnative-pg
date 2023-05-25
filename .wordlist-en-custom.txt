@@ -252,6 +252,7 @@ Pooler
 Pooler's
 PoolerIntegrations
 PoolerList
+PoolerMonitoringConfiguration
 PoolerSecrets
 PoolerSecretsVersions
 PoolerSpec

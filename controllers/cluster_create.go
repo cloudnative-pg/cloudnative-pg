@@ -32,6 +32,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	k8slices "k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -92,7 +93,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		}
 	}
 
-	err = r.createOrPatchPodMonitor(ctx, cluster)
+	err = createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, specs.NewClusterPodMonitorManager(cluster))
 	if err != nil {
 		return err
 	}
@@ -766,18 +767,30 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 	return nil
 }
 
+type podMonitorManager interface {
+	// IsPodMonitorEnabled returns a boolean indicating if the PodMonitor should exists or not
+	IsPodMonitorEnabled() bool
+	// BuildPodMonitor builds a new PodMonitor object
+	BuildPodMonitor() *monitoringv1.PodMonitor
+}
+
 // createOrPatchPodMonitor
-func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster *apiv1.Cluster) error {
+func createOrPatchPodMonitor(
+	ctx context.Context,
+	cli client.Client,
+	discoveryClient discovery.DiscoveryInterface,
+	manager podMonitorManager,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Checking for the PodMonitor Custom Resource Definition in the Kubernetes cluster
-	havePodMonitorCRD, err := utils.PodMonitorExist(r.DiscoveryClient)
+	havePodMonitorCRD, err := utils.PodMonitorExist(discoveryClient)
 	if err != nil {
 		return err
 	}
 
 	if !havePodMonitorCRD {
-		if cluster.IsPodMonitorEnabled() {
+		if manager.IsPodMonitorEnabled() {
 			// If the PodMonitor CRD does not exist, but the cluster has monitoring enabled,
 			// the controller cannot do anything until the CRD is installed
 			contextLogger.Warning("PodMonitor CRD not present. Cannot create the PodMonitor object")
@@ -785,13 +798,14 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 		return nil
 	}
 
+	expectedPodMonitor := manager.BuildPodMonitor()
 	// We get the current pod monitor
 	podMonitor := &monitoringv1.PodMonitor{}
-	if err := r.Get(
+	if err := cli.Get(
 		ctx,
 		client.ObjectKey{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
+			Name:      expectedPodMonitor.Name,
+			Namespace: expectedPodMonitor.Namespace,
 		},
 		podMonitor,
 	); err != nil {
@@ -803,27 +817,25 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 
 	switch {
 	// Pod monitor disabled and no pod monitor - nothing to do
-	case !cluster.IsPodMonitorEnabled() && podMonitor == nil:
+	case !manager.IsPodMonitorEnabled() && podMonitor == nil:
 		return nil
 	// Pod monitor disabled and pod monitor present - delete it
-	case !cluster.IsPodMonitorEnabled() && podMonitor != nil:
+	case !manager.IsPodMonitorEnabled() && podMonitor != nil:
 		contextLogger.Info("Deleting PodMonitor")
-		if err := r.Delete(ctx, podMonitor); err != nil {
+		if err := cli.Delete(ctx, podMonitor); err != nil {
 			if !apierrs.IsNotFound(err) {
 				return err
 			}
 		}
 		return nil
 	// Pod monitor enabled and no pod monitor - create it
-	case cluster.IsPodMonitorEnabled() && podMonitor == nil:
+	case manager.IsPodMonitorEnabled() && podMonitor == nil:
 		contextLogger.Debug("Creating PodMonitor")
-		newPodMonitor := specs.CreatePodMonitor(cluster)
-		cluster.SetInheritedDataAndOwnership(&newPodMonitor.ObjectMeta)
-		return r.Create(ctx, newPodMonitor)
+		return cli.Create(ctx, expectedPodMonitor)
 	// Pod monitor enabled and pod monitor present - update it
 	default:
 		origPodMonitor := podMonitor.DeepCopy()
-		podMonitor.Spec = specs.CreatePodMonitor(cluster).Spec
+		podMonitor.Spec = expectedPodMonitor.Spec
 
 		// If there's no changes we are done
 		if reflect.DeepEqual(origPodMonitor, podMonitor) {
@@ -832,7 +844,7 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 
 		// Patch the PodMonitor, so we always reconcile it with the cluster changes
 		contextLogger.Debug("Patching PodMonitor")
-		return r.Patch(ctx, podMonitor, client.MergeFrom(origPodMonitor))
+		return cli.Patch(ctx, podMonitor, client.MergeFrom(origPodMonitor))
 	}
 }
 

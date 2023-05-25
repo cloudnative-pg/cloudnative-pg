@@ -517,9 +517,17 @@ cnpg_pgbouncer_stats_total_xact_count{database="pgbouncer"} 3
 cnpg_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
 ```
 
-Like for `Clusters`, if you are using the [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator)
-you can configure it to scrape a specific Pooler by defining the following [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor):
+Like for `Clusters`, a specific `Pooler` can be monitored using the
+[Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource
+[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
+A `PodMonitor` correctly pointing to a `Pooler` can be automatically created by the operator by setting
+`.spec.monitoring.enablePodMonitor` to `true` in the `Pooler` resource itself (default: false).
 
+!!! Important
+    Any change to the `PodMonitor` created automatically will be overridden by the Operator at the next reconciliation
+    cycle, in case you need to customize it, you can do so as described below.
+
+To deploy a `PodMonitor` for a specific Pooler manually, you can just define it as follows, changing it as needed:
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor

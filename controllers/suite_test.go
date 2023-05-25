@@ -98,9 +98,10 @@ var _ = BeforeSuite(func() {
 	}
 
 	poolerReconciler = &PoolerReconciler{
-		Client:   k8sClient,
-		Scheme:   scheme,
-		Recorder: record.NewFakeRecorder(120),
+		Client:          k8sClient,
+		Scheme:          scheme,
+		Recorder:        record.NewFakeRecorder(120),
+		DiscoveryClient: discoveryClient,
 	}
 })
 
