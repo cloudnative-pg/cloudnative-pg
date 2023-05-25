@@ -53,11 +53,11 @@ func NewRemoteWebServer(
 		instance:    instance,
 	}
 	serveMux := http.NewServeMux()
+	serveMux.HandleFunc(url.PathStartup, endpoints.hasServerStartup)
 	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
-	serveMux.HandleFunc(url.PathUpdate,
-		endpoints.updateInstanceManager(cancelFunc, exitedConditions))
+	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
@@ -99,6 +99,17 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http
 	}
 
 	log.Trace("Readiness probe succeeding")
+	_, _ = fmt.Fprint(w, "OK")
+}
+
+func (ws *remoteWebserverEndpoints) hasServerStartup(w http.ResponseWriter, _ *http.Request) {
+	if !ws.instance.IsStatusRunning() {
+		log.Warning("startup not yet completed")
+		http.Error(w, "startup not yet completed", http.StatusInternalServerError)
+		return
+	}
+
+	log.Trace("Startup probe succeeding")
 	_, _ = fmt.Fprint(w, "OK")
 }
 

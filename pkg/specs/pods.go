@@ -168,17 +168,21 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 					},
 				},
 			},
-			// From K8s 1.17 and newer, startup probes will be available for
-			// all users and not just protected from feature gates. For now
-			// let's use the LivenessProbe. When we will drop support for K8s
-			// 1.16, we'll configure a StartupProbe and this will lead to a
-			// better LivenessProbe (without InitialDelaySeconds).
 			LivenessProbe: &corev1.Probe{
+				TimeoutSeconds: 5,
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: url.PathHealth,
+						Port: intstr.FromInt(url.StatusPort),
+					},
+				},
+			},
+			StartupProbe: &corev1.Probe{
 				InitialDelaySeconds: cluster.GetMaxStartDelay(),
 				TimeoutSeconds:      5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: url.PathHealth,
+						Path: url.PathStartup,
 						Port: intstr.FromInt(url.StatusPort),
 					},
 				},

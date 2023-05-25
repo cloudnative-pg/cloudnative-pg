@@ -34,8 +34,11 @@ const (
 	// PathHealth is the URL path for Health State
 	PathHealth string = "/healthz"
 
-	// PathReady is the URL oath for Ready State
+	// PathReady is the URL path for Ready State
 	PathReady string = "/readyz"
+
+	// PathStartup is the URL path for Startup State
+	PathStartup string = "/startupz"
 
 	// PathPgStatus is the URL path for PostgreSQL Status
 	PathPgStatus string = "/pg/status"

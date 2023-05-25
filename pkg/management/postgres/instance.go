@@ -364,7 +364,7 @@ func (instance *Instance) Shutdown(options ShutdownOptions) error {
 	instance.ShutdownConnections()
 
 	// check instance status
-	if !instance.isStatusRunning() {
+	if !instance.IsStatusRunning() {
 		return fmt.Errorf("instance is not running")
 	}
 
@@ -401,8 +401,8 @@ func (instance *Instance) Shutdown(options ShutdownOptions) error {
 	return nil
 }
 
-// isStatusRunning checks the status of a running server using pg_ctl status
-func (instance *Instance) isStatusRunning() bool {
+// IsStatusRunning checks the status of a running server using pg_ctl status
+func (instance *Instance) IsStatusRunning() bool {
 	options := []string{
 		"-D",
 		instance.PgData,
