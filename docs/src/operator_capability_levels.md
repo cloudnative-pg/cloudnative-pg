@@ -533,7 +533,7 @@ CloudNativePG transparently and natively supports:
 - the [`pg_failover_slots` extension](https://github.com/EnterpriseDB/pg_failover_slots),
   which makes logical replication slots usable across a physical failover,
   ensuring resilience in change data capture (CDC) contexts based on PostgreSQL's
-  native logical replication.
+  native logical replication;
 
 ### Audit
 

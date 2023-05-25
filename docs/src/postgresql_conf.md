@@ -277,7 +277,7 @@ postgresql:
 #
 ```
 
-#### Enabling `auto_explain`
+#### Enabling `pg_failover_slots`
 
 The [`pg_failover_slots`](https://github.com/EnterpriseDB/pg_failover_slots)
 extension by EDB ensures that logical replication slots can survive a
@@ -289,7 +289,7 @@ that starts with `pg_failover_slots.`: as explained above, the operator will
 transparently manage the `pg_failover_slots` entry in the
 `shared_preload_libraries` option depending on this.
 
-Please refer to [`the `pg_failover_slots`  documentation`](https://www.postgresql.org/docs/current/auto-explain.html)
+Please refer to [`the `pg_failover_slots` documentation`](https://www.postgresql.org/docs/current/auto-explain.html)
 for details on this extension.
 
 ## The `pg_hba` section
