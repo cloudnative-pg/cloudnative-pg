@@ -293,6 +293,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestGZ)
 				}, 60).Should(BeNumerically(">", previous))
 			})
+
+			By("deleting the restored cluster", func() {
+				err = DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		// We backup and restore a cluster from a standby, and verify some expected data to
@@ -449,6 +454,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// Restore backup in a new cluster
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName, psqlClientPod)
+
+			By("deleting the restored cluster", func() {
+				err = DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
@@ -608,6 +618,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// Restore backup in a new cluster
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName, psqlClientPod)
+
+			By("deleting the restored cluster", func() {
+				err := DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
@@ -933,6 +948,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			// verify test data on restored external cluster
 			AssertDataExpectedCount(namespace, externalClusterName, tableName, 2, psqlClientPod)
+
+			By("deleting the restored cluster", func() {
+				err = DeleteResourcesFromFile(namespace, externalClusterFileMinio)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
