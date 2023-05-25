@@ -493,13 +493,14 @@ func collectPGVersion(e *Exporter) error {
 		return err
 	}
 
-	majorMinor := fmt.Sprintf("%d.%d", semanticVersion.Major, semanticVersion.Minor)
+	// we use patch instead of minor because postgres doesn't use semantic versioning
+	majorMinor := fmt.Sprintf("%d.%d", semanticVersion.Major, semanticVersion.Patch)
 	version, err := strconv.ParseFloat(majorMinor, 64)
 	if err != nil {
 		return err
 	}
 
-	majorMinorPatch := fmt.Sprintf("%s.%d", majorMinor, semanticVersion.Patch)
+	majorMinorPatch := fmt.Sprintf("%d.%d", semanticVersion.Major, semanticVersion.Patch)
 	e.Metrics.PgVersion.WithLabelValues(majorMinorPatch, e.instance.ClusterName).Set(version)
 
 	return nil
