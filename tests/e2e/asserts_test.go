@@ -239,10 +239,10 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 	})
 }
 
-func AssertClusterUnderSpecInstances(namespace string, clusterName string, timeout int,
+func AssertClusterHasDeletedPods(namespace string, clusterName string, timeout int,
 	env *testsUtils.TestingEnvironment,
 ) {
-	By(fmt.Sprintf("checking the Cluster %s has fewer instances than spec", clusterName), func() {
+	By(fmt.Sprintf("checking the Cluster %s has pods that have been deleted", clusterName), func() {
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      clusterName,
@@ -253,13 +253,16 @@ func AssertClusterUnderSpecInstances(namespace string, clusterName string, timeo
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
-		Eventually(func(g Gomega) {
+		Eventually(func() bool {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(
-				utils.CountReadyPods(podList.Items) < cluster.Spec.Instances,
-			).To(BeTrue())
-		}, timeout).Should(Succeed())
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range podList.Items {
+				if pod.DeletionTimestamp != nil {
+					return true
+				}
+			}
+			return false
+		}, timeout).Should(BeTrue())
 	})
 }
 
@@ -2305,12 +2308,11 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 				Expect(err).ToNot(HaveOccurred())
 			}
 		}
-		// Make sure the cluster detects missing pods
-		waitForMissingInstances := 10
-		AssertClusterUnderSpecInstances(namespace, clusterName, waitForMissingInstances, env)
 		// We should ensure the cluster is back to 3 healthy instances, but only
-		// after it has had fewer than 3 instances at some point. Otherwise we
-		// may have a false positive on the healthy status
+		// after the replicas have been deleted, otherwise we may get a false
+		// positive on 'health' even with the pods deleted
+		waitForPodDeletions := 10
+		AssertClusterHasDeletedPods(namespace, clusterName, waitForPodDeletions, env)
 		AssertClusterIsReady(namespace, clusterName, timeout, env)
 
 		// Deleting primary pvc
