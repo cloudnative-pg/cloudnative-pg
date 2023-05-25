@@ -137,8 +137,9 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 
 		By("making sure the function builds up the correct reconcile requests", func() {
-			handler := poolerReconciler.mapSecretToPooler(ctx)
+			handler := poolerReconciler.mapSecretToPooler()
 			reReqs := handler(
+				ctx,
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      expectedAuthSecretName,

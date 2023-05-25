@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -52,6 +53,14 @@ func (cm *clientMock) Scheme() *runtime.Scheme {
 
 func (cm *clientMock) RESTMapper() meta.RESTMapper {
 	return nil
+}
+
+func (cm *clientMock) GroupVersionKindFor(_ runtime.Object) (schema.GroupVersionKind, error) {
+	return schema.GroupVersionKind{}, nil
+}
+
+func (cm *clientMock) IsObjectNamespaced(_ runtime.Object) (bool, error) {
+	return false, nil
 }
 
 var _ = Describe("Reconcile resources", func() {
