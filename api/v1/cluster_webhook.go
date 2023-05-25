@@ -301,6 +301,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateReplicationSlots,
 		r.validateEnv,
 		r.validateManagedRoles,
+		r.validateManagedExtensions,
 	}
 
 	for _, validate := range validations {
@@ -1955,6 +1956,57 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 					role.Name,
 					"This role both sets and disables a password"))
 		}
+	}
+
+	return result
+}
+
+// validateManagedExtensions validate the managed extensions parameters set by the user
+func (r *Cluster) validateManagedExtensions() field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	allErrors = append(allErrors, r.validatePgFailoverSlots()...)
+	return allErrors
+}
+
+func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
+	var result field.ErrorList
+	var pgFailoverSlots postgres.ManagedExtension
+
+	for i, ext := range postgres.ManagedExtensions {
+		if ext.Name == "pg_failover_slots" {
+			pgFailoverSlots = postgres.ManagedExtensions[i]
+		}
+	}
+	if !pgFailoverSlots.IsUsed(r.Spec.PostgresConfiguration.Parameters) {
+		return nil
+	}
+
+	const hotStandbyFeedbackKey = "hot_standby_feedback"
+	hotStandbyFeedback, hasHotStandbyFeedback := r.Spec.PostgresConfiguration.Parameters[hotStandbyFeedbackKey]
+
+	if !hasHotStandbyFeedback || hotStandbyFeedback != "on" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", hotStandbyFeedbackKey),
+				hotStandbyFeedback,
+				fmt.Sprintf("%s must be 'on' to use %s", hotStandbyFeedbackKey, pgFailoverSlots.Name)))
+	}
+
+	replicationSlotPath := field.NewPath("spec", "replicationSlots", "highAvailability", "enabled")
+	replicationSlotOut := fmt.Sprintf("High Availability replication slots must be enabled to use %s",
+		pgFailoverSlots.Name)
+	replicationSlots := r.Spec.ReplicationSlots
+	if replicationSlots == nil ||
+		replicationSlots.HighAvailability == nil ||
+		replicationSlots.HighAvailability.Enabled == nil {
+		result = append(result, field.Invalid(replicationSlotPath, nil, replicationSlotOut))
+	} else if !replicationSlots.HighAvailability.GetEnabled() {
+		result = append(result, field.Invalid(
+			replicationSlotPath,
+			replicationSlots.HighAvailability.GetEnabled(),
+			replicationSlotOut))
 	}
 
 	return result
