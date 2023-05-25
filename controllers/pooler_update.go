@@ -52,7 +52,11 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
-	return r.updateService(ctx, pooler, resources)
+	if err := r.updateService(ctx, pooler, resources); err != nil {
+		return err
+	}
+
+	return createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, pgbouncer.NewPoolerPodMonitorManager(pooler))
 }
 
 // updateDeployment update the deployment or create it when needed
