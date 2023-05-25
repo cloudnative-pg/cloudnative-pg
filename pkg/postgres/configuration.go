@@ -33,7 +33,7 @@ const (
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert
+hostssl all streaming_replica all cert
 hostssl replication streaming_replica all cert
 hostssl all cnpg_pooler_pgbouncer all cert
 
@@ -331,6 +331,7 @@ var (
 		"log_rotation_age":                       blockedConfigurationParameter,
 		"log_rotation_size":                      blockedConfigurationParameter,
 		"log_truncate_on_rotation":               blockedConfigurationParameter,
+		"pg_failover_slots.primary_dsn":          fixedConfigurationParameter,
 		"promote_trigger_file":                   blockedConfigurationParameter,
 		"recovery_end_command":                   blockedConfigurationParameter,
 		"recovery_min_apply_delay":               blockedConfigurationParameter,
