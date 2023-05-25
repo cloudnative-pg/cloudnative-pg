@@ -21,8 +21,12 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -788,5 +792,123 @@ var _ = DescribeTable("Role status getter tests",
 			"postgres":                  apiv1.RoleStatusReserved,
 			"roleWithChangedPassInSpec": apiv1.RoleStatusPendingReconciliation,
 		},
+	),
+)
+
+const (
+	namespace          = "vinci-name"
+	secretName         = "vinci-secret-name"
+	secretNameNoUser   = "vinci-secret-no-user"
+	secretNameNoPass   = "vinci-secret-no-pass"
+	userName           = "vinci"
+	password           = "vinci1234"
+	secretNameNotExist = "vinci-secret-name-not-exist"
+	userNameNotExist   = "vinci-not-exist"
+)
+
+var _ = DescribeTable("role secrets test", func(hasErr bool,
+	userNameInSpec, secretNameInSpec, expectedUsername, expectedPassword string,
+	versionEmpty bool,
+) {
+	secret := corev1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			corev1.BasicAuthUsernameKey: []byte(userName),
+			corev1.BasicAuthPasswordKey: []byte(password),
+		},
+	}
+	secretNoUser := corev1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      secretNameNoUser,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			corev1.BasicAuthPasswordKey: []byte(password),
+		},
+	}
+	secretNoPass := corev1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      secretNameNoPass,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			corev1.BasicAuthUsernameKey: []byte(userName),
+		},
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+		WithObjects(&secret, &secretNoUser, &secretNoPass).
+		Build()
+	ctx := context.Background()
+	roleConfiguration := &apiv1.RoleConfiguration{
+		Name: userNameInSpec,
+		PasswordSecret: &apiv1.LocalObjectReference{
+			Name: secretNameInSpec,
+		},
+	}
+	passwordSecret, err := getPassword(ctx, cl, *roleConfiguration, namespace)
+	if hasErr {
+		Expect(err).To(HaveOccurred())
+	} else {
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	Expect(passwordSecret.username).To(Equal(expectedUsername))
+	Expect(passwordSecret.password).To(Equal(expectedPassword))
+	if versionEmpty {
+		Expect(passwordSecret.version).To(BeEmpty())
+	} else {
+		Expect(passwordSecret.version).NotTo(BeEmpty())
+	}
+},
+	Entry("Able to extract from a secrets if secrets match and username match",
+		false,
+		userName,
+		secretName,
+		userName,
+		password,
+		false,
+	),
+	Entry("Unable to extract from a secrets if secrets name is empty",
+		false,
+		userName,
+		"",
+		"",
+		"",
+		true,
+	),
+	Entry("Unable to extract from a secrets if secrets name not match",
+		false,
+		userName,
+		secretNameNotExist,
+		"",
+		"",
+		true,
+	),
+	Entry("Unable to extract from a secrets if username not match",
+		true,
+		userNameNotExist,
+		secretName,
+		"",
+		"",
+		true,
+	),
+	Entry("Unable to extract from a secrets if username not exists in secret",
+		true,
+		userName,
+		secretNameNoUser,
+		"",
+		"",
+		true,
+	),
+	Entry("Unable to extract from a secrets if password not exists in secret",
+		true,
+		userName,
+		secretNameNoPass,
+		"",
+		"",
+		true,
 	),
 )
