@@ -796,119 +796,126 @@ var _ = DescribeTable("Role status getter tests",
 )
 
 const (
-	namespace          = "vinci-name"
+	namespace          = "vinci-namespace"
 	secretName         = "vinci-secret-name"
 	secretNameNoUser   = "vinci-secret-no-user"
 	secretNameNoPass   = "vinci-secret-no-pass"
-	userName           = "vinci"
-	password           = "vinci1234"
 	secretNameNotExist = "vinci-secret-name-not-exist"
 	userNameNotExist   = "vinci-not-exist"
+	userName           = "vinci"
+	password           = "vinci1234"
 )
 
-var _ = DescribeTable("role secrets test", func(hasErr bool,
-	userNameInSpec, secretNameInSpec, expectedUsername, expectedPassword string,
-	versionEmpty bool,
-) {
-	secret := corev1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      secretName,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			corev1.BasicAuthUsernameKey: []byte(userName),
-			corev1.BasicAuthPasswordKey: []byte(password),
-		},
-	}
-	secretNoUser := corev1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      secretNameNoUser,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			corev1.BasicAuthPasswordKey: []byte(password),
-		},
-	}
-	secretNoPass := corev1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      secretNameNoPass,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			corev1.BasicAuthUsernameKey: []byte(userName),
-		},
-	}
-	cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
-		WithObjects(&secret, &secretNoUser, &secretNoPass).
-		Build()
-	ctx := context.Background()
-	roleConfiguration := &apiv1.RoleConfiguration{
-		Name: userNameInSpec,
-		PasswordSecret: &apiv1.LocalObjectReference{
-			Name: secretNameInSpec,
-		},
-	}
-	passwordSecret, err := getPassword(ctx, cl, *roleConfiguration, namespace)
-	if hasErr {
-		Expect(err).To(HaveOccurred())
-	} else {
-		Expect(err).ToNot(HaveOccurred())
-	}
+var _ = DescribeTable("role secrets test",
+	func(
+		roleConfig *apiv1.RoleConfiguration,
+		expectedResult passwordSecret,
+		expectError bool,
+	) {
+		// define various secrets as test cases to show failure modes
+		secret := corev1.Secret{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte(userName),
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
+		secretNoUser := corev1.Secret{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      secretNameNoUser,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
+		secretNoPass := corev1.Secret{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      secretNameNoPass,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte(userName),
+			},
+		}
+		cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(&secret, &secretNoUser, &secretNoPass).
+			Build()
+		ctx := context.Background()
+		decoded, err := getPassword(ctx, cl, *roleConfig, namespace)
+		if expectError {
+			Expect(err).To(HaveOccurred())
+		} else {
+			Expect(err).ToNot(HaveOccurred())
+		}
 
-	Expect(passwordSecret.username).To(Equal(expectedUsername))
-	Expect(passwordSecret.password).To(Equal(expectedPassword))
-	if versionEmpty {
-		Expect(passwordSecret.version).To(BeEmpty())
-	} else {
-		Expect(passwordSecret.version).NotTo(BeEmpty())
-	}
-},
-	Entry("Able to extract from a secrets if secrets match and username match",
+		Expect(decoded.username).To(Equal(expectedResult.username))
+		Expect(decoded.password).To(Equal(expectedResult.password))
+		if (expectedResult == passwordSecret{}) {
+			Expect(decoded).To(BeZero())
+		}
+	},
+	Entry("Can extract credentials on correct role secretName and secret content",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretName,
+			},
+		},
+		passwordSecret{
+			username: userName,
+			password: password,
+		},
 		false,
-		userName,
-		secretName,
-		userName,
-		password,
+	),
+	Entry("Cannot extract credentials if role secretName is empty",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+		},
+		passwordSecret{},
 		false,
 	),
-	Entry("Unable to extract from a secrets if secrets name is empty",
+	Entry("Cannot extract credentials if role's secretName does not match a secret",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretNameNotExist,
+			},
+		},
+		passwordSecret{},
 		false,
-		userName,
-		"",
-		"",
-		"",
+	),
+	Entry("Throws error if secret username does not match role name",
+		&apiv1.RoleConfiguration{
+			Name: userNameNotExist,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretName,
+			},
+		},
+		passwordSecret{},
 		true,
 	),
-	Entry("Unable to extract from a secrets if secrets name not match",
-		false,
-		userName,
-		secretNameNotExist,
-		"",
-		"",
+	Entry("Throws error if configured secret does not contain a username",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretNameNoUser,
+			},
+		},
+		passwordSecret{},
 		true,
 	),
-	Entry("Unable to extract from a secrets if username not match",
-		true,
-		userNameNotExist,
-		secretName,
-		"",
-		"",
-		true,
-	),
-	Entry("Unable to extract from a secrets if username not exists in secret",
-		true,
-		userName,
-		secretNameNoUser,
-		"",
-		"",
-		true,
-	),
-	Entry("Unable to extract from a secrets if password not exists in secret",
-		true,
-		userName,
-		secretNameNoPass,
-		"",
-		"",
+	Entry("Throws error if configured secret does not contain a password",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretNameNoPass,
+			},
+		},
+		passwordSecret{},
 		true,
 	),
 )

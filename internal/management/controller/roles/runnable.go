@@ -58,12 +58,6 @@ type RoleSynchronizer struct {
 	client   client.Client
 }
 
-type passwordSecret struct {
-	username string
-	password string
-	version  string
-}
-
 // NewRoleSynchronizer creates a new RoleSynchronizer
 func NewRoleSynchronizer(instance *postgres.Instance, client client.Client) *RoleSynchronizer {
 	runner := &RoleSynchronizer{
@@ -349,6 +343,13 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 		TransactionID:         transactionID,
 		SecretResourceVersion: passVersion,
 	}, nil
+}
+
+// passwordSecret contains the decoded credentials from a Secret
+type passwordSecret struct {
+	username string
+	password string
+	version  string
 }
 
 // getPassword retrieves the password stored in the Kubernetes secret for the
