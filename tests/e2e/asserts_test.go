@@ -199,6 +199,8 @@ func AssertCreateCluster(namespace string, clusterName string, sampleFile string
 	AssertClusterIsReady(namespace, clusterName, 600, env)
 }
 
+// AssertClusterIsReady checks the cluster has as many pods as in spec, that
+// none of them are going to be deleted, and that the status is Healthy
 func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a Cluster %s with each instance in status ready", clusterName), func() {
 		namespacedName := types.NamespacedName{
@@ -222,6 +224,11 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 				return "", err
 			}
 			if cluster.Spec.Instances == utils.CountReadyPods(podList.Items) {
+				for _, pod := range podList.Items {
+					if pod.DeletionTimestamp != nil {
+						return fmt.Sprintf("Pod '%s' is waiting for deletion", pod.Name), nil
+					}
+				}
 				err = env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.Phase, err
 			}
@@ -1044,12 +1051,11 @@ func AssertFastFailOver(
 
 	By("deleting the primary", func() {
 		// The primary is force-deleted.
-		zero := int64(0)
-		forceDelete := &ctrlclient.DeleteOptions{
-			GracePeriodSeconds: &zero,
+		quickDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &quickDeletionPeriod,
 		}
 		lm := clusterName + "-1"
-		err = env.DeletePod(namespace, lm, forceDelete)
+		err = env.DeletePod(namespace, lm, quickDelete)
 
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -2250,14 +2256,13 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			}, 60, 5).Should(BeNil())
 		}
 	})
-	By("deleting Pod and PVCs", func() {
+	By("deleting Pod and PVCs, first replicas then the primary", func() {
 		// Gathering cluster primary
 		currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		currentPrimaryWalStorageName := currentPrimary.Name + "-wal"
-		zero := int64(0)
-		forceDelete := &ctrlclient.DeleteOptions{
-			GracePeriodSeconds: &zero,
+		quickDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &quickDeletionPeriod,
 		}
 
 		podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -2279,12 +2284,12 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 					Expect(err).ToNot(HaveOccurred())
 				}
 				// Deleting standby and replica pods
-				err = env.DeletePod(namespace, pod.Name, forceDelete)
+				err = env.DeletePod(namespace, pod.Name, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
-				// Ensuring cluster is healthy with three pods
-				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			}
 		}
+		AssertClusterIsReady(namespace, clusterName, timeout, env)
+
 		// Deleting primary pvc
 		_, _, err = testsUtils.Run(
 			"kubectl delete pvc " + currentPrimary.Name + " -n " + namespace + " --wait=false")
@@ -2296,10 +2301,10 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			Expect(err).ToNot(HaveOccurred())
 		}
 		// Deleting primary pod
-		err = env.DeletePod(namespace, currentPrimary.Name, forceDelete)
+		err = env.DeletePod(namespace, currentPrimary.Name, quickDelete)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	// Ensuring cluster is healthy, after failover of the primary pod and new pod is recreated
+
 	AssertClusterIsReady(namespace, clusterName, timeout, env)
 	By("verifying Cluster storage is expanded", func() {
 		// Gathering PVC list for comparison
