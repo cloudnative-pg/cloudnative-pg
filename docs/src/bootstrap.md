@@ -27,15 +27,22 @@ For more detailed information about this feature, please refer to the
     order to perform administrative tasks on the cluster.  
     **DO NOT DELETE** the `postgres` user or the `postgres` database!!!
 
+!!! Info
+    CloudNativePG is gradually introducing support for
+    [Kubernetes' native `VolumeSnapshot` API](https://github.com/cloudnative-pg/cloudnative-pg/issues/2081)
+    for both incremental and differential copy in backup and recovery
+    operations - if supported by the underlying storage classes.
+    Please see ["Recovery from Volume Snapshot objects"](#recovery-from-volumesnapshot-objects)
+    for details.
+
 ## The `bootstrap` section
 
 The *bootstrap* method can be defined in the `bootstrap` section of the cluster
-specification.
-CloudNativePG currently supports the following bootstrap methods:
+specification. CloudNativePG currently supports the following bootstrap methods:
 
 - `initdb`: initialize a new PostgreSQL cluster (default)
-- `recovery`: create a PostgreSQL cluster by restoring from an existing cluster
-  via a backup object store, and replaying all the available WAL files or up to
+- `recovery`: create a PostgreSQL cluster by restoring from a base backup of an
+  existing cluster, and replaying all the available WAL files or up to
   a given *point in time*
 - `pg_basebackup`: create a PostgreSQL cluster by cloning an existing one of
   the same major version using `pg_basebackup` via streaming replication protocol -
@@ -71,7 +78,7 @@ method or the `recovery` one. An external cluster needs to have:
     - information about streaming connection
     - information about the **recovery object store**, which is a Barman Cloud
       compatible object store that contains the backup files of the source
-      cluster - that is, base backups and WAL archives.
+      cluster - that is, WAL archive and base backups.
 
 !!! Note
     A recovery object store is normally an AWS S3, or an Azure Blob Storage,
@@ -313,8 +320,8 @@ spec:
 CloudNativePG enables the bootstrap of a cluster starting from
 another one of the same major version.
 This operation can happen by connecting directly to the source cluster via
-streaming replication (`pg_basebackup`), or indirectly via a *recovery object
-store* (`recovery`).
+streaming replication (`pg_basebackup`), or indirectly via an existing
+physical *base backup* (`recovery`).
 
 The source cluster must be defined in the `externalClusters` section, identified
 by `name` (our recommendation is to use the same `name` of the origin cluster).
@@ -327,13 +334,14 @@ by `name` (our recommendation is to use the same `name` of the origin cluster).
     `barmanObjectStore.serverName` property (by default assigned to the
     value of `name` in the external cluster definition).
 
-
 ### Bootstrap from a backup (`recovery`)
 
-The `recovery` bootstrap mode lets you create a new cluster from
-an existing backup, namely a *recovery object store*.
+The `recovery` bootstrap mode lets you create a new cluster from an existing
+physical base backup, and then reapply the WAL files containing the REDO log
+from the archive. Both base backups and WAL files are pulled from the
+*recovery object store*.
 
-There are two ways to achieve this result in CloudNativePG:
+Recovery from a *recovery object store* can be achieved in two ways:
 
 - using a recovery object store, that is a backup of another cluster
   created by Barman Cloud and defined via the `barmanObjectStore` option
@@ -351,6 +359,18 @@ compatible, from a physical replication standpoint, with the original one.
 !!! Note
     You can find more information about backup and recovery of a running cluster
     in the ["Backup and recovery" page](backup_recovery.md).
+
+CloudNativePG is also introducing support for Kubernetes' volume snapshots.
+With the current version of CloudNativePG, you can:
+
+- take a consistent cold backup of the Postgres cluster from a standby through
+  the `kubectl cnpg snapshot` command - which creates the necessary
+  `VolumeSnapshot` objects (currently one or two, if you have WALs in a separate
+  volume)
+- recover from the above *VolumeSnapshot* objects through the `volumeSnapshots`
+  option in the `.spec.bootstrap.recovery` stanza, as described in
+  ["Recovery from `VolumeSnapshot` objects"](#recovery-from-volumesnapshot-objects)
+  below
 
 #### Recovery from an object store
 
@@ -434,6 +454,65 @@ spec:
 
 This bootstrap method allows you to specify just a reference to the
 backup that needs to be restored.
+
+#### Recovery from `VolumeSnapshot` objects
+
+CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
+existing `Cluster` that's been taken with `kubectl cnpg snapshot`.
+You need to specify the name of the snapshot as in the following example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  [...]
+
+bootstrap:
+    recovery:
+      volumeSnapshots:
+        storage:
+          name: <snapshot name>
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+```
+
+!!! Warning
+    As the development of declarative support for Kubernetes' `VolumeSnapshot` API
+    progresses, you'll be able to use this technique in conjunction with a WAL
+    archive for Point In Time Recovery operations or replica clusters.
+
+In case the backed-up cluster was using a separate PVC to store the WAL files,
+the recovery must include that too:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  [...]
+
+bootstrap:
+    recovery:
+      volumeSnapshots:
+        storage:
+          name: <snapshot name>
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+
+      walDataSource:
+        storage:
+          name: <snapshot name>
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+```
+
+The `kubectl cnpg snapshot` command is able to take consistent snapshots of a
+replica through a technique known as *cold backup*, by fencing the standby
+before taking a physical copy of the volumes. For details, please refer to
+["Snapshotting a Postgres cluster"](#snapshotting-a-postgres-cluster).
 
 #### Additional considerations
 
