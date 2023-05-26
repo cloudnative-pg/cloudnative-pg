@@ -96,10 +96,10 @@ func CreateClusterFromBackupUsingPITR(
 	backupFilePath,
 	targetTime string,
 	env *TestingEnvironment,
-) error {
+) (*apiv1.Cluster, error) {
 	backupName, err := env.GetResourceNameFromYAML(backupFilePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	restoreCluster := &apiv1.Cluster{
@@ -141,7 +141,15 @@ func CreateClusterFromBackupUsingPITR(
 			},
 		},
 	}
-	return CreateObject(env, restoreCluster)
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
 }
 
 // CreateClusterFromExternalClusterBackupWithPITROnAzure creates a cluster on Azure, starting from an external cluster
@@ -154,7 +162,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 	storageCredentialsSecretName,
 	azStorageAccount string,
 	env *TestingEnvironment,
-) error {
+) (*apiv1.Cluster, error) {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/", azStorageAccount, sourceClusterName)
 
@@ -220,7 +228,15 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 			},
 		},
 	}
-	return CreateObject(env, restoreCluster)
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
 }
 
 // CreateClusterFromExternalClusterBackupWithPITROnMinio creates a cluster on Minio, starting from an external cluster
@@ -231,7 +247,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 	sourceClusterName,
 	targetTime string,
 	env *TestingEnvironment,
-) error {
+) (*apiv1.Cluster, error) {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	restoreCluster := &apiv1.Cluster{
@@ -303,7 +319,15 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 			},
 		},
 	}
-	return CreateObject(env, restoreCluster)
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
 }
 
 // CreateClusterFromExternalClusterBackupWithPITROnAzurite creates a cluster with Azurite, starting from an external
@@ -314,7 +338,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 	sourceClusterName,
 	targetTime string,
 	env *TestingEnvironment,
-) error {
+) (*apiv1.Cluster, error) {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
 
@@ -380,7 +404,15 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 			},
 		},
 	}
-	return CreateObject(env, restoreCluster)
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
 }
 
 // ComposeAzBlobListAzuriteCmd builds the Azure storage blob list command for Azurite

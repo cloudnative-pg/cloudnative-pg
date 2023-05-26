@@ -1437,11 +1437,13 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string, pod *
 	})
 }
 
-// AssertClusterImport verifies that a database has been imported into a new cluster,
-// and that the new cluster is functioning properly
-func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName, databaseName string) {
+// AssertClusterImport imports a database into a new cluster, and verifies that
+// the new cluster is functioning properly
+func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName, databaseName string) *apiv1.Cluster {
+	var cluster *apiv1.Cluster
 	By("Importing Database in a new cluster", func() {
-		err := testsUtils.ImportDatabaseMicroservice(namespace, clusterName,
+		var err error
+		cluster, err = testsUtils.ImportDatabaseMicroservice(namespace, clusterName,
 			clusterWithExternalClusterName, "", databaseName, env)
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
@@ -1449,6 +1451,7 @@ func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName,
 		// Restored standby should be attached to restored primary
 		AssertClusterStandbysAreStreaming(namespace, clusterWithExternalClusterName, 120)
 	})
+	return cluster
 }
 
 func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupName string) {
@@ -1564,7 +1567,7 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 	})
 }
 
-func AssertClusterRestorePITRWithApplicationDB(namespace, clusterName, tableName, lsn string, pod *corev1.Pod) {
+func AssertClusterWasRestoredWihtPITRAndApplicationDB(namespace, clusterName, tableName, lsn string, pod *corev1.Pod) {
 	primaryInfo := &corev1.Pod{}
 	var err error
 
@@ -1629,7 +1632,7 @@ func AssertClusterRestorePITRWithApplicationDB(namespace, clusterName, tableName
 	})
 }
 
-func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string, pod *corev1.Pod) {
+func AssertClusterWasRestoredWithPITR(namespace, clusterName, tableName, lsn string, pod *corev1.Pod) {
 	primaryInfo := &corev1.Pod{}
 	var err error
 
@@ -2400,7 +2403,7 @@ func CreateResourcesFromFileWithError(namespace, sampleFilePath string) error {
 		return wrapErr(err)
 	}
 	for _, obj := range objects {
-		err := testsUtils.CreateObject(env, obj)
+		_, err := testsUtils.CreateObject(env, obj)
 		if err != nil {
 			return wrapErr(err)
 		}

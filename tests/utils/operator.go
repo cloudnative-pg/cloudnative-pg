@@ -238,7 +238,7 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 			},
 		},
 	}
-	err = CreateObject(&env, testCluster, &ctrlclient.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	_, err = CreateObject(&env, testCluster, &ctrlclient.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		return false, err
 	}
