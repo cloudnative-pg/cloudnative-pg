@@ -182,11 +182,10 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			zero := int64(0)
-			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
+			quickDelete := &ctrlclient.DeleteOptions{
+				GracePeriodSeconds: &quickDeletionPeriod,
 			}
-			err := env.DeletePod(namespace, currentPrimary, forceDelete)
+			err := env.DeletePod(namespace, currentPrimary, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We wait until the operator knows that the primary is dead.

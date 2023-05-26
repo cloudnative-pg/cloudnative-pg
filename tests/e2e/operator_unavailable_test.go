@@ -95,11 +95,10 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			By("deleting primary pod", func() {
 				// Force-delete the primary
-				zero := int64(0)
-				forceDelete := &ctrlclient.DeleteOptions{
-					GracePeriodSeconds: &zero,
+				quickDelete := &ctrlclient.DeleteOptions{
+					GracePeriodSeconds: &quickDeletionPeriod,
 				}
-				err = env.DeletePod(namespace, currentPrimary, forceDelete)
+				err = env.DeletePod(namespace, currentPrimary, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect only 2 instances to be up and running
@@ -201,20 +200,19 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				operatorPodName = podList.Items[0].ObjectMeta.Name
 
 				// Force-delete the operator and the primary
-				zero := int64(0)
-				forceDelete := &ctrlclient.DeleteOptions{
-					GracePeriodSeconds: &zero,
+				quickDelete := &ctrlclient.DeleteOptions{
+					GracePeriodSeconds: &quickDeletionPeriod,
 				}
 
 				wg := sync.WaitGroup{}
 				wg.Add(1)
 				wg.Add(1)
 				go func() {
-					_ = env.DeletePod(operatorNamespace, operatorPodName, forceDelete)
+					_ = env.DeletePod(operatorNamespace, operatorPodName, quickDelete)
 					wg.Done()
 				}()
 				go func() {
-					_ = env.DeletePod(namespace, currentPrimary, forceDelete)
+					_ = env.DeletePod(namespace, currentPrimary, quickDelete)
 					wg.Done()
 				}()
 				wg.Wait()
@@ -233,16 +231,12 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			By("verifying the operator pod is now back", func() {
 				timeout := 120
-				Eventually(func() (int, error) {
+				Eventually(func() (bool, error) {
 					podList := &corev1.PodList{}
 					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return utils.CountReadyPods(podList.Items), err
-				}, timeout).Should(BeEquivalentTo(1))
-				// Check that the new operator pod has been created with a different name
-				podList := &corev1.PodList{}
-				err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-				Expect(err).ToNot(HaveOccurred())
-				Expect(podList.Items[0].ObjectMeta.Name).ShouldNot(BeEquivalentTo(operatorPodName))
+					return utils.CountReadyPods(podList.Items) == 1 &&
+						podList.Items[0].ObjectMeta.Name != operatorPodName, err
+				}, timeout).Should(BeTrue())
 			})
 
 			// Expect a new primary to be elected and promoted
