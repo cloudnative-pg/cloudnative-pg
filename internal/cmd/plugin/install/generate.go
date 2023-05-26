@@ -35,7 +35,8 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/releases"
 )
 
 // installationResource is a resource part of the CNPG installation
@@ -87,10 +88,9 @@ func newGenerateCmd() *cobra.Command {
 	cmd.Flags().StringVar(
 		&version,
 		"version",
-		"",
-		"The version of the operator to install, specified in the '<major>.<minor>' format (e.g. 1.17). "+
-			"The default empty value installs the latest major.minor.patch version. If a <major>.<minor> version is "+
-			"provided, the latest patch version of that minor version will be installed",
+		versions.Version,
+		"The version of the operator to install, specified in the '<major>.<minor>.<patch>' format (e.g. 1.17.0). "+
+			"The default empty value installs the same version of the used plugin.",
 	)
 	cmd.Flags().StringVar(
 		&watchNamespaces,
@@ -196,24 +196,9 @@ func (cmd *generateExecutor) printResources(irs []installationResource) error {
 }
 
 func (cmd *generateExecutor) getInstallationYAML() ([]byte, error) {
-	contextLogger := log.FromContext(cmd.ctx)
+	fileName := fmt.Sprintf("cnpg-%s.yaml", cmd.userRequestedVersion)
 
-	version, err := cmd.getVersion()
-	if err != nil {
-		return nil, err
-	}
-
-	manifestURL := fmt.Sprintf(
-		"https://raw.githubusercontent.com/cloudnative-pg/artifacts/%s/manifests/operator-manifest.yaml",
-		version,
-	)
-	contextLogger.Info(
-		"fetching installation manifests",
-		"branch", version,
-		"url", manifestURL,
-	)
-
-	return executeGetRequest(cmd.ctx, manifestURL)
+	return releases.OperatorManifests.ReadFile(fileName)
 }
 
 func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([]installationResource, error) {
@@ -361,14 +346,6 @@ func (cmd *generateExecutor) reconcileMutatingWebhook(wh *admissionregistrationv
 		wh.Webhooks[i].ClientConfig.Service.Namespace = cmd.namespace
 	}
 	return nil
-}
-
-func (cmd *generateExecutor) getVersion() (string, error) {
-	if cmd.userRequestedVersion != "" {
-		return fmt.Sprintf("release-%s", cmd.userRequestedVersion), nil
-	}
-
-	return getLatestOperatorVersion(cmd.ctx)
 }
 
 func (cmd *generateExecutor) isNamespaceEmpty() bool {

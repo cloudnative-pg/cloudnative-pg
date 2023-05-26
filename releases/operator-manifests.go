@@ -14,19 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package install
+// Package releases contains the filesystem with operator manifests with all the
+// released manifests
+package releases
 
 import (
-	"github.com/spf13/cobra"
+	"embed"
 )
 
-// NewCmd returns the installation root cmd
-func NewCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "CNPG installation commands",
-	}
-	cmd.AddCommand(newGenerateCmd())
-
-	return cmd
-}
+// OperatorManifests is the filesystem struct that contains the manifests
+// added at compilation time
+//
+//go:embed *.yaml
+var OperatorManifests embed.FS
