@@ -499,9 +499,7 @@ func collectPGVersion(e *Exporter) error {
 	if err != nil {
 		return err
 	}
-
-	majorMinorPatch := fmt.Sprintf("%d.%d", semanticVersion.Major, semanticVersion.Patch)
-	e.Metrics.PgVersion.WithLabelValues(majorMinorPatch, e.instance.ClusterName).Set(version)
+	e.Metrics.PgVersion.WithLabelValues(majorMinor, e.instance.ClusterName).Set(version)
 
 	return nil
 }
