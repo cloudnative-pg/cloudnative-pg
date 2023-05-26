@@ -62,6 +62,7 @@ var (
 	operatorPodWasRenamed   bool
 	operatorWasRestarted    bool
 	operatorLogDumped       bool
+	quickDeletionPeriod     = int64(1)
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
