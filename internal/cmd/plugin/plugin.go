@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -75,6 +76,7 @@ func createClient(cfg *rest.Config) error {
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = apiv1.AddToScheme(scheme)
+	_ = storagesnapshotv1.AddToScheme(scheme)
 
 	Client, err = client.New(cfg, client.Options{Scheme: scheme})
 	if err != nil {

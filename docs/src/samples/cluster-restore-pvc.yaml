@@ -1,0 +1,18 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      volumeSnapshots:
+        storage:
+          name: cluster-example-3
+          kind: PersistentVolumeClaim
+          apiGroup: ""
+
