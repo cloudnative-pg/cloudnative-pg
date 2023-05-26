@@ -99,6 +99,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	// If we need to download data from a backup, we do it
 	backup, env, err := info.loadBackup(ctx, typedClient, cluster)
 	if err != nil {
 		return err
