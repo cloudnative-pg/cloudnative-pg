@@ -1,0 +1,18 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      volumeSnapshots:
+        storage:
+          name: my-backup
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+

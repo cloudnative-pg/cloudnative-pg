@@ -1034,18 +1034,35 @@ type PostInitApplicationSQLRefs struct {
 }
 
 // BootstrapRecovery contains the configuration required to restore
-// the backup with the specified name and, after having changed the password
-// with the one chosen for the superuser, will use it to bootstrap a full
-// cluster cloning all the instances from the restored primary.
+// from an existing cluster using 3 methodologies: external cluster,
+// volume snapshots or backup objects. Full recovery and Point-In-Time
+// Recovery are supported.
+// The method can be also be used to create clusters in continuous recovery
+// (replica clusters), also supporting cascading replication when `instances` >
+// 1. Once the cluster exits recovery, the password for the superuser
+// will be changed through the provided secret.
 // Refer to the Bootstrap page of the documentation for more information.
 type BootstrapRecovery struct {
-	// The backup we need to restore
+	// The backup object containing the physical base backup from which to
+	// initiate the recovery procedure.
+	// Mutually exclusive with `source` and `volumeSnapshots`.
 	Backup *BackupSource `json:"backup,omitempty"`
 
 	// The external cluster whose backup we will restore. This is also
 	// used as the name of the folder under which the backup is stored,
 	// so it must be set to the name of the source cluster
+	// Mutually exclusive with `backup` and `volumeSnapshots`.
 	Source string `json:"source,omitempty"`
+
+	// The static PVC data source(s) from which to initiate the
+	// recovery procedure. Currently supporting `VolumeSnapshot`
+	// and `PersistentVolumeClaim` resources that map an existing
+	// PVC group, compatible with CloudNativePG, and taken with
+	// a cold backup copy on a fenced Postgres instance (limitation
+	// which will be removed in the future when online backup
+	// will be implemented).
+	// Mutually exclusive with `backup` and `source`.
+	VolumeSnapshots *DataSource `json:"volumeSnapshots,omitempty"`
 
 	// By default, the recovery process applies all the available
 	// WAL files in the archive (full recovery). However, you can also
@@ -1069,6 +1086,16 @@ type BootstrapRecovery struct {
 	// created from scratch
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
+}
+
+// DataSource contains the configuration required to bootstrap a
+// PostgreSQL cluster from an existing storage
+type DataSource struct {
+	// Configuration of the storage of the instances
+	Storage corev1.TypedLocalObjectReference `json:"storage"`
+
+	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
+	WalStorage *corev1.TypedLocalObjectReference `json:"walStorage,omitempty"`
 }
 
 // BackupSource contains the backup we need to restore from, plus some
