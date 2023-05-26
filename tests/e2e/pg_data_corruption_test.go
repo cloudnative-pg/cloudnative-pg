@@ -124,9 +124,8 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Force delete setting
-			zero := int64(0)
-			forceDelete := &client.DeleteOptions{
-				GracePeriodSeconds: &zero,
+			quickDelete := &client.DeleteOptions{
+				GracePeriodSeconds: &quickDeletionPeriod,
 			}
 
 			// removing old primary pod attached pvc
@@ -137,7 +136,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 			oldPrimaryPVC := &corev1.PersistentVolumeClaim{}
 			err = env.Client.Get(env.Ctx, namespacedPVCName, oldPrimaryPVC)
 			Expect(err).ToNot(HaveOccurred())
-			err = env.Client.Delete(env.Ctx, oldPrimaryPVC, forceDelete)
+			err = env.Client.Delete(env.Ctx, oldPrimaryPVC, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// removing walStorage PVC if needed
@@ -150,12 +149,12 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 				oldPrimaryWalPVC := &corev1.PersistentVolumeClaim{}
 				err = env.Client.Get(env.Ctx, namespacedWalPVCName, oldPrimaryWalPVC)
 				Expect(err).ToNot(HaveOccurred())
-				err = env.Client.Delete(env.Ctx, oldPrimaryWalPVC, forceDelete)
+				err = env.Client.Delete(env.Ctx, oldPrimaryWalPVC, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 			}
 
 			// Deleting old primary pod
-			err = env.DeletePod(namespace, oldPrimaryPodName, forceDelete)
+			err = env.DeletePod(namespace, oldPrimaryPodName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// checking that the old primary pod is eventually gone

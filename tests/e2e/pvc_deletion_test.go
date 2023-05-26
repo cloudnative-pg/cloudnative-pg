@@ -82,11 +82,10 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			originalPVCUID := pvc.GetUID()
 
 			// Delete the pod
-			zero := int64(0)
-			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
+			quickDelete := &ctrlclient.DeleteOptions{
+				GracePeriodSeconds: &quickDeletionPeriod,
 			}
-			err = env.DeletePod(namespace, podName, forceDelete)
+			err = env.DeletePod(namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// The pod should be back
@@ -133,13 +132,12 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Force delete setting
-			zero := int64(0)
-			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
+			quickDelete := &ctrlclient.DeleteOptions{
+				GracePeriodSeconds: &quickDeletionPeriod,
 			}
 
 			// Delete the PVC and the Pod
-			err = env.Client.Delete(env.Ctx, pvc, forceDelete)
+			err = env.Client.Delete(env.Ctx, pvc, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// removing WalStorage PVC if needed
@@ -152,12 +150,12 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 				walPVC := &corev1.PersistentVolumeClaim{}
 				err = env.Client.Get(env.Ctx, namespacedWalPVCName, walPVC)
 				Expect(err).ToNot(HaveOccurred())
-				err = env.Client.Delete(env.Ctx, walPVC, forceDelete)
+				err = env.Client.Delete(env.Ctx, walPVC, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 			}
 
 			// Deleting primary pod
-			err = env.DeletePod(namespace, podName, forceDelete)
+			err = env.DeletePod(namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// A new pod should be created
