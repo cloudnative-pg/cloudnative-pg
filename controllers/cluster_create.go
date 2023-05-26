@@ -948,6 +948,12 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			}
 		}
 
+		if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots != nil {
+			// We are recovering from an existing PVC snapshot, we
+			// don't need to invoke the recovery job
+			return ctrl.Result{}, nil
+		}
+
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
 		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
 	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil:

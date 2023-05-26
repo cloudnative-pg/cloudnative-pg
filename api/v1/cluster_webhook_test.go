@@ -19,6 +19,7 @@ package v1
 import (
 	"strings"
 
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2884,5 +2885,178 @@ var _ = Describe("Role management validation", func() {
 			},
 		}
 		Expect(cluster.validateManagedRoles()).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("Recovery from volume snapshot validation", func() {
+	clusterFromRecovery := func(recovery *BootstrapRecovery) *Cluster {
+		return &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: recovery,
+				},
+				WalStorage: &StorageConfiguration{},
+			},
+		}
+	}
+
+	It("should produce an error when defining two recovery sources at the same time", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Source:          "sourceName",
+						Backup:          &BackupSource{},
+						VolumeSnapshots: &DataSource{},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(1))
+	})
+
+	It("should produce an error when requested a recovery target time", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						VolumeSnapshots: &DataSource{
+							Storage: corev1.TypedLocalObjectReference{
+								APIGroup: pointer.String(""),
+								Kind:     "PersistentVolumeClaim",
+								Name:     "pgdata",
+							},
+						},
+						RecoveryTarget: &RecoveryTarget{},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(1))
+	})
+
+	It("should produce an error when asking to recovery WALs from a snapshot without having storage for it", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						VolumeSnapshots: &DataSource{
+							Storage: corev1.TypedLocalObjectReference{
+								APIGroup: pointer.String(""),
+								Kind:     "PersistentVolumeClaim",
+								Name:     "pgdata",
+							},
+							WalStorage: &corev1.TypedLocalObjectReference{
+								APIGroup: pointer.String(""),
+								Kind:     "PersistentVolumeClaim",
+								Name:     "pgwal",
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(1))
+	})
+
+	It("should not produce an error when the configuration is sound", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						VolumeSnapshots: &DataSource{
+							Storage: corev1.TypedLocalObjectReference{
+								APIGroup: pointer.String(""),
+								Kind:     "PersistentVolumeClaim",
+								Name:     "pgdata",
+							},
+							WalStorage: &corev1.TypedLocalObjectReference{
+								APIGroup: pointer.String(""),
+								Kind:     "PersistentVolumeClaim",
+								Name:     "pgwal",
+							},
+						},
+					},
+				},
+				WalStorage: &StorageConfiguration{},
+			},
+		}
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
+	})
+
+	It("accepts recovery from a VolumeSnapshot", func() {
+		cluster := clusterFromRecovery(&BootstrapRecovery{
+			VolumeSnapshots: &DataSource{
+				Storage: corev1.TypedLocalObjectReference{
+					APIGroup: pointer.String(storagesnapshotv1.GroupName),
+					Kind:     "VolumeSnapshot",
+					Name:     "pgdata",
+				},
+				WalStorage: &corev1.TypedLocalObjectReference{
+					APIGroup: pointer.String(storagesnapshotv1.GroupName),
+					Kind:     "VolumeSnapshot",
+					Name:     "pgwal",
+				},
+			},
+		})
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
+	})
+
+	When("using an nil apiGroup", func() {
+		It("accepts recovery from a PersistentVolumeClaim", func() {
+			cluster := clusterFromRecovery(&BootstrapRecovery{
+				VolumeSnapshots: &DataSource{
+					Storage: corev1.TypedLocalObjectReference{
+						APIGroup: nil,
+						Kind:     "PersistentVolumeClaim",
+						Name:     "pgdata",
+					},
+					WalStorage: &corev1.TypedLocalObjectReference{
+						APIGroup: nil,
+						Kind:     "PersistentVolumeClaim",
+						Name:     "pgwal",
+					},
+				},
+			})
+			Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
+		})
+	})
+
+	When("using an empty apiGroup", func() {
+		It("accepts recovery from a PersistentVolumeClaim", func() {
+			cluster := clusterFromRecovery(&BootstrapRecovery{
+				VolumeSnapshots: &DataSource{
+					Storage: corev1.TypedLocalObjectReference{
+						APIGroup: pointer.String(""),
+						Kind:     "PersistentVolumeClaim",
+						Name:     "pgdata",
+					},
+					WalStorage: &corev1.TypedLocalObjectReference{
+						APIGroup: pointer.String(""),
+						Kind:     "PersistentVolumeClaim",
+						Name:     "pgwal",
+					},
+				},
+			})
+			Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
+		})
+	})
+
+	It("prevent recovery from other Objects", func() {
+		cluster := clusterFromRecovery(&BootstrapRecovery{
+			VolumeSnapshots: &DataSource{
+				Storage: corev1.TypedLocalObjectReference{
+					APIGroup: pointer.String(""),
+					Kind:     "Secret",
+					Name:     "pgdata",
+				},
+				WalStorage: &corev1.TypedLocalObjectReference{
+					APIGroup: pointer.String(""),
+					Kind:     "ConfigMap",
+					Name:     "pgwal",
+				},
+			},
+		})
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(2))
 	})
 })

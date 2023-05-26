@@ -92,6 +92,7 @@ DISA
 DNS
 DataBackupConfiguration
 DataBase
+DataSource
 DeploymentStrategy
 DevOps
 DevSecOps
@@ -216,6 +217,7 @@ OperatorHub
 PGAudit
 PGDATA
 PGDG
+PGData
 PGSQL
 PKI
 PODNAME
@@ -328,6 +330,7 @@ ServiceMonitor
 Silvela
 Slonik
 SnapshotType
+Snapshotting
 StatefulSets
 StorageClass
 StorageConfiguration
@@ -341,6 +344,7 @@ TOC
 TODO
 TimelineId
 TopologyKey
+TypedLocalObjectReference
 UID
 Uncomment
 Unrealizable
@@ -350,6 +354,7 @@ VMs
 VOLNAME
 Valerio
 VirtualBox
+VolumeSnapshot
 WAL
 WAL's
 WALBackupConfiguration
@@ -869,6 +874,8 @@ shmmax
 sig
 sigs
 singlenamespace
+snapshotted
+snapshotting
 sourceNamespace
 specificities
 sql
@@ -943,6 +950,8 @@ ul
 un
 uncordon
 unencrypted
+unfence
+unfencing
 unix
 upgradable
 usename
@@ -955,6 +964,7 @@ virtualized
 virtualxid
 volumeMode
 volumeMounts
+volumesnapshot
 wal
 walSegmentSize
 walStorage

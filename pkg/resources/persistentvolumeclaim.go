@@ -45,6 +45,18 @@ func (b *PersistentVolumeClaimBuilder) WithSpec(spec *corev1.PersistentVolumeCla
 	return b
 }
 
+// WithSource assigns the currently source to the underlying object
+func (b *PersistentVolumeClaimBuilder) WithSource(
+	source *corev1.TypedLocalObjectReference,
+) *PersistentVolumeClaimBuilder {
+	if source == nil {
+		return b
+	}
+
+	b.pvc.Spec.DataSource = source.DeepCopy()
+	return b
+}
+
 // WithStorageClass adds the storageClass to the object being build
 func (b *PersistentVolumeClaimBuilder) WithStorageClass(storageClass *string) *PersistentVolumeClaimBuilder {
 	b.pvc.Spec.StorageClassName = storageClass

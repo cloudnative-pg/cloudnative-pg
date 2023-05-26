@@ -40,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/report"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/restart"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/snapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/status"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -88,6 +89,7 @@ func main() {
 	rootCmd.AddCommand(versions.NewCmd())
 	rootCmd.AddCommand(backup.NewCmd())
 	rootCmd.AddCommand(psql.NewCmd())
+	rootCmd.AddCommand(snapshot.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
