@@ -1994,19 +1994,23 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 				fmt.Sprintf("%s must be 'on' to use %s", hotStandbyFeedbackKey, pgFailoverSlots.Name)))
 	}
 
-	replicationSlotPath := field.NewPath("spec", "replicationSlots", "highAvailability", "enabled")
-	replicationSlotOut := fmt.Sprintf("High Availability replication slots must be enabled to use %s",
-		pgFailoverSlots.Name)
-	replicationSlots := r.Spec.ReplicationSlots
-	if replicationSlots == nil ||
-		replicationSlots.HighAvailability == nil ||
-		replicationSlots.HighAvailability.Enabled == nil {
-		result = append(result, field.Invalid(replicationSlotPath, nil, replicationSlotOut))
-	} else if !replicationSlots.HighAvailability.GetEnabled() {
-		result = append(result, field.Invalid(
-			replicationSlotPath,
-			replicationSlots.HighAvailability.GetEnabled(),
-			replicationSlotOut))
+	if r.Spec.ReplicationSlots == nil {
+		return append(result,
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots"),
+				nil,
+				"replicationSlots must be enabled"),
+		)
+	}
+
+	if r.Spec.ReplicationSlots.HighAvailability == nil ||
+		!r.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
+		return append(result,
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "highAvailability"),
+				"nil or false",
+				"High Availability replication slots must be enabled"),
+		)
 	}
 
 	return result

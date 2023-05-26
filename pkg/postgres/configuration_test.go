@@ -302,7 +302,7 @@ var _ = Describe("pgaudit", func() {
 		Expect(libraries).ToNot(ContainElement(""))
 		Expect(libraries).To(ContainElements("pg_stat_statements", "other_library"))
 	})
-	It("adds pg_stat_statements and pg_audit to shared_preload_library", func() {
+	It("adds pg_stat_statements and pgaudit to shared_preload_library", func() {
 		info := ConfigurationInfo{
 			Settings:     CnpgConfigurationSettings,
 			MajorVersion: 130000,
