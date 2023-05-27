@@ -69,13 +69,12 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			continue
 		}
 
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
-			fmt.Sprintf("Restarting instance %s, because: %s", postgresqlStatus.Pod.Name, reason),
-		); err != nil {
+		restartMessage := fmt.Sprintf("Restarting instance %s, because: %s", postgresqlStatus.Pod.Name, reason)
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade, restartMessage); err != nil {
 			return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 		}
 
-		return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)
+		return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod, restartMessage)
 	}
 
 	// report an error if there is no primary. This condition should never happen because
@@ -146,7 +145,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		if err != nil {
 			return false, err
 		}
-		err = r.upgradePod(ctx, cluster, &primaryPod)
+		err = r.upgradePod(ctx, cluster, &primaryPod, reason)
 		return err == nil, err
 	}
 
@@ -183,7 +182,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		return false, fmt.Errorf("postgresqlStatus for pod %s: %w", primaryPod.Name, err)
 	}
 
-	return true, r.upgradePod(ctx, cluster, &primaryPod)
+	return true, r.upgradePod(ctx, cluster, &primaryPod, reason)
 }
 
 func (r *ClusterReconciler) updateRestartAnnotation(
@@ -306,8 +305,9 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	}
 
 	// check if pod needs to be restarted because of some config requiring it
-	return isPodNeedingRestart(cluster, status),
-		true, "configuration needs a restart to apply some configuration changes"
+	// or if the cluster have been explicitly restarted
+	needingRestart, reason := isPodNeedingRestart(cluster, status)
+	return needingRestart, true, reason
 }
 
 // isPodNeedingUpdatedScheduler returns a boolean indicating if a restart is required and the relative message
@@ -405,18 +405,22 @@ func isPodNeedingUpgradedInitContainerImage(
 func isPodNeedingRestart(
 	cluster *apiv1.Cluster,
 	instanceStatus postgres.PostgresqlStatus,
-) bool {
+) (bool, string) {
 	// If the cluster has been restarted and we are working with a Pod
 	// which have not been restarted yet, or restarted in a different
 	// time, let's restart it.
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
 		podRestart := instanceStatus.Pod.Annotations[specs.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
-			return true
+			return true, "cluster have been explicitly restarted via annotation"
 		}
 	}
 
-	return instanceStatus.PendingRestart
+	if instanceStatus.PendingRestart {
+		return true, "configuration needs a restart to apply some configuration changes"
+	}
+
+	return false, ""
 }
 
 func isPodNeedingUpdatedEnvironment(cluster apiv1.Cluster, pod corev1.Pod) (bool, string) {
@@ -455,11 +459,19 @@ func isPodNeedingUpdatedEnvironment(cluster apiv1.Cluster, pod corev1.Pod) (bool
 	return false, ""
 }
 
-// upgradePod updates an instance to a newer image version
-func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Cluster, pod *corev1.Pod) error {
+// upgradePod deletes a Pod to let the operator recreate it using an
+// updated definition
+func (r *ClusterReconciler) upgradePod(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pod *corev1.Pod,
+	reason string,
+) error {
 	log.FromContext(ctx).Info("Deleting old Pod",
 		"pod", pod.Name,
-		"to", cluster.Spec.ImageName)
+		"to", cluster.Spec.ImageName,
+		"reason", reason,
+	)
 
 	r.Recorder.Eventf(cluster, "Normal", "UpgradingInstance",
 		"Upgrading instance %v", pod.Name)
