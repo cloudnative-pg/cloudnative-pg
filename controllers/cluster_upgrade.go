@@ -40,6 +40,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+type rolloutReason = string
+
 func (r *ClusterReconciler) rolloutDueToCondition(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -110,7 +112,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	podList *postgres.PostgresqlStatusList,
 	primaryPod corev1.Pod,
 	inPlacePossible bool,
-	reason string,
+	reason rolloutReason,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -405,7 +407,7 @@ func isPodNeedingUpgradedInitContainerImage(
 func isPodNeedingRestart(
 	cluster *apiv1.Cluster,
 	instanceStatus postgres.PostgresqlStatus,
-) (bool, string) {
+) (bool, rolloutReason) {
 	// If the cluster has been restarted and we are working with a Pod
 	// which have not been restarted yet, or restarted in a different
 	// time, let's restart it.
@@ -465,7 +467,7 @@ func (r *ClusterReconciler) upgradePod(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	pod *corev1.Pod,
-	reason string,
+	reason rolloutReason,
 ) error {
 	log.FromContext(ctx).Info("Deleting old Pod",
 		"pod", pod.Name,
