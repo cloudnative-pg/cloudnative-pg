@@ -103,7 +103,7 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http
 }
 
 func (ws *remoteWebserverEndpoints) hasServerStartup(w http.ResponseWriter, _ *http.Request) {
-	if !ws.instance.IsStatusRunning() {
+	if !ws.instance.IsStatusRunning() && !ws.instance.PgRewindIsRunning {
 		log.Warning("startup not yet completed")
 		http.Error(w, "startup not yet completed", http.StatusInternalServerError)
 		return
