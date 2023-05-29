@@ -73,7 +73,7 @@ type PostgresqlStatus struct {
 	// not still invoked the readiness probe.
 	//
 	// If you want to check the latest detected status of PostgreSQL, you
-	// need to call IsPostgresqlReady().
+	// need to call HasHTTPStatus().
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
@@ -115,13 +115,13 @@ func (status *PostgresqlStatus) AddPod(pod corev1.Pod) {
 	status.Node = pod.Spec.NodeName
 }
 
-// IsPostgresqlReady checks if the instance manager is reporting this
+// HasHTTPStatus checks if the instance manager is reporting this
 // instance as ready.
 //
 // The result represents the state of PostgreSQL at the moment of the
 // collection of the instance status and is more up-to-date than
 // IsPodReady field, which is updated asynchronously.
-func (status PostgresqlStatus) IsPostgresqlReady() bool {
+func (status PostgresqlStatus) HasHTTPStatus() bool {
 	// To load the status of this instance, we use the `/pg/status` endpoint
 	// of the instance manager. PostgreSQL is ready and running if the
 	// endpoint returns success, and the Error field will be nil.
@@ -356,22 +356,6 @@ func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bo
 	}
 
 	return false
-}
-
-// AllReadyInstancesStatusExtracted checks whether the operator has successfully extracted
-// the status of all ready instances via HTTP request. It iterates through the list of PostgreSQL Instances
-// statuses, verifying if the associated active and ready pods are free of errors.
-// Returns true if all ready instances have their status extracted successfully, false otherwise.
-func (list PostgresqlStatusList) AllReadyInstancesStatusExtracted() bool {
-	for _, item := range list.Items {
-		podIsActiveAndReady := utils.IsPodActive(item.Pod) && utils.IsPodReady(item.Pod)
-		if podIsActiveAndReady && item.Error != nil {
-			// If a pod is active and ready but an error occurred while extracting its status, return false.
-			return false
-		}
-	}
-	// All active and ready pods had their status extracted successfully.
-	return true
 }
 
 // InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable

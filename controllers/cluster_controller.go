@@ -230,20 +230,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
 
-	if !instancesStatus.AllReadyInstancesStatusExtracted() {
-		contextLogger.Warning(
-			"Failed to extract instance status from ready instances. Attempting requeue...",
-		)
-		registerPhaseErr := r.RegisterPhase(
-			ctx,
-			cluster,
-			"Instance Status Extraction Error: HTTP communication issue",
-			"Communication issue detected: The operator was unable to receive the status from one or more ready instances. "+
-				"This may be due to network restrictions such as NetworkPolicy settings. Please verify your network configuration.",
-		)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
-	}
-
 	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
 	// field in the status
 	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
@@ -270,17 +256,18 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// un-fenced, and the Kubelet still hasn't refreshed the status of the
 	// readiness probe.
 	if instancesStatus.Len() > 0 {
-		isPostgresReady := instancesStatus.Items[0].IsPostgresqlReady()
-		isPodReady := instancesStatus.Items[0].IsPodReady
+		podStatus := instancesStatus.Items[0]
+		hasHTTPStatus := podStatus.HasHTTPStatus()
+		isPodReady := podStatus.IsPodReady
 
-		if isPostgresReady && !isPodReady {
+		if hasHTTPStatus && !isPodReady {
 			// The readiness probe status from the Kubelet is not updated, so
 			// we need to wait for it to be refreshed
 			contextLogger.Info(
 				"Waiting for the Kubelet to refresh the readiness probe",
-				"instanceName", instancesStatus.Items[0].Node,
-				"instanceStatus", instancesStatus.Items[0],
-				"isPostgresReady", isPostgresReady,
+				"instanceName", podStatus.Node,
+				"instanceStatus", podStatus,
+				"hasHTTPStatus", hasHTTPStatus,
 				"isPodReady", isPodReady)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
