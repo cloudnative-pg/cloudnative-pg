@@ -37,7 +37,7 @@ on:
 env:
   GOLANG_VERSION: "1.20.x"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.17.0"
+  KIND_VERSION: "v1.27.2"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
 
 defaults:
