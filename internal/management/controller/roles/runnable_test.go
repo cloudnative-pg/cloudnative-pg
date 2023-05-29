@@ -21,8 +21,12 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -788,5 +792,130 @@ var _ = DescribeTable("Role status getter tests",
 			"postgres":                  apiv1.RoleStatusReserved,
 			"roleWithChangedPassInSpec": apiv1.RoleStatusPendingReconciliation,
 		},
+	),
+)
+
+const (
+	namespace          = "vinci-namespace"
+	secretName         = "vinci-secret-name"
+	secretNameNoUser   = "vinci-secret-no-user"
+	secretNameNoPass   = "vinci-secret-no-pass"
+	secretNameNotExist = "vinci-secret-name-not-exist"
+	userNameNotExist   = "vinci-not-exist"
+	userName           = "vinci"
+	password           = "vinci1234"
+)
+
+var _ = DescribeTable("role secrets test",
+	func(
+		roleConfig *apiv1.RoleConfiguration,
+		expectedResult passwordSecret,
+		expectError bool,
+	) {
+		// define various secrets as test cases to show failure modes
+		secret := corev1.Secret{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte(userName),
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
+		secretNoUser := corev1.Secret{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      secretNameNoUser,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthPasswordKey: []byte(password),
+			},
+		}
+		secretNoPass := corev1.Secret{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      secretNameNoPass,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte(userName),
+			},
+		}
+		cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(&secret, &secretNoUser, &secretNoPass).
+			Build()
+		ctx := context.Background()
+		decoded, err := getPassword(ctx, cl, *roleConfig, namespace)
+		if expectError {
+			Expect(err).To(HaveOccurred())
+		} else {
+			Expect(err).ToNot(HaveOccurred())
+		}
+
+		Expect(decoded.username).To(Equal(expectedResult.username))
+		Expect(decoded.password).To(Equal(expectedResult.password))
+		if (expectedResult == passwordSecret{}) {
+			Expect(decoded).To(BeZero())
+		}
+	},
+	Entry("Can extract credentials on correct role secretName and secret content",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretName,
+			},
+		},
+		passwordSecret{
+			username: userName,
+			password: password,
+		},
+		false,
+	),
+	Entry("Cannot extract credentials if role secretName is empty",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+		},
+		passwordSecret{},
+		false,
+	),
+	Entry("Cannot extract credentials if role's secretName does not match a secret",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretNameNotExist,
+			},
+		},
+		passwordSecret{},
+		false,
+	),
+	Entry("Throws error if secret username does not match role name",
+		&apiv1.RoleConfiguration{
+			Name: userNameNotExist,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretName,
+			},
+		},
+		passwordSecret{},
+		true,
+	),
+	Entry("Throws error if configured secret does not contain a username",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretNameNoUser,
+			},
+		},
+		passwordSecret{},
+		true,
+	),
+	Entry("Throws error if configured secret does not contain a password",
+		&apiv1.RoleConfiguration{
+			Name: userName,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: secretNameNoPass,
+			},
+		},
+		passwordSecret{},
+		true,
 	),
 )
