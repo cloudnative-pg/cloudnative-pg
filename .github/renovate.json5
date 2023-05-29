@@ -51,10 +51,12 @@
       "fileMatch": [
         "^Makefile$",
         "^hack/setup-cluster.sh$",
+        "^.github/workflows/continuous-delivery.yml"
       ],
       "matchStrings": [
         "KIND_CLUSTER_VERSION \\?= (?<currentValue>.*?)\\n",
         "K8S_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
+        "KIND_VERSION: \"(?<currentValue>.*?)\"",
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
