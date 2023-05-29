@@ -245,12 +245,14 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 			// The operator should eventually set the cluster target primary to
 			// the instance we expect to take that role (-3).
-			timeout = 120
 			Eventually(func() (string, error) {
 				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.TargetPrimary, err
-			}, timeout).ShouldNot(Or(BeEquivalentTo(currentPrimary), BeEquivalentTo(apiv1.PendingFailoverMarker)))
+			}, testTimeouts[utils.NewTargetOnFailover]).
+				ShouldNot(
+					Or(BeEquivalentTo(currentPrimary),
+						BeEquivalentTo(apiv1.PendingFailoverMarker)))
 			cluster := &apiv1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.TargetPrimary, err).To(
@@ -259,17 +261,16 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 		// Finally, the cluster current primary should be changed by the
 		// operator to the target primary
-		By("waiting that the TargetPrimary become also CurrentPrimary", func() {
+		By("waiting for the TargetPrimary to become CurrentPrimary", func() {
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			timeout := 30
 			Eventually(func() (string, error) {
 				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.CurrentPrimary, err
-			}, timeout).Should(BeEquivalentTo(targetPrimary))
+			}, testTimeouts[utils.NewPrimaryAfterFailover]).Should(BeEquivalentTo(targetPrimary))
 		})
 	})
 })

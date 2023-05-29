@@ -29,8 +29,14 @@ import (
 	. "github.com/onsi/gomega" // nolint
 )
 
-// ExecuteBackup performs a backup and check the backup status
-func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment) {
+// ExecuteBackup performs a backup and checks the backup status
+func ExecuteBackup(
+	namespace,
+	backupFile string,
+	_ bool,
+	timeoutSeconds int,
+	env *TestingEnvironment,
+) {
 	backupName, err := env.GetResourceNameFromYAML(backupFile)
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() error {
@@ -40,9 +46,6 @@ func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment)
 		}
 		return nil
 	}, RetryTimeout, PollingTime).Should(BeNil())
-
-	// After a while the Backup should be completed
-	timeout := 180
 	backupNamespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      backupName,
@@ -52,7 +55,7 @@ func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment)
 	Eventually(func() (apiv1.BackupPhase, error) {
 		err = env.Client.Get(env.Ctx, backupNamespacedName, backup)
 		return backup.Status.Phase, err
-	}, timeout).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+	}, timeoutSeconds).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 	Eventually(func() (string, error) {
 		err = env.Client.Get(env.Ctx, backupNamespacedName, backup)
 		if err != nil {
@@ -60,7 +63,7 @@ func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment)
 		}
 		backupStatus := backup.GetStatus()
 		return backupStatus.BeginLSN, err
-	}, timeout).ShouldNot(BeEmpty())
+	}, timeoutSeconds).ShouldNot(BeEmpty())
 
 	backupStatus := backup.GetStatus()
 	Expect(backupStatus.BeginWal).NotTo(BeEmpty())

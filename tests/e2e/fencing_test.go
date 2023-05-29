@@ -166,7 +166,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	assertFencingFollowerWorks := func(fencingMethod testUtils.FencingMethod) {
 		It("can fence a follower instance", func() {
 			var beforeFencingPodName string
-			AssertClusterIsReady(namespace, clusterName, 120, env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[testUtils.ClusterIsReadyQuick], env)
 			By("fence a follower instance", func() {
 				podList, _ := env.GetClusterPodList(namespace, clusterName)
 				Expect(len(podList.Items)).To(BeEquivalentTo(3))
