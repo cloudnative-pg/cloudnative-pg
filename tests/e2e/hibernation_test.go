@@ -254,7 +254,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				verifySummaryInHibernationStatus(clusterName, clusterOffStatusMessage)
 			})
 
-			AssertClusterIsReady(namespace, clusterName, 600, env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 			// Test data should be present after hibernation off
 			AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 		}
@@ -331,7 +331,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 					verifySummaryInHibernationStatus(clusterName, clusterOffStatusMessage)
 				})
 
-				AssertClusterIsReady(namespace, clusterName, 600, env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 				// Test data should be present after hibernation off
 				AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 			})
