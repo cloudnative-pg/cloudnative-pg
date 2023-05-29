@@ -358,6 +358,18 @@ func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bo
 	return false
 }
 
+// HasExtractedStatusFromReadyInstances reports if the operator has extracted the status of the ready instances by
+// executing the HTTP request
+func (list PostgresqlStatusList) HasExtractedStatusFromReadyInstances() bool {
+	for _, item := range list.Items {
+		if utils.IsPodActive(item.Pod) && utils.IsPodReady(item.Pod) && item.Error != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
 // InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable
 func (list PostgresqlStatusList) InstancesReportingStatus() int {
 	var n int
