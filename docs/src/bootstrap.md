@@ -502,8 +502,7 @@ bootstrap:
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 
-      walDataSource:
-        storage:
+        walStorage:
           name: <snapshot name>
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
