@@ -314,13 +314,13 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
 				role.PasswordSecret.Name)
 	case role.PasswordSecret != nil && !role.DisablePassword:
-		pass, version, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
+		passwordSecret, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
 		if err != nil {
 			return apiv1.PasswordState{}, err
 		}
 
-		databaseRole.password = sql.NullString{Valid: true, String: pass}
-		passVersion = version
+		databaseRole.password = sql.NullString{Valid: true, String: passwordSecret.password}
+		passVersion = passwordSecret.version
 	}
 
 	var err error
@@ -345,6 +345,13 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	}, nil
 }
 
+// passwordSecret contains the decoded credentials from a Secret
+type passwordSecret struct {
+	username string
+	password string
+	version  string
+}
+
 // getPassword retrieves the password stored in the Kubernetes secret for the
 // RoleConfiguration
 func getPassword(
@@ -352,11 +359,11 @@ func getPassword(
 	cl client.Client,
 	roleInSpec apiv1.RoleConfiguration,
 	namespace string,
-) (string, string, error) {
+) (passwordSecret, error) {
 	secretName := roleInSpec.GetRoleSecretsName()
 	// no secrets defined, will keep roleInSpec.Password nil
 	if secretName == "" {
-		return "", "", nil
+		return passwordSecret{}, nil
 	}
 
 	var secret corev1.Secret
@@ -365,19 +372,24 @@ func getPassword(
 		&secret)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
-			return "", "", nil
+			return passwordSecret{}, nil
 		}
-		return "", "", err
+		return passwordSecret{}, err
 	}
 	usernameFromSecret, passwordFromSecret, err := utils.GetUserPasswordFromSecret(&secret)
 	if err != nil {
-		return "", "", err
+		return passwordSecret{}, err
 	}
 	if strings.TrimSpace(roleInSpec.Name) != strings.TrimSpace(usernameFromSecret) {
 		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
-		return "", "", err
+		return passwordSecret{}, err
 	}
-	return strings.TrimSpace(passwordFromSecret), secret.GetResourceVersion(), nil
+	return passwordSecret{
+			strings.TrimSpace(usernameFromSecret),
+			strings.TrimSpace(passwordFromSecret),
+			secret.GetResourceVersion(),
+		},
+		nil
 }
 
 // getPasswordSecretResourceVersion returns a list of resource version of the passwords secrets for managed roles
@@ -393,11 +405,11 @@ func getPasswordSecretResourceVersion(
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
-		_, version, err := getPassword(ctx, client, role, namespace)
+		passwordSecret, err := getPassword(ctx, client, role, namespace)
 		if err != nil {
 			return nil, err
 		}
-		re[role.Name] = version
+		re[role.Name] = passwordSecret.version
 	}
 	return re, nil
 }
