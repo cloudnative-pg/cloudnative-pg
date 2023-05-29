@@ -327,3 +327,21 @@ var _ = Describe("pgaudit", func() {
 		Expect(libraries).To(ContainElements("pg_stat_statements", "pgaudit"))
 	})
 })
+
+var _ = Describe("pg_failover_slots", func() {
+	It("adds pg_failover_slots to shared_preload_library", func() {
+		info := ConfigurationInfo{
+			Settings:                        CnpgConfigurationSettings,
+			MajorVersion:                    130000,
+			UserSettings:                    map[string]string{"pg_failover_slots.something": "something"},
+			IncludingMandatory:              true,
+			IncludingSharedPreloadLibraries: true,
+			SyncReplicas:                    0,
+		}
+		config := CreatePostgresqlConfiguration(info)
+		libraries := strings.Split(config.GetConfig(SharedPreloadLibraries), ",")
+		Expect(len(libraries)).To(BeNumerically("==", 1))
+		Expect(libraries).ToNot(ContainElement(""))
+		Expect(libraries).To(ContainElements("pg_failover_slots"))
+	})
+})
