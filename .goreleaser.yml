@@ -112,3 +112,6 @@ krews:
     short_description: 'Manage your CloudNativePG clusters'
     skip_upload: true
     description: 'This plugin provides multiple commands to help you manage your CloudNativePG clusters.'
+
+sboms:
+  - artifacts: archive
