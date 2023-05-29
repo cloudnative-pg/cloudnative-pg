@@ -28,7 +28,12 @@ import (
 
 // DrainPrimaryNode drains the node containing the primary pod.
 // It returns the names of the pods that were running on that node
-func DrainPrimaryNode(namespace string, clusterName string, env *utils.TestingEnvironment) []string {
+func DrainPrimaryNode(
+	namespace,
+	clusterName string,
+	timeoutSeconds int,
+	env *utils.TestingEnvironment,
+) []string {
 	var primaryNode string
 	var podNames []string
 	By("identifying primary node and draining", func() {
@@ -46,18 +51,15 @@ func DrainPrimaryNode(namespace string, clusterName string, env *utils.TestingEn
 		}
 
 		// Draining the primary pod's node
-		timeout := 900
-		// should set a timeout otherwise will hang forever
 		var stdout, stderr string
 		Eventually(func() error {
 			cmd := fmt.Sprintf("kubectl drain %v --ignore-daemonsets --delete-local-data --force --timeout=%ds",
-				primaryNode, timeout)
+				primaryNode, timeoutSeconds)
 			stdout, stderr, err = utils.RunUnchecked(cmd)
 			return err
-		}, timeout).ShouldNot(HaveOccurred(), fmt.Sprintf("stdout: %s, stderr: %s", stdout, stderr))
+		}, timeoutSeconds).ShouldNot(HaveOccurred(), fmt.Sprintf("stdout: %s, stderr: %s", stdout, stderr))
 	})
 	By("ensuring no cluster pod is still running on the drained node", func() {
-		timeout := 60
 		Eventually(func() ([]string, error) {
 			var usedNodes []string
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -65,7 +67,7 @@ func DrainPrimaryNode(namespace string, clusterName string, env *utils.TestingEn
 				usedNodes = append(usedNodes, pod.Spec.NodeName)
 			}
 			return usedNodes, err
-		}, timeout).ShouldNot(ContainElement(primaryNode))
+		}, 60).ShouldNot(ContainElement(primaryNode))
 	})
 
 	return podNames

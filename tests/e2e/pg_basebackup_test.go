@@ -62,7 +62,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.La
 			AssertCreateCluster(namespace, dstClusterName, dstCluster, env)
 
 			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, 800, env)
+			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
 		})
 
 		By("checking the dst cluster with auto generated app password connectable", func() {
@@ -138,7 +138,7 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.Labe
 			AssertCreateCluster(namespace, dstClusterName, dstCluster, env)
 
 			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, 800, env)
+			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
 		})
 
 		By("checking data have been copied correctly", func() {

@@ -148,7 +148,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 		})
 		AssertPVCCount(namespace, clusterName, expectedPvcCount, 120)
 		AssertClusterEventuallyReachesPhase(namespace, clusterName, apiv1.PhaseUpgrade, 30)
-		AssertClusterIsReady(namespace, clusterName, 120, env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 		AssertClusterPhaseIsConsistent(namespace, clusterName, apiv1.PhaseHealthy, 30)
 		verifyPgWal(namespace)
 	})

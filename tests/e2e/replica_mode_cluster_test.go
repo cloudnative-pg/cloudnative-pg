@@ -170,7 +170,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("setting up minio", func() {
 				minio, err := utils.MinioDefaultSetup(replicaNamespace)
 				Expect(err).ToNot(HaveOccurred())
-				err = utils.InstallMinio(env, minio, 300)
+				err = utils.InstallMinio(env, minio, uint(testTimeouts[utils.MinioInstallation]))
 				Expect(err).ToNot(HaveOccurred())
 			})
 			// Create the minio client pod and wait for it to be ready.
