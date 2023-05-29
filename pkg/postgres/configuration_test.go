@@ -250,7 +250,8 @@ var _ = Describe("pg_hba.conf generation", func() {
 
 var _ = Describe("pgaudit", func() {
 	var pgaudit *ManagedExtension
-	It("manages pgaudit", func() {
+	BeforeEach(func() {
+		pgaudit = nil
 		for i, ext := range ManagedExtensions {
 			if ext.Name == "pgaudit" {
 				pgaudit = &ManagedExtensions[i]
@@ -259,15 +260,18 @@ var _ = Describe("pgaudit", func() {
 		}
 		Expect(pgaudit).ToNot(BeNil())
 	})
+
 	It("is enabled", func() {
 		userConfigsWithPgAudit := make(map[string]string, 1)
 		userConfigsWithPgAudit["pgaudit.xxx"] = "test"
 		Expect(pgaudit.IsUsed(userConfigsWithPgAudit)).To(BeTrue())
 	})
+
 	It("is not enabled", func() {
 		userConfigsWithNoPgAudit := make(map[string]string, 1)
 		Expect(pgaudit.IsUsed(userConfigsWithNoPgAudit)).To(BeFalse())
 	})
+
 	It("adds pgaudit to shared_preload_library", func() {
 		info := ConfigurationInfo{
 			Settings:                        CnpgConfigurationSettings,
@@ -285,6 +289,7 @@ var _ = Describe("pgaudit", func() {
 		Expect(libraries).ToNot(ContainElement(""))
 		Expect(libraries).To(ContainElements("pgaudit", "other_library"))
 	})
+
 	It("adds pg_stat_statements to shared_preload_library", func() {
 		info := ConfigurationInfo{
 			Settings:                        CnpgConfigurationSettings,
@@ -302,6 +307,7 @@ var _ = Describe("pgaudit", func() {
 		Expect(libraries).ToNot(ContainElement(""))
 		Expect(libraries).To(ContainElements("pg_stat_statements", "other_library"))
 	})
+
 	It("adds pg_stat_statements and pgaudit to shared_preload_library", func() {
 		info := ConfigurationInfo{
 			Settings:     CnpgConfigurationSettings,
