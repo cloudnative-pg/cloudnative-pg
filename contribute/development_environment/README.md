@@ -85,6 +85,11 @@ brew install go \
   goreleaser
 ```
 
+Please note that bash v5.0+ is required, this can be installed with:
+``` bash
+brew install bash
+```
+
 >**⚠️ Note:**
 >If `kind` is already installed, make sure you have the latest version:
 >
