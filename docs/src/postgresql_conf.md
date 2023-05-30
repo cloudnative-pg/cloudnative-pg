@@ -292,6 +292,17 @@ transparently manage the `pg_failover_slots` entry in the
 Please refer to [`the `pg_failover_slots` documentation`](https://www.postgresql.org/docs/current/auto-explain.html)
 for details on this extension.
 
+Additionally, for each database that you intend to you use with `pg_failover_slots`
+you need to add an entry in the `pg_hba` section that enables each replica to
+connect to the primary.
+For example, suppose that you want to use the `app` database with `pg_failover_slots`,
+you need to add this entry in the `pg_hba` section:
+
+``` yaml
+  postgresql:
+    pg_hba:
+      - hostssl app streaming_replica all cert
+
 ## The `pg_hba` section
 
 `pg_hba` is a list of PostgreSQL Host Based Authentication rules
