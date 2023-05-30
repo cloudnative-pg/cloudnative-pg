@@ -2774,6 +2774,79 @@ var _ = Describe("Storage configuration validation", func() {
 	})
 })
 
+var _ = Describe("Managed Extensions validation", func() {
+	It("should succeed if no extension is enabled", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{},
+		}
+		Expect(cluster.validateManagedExtensions()).To(BeEmpty())
+	})
+
+	It("should succeed if pg_failover_slots and its prerequisites are enabled", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled: pointer.Bool(true),
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"hot_standby_feedback":                     "on",
+						"pg_failover_slots.synchronize_slot_names": "my_slot",
+					},
+				},
+			},
+		}
+		Expect(cluster.validatePgFailoverSlots()).To(BeEmpty())
+	})
+
+	It("should produce two errors if pg_failover_slots is enabled and its prerequisites are disabled", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"pg_failover_slots.synchronize_slot_names": "my_slot",
+					},
+				},
+			},
+		}
+		Expect(cluster.validatePgFailoverSlots()).To(HaveLen(2))
+	})
+
+	It("should produce an error if pg_failover_slots is enabled and HA slots are disabled", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"hot_standby_feedback":                     "on",
+						"pg_failover_slots.synchronize_slot_names": "my_slot",
+					},
+				},
+			},
+		}
+		Expect(cluster.validatePgFailoverSlots()).To(HaveLen(1))
+	})
+
+	It("should produce an error if pg_failover_slots is enabled and hot_standby_feedback is disabled", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled: pointer.Bool(true),
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"pg_failover_slots.synchronize_slot_names": "my_slot",
+					},
+				},
+			},
+		}
+		Expect(cluster.validatePgFailoverSlots()).To(HaveLen(1))
+	})
+})
+
 var _ = Describe("Recovery from volume snapshot validation", func() {
 	clusterFromRecovery := func(recovery *BootstrapRecovery) *Cluster {
 		return &Cluster{

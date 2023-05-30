@@ -512,11 +512,15 @@ CloudNativePG transparently and natively supports:
 
 - the essential [`pg_stat_statements` extension](https://www.postgresql.org/docs/current/pgstatstatements.html),
   which enables tracking of planning and execution statistics of all SQL
-  statements executed by a PostgreSQL server.
+  statements executed by a PostgreSQL server;
 - the [`auto_explain` extension](https://www.postgresql.org/docs/current/auto-explain.html),
   which provides a means for logging execution plans of slow statements
   automatically, without having to manually run `EXPLAIN` (helpful for tracking
-  down un-optimized queries).
+  down un-optimized queries);
+- the [`pg_failover_slots` extension](https://github.com/EnterpriseDB/pg_failover_slots),
+  which makes logical replication slots usable across a physical failover,
+  ensuring resilience in change data capture (CDC) contexts based on PostgreSQL's
+  native logical replication;
 
 ### Audit
 
