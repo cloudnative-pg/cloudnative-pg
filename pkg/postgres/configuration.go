@@ -273,6 +273,12 @@ var (
 			Namespaces:             []string{"auto_explain"},
 			SharedPreloadLibraries: []string{"auto_explain"},
 		},
+		{
+			Name:                   "pg_failover_slots",
+			SkipCreateExtension:    true,
+			Namespaces:             []string{"pg_failover_slots"},
+			SharedPreloadLibraries: []string{"pg_failover_slots"},
+		},
 	}
 
 	// FixedConfigurationParameters contains the parameters that can't be
@@ -325,6 +331,7 @@ var (
 		"log_rotation_age":                       blockedConfigurationParameter,
 		"log_rotation_size":                      blockedConfigurationParameter,
 		"log_truncate_on_rotation":               blockedConfigurationParameter,
+		"pg_failover_slots.primary_dsn":          fixedConfigurationParameter,
 		"promote_trigger_file":                   blockedConfigurationParameter,
 		"recovery_end_command":                   blockedConfigurationParameter,
 		"recovery_min_apply_delay":               blockedConfigurationParameter,

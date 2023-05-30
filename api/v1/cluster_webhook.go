@@ -301,6 +301,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateReplicationSlots,
 		r.validateEnv,
 		r.validateManagedRoles,
+		r.validateManagedExtensions,
 	}
 
 	for _, validate := range validations {
@@ -1955,6 +1956,61 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 					role.Name,
 					"This role both sets and disables a password"))
 		}
+	}
+
+	return result
+}
+
+// validateManagedExtensions validate the managed extensions parameters set by the user
+func (r *Cluster) validateManagedExtensions() field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	allErrors = append(allErrors, r.validatePgFailoverSlots()...)
+	return allErrors
+}
+
+func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
+	var result field.ErrorList
+	var pgFailoverSlots postgres.ManagedExtension
+
+	for i, ext := range postgres.ManagedExtensions {
+		if ext.Name == "pg_failover_slots" {
+			pgFailoverSlots = postgres.ManagedExtensions[i]
+		}
+	}
+	if !pgFailoverSlots.IsUsed(r.Spec.PostgresConfiguration.Parameters) {
+		return nil
+	}
+
+	const hotStandbyFeedbackKey = "hot_standby_feedback"
+	hotStandbyFeedback, hasHotStandbyFeedback := r.Spec.PostgresConfiguration.Parameters[hotStandbyFeedbackKey]
+
+	if !hasHotStandbyFeedback || hotStandbyFeedback != "on" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", hotStandbyFeedbackKey),
+				hotStandbyFeedback,
+				fmt.Sprintf("%s must be 'on' to use %s", hotStandbyFeedbackKey, pgFailoverSlots.Name)))
+	}
+
+	if r.Spec.ReplicationSlots == nil {
+		return append(result,
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots"),
+				nil,
+				"replicationSlots must be enabled"),
+		)
+	}
+
+	if r.Spec.ReplicationSlots.HighAvailability == nil ||
+		!r.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
+		return append(result,
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "highAvailability"),
+				"nil or false",
+				"High Availability replication slots must be enabled"),
+		)
 	}
 
 	return result
