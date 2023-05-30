@@ -364,7 +364,7 @@ func AssertOperatorIsReady() {
 func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.Pod) {
 	By("creating test data", func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
-		_, _, err := env.ExecCommandWithPsqlClient(
+		_, stderr, err := env.ExecCommandWithPsqlClient(
 			namespace,
 			clusterName,
 			pod,
@@ -372,7 +372,7 @@ func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.
 			testsUtils.AppDBName,
 			query,
 		)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), stderr)
 	})
 }
 
@@ -425,7 +425,7 @@ func insertRecordIntoTableWithDatabaseName(
 // insertRecordIntoTable insert an entry into a table
 func insertRecordIntoTable(namespace, clusterName, tableName string, value int, pod *corev1.Pod) {
 	query := fmt.Sprintf("INSERT INTO %v VALUES (%v);", tableName, value)
-	_, _, err := env.ExecCommandWithPsqlClient(
+	_, stderr, err := env.ExecCommandWithPsqlClient(
 		namespace,
 		clusterName,
 		pod,
@@ -433,7 +433,7 @@ func insertRecordIntoTable(namespace, clusterName, tableName string, value int, 
 		testsUtils.AppDBName,
 		query,
 	)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), stderr)
 }
 
 // AssertDatabaseExists assert if database is existed
@@ -444,9 +444,9 @@ func AssertDatabaseExists(namespace, podName, databaseName string, expectedValue
 		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));", databaseName)
 		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, pod)
 		Expect(err).ToNot(HaveOccurred())
-		stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+		stdout, stderr, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", query)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), stderr)
 		if expectedValue {
 			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
 		} else {
@@ -470,10 +470,10 @@ func AssertDataExpectedCountWithDatabaseName(namespace, podName, databaseName st
 			if err != nil {
 				return 0, err
 			}
-			stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+			stdout, stderr, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", databaseName, "-tAc", query)
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("stderr: %s, err: %v", stderr, err)
 			}
 			nRows, err := strconv.Atoi(strings.Trim(stdout, "\n"))
 			return nRows, err
@@ -486,7 +486,7 @@ func AssertDataExpectedCount(namespace, clusterName, tableName string, expectedV
 	By(fmt.Sprintf("verifying test data in table %v", tableName), func() {
 		query := fmt.Sprintf("select count(*) from %v", tableName)
 		Eventually(func() (int, error) {
-			stdout, _, err := env.ExecCommandWithPsqlClient(
+			stdout, stderr, err := env.ExecCommandWithPsqlClient(
 				namespace,
 				clusterName,
 				pod,
@@ -494,7 +494,7 @@ func AssertDataExpectedCount(namespace, clusterName, tableName string, expectedV
 				testsUtils.AppDBName,
 				query)
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("stderr: %s, err: %v", stderr, err)
 			}
 			nRows, err := strconv.Atoi(strings.Trim(stdout, "\n"))
 			return nRows, err
@@ -840,16 +840,22 @@ func AssertReplicaModeCluster(
 	By("verifying that replica cluster primary is in recovery mode", func() {
 		query := "select pg_is_in_recovery();"
 		Eventually(func() (string, error) {
-			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+			stdOut, stderr, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
+			if err != nil {
+				err = fmt.Errorf("stderr: %s, err: %v", stderr, err)
+			}
 			return strings.Trim(stdOut, "\n"), err
 		}, 300, 15).Should(BeEquivalentTo("t"))
 	})
 
 	By("checking data have been copied correctly in replica cluster", func() {
 		Eventually(func() (string, error) {
-			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+			stdOut, stderr, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", checkQuery)
+			if err != nil {
+				err = fmt.Errorf("stderr: %s, err: %v", stderr, err)
+			}
 			return strings.Trim(stdOut, "\n"), err
 		}, 180, 10).Should(BeEquivalentTo("2"))
 	})
@@ -869,9 +875,9 @@ func AssertReplicaModeCluster(
 	// verify that if replica mode is enabled, no application user is created
 	By("checking in replica cluster, there is no database app and user app", func() {
 		checkDB := "select exists( SELECT datname FROM pg_catalog.pg_database WHERE lower(datname) = lower('app'));"
-		stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+		stdOut, stderr, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", checkDB)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), stderr)
 		Expect(strings.Trim(stdOut, "\n")).To(BeEquivalentTo("f"))
 	})
 }
@@ -895,10 +901,10 @@ func AssertWritesToReplicaFails(
 			Expect(value, err).To(Equal("t"))
 
 			// Expect to be in a read-only transaction
-			_, _, err = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, *connectingPod,
+			_, stderr, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, *connectingPod,
 				specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "CREATE TABLE IF NOT EXISTS table1(var1 text);")
-			Expect(err).To(HaveOccurred())
+			Expect(err).To(HaveOccurred(), stderr)
 			Expect(err.Error()).Should(
 				ContainSubstring("cannot execute CREATE TABLE in a read-only transaction"))
 		})
@@ -1039,9 +1045,15 @@ func AssertFastFailOver(
 		Eventually(func() (string, error) {
 			primaryPod := &corev1.Pod{}
 			err = env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-			out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
+			if err != nil {
+				return "", err
+			}
+			out, stderr, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 				"SELECT count(*) > 0 FROM tps.tl")
+			if err != nil {
+				err = fmt.Errorf("stderr: %s, err: %v", stderr, err)
+			}
 			return strings.TrimSpace(out), err
 		}, timeout).Should(BeEquivalentTo("t"))
 	})
@@ -1100,7 +1112,7 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 
 		createDBQuery := fmt.Sprintf("CREATE DATABASE %v;", targetDBName)
 		// Create database
-		_, _, err = env.ExecCommandWithPsqlClient(
+		_, stderr, err := env.ExecCommandWithPsqlClient(
 			namespace,
 			clusterName,
 			pod,
@@ -1108,7 +1120,7 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 			testsUtils.PostgresDBName,
 			createDBQuery,
 		)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), stderr)
 
 		// Create table on target database
 		createTableQuery := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v (id int);", tableName)

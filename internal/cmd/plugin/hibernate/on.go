@@ -373,7 +373,7 @@ func getPGControlData(ctx context.Context,
 ) (string, error) {
 	timeout := time.Second * 10
 	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
-	stdout, _, err := utils.ExecCommand(
+	stdout, stderr, err := utils.ExecCommand(
 		ctx,
 		clientInterface,
 		plugin.Config,
@@ -382,7 +382,8 @@ func getPGControlData(ctx context.Context,
 		&timeout,
 		"pg_controldata")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not get pg_controldata\nStdout: %s\nError: %v",
+			stderr, err)
 	}
 
 	return stdout, nil
