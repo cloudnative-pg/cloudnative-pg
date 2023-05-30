@@ -265,7 +265,7 @@ destroy_k3d() {
 }
 
 check_registry_k3d() {
-  [ -n "$(check_registry "k3d-${cluster_name}")" ]
+  [ -n "$(check_registry "k3d-${CLUSTER_NAME}")" ]
 }
 
 ##
