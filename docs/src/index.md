@@ -70,8 +70,8 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Definition of the *read-write* service, to connect your applications to the only primary server of the cluster
 * Definition of the *read-only* service, to connect your applications to any of the instances for reading workloads
 * Declarative management of PostgreSQL configuration, including certain popular
-  Postgres extensions through the cluster `spec`: `pg_audit`, `auto_explain`,
-  and `pg_stat_statements`
+  Postgres extensions through the cluster `spec`: `pgaudit`, `auto_explain`,
+  `pg_stat_statements`, and `pg_failover_slots`
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
 * Separate volume for WAL files

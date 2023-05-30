@@ -191,6 +191,7 @@ supported extensions. The current list includes:
 - `auto_explain`
 - `pg_stat_statements`
 - `pgaudit`
+- `pg_failover_slots`
 
 Some of these libraries also require additional objects in a database before
 using them, normally views and/or functions managed via the `CREATE EXTENSION`
@@ -275,6 +276,32 @@ postgresql:
     pgaudit.log_relation: "on"
 #
 ```
+
+#### Enabling `pg_failover_slots`
+
+The [`pg_failover_slots`](https://github.com/EnterpriseDB/pg_failover_slots)
+extension by EDB ensures that logical replication slots can survive a
+failover scenario. Failovers are normally implemented using physical
+streaming replication, like in the case of CloudNativePG.
+
+You can enable `pg_failover_slots` by adding to the configuration a parameter
+that starts with `pg_failover_slots.`: as explained above, the operator will
+transparently manage the `pg_failover_slots` entry in the
+`shared_preload_libraries` option depending on this.
+
+Please refer to [`the `pg_failover_slots` documentation`](https://www.enterprisedb.com/docs/pg_extensions/pg_failover_slots)
+for details on this extension.
+
+Additionally, for each database that you intend to you use with `pg_failover_slots`
+you need to add an entry in the `pg_hba` section that enables each replica to
+connect to the primary.
+For example, suppose that you want to use the `app` database with `pg_failover_slots`,
+you need to add this entry in the `pg_hba` section:
+
+``` yaml
+  postgresql:
+    pg_hba:
+      - hostssl app streaming_replica all cert
 
 ## The `pg_hba` section
 
