@@ -1009,7 +1009,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			AssertClusterWasRestoredWihtPITRAndApplicationDB(
+			AssertClusterWasRestoredWithPITRAndApplicationDB(
 				namespace,
 				externalClusterRestoreName,
 				tableName,
@@ -1120,7 +1120,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterWasRestoredWihtPITRAndApplicationDB(namespace, externalClusterName,
+				AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, externalClusterName,
 					tableName, "00000002", psqlClientPod)
 
 				By("delete restored cluster", func() {
@@ -1203,7 +1203,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterWasRestoredWihtPITRAndApplicationDB(namespace, externalClusterName,
+				AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, externalClusterName,
 					tableName, "00000002", psqlClientPod)
 
 				By("delete restored cluster", func() {
@@ -1273,7 +1273,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
-			AssertClusterWasRestoredWihtPITRAndApplicationDB(
+			AssertClusterWasRestoredWithPITRAndApplicationDB(
 				namespace,
 				externalClusterRestoreName,
 				tableName,

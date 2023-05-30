@@ -1567,7 +1567,7 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 	})
 }
 
-func AssertClusterWasRestoredWihtPITRAndApplicationDB(namespace, clusterName, tableName, lsn string, pod *corev1.Pod) {
+func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, tableName, lsn string, pod *corev1.Pod) {
 	primaryInfo := &corev1.Pod{}
 	var err error
 
