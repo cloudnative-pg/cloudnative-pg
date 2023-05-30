@@ -289,7 +289,7 @@ that starts with `pg_failover_slots.`: as explained above, the operator will
 transparently manage the `pg_failover_slots` entry in the
 `shared_preload_libraries` option depending on this.
 
-Please refer to [`the `pg_failover_slots` documentation`](https://www.postgresql.org/docs/current/auto-explain.html)
+Please refer to [`the `pg_failover_slots` documentation`](https://www.enterprisedb.com/docs/pg_extensions/pg_failover_slots)
 for details on this extension.
 
 Additionally, for each database that you intend to you use with `pg_failover_slots`
