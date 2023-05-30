@@ -32,7 +32,7 @@ on:
 
 jobs:
   duplicate_runs:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: Skip duplicate runs
     continue-on-error: true
     outputs:
