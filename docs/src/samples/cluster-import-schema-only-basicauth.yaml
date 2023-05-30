@@ -10,6 +10,8 @@ spec:
       import:
         type: microservice
         schemaOnly: true
+        storage:
+          size: 1Gi
         databases:
           - app
         source:

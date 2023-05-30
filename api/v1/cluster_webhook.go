@@ -291,6 +291,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateMaxSyncReplicas,
 		r.validateStorageSize,
 		r.validateWalStorageSize,
+		r.validateImportStorageSize,
 		r.validateName,
 		r.validateBootstrapPgBaseBackupSource,
 		r.validateBootstrapRecoverySource,
@@ -1443,6 +1444,16 @@ func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	}
 
 	return result
+}
+
+func (r *Cluster) validateImportStorageSize() field.ErrorList {
+	if r.Spec.Bootstrap == nil ||
+		r.Spec.Bootstrap.InitDB == nil ||
+		r.Spec.Bootstrap.InitDB.Import == nil ||
+		r.Spec.Bootstrap.InitDB.Import.Storage == nil {
+		return nil
+	}
+	return validateStorageConfigurationSize("bootstrap.initdb.import.storage", *r.Spec.Bootstrap.InitDB.Import.Storage)
 }
 
 func validateStorageConfigurationSize(structPath string, storageConfiguration StorageConfiguration) field.ErrorList {

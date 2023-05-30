@@ -89,6 +89,10 @@ const (
 	// get the name of the PVC dedicated to WAL files.
 	WalArchiveVolumeSuffix = "-wal"
 
+	// ImportVolumeSuffix is the suffix appended to the volume to store the import file
+	// ot initialize the first instance
+	ImportVolumeSuffix = "-import"
+
 	// StreamingReplicationUser is the name of the user we'll use for
 	// streaming replication purposes
 	StreamingReplicationUser = "streaming_replica"
@@ -1324,6 +1328,11 @@ type Import struct {
 	// +kubebuilder:default:=false
 	// +optional
 	SchemaOnly bool `json:"schemaOnly,omitempty"`
+
+	// Temporary storage to store the import files when running the init job to create
+	// the first instance
+	// +optional
+	Storage *StorageConfiguration `json:"storage,omitempty"`
 }
 
 // ImportSource describes the source for the logical snapshot
@@ -2910,6 +2919,16 @@ func (cluster *Cluster) GetCoredumpFilter() string {
 func (cluster *Cluster) IsInplaceRestartPhase() bool {
 	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
 		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
+}
+
+func (cluster *Cluster) ShouldCreateImportStorage() bool {
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.InitDB == nil ||
+		cluster.Spec.Bootstrap.InitDB.Import == nil ||
+		cluster.Spec.Bootstrap.InitDB.Import.Storage == nil {
+		return false
+	}
+	return cluster.Spec.Bootstrap.InitDB.Import.Storage != nil
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

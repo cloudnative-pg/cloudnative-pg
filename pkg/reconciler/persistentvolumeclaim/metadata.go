@@ -186,6 +186,13 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 					}
 				}
 
+				if pvc.Name == GetName(instanceName, utils.PVCRoleImport) {
+					found = true
+					if pvcRole != utils.PVCRoleImport {
+						return false
+					}
+				}
+
 				if found && pvc.Labels[utils.InstanceNameLabelName] != instanceName {
 					return false
 				}

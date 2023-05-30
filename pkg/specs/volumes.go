@@ -25,13 +25,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
-// PgWalVolumePath its the path used by the WAL volume when present
+// PgWalVolumePath it's the path used by the WAL volume when present
 const PgWalVolumePath = "/var/lib/postgresql/wal"
 
-// PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
+// PgWalVolumePgWalPath it's the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
-func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
+// PgImportVolumePath the path to store the initial import files when initializing the first instance
+const PgImportVolumePath = "/var/lib/postgresql/import"
+
+func createPostgresVolumes(cluster apiv1.Cluster, podName string, role jobRole) []corev1.Volume {
 	result := []corev1.Volume{
 		{
 			Name: "pgdata",
@@ -101,6 +104,18 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 	if cluster.ShouldCreateProjectedVolume() {
 		result = append(result, createProjectedVolume(cluster))
 	}
+
+	if cluster.ShouldCreateImportStorage() && role == jobRoleImport {
+		result = append(result, corev1.Volume{
+			Name: "import",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: podName + apiv1.ImportVolumeSuffix,
+				},
+			},
+		})
+	}
+
 	return result
 }
 
@@ -217,6 +232,15 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 			corev1.VolumeMount{
 				Name:      "projected",
 				MountPath: postgres.ProjectedVolumeDirectory,
+			},
+		)
+	}
+
+	if cluster.ShouldCreateImportStorage() {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      "import",
+				MountPath: PgImportVolumePath,
 			},
 		)
 	}

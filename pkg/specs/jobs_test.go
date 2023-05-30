@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,6 +140,10 @@ var _ = Describe("Barman endpoint CA", func() {
 var _ = Describe("Job created via InitDB", func() {
 	It("contain cluster post-init SQL instructions", func() {
 		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{"annotation": "annotation"},
+				Labels:      map[string]string{"label": "label"},
+			},
 			Spec: apiv1.ClusterSpec{
 				Bootstrap: &apiv1.BootstrapConfiguration{
 					InitDB: &apiv1.BootstrapInitDB{
@@ -154,14 +160,29 @@ var _ = Describe("Job created via InitDB", func() {
 								},
 							},
 						},
+						DataChecksums:  pointerToBool(true),
+						Encoding:       "C",
+						LocaleCollate:  "C",
+						LocaleCType:    "C",
+						WalSegmentSize: 1024,
 					},
 				},
 			},
 		}
+		configuration.Current.CreateAnyService = true
+		configuration.Current.InheritedAnnotations = []string{"annotation"}
+		configuration.Current.InheritedLabels = []string{"label"}
 		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		fmt.Printf("WAT %+v\n", job.Spec.Template.Spec.Containers[0].Command)
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitTemplateSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement(postInitApplicationSQLRefsFolder))
+		Expect(job.ObjectMeta.Annotations).Should(ContainElements("annotation"))
+		Expect(job.ObjectMeta.Labels).Should(ContainElements("label"))
+
+		Expect(job.Spec.Template.Spec.Containers[0].Command).
+			Should(ContainElement("-k --encoding=C --lc-collate=C --lc-ctype=C --wal-segsize=1024"))
+
 	})
 })

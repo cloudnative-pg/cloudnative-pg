@@ -18,7 +18,6 @@ package specs
 
 import (
 	"fmt"
-
 	"github.com/kballard/go-shellquote"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -318,7 +317,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 							SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 						},
 					},
-					Volumes: createPostgresVolumes(cluster, instanceName),
+					Volumes: createPostgresVolumes(cluster, instanceName, role),
 					SecurityContext: CreatePodSecurityContext(
 						cluster.GetSeccompProfile(),
 						cluster.GetPostgresUID(),
