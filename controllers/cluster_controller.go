@@ -256,17 +256,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// un-fenced, and the Kubelet still hasn't refreshed the status of the
 	// readiness probe.
 	if instancesStatus.Len() > 0 {
-		podStatus := instancesStatus.Items[0]
-		hasHTTPStatus := podStatus.HasHTTPStatus()
-		isPodReady := podStatus.IsPodReady
+		mostAdvancedInstance := instancesStatus.Items[0]
+		hasHTTPStatus := mostAdvancedInstance.HasHTTPStatus()
+		isPodReady := mostAdvancedInstance.IsPodReady
 
 		if hasHTTPStatus && !isPodReady {
 			// The readiness probe status from the Kubelet is not updated, so
 			// we need to wait for it to be refreshed
 			contextLogger.Info(
 				"Waiting for the Kubelet to refresh the readiness probe",
-				"instanceName", podStatus.Node,
-				"instanceStatus", podStatus,
+				"mostAdvancedInstanceName", mostAdvancedInstance.Node,
+				"mostAdvancedInstanceStatus", mostAdvancedInstance,
 				"hasHTTPStatus", hasHTTPStatus,
 				"isPodReady", isPodReady)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
