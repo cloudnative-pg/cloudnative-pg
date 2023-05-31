@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,10 +33,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-type pgBenchCommand struct {
+type pgBenchRun struct {
 	jobName            string
 	clusterName        string
 	dbName             string
+	nodeSelector       []string
 	pgBenchCommandArgs []string
 	dryRun             bool
 }
@@ -52,36 +54,14 @@ var jobExample = `
   kubectl-cnpg pgbench cluster-example
 
   # Dry-run command with given values and clusterName "cluster-example"
-  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name job-name --dry-run -- \
+  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --dry-run -- \
     --time 30 --client 1 --jobs 1
 
   # Create a job with given values and clusterName "cluster-example"
-  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --pgbench-job-name job-name -- \
+  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name -- \
     --time 30 --client 1 --jobs 1`
 
-// newPGBenchCommand initialize pgbench job options
-func newPGBenchCommand(
-	clusterName string,
-	jobName string,
-	dbName string,
-	dryRun bool,
-	pgBenchCommandArgs []string,
-) *pgBenchCommand {
-	if jobName == "" {
-		jobName = fmt.Sprintf("%v-%v-%v", clusterName, pgBenchKeyWord, rand.Intn(1000000))
-	}
-
-	bench := &pgBenchCommand{
-		jobName:            jobName,
-		pgBenchCommandArgs: pgBenchCommandArgs,
-		dryRun:             dryRun,
-		clusterName:        clusterName,
-		dbName:             dbName,
-	}
-	return bench
-}
-
-func (cmd *pgBenchCommand) execute(ctx context.Context) error {
+func (cmd *pgBenchRun) execute(ctx context.Context) error {
 	cluster, err := cmd.getCluster(ctx)
 	if err != nil {
 		return err
@@ -101,19 +81,45 @@ func (cmd *pgBenchCommand) execute(ctx context.Context) error {
 	return nil
 }
 
-func (cmd *pgBenchCommand) getCluster(ctx context.Context) (apiv1.Cluster, error) {
+func (cmd *pgBenchRun) getCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
 	err := plugin.Client.Get(
 		ctx,
 		client.ObjectKey{Namespace: plugin.Namespace, Name: cmd.clusterName},
 		&cluster)
 	if err != nil {
-		return apiv1.Cluster{}, fmt.Errorf("could not get cluster: %v", err)
+		return nil, fmt.Errorf("could not get cluster: %v", err)
 	}
-	return cluster, nil
+
+	return &cluster, nil
 }
 
-func (cmd *pgBenchCommand) buildJob(cluster apiv1.Cluster) *batchv1.Job {
+func (cmd *pgBenchRun) getJobName() string {
+	if cmd.jobName == "" {
+		return fmt.Sprintf("%v-%v-%v", cmd.clusterName, pgBenchKeyWord, rand.Intn(1000000))
+	}
+
+	return cmd.jobName
+}
+
+func (cmd *pgBenchRun) buildNodeSelector() map[string]string {
+	selectorsLength := len(cmd.nodeSelector)
+	if selectorsLength < 1 {
+		return nil
+	}
+
+	mappedSelectors := make(map[string]string, selectorsLength)
+	for _, v := range cmd.nodeSelector {
+		selector := strings.Split(v, "=")
+		if len(selector) <= 1 {
+			continue
+		}
+		mappedSelectors[selector[0]] = selector[1]
+	}
+	return mappedSelectors
+}
+
+func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 	clusterImageName := cluster.Spec.ImageName
 	labels := map[string]string{
 		"pbBenchJob": cluster.Name,
@@ -125,7 +131,7 @@ func (cmd *pgBenchCommand) buildJob(cluster apiv1.Cluster) *batchv1.Job {
 			Kind:       "Job",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cmd.jobName,
+			Name:      cmd.getJobName(),
 			Namespace: cluster.Namespace,
 			Labels:    labels,
 		},
@@ -172,13 +178,14 @@ func (cmd *pgBenchCommand) buildJob(cluster apiv1.Cluster) *batchv1.Job {
 							Args:            cmd.pgBenchCommandArgs,
 						},
 					},
+					NodeSelector: cmd.buildNodeSelector(),
 				},
 			},
 		},
 	}
 }
 
-func (cmd *pgBenchCommand) buildEnvVariables() []corev1.EnvVar {
+func (cmd *pgBenchRun) buildEnvVariables() []corev1.EnvVar {
 	clusterName := cmd.clusterName
 	pgHost := fmt.Sprintf("%v%v", clusterName, apiv1.ServiceReadWriteSuffix)
 	appSecreteName := fmt.Sprintf("%v-%v", clusterName, "app")
