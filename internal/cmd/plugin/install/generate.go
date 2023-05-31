@@ -92,6 +92,7 @@ func newGenerateCmd() *cobra.Command {
 		"The version of the operator to install, specified in the '<major>.<minor>.<patch>' format (e.g. 1.17.0). "+
 			"The default empty value installs the same version of the used plugin.",
 	)
+
 	cmd.Flags().StringVar(
 		&watchNamespaces,
 		"watch-namespace",
@@ -99,6 +100,7 @@ func newGenerateCmd() *cobra.Command {
 		"Limit the namespaces to watch. You can pass a list of namespaces through a comma separated string. "+
 			"When empty, the operator watches all namespaces",
 	)
+
 	cmd.Flags().Int32Var(
 		&replicas,
 		"replicas",
@@ -198,7 +200,12 @@ func (cmd *generateExecutor) printResources(irs []installationResource) error {
 func (cmd *generateExecutor) getInstallationYAML() ([]byte, error) {
 	fileName := fmt.Sprintf("cnpg-%s.yaml", cmd.userRequestedVersion)
 
-	return releases.OperatorManifests.ReadFile(fileName)
+	out, err := releases.OperatorManifests.ReadFile(fileName)
+	if err != nil {
+		return nil, fmt.Errorf("release version %s not found", cmd.userRequestedVersion)
+	}
+
+	return out, nil
 }
 
 func (cmd *generateExecutor) getInstallationResourcesFromYAML(rawYaml []byte) ([]installationResource, error) {
