@@ -72,7 +72,7 @@ func NewCmd() *cobra.Command {
 		&run.nodeSelector,
 		"node-selector",
 		[]string{},
-		"The node label selector in the format <labelName>=<labelValue>.",
+		"Node label selector in the <labelName>=<labelValue> format.",
 	)
 	_ = pgBenchCmd.Flags().MarkDeprecated("pgbench-job-name", "use job-name instead")
 
