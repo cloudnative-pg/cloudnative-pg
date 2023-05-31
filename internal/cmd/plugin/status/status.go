@@ -285,14 +285,13 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
 
 	// Read PostgreSQL configuration from custom.conf
-	customConf, stderr, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
+	customConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout,
 		"cat",
 		path.Join(specs.PgDataPath, constants.PostgresqlCustomConfigurationFile))
 	if err != nil {
-		return fmt.Errorf("could not print postgres configuration\nStderr: %s\nError: %v",
-			stderr, err)
+		return err
 	}
 
 	// Read PostgreSQL HBA Rules from pg_hba.conf
