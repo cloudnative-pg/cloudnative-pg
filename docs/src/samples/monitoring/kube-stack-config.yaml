@@ -52,6 +52,8 @@ defaultRules:
     prometheus: false
     prometheusOperator: false
 
+#nodeSelector:
+  #workload: monitor
 prometheus:
   prometheusSpec:
     podMonitorSelectorNilUsesHelmValues: false
