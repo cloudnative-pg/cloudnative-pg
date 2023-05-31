@@ -634,10 +634,13 @@ func AssertWritesResumedBeforeTimeout(namespace string, clusterName string, time
 		pod := &corev1.Pod{}
 		err := env.Client.Get(env.Ctx, namespacedName, pod)
 		Expect(err).ToNot(HaveOccurred())
-		out, _, _ := env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+		out, _, err := env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
 		switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
-		fmt.Printf("Write activity resumed in %v seconds\n", switchTime)
+		if err != nil {
+			fmt.Printf("Write activity resumed in %v seconds\n", switchTime)
+		}
 		Expect(switchTime, err).Should(BeNumerically("<", timeout))
 	})
 }
