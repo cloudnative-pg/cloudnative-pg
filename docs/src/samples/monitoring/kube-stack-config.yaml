@@ -52,16 +52,27 @@ defaultRules:
     prometheus: false
     prometheusOperator: false
 
+#nodeSelector:
+  #workload: monitor
 prometheus:
   prometheusSpec:
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
     serviceMonitorSelectorNilUsesHelmValues: false
     probeSelectorNilUsesHelmValues: false
+  #nodeSelector:
+    #workload: monitor
 grafana:
   enabled: true
   # -- the grafana admin password
   adminPassword: prom-operator
   defaultDashboardsEnabled: false
+  sidecar:
+      dashboards:
+        enabled: true
+  #nodeSelector:
+    #workload: monitor
 alertmanager:
   enabled: true
+  #nodeSelector:
+    #workload: monitor
