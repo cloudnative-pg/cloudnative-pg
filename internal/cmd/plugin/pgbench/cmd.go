@@ -17,7 +17,6 @@ limitations under the License.
 package pgbench
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -25,41 +24,57 @@ import (
 
 // NewCmd initializes the pgBench command
 func NewCmd() *cobra.Command {
-	var pgBenchJobName, dbName string
-	var dryRun bool
+	run := &pgBenchRun{}
 
 	pgBenchCmd := &cobra.Command{
 		Use:     "pgbench [cluster] [-- pgBenchCommandArgs...]",
 		Short:   "Creates a pgbench job",
 		Args:    validateCommandArgs,
-		Long:    `Creates a pgbench job that will be executed on the specified Postgres Cluster.`,
+		Long:    "Creates a pgbench job to run against the specified Postgres Cluster.",
 		Example: jobExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
-			clusterName := args[0]
-			pgBenchArgs := args[1:]
-			benchCommand := newPGBenchCommand(clusterName, pgBenchJobName, dbName, dryRun, pgBenchArgs)
-			return benchCommand.execute(ctx)
+			run.clusterName = args[0]
+			run.pgBenchCommandArgs = args[1:]
+
+			return run.execute(cmd.Context())
 		},
 	}
+
 	pgBenchCmd.Flags().StringVar(
-		&pgBenchJobName,
+		&run.jobName,
+		"job-name",
+		"",
+		"Name of the job, defaulting to: <clusterName>-pgbench-xxxx",
+	)
+
+	pgBenchCmd.Flags().StringVar(
+		&run.jobName,
 		"pgbench-job-name",
 		"",
-		"The name used to created the job. Defaults to: <clusterName>-pgbench-xxxx",
+		"Name of the job, defaulting to: <clusterName>-pgbench-xxxx",
 	)
+
 	pgBenchCmd.Flags().StringVar(
-		&dbName,
+		&run.dbName,
 		"db-name",
 		"app",
 		"The name of the database that will be used by pgbench. Defaults to: app",
 	)
+
 	pgBenchCmd.Flags().BoolVar(
-		&dryRun,
+		&run.dryRun,
 		"dry-run",
 		false,
 		"When true prints the job manifest instead of creating it",
 	)
+
+	pgBenchCmd.Flags().StringSliceVar(
+		&run.nodeSelector,
+		"node-selector",
+		[]string{},
+		"Node label selector in the <labelName>=<labelValue> format.",
+	)
+	_ = pgBenchCmd.Flags().MarkDeprecated("pgbench-job-name", "use job-name instead")
 
 	return pgBenchCmd
 }
@@ -70,7 +85,7 @@ func validateCommandArgs(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.ArgsLenAtDash() > 1 {
-		return fmt.Errorf("pgBenchCommands should be passed after -- delimitator")
+		return fmt.Errorf("pgBenchCommands should be passed after -- delimiter")
 	}
 
 	return nil
