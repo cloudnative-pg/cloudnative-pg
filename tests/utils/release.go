@@ -60,6 +60,12 @@ func GetAvailableReleases(releasesPath string) ([]*semver.Version, error) {
 		return nil, err
 	}
 
+	for i, file := range fileInfo {
+		if !strings.HasSuffix(file.Name(), ".yaml") {
+			fileInfo = append(fileInfo[:i], fileInfo[i+1:]...)
+		}
+	}
+
 	versions := make([]*semver.Version, len(fileInfo))
 
 	// build the array that contains the versions
