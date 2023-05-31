@@ -593,11 +593,11 @@ jobs:
         name: Prepare the environment
         uses: nick-fields/retry@v2
         with:
-          timeout_seconds: 120
+          timeout_seconds: 300
           max_attempts: 3
           on_retry_command: |
             # Clear-ups before retries
-            rm -rf /usr/local/bin/kind /usr/local/bin/kubectl
+            sudo rm -rf /usr/local/bin/kind /usr/local/bin/kubectl
           command: |
             sudo apt-get update
             sudo apt-get install -y gettext-base
