@@ -774,13 +774,15 @@ kubectl cnpg hibernate status <cluster-name>
 
 ### Benchmarking the database with pgbench
 
-Pgbench can be ran on an existing PostgreSQL cluster with following command:
+Pgbench can be run against an existing PostgreSQL cluster with following
+command:
 
 ```
 kubectl cnpg pgbench <cluster-name> -- --time 30 --client 1 --jobs 1
 ```
 
-Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more details.
+Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more
+details.
 
 ### Benchmarking the storage with fio
 
