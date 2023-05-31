@@ -895,10 +895,10 @@ func AssertWritesToReplicaFails(
 			Expect(value, err).To(Equal("t"))
 
 			// Expect to be in a read-only transaction
-			_, stderr, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, *connectingPod,
+			_, _, err = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, *connectingPod,
 				specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "CREATE TABLE IF NOT EXISTS table1(var1 text);")
-			Expect(err).To(HaveOccurred(), stderr)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).Should(
 				ContainSubstring("cannot execute CREATE TABLE in a read-only transaction"))
 		})
