@@ -19,6 +19,7 @@ package utils
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os/exec"
 	"time"
 
@@ -41,6 +42,9 @@ func RunUnchecked(command string) (stdout string, stderr string, err error) {
 	err = cmd.Run()
 	stdout = outBuffer.String()
 	stderr = errBuffer.String()
+	if err != nil {
+		err = fmt.Errorf("%w - %v", err, stderr)
+	}
 	return
 }
 
@@ -66,6 +70,9 @@ func RunUncheckedRetry(command string) (stdout string, stderr string, err error)
 	)
 	stdout = outBuffer.String()
 	stderr = errBuffer.String()
+	if err != nil {
+		err = fmt.Errorf("%w - %v", err, stderr)
+	}
 	return
 }
 
