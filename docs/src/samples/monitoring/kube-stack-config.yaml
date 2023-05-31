@@ -58,6 +58,8 @@ prometheus:
     ruleSelectorNilUsesHelmValues: false
     serviceMonitorSelectorNilUsesHelmValues: false
     probeSelectorNilUsesHelmValues: false
+  #nodeSelector:
+    #workload: monitor
 grafana:
   enabled: true
   # -- the grafana admin password
@@ -66,5 +68,9 @@ grafana:
   sidecar:
       dashboards:
         enabled: true
+  #nodeSelector:
+    #workload: monitor
 alertmanager:
   enabled: true
+  #nodeSelector:
+    #workload: monitor
