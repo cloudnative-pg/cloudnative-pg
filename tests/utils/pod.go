@@ -136,7 +136,7 @@ func (env TestingEnvironment) GetPodList(namespace string) (*corev1.PodList, err
 	return podList, err
 }
 
-// GetPod gets a pod
+// GetPod gets a pod by namespace and name
 func (env TestingEnvironment) GetPod(namespace, podName string) (*corev1.Pod, error) {
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while getting pod '%s/%s': %w", namespace, podName, err)
@@ -153,8 +153,9 @@ func (env TestingEnvironment) GetPod(namespace, podName string) (*corev1.Pod, er
 	return nil, wrapErr(errors.New("pod not found"))
 }
 
-// ExecCommandInPod executes commands in a given pod
-func (env TestingEnvironment) ExecCommandInPod(
+// ExecCommandInInstancePod executes commands in a given instance pod, in the
+// postgres container
+func (env TestingEnvironment) ExecCommandInInstancePod(
 	namespace, podName string,
 	timeout *time.Duration,
 	command ...string,
@@ -169,13 +170,14 @@ func (env TestingEnvironment) ExecCommandInPod(
 	return env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, timeout, command...)
 }
 
-// ExecSQLInPod matt damon
-func (env TestingEnvironment) ExecSQLInPod(
+// ExecQueryInInstancePod executes a query in an instance pod, by connecting to the pod
+// and the postgres container, and using a local connection with the postgres user
+func (env TestingEnvironment) ExecQueryInInstancePod(
 	namespace, podName string,
 	dbname string,
 	query string,
 ) (string, string, error) {
 	timeout := time.Second * 10
-	return env.ExecCommandInPod(namespace, podName,
+	return env.ExecCommandInInstancePod(namespace, podName,
 		&timeout, "psql", "-U", "postgres", dbname, "-tAc", query)
 }

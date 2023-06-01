@@ -81,7 +81,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 		})
 
 		By("corrupting primary pod by removing PGDATA", func() {
-			_, _, err = env.ExecCommandInPod(namespace, oldPrimaryPodName, nil,
+			_, _, err = env.ExecCommandInInstancePod(namespace, oldPrimaryPodName, nil,
 				"/bin/bash", "-c", "rm -fr %v/base/*")
 			Expect(err).ToNot(HaveOccurred())
 		})

@@ -95,7 +95,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 		assertUserExists := func(namespace, primaryPod, username string, shouldExists bool) {
 			Eventually(func(g Gomega) {
-				stdout, _, err := env.ExecSQLInPod(namespace, primaryPod, "postgres", "\\du")
+				stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPod, "postgres", "\\du")
 				g.Expect(err).ToNot(HaveOccurred())
 				if shouldExists {
 					g.Expect(stdout).To(ContainSubstring(username))
@@ -116,7 +116,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						FROM pg_auth_members GROUP BY member
 					) mem ON member = oid
 					WHERE rolname =` + pq.QuoteLiteral(roleName)
-				stdout, _, err := env.ExecSQLInPod(namespace, primaryPod, "postgres", query)
+				stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPod, "postgres", query)
 				if err != nil {
 					return []string{ERROR}
 				}
@@ -148,7 +148,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					"and rolbypassrls=%v and rolconnlimit=%v", username, rolCanLoginInSpec, rolSuperInSpec, rolCreateDBInSpec,
 					rolCreateRoleInSpec, rolInheritInSpec, rolReplicationInSpec, rolByPassRLSInSpec, rolConnLimitInSpec)
 
-				stdout, _, err := env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+				stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout).To(Equal("1\n"))
 			})
@@ -167,7 +167,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 				query := fmt.Sprintf("SELECT rolcreatedb FROM pg_roles WHERE rolname='%s'", appUsername)
 
-				stdout, _, err := env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+				stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout).To(Equal("t\n"))
 			})
@@ -235,7 +235,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						"and rolcreatedb=%v and rolcreaterole=%v and rolconnlimit=%v",
 						username, expectedLogin, expectedCreateDB, expectedCreateRole, expectedConnLmt)
 
-					stdout, _, err := env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+					stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 					if err != nil {
 						return ""
 					}
@@ -303,7 +303,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						defaultRolCreateRole, defaultRolInherit, defaultRolReplication,
 						defaultRolByPassRLS, defaultRolConnLimit)
 
-					stdout, _, err := env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+					stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 					if err != nil {
 						return ""
 					}
@@ -339,7 +339,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						" FROM pg_catalog.pg_authid WHERE rolname='%s'",
 						newUserName)
 
-					stdout, _, err := env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+					stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 					if err != nil {
 						return ERROR
 					}
@@ -353,7 +353,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						" FROM pg_catalog.pg_authid WHERE rolname='%s'",
 						username)
 
-					stdout, _, err := env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+					stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 					if err != nil {
 						return ERROR
 					}
@@ -489,7 +489,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				query := fmt.Sprintf("ALTER ROLE %s WITH PASSWORD %s",
 					username, pq.QuoteLiteral(newPassword))
 
-				_, _, err = env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+				_, _, err = env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 				Expect(err).To(BeNil())
 			})
 
@@ -530,7 +530,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						" WHERE rolname='%s' and (rolvaliduntil is NULL or rolevaliduntil='infinity')",
 						newUserName)
 
-					stdout, _, err := env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+					stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 					if err != nil {
 						return ERROR
 					}
@@ -544,7 +544,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						" WHERE rolname='%s' and rolvaliduntil='%s'",
 						username, newValidUntilString)
 
-					stdout, _, err := env.ExecSQLInPod(namespace, primaryPodInfo.Name, "postgres", query)
+					stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryPodInfo.Name, "postgres", query)
 					if err != nil {
 						return ERROR
 					}

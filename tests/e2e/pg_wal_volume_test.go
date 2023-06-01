@@ -77,7 +77,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 					".*[0-9]$")
 				timeout := 300
 				Eventually(func() (int, error, error) {
-					out, _, err := env.ExecCommandInPod(namespace, pod.GetName(), nil, "sh", "-c", cmd)
+					out, _, err := env.ExecCommandInInstancePod(namespace, pod.GetName(), nil, "sh", "-c", cmd)
 					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 					return value, err, atoiErr
 				}, timeout).Should(BeNumerically(">=", 1))
