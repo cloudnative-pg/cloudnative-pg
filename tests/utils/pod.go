@@ -18,6 +18,7 @@ package utils
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -132,4 +134,48 @@ func (env TestingEnvironment) GetPodList(namespace string) (*corev1.PodList, err
 		&env, podList, client.InNamespace(namespace),
 	)
 	return podList, err
+}
+
+// GetPod gets a pod
+func (env TestingEnvironment) GetPod(namespace, podName string) (*corev1.Pod, error) {
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while getting pod '%s/%s': %w", namespace, podName, err)
+	}
+	podList, err := env.GetPodList(namespace)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	for _, pod := range podList.Items {
+		if podName == pod.Name {
+			return &pod, nil
+		}
+	}
+	return nil, wrapErr(errors.New("pod not found"))
+}
+
+// ExecCommandInPod executes commands in a given pod
+func (env TestingEnvironment) ExecCommandInPod(
+	namespace, podName string,
+	timeout *time.Duration,
+	command ...string,
+) (string, string, error) {
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while executing command in pod '%s/%s': %w", namespace, podName, err)
+	}
+	pod, err := env.GetPod(namespace, podName)
+	if err != nil {
+		return "", "", wrapErr(err)
+	}
+	return env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, timeout, command...)
+}
+
+// ExecSQLInPod matt damon
+func (env TestingEnvironment) ExecSQLInPod(
+	namespace, podName string,
+	dbname string,
+	query string,
+) (string, string, error) {
+	timeout := time.Second * 10
+	return env.ExecCommandInPod(namespace, podName,
+		&timeout, "psql", "-U", "postgres", dbname, "-tAc", query)
 }
