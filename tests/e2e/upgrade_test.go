@@ -140,8 +140,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				Namespace: upgradeNamespace,
 				Name:      clusterName,
 			}
-			cluster := &apiv1.Cluster{}
-			err = env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(upgradeNamespace, clusterName)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 
 			oldPrimary := cluster.Status.CurrentPrimary

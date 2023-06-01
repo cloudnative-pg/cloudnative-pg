@@ -52,14 +52,11 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 
 	// First we check that the starting situation is the expected one
 	By("checking that CurrentPrimary and TargetPrimary are the same", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
+		var cluster *apiv1.Cluster
 
 		Eventually(func(g Gomega) {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
 			g.Expect(err).To(BeNil())
 			g.Expect(cluster.Status.CurrentPrimary, err).To(
 				BeEquivalentTo(cluster.Status.TargetPrimary),
@@ -81,13 +78,8 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 	})
 
 	By("setting the TargetPrimary node to trigger a switchover", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Status.TargetPrimary = targetPrimary
 			return env.Client.Status().Update(env.Ctx, cluster)
@@ -96,13 +88,9 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 	})
 
 	By("waiting that the TargetPrimary become also CurrentPrimary", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.CurrentPrimary, err
 		}, testTimeouts[testsUtils.NewPrimaryAfterSwitchover]).Should(BeEquivalentTo(targetPrimary))
 	})
@@ -207,10 +195,11 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 		// Eventually the number of ready instances should be equal to the
 		// amount of instances defined in the cluster and
 		// the cluster status should be in healthy state
-		cluster := &apiv1.Cluster{}
+		var cluster *apiv1.Cluster
 
 		Eventually(func(g Gomega) {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
@@ -247,16 +236,14 @@ func AssertClusterDefault(namespace string, clusterName string,
 	isExpectedToDefault bool, env *testsUtils.TestingEnvironment,
 ) {
 	By("having a Cluster object populated with default values", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 		// Eventually the number of ready instances should be equal to the
 		// amount of instances defined in the cluster and
 		// the cluster status should be in healthy state
-		cluster := &apiv1.Cluster{}
+		var cluster *apiv1.Cluster
 		Eventually(func(g Gomega) {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
@@ -653,23 +640,18 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 	By(fmt.Sprintf("verifying the new primary pod, oldPrimary is %s", oldPrimary), func() {
 		// Gather the primary
 		timeout := 120
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 		// Wait for the operator to set a new TargetPrimary
+		var cluster *apiv1.Cluster
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.TargetPrimary, err
 		}, timeout).ShouldNot(Or(BeEquivalentTo(oldPrimary), BeEquivalentTo(apiv1.PendingFailoverMarker)))
-		cluster := &apiv1.Cluster{}
-		err := env.Client.Get(env.Ctx, namespacedName, cluster)
 		newPrimary := cluster.Status.TargetPrimary
-		Expect(err).ToNot(HaveOccurred())
 
 		// Expect the chosen pod to eventually become a primary
-		namespacedName = types.NamespacedName{
+		namespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      newPrimary,
 		}
@@ -1768,10 +1750,8 @@ func prepareClusterForPITROnMinio(
 			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
 				expectedVal))
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})
@@ -1811,10 +1791,8 @@ func prepareClusterForPITROnAzureBlob(
 			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 		}, 30).Should(BeEquivalentTo(expectedVal))
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})
@@ -1883,10 +1861,8 @@ func prepareClusterBackupOnAzurite(
 			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})
@@ -1908,10 +1884,8 @@ func prepareClusterForPITROnAzurite(
 			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})

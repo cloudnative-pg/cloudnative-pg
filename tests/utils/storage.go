@@ -19,10 +19,7 @@ package utils
 import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // GetStorageAllowExpansion returns the boolean value of the 'AllowVolumeExpansion' value of the storage class
@@ -34,12 +31,7 @@ func GetStorageAllowExpansion(defaultStorageClass string, env *TestingEnvironmen
 
 // IsWalStorageEnabled returns true if 'WalStorage' is being used
 func IsWalStorageEnabled(namespace, clusterName string, env *TestingEnvironment) (bool, error) {
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      clusterName,
-	}
-	cluster := &apiv1.Cluster{}
-	err := env.Client.Get(env.Ctx, namespacedName, cluster)
+	cluster, err := env.GetCluster(namespace, clusterName)
 	if cluster.Spec.WalStorage == nil {
 		return false, err
 	}

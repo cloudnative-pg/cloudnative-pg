@@ -226,12 +226,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		cluster := &apiv1.Cluster{}
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		err = env.Client.Get(env.Ctx, namespacedName, cluster)
+		cluster, err := env.GetCluster(namespace, clusterName)
 		Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 		oldPrimary := cluster.Status.CurrentPrimary
 
@@ -258,7 +253,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		By("verify that a switchover happened", func() {
 			// Check that a switchover happened
 			Eventually(func() (string, error) {
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				return cluster.Status.CurrentPrimary, err
 			}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
 		})
@@ -269,12 +264,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		cluster := &apiv1.Cluster{}
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		err = env.Client.Get(env.Ctx, namespacedName, cluster)
+		cluster, err := env.GetCluster(namespace, clusterName)
 		Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 		oldPrimary := cluster.Status.CurrentPrimary
 
@@ -309,7 +299,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		By("verify that a switchover happened", func() {
 			// Check that a switchover happened
 			Eventually(func() (string, error) {
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				return cluster.Status.CurrentPrimary, err
 			}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
 		})
@@ -335,12 +325,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			cluster := &apiv1.Cluster{}
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-			err = env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
 
@@ -368,7 +353,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			By("verify that a switchover not happened", func() {
 				// Check that a switchover did not happen
 				Eventually(func() (string, error) {
-					err := env.Client.Get(env.Ctx, namespacedName, cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.CurrentPrimary, err
 				}, timeout).Should(BeEquivalentTo(oldPrimary))
 			})
@@ -383,12 +368,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			cluster := &apiv1.Cluster{}
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-			err = env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
 
@@ -415,7 +395,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			By("verify that a switchover not happened", func() {
 				// Check that a switchover did not happen
 				Eventually(func() (string, error) {
-					err := env.Client.Get(env.Ctx, namespacedName, cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.CurrentPrimary, err
 				}, timeout).Should(BeEquivalentTo(oldPrimary))
 			})
