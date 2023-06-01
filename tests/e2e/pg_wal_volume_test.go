@@ -72,17 +72,12 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelBackupRestore), func
 		By("checking WALs are archived in the dedicated volume", func() {
 			for _, pod := range podList.Items {
 				cmd := fmt.Sprintf(
-					"sh -c 'find %v -maxdepth 1 -type f -regextype sed -regex %v -print | wc -l'",
+					"find %v -maxdepth 1 -type f -regextype sed -regex %v -print | wc -l",
 					specs.PgWalVolumePgWalPath,
 					".*[0-9]$")
 				timeout := 300
 				Eventually(func() (int, error, error) {
-					out, _, err := testsUtils.Run(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						pod.GetName(),
-						cmd),
-					)
+					out, _, err := env.ExecCommandInPod(namespace, pod.GetName(), nil, "sh", "-c", cmd)
 					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 					return value, err, atoiErr
 				}, timeout).Should(BeNumerically(">=", 1))

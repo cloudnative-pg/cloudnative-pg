@@ -81,9 +81,8 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 		})
 
 		By("corrupting primary pod by removing PGDATA", func() {
-			cmd := fmt.Sprintf("kubectl exec %v -n %v postgres -- /bin/bash -c 'rm -fr %v/base/*'",
-				oldPrimaryPodName, namespace, specs.PgDataPath)
-			_, _, err = testsUtils.Run(cmd)
+			_, _, err = env.ExecCommandInPod(namespace, oldPrimaryPodName, nil,
+				"/bin/bash", "-c", "rm -fr %v/base/*")
 			Expect(err).ToNot(HaveOccurred())
 		})
 

@@ -98,20 +98,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	// but a single scheduled backups during the check
 	AssertScheduledBackupsAreScheduled := func(upgradeNamespace string) {
 		By("verifying scheduled backups are still happening", func() {
-			out, _, err := testsUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				upgradeNamespace,
-				minioClientName,
-				countBackupsScript))
+			out, _, err := env.ExecCommandInPod(upgradeNamespace, minioClientName, nil,
+				"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
 			Expect(err).ToNot(HaveOccurred())
 			currentBackups, err := strconv.Atoi(strings.Trim(out, "\n"))
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {
-				out, _, err := testsUtils.RunUnchecked(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					upgradeNamespace,
-					minioClientName,
-					countBackupsScript))
+				out, _, err := env.ExecCommandInPod(upgradeNamespace, minioClientName, nil,
+					"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
 				if err != nil {
 					return 0, err
 				}
@@ -386,25 +380,19 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// minio within a short time.
 		By("archiving WALs on minio", func() {
 			primary := clusterName1 + "-1"
-			out, _, err := testsUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				upgradeNamespace,
-				primary,
-				"psql -U postgres appdb -v SHOW_ALL_RESULTS=off -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"))
+			out, _, err := env.ExecCommandInPod(upgradeNamespace, primary, nil,
+				"psql", "-U", "postgres", "appdb", "-v", "SHOW_ALL_RESULTS=off", "-tAc",
+				"CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())")
 			Expect(err).ToNot(HaveOccurred())
 			latestWAL := strings.TrimSpace(out)
 
 			Eventually(func() (int, error, error) {
 				// In the fixture WALs are compressed with gzip
 				findCmd := fmt.Sprintf(
-					"sh -c 'mc find minio --name %v.gz | wc -l'",
+					"mc find minio --name %v.gz | wc -l",
 					latestWAL)
-				out, _, err := testsUtils.RunUnchecked(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					upgradeNamespace,
-					minioClientName,
-					findCmd))
-
+				out, _, err := env.ExecCommandInPod(upgradeNamespace, minioClientName, nil,
+					"sh", "-c", findCmd)
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
 			}, 60).Should(BeEquivalentTo(1))
@@ -428,11 +416,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// A file called data.tar.gz should be available on minio
 			Eventually(func() (int, error, error) {
-				out, _, err := testsUtils.RunUnchecked(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					upgradeNamespace,
-					minioClientName,
-					countBackupsScript))
+				out, _, err := env.ExecCommandInPod(upgradeNamespace, minioClientName, nil,
+					"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
 			}, 60).Should(BeEquivalentTo(1))
@@ -537,36 +522,24 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"
-			cmd := "psql -U postgres appdb -tAc 'SELECT count(*) FROM to_restore'"
-			out, _, err := testsUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				upgradeNamespace,
-				primary,
-				cmd))
+			out, _, err := env.ExecSQLInPod(upgradeNamespace, primary, "appdb",
+				"SELECT count(*) FROM to_restore")
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 
 			// Restored primary should be a timeline higher than 1, because
 			// we expect a promotion. We can't enforce "2" because the timeline
 			// ID will also depend on the history files existing in the cloud
 			// storage and we don't know the status of that.
-			cmd = "psql -U postgres appdb -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
-			out, _, err = testsUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				upgradeNamespace,
-				primary,
-				cmd))
+			out, _, err = env.ExecSQLInPod(upgradeNamespace, primary, "appdb",
+				"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(strconv.Atoi(strings.Trim(out, "\n"))).To(
 				BeNumerically(">", 1))
 
 			// Restored standbys should soon attach themselves to restored primary
 			Eventually(func() (string, error) {
-				cmd = "psql -U postgres appdb -tAc 'SELECT count(*) FROM pg_stat_replication'"
-				out, _, err = testsUtils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					upgradeNamespace,
-					primary,
-					cmd))
+				out, _, err = env.ExecSQLInPod(upgradeNamespace, primary, "appdb",
+					"SELECT count(*) FROM pg_stat_replication")
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
 		})

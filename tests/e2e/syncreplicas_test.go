@@ -164,10 +164,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 		By("checking that synchronous_standby_names has the expected value on the primary", func() {
 			Eventually(func() string {
-				out, _, err := utils.Run(
-					fmt.Sprintf("kubectl exec -n %v %v-1 -c postgres -- "+
-						"psql -U postgres -tAc \"select setting from pg_settings where name = 'synchronous_standby_names'\"",
-						namespace, clusterName))
+				out, _, err := env.ExecSQLInPod(namespace, clusterName, "postgres",
+					"select setting from pg_settings where name = 'synchronous_standby_names'")
 				if err != nil {
 					return ""
 				}
