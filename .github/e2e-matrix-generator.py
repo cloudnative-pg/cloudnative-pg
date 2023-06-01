@@ -26,6 +26,7 @@ POSTGRES_REPO = "ghcr.io/cloudnative-pg/postgresql"
 PG_VERSIONS_FILE = ".github/pg_versions.json"
 KIND_VERSIONS_FILE = ".github/kind_versions.json"
 VERSION_SCOPE_FILE = ".github/k8s_versions_scope.json"
+E2E_TEST_TIMEOUT = ".github/e2e_test_timeout.json"
 
 
 class VersionList(list):
@@ -75,6 +76,10 @@ def filter_version(versions_list, version_range):
         )
     )
 
+# Default timeout for the e2e test
+with open(E2E_TEST_TIMEOUT) as json_file:
+    timeout_list = json.load(json_file)
+TIMEOUT_LIST = timeout_list
 
 # Minimum support k8s version (include) in different cloud vendor
 with open(VERSION_SCOPE_FILE) as json_file:
@@ -273,3 +278,4 @@ if __name__ == "__main__":
         with open(os.getenv("GITHUB_OUTPUT"), 'a') as env:
             print(f"{engine}Matrix=" + json.dumps({"include": include}), file=env)
             print(f"{engine}Enabled=" + str(len(include) > 0), file=env)
+            print(f"{engine}E2ETimeout=" + json.dumps(TIMEOUT_LIST.get(engine, {})), file=env)
