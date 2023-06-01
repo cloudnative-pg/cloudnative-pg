@@ -76,6 +76,20 @@ func NewCmd() *cobra.Command {
 	)
 	_ = pgBenchCmd.Flags().MarkDeprecated("pgbench-job-name", "use job-name instead")
 
+	pgBenchCmd.Flags().BoolVar(
+		&run.initialize,
+		"initialize",
+		false,
+		"When passed adds the --initialize flag to pgbench",
+	)
+
+	pgBenchCmd.Flags().IntVar(
+		&run.scale,
+		"scale",
+		1,
+		"Configures the --scale parameter. Defaults to 1.",
+	)
+
 	return pgBenchCmd
 }
 
