@@ -722,7 +722,7 @@ jobs:
 
       - name: Compute the E2E test summary
         id: generate-summary
-        uses: cloudnative-pg/ciclops@v1.2.0
+        uses: cloudnative-pg/ciclops@v1.2.1
         with:
           artifact_directory: test-artifacts/data
       
