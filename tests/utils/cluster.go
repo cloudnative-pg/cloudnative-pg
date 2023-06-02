@@ -285,7 +285,14 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 		return &corev1.Pod{}, err
 	}
 	if len(podList.Items) > 0 {
-		return &(podList.Items[0]), nil
+		// if there are multiple, get the one without deletion timestamp
+		for _, pod := range podList.Items {
+			if pod.DeletionTimestamp == nil {
+				return &pod, nil
+			}
+		}
+		err = fmt.Errorf("all pod with primary role has deletion timestamp")
+		return &(podList.Items[0]), err
 	}
 	err = fmt.Errorf("no primary found")
 	return &corev1.Pod{}, err
