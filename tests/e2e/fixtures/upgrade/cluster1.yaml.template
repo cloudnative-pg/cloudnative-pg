@@ -4,7 +4,7 @@ metadata:
   name: cluster1
 spec:
   instances: 3
-  imageName: "${POSTGRES_IMG}"
+  image: "${POSTGRES_IMG}"
   description: "Example of cluster"
   startDelay: 300
   stopDelay: 300

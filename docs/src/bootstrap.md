@@ -874,7 +874,7 @@ metadata:
   name: target-db
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:15.3
+  image: ghcr.io/cloudnative-pg/postgresql:15.3
 
   bootstrap:
     pg_basebackup:
@@ -924,7 +924,7 @@ metadata:
   name: cluster-clone-tls
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:15.3
+  image: ghcr.io/cloudnative-pg/postgresql:15.3
 
   bootstrap:
     pg_basebackup:

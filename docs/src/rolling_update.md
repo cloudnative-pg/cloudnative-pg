@@ -8,7 +8,7 @@ applications are running against it.
 
 Rolling upgrades are started when:
 
-- the user changes the `imageName` attribute of the cluster specification;
+- the user changes the `image` attribute of the cluster specification;
 
 - a change in the PostgreSQL configuration requires a restart to be
   applied;

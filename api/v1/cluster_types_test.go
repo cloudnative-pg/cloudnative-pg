@@ -630,7 +630,7 @@ var _ = Describe("A config map resource version", func() {
 
 var _ = Describe("PostgreSQL version detection", func() {
 	tests := []struct {
-		imageName       string
+		image           string
 		postgresVersion int
 	}{
 		{
@@ -650,7 +650,7 @@ var _ = Describe("PostgreSQL version detection", func() {
 	It("correctly extract PostgreSQL versions", func() {
 		cluster := Cluster{}
 		for _, test := range tests {
-			cluster.Spec.ImageName = test.imageName
+			cluster.Spec.ImageName = test.image
 			Expect(cluster.GetPostgresqlVersion()).To(Equal(test.postgresVersion))
 		}
 	})

@@ -32,12 +32,12 @@ func ImportDatabaseMicroservice(
 	namespace,
 	sourceClusterName,
 	importedClusterName,
-	imageName,
+	image,
 	databaseName string,
 	env *TestingEnvironment,
 ) (*apiv1.Cluster, error) {
-	if imageName == "" {
-		imageName = os.Getenv("POSTGRES_IMG")
+	if image == "" {
+		image = os.Getenv("POSTGRES_IMG")
 	}
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	host := fmt.Sprintf("%v-rw.%v.svc", sourceClusterName, namespace)
@@ -49,7 +49,7 @@ func ImportDatabaseMicroservice(
 		},
 		Spec: apiv1.ClusterSpec{
 			Instances: 3,
-			ImageName: imageName,
+			Image:     image,
 
 			StorageConfiguration: apiv1.StorageConfiguration{
 				Size:         "1Gi",
@@ -102,13 +102,13 @@ func ImportDatabasesMonolith(
 	namespace,
 	sourceClusterName,
 	importedClusterName,
-	imageName string,
+	image string,
 	databaseNames []string,
 	roles []string,
 	env *TestingEnvironment,
 ) (*apiv1.Cluster, error) {
-	if imageName == "" {
-		imageName = os.Getenv("POSTGRES_IMG")
+	if image == "" {
+		image = os.Getenv("POSTGRES_IMG")
 	}
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	host := fmt.Sprintf("%v-rw.%v.svc", sourceClusterName, namespace)
@@ -120,7 +120,7 @@ func ImportDatabasesMonolith(
 		},
 		Spec: apiv1.ClusterSpec{
 			Instances: 3,
-			ImageName: imageName,
+			Image:     image,
 
 			StorageConfiguration: apiv1.StorageConfiguration{
 				Size:         "1Gi",

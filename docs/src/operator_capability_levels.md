@@ -57,7 +57,7 @@ By default, the operator uses the latest available minor
 version of the latest stable major version supported by the PostgreSQL
 Community and published on ghcr.io.
 You can use any compatible image of PostgreSQL supporting the
-primary/standby architecture directly by setting the `imageName`
+primary/standby architecture directly by setting the `image`
 attribute in the CR. The operator also supports `imagePullSecrets`
 to access private container registries, as well as digests in addition to
 tags for finer control of container image immutability.
@@ -272,7 +272,7 @@ update - and subsequent switchover - of the cluster.
 ### Upgrade of the managed workload
 
 The operand can be upgraded using a declarative configuration approach as
-part of changing the CR and, in particular, the `imageName` parameter. The
+part of changing the CR and, in particular, the `image` parameter. The
 operator prevents major upgrades of PostgreSQL while making it possible to go
 in both directions in terms of minor PostgreSQL releases within a major
 version (enabling updates and rollbacks).

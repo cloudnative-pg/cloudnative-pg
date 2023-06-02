@@ -487,7 +487,7 @@ func (r *ClusterReconciler) upgradePod(
 ) error {
 	log.FromContext(ctx).Info("Deleting old Pod",
 		"pod", pod.Name,
-		"to", cluster.Spec.ImageName,
+		"to", cluster.Spec.Image,
 		"reason", reason,
 	)
 

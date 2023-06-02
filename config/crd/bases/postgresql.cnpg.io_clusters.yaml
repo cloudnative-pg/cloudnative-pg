@@ -2182,9 +2182,13 @@ spec:
                   was detected to be unhealthy
                 format: int32
                 type: integer
-              imageName:
+              image:
                 description: Name of the container image, supporting both tags (`<image>:<tag>`)
                   and digests for deterministic and repeatable deployments (`<image>:<tag>@sha256:<digestValue>`)
+                type: string
+              imageName:
+                description: 'Deprecated: This field will be removed in version 1.22
+                  of the operator in favor of image'
                 type: string
               imagePullPolicy:
                 description: 'Image pull policy. One of `Always`, `Never` or `IfNotPresent`.

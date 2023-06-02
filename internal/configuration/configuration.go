@@ -58,9 +58,9 @@ type Data struct {
 	// used to bootstrap Pods
 	OperatorImageName string `json:"operatorImageName" env:"OPERATOR_IMAGE_NAME"`
 
-	// PostgresImageName is the name of the image of PostgreSQL that is
+	// PostgresImage is the name of the image of PostgreSQL that is
 	// used by default for new clusters
-	PostgresImageName string `json:"postgresImageName" env:"POSTGRES_IMAGE_NAME"`
+	PostgresImage string `json:"postgresImageName" env:"POSTGRES_IMAGE_NAME"`
 
 	// InheritedAnnotations is a list of annotations that every resource could inherit from
 	// the owning Cluster
@@ -98,7 +98,7 @@ func newDefaultConfig() *Data {
 	return &Data{
 		OperatorPullSecretName: DefaultOperatorPullSecretName,
 		OperatorImageName:      versions.DefaultOperatorImageName,
-		PostgresImageName:      versions.DefaultImageName,
+		PostgresImage:          versions.DefaultImageName,
 		CreateAnyService:       false,
 	}
 }

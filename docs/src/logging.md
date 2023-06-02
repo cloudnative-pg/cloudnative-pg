@@ -113,7 +113,7 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:13
+  image: ghcr.io/cloudnative-pg/postgresql:13
 
   postgresql:
     parameters:

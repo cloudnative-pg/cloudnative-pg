@@ -125,6 +125,10 @@ type ClusterSpec struct {
 	// Name of the container image, supporting both tags (`<image>:<tag>`)
 	// and digests for deterministic and repeatable deployments
 	// (`<image>:<tag>@sha256:<digestValue>`)
+	Image string `json:"image,omitempty"`
+
+	// Deprecated: This field will be removed in version 1.22 of
+	// the operator in favor of image
 	ImageName string `json:"imageName,omitempty"`
 
 	// Image pull policy.
@@ -1861,7 +1865,7 @@ func (cluster *Cluster) GetImageName() string {
 		return cluster.Spec.ImageName
 	}
 
-	return configuration.Current.PostgresImageName
+	return configuration.Current.PostgresImage
 }
 
 // GetPostgresqlVersion gets the PostgreSQL image version detecting it from the

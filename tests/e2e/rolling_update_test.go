@@ -75,7 +75,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// Update to the latest minor
 		updatedImageName := os.Getenv("POSTGRES_IMG")
 		if updatedImageName == "" {
-			updatedImageName = configuration.Current.PostgresImageName
+			updatedImageName = configuration.Current.PostgresImage
 		}
 
 		// We should be able to apply the conf containing the new
@@ -86,7 +86,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			cluster, err = env.GetCluster(namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 
-			cluster.Spec.ImageName = updatedImageName
+			cluster.Spec.Image = updatedImageName
 			return env.Client.Update(env.Ctx, cluster)
 		}, RetryTimeout, PollingTime).Should(BeNil())
 

@@ -135,7 +135,7 @@ kubectl get pods -l cnpg.io/cluster=<CLUSTER>
 
 By default, the operator will install the latest available minor version
 of the latest major version of PostgreSQL when the operator was released.
-You can override this by setting the `imageName` key in the `spec` section of
+You can override this by setting the `image` key in the `spec` section of
 the `Cluster` definition. For example, to install PostgreSQL 13.6:
 
 ```yaml
@@ -145,7 +145,7 @@ metadata:
    # [...]
 spec:
    # [...]
-   imageName: ghcr.io/cloudnative-pg/postgresql:13.6
+   image: ghcr.io/cloudnative-pg/postgresql:13.6
    #[...]
 ```
 

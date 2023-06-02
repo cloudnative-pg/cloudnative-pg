@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: postgresql-three-instances
 spec:
-  imageName: ${E2E_PRE_ROLLING_UPDATE_IMG}
+  image: ${E2E_PRE_ROLLING_UPDATE_IMG}
   instances: 3
 
   postgresql:

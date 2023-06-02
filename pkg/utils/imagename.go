@@ -82,7 +82,7 @@ func NewReference(name string) *Reference {
 //
 //	GetImageTag("postgres") == "latest"
 //	GetImageTag("ghcr.io/cloudnative-pg/postgresql:12.3") == "12.3"
-func GetImageTag(imageName string) string {
-	ref := NewReference(imageName)
+func GetImageTag(image string) string {
+	ref := NewReference(image)
 	return ref.Tag
 }

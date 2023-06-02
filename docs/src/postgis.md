@@ -49,7 +49,7 @@ do this in two ways:
 Let's suppose you want to create a new PostgreSQL 14 cluster with PostGIS 3.2.
 
 The first step is to ensure you use the right PostGIS container image for the
-operand, and properly set the `.spec.imageName` option in the `Cluster`
+operand, and properly set the `.spec.image` option in the `Cluster`
 resource.
 
 The [`postgis-example.yaml` manifest](samples/postgis-example.yaml) below
@@ -58,7 +58,7 @@ provides some guidance on how the creation of a PostGIS cluster can be done.
 !!! Warning
     Please consider that, although convention over configuration applies in
     CloudNativePG, you should spend time configuring and tuning your system for
-    production. Also the `imageName` in the example below deliberately points
+    production. Also the `image` in the example below deliberately points
     to the latest available image for PostgreSQL 14 - you should use a specific
     image name or, preferably, the SHA256 digest for true immutability.
 
@@ -69,7 +69,7 @@ metadata:
   name: postgis-example
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgis:14
+  image: ghcr.io/cloudnative-pg/postgis:14
   bootstrap:
     initdb:
       postInitTemplateSQL:

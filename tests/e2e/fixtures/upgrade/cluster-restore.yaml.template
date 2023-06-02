@@ -4,7 +4,7 @@ metadata:
   name: cluster-restore
 spec:
   instances: 3
-  imageName: "${POSTGRES_IMG}"
+  image: "${POSTGRES_IMG}"
 
   storage:
     size: 1Gi

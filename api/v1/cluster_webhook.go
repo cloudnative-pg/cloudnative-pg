@@ -86,8 +86,8 @@ func (r *Cluster) SetDefaults() {
 
 func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	// Defaulting the image name if not specified
-	if r.Spec.ImageName == "" {
-		r.Spec.ImageName = configuration.Current.PostgresImageName
+	if r.Spec.Image == "" {
+		r.Spec.Image = configuration.Current.PostgresImage
 	}
 
 	// Defaulting the bootstrap method if not specified
@@ -118,7 +118,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	psqlVersion, err := r.GetPostgresqlVersion()
 	if err == nil {
 		// The validation error will be already raised by the
-		// validateImageName function
+		// validateImage function
 		info := postgres.ConfigurationInfo{
 			Settings:                      postgres.CnpgConfigurationSettings,
 			MajorVersion:                  psqlVersion,
@@ -258,12 +258,14 @@ var _ webhook.Validator = &Cluster{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	clusterLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
+	warnings := r.warningImageName()
+
 	allErrs := r.Validate()
 	if len(allErrs) == 0 {
-		return nil, nil
+		return warnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return warnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
 		r.Name, allErrs)
 }
@@ -279,7 +281,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateSuperuserSecret,
 		r.validateCerts,
 		r.validateBootstrapMethod,
-		r.validateImageName,
+		r.validateImage,
 		r.validateImagePullPolicy,
 		r.validateRecoveryTarget,
 		r.validatePrimaryUpdateStrategy,
@@ -316,6 +318,10 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 	clusterLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 	oldCluster := old.(*Cluster)
 
+	if oldCluster.Spec.ImageName != "" {
+		oldCluster.Spec.Image = oldCluster.Spec.ImageName
+	}
+
 	// applying defaults before validating updates to set any new default
 	oldCluster.SetDefaults()
 
@@ -341,7 +347,7 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 			"old", old)
 		return nil
 	}
-	allErrs = append(allErrs, r.validateImageChange(old.Spec.ImageName)...)
+	allErrs = append(allErrs, r.validateImageChange(old.Spec.Image)...)
 	allErrs = append(allErrs, r.validateConfigurationChange(old)...)
 	allErrs = append(allErrs, r.validateStorageChange(old)...)
 	allErrs = append(allErrs, r.validateWalStorageChange(old)...)
@@ -889,31 +895,44 @@ func validateVolumeSnapshotSource(
 	return nil
 }
 
-// validateImageName validates the image name ensuring we aren't
+func (r *Cluster) warningImageName() admission.Warnings {
+	var warns admission.Warnings
+	if r.Spec.ImageName != "" {
+		warns = append(warns, "spec.imageName field is being deprecated please use spec.image instead")
+	}
+
+	return warns
+}
+
+// validateImage validates the image name ensuring we aren't
 // using the "latest" tag
-func (r *Cluster) validateImageName() field.ErrorList {
+func (r *Cluster) validateImage() field.ErrorList {
 	var result field.ErrorList
 
-	if r.Spec.ImageName == "" {
+	if r.Spec.ImageName != "" {
+		r.Spec.Image = r.Spec.ImageName
+	}
+
+	if r.Spec.Image == "" {
 		// We'll use the default one
 		return result
 	}
 
-	tag := utils.GetImageTag(r.Spec.ImageName)
+	tag := utils.GetImageTag(r.Spec.Image)
 	switch tag {
 	case "latest":
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
+				field.NewPath("spec", "image"),
+				r.Spec.Image,
 				"Can't use 'latest' as image tag as we can't detect upgrades"))
 	case "":
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
+				field.NewPath("spec", "image"),
+				r.Spec.Image,
 				"Can't use just the image sha as we can't detect upgrades"))
 	default:
 		_, err := postgres.GetPostgresVersionFromTag(tag)
@@ -921,8 +940,8 @@ func (r *Cluster) validateImageName() field.ErrorList {
 			result = append(
 				result,
 				field.Invalid(
-					field.NewPath("spec", "imageName"),
-					r.Spec.ImageName,
+					field.NewPath("spec", "image"),
+					r.Spec.Image,
 					"invalid version tag"))
 		}
 	}
@@ -955,14 +974,14 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	pgVersion, err := r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
-		// validateImageName function
+		// validateImage function
 		return result
 	}
 	if pgVersion < 110000 {
 		result = append(result,
 			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
+				field.NewPath("spec", "image"),
+				r.Spec.Image,
 				"Unsupported PostgreSQL version. Versions 11 or newer are supported"))
 	}
 	info := postgres.ConfigurationInfo{
@@ -1120,7 +1139,7 @@ func parseWalSettingValue(value string) (resource.Quantity, error) {
 func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	if old.Spec.ImageName != r.Spec.ImageName {
+	if old.Spec.Image != r.Spec.Image {
 		diff := utils.CollectDifferencesFromMaps(old.Spec.PostgresConfiguration.Parameters,
 			r.Spec.PostgresConfiguration.Parameters)
 		if len(diff) > 0 {
@@ -1128,8 +1147,8 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 			result = append(
 				result,
 				field.Invalid(
-					field.NewPath("spec", "imageName"),
-					r.Spec.ImageName,
+					field.NewPath("spec", "image"),
+					r.Spec.Image,
 					fmt.Sprintf("Can't change image name and configuration at the same time. "+
 						"There are differences in PostgreSQL configuration parameters: %s", jsonDiff)))
 			return result
@@ -1160,15 +1179,18 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 // to a new one.
 func (r *Cluster) validateImageChange(old string) field.ErrorList {
 	var result field.ErrorList
+	if r.Spec.ImageName != "" {
+		r.Spec.Image = r.Spec.ImageName
+	}
 
-	newVersion := r.Spec.ImageName
+	newVersion := r.Spec.Image
 	if newVersion == "" {
 		// We'll use the default one
-		newVersion = configuration.Current.PostgresImageName
+		newVersion = configuration.Current.PostgresImage
 	}
 
 	if old == "" {
-		old = configuration.Current.PostgresImageName
+		old = configuration.Current.PostgresImage
 	}
 
 	status, err := postgres.CanUpgrade(old, newVersion)
@@ -1176,15 +1198,15 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
+				field.NewPath("spec", "image"),
+				r.Spec.Image,
 				fmt.Sprintf("wrong version: %v", err.Error())))
 	} else if !status {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
+				field.NewPath("spec", "image"),
+				r.Spec.Image,
 				fmt.Sprintf("can't upgrade between %v and %v",
 					old, newVersion)))
 	}
@@ -1750,7 +1772,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 	psqlVersion, err := r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
-		// validateImageName function
+		// validateImage function
 		return nil
 	}
 

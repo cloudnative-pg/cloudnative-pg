@@ -565,7 +565,7 @@ var _ = Describe("Defaulting webhook", func() {
 	It("should fill the image name if isn't already set", func() {
 		cluster := Cluster{}
 		cluster.Default()
-		Expect(cluster.Spec.ImageName).To(Equal(configuration.Current.PostgresImageName))
+		Expect(cluster.Spec.ImageName).To(Equal(configuration.Current.PostgresImage))
 	})
 
 	It("shouldn't set the image name if already present", func() {
@@ -620,11 +620,11 @@ var _ = Describe("Defaulting webhook", func() {
 var _ = Describe("Image name validation", func() {
 	It("doesn't complain if the user simply accept the default", func() {
 		var cluster Cluster
-		Expect(cluster.validateImageName()).To(BeEmpty())
+		Expect(cluster.validateImage()).To(BeEmpty())
 
 		// Let's apply the defaulting webhook, too
 		cluster.Default()
-		Expect(cluster.validateImageName()).To(BeEmpty())
+		Expect(cluster.validateImage()).To(BeEmpty())
 	})
 
 	It("complains when the 'latest' tag is detected", func() {
@@ -633,7 +633,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:latest",
 			},
 		}
-		Expect(len(cluster.validateImageName())).To(Equal(1))
+		Expect(len(cluster.validateImage())).To(Equal(1))
 	})
 
 	It("doesn't complain when a alpha tag is used", func() {
@@ -642,7 +642,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:15alpha1",
 			},
 		}
-		Expect(len(cluster.validateImageName())).To(Equal(0))
+		Expect(len(cluster.validateImage())).To(Equal(0))
 	})
 
 	It("doesn't complain when a beta tag is used", func() {
@@ -651,7 +651,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:15beta1",
 			},
 		}
-		Expect(len(cluster.validateImageName())).To(Equal(0))
+		Expect(len(cluster.validateImage())).To(Equal(0))
 	})
 
 	It("doesn't complain when a release candidate tag is used", func() {
@@ -660,7 +660,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:15rc1",
 			},
 		}
-		Expect(len(cluster.validateImageName())).To(Equal(0))
+		Expect(len(cluster.validateImage())).To(Equal(0))
 	})
 
 	It("complains when only the sha is passed", func() {
@@ -669,7 +669,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
 			},
 		}
-		Expect(len(cluster.validateImageName())).To(Equal(1))
+		Expect(len(cluster.validateImage())).To(Equal(1))
 	})
 
 	It("doesn't complain if the tag is valid", func() {
@@ -678,7 +678,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:10.4",
 			},
 		}
-		Expect(cluster.validateImageName()).To(BeEmpty())
+		Expect(cluster.validateImage()).To(BeEmpty())
 	})
 
 	It("doesn't complain if the tag is valid", func() {
@@ -687,7 +687,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:14.4-1",
 			},
 		}
-		Expect(cluster.validateImageName()).To(BeEmpty())
+		Expect(cluster.validateImage()).To(BeEmpty())
 	})
 
 	It("doesn't complain if the tag is valid and has sha", func() {
@@ -696,7 +696,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:10.4@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
 			},
 		}
-		Expect(cluster.validateImageName()).To(BeEmpty())
+		Expect(cluster.validateImage()).To(BeEmpty())
 	})
 
 	It("complain when the tag name is not a PostgreSQL version", func() {
@@ -705,7 +705,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:test_12",
 			},
 		}
-		Expect(len(cluster.validateImageName())).To(Equal(1))
+		Expect(len(cluster.validateImage())).To(Equal(1))
 	})
 })
 
