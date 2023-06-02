@@ -153,10 +153,17 @@ func (env TestingEnvironment) GetPod(namespace, podName string) (*corev1.Pod, er
 	return nil, wrapErr(errors.New("pod not found"))
 }
 
-// ExecCommandInInstancePod executes commands in a given instance pod, in the
+// ContainerLocator contains the necessary data to find a container on a pod
+type ContainerLocator struct {
+	Namespace string
+	PodName   string
+	Container string
+}
+
+// ExecCommandInContainer executes commands in a given instance pod, in the
 // postgres container
-func (env TestingEnvironment) ExecCommandInInstancePod(
-	namespace, podName string,
+func (env TestingEnvironment) ExecCommandInContainer(
+	namespace, podName, container string,
 	timeout *time.Duration,
 	command ...string,
 ) (string, string, error) {
@@ -167,8 +174,27 @@ func (env TestingEnvironment) ExecCommandInInstancePod(
 	if err != nil {
 		return "", "", wrapErr(err)
 	}
-	return env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, timeout, command...)
+	return env.ExecCommand(env.Ctx, *pod, container, timeout, command...)
 }
+
+// PodLocator contains the necessary data to find a pod
+type PodLocator struct {
+	Namespace string
+	PodName   string
+}
+
+// ExecCommandInInstancePod executes commands in a given instance pod, in the
+// postgres container
+func (env TestingEnvironment) ExecCommandInInstancePod(
+	namespace, podName string,
+	timeout *time.Duration,
+	command ...string,
+) (string, string, error) {
+	return env.ExecCommandInContainer(namespace, podName, specs.PostgresContainerName, timeout, command...)
+}
+
+// DatabaseName is a special type for the database argument in an Exec call
+type DatabaseName string
 
 // ExecQueryInInstancePod executes a query in an instance pod, by connecting to the pod
 // and the postgres container, and using a local connection with the postgres user

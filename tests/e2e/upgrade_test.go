@@ -98,13 +98,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	// but a single scheduled backups during the check
 	AssertScheduledBackupsAreScheduled := func(upgradeNamespace string) {
 		By("verifying scheduled backups are still happening", func() {
-			out, _, err := env.ExecCommandInInstancePod(upgradeNamespace, minioClientName, nil,
+			out, _, err := env.ExecCommandInContainer(upgradeNamespace, minioClientName, "mc", nil,
 				"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
 			Expect(err).ToNot(HaveOccurred())
 			currentBackups, err := strconv.Atoi(strings.Trim(out, "\n"))
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {
-				out, _, err := env.ExecCommandInInstancePod(upgradeNamespace, minioClientName, nil,
+				out, _, err := env.ExecCommandInContainer(upgradeNamespace, minioClientName, "mc", nil,
 					"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
 				if err != nil {
 					return 0, err
@@ -391,7 +391,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				findCmd := fmt.Sprintf(
 					"mc find minio --name %v.gz | wc -l",
 					latestWAL)
-				out, _, err := env.ExecCommandInInstancePod(upgradeNamespace, minioClientName, nil,
+				out, _, err := env.ExecCommandInContainer(upgradeNamespace, minioClientName, "mc", nil,
 					"sh", "-c", findCmd)
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
@@ -416,7 +416,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// A file called data.tar.gz should be available on minio
 			Eventually(func() (int, error, error) {
-				out, _, err := env.ExecCommandInInstancePod(upgradeNamespace, minioClientName, nil,
+				out, _, err := env.ExecCommandInContainer(upgradeNamespace, minioClientName, "mc", nil,
 					"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr

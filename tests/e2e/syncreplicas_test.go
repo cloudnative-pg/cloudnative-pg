@@ -164,10 +164,14 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 		By("checking that synchronous_standby_names has the expected value on the primary", func() {
 			Eventually(func() string {
-				out, _, err := env.ExecQueryInInstancePod(namespace, clusterName, "postgres",
+				primary, err := env.GetClusterPrimary(namespace, clusterName)
+				if err != nil {
+					return err.Error()
+				}
+				out, stderr, err := env.ExecQueryInInstancePod(namespace, primary.GetName(), "postgres",
 					"select setting from pg_settings where name = 'synchronous_standby_names'")
 				if err != nil {
-					return ""
+					return stderr + " - " + err.Error()
 				}
 				return strings.Trim(out, "\n")
 			}, 30).Should(Equal("ANY 1 (\"cluster-pgstatstatements-2\",\"cluster-pgstatstatements-3\")"))

@@ -81,18 +81,19 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 		})
 
 		By("corrupting primary pod by removing PGDATA", func() {
+			cmd := fmt.Sprintf("rm -fr %v/base/*", specs.PgDataPath)
 			_, _, err = env.ExecCommandInInstancePod(namespace, oldPrimaryPodName, nil,
-				"/bin/bash", "-c", "rm -fr %v/base/*")
+				"/bin/bash", "-c", cmd)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("verifying failover happened after the primary pod PGDATA got corrupted", func() {
-			Eventually(func() string {
+			Eventually(func() (string, error) {
 				newPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				if err != nil {
-					return ""
+					return "", err
 				}
-				return newPrimaryPod.GetName()
+				return newPrimaryPod.GetName(), nil
 			}, 120, 5).ShouldNot(BeEquivalentTo(oldPrimaryPodName),
 				"operator did not perform the failover")
 		})
