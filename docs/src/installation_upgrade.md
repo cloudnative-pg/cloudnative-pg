@@ -64,7 +64,7 @@ this minor release with:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.20/manifests/operator-manifest.yaml | \
   kubectl apply -f -
 ```
 
