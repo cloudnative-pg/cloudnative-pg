@@ -225,13 +225,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 						ctrlclient.MatchingLabels{utils.ClusterLabelName: "operator-unavailable"},
 					)
 					Expect(err).ToNot(HaveOccurred())
-					count := int32(0)
-					for _, pod := range podList.Items {
-						if pod.DeletionTimestamp == nil {
-							count++
-						}
-					}
-					return count
+					return int32(len(utils.FilterActivePods(podList.Items)))
 				}, 120).Should(BeEquivalentTo(2))
 			})
 
