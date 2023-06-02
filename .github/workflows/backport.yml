@@ -18,7 +18,7 @@ jobs:
     name: label the source pr
     if: github.event.pull_request.merged == false &&
         !contains(github.event.pull_request.labels.*.name, 'backport-requested')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       -
         name: label the pull request
@@ -55,7 +55,7 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'backport-requested :arrow_backward:')
         ) &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +129,7 @@ jobs:
     env:
       PR: ${{ github.event.pull_request.number }}
       COMMIT: ${{ needs.back-porting-pr.outputs.commit }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: create ticket
         uses: dacbd/create-issue-action@v1
