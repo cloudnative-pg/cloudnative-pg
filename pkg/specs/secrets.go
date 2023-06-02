@@ -61,7 +61,11 @@ func CreateSecret(
 		Type: corev1.SecretTypeBasicAuth,
 		StringData: map[string]string{
 			"username": username,
+			"user":     username,
 			"password": password,
+			"dbname":   dbname,
+			"host":     hostname,
+			"port":     fmt.Sprintf("%d", postgres.ServerPort),
 			"pgpass": fmt.Sprintf(
 				"%v:%v:%v:%v:%v\n",
 				hostname,
