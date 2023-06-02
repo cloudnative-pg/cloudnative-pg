@@ -158,7 +158,7 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 						},
 						{
 							Name:  "pgbench-init",
-							Image: cluster.Spec.ImageName,
+							Image: clusterImageName,
 							Env:   cmd.buildEnvVariables(),
 							Command: []string{
 								"pgbench",

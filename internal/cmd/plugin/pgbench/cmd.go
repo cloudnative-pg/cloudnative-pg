@@ -80,7 +80,7 @@ func NewCmd() *cobra.Command {
 		&run.initialize,
 		"initialize",
 		false,
-		"When passed adds the --initialize flag to pgbench",
+		"When true adds the --initialize flag to pgbench",
 	)
 
 	pgBenchCmd.Flags().IntVar(
