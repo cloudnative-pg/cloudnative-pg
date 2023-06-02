@@ -44,6 +44,7 @@ GORELEASER_VERSION ?= v1.18.2
 SPELLCHECK_VERSION ?= 0.32.0
 WOKE_VERSION ?= 0.19.0
 ARCH ?= amd64
+LOCALBIN ?= $(shell pwd)/bin
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -210,10 +211,15 @@ apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
 	  api/v1/*_types.go ;\
 	cp $${CONFIG_TMP_DIR}/api_reference.md docs/src/api_reference.md
 
+
+##@ Cleanup
+
+distclean: ## Clean-up the work tree from building binaries
+	rm -rf $(LOCALBIN)/*
+
 ##@ Tools
 
 ## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
