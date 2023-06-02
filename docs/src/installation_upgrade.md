@@ -59,12 +59,11 @@ manifests from the
 which provides easy access to the current trunk (main) as well as to each
 supported release.
 
-For example, you can install the latest snapshot of the operator for
-this minor release with:
+For example, you can install the latest snapshot of the operator with:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.20/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
   kubectl apply -f -
 ```
 
