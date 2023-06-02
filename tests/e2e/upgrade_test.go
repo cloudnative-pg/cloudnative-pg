@@ -140,10 +140,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Gather current primary
-			namespacedName := types.NamespacedName{
-				Namespace: upgradeNamespace,
-				Name:      clusterName,
-			}
 			cluster, err := env.GetCluster(upgradeNamespace, clusterName)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 
@@ -181,8 +177,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}
 			// Check that a switchover happened
 			Eventually(func() (bool, error) {
-				c := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, c)
+				c, err := env.GetCluster(upgradeNamespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				GinkgoWriter.Printf("Current Primary: %s, Current Primary timestamp: %s\n",

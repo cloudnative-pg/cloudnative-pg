@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -30,16 +29,11 @@ var _ = Describe("Cluster declarative hibernation", func() {
 	It("hibernates an existing cluster", func(ctx SpecContext) {
 		const namespacePrefix = "declarative-hibernation"
 
-		var cluster apiv1.Cluster
 		clusterName, err := env.GetResourceNameFromYAML(sampleFileCluster)
 		Expect(err).ToNot(HaveOccurred())
 		// Create a cluster in a namespace we'll delete after the test
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
@@ -55,19 +49,21 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		})
 
 		By("hibernating the new cluster", func() {
-			Expect(env.Client.Get(ctx, namespacedName, &cluster)).To(Succeed())
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).NotTo(HaveOccurred())
 			if cluster.Annotations == nil {
 				cluster.Annotations = make(map[string]string)
 			}
 			originCluster := cluster.DeepCopy()
 			cluster.Annotations[hibernation.HibernationAnnotationName] = hibernation.HibernationOn
 
-			Expect(env.Client.Patch(ctx, &cluster, ctrlclient.MergeFrom(originCluster))).To(Succeed())
+			Expect(env.Client.Patch(ctx, cluster, ctrlclient.MergeFrom(originCluster))).To(Succeed())
 		})
 
 		By("waiting for the cluster to be hibernated correctly", func() {
 			Eventually(func(g Gomega) {
-				g.Expect(env.Client.Get(ctx, namespacedName, &cluster)).To(Succeed())
+				cluster, err := env.GetCluster(namespace, clusterName)
+				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(meta.IsStatusConditionTrue(cluster.Status.Conditions, hibernation.HibernationConditionType)).To(BeTrue())
 			}, 300).Should(Succeed())
 		})
@@ -78,18 +74,22 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		})
 
 		By("rehydrating the cluster", func() {
-			Expect(env.Client.Get(ctx, namespacedName, &cluster)).To(Succeed())
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).NotTo(HaveOccurred())
 			if cluster.Annotations == nil {
 				cluster.Annotations = make(map[string]string)
 			}
 			originCluster := cluster.DeepCopy()
 			cluster.Annotations[hibernation.HibernationAnnotationName] = hibernation.HibernationOff
-			Expect(env.Client.Patch(ctx, &cluster, ctrlclient.MergeFrom(originCluster))).To(Succeed())
+			Expect(env.Client.Patch(ctx, cluster, ctrlclient.MergeFrom(originCluster))).To(Succeed())
 		})
 
+		var cluster *apiv1.Cluster
 		By("waiting for the condition to be removed", func() {
 			Eventually(func(g Gomega) {
-				g.Expect(env.Client.Get(ctx, namespacedName, &cluster)).To(Succeed())
+				var err error
+				cluster, err = env.GetCluster(namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
 
 				condition := meta.FindStatusCondition(cluster.Status.Conditions, hibernation.HibernationConditionType)
 				g.Expect(condition).To(BeNil())

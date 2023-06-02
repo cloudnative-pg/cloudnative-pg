@@ -415,7 +415,6 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 		clusterFileWithPrimaryUpdateRestart := fixturesDir +
 			"/config_update/primary_update_method/primary-update-restart.yaml.template"
 		var namespace, clusterName string
-		var sourceClusterNamespacedName *types.NamespacedName
 
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
@@ -435,10 +434,6 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterFileWithPrimaryUpdateRestart)
 			Expect(err).ToNot(HaveOccurred())
-			sourceClusterNamespacedName = &types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
 
 			By("setting up cluster with primaryUpdateMethod value set to restart", func() {
 				AssertCreateCluster(namespace, clusterName, clusterFileWithPrimaryUpdateRestart, env)
@@ -494,14 +489,13 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			})
 
 			By(fmt.Sprintf("updating max_connection value to %v", newMaxConnectionsValue), func() {
-				var cluster apiv1.Cluster
-				err := env.Client.Get(env.Ctx, *sourceClusterNamespacedName, &cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				updated := cluster.DeepCopy()
 				updated.Spec.PostgresConfiguration.Parameters[maxConnectionParamKey] = fmt.Sprintf("%v",
 					newMaxConnectionsValue)
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(&cluster))
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -522,9 +516,8 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			})
 
 			By("verifying the old primary is still the primary", func() {
-				cluster := apiv1.Cluster{}
 				Eventually(func() (string, error) {
-					err := env.Client.Get(env.Ctx, *sourceClusterNamespacedName, &cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.CurrentPrimary, err
 				}, 60).Should(BeEquivalentTo(oldPrimaryPodName))
 			})
@@ -557,13 +550,12 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			commandTimeout := time.Second * 10
 
 			By("updating work mem ", func() {
-				var cluster apiv1.Cluster
-				err := env.Client.Get(env.Ctx, *sourceClusterNamespacedName, &cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				updated := cluster.DeepCopy()
 				updated.Spec.PostgresConfiguration.Parameters["work_mem"] = expectedNewValueForWorkMem
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(&cluster))
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 			})
 
