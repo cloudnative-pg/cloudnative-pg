@@ -50,6 +50,12 @@ kubectl cnpg pgbench \
     This will generate a database with 100000000 records, taking approximately 13GB
     of space on disk.
 
+You can see the progress of the job with:
+
+```shell 
+kubectl logs jobs/pgbench-run
+```
+
 The following example creates a job called `pgbench-run` executing `pgbench`
 against the previously initialized database for 30 seconds, using a single
 connection:
