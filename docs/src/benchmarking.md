@@ -35,25 +35,30 @@ kubectl cnpg pgbench \
     Please refer to the [`pgbench` documentation](https://www.postgresql.org/docs/current/pgbench.html)
     for information about the specific options to be used in your jobs.
 
-This example creates a job that initializes a `Cluster` named
-`cluster-example` in the `pgbench` namespace for `pgbench` purposes,
+This example creates a job called `pgbench-init` that initializes for `pgbench`
+OLTP-like purposes the `app` database in a `Cluster` named `cluster-example`,
 using a scale factor of 1000:
 
 ```shell
 kubectl cnpg pgbench \
-   -n pgbench cluster-example \
-   --job-name pgbench-job \
-   -- --initialize --scale 1000
+  --job-name pgbench-init \
+  cluster-example \
+  -- --initialize --scale 1000
 ```
 
-The following example creates a job executing `pgbench` against a `Cluster`
-named `cluster-example` in the `pgbench` namespace:
+!!! Note
+    This will generate a database with 100000000 records, taking approximately 13GB
+    of space on disk.
+
+The following example creates a job called `pgbench-run` executing `pgbench`
+against the previously initialized database for 30 seconds, using a single
+connection:
 
 ```shell
 kubectl cnpg pgbench \
-   -n pgbench cluster-example \
-   --job-name pgbench-job \
-   -- --time 30 --client 1 --jobs 1
+  --job-name pgbench-run \
+  cluster-example \
+  -- --time 30 --client 1 --jobs 1
 ```
 
 The next example runs `pgbench` against an existing database by using the
@@ -61,23 +66,23 @@ The next example runs `pgbench` against an existing database by using the
 
 ```shell
 kubectl cnpg pgbench \
-  -n pgbench cluster-example \
   --db-name pgbench \
   --job-name pgbench-job \
+  cluster-example \
   -- --time 30 --client 1 --jobs 1
 ```
 
 If you want to run a `pgbench` job on a specific worker node, you can use
-the `--node-selector` option. Suppose you want to run the previous job on a
-node having the `workload=pgbench` label, you can run:
+the `--node-selector` option. Suppose you want to run the previous
+initialization job on a node having the `workload=pgbench` label, you can run:
 
 ```shell
 kubectl cnpg pgbench \
-  -n pgbench cluster-example \
   --db-name pgbench \
-  --job-name pgbench-job \
+  --job-name pgbench-init \
   --node-selector workload=pgbench \
-  -- --time 30 --client 1 --jobs 1
+  cluster-example \
+  -- --initialize --scale 1000
 ```
 
 The job status can be fetched by running:
