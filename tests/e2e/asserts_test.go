@@ -135,8 +135,11 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 		Eventually(func() error {
 			count := 0
 			for _, pod := range pods {
-				out, _, err := env.ExecCommandInInstancePod(namespace, pod, nil,
-					"sh", "-c", "ls $PGDATA/pg_wal/*.history")
+				out, _, err := env.ExecCommandInInstancePod(
+					testsUtils.PodLocator{
+						Namespace: namespace,
+						PodName:   pod,
+					}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history")
 				if err != nil {
 					return err
 				}
@@ -1362,7 +1365,12 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 		AssertDataExpectedCount(namespace, restoredClusterName, tableName, 2, pod)
 
 		// Restored primary should be on timeline 2
-		out, _, err := env.ExecQueryInInstancePod(namespace, primary, "app",
+		out, _, err := env.ExecQueryInInstancePod(
+			testsUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   primary,
+			},
+			testsUtils.DatabaseName("app"),
 			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
@@ -1414,7 +1422,12 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string, pod *
 		AssertDataExpectedCount(namespace, restoredClusterName, tableName, 2, pod)
 
 		// Restored primary should be on timeline 2
-		out, _, err := env.ExecQueryInInstancePod(namespace, primary, "app",
+		out, _, err := env.ExecQueryInInstancePod(
+			testsUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   primary,
+			},
+			testsUtils.DatabaseName("app"),
 			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
@@ -1702,11 +1715,21 @@ func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azSto
 
 // switchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
 func switchWalAndGetLatestArchive(namespace, podName string) string {
-	_, _, err := env.ExecQueryInInstancePod(namespace, podName, "postgres",
+	_, _, err := env.ExecQueryInInstancePod(
+		testsUtils.PodLocator{
+			Namespace: namespace,
+			PodName:   podName,
+		},
+		testsUtils.DatabaseName("postgres"),
 		"CHECKPOINT;")
 	Expect(err).ToNot(HaveOccurred())
 
-	out, _, err := env.ExecQueryInInstancePod(namespace, podName, "postgres",
+	out, _, err := env.ExecQueryInInstancePod(
+		testsUtils.PodLocator{
+			Namespace: namespace,
+			PodName:   podName,
+		},
+		testsUtils.DatabaseName("postgres"),
 		"SELECT pg_walfile_name(pg_switch_wal());")
 	Expect(err).ToNot(HaveOccurred())
 

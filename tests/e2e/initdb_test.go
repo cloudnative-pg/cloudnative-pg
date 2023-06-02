@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -69,33 +70,57 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			primaryDst := clusterName + "-1"
 
 			By("querying the tables via psql", func() {
-				_, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "postgres",
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("postgres"),
 					"SELECT count(*) FROM numbers")
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the App database tables via psql", func() {
-				_, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "app",
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("app"),
 					"SELECT count(*) FROM application_numbers")
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the App database tables defined by secretRefs", func() {
-				_, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "app",
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("app"),
 					"SELECT count(*) FROM secrets")
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the App database tables defined by configMapRefs", func() {
-				_, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "app",
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("app"),
 					"SELECT count(*) FROM configmaps")
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the database to ensure the installed extension is there", func() {
-				stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "postgres",
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("postgres"),
 					"SELECT count(*) FROM pg_available_extensions WHERE name LIKE 'intarray'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("1\n"))
 			})
 			By("checking inside the database the default locale", func() {
-				stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "postgres",
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("postgres"),
 					"select datcollate from pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("C\n"))
@@ -128,7 +153,11 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			primaryDst := clusterName + "-1"
 
 			By("checking inside the database", func() {
-				stdout, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "postgres",
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("postgres"),
 					"select datcollate from pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("en_US.utf8\n"))

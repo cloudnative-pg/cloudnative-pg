@@ -168,7 +168,12 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				if err != nil {
 					return err.Error()
 				}
-				out, stderr, err := env.ExecQueryInInstancePod(namespace, primary.GetName(), "postgres",
+				out, stderr, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.GetName(),
+					},
+					utils.DatabaseName("postgres"),
 					"select setting from pg_settings where name = 'synchronous_standby_names'")
 				if err != nil {
 					return stderr + " - " + err.Error()

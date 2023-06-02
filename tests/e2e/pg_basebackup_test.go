@@ -85,7 +85,12 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.La
 
 		By("checking data have been copied correctly", func() {
 			// Test data should be present on restored primary
-			out, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "app",
+			out, _, err := env.ExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: namespace,
+					PodName:   primaryDst,
+				},
+				utils.DatabaseName("app"),
 				"SELECT count(*) FROM to_bootstrap")
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 		})
@@ -95,7 +100,12 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.La
 		})
 
 		By("checking the src cluster was not modified", func() {
-			out, _, err := env.ExecQueryInInstancePod(namespace, primarySrc, "app",
+			out, _, err := env.ExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: namespace,
+					PodName:   primarySrc,
+				},
+				utils.DatabaseName("app"),
 				"SELECT count(*) FROM to_bootstrap")
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 			Expect(err).ToNot(HaveOccurred())
@@ -135,7 +145,12 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.Labe
 
 		By("checking data have been copied correctly", func() {
 			// Test data should be present on restored primary
-			out, _, err := env.ExecQueryInInstancePod(namespace, primaryDst, "app",
+			out, _, err := env.ExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: namespace,
+					PodName:   primaryDst,
+				},
+				utils.DatabaseName("app"),
 				"SELECT count(*) FROM to_bootstrap")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
@@ -146,7 +161,12 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.Labe
 		})
 
 		By("checking the src cluster was not modified", func() {
-			out, _, err := env.ExecQueryInInstancePod(namespace, primarySrc, "app",
+			out, _, err := env.ExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: namespace,
+					PodName:   primarySrc,
+				},
+				utils.DatabaseName("app"),
 				"SELECT count(*) FROM to_bootstrap")
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 			Expect(err).ToNot(HaveOccurred())
