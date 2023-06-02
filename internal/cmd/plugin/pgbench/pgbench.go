@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -35,8 +34,6 @@ import (
 )
 
 type pgBenchRun struct {
-	initialize         bool
-	scale              int
 	jobName            string
 	clusterName        string
 	dbName             string
@@ -145,27 +142,6 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
-					InitContainers: []corev1.Container{
-						{
-							Name:  "wait-for-cnpg",
-							Image: clusterImageName,
-							Env:   cmd.buildEnvVariables(),
-							Command: []string{
-								"sh",
-								"-c",
-								"until psql -c \"SELECT 1\"; do echo 'Waiting for service' sleep 15; done",
-							},
-						},
-						{
-							Name:  "pgbench-init",
-							Image: clusterImageName,
-							Env:   cmd.buildEnvVariables(),
-							Command: []string{
-								"pgbench",
-							},
-							Args: cmd.buildPGBenchInitArgs(),
-						},
-					},
 					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
 						{
@@ -227,13 +203,4 @@ func (cmd *pgBenchRun) buildEnvVariables() []corev1.EnvVar {
 	}
 
 	return envVar
-}
-
-func (cmd *pgBenchRun) buildPGBenchInitArgs() []string {
-	var args []string
-	if cmd.initialize {
-		args = append(args, "--initialize")
-	}
-
-	return append(args, "--scale", strconv.Itoa(cmd.scale))
 }

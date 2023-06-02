@@ -43,7 +43,7 @@ using a scale factor of 1000:
 kubectl cnpg pgbench \
    -n pgbench cluster-example \
    --job-name pgbench-job \
-   -- --initialize - --scale 1000
+   -- --initialize --scale 1000
 ```
 
 The following example creates a job executing `pgbench` against a `Cluster`
