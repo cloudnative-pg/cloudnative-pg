@@ -18,6 +18,7 @@ package specs
 
 import (
 	"fmt"
+	"net/url"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +35,21 @@ func CreateSecret(
 	username string,
 	password string,
 ) *corev1.Secret {
+	uri := &url.URL{
+		Scheme: "postgresql",
+		User:   url.UserPassword(username, password),
+		Host:   fmt.Sprintf("%s:%d", hostname, postgres.ServerPort),
+		Path:   dbname,
+	}
+	jdbc_uri := &url.URL{
+		Scheme: "jdbc:postgresql",
+		Host:   fmt.Sprintf("%s:%d", hostname, postgres.ServerPort),
+		Path:   dbname,
+	}
+	q := jdbc_uri.Query()
+	q.Set("user", username)
+	q.Set("password", password)
+	jdbc_uri.RawQuery = q.Encode()
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -53,6 +69,8 @@ func CreateSecret(
 				dbname,
 				username,
 				password),
+			"uri":      uri.String(),
+			"jdbc-uri": jdbc_uri.String(),
 		},
 	}
 }
