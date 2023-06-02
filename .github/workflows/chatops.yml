@@ -14,7 +14,7 @@ jobs:
     if: |
         github.event.issue.pull_request &&
         startsWith(github.event.comment.body, '/ok-to-merge')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check User Permission
         id: checkUser
