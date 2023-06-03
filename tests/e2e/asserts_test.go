@@ -646,7 +646,8 @@ func AssertWritesResumedBeforeTimeout(namespace string, clusterName string, time
 // is being elected and promoted and that write operation succeed
 // on this new pod.
 func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
-	By("verifying the new primary pod", func() {
+	var newPrimaryPod string
+	By(fmt.Sprintf("verifying the new primary pod, oldPrimary is %s", oldPrimary), func() {
 		// Gather the primary
 		timeout := 120
 		namespacedName := types.NamespacedName{
@@ -674,14 +675,20 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 			err := env.Client.Get(env.Ctx, namespacedName, &pod)
 			return specs.IsPodPrimary(pod), err
 		}, timeout).Should(BeTrue())
+		newPrimaryPod = newPrimary
 	})
-	By("verifying write operation on the new primary pod", func() {
+	By(fmt.Sprintf("verifying write operation on the new primary pod: %s", newPrimaryPod), func() {
 		commandTimeout := time.Second * 10
-		pod, err := env.GetClusterPrimary(namespace, clusterName)
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      newPrimaryPod,
+		}
+		pod := corev1.Pod{}
+		err := env.Client.Get(env.Ctx, namespacedName, &pod)
 		Expect(err).ToNot(HaveOccurred())
 		// Expect write operation to succeed
 		query := "CREATE TABLE IF NOT EXISTS assert_new_primary(var1 text);"
-		_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+		_, _, err = env.EventuallyExecCommand(env.Ctx, pod, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
 	})

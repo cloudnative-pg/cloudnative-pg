@@ -17,7 +17,7 @@ permissions:
 jobs:
 
   release:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       -
         name: Checkout
@@ -51,7 +51,7 @@ jobs:
 
   release-binaries:
     name: Build containers
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.build-meta.outputs.version }}
       digest: ${{ steps.build.outputs.digest }}
