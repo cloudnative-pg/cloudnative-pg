@@ -62,47 +62,38 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		"wal_receiver_timeout":        "2s",
 	}
 	updateClusterPostgresParams := func(paramsMap map[string]string, namespace string) {
-		cluster := apiv1.Cluster{}
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
+		cluster := &apiv1.Cluster{}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			err := utils.GetObject(env, namespacedName, &cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Spec.PostgresConfiguration.Parameters = paramsMap
-			return env.Client.Update(env.Ctx, &cluster)
+			return env.Client.Update(env.Ctx, cluster)
 		})
 		Expect(err).ToNot(HaveOccurred())
 	}
 
 	updateClusterPostgresPgHBA := func(namespace string) {
-		cluster := apiv1.Cluster{}
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
+		cluster := &apiv1.Cluster{}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			err := utils.GetObject(env, namespacedName, &cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Spec.PostgresConfiguration.PgHBA = []string{"host all all all trust"}
-			return env.Client.Update(env.Ctx, &cluster)
+			return env.Client.Update(env.Ctx, cluster)
 		})
 		Expect(err).ToNot(HaveOccurred())
 	}
 
 	checkErrorOutFixedAndBlockedConfigurationParameter := func(params map[string]string, namespace string) {
 		// Update the configuration
-		cluster := apiv1.Cluster{}
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
+		cluster := &apiv1.Cluster{}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			err := utils.GetObject(env, namespacedName, &cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			cluster.Spec.PostgresConfiguration.Parameters = params
-			return env.Client.Update(env.Ctx, &cluster)
+			return env.Client.Update(env.Ctx, cluster)
 		})
 		Expect(apierrors.IsInvalid(err)).To(BeTrue())
 

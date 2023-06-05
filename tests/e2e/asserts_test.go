@@ -187,10 +187,6 @@ func AssertCreateCluster(namespace string, clusterName string, sampleFile string
 // none of them are going to be deleted, and that the status is Healthy
 func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a Cluster %s with each instance in status ready", clusterName), func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 		// Eventually the number of ready instances should be equal to the
 		// amount of instances defined in the cluster and
 		// the cluster status should be in healthy state
@@ -214,7 +210,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 						return fmt.Sprintf("Pod '%s' is waiting for deletion", pod.Name), nil
 					}
 				}
-				err = env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err = env.GetCluster(namespace, clusterName)
 				return cluster.Status.Phase, err
 			}
 			return fmt.Sprintf("Ready pod is not as expected. Spec Instances: %d, ready pods: %d \n",
