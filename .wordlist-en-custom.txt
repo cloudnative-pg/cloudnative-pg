@@ -347,6 +347,8 @@ TOC
 TODO
 TimelineId
 TopologyKey
+TopologySpreadConstraint
+TopologySpreadConstraints
 TypedLocalObjectReference
 UID
 Uncomment

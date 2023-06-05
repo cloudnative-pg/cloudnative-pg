@@ -364,6 +364,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 			ServiceAccountName:            cluster.Name,
 			NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
 			TerminationGracePeriodSeconds: &gracePeriod,
+			TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
 		},
 	}
 

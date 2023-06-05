@@ -636,6 +636,13 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.Affinity.DeepCopyInto(&out.Affinity)
+	if in.TopologySpreadConstraints != nil {
+		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
+		*out = make([]corev1.TopologySpreadConstraint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.Backup != nil {
 		in, out := &in.Backup, &out.Backup
