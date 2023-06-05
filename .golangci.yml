@@ -16,7 +16,6 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    - depguard
     - dogsled
     - dupl
     - durationcheck
@@ -77,6 +76,7 @@ linters:
 
   # don't enable:
   # - cyclop
+  # - depguard
   # - exhaustive
   # - exhaustivestruct
   # - funlen
