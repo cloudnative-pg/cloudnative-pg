@@ -55,6 +55,7 @@ ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interv
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO=$?
 
 # Report if there are any tests that failed and did NOT have an "ignore-fails" label
+RC=0
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
 
 # The exit code reported depends on the two `jq` filter calls. In case we have

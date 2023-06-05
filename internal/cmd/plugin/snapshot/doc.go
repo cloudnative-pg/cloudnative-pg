@@ -14,19 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package install
-
-import (
-	"github.com/spf13/cobra"
-)
-
-// NewCmd returns the installation root cmd
-func NewCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "CNPG installation commands",
-	}
-	cmd.AddCommand(newGenerateCmd())
-
-	return cmd
-}
+// Package snapshot implements the snapshot feature
+package snapshot

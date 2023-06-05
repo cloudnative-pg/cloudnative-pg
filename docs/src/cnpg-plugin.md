@@ -774,13 +774,15 @@ kubectl cnpg hibernate status <cluster-name>
 
 ### Benchmarking the database with pgbench
 
-Pgbench can be ran on an existing PostgreSQL cluster with following command:
+Pgbench can be run against an existing PostgreSQL cluster with following
+command:
 
 ```
 kubectl cnpg pgbench <cluster-name> -- --time 30 --client 1 --jobs 1
 ```
 
-Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more details.
+Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more
+details.
 
 ### Benchmarking the storage with fio
 
@@ -853,3 +855,47 @@ postgres=# \q
 
 This command will start `kubectl exec`, and the `kubectl` executable must be
 reachable in your `PATH` variable to correctly work.
+
+### Snapshotting a Postgres cluster
+
+The `kubectl cnpg snapshot` creates consistent snapshots of a Postgres
+`Cluster` by:
+
+1. choosing a replica Pod to work on
+2. fencing the replica
+3. taking the snapshot
+4. unfencing the replica
+
+!!! Warning
+    A cluster already having a fenced instance cannot be snapshotted.
+
+At the moment, this command can be used only for clusters having at least one
+replica: that replica will be shut down by the fencing procedure to ensure the
+snapshot to be consistent (cold backup). As the development of
+declarative support for Kubernetes' `VolumeSnapshot` API continues,
+this limitation will be removed, allowing you to take online backups
+as business continuity requires.
+
+!!! Important
+    Even if the procedure will shut down a replica, the primary
+    Pod will not be involved.
+
+The `kubectl cnpg snapshot` command requires the cluster name:
+
+```shell
+kubectl cnpg snapshot cluster-example
+
+waiting for cluster-example-3 to be fenced
+waiting for VolumeSnapshot cluster-example-3-1682539624 to be ready to use
+unfencing pod cluster-example-3
+```
+
+The `VolumeSnapshot` resource will be created with an empty
+`VolumeSnapshotClass` reference. That resource is intended by be used by the
+`VolumeSnapshotClass` configured as default.
+
+A specific `VolumeSnapshotClass` can be requested via the `-c` option:
+
+```shell
+kubectl cnpg snapshot cluster-example -c longhorn
+```

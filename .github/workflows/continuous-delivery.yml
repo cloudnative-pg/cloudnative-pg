@@ -37,7 +37,7 @@ on:
 env:
   GOLANG_VERSION: "1.20.x"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.17.0"
+  KIND_VERSION: "v0.19.0"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
 
 defaults:
@@ -49,7 +49,7 @@ jobs:
   # Trigger the workflow on release-* branches for smoke testing whenever it's a scheduled run.
   # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
   smoke_test_release_branches:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: smoke test release-* branches when it's a scheduled run
     if: github.event_name == 'schedule'
     strategy:
@@ -73,7 +73,7 @@ jobs:
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/test')
     name: Retrieve command
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       github_ref: ${{ steps.refs.outputs.head_sha }}
       depth: ${{ env.DEPTH }}
@@ -150,7 +150,7 @@ jobs:
     name: Parse arguments
     if: |
       github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       github_ref: ${{ github.ref }}
       depth: ${{ env.DEPTH }}
@@ -188,7 +188,7 @@ jobs:
     needs:
       - check_commenter
       - test_arguments
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: |
       (
         needs.check_commenter.result == 'success' ||
@@ -231,7 +231,7 @@ jobs:
     if: |
       always() && !cancelled() &&
       needs.evaluate_options.result == 'success'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
@@ -431,7 +431,7 @@ jobs:
       needs.buildx.result == 'success' &&
       needs.buildx.outputs.upload_artifacts == 'true' &&
       github.repository_owner == 'cloudnative-pg'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       -
         name: Checkout artifact
@@ -497,11 +497,12 @@ jobs:
     if: |
       (always() && !cancelled()) &&
       needs.buildx.result == 'success'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       image: ${{ needs.buildx.outputs.image }}
       localMatrix: ${{ steps.generate-jobs.outputs.localMatrix }}
       localEnabled: ${{ steps.generate-jobs.outputs.localEnabled }}
+      localTimeout: ${{ steps.generate-jobs.outputs.localE2ETimeout }}
     steps:
       -
         name: Checkout code
@@ -529,7 +530,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
@@ -543,6 +544,7 @@ jobs:
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       # The version of operator to upgrade FROM, in the rolling upgrade E2E test
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+      TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.localTimeout }}
       BRANCH_NAME:  ${{ needs.buildx.outputs.branch_name }}
 
       DOCKER_SERVER: ghcr.io
@@ -591,11 +593,11 @@ jobs:
         name: Prepare the environment
         uses: nick-fields/retry@v2
         with:
-          timeout_seconds: 120
+          timeout_seconds: 300
           max_attempts: 3
           on_retry_command: |
             # Clear-ups before retries
-            rm -rf /usr/local/bin/kind /usr/local/bin/kubectl
+            sudo rm -rf /usr/local/bin/kind /usr/local/bin/kubectl
           command: |
             sudo apt-get update
             sudo apt-get install -y gettext-base
@@ -699,7 +701,7 @@ jobs:
         needs.e2e-local.result == 'success' ||
         needs.e2e-local.result == 'failure'
       )
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Create a directory for the artifacts
         run: mkdir test-artifacts
@@ -722,7 +724,7 @@ jobs:
 
       - name: Compute the E2E test summary
         id: generate-summary
-        uses: cloudnative-pg/ciclops@v1.2.0
+        uses: cloudnative-pg/ciclops@v1.2.1
         with:
           artifact_directory: test-artifacts/data
       
@@ -759,7 +761,7 @@ jobs:
       needs.e2e-local.result == 'success' &&
       github.event_name == 'issue_comment' &&
       needs.evaluate_options.outputs.test_level == '4'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check preconditions
         id: get_pr_number_and_labels
@@ -788,7 +790,7 @@ jobs:
       always() &&
       needs.e2e-local.result == 'failure' &&
       github.event_name == 'issue_comment'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check preconditions
         id: get_pr_number_and_labels

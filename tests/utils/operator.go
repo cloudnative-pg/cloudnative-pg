@@ -156,13 +156,14 @@ func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 		&env, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"}); err != nil {
 		return corev1.Pod{}, err
 	}
+	activePods := utils.FilterActivePods(podList.Items)
 	switch {
-	case len(podList.Items) > 1:
-		err := fmt.Errorf("number of running operator pods greater than 1: %v pods running", len(podList.Items))
+	case len(activePods) > 1:
+		err := fmt.Errorf("number of running operator pods greater than 1: %v pods running", len(activePods))
 		return corev1.Pod{}, err
 
-	case len(podList.Items) == 1:
-		return podList.Items[0], nil
+	case len(activePods) == 1:
+		return activePods[0], nil
 	}
 
 	operatorNamespace, err := env.GetOperatorNamespaceName()
@@ -178,8 +179,9 @@ func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 		ctrlclient.InNamespace(operatorNamespace)); err != nil {
 		return corev1.Pod{}, err
 	}
-	if len(podList.Items) != 1 {
-		err := fmt.Errorf("number of running operator different than 1: %v pods running", len(podList.Items))
+	activePods = utils.FilterActivePods(podList.Items)
+	if len(activePods) != 1 {
+		err := fmt.Errorf("number of running operator different than 1: %v pods running", len(activePods))
 		return corev1.Pod{}, err
 	}
 

@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -289,6 +290,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateName,
 		r.validateBootstrapPgBaseBackupSource,
 		r.validateBootstrapRecoverySource,
+		r.validateBootstrapRecoveryDataSource,
 		r.validateExternalClusters,
 		r.validateTolerations,
 		r.validateAntiAffinity,
@@ -299,6 +301,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateReplicationSlots,
 		r.validateEnv,
 		r.validateManagedRoles,
+		r.validateManagedExtensions,
 	}
 
 	for _, validate := range validations {
@@ -798,6 +801,92 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 	}
 
 	return result
+}
+
+// validateBootstrapRecoveryDataSource is used to ensure that the data
+// source is correctly defined
+func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
+	// This validation is only applicable for datasource-based recovery based bootstrap
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+		return nil
+	}
+
+	recoveryPath := field.NewPath("spec", "bootstrap", "recovery")
+	recoverySection := r.Spec.Bootstrap.Recovery
+	if recoverySection.Source != "" {
+		return field.ErrorList{
+			field.Invalid(
+				recoveryPath.Child("dataSource"),
+				r.Spec.Bootstrap.Recovery.VolumeSnapshots,
+				"Recovery from dataSource is not compatible with other types of recovery"),
+		}
+	}
+
+	if recoverySection.Backup != nil {
+		return field.ErrorList{
+			field.Invalid(
+				recoveryPath.Child("backup"),
+				r.Spec.Bootstrap.Recovery.Backup,
+				"Recovery from dataSource is not compatible with other types of recovery"),
+		}
+	}
+
+	result := validateVolumeSnapshotSource(recoverySection.VolumeSnapshots.Storage, recoveryPath.Child("storage"))
+	if recoverySection.RecoveryTarget != nil {
+		result = append(
+			result,
+			field.Invalid(
+				recoveryPath.Child("recoveryTarget"),
+				r.Spec.Bootstrap.Recovery.RecoveryTarget,
+				"A recovery target cannot be set while recovering from a DataSource"))
+	}
+
+	if recoverySection.VolumeSnapshots.WalStorage != nil && r.Spec.WalStorage == nil {
+		walStoragePath := recoveryPath.Child("dataSource", "walStorage")
+		result = append(
+			result,
+			field.Invalid(
+				walStoragePath,
+				r.Spec.Bootstrap.Recovery.VolumeSnapshots.WalStorage,
+				"A WAL storage configuration is required when recovering using a DataSource for WALs"))
+		result = append(
+			result,
+			validateVolumeSnapshotSource(
+				*recoverySection.VolumeSnapshots.WalStorage, walStoragePath)...)
+	}
+
+	if recoverySection.VolumeSnapshots.WalStorage != nil {
+		result = append(
+			result,
+			validateVolumeSnapshotSource(
+				*recoverySection.VolumeSnapshots.WalStorage,
+				recoveryPath.Child("dataSource", "walStorage"))...)
+	}
+
+	return result
+}
+
+// validateVolumeSnapshotSource validates a source of a recovery snapshot.
+// The supported resources are VolumeSnapshots and PersistentVolumeClaim
+func validateVolumeSnapshotSource(
+	value v1.TypedLocalObjectReference,
+	path *field.Path,
+) field.ErrorList {
+	apiGroup := ""
+	if value.APIGroup != nil {
+		apiGroup = *value.APIGroup
+	}
+
+	switch {
+	case apiGroup == storagesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
+	case apiGroup == "" && value.Kind == "PersistentVolumeClaim":
+	default:
+		return field.ErrorList{
+			field.Invalid(path, value, "Only VolumeSnapshots and PersistentVolumeClaims are supported"),
+		}
+	}
+
+	return nil
 }
 
 // validateImageName validates the image name ensuring we aren't
@@ -1867,6 +1956,61 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 					role.Name,
 					"This role both sets and disables a password"))
 		}
+	}
+
+	return result
+}
+
+// validateManagedExtensions validate the managed extensions parameters set by the user
+func (r *Cluster) validateManagedExtensions() field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	allErrors = append(allErrors, r.validatePgFailoverSlots()...)
+	return allErrors
+}
+
+func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
+	var result field.ErrorList
+	var pgFailoverSlots postgres.ManagedExtension
+
+	for i, ext := range postgres.ManagedExtensions {
+		if ext.Name == "pg_failover_slots" {
+			pgFailoverSlots = postgres.ManagedExtensions[i]
+		}
+	}
+	if !pgFailoverSlots.IsUsed(r.Spec.PostgresConfiguration.Parameters) {
+		return nil
+	}
+
+	const hotStandbyFeedbackKey = "hot_standby_feedback"
+	hotStandbyFeedback, hasHotStandbyFeedback := r.Spec.PostgresConfiguration.Parameters[hotStandbyFeedbackKey]
+
+	if !hasHotStandbyFeedback || hotStandbyFeedback != "on" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", hotStandbyFeedbackKey),
+				hotStandbyFeedback,
+				fmt.Sprintf("%s must be 'on' to use %s", hotStandbyFeedbackKey, pgFailoverSlots.Name)))
+	}
+
+	if r.Spec.ReplicationSlots == nil {
+		return append(result,
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots"),
+				nil,
+				"replicationSlots must be enabled"),
+		)
+	}
+
+	if r.Spec.ReplicationSlots.HighAvailability == nil ||
+		!r.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
+		return append(result,
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "highAvailability"),
+				"nil or false",
+				"High Availability replication slots must be enabled"),
+		)
 	}
 
 	return result

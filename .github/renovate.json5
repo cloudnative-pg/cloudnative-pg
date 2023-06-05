@@ -47,11 +47,21 @@
       "versioningTemplate": "loose",
       "depNameTemplate": "github.com/goreleaser/goreleaser",
     }, {
+      "fileMatch": [
+        "^.github/workflows/continuous-delivery.yml"
+      ],
+      "matchStrings": [
+        "KIND_VERSION: \"(?<currentValue>.*?)\"",
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "kubernetes-sigs/kind",
+    }, {
       // We want a PR to bump kind node version in the Makefile
       "fileMatch": [
         "^Makefile$",
         "^hack/setup-cluster.sh$",
       ],
+
       "matchStrings": [
         "KIND_CLUSTER_VERSION \\?= (?<currentValue>.*?)\\n",
         "K8S_DEFAULT_VERSION=(?<currentValue>.*?)\\n",

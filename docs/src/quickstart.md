@@ -321,6 +321,11 @@ kubectl apply -f \
 Which will be picked up by the Grafana page in a few seconds. You should now
 see the `CloudNativePG` dashboard.
 
+!!! Warning
+    Some graphs in the previous dashboard make use of metrics that are in alpha stage by the time
+    this was created, like `kubelet_volume_stats_available_bytes` and `kubelet_volume_stats_capacity_bytes`
+    producing some graphs to show `No data`.
+
 ![local grafana](images/grafana-local.png)
 
 Note that in our example setup, both Prometheus and Grafana will pick up

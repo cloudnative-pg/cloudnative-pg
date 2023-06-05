@@ -117,7 +117,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		CreateResourceFromFile(namespace, sampleFile)
 	})
 	By("having a Cluster with three instances ready", func() {
-		AssertClusterIsReady(namespace, clusterName, 600, env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ClusterIsReady], env)
 	})
 	// Node 1 should be the primary, so the -rw service should
 	// point there. We verify this.
@@ -188,7 +188,10 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		Eventually(func() (string, error) {
 			primaryPod := &corev1.Pod{}
 			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-			out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
+			if err != nil {
+				return "", err
+			}
+			out, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 				"SELECT count(*) > 0 FROM tps.tl")
 			return strings.TrimSpace(out), err
