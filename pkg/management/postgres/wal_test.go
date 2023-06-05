@@ -56,8 +56,8 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 		mock.ExpectQuery(flexibleCoalescenceQuery).WillReturnRows(rows)
 
 		err := bootstrapper.mustHaveFirstWalArchived(db)
-		Expect(err).To(BeNil())
-		Expect(mock.ExpectationsWereMet()).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(mock.ExpectationsWereMet()).ToNot(HaveOccurred())
 	})
 
 	It("returns an error if WAL archiving is not working and last_failed_time is present", func() {
@@ -67,7 +67,7 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 
 		err := bootstrapper.mustHaveFirstWalArchived(db)
 		Expect(err).To(Equal(errors.New("wal-archive not working")))
-		Expect(mock.ExpectationsWereMet()).To(BeNil())
+		Expect(mock.ExpectationsWereMet()).ToNot(HaveOccurred())
 	})
 
 	It("triggers the first WAL archive if it has not been triggered", func() {
@@ -84,6 +84,6 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// Ensure the mock expectations are met
-		Expect(mock.ExpectationsWereMet()).To(BeNil())
+		Expect(mock.ExpectationsWereMet()).ToNot(HaveOccurred())
 	})
 })

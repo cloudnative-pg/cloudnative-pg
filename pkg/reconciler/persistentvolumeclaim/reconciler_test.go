@@ -403,16 +403,16 @@ var _ = Describe("Storage configuration", func() {
 	It("Should not fail when the roles it's correct", func() {
 		configuration, err := getStorageConfiguration(cluster, utils.PVCRolePgData)
 		Expect(configuration).ToNot(BeNil())
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		configuration, err = getStorageConfiguration(cluster, utils.PVCRolePgWal)
 		Expect(configuration).ToNot(BeNil())
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("fail if we look for the wrong role", func() {
 		configuration, err := getStorageConfiguration(cluster, "NoRol")
-		Expect(err).ToNot(BeNil())
+		Expect(err).To(HaveOccurred())
 		Expect(configuration.StorageClass).To(BeNil())
 	})
 })
@@ -447,7 +447,7 @@ var _ = Describe("Storage source", func() {
 		When("working on the first instance", func() {
 			It("should fail when looking for a wrong role", func() {
 				_, err := getStorageSource(cluster, "NoRol", 1)
-				Expect(err).ToNot(BeNil())
+				Expect(err).To(HaveOccurred())
 			})
 
 			It("should return the correct source when chosing pgdata", func() {

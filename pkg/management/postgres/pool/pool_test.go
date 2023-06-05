@@ -35,19 +35,19 @@ var _ = Describe("Connection pool test", func() {
 
 	It("is initially empty", func() {
 		pool := NewConnectionPool("host=127.0.0.1")
-		Expect(len(pool.connectionMap)).To(Equal(0))
+		Expect(pool.connectionMap).To(BeEmpty())
 	})
 
 	It("stores created connections", func() {
 		pool := NewConnectionPool("host=127.0.0.1")
 		Expect(pool.Connection("test")).ToNot(BeNil())
-		Expect(len(pool.connectionMap)).To(Equal(1))
+		Expect(pool.connectionMap).To(HaveLen(1))
 	})
 
 	It("shut down connections on request", func() {
 		pool := NewConnectionPool("host=127.0.0.1")
 		Expect(pool.Connection("test")).ToNot(BeNil())
 		pool.ShutdownConnections()
-		Expect(len(pool.connectionMap)).To(Equal(0))
+		Expect(pool.connectionMap).To(BeEmpty())
 	})
 })

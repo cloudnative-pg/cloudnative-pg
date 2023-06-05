@@ -544,7 +544,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					},
 					utils.DatabaseName("postgres"),
 					query)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("Verify password in secrets could still valid", func() {
@@ -581,7 +581,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By(fmt.Sprintf("Verify valid until is removed in db for %s", newUserName), func() {
 				Eventually(func() string {
 					query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_authid"+
-						" WHERE rolname='%s' and (rolvaliduntil is NULL or rolevaliduntil='infinity')",
+						" WHERE rolname='%s' and (rolvaliduntil is NULL or rolvaliduntil='infinity')",
 						newUserName)
 
 					stdout, _, err := env.ExecQueryInInstancePod(
@@ -595,7 +595,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						return ERROR
 					}
 					return stdout
-				})
+				}).Should(Equal("1\n"))
 			})
 
 			By(fmt.Sprintf("Verify valid until update in db for %s", username), func() {

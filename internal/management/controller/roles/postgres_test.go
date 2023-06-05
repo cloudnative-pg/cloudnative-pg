@@ -359,7 +359,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectQuery(expectedMembershipStmt).WillReturnError(fmt.Errorf("kaboom"))
 		roles, err := prm.GetParentRoles(ctx, DatabaseRole{Name: "foo"})
 		Expect(err).Should(HaveOccurred())
-		Expect(roles).To(HaveLen(0))
+		Expect(roles).To(BeEmpty())
 	})
 
 	It("UpdateMembership will send correct GRANT and REVOKE statements to the DB", func(ctx context.Context) {
