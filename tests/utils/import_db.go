@@ -35,7 +35,7 @@ func ImportDatabaseMicroservice(
 	imageName,
 	databaseName string,
 	env *TestingEnvironment,
-) error {
+) (*apiv1.Cluster, error) {
 	if imageName == "" {
 		imageName = os.Getenv("POSTGRES_IMG")
 	}
@@ -84,7 +84,15 @@ func ImportDatabaseMicroservice(
 		},
 	}
 
-	return CreateObject(env, restoreCluster)
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of cluster type: %T %v", obj, obj)
+	}
+	return cluster, nil
 }
 
 // ImportDatabasesMonolith creates a new cluster spec importing from a sourceCluster
@@ -98,7 +106,7 @@ func ImportDatabasesMonolith(
 	databaseNames []string,
 	roles []string,
 	env *TestingEnvironment,
-) error {
+) (*apiv1.Cluster, error) {
 	if imageName == "" {
 		imageName = os.Getenv("POSTGRES_IMG")
 	}
@@ -146,5 +154,13 @@ func ImportDatabasesMonolith(
 		},
 	}
 
-	return CreateObject(env, targetCluster)
+	obj, err := CreateObject(env, targetCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of cluster type: %T %v", obj, obj)
+	}
+	return cluster, nil
 }

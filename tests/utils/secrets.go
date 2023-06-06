@@ -57,7 +57,7 @@ func CreateSecretCA(
 	if !includeCAPrivateKey {
 		delete(caSecret.Data, certs.CAPrivateKeyKey)
 	}
-	err = CreateObject(env, caSecret)
+	_, err = CreateObject(env, caSecret)
 	if err != nil {
 		return cluster, caPair, err
 	}

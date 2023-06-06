@@ -293,6 +293,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestGZ)
 				}, 60).Should(BeNumerically(">", previous))
 			})
+
+			By("deleting the restored cluster", func() {
+				err = DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		// We backup and restore a cluster from a standby, and verify some expected data to
@@ -344,7 +349,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		// We backup and restore a cluster from a standby, and verify some expected data to
 		// be there
-		It("backs up and restore a cluster from standby with backup target defined in backup", func() {
+		It("backs up a cluster from standby with backup target defined in backup", func() {
 			const (
 				targetDBOne                = "test"
 				targetDBTwo                = "test1"
@@ -386,6 +391,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 						cluster)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
+			})
+
+			By("deleting the cluster", func() {
+				err = DeleteResourcesFromFile(namespace, clusterWithMinioSampleFile)
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 
@@ -449,6 +459,16 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// Restore backup in a new cluster
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName, psqlClientPod)
+
+			By("deleting the primary cluster", func() {
+				err = DeleteResourcesFromFile(namespace, clusterWithMinioCustomSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("deleting the restored cluster", func() {
+				err = DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
@@ -483,7 +503,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				psqlClientPod,
 			)
 
-			err := testUtils.CreateClusterFromBackupUsingPITR(
+			cluster, err := testUtils.CreateClusterFromBackupUsingPITR(
 				namespace,
 				restoredClusterName,
 				backupFilePITR,
@@ -493,7 +513,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000003", psqlClientPod)
+			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000003", psqlClientPod)
+
+			By("deleting the restored cluster", func() {
+				Expect(testUtils.DeleteObject(env, cluster)).To(Succeed())
+			})
 		})
 
 		// We create a cluster and a scheduled backup, then it is patched to suspend its
@@ -607,6 +631,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// Restore backup in a new cluster
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName, psqlClientPod)
+
+			By("deleting the restored cluster", func() {
+				err := DeleteResourcesFromFile(namespace, clusterRestoreSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
@@ -637,11 +666,15 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 
-			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			cluster, err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName,
+				backupFile, *currentTimestamp, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000002", psqlClientPod)
+			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002", psqlClientPod)
+			By("deleting the restored cluster", func() {
+				Expect(testUtils.DeleteObject(env, cluster)).To(Succeed())
+			})
 		})
 
 		// We create a cluster, create a scheduled backup, patch it to suspend its
@@ -740,7 +773,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			prepareClusterForPITROnAzurite(namespace, clusterName, backupFilePITR, currentTimestamp, psqlClientPod)
 
-			err := testUtils.CreateClusterFromBackupUsingPITR(
+			cluster, err := testUtils.CreateClusterFromBackupUsingPITR(
 				namespace,
 				restoredClusterName,
 				backupFilePITR,
@@ -750,7 +783,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Restore backup in a new cluster, also cover if no application database is configured
-			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000002", psqlClientPod)
+			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002", psqlClientPod)
+
+			By("deleting the restored cluster", func() {
+				Expect(testUtils.DeleteObject(env, cluster)).To(Succeed())
+			})
 		})
 
 		// We create a cluster, create a scheduled backup, patch it to suspend its
@@ -933,6 +970,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			// verify test data on restored external cluster
 			AssertDataExpectedCount(namespace, externalClusterName, tableName, 2, psqlClientPod)
+
+			By("deleting the restored cluster", func() {
+				err = DeleteResourcesFromFile(namespace, externalClusterFileMinio)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
@@ -961,17 +1003,22 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				}, 60).Should(BeEquivalentTo(2),
 					fmt.Sprintf("verify the number of backup %v is equals to 2", latestTar))
 			})
+			var restoredCluster *apiv1.Cluster
 			By("create a cluster from backup with PITR", func() {
-				err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnMinio(
+				var err error
+				restoredCluster, err = testUtils.CreateClusterFromExternalClusterBackupWithPITROnMinio(
 					namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			AssertClusterRestorePITRWithApplicationDB(
+			AssertClusterWasRestoredWithPITRAndApplicationDB(
 				namespace,
 				externalClusterRestoreName,
 				tableName,
 				"00000002",
 				psqlClientPod)
+			By("delete restored cluster", func() {
+				Expect(testUtils.DeleteObject(env, restoredCluster)).To(Succeed())
+			})
 		})
 
 		It("restore cluster from barman object using replica option in spec", func() {
@@ -1069,13 +1116,18 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					currentTimestamp,
 					psqlClientPod)
 
-				err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace, externalClusterName,
-					clusterName, *currentTimestamp, "backup-storage-creds", azStorageAccount, env)
+				restoredCluster, err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace,
+					externalClusterName, clusterName, *currentTimestamp, "backup-storage-creds", azStorageAccount, env)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterRestorePITRWithApplicationDB(namespace, externalClusterName, tableName, "00000002", psqlClientPod)
+				AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, externalClusterName,
+					tableName, "00000002", psqlClientPod)
+
+				By("delete restored cluster", func() {
+					Expect(testUtils.DeleteObject(env, restoredCluster)).To(Succeed())
+				})
 			})
 		})
 
@@ -1124,7 +1176,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					AssertBackupConditionInClusterStatus(namespace, clusterName)
 					// Verifying file called data.tar should be available on Azure blob storage
 					Eventually(func() (int, error) {
-						return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+						return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey,
+							clusterName, "data.tar")
 					}, 30).Should(BeNumerically(">=", 1))
 				})
 
@@ -1146,13 +1199,18 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					currentTimestamp,
 					psqlClientPod)
 
-				err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace, externalClusterName,
-					clusterName, *currentTimestamp, "backup-storage-creds-sas", azStorageAccount, env)
+				restoredCluster, err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace,
+					externalClusterName, clusterName, *currentTimestamp, "backup-storage-creds-sas", azStorageAccount, env)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterRestorePITRWithApplicationDB(namespace, externalClusterName, tableName, "00000002", psqlClientPod)
+				AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, externalClusterName,
+					tableName, "00000002", psqlClientPod)
+
+				By("delete restored cluster", func() {
+					Expect(testUtils.DeleteObject(env, restoredCluster)).To(Succeed())
+				})
 			})
 		})
 	})
@@ -1213,16 +1271,20 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			prepareClusterForPITROnAzurite(namespace, clusterName, backupFileAzuritePITR, currentTimestamp, psqlClientPod)
 
 			//  Create a cluster from a particular time using external backup.
-			err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzurite(
+			restoredCluster, err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 				namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
-			AssertClusterRestorePITRWithApplicationDB(
+			AssertClusterWasRestoredWithPITRAndApplicationDB(
 				namespace,
 				externalClusterRestoreName,
 				tableName,
 				"00000002",
 				psqlClientPod)
+
+			By("delete restored cluster", func() {
+				Expect(testUtils.DeleteObject(env, restoredCluster)).To(Succeed())
+			})
 		})
 	})
 })
