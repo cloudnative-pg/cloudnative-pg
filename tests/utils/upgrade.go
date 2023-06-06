@@ -55,7 +55,7 @@ func EnableOnlineUpgradeForInstanceManager(pgOperatorNamespace, configName strin
 			},
 			Data: map[string]string{"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES": "true"},
 		}
-		err := CreateObject(env, configMap)
+		_, err := CreateObject(env, configMap)
 		Expect(err).NotTo(HaveOccurred())
 	})
 }
