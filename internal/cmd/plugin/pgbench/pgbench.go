@@ -142,31 +142,6 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
-					InitContainers: []corev1.Container{
-						{
-							Name:  "wait-for-cnpg",
-							Image: clusterImageName,
-							Env:   cmd.buildEnvVariables(),
-							Command: []string{
-								"sh",
-								"-c",
-								"until psql -c \"SELECT 1\"; do echo 'Waiting for service' sleep 15; done",
-							},
-						},
-						{
-							Name:  "pgbench-init",
-							Image: clusterImageName,
-							Env:   cmd.buildEnvVariables(),
-							Command: []string{
-								"pgbench",
-							},
-							Args: []string{
-								"--initialize",
-								"--scale",
-								"1",
-							},
-						},
-					},
 					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
 						{

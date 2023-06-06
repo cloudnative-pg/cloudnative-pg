@@ -74,5 +74,6 @@ grafana:
     #workload: monitor
 alertmanager:
   enabled: true
-  #nodeSelector:
-    #workload: monitor
+  #alerManagerSpec:
+    #nodeSelector:
+      #workload: monitor
