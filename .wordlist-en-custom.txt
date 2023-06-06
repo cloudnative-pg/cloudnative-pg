@@ -196,6 +196,7 @@ NodeMaintenanceWindow
 NodeSelector
 Noland
 O'Reilly
+OLTP
 OOM
 OU
 ObjectMeta
