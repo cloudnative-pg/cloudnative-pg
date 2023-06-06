@@ -71,7 +71,7 @@ func TestDirectoryEmpty(namespace, podName, directoryPath string) bool {
 }
 
 // CreateObject create object in the Kubernetes cluster
-func CreateObject(env *TestingEnvironment, object client.Object, opts ...client.CreateOption) error {
+func CreateObject(env *TestingEnvironment, object client.Object, opts ...client.CreateOption) (client.Object, error) {
 	err := retry.Do(
 		func() error {
 			return env.Client.Create(env.Ctx, object, opts...)
@@ -81,7 +81,7 @@ func CreateObject(env *TestingEnvironment, object client.Object, opts ...client.
 		retry.DelayType(retry.FixedDelay),
 		retry.RetryIf(func(err error) bool { return !apierrs.IsAlreadyExists(err) }),
 	)
-	return err
+	return object, err
 }
 
 // DeleteObject delete object in the Kubernetes cluster

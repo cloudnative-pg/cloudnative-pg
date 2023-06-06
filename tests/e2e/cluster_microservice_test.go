@@ -82,9 +82,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data, psqlClientPod)
 
 		importedClusterName = "cluster-pgdump-large-object"
-		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
+		cluster := AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
 		AssertDataExpectedCount(namespace, importedClusterName, tableName, 2, psqlClientPod)
 		AssertLargeObjectValue(namespace, importedClusterName, oid, data, psqlClientPod)
+		By("deleting the imported database", func() {
+			Expect(testsUtils.DeleteObject(env, cluster)).To(Succeed())
+		})
 	})
 
 	It("can import a database", func() {
@@ -318,8 +321,9 @@ func assertImportRenamesSelectedDatabase(
 		Expect(err).ToNot(HaveOccurred())
 	})
 
+	var importedCluster *apiv1.Cluster
 	By("importing Database with microservice approach in a new cluster", func() {
-		err = testsUtils.ImportDatabaseMicroservice(namespace, clusterName,
+		importedCluster, err = testsUtils.ImportDatabaseMicroservice(namespace, clusterName,
 			importedClusterName, imageName, dbToImport, env)
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
@@ -339,5 +343,12 @@ func assertImportRenamesSelectedDatabase(
 		Expect(err).ToNot(HaveOccurred(), err)
 		Expect(strings.Contains(dbList, "db2"), err).Should(BeFalse())
 		Expect(strings.Contains(dbList, "app"), err).Should(BeTrue())
+	})
+
+	By("cleaning up the clusters", func() {
+		err = DeleteResourcesFromFile(namespace, sampleFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(testsUtils.DeleteObject(env, importedCluster)).To(Succeed())
 	})
 }

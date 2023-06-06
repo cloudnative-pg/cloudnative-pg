@@ -33,7 +33,7 @@ import (
 
 // PodCreateAndWaitForReady creates a given pod object and wait for it to be ready
 func PodCreateAndWaitForReady(env *TestingEnvironment, pod *corev1.Pod, timeoutSeconds uint) error {
-	err := CreateObject(env, pod)
+	_, err := CreateObject(env, pod)
 	if err != nil {
 		return err
 	}

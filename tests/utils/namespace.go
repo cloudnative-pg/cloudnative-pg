@@ -52,7 +52,8 @@ func (env TestingEnvironment) CreateNamespace(name string, opts ...client.Create
 		Version: "v1",
 		Kind:    "Namespace",
 	})
-	return CreateObject(&env, u, opts...)
+	_, err := CreateObject(&env, u, opts...)
+	return err
 }
 
 // DeleteNamespace deletes a namespace if existent
