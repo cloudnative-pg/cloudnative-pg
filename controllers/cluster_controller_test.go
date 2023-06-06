@@ -394,11 +394,12 @@ var _ = Describe("object metadata test", func() {
 	})
 
 	Context("updateOperatorLabelsOnInstances", func() {
+		const instanceName = "instance1"
 		It("Should create labels if the instance has no labels", func() {
 			instances := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "instance1",
+						Name: instanceName,
 					},
 				},
 			}
@@ -416,9 +417,9 @@ var _ = Describe("object metadata test", func() {
 			instances := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "instance1",
+						Name: instanceName,
 						Labels: map[string]string{
-							utils.InstanceNameLabelName: "instance1",
+							utils.InstanceNameLabelName: instanceName,
 							utils.PodRoleLabelName:      string(utils.PodRoleInstance),
 						},
 					},
@@ -440,7 +441,7 @@ var _ = Describe("object metadata test", func() {
 			instances := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "instance1",
+						Name: instanceName,
 						Labels: map[string]string{
 							utils.InstanceNameLabelName: "incorrectName",
 							utils.PodRoleLabelName:      string(utils.PodRoleInstance),
@@ -454,16 +455,16 @@ var _ = Describe("object metadata test", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedInstance := getPod(re, instances[0].Name)
-			Expect(updatedInstance.Labels[utils.InstanceNameLabelName]).To(Equal("instance1"))
+			Expect(updatedInstance.Labels[utils.InstanceNameLabelName]).To(Equal(instanceName))
 		})
 
 		It("Should update role label if it's incorrect", func() {
 			instances := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "instance1",
+						Name: instanceName,
 						Labels: map[string]string{
-							utils.InstanceNameLabelName: "instance1",
+							utils.InstanceNameLabelName: instanceName,
 							utils.PodRoleLabelName:      "incorrectRole",
 						},
 					},
@@ -482,7 +483,7 @@ var _ = Describe("object metadata test", func() {
 			instances := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "instance1",
+						Name: instanceName,
 						Labels: map[string]string{
 							utils.InstanceNameLabelName: "incorrectName1",
 							utils.PodRoleLabelName:      string(utils.PodRoleInstance),
@@ -518,13 +519,20 @@ var _ = Describe("object metadata test", func() {
 	})
 
 	Context("updateClusterLabelsOnPods", func() {
+		const (
+			labelKey      = "label1"
+			labelValue    = "value1"
+			labelKeyTwo   = "label2"
+			labelValueTwo = "value2"
+		)
+
 		It("Should correctly add missing labels from cluster to pods", func() {
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
 						Labels: map[string]string{
-							"label1": "value1",
-							"label2": "value2",
+							labelKey:    labelValue,
+							labelKeyTwo: labelValueTwo,
 						},
 					},
 				},
@@ -536,7 +544,7 @@ var _ = Describe("object metadata test", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "pod1",
 							Labels: map[string]string{
-								"label1": "value1",
+								labelKey: labelValue,
 							},
 						},
 					},
@@ -563,8 +571,8 @@ var _ = Describe("object metadata test", func() {
 				Spec: apiv1.ClusterSpec{
 					InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
 						Labels: map[string]string{
-							"label1": "value1",
-							"label2": "value2",
+							labelKey:    labelValue,
+							labelKeyTwo: labelValueTwo,
 						},
 					},
 				},
@@ -575,8 +583,8 @@ var _ = Describe("object metadata test", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "pod1",
 							Labels: map[string]string{
-								"label1": "value1",
-								"label2": "value2",
+								labelKey:    labelValue,
+								labelKeyTwo: labelValueTwo,
 							},
 						},
 					},
@@ -600,13 +608,7 @@ var _ = Describe("object metadata test", func() {
 				},
 			}
 			pods := corev1.PodList{
-				Items: []corev1.Pod{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "pod1",
-						},
-					},
-				},
+				Items: []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}}},
 			}
 			re := makeReconciler(pods.Items)
 			err := re.updateClusterLabelsOnPods(context.Background(), cluster, pods)
@@ -618,21 +620,21 @@ var _ = Describe("object metadata test", func() {
 	})
 
 	Context("updateClusterAnnotationsOnPods", func() {
+		const key = "annotation1"
+		const value = "value1"
+
 		It("Should correctly add missing annotations from cluster to pods", func() {
 			pods := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "pod1",
-						Annotations: map[string]string{},
+						Name: "pod1",
 					},
 				},
 			}
 			cluster := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
-						Annotations: map[string]string{
-							"annotation1": "value1",
-						},
+						Annotations: map[string]string{key: value},
 					},
 				},
 			}
@@ -641,17 +643,15 @@ var _ = Describe("object metadata test", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			updatedPod := getPod(re, pods[0].Name)
-			Expect(updatedPod.Annotations["annotation1"]).To(Equal("value1"))
+			Expect(updatedPod.Annotations[key]).To(Equal(value))
 		})
 
 		It("Should not change annotations if they already match the cluster's", func() {
 			pods := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod1",
-						Annotations: map[string]string{
-							"annotation1": "value1",
-						},
+						Name:        "pod1",
+						Annotations: map[string]string{key: value},
 					},
 				},
 			}
@@ -659,9 +659,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: apiv1.ClusterSpec{
 					InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
-						Annotations: map[string]string{
-							"annotation1": "value1",
-						},
+						Annotations: map[string]string{key: value},
 					},
 				},
 			}
@@ -674,7 +672,7 @@ var _ = Describe("object metadata test", func() {
 
 			updatedPod := getPod(re, pods[0].Name)
 			Expect(updatedPod.Annotations).To(HaveLen(1))
-			Expect(updatedPod.Annotations["annotation1"]).To(Equal("value1"))
+			Expect(updatedPod.Annotations[key]).To(Equal(value))
 		})
 
 		It("Should correctly add AppArmor annotations if present in the cluster's annotations", func() {
@@ -686,17 +684,14 @@ var _ = Describe("object metadata test", func() {
 			pods := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "pod1",
-						Annotations: map[string]string{},
+						Name: "pod1",
 					},
 				},
 			}
 
 			cluster := &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						key: value,
-					},
+					Annotations: map[string]string{key: value},
 				},
 			}
 			re := makeReconciler(pods)
@@ -711,8 +706,7 @@ var _ = Describe("object metadata test", func() {
 			pods := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "pod1",
-						Annotations: map[string]string{},
+						Name: "pod1",
 					},
 				},
 			}
