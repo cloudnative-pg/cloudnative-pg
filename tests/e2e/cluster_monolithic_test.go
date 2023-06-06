@@ -160,7 +160,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			expectedImageName, err := testsUtils.BumpPostgresImageMajorVersion(postgresImage)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(expectedImageName).ShouldNot(BeEmpty(), "imageName could not be empty")
-			err = testsUtils.ImportDatabasesMonolith(namespace,
+			_, err = testsUtils.ImportDatabasesMonolith(namespace,
 				sourceClusterName,
 				targetClusterName,
 				expectedImageName,
