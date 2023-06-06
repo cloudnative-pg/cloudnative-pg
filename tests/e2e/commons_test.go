@@ -16,8 +16,30 @@ limitations under the License.
 
 package e2e
 
+import "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+
 const (
 	minioClientName = "mc"
 	checkPointCmd   = "psql -U postgres postgres -tAc 'CHECKPOINT;'"
 	getLatestWalCmd = "psql -U postgres postgres -tAc 'SELECT pg_walfile_name(pg_switch_wal());'"
 )
+
+// IsAKS check if the running cluster is on AKS
+func IsAKS() bool {
+	return *testCloudVendorEnv == utils.AKS
+}
+
+// IsEKS check if the running cluster is on EKS
+func IsEKS() bool {
+	return *testCloudVendorEnv == utils.EKS
+}
+
+// IsGKE check if the running cluster is on GKE
+func IsGKE() bool {
+	return *testCloudVendorEnv == utils.GKE
+}
+
+// IsLocal check if the running cluster is on local
+func IsLocal() bool {
+	return *testCloudVendorEnv == utils.LOCAL
+}
