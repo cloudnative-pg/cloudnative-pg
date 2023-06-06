@@ -408,7 +408,7 @@ var _ = Describe("object metadata test", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedInstance := getPod(re, instances[0].Name)
-			Expect(updatedInstance.Labels[utils.InstanceNameLabelName]).To(Equal("instance1"))
+			Expect(updatedInstance.Labels[utils.InstanceNameLabelName]).To(Equal(instances[0].Name))
 			Expect(updatedInstance.Labels[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
 		})
 
@@ -529,6 +529,7 @@ var _ = Describe("object metadata test", func() {
 					},
 				},
 			}
+
 			pods := corev1.PodList{
 				Items: []corev1.Pod{
 					{
@@ -546,9 +547,11 @@ var _ = Describe("object metadata test", func() {
 					},
 				},
 			}
+
 			re := makeReconciler(pods.Items)
 			err := re.updateClusterLabelsOnPods(context.Background(), cluster, pods)
 			Expect(err).ToNot(HaveOccurred())
+
 			for _, pod := range pods.Items {
 				updatedPod := getPod(re, pod.Name)
 				Expect(updatedPod.Labels).To(Equal(cluster.GetFixedInheritedLabels()))
@@ -579,6 +582,9 @@ var _ = Describe("object metadata test", func() {
 					},
 				},
 			}
+
+			Expect(cluster.Spec.InheritedMetadata.Labels).To(Equal(cluster.GetFixedInheritedLabels()))
+
 			re := makeReconciler(pods.Items)
 			err := re.updateClusterLabelsOnPods(context.Background(), cluster, pods)
 			Expect(err).ToNot(HaveOccurred())
@@ -659,6 +665,9 @@ var _ = Describe("object metadata test", func() {
 					},
 				},
 			}
+
+			Expect(cluster.Spec.InheritedMetadata.Annotations).To(Equal(cluster.GetFixedInheritedAnnotations()))
+
 			re := makeReconciler(pods)
 			err := re.updateClusterAnnotationsOnPods(context.Background(), cluster, corev1.PodList{Items: pods})
 			Expect(err).NotTo(HaveOccurred())
@@ -669,6 +678,11 @@ var _ = Describe("object metadata test", func() {
 		})
 
 		It("Should correctly add AppArmor annotations if present in the cluster's annotations", func() {
+			const (
+				key   = "container.apparmor.security.beta.kubernetes.io/pod"
+				value = "runtime/default"
+			)
+
 			pods := []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -677,10 +691,11 @@ var _ = Describe("object metadata test", func() {
 					},
 				},
 			}
+
 			cluster := &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"container.apparmor.security.beta.kubernetes.io/pod": "runtime/default",
+						key: value,
 					},
 				},
 			}
@@ -689,7 +704,7 @@ var _ = Describe("object metadata test", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			updatedPod := getPod(re, pods[0].Name)
-			Expect(updatedPod.Annotations["container.apparmor.security.beta.kubernetes.io/pod"]).To(Equal("runtime/default"))
+			Expect(updatedPod.Annotations[key]).To(Equal(value))
 		})
 
 		It("Should correctly handle the case of no fixed inherited annotations from the cluster", func() {
