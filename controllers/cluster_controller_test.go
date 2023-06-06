@@ -285,6 +285,13 @@ var _ = Describe("object metadata test", func() {
 		return &ClusterReconciler{Client: builder.Build()}
 	}
 
+	getPod := func(re *ClusterReconciler, name string) *corev1.Pod {
+		pod := &corev1.Pod{}
+		err := re.Client.Get(context.Background(), types.NamespacedName{Name: name}, pod)
+		Expect(err).ToNot(HaveOccurred())
+		return pod
+	}
+
 	Context("updateRoleLabelsOnPods", func() {
 		It("Should update the role labels correctly", func() {
 			cluster := &apiv1.Cluster{
@@ -312,14 +319,10 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateRoleLabelsOnPods(context.Background(), cluster, corev1.PodList{Items: pods})
 			Expect(err).ToNot(HaveOccurred())
 
-			primaryPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "primaryPod"}, primaryPod)
-			Expect(err).ToNot(HaveOccurred())
+			primaryPod := getPod(re, pods[0].Name)
 			Expect(primaryPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
-			replicaPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "replicaPod"}, replicaPod)
-			Expect(err).ToNot(HaveOccurred())
+			replicaPod := getPod(re, pods[1].Name)
 			Expect(replicaPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 
@@ -353,14 +356,10 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateRoleLabelsOnPods(context.Background(), cluster, corev1.PodList{Items: pods})
 			Expect(err).ToNot(HaveOccurred())
 
-			newPrimaryPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "newPrimaryPod"}, newPrimaryPod)
-			Expect(err).ToNot(HaveOccurred())
+			newPrimaryPod := getPod(re, pods[0].Name)
 			Expect(newPrimaryPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
-			newReplicaPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "newReplicaPod"}, newReplicaPod)
-			Expect(err).ToNot(HaveOccurred())
+			newReplicaPod := getPod(re, pods[1].Name)
 			Expect(newReplicaPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 
@@ -388,9 +387,7 @@ var _ = Describe("object metadata test", func() {
 
 			// Labels of pods should not have been updated
 			for _, pod := range pods {
-				updatedPod := &corev1.Pod{}
-				err = re.Client.Get(context.Background(), types.NamespacedName{Name: pod.Name}, updatedPod)
-				Expect(err).ToNot(HaveOccurred())
+				updatedPod := getPod(re, pod.Name)
 				Expect(updatedPod.Labels[specs.ClusterRoleLabelName]).To(Equal(pod.Labels[specs.ClusterRoleLabelName]))
 			}
 		})
@@ -410,9 +407,7 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateOperatorLabelsOnInstances(context.Background(), corev1.PodList{Items: instances})
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedInstance := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "instance1"}, updatedInstance)
-			Expect(err).ToNot(HaveOccurred())
+			updatedInstance := getPod(re, instances[0].Name)
 			Expect(updatedInstance.Labels[utils.InstanceNameLabelName]).To(Equal("instance1"))
 			Expect(updatedInstance.Labels[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
 		})
@@ -436,9 +431,7 @@ var _ = Describe("object metadata test", func() {
 
 			// Labels of instances should not have been updated
 			for _, instance := range instances {
-				updatedInstance := &corev1.Pod{}
-				err = re.Client.Get(context.Background(), types.NamespacedName{Name: instance.Name}, updatedInstance)
-				Expect(err).ToNot(HaveOccurred())
+				updatedInstance := getPod(re, instance.Name)
 				Expect(updatedInstance.Labels).To(Equal(instance.Labels))
 			}
 		})
@@ -460,9 +453,7 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateOperatorLabelsOnInstances(context.Background(), corev1.PodList{Items: instances})
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedInstance := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "instance1"}, updatedInstance)
-			Expect(err).ToNot(HaveOccurred())
+			updatedInstance := getPod(re, instances[0].Name)
 			Expect(updatedInstance.Labels[utils.InstanceNameLabelName]).To(Equal("instance1"))
 		})
 
@@ -483,9 +474,7 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateOperatorLabelsOnInstances(context.Background(), corev1.PodList{Items: instances})
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedInstance := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "instance1"}, updatedInstance)
-			Expect(err).ToNot(HaveOccurred())
+			updatedInstance := getPod(re, instances[0].Name)
 			Expect(updatedInstance.Labels[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
 		})
 
@@ -521,9 +510,7 @@ var _ = Describe("object metadata test", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			for _, instance := range instances {
-				updatedInstance := &corev1.Pod{}
-				err = re.Client.Get(context.Background(), types.NamespacedName{Name: instance.Name}, updatedInstance)
-				Expect(err).ToNot(HaveOccurred())
+				updatedInstance := getPod(re, instance.Name)
 				Expect(updatedInstance.Labels[utils.InstanceNameLabelName]).To(Equal(updatedInstance.Name))
 				Expect(updatedInstance.Labels[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
 			}
@@ -563,9 +550,7 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateClusterLabelsOnPods(context.Background(), cluster, pods)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range pods.Items {
-				updatedPod := &corev1.Pod{}
-				err = re.Client.Get(context.Background(), types.NamespacedName{Name: pod.Name}, updatedPod)
-				Expect(err).ToNot(HaveOccurred())
+				updatedPod := getPod(re, pod.Name)
 				Expect(updatedPod.Labels).To(Equal(cluster.GetFixedInheritedLabels()))
 			}
 		})
@@ -597,9 +582,8 @@ var _ = Describe("object metadata test", func() {
 			re := makeReconciler(pods.Items)
 			err := re.updateClusterLabelsOnPods(context.Background(), cluster, pods)
 			Expect(err).ToNot(HaveOccurred())
-			updatedPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: pods.Items[0].Name}, updatedPod)
-			Expect(err).ToNot(HaveOccurred())
+
+			updatedPod := getPod(re, pods.Items[0].Name)
 			Expect(updatedPod.Labels).To(Equal(cluster.GetFixedInheritedLabels()))
 		})
 
@@ -621,9 +605,8 @@ var _ = Describe("object metadata test", func() {
 			re := makeReconciler(pods.Items)
 			err := re.updateClusterLabelsOnPods(context.Background(), cluster, pods)
 			Expect(err).ToNot(HaveOccurred())
-			updatedPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: pods.Items[0].Name}, updatedPod)
-			Expect(err).ToNot(HaveOccurred())
+
+			updatedPod := getPod(re, pods.Items[0].Name)
 			Expect(updatedPod.Labels).To(BeEmpty())
 		})
 	})
@@ -651,9 +634,7 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateClusterAnnotationsOnPods(context.Background(), cluster, corev1.PodList{Items: pods})
 			Expect(err).NotTo(HaveOccurred())
 
-			updatedPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "pod1"}, updatedPod)
-			Expect(err).NotTo(HaveOccurred())
+			updatedPod := getPod(re, pods[0].Name)
 			Expect(updatedPod.Annotations["annotation1"]).To(Equal("value1"))
 		})
 
@@ -682,9 +663,7 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateClusterAnnotationsOnPods(context.Background(), cluster, corev1.PodList{Items: pods})
 			Expect(err).NotTo(HaveOccurred())
 
-			updatedPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "pod1"}, updatedPod)
-			Expect(err).NotTo(HaveOccurred())
+			updatedPod := getPod(re, pods[0].Name)
 			Expect(updatedPod.Annotations).To(HaveLen(1))
 			Expect(updatedPod.Annotations["annotation1"]).To(Equal("value1"))
 		})
@@ -709,9 +688,7 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateClusterAnnotationsOnPods(context.Background(), cluster, corev1.PodList{Items: pods})
 			Expect(err).NotTo(HaveOccurred())
 
-			updatedPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "pod1"}, updatedPod)
-			Expect(err).NotTo(HaveOccurred())
+			updatedPod := getPod(re, pods[0].Name)
 			Expect(updatedPod.Annotations["container.apparmor.security.beta.kubernetes.io/pod"]).To(Equal("runtime/default"))
 		})
 
@@ -729,9 +706,7 @@ var _ = Describe("object metadata test", func() {
 			err := re.updateClusterAnnotationsOnPods(context.Background(), cluster, corev1.PodList{Items: pods})
 			Expect(err).NotTo(HaveOccurred())
 
-			updatedPod := &corev1.Pod{}
-			err = re.Client.Get(context.Background(), types.NamespacedName{Name: "pod1"}, updatedPod)
-			Expect(err).NotTo(HaveOccurred())
+			updatedPod := getPod(re, pods[0].Name)
 			Expect(len(updatedPod.Annotations)).To(Equal(0))
 		})
 	})
