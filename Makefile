@@ -33,6 +33,7 @@ LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 DIST_PATH := $(shell pwd)/dist
 OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
+LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
@@ -44,7 +45,6 @@ GORELEASER_VERSION ?= v1.18.2
 SPELLCHECK_VERSION ?= 0.32.0
 WOKE_VERSION ?= 0.19.0
 ARCH ?= amd64
-LOCALBIN ?= $(shell pwd)/bin
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -215,7 +215,7 @@ apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
 ##@ Cleanup
 
 clean: ## Clean-up the work tree from building binaries
-	rm -rf $(LOCALBIN)/*
+	rm -rf $(LOCALBIN) $(DIST_PATH) _*/ tests/e2e/out/ cover.out
 
 ##@ Tools
 
