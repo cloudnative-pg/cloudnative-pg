@@ -188,7 +188,10 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		Eventually(func() (string, error) {
 			primaryPod := &corev1.Pod{}
 			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-			out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
+			if err != nil {
+				return "", err
+			}
+			out, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 				"SELECT count(*) > 0 FROM tps.tl")
 			return strings.TrimSpace(out), err

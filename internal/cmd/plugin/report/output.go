@@ -82,7 +82,7 @@ func writeZippedReport(sections []zipFileWriter, file, folder string) (err error
 	for _, section := range sections {
 		err = section(zipper, folder)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
