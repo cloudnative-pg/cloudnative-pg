@@ -67,6 +67,15 @@ curl -sSfL \
   kubectl apply -f -
 ```
 
+If you are instead looking for the latest snapshot of the operator for this
+specific minor release, you can just run:
+
+```sh
+curl -sSfL \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.20/manifests/operator-manifest.yaml | \
+  kubectl apply -f -
+```
+
 !!! Important
     Snapshots are not supported by the CloudNativePG and not intended for production usage.
 
