@@ -33,6 +33,7 @@ LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 DIST_PATH := $(shell pwd)/dist
 OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
+LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
@@ -210,10 +211,19 @@ apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
 	  api/v1/*_types.go ;\
 	cp $${CONFIG_TMP_DIR}/api_reference.md docs/src/api_reference.md
 
+
+##@ Cleanup
+
+clean: ## Clean-up the work tree from build/test artifacts
+	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ cover.out
+
+distclean: clean ## Clean-up the work tree removing also cached tools binaries
+	! [ -d "$(ENVTEST_ASSETS_DIR)" ] || chmod -R u+w $(ENVTEST_ASSETS_DIR)
+	rm -rf $(LOCALBIN) $(ENVTEST_ASSETS_DIR)
+
 ##@ Tools
 
 ## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
