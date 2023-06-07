@@ -24,22 +24,22 @@ const (
 	getLatestWalCmd = "psql -U postgres postgres -tAc 'SELECT pg_walfile_name(pg_switch_wal());'"
 )
 
-// IsAKS check if the running cluster is on AKS
+// IsAKS checks if the running cluster is on AKS
 func IsAKS() bool {
 	return *testCloudVendorEnv == utils.AKS
 }
 
-// IsEKS check if the running cluster is on EKS
+// IsEKS checks if the running cluster is on EKS
 func IsEKS() bool {
 	return *testCloudVendorEnv == utils.EKS
 }
 
-// IsGKE check if the running cluster is on GKE
+// IsGKE checks if the running cluster is on GKE
 func IsGKE() bool {
 	return *testCloudVendorEnv == utils.GKE
 }
 
-// IsLocal check if the running cluster is on local
+// IsLocal checks if the running cluster is on local
 func IsLocal() bool {
 	return *testCloudVendorEnv == utils.LOCAL
 }
