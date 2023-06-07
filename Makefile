@@ -214,7 +214,7 @@ apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
 
 ##@ Cleanup
 
-distclean: ## Clean-up the work tree from building binaries
+clean: ## Clean-up the work tree from building binaries
 	rm -rf $(LOCALBIN)/*
 
 ##@ Tools
