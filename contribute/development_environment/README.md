@@ -180,6 +180,10 @@ This will build the operator based on the `main` branch content, create a
 `kind` cluster in your workstation with a container registry that provides the
 operator image that you just built.
 
+> **NOTE:** In case of errors, make sure that you have the latest versions of the Go
+> binaries in your system. For this reason, from time to time, we recommend
+> you running: `make distclean`.
+
 If everything went well, you are now able to use this version of the operator
 in the local `kind` cluster. For example, you should be able to see the
 CloudNativePG operator installed with:
