@@ -895,32 +895,9 @@ func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster
 func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
-	// This function could also be called while the server is being
-	// started up, so we are not sure that the server is really active.
-	// Let's wait for that.
-	if r.instance.ConfigSha256 == "" {
-		return nil
-	}
-
-	err := r.instance.WaitForSuperuserConnectionAvailable()
+	status, err := r.instance.WaitForConfigReloaded()
 	if err != nil {
-		return fmt.Errorf("while applying new configuration: %w", err)
-	}
-
-	err = r.instance.WaitForConfigReloaded()
-	if err != nil {
-		return fmt.Errorf("while waiting for new configuration to be reloaded: %w", err)
-	}
-
-	status, err := r.instance.GetStatus()
-	if err != nil {
-		return fmt.Errorf("while applying new configuration: %w", err)
-	}
-	if status.MightBeUnavailableMaskedError != "" {
-		return fmt.Errorf(
-			"while applying new configuration encountered an error masked by mightBeUnavailable: %s",
-			status.MightBeUnavailableMaskedError,
-		)
+		return err
 	}
 
 	if !status.PendingRestart {
