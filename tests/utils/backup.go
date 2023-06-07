@@ -42,7 +42,7 @@ func ExecuteBackup(
 	Eventually(func() error {
 		_, stderr, err := RunUnchecked("kubectl apply -n " + namespace + " -f " + backupFile)
 		if err != nil {
-			return fmt.Errorf("failed to create backup\nstderr: %v\nerror:%v", stderr, err)
+			return fmt.Errorf("could not create backup.\nStdErr: %v\nError: %v", stderr, err)
 		}
 		return nil
 	}, RetryTimeout, PollingTime).Should(BeNil())
