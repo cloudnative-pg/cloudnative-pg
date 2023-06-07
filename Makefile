@@ -214,8 +214,11 @@ apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
 
 ##@ Cleanup
 
-clean: ## Clean-up the work tree from building binaries
-	rm -rf $(LOCALBIN) $(DIST_PATH) _*/ tests/e2e/out/ cover.out
+clean: ## Clean-up the work tree from build/test artifacts
+	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ cover.out
+
+distclean: clean ## Clean-up the work tree removing also cached tools binaries
+	rm -rf $(LOCALBIN)
 
 ##@ Tools
 
