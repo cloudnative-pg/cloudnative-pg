@@ -431,7 +431,7 @@ func (r *ClusterReconciler) reconcileResources(
 	ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 
 	// TODO: refactor how we handle label and annotation reconciliation.
 	// TODO: We should generate a fake pod containing the expected labels and annotations and compare it to the living pod
