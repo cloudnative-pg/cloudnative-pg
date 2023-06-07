@@ -275,8 +275,8 @@ func createStandbySignal(pgData string) error {
 	return err
 }
 
-// RemoveArchiveModeFromPostgresAutoConf removes the "archive_mode" option from "postgresql.auto.conf"
-func RemoveArchiveModeFromPostgresAutoConf(pgData string) (changed bool, err error) {
+// removeArchiveModeFromPostgresAutoConf removes the "archive_mode" option from "postgresql.auto.conf"
+func removeArchiveModeFromPostgresAutoConf(pgData string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
 	currentContent, err := fileutils.ReadFile(targetFile)
 	if err != nil {

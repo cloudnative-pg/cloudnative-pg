@@ -289,7 +289,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	}
 	reloadNeeded = reloadNeeded || reloadConfig
 
-	reloadReplicaConfig, err := r.refreshReplicaConfiguration(ctx, cluster)
+	reloadReplicaConfig, err := r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
 	if err != nil {
 		return false, err
 	}
@@ -682,7 +682,7 @@ func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 	if cluster.Status.TargetPrimary != r.instance.PodName {
 		if !isPrimary {
 			// We need to ensure that this instance is replicating from the correct server
-			return r.refreshReplicaConfiguration(ctx, cluster)
+			return r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
 		}
 		return false, nil
 	}
@@ -1134,7 +1134,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	}
 
 	// We need to ensure that this instance is replicating from the correct server
-	changed, err = r.refreshReplicaConfiguration(ctx, cluster)
+	changed, err = r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
 	if err != nil {
 		return changed, err
 	}
