@@ -80,13 +80,10 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 		// We should be able to apply the conf containing the new
 		// image
-		cluster := &apiv1.Cluster{}
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
+		var cluster *apiv1.Cluster
 		Eventually(func(g Gomega) error {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 
 			cluster.Spec.ImageName = updatedImageName
@@ -244,12 +241,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		// Gather the number of instances in this Cluster
-		cluster := &apiv1.Cluster{}
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		err := env.Client.Get(env.Ctx, namespacedName, cluster)
+		cluster, err := env.GetCluster(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		clusterInstances := cluster.Spec.Instances
 

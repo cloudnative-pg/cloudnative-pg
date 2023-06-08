@@ -206,24 +206,15 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-						cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 				Eventually(func() (string, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-						cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.LastSuccessfulBackup, err
 				}, 30).ShouldNot(BeEmpty())
 				Eventually(func() (string, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-						cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.LastFailedBackup, err
 				}, 30).Should(BeEmpty())
 			})
@@ -255,10 +246,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					ctrlclient.ObjectKey{Namespace: namespace, Name: backupName},
 					backup)
 				Expect(err).ToNot(HaveOccurred())
-				cluster := &apiv1.Cluster{}
-				err = env.Client.Get(env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-					cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// We know that our current images always contain the latest barman version
 				if cluster.ShouldForceLegacyBackup() {
@@ -271,10 +259,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName, psqlClientPod)
 
-			cluster := &apiv1.Cluster{}
-			err = env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: restoredClusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, restoredClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			AssertMetricsData(namespace, curlPodName, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 
@@ -338,10 +323,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: targetClusterName},
-						cluster)
+					cluster, err := env.GetCluster(namespace, targetClusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
@@ -385,10 +367,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: targetClusterName},
-						cluster)
+					cluster, err := env.GetCluster(namespace, targetClusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
@@ -449,10 +428,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					fmt.Sprintf("verify the number of backup %v is equals to 1", latestBaseTar))
 				// this is the second backup we take on the bucket
 				Eventually(func() (string, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: customClusterName},
-						cluster)
+					cluster, err := env.GetCluster(namespace, customClusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
@@ -621,10 +597,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 				}, 30).Should(BeNumerically(">=", 1))
 				Eventually(func() (string, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-						cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
@@ -956,10 +929,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				}, 60).Should(BeEquivalentTo(1),
 					fmt.Sprintf("verify the number of backup %v is equals to 1", latestTar))
 				Eventually(func() (string, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-						cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})

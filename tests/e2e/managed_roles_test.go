@@ -94,13 +94,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 		})
 
 		assertUserExists := func(namespace, primaryPod, username string, shouldExists bool) {
-			cmd := `psql -U postgres postgres -tAc '\du'`
 			Eventually(func(g Gomega) {
-				stdout, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryPod,
-					cmd))
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryPod,
+					},
+					utils.DatabaseName("postgres"),
+					"\\du")
 				g.Expect(err).ToNot(HaveOccurred())
 				if shouldExists {
 					g.Expect(stdout).To(ContainSubstring(username))
@@ -121,12 +122,13 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						FROM pg_auth_members GROUP BY member
 					) mem ON member = oid
 					WHERE rolname =` + pq.QuoteLiteral(roleName)
-				cmd := "psql -U postgres postgres -tAc " + fmt.Sprintf("\"%s\"", query)
-				stdout, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryPod,
-					cmd))
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryPod,
+					},
+					utils.DatabaseName("postgres"),
+					query)
 				if err != nil {
 					return []string{ERROR}
 				}
@@ -153,18 +155,18 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				assertUserExists(namespace, primaryPodInfo.Name, username, true)
 				assertUserExists(namespace, primaryPodInfo.Name, unrealizableUser, false)
 
-				cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-					"\"SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
+				query := fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
 					"and rolcreatedb=%v and rolcreaterole=%v and rolinherit=%v and rolreplication=%v "+
-					"and rolbypassrls=%v and rolconnlimit=%v\"", username, rolCanLoginInSpec, rolSuperInSpec, rolCreateDBInSpec,
+					"and rolbypassrls=%v and rolconnlimit=%v", username, rolCanLoginInSpec, rolSuperInSpec, rolCreateDBInSpec,
 					rolCreateRoleInSpec, rolInheritInSpec, rolReplicationInSpec, rolByPassRLSInSpec, rolConnLimitInSpec)
 
-				stdout, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryPodInfo.Name,
-					cmd))
-
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryPodInfo.Name,
+					},
+					utils.DatabaseName("postgres"),
+					query)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout).To(Equal("1\n"))
 			})
@@ -181,15 +183,15 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 				assertUserExists(namespace, primaryPodInfo.Name, appUsername, true)
 
-				cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-					"\"SELECT rolcreatedb FROM pg_roles WHERE rolname='%s'\"", appUsername)
+				query := fmt.Sprintf("SELECT rolcreatedb FROM pg_roles WHERE rolname='%s'", appUsername)
 
-				stdout, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryPodInfo.Name,
-					cmd))
-
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryPodInfo.Name,
+					},
+					utils.DatabaseName("postgres"),
+					query)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout).To(Equal("t\n"))
 			})
@@ -253,16 +255,17 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(func() string {
-					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-						"\"SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v "+
-						"and rolcreatedb=%v and rolcreaterole=%v and rolconnlimit=%v\"",
+					query := fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v "+
+						"and rolcreatedb=%v and rolcreaterole=%v and rolconnlimit=%v",
 						username, expectedLogin, expectedCreateDB, expectedCreateRole, expectedConnLmt)
 
-					stdout, _, err := utils.Run(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						primaryPodInfo.Name,
-						cmd))
+					stdout, _, err := env.ExecQueryInInstancePod(
+						utils.PodLocator{
+							Namespace: namespace,
+							PodName:   primaryPodInfo.Name,
+						},
+						utils.DatabaseName("postgres"),
+						query)
 					if err != nil {
 						return ""
 					}
@@ -323,19 +326,20 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By("Verify new_role exists with all attribute default", func() {
 				Eventually(func() string {
-					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-						"\"SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
+					query := fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
 						"and rolcreatedb=%v and rolcreaterole=%v and rolinherit=%v and rolreplication=%v "+
-						"and rolbypassrls=%v and rolconnlimit=%v\"", newUserName, defaultRolCanLogin,
+						"and rolbypassrls=%v and rolconnlimit=%v", newUserName, defaultRolCanLogin,
 						defaultRolSuper, defaultRolCreateDB,
 						defaultRolCreateRole, defaultRolInherit, defaultRolReplication,
 						defaultRolByPassRLS, defaultRolConnLimit)
 
-					stdout, _, err := utils.Run(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						primaryPodInfo.Name,
-						cmd))
+					stdout, _, err := env.ExecQueryInInstancePod(
+						utils.PodLocator{
+							Namespace: namespace,
+							PodName:   primaryPodInfo.Name,
+						},
+						utils.DatabaseName("postgres"),
+						query)
 					if err != nil {
 						return ""
 					}
@@ -367,16 +371,17 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By(fmt.Sprintf("Verify comments update in db for %s", newUserName), func() {
 				Eventually(func() string {
-					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-						"\"SELECT pg_catalog.shobj_description(oid, 'pg_authid') as comment"+
-						" FROM pg_catalog.pg_authid WHERE rolname='%s'\"",
+					query := fmt.Sprintf("SELECT pg_catalog.shobj_description(oid, 'pg_authid') as comment"+
+						" FROM pg_catalog.pg_authid WHERE rolname='%s'",
 						newUserName)
 
-					stdout, _, err := utils.Run(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						primaryPodInfo.Name,
-						cmd))
+					stdout, _, err := env.ExecQueryInInstancePod(
+						utils.PodLocator{
+							Namespace: namespace,
+							PodName:   primaryPodInfo.Name,
+						},
+						utils.DatabaseName("postgres"),
+						query)
 					if err != nil {
 						return ERROR
 					}
@@ -386,16 +391,17 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By(fmt.Sprintf("Verify comments update in db for %s", username), func() {
 				Eventually(func() string {
-					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-						"\"SELECT pg_catalog.shobj_description(oid, 'pg_authid') as comment"+
-						" FROM pg_catalog.pg_authid WHERE rolname='%s'\"",
+					query := fmt.Sprintf("SELECT pg_catalog.shobj_description(oid, 'pg_authid') as comment"+
+						" FROM pg_catalog.pg_authid WHERE rolname='%s'",
 						username)
 
-					stdout, _, err := utils.Run(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						primaryPodInfo.Name,
-						cmd))
+					stdout, _, err := env.ExecQueryInInstancePod(
+						utils.PodLocator{
+							Namespace: namespace,
+							PodName:   primaryPodInfo.Name,
+						},
+						utils.DatabaseName("postgres"),
+						query)
 					if err != nil {
 						return ERROR
 					}
@@ -528,15 +534,16 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By("Update password in database", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-					"\"ALTER ROLE %s WITH PASSWORD %s\"",
+				query := fmt.Sprintf("ALTER ROLE %s WITH PASSWORD %s",
 					username, pq.QuoteLiteral(newPassword))
 
-				_, _, err = utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryPodInfo.Name,
-					cmd))
+				_, _, err = env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryPodInfo.Name,
+					},
+					utils.DatabaseName("postgres"),
+					query)
 				Expect(err).To(BeNil())
 			})
 
@@ -573,16 +580,17 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By(fmt.Sprintf("Verify valid until is removed in db for %s", newUserName), func() {
 				Eventually(func() string {
-					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-						"\"SELECT 1 FROM pg_catalog.pg_authid"+
-						" WHERE rolname='%s' and (rolvaliduntil is NULL or rolevaliduntil='infinity')\"",
+					query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_authid"+
+						" WHERE rolname='%s' and (rolvaliduntil is NULL or rolevaliduntil='infinity')",
 						newUserName)
 
-					stdout, _, err := utils.Run(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						primaryPodInfo.Name,
-						cmd))
+					stdout, _, err := env.ExecQueryInInstancePod(
+						utils.PodLocator{
+							Namespace: namespace,
+							PodName:   primaryPodInfo.Name,
+						},
+						utils.DatabaseName("postgres"),
+						query)
 					if err != nil {
 						return ERROR
 					}
@@ -592,16 +600,17 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By(fmt.Sprintf("Verify valid until update in db for %s", username), func() {
 				Eventually(func() string {
-					cmd := fmt.Sprintf("psql -U postgres postgres -tAc "+
-						"\"SELECT 1 FROM pg_catalog.pg_authid "+
-						" WHERE rolname='%s' and rolvaliduntil='%s'\"",
+					query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_authid "+
+						" WHERE rolname='%s' and rolvaliduntil='%s'",
 						username, newValidUntilString)
 
-					stdout, _, err := utils.Run(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						primaryPodInfo.Name,
-						cmd))
+					stdout, _, err := env.ExecQueryInInstancePod(
+						utils.PodLocator{
+							Namespace: namespace,
+							PodName:   primaryPodInfo.Name,
+						},
+						utils.DatabaseName("postgres"),
+						query)
 					if err != nil {
 						return ERROR
 					}
