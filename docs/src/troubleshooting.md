@@ -599,7 +599,7 @@ kubectl delete pod/$PODNAME pvc/$PODNAME pvc/$PODNAME-wal pv/$VOLNAME
 Cluster is stuck in "Creating a new replica", while pod logs don't show
 relevant problems.
 This has been found to be related to the next issue
-[on connectivity](#networking-impaired-by-installed-network-policies).
+[on connectivity](#networking-is-impaired-by-installed-network-policies).
 From releases 1.20.1 and 1.19.3, networking issues will more clearly be
 reflected in the status to help diagnosis.
 
