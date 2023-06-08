@@ -410,7 +410,7 @@ above.
 However, in some cases, Kubernetes administrators prefer to *manually* create new
 storage volumes, and then create the related `PersistentVolume` objects for
 their representation inside the Kubernetes cluster. This is also known as
-**pre-previsioning** of volumes.
+**pre-provisioning** of volumes.
 
 !!! Important
     Our recommendation is to avoid pre-provisioning of volumes as it
