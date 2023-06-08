@@ -117,10 +117,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 				By(fmt.Sprintf("verifying cluster %v is removed", clusterName), func() {
 					Eventually(func() (bool, apiv1.Cluster) {
-						cluster := &apiv1.Cluster{}
-						err := env.Client.Get(env.Ctx,
-							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-							cluster)
+						cluster, err := env.GetCluster(namespace, clusterName)
 						if err != nil {
 							return true, apiv1.Cluster{}
 						}

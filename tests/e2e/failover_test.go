@@ -76,12 +76,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		// We check that the currentPrimary is the -1 instance as expected,
 		// and we define the targetPrimary (-3) and pausedReplica (-2).
 		By("checking that CurrentPrimary and TargetPrimary are equal", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(cluster.Status.CurrentPrimary, err).To(
 				BeEquivalentTo(cluster.Status.TargetPrimary))
 			currentPrimary = cluster.Status.CurrentPrimary
@@ -211,10 +206,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		// Force-delete the primary. Eventually the cluster should elect a
 		// new target primary (and we check that it's the expected one)
 		By("deleting the CurrentPrimary node to trigger a failover", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
 			quickDelete := &ctrlclient.DeleteOptions{
 				GracePeriodSeconds: &quickDeletionPeriod,
 			}
@@ -226,8 +217,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			// to be disconnected. We can send the SIGCONT now.
 			timeout := 60
 			Eventually(func() (int, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				return cluster.Status.ReadyInstances, err
 			}, timeout).Should(BeEquivalentTo(2))
 
@@ -246,15 +236,13 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			// The operator should eventually set the cluster target primary to
 			// the instance we expect to take that role (-3).
 			Eventually(func() (string, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				return cluster.Status.TargetPrimary, err
 			}, testTimeouts[utils.NewTargetOnFailover]).
 				ShouldNot(
 					Or(BeEquivalentTo(currentPrimary),
 						BeEquivalentTo(apiv1.PendingFailoverMarker)))
-			cluster := &apiv1.Cluster{}
-			err = env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(cluster.Status.TargetPrimary, err).To(
 				BeEquivalentTo(targetPrimary))
 		})
@@ -262,13 +250,8 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		// Finally, the cluster current primary should be changed by the
 		// operator to the target primary
 		By("waiting for the TargetPrimary to become CurrentPrimary", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
 			Eventually(func() (string, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				return cluster.Status.CurrentPrimary, err
 			}, testTimeouts[utils.NewPrimaryAfterFailover]).Should(BeEquivalentTo(targetPrimary))
 		})

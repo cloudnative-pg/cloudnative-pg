@@ -26,7 +26,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	clusterv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -152,15 +151,10 @@ var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnect
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		// we use a pod in the cluster to have a psql client ready and
 		// internal access to the k8s cluster
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 
 		By("disable superuser access", func() {
 			const secretName = clusterName + "-superuser"
-			cluster := &clusterv1.Cluster{}
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			_, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() error {
@@ -172,7 +166,7 @@ var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnect
 
 			// Setting to false, now we should not have a secret or password
 			Eventually(func() error {
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				if err != nil {
 					return err
 				}
@@ -213,7 +207,7 @@ var _ = Describe("Disabling superuser password", Label(tests.LabelServiceConnect
 
 			// Setting to true, so we have a secret and a new password
 			Eventually(func() error {
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				if err != nil {
 					return err
 				}
@@ -258,7 +252,6 @@ var _ = Describe("Creating a cluster without superuser password", Label(tests.La
 
 	It("create a cluster without postgres password", func() {
 		var secret corev1.Secret
-		var cluster clusterv1.Cluster
 		var err error
 		const secretName = clusterName + "-superuser"
 
@@ -274,13 +267,9 @@ var _ = Describe("Creating a cluster without superuser password", Label(tests.La
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		// we use a pod in the cluster to have a psql client ready and
 		// internal access to the k8s cluster
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 
 		By("ensuring no superuser secret is generated", func() {
-			err := env.Client.Get(env.Ctx, namespacedName, &cluster)
+			_, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
@@ -295,11 +284,11 @@ var _ = Describe("Creating a cluster without superuser password", Label(tests.La
 			// Setting to true, now we should have a secret with the password
 			Eventually(func() error {
 				err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-					err := env.Client.Get(env.Ctx, namespacedName, &cluster)
+					cluster, err := env.GetCluster(namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
 					trueValue := true
 					cluster.Spec.EnableSuperuserAccess = &trueValue
-					err = env.Client.Update(env.Ctx, &cluster)
+					err = env.Client.Update(env.Ctx, cluster)
 					if err != nil {
 						return err
 					}

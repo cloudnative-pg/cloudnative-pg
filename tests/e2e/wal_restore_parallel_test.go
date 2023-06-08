@@ -34,10 +34,9 @@ import (
 
 var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), func() {
 	const (
-		level             = tests.High
-		walRestoreCommand = "/controller/manager wal-restore"
-		PgWalPath         = specs.PgWalPath
-		SpoolDirectory    = walrestore.SpoolDirectory
+		level          = tests.High
+		PgWalPath      = specs.PgWalPath
+		SpoolDirectory = walrestore.SpoolDirectory
 	)
 
 	var namespace string
@@ -164,11 +163,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		By("asserting the spool directory is empty on the standby", func() {
 			if !testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory) {
 				purgeSpoolDirectoryCmd := "rm " + SpoolDirectory + "/*"
-				_, _, err := testUtils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					standby,
-					purgeSpoolDirectoryCmd))
+				_, _, err := env.ExecCommandInInstancePod(
+					testUtils.PodLocator{
+						Namespace: namespace,
+						PodName:   standby,
+					}, nil,
+					purgeSpoolDirectoryCmd)
 				Expect(err).ShouldNot(HaveOccurred())
 			}
 		})
@@ -178,11 +178,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// 		exit code 0, #1 is in the output location, #2 and #3 are in the spool directory.
 		// 		The flag is unset.
 		By("invoking the wal-restore command requesting #1 wal", func() {
-			_, _, err := testUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				standby,
-				walRestoreCommand+" "+walFile1+" "+PgWalPath+"/"+walFile1))
+			_, _, err := env.ExecCommandInInstancePod(
+				testUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile1, PgWalPath+"/"+walFile1)
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile1) }).
 				WithTimeout(RetryTimeout).
@@ -207,11 +208,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// 		exit code 0, #2 is in the output location, #3 is in the spool directory.
 		// 		The flag is unset.
 		By("invoking the wal-restore command requesting #2 wal", func() {
-			_, _, err := testUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				standby,
-				walRestoreCommand+" "+walFile2+" "+PgWalPath+"/"+walFile2))
+			_, _, err := env.ExecCommandInInstancePod(
+				testUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile2, PgWalPath+"/"+walFile2)
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile2) }).
 				WithTimeout(RetryTimeout).
@@ -232,11 +234,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// 		exit code 0, #3 is in the output location, spool directory is empty.
 		// 		The flag is unset.
 		By("invoking the wal-restore command requesting #3 wal", func() {
-			_, _, err := testUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				standby,
-				walRestoreCommand+" "+walFile3+" "+PgWalPath+"/"+walFile3))
+			_, _, err := env.ExecCommandInInstancePod(
+				testUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile3, PgWalPath+"/"+walFile3)
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile3) }).
 				WithTimeout(RetryTimeout).
@@ -253,11 +256,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// 		exit code 0, #4 is in the output location, #5 is in the spool directory.
 		// 		The flag is set because #6 file not present.
 		By("invoking the wal-restore command requesting #4 wal", func() {
-			_, _, err := testUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				standby,
-				walRestoreCommand+" "+walFile4+" "+PgWalPath+"/"+walFile4))
+			_, _, err := env.ExecCommandInInstancePod(
+				testUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile4, PgWalPath+"/"+walFile4)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile4) }).
 				WithTimeout(RetryTimeout).
@@ -284,11 +288,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Expected outcome:
 		//		exit code 0, #5 is in the output location, no files in the spool directory. The flag is still present.
 		By("invoking the wal-restore command requesting #5 wal", func() {
-			_, _, err := testUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				standby,
-				walRestoreCommand+" "+walFile5+" "+PgWalPath+"/"+walFile5))
+			_, _, err := env.ExecCommandInInstancePod(
+				testUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile5, PgWalPath+"/"+walFile5)
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile5) }).
 				WithTimeout(RetryTimeout).
@@ -308,11 +313,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Expected outcome:
 		//		exit code 1, output location untouched, no files in the spool directory. The flag is unset.
 		By("invoking the wal-restore command requesting #6 wal", func() {
-			_, _, err := testUtils.RunUnchecked(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				standby,
-				walRestoreCommand+" "+walFile6+" "+PgWalPath+"/"+walFile6))
+			_, _, err := env.ExecCommandInInstancePod(
+				testUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile6, PgWalPath+"/"+walFile6)
 			Expect(err).To(HaveOccurred(),
 				"exit code should 1 since #6 wal is not in the output location or spool directory and flag is set")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile6) }).
@@ -330,11 +336,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		//		exit code 0, #6 is in the output location, no files in the spool directory.
 		//		The flag is present again because #7 and #8 are unavailable.
 		By("invoking the wal-restore command requesting #6 wal again", func() {
-			_, _, err := testUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				standby,
-				walRestoreCommand+" "+walFile6+" "+PgWalPath+"/"+walFile6))
+			_, _, err := env.ExecCommandInInstancePod(
+				testUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   standby,
+				}, nil,
+				"/controller/manager", "wal-restore", walFile6, PgWalPath+"/"+walFile6)
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile6) }).
 				WithTimeout(RetryTimeout).

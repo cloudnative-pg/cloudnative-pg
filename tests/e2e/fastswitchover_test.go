@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -204,13 +203,8 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 
 	By("setting the TargetPrimary to node2 to trigger a switchover", func() {
 		targetPrimary = clusterName + "-2"
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Status.TargetPrimary = targetPrimary
 			return env.Client.Status().Update(env.Ctx, cluster)

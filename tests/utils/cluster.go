@@ -331,12 +331,7 @@ func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, ne
 
 // PrintClusterResources prints a summary of the cluster pods, jobs, pvcs etc.
 func PrintClusterResources(namespace, clusterName string, env *TestingEnvironment) string {
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      clusterName,
-	}
-	cluster := &apiv1.Cluster{}
-	err := GetObject(env, namespacedName, cluster)
+	cluster, err := env.GetCluster(namespace, clusterName)
 	if err != nil {
 		return fmt.Sprintf("Error while Getting Object %v", err)
 	}
