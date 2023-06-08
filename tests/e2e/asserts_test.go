@@ -52,14 +52,11 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 
 	// First we check that the starting situation is the expected one
 	By("checking that CurrentPrimary and TargetPrimary are the same", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
+		var cluster *apiv1.Cluster
 
 		Eventually(func(g Gomega) {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
 			g.Expect(err).To(BeNil())
 			g.Expect(cluster.Status.CurrentPrimary, err).To(
 				BeEquivalentTo(cluster.Status.TargetPrimary),
@@ -81,13 +78,8 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 	})
 
 	By("setting the TargetPrimary node to trigger a switchover", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Status.TargetPrimary = targetPrimary
 			return env.Client.Status().Update(env.Ctx, cluster)
@@ -96,13 +88,9 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 	})
 
 	By("waiting that the TargetPrimary become also CurrentPrimary", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.CurrentPrimary, err
 		}, testTimeouts[testsUtils.NewPrimaryAfterSwitchover]).Should(BeEquivalentTo(targetPrimary))
 	})
@@ -147,12 +135,11 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 		Eventually(func() error {
 			count := 0
 			for _, pod := range pods {
-				out, _, err := testsUtils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					pod,
-					"sh -c 'ls $PGDATA/pg_wal/*.history'"),
-				)
+				out, _, err := env.ExecCommandInInstancePod(
+					testsUtils.PodLocator{
+						Namespace: namespace,
+						PodName:   pod,
+					}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history")
 				if err != nil {
 					return err
 				}
@@ -200,17 +187,14 @@ func AssertCreateCluster(namespace string, clusterName string, sampleFile string
 // none of them are going to be deleted, and that the status is Healthy
 func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a Cluster %s with each instance in status ready", clusterName), func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 		// Eventually the number of ready instances should be equal to the
 		// amount of instances defined in the cluster and
 		// the cluster status should be in healthy state
-		cluster := &apiv1.Cluster{}
+		var cluster *apiv1.Cluster
 
 		Eventually(func(g Gomega) {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
@@ -226,7 +210,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 						return fmt.Sprintf("Pod '%s' is waiting for deletion", pod.Name), nil
 					}
 				}
-				err = env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err = env.GetCluster(namespace, clusterName)
 				return cluster.Status.Phase, err
 			}
 			return fmt.Sprintf("Ready pod is not as expected. Spec Instances: %d, ready pods: %d \n",
@@ -247,16 +231,14 @@ func AssertClusterDefault(namespace string, clusterName string,
 	isExpectedToDefault bool, env *testsUtils.TestingEnvironment,
 ) {
 	By("having a Cluster object populated with default values", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 		// Eventually the number of ready instances should be equal to the
 		// amount of instances defined in the cluster and
 		// the cluster status should be in healthy state
-		cluster := &apiv1.Cluster{}
+		var cluster *apiv1.Cluster
 		Eventually(func(g Gomega) {
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
@@ -653,23 +635,18 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 	By(fmt.Sprintf("verifying the new primary pod, oldPrimary is %s", oldPrimary), func() {
 		// Gather the primary
 		timeout := 120
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
 		// Wait for the operator to set a new TargetPrimary
+		var cluster *apiv1.Cluster
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.TargetPrimary, err
 		}, timeout).ShouldNot(Or(BeEquivalentTo(oldPrimary), BeEquivalentTo(apiv1.PendingFailoverMarker)))
-		cluster := &apiv1.Cluster{}
-		err := env.Client.Get(env.Ctx, namespacedName, cluster)
 		newPrimary := cluster.Status.TargetPrimary
-		Expect(err).ToNot(HaveOccurred())
 
 		// Expect the chosen pod to eventually become a primary
-		namespacedName = types.NamespacedName{
+		namespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      newPrimary,
 		}
@@ -1384,12 +1361,13 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 		AssertDataExpectedCount(namespace, restoredClusterName, tableName, 2, pod)
 
 		// Restored primary should be on timeline 2
-		cmd := "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
-		out, _, err := testsUtils.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			cmd))
+		out, _, err := env.ExecQueryInInstancePod(
+			testsUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   primary,
+			},
+			testsUtils.DatabaseName("app"),
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
 		// Restored standby should be attached to restored primary
@@ -1440,12 +1418,13 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string, pod *
 		AssertDataExpectedCount(namespace, restoredClusterName, tableName, 2, pod)
 
 		// Restored primary should be on timeline 2
-		cmd := "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
-		out, _, err := testsUtils.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			cmd))
+		out, _, err := env.ExecQueryInInstancePod(
+			testsUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   primary,
+			},
+			testsUtils.DatabaseName("app"),
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
 		// Restored standby should be attached to restored primary
@@ -1732,18 +1711,22 @@ func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azSto
 
 // switchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
 func switchWalAndGetLatestArchive(namespace, podName string) string {
-	_, _, err := testsUtils.Run(fmt.Sprintf(
-		"kubectl exec -n %v %v -- %v",
-		namespace,
-		podName,
-		checkPointCmd))
+	_, _, err := env.ExecQueryInInstancePod(
+		testsUtils.PodLocator{
+			Namespace: namespace,
+			PodName:   podName,
+		},
+		testsUtils.DatabaseName("postgres"),
+		"CHECKPOINT;")
 	Expect(err).ToNot(HaveOccurred())
 
-	out, _, err := testsUtils.Run(fmt.Sprintf(
-		"kubectl exec -n %v %v -- %v",
-		namespace,
-		podName,
-		getLatestWalCmd))
+	out, _, err := env.ExecQueryInInstancePod(
+		testsUtils.PodLocator{
+			Namespace: namespace,
+			PodName:   podName,
+		},
+		testsUtils.DatabaseName("postgres"),
+		"SELECT pg_walfile_name(pg_switch_wal());")
 	Expect(err).ToNot(HaveOccurred())
 
 	return strings.TrimSpace(out)
@@ -1768,10 +1751,8 @@ func prepareClusterForPITROnMinio(
 			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
 				expectedVal))
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})
@@ -1811,10 +1792,8 @@ func prepareClusterForPITROnAzureBlob(
 			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 		}, 30).Should(BeEquivalentTo(expectedVal))
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})
@@ -1883,10 +1862,8 @@ func prepareClusterBackupOnAzurite(
 			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})
@@ -1908,10 +1885,8 @@ func prepareClusterForPITROnAzurite(
 			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
 		Eventually(func() (string, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx,
-				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-				cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})

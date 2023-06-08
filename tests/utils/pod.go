@@ -18,6 +18,7 @@ package utils
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -132,4 +134,85 @@ func (env TestingEnvironment) GetPodList(namespace string) (*corev1.PodList, err
 		&env, podList, client.InNamespace(namespace),
 	)
 	return podList, err
+}
+
+// GetPod gets a pod by namespace and name
+func (env TestingEnvironment) GetPod(namespace, podName string) (*corev1.Pod, error) {
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while getting pod '%s/%s': %w", namespace, podName, err)
+	}
+	podList, err := env.GetPodList(namespace)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	for _, pod := range podList.Items {
+		if podName == pod.Name {
+			return &pod, nil
+		}
+	}
+	return nil, wrapErr(errors.New("pod not found"))
+}
+
+// ContainerLocator contains the necessary data to find a container on a pod
+type ContainerLocator struct {
+	Namespace     string
+	PodName       string
+	ContainerName string
+}
+
+// ExecCommandInContainer executes commands in a given instance pod, in the
+// postgres container
+func (env TestingEnvironment) ExecCommandInContainer(
+	container ContainerLocator,
+	timeout *time.Duration,
+	command ...string,
+) (string, string, error) {
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while executing command in pod '%s/%s': %w",
+			container.Namespace, container.PodName, err)
+	}
+	pod, err := env.GetPod(container.Namespace, container.PodName)
+	if err != nil {
+		return "", "", wrapErr(err)
+	}
+	return env.ExecCommand(env.Ctx, *pod, container.ContainerName, timeout, command...)
+}
+
+// PodLocator contains the necessary data to find a pod
+type PodLocator struct {
+	Namespace string
+	PodName   string
+}
+
+// ExecCommandInInstancePod executes commands in a given instance pod, in the
+// postgres container
+func (env TestingEnvironment) ExecCommandInInstancePod(
+	podLocator PodLocator,
+	timeout *time.Duration,
+	command ...string,
+) (string, string, error) {
+	return env.ExecCommandInContainer(
+		ContainerLocator{
+			Namespace:     podLocator.Namespace,
+			PodName:       podLocator.PodName,
+			ContainerName: specs.PostgresContainerName,
+		}, timeout, command...)
+}
+
+// DatabaseName is a special type for the database argument in an Exec call
+type DatabaseName string
+
+// ExecQueryInInstancePod executes a query in an instance pod, by connecting to the pod
+// and the postgres container, and using a local connection with the postgres user
+func (env TestingEnvironment) ExecQueryInInstancePod(
+	podLocator PodLocator,
+	dbname DatabaseName,
+	query string,
+) (string, string, error) {
+	timeout := time.Second * 10
+	return env.ExecCommandInInstancePod(
+		PodLocator{
+			Namespace: podLocator.Namespace,
+			PodName:   podLocator.PodName,
+		}, &timeout, "psql", "-U", "postgres", string(dbname), "-tAc", query)
 }

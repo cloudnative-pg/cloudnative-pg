@@ -65,9 +65,11 @@ func ExecuteBackup(
 		return backupStatus.BeginLSN, err
 	}, timeoutSeconds).ShouldNot(BeEmpty())
 
-	cluster := apiv1.Cluster{}
+	var cluster *apiv1.Cluster
 	Eventually(func() error {
-		return env.Client.Get(env.Ctx, types.NamespacedName{Name: backup.Spec.Cluster.Name, Namespace: namespace}, &cluster)
+		var err error
+		cluster, err = env.GetCluster(namespace, backup.Spec.Cluster.Name)
+		return err
 	}, timeoutSeconds).ShouldNot(HaveOccurred())
 
 	backupStatus := backup.GetStatus()

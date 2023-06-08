@@ -138,10 +138,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName, psqlClientPod)
 		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName, psqlClientPod)
 
-		cluster := &apiv1.Cluster{}
-		err = env.Client.Get(env.Ctx,
-			ctrlclient.ObjectKey{Namespace: namespace, Name: metricsClusterName},
-			cluster)
+		cluster, err := env.GetCluster(namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertMetricsData(namespace, curlPodName, targetDBOne, targetDBTwo, targetDBSecret, cluster)
