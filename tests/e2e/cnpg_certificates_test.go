@@ -19,11 +19,8 @@ package e2e
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -74,13 +71,8 @@ var _ = Describe("Certificates", func() {
 		)
 
 		cleanClusterCertification := func() {
-			cluster := &apiv1.Cluster{}
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				err := utils.GetObject(env, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Certificates.ServerTLSSecret = ""
 				cluster.Spec.Certificates.ServerCASecret = ""
@@ -112,8 +104,7 @@ var _ = Describe("Certificates", func() {
 
 		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin",
 			Label(tests.LabelPlugin), func() {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				err = utils.CreateClientCertificatesViaKubectlPlugin(
 					*cluster,
@@ -131,8 +122,7 @@ var _ = Describe("Certificates", func() {
 			})
 
 		It("can authenticate after switching to user-supplied server certs", Label(tests.LabelServiceConnectivity), func() {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
+			_, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			CreateAndAssertServerCertificatesSecrets(
 				namespace,
@@ -156,12 +146,7 @@ var _ = Describe("Certificates", func() {
 			}, 60, 5).Should(BeNil())
 			Eventually(func() (bool, error) {
 				certUpdateStatus := false
-				cluster := &apiv1.Cluster{}
-				err = env.Client.Get(
-					env.Ctx,
-					ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-					cluster,
-				)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				if cluster.Status.Certificates.ServerCASecret == serverCASecretName {
 					if cluster.Status.Certificates.ServerTLSSecret == serverCertSecretName {
 						certUpdateStatus = true
@@ -201,9 +186,7 @@ var _ = Describe("Certificates", func() {
 			}, 60, 5).Should(BeNil())
 
 			Eventually(func() (bool, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
-
+				cluster, err := env.GetCluster(namespace, clusterName)
 				return cluster.Spec.Certificates.ClientCASecret == clientCASecretName &&
 					cluster.Status.Certificates.ReplicationTLSSecret == replicaCertSecretName, err
 			}, 120, 5).Should(BeTrue())
@@ -239,9 +222,7 @@ var _ = Describe("Certificates", func() {
 				}, 60, 5).Should(BeNil())
 
 				Eventually(func() (bool, error) {
-					cluster := &apiv1.Cluster{}
-					err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
-
+					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.Certificates.ServerCASecret == serverCASecretName &&
 						cluster.Status.Certificates.ClientCASecret == clientCASecretName &&
 						cluster.Status.Certificates.ServerTLSSecret == serverCertSecretName &&
@@ -281,8 +262,7 @@ var _ = Describe("Certificates", func() {
 				false,
 			)
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-			cluster := &apiv1.Cluster{}
-			err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			err = utils.CreateClientCertificatesViaKubectlPlugin(
 				*cluster,

@@ -17,8 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
-
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -72,58 +70,58 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			primaryDst := clusterName + "-1"
 
 			By("querying the tables via psql", func() {
-				cmd := "psql -U postgres postgres -tAc 'SELECT count(*) FROM numbers'"
-				_, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryDst,
-					cmd))
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("postgres"),
+					"SELECT count(*) FROM numbers")
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the App database tables via psql", func() {
-				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM application_numbers'"
-				_, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryDst,
-					cmd))
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("app"),
+					"SELECT count(*) FROM application_numbers")
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the App database tables defined by secretRefs", func() {
-				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM secrets'"
-				_, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryDst,
-					cmd))
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("app"),
+					"SELECT count(*) FROM secrets")
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the App database tables defined by configMapRefs", func() {
-				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM configmaps'"
-				_, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryDst,
-					cmd))
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("app"),
+					"SELECT count(*) FROM configmaps")
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the database to ensure the installed extension is there", func() {
-				cmd := `psql -U postgres postgres -tAc "SELECT count(*) FROM pg_available_extensions WHERE name LIKE 'intarray'"`
-				stdout, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryDst,
-					cmd))
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("postgres"),
+					"SELECT count(*) FROM pg_available_extensions WHERE name LIKE 'intarray'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("1\n"))
 			})
 			By("checking inside the database the default locale", func() {
-				cmd := "psql -U postgres postgres -tAc \"select datcollate from pg_database where datname='template0'\""
-				stdout, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryDst,
-					cmd))
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("postgres"),
+					"select datcollate from pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("C\n"))
 			})
@@ -155,12 +153,12 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			primaryDst := clusterName + "-1"
 
 			By("checking inside the database", func() {
-				cmd := "psql -U postgres postgres -tAc \"select datcollate from pg_database where datname='template0'\""
-				stdout, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primaryDst,
-					cmd))
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, utils.DatabaseName("postgres"),
+					"select datcollate from pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("en_US.utf8\n"))
 			})

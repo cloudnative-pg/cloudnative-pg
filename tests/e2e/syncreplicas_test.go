@@ -22,8 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -77,14 +75,9 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			}, timeout).Should(BeEquivalentTo(2))
 		})
 		By("checking that synchronous_standby_names reflects cluster's changes", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
 			// Set MaxSyncReplicas to 1
 			Eventually(func(g Gomega) error {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				cluster, err := env.GetCluster(namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 
 				cluster.Spec.MaxSyncReplicas = 1
@@ -103,8 +96,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			// Construct the expected synchronous_standby_names value
 			var podNames []string
-			cluster := &apiv1.Cluster{}
-			err = env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -129,21 +121,14 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 		})
 
 		By("erroring out when SyncReplicas fields are invalid", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Expect an error. MaxSyncReplicas must be lower than the number of instances
 			cluster.Spec.MaxSyncReplicas = 2
 			err = env.Client.Update(env.Ctx, cluster)
 			Expect(err).To(HaveOccurred())
 
-			cluster = &apiv1.Cluster{}
-			err = env.Client.Get(env.Ctx, namespacedName, cluster)
+			cluster, err = env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas
 			cluster.Spec.MinSyncReplicas = 2
@@ -179,12 +164,19 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 		By("checking that synchronous_standby_names has the expected value on the primary", func() {
 			Eventually(func() string {
-				out, _, err := utils.Run(
-					fmt.Sprintf("kubectl exec -n %v %v-1 -c postgres -- "+
-						"psql -U postgres -tAc \"select setting from pg_settings where name = 'synchronous_standby_names'\"",
-						namespace, clusterName))
+				primary, err := env.GetClusterPrimary(namespace, clusterName)
 				if err != nil {
-					return ""
+					return err.Error()
+				}
+				out, stderr, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.GetName(),
+					},
+					utils.DatabaseName("postgres"),
+					"select setting from pg_settings where name = 'synchronous_standby_names'")
+				if err != nil {
+					return stderr + " - " + err.Error()
 				}
 				return strings.Trim(out, "\n")
 			}, 30).Should(Equal("ANY 1 (\"cluster-pgstatstatements-2\",\"cluster-pgstatstatements-3\")"))
