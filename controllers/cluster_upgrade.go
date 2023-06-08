@@ -46,7 +46,6 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	podList *postgres.PostgresqlStatusList,
-	conditionFunc func(postgres.PostgresqlStatus, *apiv1.Cluster) (bool, bool, string),
 ) (bool, error) {
 	// The following code works under the assumption that podList.Items list is ordered
 	// by lag (primary first)
@@ -66,12 +65,13 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			continue
 		}
 
-		shouldRestart, _, reason := conditionFunc(postgresqlStatus, cluster)
-		if !shouldRestart {
+		rollout := IsPodNeedingRollout(postgresqlStatus, cluster)
+		if !rollout.Required {
 			continue
 		}
 
-		restartMessage := fmt.Sprintf("Restarting instance %s, because: %s", postgresqlStatus.Pod.Name, reason)
+		restartMessage := fmt.Sprintf("Restarting instance %s, because: %s",
+			postgresqlStatus.Pod.Name, rollout.Reason)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade, restartMessage); err != nil {
 			return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 		}
@@ -92,8 +92,8 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	}
 
 	// we first check whether a restart is needed given the provided condition
-	shouldRestart, inPlacePossible, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
-	if !shouldRestart {
+	rollout := IsPodNeedingRollout(*primaryPostgresqlStatus, cluster)
+	if !rollout.Required {
 		return false, nil
 	}
 
@@ -103,7 +103,8 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		return false, nil
 	}
 
-	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod, inPlacePossible, reason)
+	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
+		rollout.CanBeInPlace, rollout.Reason)
 }
 
 func (r *ClusterReconciler) updatePrimaryPod(
@@ -208,7 +209,15 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 	return nil
 }
 
-// IsPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its actual state
+// Rollout describes whether a rollout should happen, and if so whether it can
+// be done in-place, and what the reason for rollout is
+type Rollout struct {
+	Required     bool
+	CanBeInPlace bool
+	Reason       string
+}
+
+// IsPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its current state
 // with its expected state defined inside the cluster struct.
 //
 // Arguments:
@@ -224,96 +233,112 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 // - a boolean indicating if an in-place restart is possible
 //
 // - a string indicating the reason of the rollout.
-func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluster) (
-	needsRollout bool,
-	inPlacePossible bool,
-	reason string,
+func IsPodNeedingRollout(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) (
+	rollout Rollout,
 ) {
 	if !status.IsPodReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
-		return false, false, ""
+		return Rollout{}
 	}
 
 	// check if the pod is reporting his instance manager version
 	if status.ExecutableHash == "" {
 		// This is an old instance manager.
 		// We need to replace it with one supporting the online operator upgrade feature
-		return true, false, ""
+		return Rollout{Required: true}
 	}
 
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, pvcName := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC begins with the name of the pod using it.
 			if persistentvolumeclaim.BelongToInstance(cluster, status.Pod.Name, pvcName) {
-				return true, false, fmt.Sprintf("rebooting pod to complete resizing %s", pvcName)
+				return Rollout{Required: true, Reason: fmt.Sprintf("rebooting pod to complete resizing %s", pvcName)}
 			}
 		}
 	}
 
 	// Check if there is a change in the projected volume configuration
 	if needsUpdate, reason := isPodNeedingUpdateOfProjectedVolume(cluster, *status.Pod); needsUpdate {
-		return true, false, reason
+		return Rollout{Required: true, Reason: reason}
 	}
 
 	// check if the pod requires an image upgrade
 	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, *status.Pod)
 	if err != nil {
 		log.Error(err, "while checking if image could be upgraded")
-		return false, false, ""
+		return Rollout{}
 	}
 	if newImage != "" {
-		return true, false, fmt.Sprintf("the instance is using an old image: %s -> %s",
-			oldImage, newImage)
+		return Rollout{
+			Required: true,
+			Reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
+				oldImage, newImage),
+		}
 	}
+	// KILL above
 
 	if !configuration.Current.EnableInstanceManagerInplaceUpdates {
 		oldImage, newImage, err = isPodNeedingUpgradedInitContainerImage(*status.Pod)
 		if err != nil {
 			log.Error(err, "while checking if init container image could be upgraded")
-			return false, false, ""
+			return Rollout{}
 		}
 
 		if newImage != "" {
-			return true, false, fmt.Sprintf("the instance is using an old init container image: %s -> %s",
-				oldImage, newImage)
+			return Rollout{
+				Required: true,
+				Reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
+					oldImage, newImage),
+			}
 		}
 	}
+	// CANNOT? KILL above
 
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
-		return true, false, string(apiv1.DetachedVolume)
+		return Rollout{Required: true, Reason: string(apiv1.DetachedVolume)}
 	}
 
 	// Check if there is a change in the environment section
 	if restartRequired, reason := isPodNeedingUpdatedEnvironment(*cluster, *status.Pod); restartRequired {
-		return true, false, reason
+		return Rollout{Required: true, Reason: reason}
+	}
+
+	// TODO KABOOM happening here
+	if restartRequired, reason := hasInstanceDescriptionChanged(*cluster, *status.Pod); restartRequired {
+		return Rollout{Required: true, Reason: reason}
 	}
 
 	if restartRequired, reason := isPodNeedingUpdatedScheduler(cluster, *status.Pod); restartRequired {
-		return restartRequired, false, reason
+		return Rollout{Required: restartRequired, Reason: reason}
 	}
+	// KILL above
 
 	if restartRequired, reason := isPodNeedingUpdatedTopology(cluster, *status.Pod); restartRequired {
-		return restartRequired, false, reason
+		return Rollout{Required: restartRequired, Reason: reason}
 	}
 
 	// Detect changes in the postgres container configuration
 	for _, container := range status.Pod.Spec.Containers {
-		// we go to the next array element if it isn't the postgres container
-		if container.Name != specs.PostgresContainerName {
-			continue
-		}
-
-		// Check if there is a change in the resource requirements
-		if !utils.IsResourceSubset(container.Resources, cluster.Spec.Resources) {
-			return true, false, fmt.Sprintf("resources changed, old: %+v, new: %+v",
-				cluster.Spec.Resources,
-				container.Resources)
+		if container.Name == specs.PostgresContainerName {
+			// Check if the container has all the resources from the cluster spec
+			if !utils.IsResourceSubset(container.Resources, cluster.Spec.Resources) {
+				return Rollout{
+					Required: true,
+					Reason: fmt.Sprintf("resources changed, old: %+v, new: %+v",
+						cluster.Spec.Resources,
+						container.Resources),
+				}
+			}
 		}
 	}
+	// KILL above?
 
 	// check if pod needs to be restarted because of some config requiring it
 	// or if the cluster have been explicitly restarted
 	needingRestart, reason := isPodNeedingRestart(cluster, status)
-	return needingRestart, true, reason
+	return Rollout{Required: needingRestart, CanBeInPlace: true, Reason: reason}
 }
 
 func isPodNeedingUpdatedTopology(cluster *apiv1.Cluster, pod corev1.Pod) (bool, string) {
@@ -425,17 +450,27 @@ func isPodNeedingRestart(
 	instanceStatus postgres.PostgresqlStatus,
 ) (bool, rolloutReason) {
 	// If the cluster has been restarted and we are working with a Pod
-	// which have not been restarted yet, or restarted in a different
+	// which has not been restarted yet, or restarted at a different
 	// time, let's restart it.
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
 		podRestart := instanceStatus.Pod.Annotations[specs.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
-			return true, "cluster have been explicitly restarted via annotation"
+			return true, "cluster has been explicitly restarted via annotation"
 		}
 	}
 
 	if instanceStatus.PendingRestart {
 		return true, "configuration needs a restart to apply some configuration changes"
+	}
+
+	return false, ""
+}
+
+func hasInstanceDescriptionChanged(cluster apiv1.Cluster, pod corev1.Pod) (bool, string) {
+	instanceHash, _ := specs.ComputeInstaceHash(cluster)
+	podContentHash, hasPodContenthash := pod.Annotations[utils.PodContentHashAnnotationName]
+	if hasPodContenthash && podContentHash != instanceHash {
+		return true, "pod instance hash has changed"
 	}
 
 	return false, ""

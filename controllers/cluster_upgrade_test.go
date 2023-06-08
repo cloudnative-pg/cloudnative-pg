@@ -29,15 +29,11 @@ import (
 )
 
 var _ = Describe("Pod upgrade", func() {
-	var cluster apiv1.Cluster
-
-	BeforeEach(func() {
-		cluster = apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:13.0",
-			},
-		}
-	})
+	cluster := apiv1.Cluster{
+		Spec: apiv1.ClusterSpec{
+			ImageName: "postgres:13.0",
+		},
+	}
 
 	It("will not require a restart for just created Pods", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
@@ -87,25 +83,37 @@ var _ = Describe("Pod upgrade", func() {
 		Expect(reason).ToNot(BeEmpty())
 	})
 
-	It("checks when a rollout is being needed for any reason", func() {
+	It("checks when a rollout is needed for any reason", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
-		status := postgres.PostgresqlStatus{Pod: pod, PendingRestart: true}
-		needRollout, inplacePossible, reason := IsPodNeedingRollout(status, &cluster)
-		Expect(needRollout).To(BeFalse())
-		Expect(inplacePossible).To(BeFalse())
-		Expect(reason).To(BeEmpty())
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			PendingRestart: true,
+		}
+		rollout := IsPodNeedingRollout(status, &cluster)
+		Expect(rollout.Required).To(BeFalse())
+		Expect(rollout.CanBeInPlace).To(BeFalse())
+		Expect(rollout.Reason).To(BeEmpty())
 
-		status.IsPodReady = true
-		needRollout, inplacePossible, reason = IsPodNeedingRollout(status, &cluster)
-		Expect(needRollout).To(BeTrue())
-		Expect(inplacePossible).To(BeFalse())
-		Expect(reason).To(BeEmpty())
+		status = postgres.PostgresqlStatus{
+			Pod:            pod,
+			PendingRestart: true,
+			IsPodReady:     true,
+		}
+		rollout = IsPodNeedingRollout(status, &cluster)
+		Expect(rollout.Required).To(BeTrue())
+		Expect(rollout.CanBeInPlace).To(BeFalse())
+		Expect(rollout.Reason).To(BeEmpty())
 
-		status.ExecutableHash = "test_hash"
-		needRollout, inplacePossible, reason = IsPodNeedingRollout(status, &cluster)
-		Expect(needRollout).To(BeTrue())
-		Expect(inplacePossible).To(BeTrue())
-		Expect(reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
+		status = postgres.PostgresqlStatus{
+			Pod:            pod,
+			PendingRestart: true,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+		rollout = IsPodNeedingRollout(status, &cluster)
+		Expect(rollout.Required).To(BeTrue())
+		Expect(rollout.CanBeInPlace).To(BeTrue())
+		Expect(rollout.Reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
 	})
 
 	It("should trigger a rollout when the scheduler changes", func() {

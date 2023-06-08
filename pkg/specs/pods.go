@@ -325,12 +325,27 @@ func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group
 	}
 }
 
+// ComputeInstaceHash creates a hash over the fields that will
+func ComputeInstaceHash(cluster apiv1.Cluster) (string, error) {
+	var instanceView struct {
+		targetImageName string
+		schedulerName   string
+		resources       corev1.ResourceRequirements
+	}
+	instanceView.targetImageName = cluster.GetImageName()
+	instanceView.schedulerName = cluster.Spec.SchedulerName
+	instanceView.resources = cluster.Spec.Resources
+
+	return hash.ComputeHash(instanceView)
+}
+
 // PodWithExistingStorage create a new instance with an existing storage
 func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
+	instanceHash, _ := ComputeInstaceHash(cluster)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -341,8 +356,9 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
 			},
 			Annotations: map[string]string{
-				ClusterSerialAnnotationName:    strconv.Itoa(nodeSerial),
-				utils.PodEnvHashAnnotationName: envConfig.Hash,
+				ClusterSerialAnnotationName:        strconv.Itoa(nodeSerial),
+				utils.PodEnvHashAnnotationName:     envConfig.Hash,
+				utils.PodContentHashAnnotationName: instanceHash,
 			},
 			Name:      podName,
 			Namespace: cluster.Namespace,
