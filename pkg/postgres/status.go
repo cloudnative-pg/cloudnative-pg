@@ -358,6 +358,23 @@ func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bo
 	return false
 }
 
+// AllReadyInstancesStatusUnreachable checks whether the operator has successfully extracted
+// the status of at least a ready instances via HTTP request.
+// It iterates through the list of PostgreSQL Instances statuses,
+// verifying if the associated active and ready pods are free of errors.
+// Returns true if at least a ready instances have their status extracted successfully, false otherwise.
+func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
+	for _, item := range list.Items {
+		podIsActiveAndReady := utils.IsPodActive(item.Pod) && utils.IsPodReady(item.Pod)
+		if podIsActiveAndReady && item.Error == nil {
+			// If a pod is active, ready and correctly reporting its status, return false.
+			return false
+		}
+	}
+	// All active and ready pods fail to report their status.
+	return true
+}
+
 // InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable
 func (list PostgresqlStatusList) InstancesReportingStatus() int {
 	var n int

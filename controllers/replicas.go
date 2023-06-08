@@ -106,20 +106,8 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	}
 
 	// If the first pod of the list has no reported status, it means that we weren't able to fetch any status.
+	// This is a programmatic error as the reconciliation cycle should not have reached this function.
 	if !mostAdvancedInstance.HasHTTPStatus() {
-		contextLogger.Warning(
-			"Failed to extract instance status from ready instances. Attempting requeue...",
-		)
-		if err := r.RegisterPhase(
-			ctx,
-			cluster,
-			"Instance Status Extraction Error: HTTP communication issue",
-			"Communication issue detected: The operator was unable to receive the status from one or more ready instances. "+
-				"This may be due to network restrictions such as NetworkPolicy settings. Please verify your network configuration.",
-		); err != nil {
-			return "", fmt.Errorf("while registering phase: %w", err)
-		}
-
 		return "", fmt.Errorf("unable to evaluate failover logic, unable to fetch the instances status")
 	}
 
