@@ -120,7 +120,7 @@ func (ds *databaseSnapshotter) importDatabases(
 	contextLogger := log.FromContext(ctx)
 
 	for _, database := range databases {
-		for _, section := range []string{"pre-data", "data", "post-data"} {
+		for _, section := range ds.getPgRestoreStagesToExecute() {
 			targetDatabase := target.GetDsn(database)
 			contextLogger.Info(
 				"executing database importing section",
@@ -190,7 +190,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 		return err
 	}
 
-	for _, section := range []string{"pre-data", "data", "post-data"} {
+	for _, section := range ds.getPgRestoreStagesToExecute() {
 		contextLogger.Info(
 			"executing database importing section",
 			"databaseName", database,
@@ -339,4 +339,21 @@ func (ds *databaseSnapshotter) dropExtensionsFromDatabase(
 	}
 
 	return rows.Err()
+}
+
+// getPgRestoreStagesToExecute determines which stages of `pg_restore` to execute,
+// based on the configuration of the cluster. It returns a slice of strings representing
+// the stages to execute. These stages are labeled as "pre-data", "data", and "post-data".
+func (ds *databaseSnapshotter) getPgRestoreStagesToExecute() []string {
+	const (
+		preData  = "pre-data"
+		data     = "data"
+		postData = "post-data"
+	)
+
+	if ds.cluster.Spec.Bootstrap.InitDB.Import.SchemaOnly {
+		return []string{preData, postData}
+	}
+
+	return []string{preData, data, postData}
 }

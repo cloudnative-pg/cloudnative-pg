@@ -1064,6 +1064,9 @@ type Import struct {
 	// database right after is imported - to be used with extreme care
 	// (by default empty). Only available in microservice type.
 	PostImportApplicationSQL []string `json:"postImportApplicationSQL,omitempty"`
+
+	// When set to true, only the pre-data and post-data sections of pg_restore are invoked.
+	SchemaOnly bool `json:"schemaOnly,omitempty"`
 }
 
 // ImportSource describes the source for the logical snapshot

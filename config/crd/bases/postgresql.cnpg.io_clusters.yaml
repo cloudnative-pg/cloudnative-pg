@@ -1283,6 +1283,10 @@ spec:
                             items:
                               type: string
                             type: array
+                          schemaOnly:
+                            description: When set to true, only the pre-data and post-data
+                              sections of pg_restore are invoked.
+                            type: boolean
                           source:
                             description: The source of the import
                             properties:
