@@ -510,6 +510,30 @@ $ kubectl get cluster/<cluster-name> -o yaml
 
 ```
 
+## Networking
+
+CloudNativePG requires basic networking and connectivity in place.
+You can find more information in [networking](networking.md).
+
+If installing CloudNativePG in an existing environment, there might be
+network policies in place, which could have an impact on the required
+connectivity.
+
+You can look for existing network policies with:
+
+``` sh
+kubectl get networkpolicies
+```
+
+There might be several network policies set up by IT.
+
+``` sh
+$ kubectl get networkpolicies                       
+NAME                   POD-SELECTOR                      AGE
+allow-prometheus       cnpg.io/cluster=cluster-example   47m
+default-deny-ingress   <none>                            57m
+```
+
 ## Some common issues
 
 ### Storage is full
@@ -569,3 +593,51 @@ VOLNAME=$(kubectl get pv -o json | \
 
 kubectl delete pod/$PODNAME pvc/$PODNAME pvc/$PODNAME-wal pv/$VOLNAME
 ```
+
+### Cluster stuck in `Creating new replica`
+
+Cluster is stuck in "Creating a new replica", while pod logs don't show
+relevant problems.
+This has been found to be related to the next issue
+[on connectivity](#networking-impaired-by-installed-network-policies).
+From releases 1.20.1 and 1.19.3, networking issues will more clearly be
+reflected in the status to help diagnosis.
+
+### Networking is impaired by installed Network Policies
+
+As pointed out in the [networking section](#networking), local network policies
+could prevent some of the required connectivity.
+
+A tell-tale sign that connectivity is impaired is the presence in the operator
+logs of messages like:
+
+``` text
+"Cannot extract Pod status", […snipped…] "Get \"http://100.78.22.58:8000/pg/status\": dial tcp 100.78.22.58:8000: i/o timeout"
+```
+
+You should list the network policies, and look for any policies restricting
+connectivity.
+
+``` sh
+$ kubectl get networkpolicies                       
+NAME                   POD-SELECTOR                      AGE
+allow-prometheus       cnpg.io/cluster=cluster-example   47m
+default-deny-ingress   <none>                            57m
+```
+
+For example, in the listing above, `default-deny-ingress` seems a likely
+culprit.
+You can drill into it:
+
+``` sh
+$ kubectl get networkpolicies default-deny-ingress -o yaml
+<…snipped…>
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+```
+
+In the [networking page](networking.md) you can find a network policy file
+that you can customize to create a `NetworkPolicy` explicitly allowing the
+operator to connect cross-namespace to cluster pods.
