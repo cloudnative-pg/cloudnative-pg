@@ -214,7 +214,7 @@ func (r *InstanceReconciler) Reconcile(
 		if err = r.instance.Reload(); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
 		}
-		if err = r.waitForConfigurationReload(ctx, cluster); err != nil {
+		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 		}
 	}
@@ -890,12 +890,12 @@ func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster
 	return nil
 }
 
-// waitForConfigurationReload waits for the db to be up and
+// processConfigReloadAndManageRestart waits for the db to be up and
 // the new configuration to be reloaded
-func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
-	status, err := r.instance.WaitForConfigReloaded()
+	status, err := r.instance.WaitForConfigReload()
 	if err != nil {
 		return err
 	}
@@ -1052,7 +1052,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
-		if err := r.promoteAndWait(ctx, cluster); err != nil {
+		if err := r.handlePromotion(ctx, cluster); err != nil {
 			return false, err
 		}
 		restarted = true
@@ -1079,7 +1079,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	return restarted, nil
 }
 
-func (r *InstanceReconciler) promoteAndWait(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
 	if r.instance.PodName != cluster.Status.CurrentPrimary {
