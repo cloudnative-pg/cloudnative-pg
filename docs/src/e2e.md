@@ -7,11 +7,11 @@ the operator correctly deploys and manages PostgreSQL clusters.
 Moreover, the following Kubernetes versions are tested for each commit,
 helping detect bugs at an early stage of the development process:
 
+* 1.27
 * 1.26
 * 1.25
 * 1.24
 * 1.23
-* 1.22
 
 The following PostgreSQL versions are tested:
 
