@@ -249,13 +249,13 @@ func IsPodNeedingRollout(
 	checkers := []rolloutChecker{
 		checkHasExecutableHash,
 		checkHasResizingPVC,
-		checkProjectedVolumeNeedsUpdate,
-		checkPodImageNeedsUpdate,
-		checkPodInitContainerNeedsUpdate,
+		checkProjectedVolumeIsOutdated,
+		checkPodImageIsOutdated,
+		checkPodInitContainerIsOutdated,
 		checkHasMissingPVCs,
 		checkPodEnvironmentIsOutdated,
 		checkSchedulerIsOutdated,
-		checkPostgresCotainerConfigOutdated,
+		checkPostgresContainerIsOutdated,
 		checkClusterHasNewerRestartAnnotation,
 	}
 	for _, check := range checkers {
@@ -294,7 +294,7 @@ func checkHasResizingPVC(
 	return Rollout{}
 }
 
-func checkProjectedVolumeNeedsUpdate(
+func checkProjectedVolumeIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) Rollout {
@@ -305,7 +305,7 @@ func checkProjectedVolumeNeedsUpdate(
 	return Rollout{}
 }
 
-func checkPodImageNeedsUpdate(
+func checkPodImageIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) Rollout {
@@ -324,7 +324,7 @@ func checkPodImageNeedsUpdate(
 	return Rollout{}
 }
 
-func checkPodInitContainerNeedsUpdate(
+func checkPodInitContainerIsOutdated(
 	status postgres.PostgresqlStatus,
 	_ *apiv1.Cluster,
 ) Rollout {
@@ -377,7 +377,7 @@ func checkSchedulerIsOutdated(
 	return Rollout{}
 }
 
-func checkPostgresCotainerConfigOutdated(
+func checkPostgresContainerIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) Rollout {
