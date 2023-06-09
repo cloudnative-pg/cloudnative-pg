@@ -43,6 +43,7 @@ CR's
 CRC
 CRD
 CRDs
+CSI
 CSV
 CSVs
 Canovai
