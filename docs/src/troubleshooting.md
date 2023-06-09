@@ -510,6 +510,32 @@ $ kubectl get cluster/<cluster-name> -o yaml
 
 ```
 
+## Networking
+
+CloudNativePG requires basic networking and connectivity in place.
+You can find more information in the [networking](networking.md) section.
+
+If installing CloudNativePG in an existing environment, there might be
+network policies in place, or other network configuration made specifically
+for the cluster, which could have an impact on the required connectivity
+between the operator and the cluster pods and/or the between the pods.
+
+You can look for existing network policies with the following command:
+
+``` sh
+kubectl get networkpolicies
+```
+
+There might be several network policies set up by the Kubernetes network
+administrator.
+
+``` sh
+$ kubectl get networkpolicies                       
+NAME                   POD-SELECTOR                      AGE
+allow-prometheus       cnpg.io/cluster=cluster-example   47m
+default-deny-ingress   <none>                            57m
+```
+
 ## Some common issues
 
 ### Storage is full
@@ -569,3 +595,54 @@ VOLNAME=$(kubectl get pv -o json | \
 
 kubectl delete pod/$PODNAME pvc/$PODNAME pvc/$PODNAME-wal pv/$VOLNAME
 ```
+
+### Cluster stuck in `Creating new replica`
+
+Cluster is stuck in "Creating a new replica", while pod logs don't show
+relevant problems.
+This has been found to be related to the next issue
+[on connectivity](#networking-is-impaired-by-installed-network-policies).
+From releases 1.20.1, 1.19.3, and 1.18.5, networking issues will be more clearly
+reflected in the status column as follows:
+
+``` text
+Instance Status Extraction Error: HTTP communication issue
+```
+
+### Networking is impaired by installed Network Policies
+
+As pointed out in the [networking section](#networking), local network policies
+could prevent some of the required connectivity.
+
+A tell-tale sign that connectivity is impaired is the presence in the operator
+logs of messages like:
+
+``` text
+"Cannot extract Pod status", […snipped…] "Get \"http://<pod IP>:8000/pg/status\": dial tcp <pod IP>:8000: i/o timeout"
+```
+
+You should list the network policies, and look for any policies restricting
+connectivity.
+
+``` sh
+$ kubectl get networkpolicies                       
+NAME                   POD-SELECTOR                      AGE
+allow-prometheus       cnpg.io/cluster=cluster-example   47m
+default-deny-ingress   <none>                            57m
+```
+
+For example, in the listing above, `default-deny-ingress` seems a likely culprit.
+You can drill into it:
+
+``` sh
+$ kubectl get networkpolicies default-deny-ingress -o yaml
+<…snipped…>
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+```
+
+In the [networking page](networking.md) you can find a network policy file
+that you can customize to create a `NetworkPolicy` explicitly allowing the
+operator to connect cross-namespace to cluster pods.
