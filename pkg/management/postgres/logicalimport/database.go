@@ -90,6 +90,12 @@ func (ds *databaseSnapshotter) exportDatabases(
 	databases []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
+	sectionsToExport := []string{}
+
+	for _, section := range ds.getSectionsToExecute() {
+		sectionsToExport = append(sectionsToExport, fmt.Sprintf("--section=%s", section))
+	}
+
 	for _, database := range databases {
 		contextLogger.Info("exporting database", "databaseName", database)
 		dsn := target.GetDsn(database)
@@ -99,6 +105,7 @@ func (ds *databaseSnapshotter) exportDatabases(
 			"-d", dsn,
 			"-v",
 		}
+		options = append(options, sectionsToExport...)
 
 		contextLogger.Info("Running pg_dump", "cmd", pgDump,
 			"options", options)
@@ -120,7 +127,7 @@ func (ds *databaseSnapshotter) importDatabases(
 	contextLogger := log.FromContext(ctx)
 
 	for _, database := range databases {
-		for _, section := range ds.getPgRestoreStagesToExecute() {
+		for _, section := range ds.getSectionsToExecute() {
 			targetDatabase := target.GetDsn(database)
 			contextLogger.Info(
 				"executing database importing section",
@@ -190,7 +197,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 		return err
 	}
 
-	for _, section := range ds.getPgRestoreStagesToExecute() {
+	for _, section := range ds.getSectionsToExecute() {
 		contextLogger.Info(
 			"executing database importing section",
 			"databaseName", database,
@@ -341,10 +348,10 @@ func (ds *databaseSnapshotter) dropExtensionsFromDatabase(
 	return rows.Err()
 }
 
-// getPgRestoreStagesToExecute determines which stages of `pg_restore` to execute,
+// getSectionsToExecute determines which stages of `pg_restore` and `pg_dump` to execute,
 // based on the configuration of the cluster. It returns a slice of strings representing
-// the stages to execute. These stages are labeled as "pre-data", "data", and "post-data".
-func (ds *databaseSnapshotter) getPgRestoreStagesToExecute() []string {
+// the sections to execute. These sections are labeled as "pre-data", "data", and "post-data".
+func (ds *databaseSnapshotter) getSectionsToExecute() []string {
 	const (
 		preData  = "pre-data"
 		data     = "data"
