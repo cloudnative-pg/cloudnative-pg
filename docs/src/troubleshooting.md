@@ -513,19 +513,20 @@ $ kubectl get cluster/<cluster-name> -o yaml
 ## Networking
 
 CloudNativePG requires basic networking and connectivity in place.
-You can find more information in [networking](networking.md).
+You can find more information in [networking](networking.md) section.
 
 If installing CloudNativePG in an existing environment, there might be
-network policies in place, which could have an impact on the required
-connectivity.
+network policies in place or other network configuration made specifically
+for the cluster, which could have an impact on the required connectivity between,
+the operator and the cluster pods and/or the between the pods.
 
-You can look for existing network policies with:
+You can look for existing network policies with the following command:
 
 ``` sh
 kubectl get networkpolicies
 ```
 
-There might be several network policies set up by IT.
+There might be several network policies set up by Kubernetes network administrator.
 
 ``` sh
 $ kubectl get networkpolicies                       
@@ -533,6 +534,9 @@ NAME                   POD-SELECTOR                      AGE
 allow-prometheus       cnpg.io/cluster=cluster-example   47m
 default-deny-ingress   <none>                            57m
 ```
+
+In case there's no network policies in place, but still having connectivity issues,
+please refer to the network plugin documentation.
 
 ## Some common issues
 
@@ -600,8 +604,12 @@ Cluster is stuck in "Creating a new replica", while pod logs don't show
 relevant problems.
 This has been found to be related to the next issue
 [on connectivity](#networking-is-impaired-by-installed-network-policies).
-From releases 1.20.1 and 1.19.3, networking issues will more clearly be
-reflected in the status to help diagnosis.
+From releases 1.20.1 and 1.19.3, networking issues will be more clearly
+reflected in the status column as follow:
+
+``` text
+Instance Status Extraction Error: HTTP communication issue
+```
 
 ### Networking is impaired by installed Network Policies
 
@@ -612,10 +620,16 @@ A tell-tale sign that connectivity is impaired is the presence in the operator
 logs of messages like:
 
 ``` text
-"Cannot extract Pod status", […snipped…] "Get \"http://100.78.22.58:8000/pg/status\": dial tcp 100.78.22.58:8000: i/o timeout"
+"Cannot extract Pod status", […snipped…] "Get \"http://<pod IP>:8000/pg/status\": dial tcp <pod IP>:8000: i/o timeout"
 ```
 
-You should list the network policies, and look for any policies restricting
+!!! Important
+    Even if the policy was just applied, it is possible that this error will not appear right away since
+    is required a reconciliation cycle from the operator that will require the status of the pods, or that
+    something changes in the cluster that will try to retrieve all the status, and this error will be reflected.
+    Thus, it could take and undetermined amount of time to see this error.
+
+As a first step, you can list the network policies, and look for any policies restricting
 connectivity.
 
 ``` sh
@@ -625,8 +639,7 @@ allow-prometheus       cnpg.io/cluster=cluster-example   47m
 default-deny-ingress   <none>                            57m
 ```
 
-For example, in the listing above, `default-deny-ingress` seems a likely
-culprit.
+For example, in the listing above, `default-deny-ingress` seems a likely culprit.
 You can drill into it:
 
 ``` sh
