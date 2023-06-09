@@ -219,8 +219,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	// using a service for which the routing table hasn't changed, getting
 	// stuck for a while. We raise the timeout, since we can't intervene
 	// on GKE configuration.
-	isGKE, err := env.IsGKE()
-	if err != nil && isGKE {
+	if IsGKE() {
 		maxReattachTime = 180
 	}
 

@@ -118,11 +118,11 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 		BeforeAll(func() {
 			// limit the case running on local kind env as we are using taint to simulate the eviction
 			// we do not know if other cloud vendor crd controller is running on the node been evicted
-			isIBM := env.IsIBM()
-			isAKS, _ := env.IsAKS()
-			isGKE, _ := env.IsGKE()
-			if isIBM || isAKS || isGKE {
-				Skip("Test runs only on local")
+			if !IsLocal() {
+				Skip("This test is only run on local cluster")
+			}
+			if env.IsIBM() {
+				Skip("This test is not run on IBM architecture")
 			}
 			const namespacePrefix = "single-instance-pod-eviction"
 			var err error
@@ -178,11 +178,11 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			isIBM := env.IsIBM()
-			isAKS, _ := env.IsAKS()
-			isGKE, _ := env.IsGKE()
-			if isIBM || isAKS || isGKE {
-				Skip("Test runs only on local")
+			if !IsLocal() {
+				Skip("This test is only run on local cluster")
+			}
+			if env.IsIBM() {
+				Skip("This test is not run on IBM architecture")
 			}
 		})
 		JustAfterEach(func() {

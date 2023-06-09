@@ -17,8 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
-
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -52,12 +50,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// Sometimes on AKS the promotion itself takes more than 10 seconds.
 		// Nothing to be done operator side, we raise the timeout to avoid
 		// failures in the test.
-		isAKS, err := env.IsAKS()
-		if err != nil {
-			fmt.Println("Couldn't verify if tests are running on AKS, assuming they aren't")
-		}
-
-		if isAKS {
+		if IsAKS() {
 			maxFailoverTime = 30
 		}
 
@@ -65,12 +58,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// using a service, for which the routing table hasn't changed, getting
 		// stuck for a while.
 		// We raise the timeout, since we can't intervene on GKE configuration.
-		isGKE, err := env.IsGKE()
-		if err != nil {
-			fmt.Println("Couldn't verify if tests are running on GKE, assuming they aren't")
-		}
-
-		if isGKE {
+		if IsGKE() {
 			maxReattachTime = 180
 			maxFailoverTime = 20
 		}
