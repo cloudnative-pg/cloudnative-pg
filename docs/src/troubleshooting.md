@@ -513,12 +513,12 @@ $ kubectl get cluster/<cluster-name> -o yaml
 ## Networking
 
 CloudNativePG requires basic networking and connectivity in place.
-You can find more information in [networking](networking.md) section.
+You can find more information in the [networking](networking.md) section.
 
 If installing CloudNativePG in an existing environment, there might be
-network policies in place or other network configuration made specifically
-for the cluster, which could have an impact on the required connectivity between,
-the operator and the cluster pods and/or the between the pods.
+network policies in place, or other network configuration made specifically
+for the cluster, which could have an impact on the required connectivity
+between the operator and the cluster pods and/or the between the pods.
 
 You can look for existing network policies with the following command:
 
@@ -526,7 +526,8 @@ You can look for existing network policies with the following command:
 kubectl get networkpolicies
 ```
 
-There might be several network policies set up by Kubernetes network administrator.
+There might be several network policies set up by the Kubernetes network
+administrator.
 
 ``` sh
 $ kubectl get networkpolicies                       
@@ -534,9 +535,6 @@ NAME                   POD-SELECTOR                      AGE
 allow-prometheus       cnpg.io/cluster=cluster-example   47m
 default-deny-ingress   <none>                            57m
 ```
-
-In case there's no network policies in place, but still having connectivity issues,
-please refer to the network plugin documentation.
 
 ## Some common issues
 
@@ -604,8 +602,8 @@ Cluster is stuck in "Creating a new replica", while pod logs don't show
 relevant problems.
 This has been found to be related to the next issue
 [on connectivity](#networking-is-impaired-by-installed-network-policies).
-From releases 1.20.1 and 1.19.3, networking issues will be more clearly
-reflected in the status column as follow:
+From releases 1.20.1, 1.19.3, and 1.18.5, networking issues will be more clearly
+reflected in the status column as follows:
 
 ``` text
 Instance Status Extraction Error: HTTP communication issue
@@ -623,13 +621,7 @@ logs of messages like:
 "Cannot extract Pod status", […snipped…] "Get \"http://<pod IP>:8000/pg/status\": dial tcp <pod IP>:8000: i/o timeout"
 ```
 
-!!! Important
-    Even if the policy was just applied, it is possible that this error will not appear right away since
-    is required a reconciliation cycle from the operator that will require the status of the pods, or that
-    something changes in the cluster that will try to retrieve all the status, and this error will be reflected.
-    Thus, it could take and undetermined amount of time to see this error.
-
-As a first step, you can list the network policies, and look for any policies restricting
+You should list the network policies, and look for any policies restricting
 connectivity.
 
 ``` sh
