@@ -205,11 +205,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		When("the cluster allows moving PVCs between nodes", func() {
 			BeforeEach(func() {
 				// AKS using rook and the standard GKE StorageClass allow moving PVCs between nodes
-				isAKS, err := env.IsAKS()
-				Expect(err).ToNot(HaveOccurred())
-				isGKE, err := env.IsGKE()
-				Expect(err).ToNot(HaveOccurred())
-				if !(isAKS || isGKE) {
+				if !(IsAKS() || IsGKE()) {
 					Skip("This test case is only applicable on clusters where PVC can be moved")
 				}
 			})

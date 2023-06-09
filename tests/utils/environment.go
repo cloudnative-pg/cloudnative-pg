@@ -274,6 +274,8 @@ func (env TestingEnvironment) GetScheduledBackupList(namespace string) (*apiv1.S
 
 // IsGKE returns true if we run on Google Kubernetes Engine. We check that
 // by verifying if all the node names start with "gke-"
+// Deprecated.
+// Using testCloudVendorEnv
 func (env TestingEnvironment) IsGKE() (bool, error) {
 	nodeList := &corev1.NodeList{}
 	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
@@ -290,6 +292,8 @@ func (env TestingEnvironment) IsGKE() (bool, error) {
 
 // IsAKS returns true if we run on Azure Kubernetes Service. We check that
 // by verifying if all the node names start with "aks-"
+// Deprecated.
+// Using testCloudVendorEnv
 func (env TestingEnvironment) IsAKS() (bool, error) {
 	nodeList := &corev1.NodeList{}
 	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
@@ -306,6 +310,8 @@ func (env TestingEnvironment) IsAKS() (bool, error) {
 
 // IsEKS returns true if we run on amazon EKS Service. We check that
 // by verifying if all the node names start with "ip-"
+// Deprecated.
+// Using testCloudVendorEnv
 func (env TestingEnvironment) IsEKS() (bool, error) {
 	nodeList := &corev1.NodeList{}
 	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
