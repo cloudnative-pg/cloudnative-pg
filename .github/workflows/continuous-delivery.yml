@@ -557,6 +557,7 @@ jobs:
       E2E_DEFAULT_STORAGE_CLASS: standard
       LOG_DIR: ${{ github.workspace }}/kind-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
+      TEST_CLOUD_VENDOR: "local"
     steps:
       -
         name: Cleanup Disk

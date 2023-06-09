@@ -80,27 +80,14 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				GinkgoWriter.Println("---- Testing barman backups without the name flag ----")
 				clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-legacy.yaml.template"
 			}
-
-			isAKS, err := env.IsAKS()
-			Expect(err).ToNot(HaveOccurred())
-			if isAKS {
-				Skip("This test is not run on AKS")
-			}
-			isEKS, err := env.IsEKS()
-			Expect(err).ToNot(HaveOccurred())
-			if isEKS {
-				Skip("This test is not run on EKS")
-			}
-			isGKE, err := env.IsGKE()
-			Expect(err).ToNot(HaveOccurred())
-			if isGKE {
-				Skip("This test is not run on GKE")
+			if !IsLocal() {
+				Skip("This test is only run on local cluster")
 			}
 			if env.IsIBM() {
-				Skip("This test is not run on an IBM architecture")
+				Skip("This test is not run on IBM architecture")
 			}
 			const namespacePrefix = "cluster-backup-minio"
-
+			var err error
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -552,14 +539,13 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			"/backup/scheduled_backup_immediate/scheduled-backup-immediate-azure-blob.yaml"
 		backupFile := fixturesDir + "/backup/azure_blob/backup-azure-blob.yaml"
 		BeforeAll(func() {
-			isAKS, err := env.IsAKS()
-			Expect(err).ToNot(HaveOccurred())
-			if !isAKS {
-				Skip("This test is only executed on AKS clusters")
+			if !IsAKS() {
+				Skip("This test is only run on AKS clusters")
 			}
 			azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 			azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
 			const namespacePrefix = "cluster-backup-azure-blob"
+			var err error
 			clusterName, err = env.GetResourceNameFromYAML(azureBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -689,15 +675,14 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		)
 
 		BeforeAll(func() {
-			isAKS, err := env.IsAKS()
-			Expect(err).ToNot(HaveOccurred())
-			if isAKS {
+			if !IsLocal() || !IsGKE() {
 				Skip("This test is only executed on gke, openshift and local")
 			}
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
 			const namespacePrefix = "cluster-backup-azurite"
+			var err error
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -830,25 +815,14 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	// created by Barman Cloud, and defined via the barmanObjectStore option in the externalClusters section
 	Context("using minio as object storage", Ordered, func() {
 		BeforeAll(func() {
-			isAKS, err := env.IsAKS()
-			Expect(err).ToNot(HaveOccurred())
-			if isAKS {
-				Skip("This test is only executed on gke, openshift and local")
-			}
-			isEKS, err := env.IsEKS()
-			Expect(err).ToNot(HaveOccurred())
-			if isEKS {
-				Skip("This test is not run on EKS")
-			}
-			isGKE, err := env.IsGKE()
-			Expect(err).ToNot(HaveOccurred())
-			if isGKE {
-				Skip("This test is not run on GKE")
+			if !IsLocal() {
+				Skip("This test is only executed on openshift and local")
 			}
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
 			const namespacePrefix = "recovery-barman-object-minio"
+			var err error
 			clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileMinio)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
@@ -1022,14 +996,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	Context("using azure blobs as object storage", func() {
 		Context("storage account access authentication", Ordered, func() {
 			BeforeAll(func() {
-				isAKS, err := env.IsAKS()
-				Expect(err).ToNot(HaveOccurred())
-				if !isAKS {
+				if !IsAKS() {
 					Skip("This test is only executed on AKS clusters")
 				}
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
 				const namespacePrefix = "recovery-barman-object-azure"
+				var err error
 				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzure)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1103,14 +1076,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 		Context("storage account SAS Token authentication", Ordered, func() {
 			BeforeAll(func() {
-				isAKS, err := env.IsAKS()
-				Expect(err).ToNot(HaveOccurred())
-				if !isAKS {
+				if !IsAKS() {
 					Skip("This test is only executed on AKS clusters")
 				}
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
 				const namespacePrefix = "cluster-backup-azure-blob-sas"
+				var err error
 				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzureSAS)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1187,15 +1159,14 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 	Context("using Azurite blobs as object storage", Ordered, func() {
 		BeforeAll(func() {
-			isAKS, err := env.IsAKS()
-			Expect(err).ToNot(HaveOccurred())
-			if isAKS {
+			if IsAKS() {
 				Skip("This test is not run on AKS")
 			}
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
 			const namespacePrefix = "recovery-barman-object-azurite"
+			var err error
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1293,28 +1264,16 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			restoreBackup             = fixturesDir + "/backup/backup_restore_safety/backup-cluster-2.yaml"
 		)
 		BeforeAll(func() {
-			isAKS, err := env.IsAKS()
-			Expect(err).ToNot(HaveOccurred())
-
-			if isAKS {
-				Skip("This test is not run on AKS")
-			}
-			isEKS, err := env.IsEKS()
-			Expect(err).ToNot(HaveOccurred())
-			if isEKS {
-				Skip("This test is not run on EKS")
-			}
-			isGKE, err := env.IsGKE()
-			Expect(err).ToNot(HaveOccurred())
-			if isGKE {
-				Skip("This test is not run on GKE")
+			if !IsLocal() {
+				Skip("This test is only run on local cluster")
 			}
 			if env.IsIBM() {
-				Skip("This test is not run on an IBM architecture")
+				Skip("This test is not run on IBM architecture")
 			}
 			// This name is used in yaml file, keep it as const
 			namespace = "backup-safety-1"
 			namespacePrefix2 := "backup-safety-2"
+			var err error
 			clusterName, err = env.GetResourceNameFromYAML(clusterSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
