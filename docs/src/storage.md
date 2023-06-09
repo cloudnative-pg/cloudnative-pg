@@ -16,8 +16,10 @@ and bare metal, are also valid in container contexts managed by Kubernetes.
 
 There are two primary methods of access to storage:
 
-- **network**: either directly or indirectly (think of an NFS volume locally mounted on a host running Kubernetes)
-- **local**: directly attached to the node where a Pod is running (this also includes directly attached disks on bare metal installations of Kubernetes)
+- **network**: either directly or indirectly (think of an NFS volume locally
+  mounted on a host running Kubernetes)
+- **local**: directly attached to the node where a Pod is running (this also
+  includes directly attached disks on bare metal installations of Kubernetes)
 
 Network storage, which is the most common usage pattern in Kubernetes,
 presents the same issues of throughput and latency that you can
@@ -397,3 +399,39 @@ cluster-example-2              1/1     Running     0          5m43s
 cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```
+
+## Static provisioning of persistent volumes
+
+CloudNativePG has been designed to work with dynamic volume provisioning, which
+allows storage volumes to be automatically created on-demand when requested by
+users, via storage classes and persistent volume claim templates as described
+above.
+
+However, in some cases, Kubernetes administrators prefer to *manually* create new
+storage volumes, and then create the related `PersistentVolume` objects for
+their representation inside the Kubernetes cluster. This is also known as
+**pre-provisioning** of volumes.
+
+!!! Important
+    Our recommendation is to avoid pre-provisioning of volumes as it
+    impacts on the high availability and self-healing capabilities
+    of the operator, and breaks the fully declarative model on which
+    CloudNativePG has been built.
+
+You can use a pre-provisioned volume in CloudNativePG by following these steps:
+
+1. Manually create the volume outside Kubernetes
+2. Create the `PersistentVolume` object to match the above volume using the
+   correct parameters as required by actual CSI driver (i.e. `volumeHandle`,
+   `fsType`, `storageClassName`, and so on)
+3. Create the Postgres `Cluster` using, for each storage section, a coherent
+   [`pvcTemplate`](storage.md#configuration-via-a-pvc-template)
+   section that can help Kubernetes match the above `PersistentVolume`
+   and enable CloudNativePG to create the needed `PersistentVolumeClaim`
+
+!!! Warning
+    With static provisioning, it is your responsibility to ensure that, based
+    on the affinity rules of your cluster, Postgres pods can be correctly scheduled
+    by Kubernetes where a pre-provisioned volume exists. Make sure you check
+    for any pods stuck in `Pending` after you have deployed the cluster, and
+    if the condition persists investigate why this is happening.
