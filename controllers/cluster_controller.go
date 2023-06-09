@@ -232,14 +232,15 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	if instancesStatus.AllReadyInstancesStatusUnreachable() {
 		contextLogger.Warning(
-			"Failed to extract instance status from ready instances. Attempting requeue...",
+			"Failed to extract instance status from ready instances. Attempting to requeue...",
 		)
 		registerPhaseErr := r.RegisterPhase(
 			ctx,
 			cluster,
 			"Instance Status Extraction Error: HTTP communication issue",
 			"Communication issue detected: The operator was unable to receive the status from all the ready instances. "+
-				"This may be due to network restrictions such as NetworkPolicy settings. Please verify your network configuration.",
+				"This may be due to network restrictions such as NetworkPolicy and/or any other network plugin setting. "+
+				"Please verify your network configuration.",
 		)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 	}
