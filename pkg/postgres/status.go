@@ -73,7 +73,7 @@ type PostgresqlStatus struct {
 	// not still invoked the readiness probe.
 	//
 	// If you want to check the latest detected status of PostgreSQL, you
-	// need to call IsPostgresqlReady().
+	// need to call HasHTTPStatus().
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
@@ -115,13 +115,13 @@ func (status *PostgresqlStatus) AddPod(pod corev1.Pod) {
 	status.Node = pod.Spec.NodeName
 }
 
-// IsPostgresqlReady checks if the instance manager is reporting this
+// HasHTTPStatus checks if the instance manager is reporting this
 // instance as ready.
 //
 // The result represents the state of PostgreSQL at the moment of the
 // collection of the instance status and is more up-to-date than
 // IsPodReady field, which is updated asynchronously.
-func (status PostgresqlStatus) IsPostgresqlReady() bool {
+func (status PostgresqlStatus) HasHTTPStatus() bool {
 	// To load the status of this instance, we use the `/pg/status` endpoint
 	// of the instance manager. PostgreSQL is ready and running if the
 	// endpoint returns success, and the Error field will be nil.
@@ -356,6 +356,26 @@ func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bo
 	}
 
 	return false
+}
+
+// AllReadyInstancesStatusUnreachable returns true if all the
+// ready instances are unreachable from the operator via HTTP request.
+func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
+	hasActiveAndReady := false
+	for _, item := range list.Items {
+		podIsActiveAndReady := utils.IsPodActive(item.Pod) && utils.IsPodReady(item.Pod)
+
+		if !podIsActiveAndReady {
+			continue
+		}
+
+		hasActiveAndReady = true
+		if item.Error == nil {
+			return false
+		}
+	}
+
+	return hasActiveAndReady
 }
 
 // InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable
