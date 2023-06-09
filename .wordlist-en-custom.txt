@@ -946,6 +946,7 @@ tls
 tmp
 tmpfs
 tolerations
+topologies
 topologyKey
 transactional
 transactionid
