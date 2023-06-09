@@ -57,6 +57,7 @@ const (
 var (
 	env                     *utils.TestingEnvironment
 	testLevelEnv            *tests.TestEnvLevel
+	testCloudVendorEnv      *utils.TestEnvVendor
 	psqlClientPod           *corev1.Pod
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
@@ -88,18 +89,18 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	var err error
 	// We are creating new testing env object again because above testing env can not serialize and
 	// accessible to all nodes (specs)
-	env, err = utils.NewTestingEnvironment()
-	if err != nil {
+	if env, err = utils.NewTestingEnvironment(); err != nil {
 		panic(err)
 	}
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
-	testLevelEnv, err = tests.TestLevel()
-	if err != nil {
+	if testLevelEnv, err = tests.TestLevel(); err != nil {
 		panic(err)
 	}
-	testTimeouts, err = utils.Timeouts()
-	if err != nil {
+	if testTimeouts, err = utils.Timeouts(); err != nil {
+		panic(err)
+	}
+	if testCloudVendorEnv, err = utils.TestCloudVendor(); err != nil {
 		panic(err)
 	}
 	if err := json.Unmarshal(data, &psqlClientPod); err != nil {

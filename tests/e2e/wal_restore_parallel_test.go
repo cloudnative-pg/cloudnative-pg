@@ -46,23 +46,11 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+		if !IsLocal() {
+			Skip("This test is only run on local cluster")
+		}
 		if env.IsIBM() {
-			Skip("This test is not run on an IBM architecture")
-		}
-		isAKS, err := env.IsAKS()
-		Expect(err).ToNot(HaveOccurred())
-		if isAKS {
-			Skip("This test is not run on AKS")
-		}
-		isEKS, err := env.IsEKS()
-		Expect(err).ToNot(HaveOccurred())
-		if isEKS {
-			Skip("This test is not run on EKS")
-		}
-		isGKE, err := env.IsGKE()
-		Expect(err).ToNot(HaveOccurred())
-		if isGKE {
-			Skip("This test is not run on GKE")
+			Skip("This test is not run on IBM architecture")
 		}
 	})
 
