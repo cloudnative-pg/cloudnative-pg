@@ -266,6 +266,7 @@ proper AppArmor profile to use.
 The pods created by the `Cluster` resource can be controlled by Kubernetes
 [network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 to enable/disable inbound and outbound network access at IP and TCP level.
+You can find more information in the [networking document](networking.md).
 
 !!! Important
     The operator needs to communicate to each instance on TCP port 8000

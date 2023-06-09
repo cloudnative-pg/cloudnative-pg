@@ -1,0 +1,22 @@
+# This network policy allows ingress from the CNPG operator
+# installed in namespace cnpg-system into the pods corresponding
+# to a cluster named cluster-example
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-operator
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: cluster-example # The label value must be the cluster name
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system # Namespace where the operator is deployed
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudnative-pg # Matches the Operator pod
+      ports:
+        - port: 8000
+        - port: 5432

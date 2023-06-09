@@ -153,6 +153,7 @@ Istio's
 JSON
 Jihyuk
 Jitendra
+KinD
 Krew
 KubeCon
 Kumar
@@ -691,6 +692,7 @@ namespaced
 namespaces
 natively
 ndQuadrant
+networkpolicy
 newers
 nextScheduleTime
 nginx

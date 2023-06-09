@@ -50,6 +50,7 @@ nav:
   - operator_capability_levels.md
   - controller.md
   - samples.md
+  - networking.md
   - benchmarking.md
   - commercial_support.md
   - faq.md
