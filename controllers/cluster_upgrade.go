@@ -217,6 +217,11 @@ type Rollout struct {
 	Reason       string
 }
 
+type rolloutChecker func(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout
+
 // IsPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its current state
 // with its expected state defined inside the cluster struct.
 //
@@ -236,20 +241,48 @@ type Rollout struct {
 func IsPodNeedingRollout(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (
-	rollout Rollout,
-) {
+) Rollout {
 	if !status.IsPodReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
 		return Rollout{}
 	}
 
-	// check if the pod is reporting his instance manager version
+	checkers := []rolloutChecker{
+		checkHasExecutableHash,
+		checkHasResizingPVC,
+		checkProjectedVolumeNeedsUpdate,
+		checkPodImageNeedsUpdate,
+		checkPodInitContainerNeedsUpdate,
+		checkHasMissingPVCs,
+		checkPodEnvironmentIsOutdated,
+		checkSchedulerIsOutdated,
+		checkPostgresCotainerConfigOutdated,
+		checkClusterHasNewerRestartAnnotation,
+	}
+	for _, check := range checkers {
+		rollout := check(status, cluster)
+		if rollout.Required {
+			return rollout
+		}
+	}
+	return Rollout{}
+}
+
+func checkHasExecutableHash(
+	status postgres.PostgresqlStatus,
+	_ *apiv1.Cluster,
+) Rollout {
 	if status.ExecutableHash == "" {
 		// This is an old instance manager.
 		// We need to replace it with one supporting the online operator upgrade feature
 		return Rollout{Required: true}
 	}
+	return Rollout{}
+}
 
+func checkHasResizingPVC(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout {
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, pvcName := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC begins with the name of the pod using it.
@@ -258,13 +291,24 @@ func IsPodNeedingRollout(
 			}
 		}
 	}
+	return Rollout{}
+}
 
+func checkProjectedVolumeNeedsUpdate(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout {
 	// Check if there is a change in the projected volume configuration
 	if needsUpdate, reason := isPodNeedingUpdateOfProjectedVolume(cluster, *status.Pod); needsUpdate {
 		return Rollout{Required: true, Reason: reason}
 	}
+	return Rollout{}
+}
 
-	// check if the pod requires an image upgrade
+func checkPodImageNeedsUpdate(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout {
 	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, *status.Pod)
 	if err != nil {
 		log.Error(err, "while checking if image could be upgraded")
@@ -277,10 +321,15 @@ func IsPodNeedingRollout(
 				oldImage, newImage),
 		}
 	}
-	// KILL above
+	return Rollout{}
+}
 
+func checkPodInitContainerNeedsUpdate(
+	status postgres.PostgresqlStatus,
+	_ *apiv1.Cluster,
+) Rollout {
 	if !configuration.Current.EnableInstanceManagerInplaceUpdates {
-		oldImage, newImage, err = isPodNeedingUpgradedInitContainerImage(*status.Pod)
+		oldImage, newImage, err := isPodNeedingUpgradedInitContainerImage(*status.Pod)
 		if err != nil {
 			log.Error(err, "while checking if init container image could be upgraded")
 			return Rollout{}
@@ -294,32 +343,44 @@ func IsPodNeedingRollout(
 			}
 		}
 	}
-	// CANNOT? KILL above
+	return Rollout{}
+}
 
+func checkHasMissingPVCs(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
 		return Rollout{Required: true, Reason: string(apiv1.DetachedVolume)}
 	}
+	return Rollout{}
+}
 
+func checkPodEnvironmentIsOutdated(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout {
 	// Check if there is a change in the environment section
 	if restartRequired, reason := isPodNeedingUpdatedEnvironment(*cluster, *status.Pod); restartRequired {
 		return Rollout{Required: true, Reason: reason}
 	}
+	return Rollout{}
+}
 
-	// TODO KABOOM happening here
-	if restartRequired, reason := hasInstanceDescriptionChanged(*cluster, *status.Pod); restartRequired {
-		return Rollout{Required: true, Reason: reason}
-	}
-
+func checkSchedulerIsOutdated(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout {
 	if restartRequired, reason := isPodNeedingUpdatedScheduler(cluster, *status.Pod); restartRequired {
 		return Rollout{Required: restartRequired, Reason: reason}
 	}
-	// KILL above
+	return Rollout{}
+}
 
-	if restartRequired, reason := isPodNeedingUpdatedTopology(cluster, *status.Pod); restartRequired {
-		return Rollout{Required: restartRequired, Reason: reason}
-	}
-
-	// Detect changes in the postgres container configuration
+func checkPostgresCotainerConfigOutdated(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout {
 	for _, container := range status.Pod.Spec.Containers {
 		if container.Name == specs.PostgresContainerName {
 			// Check if the container has all the resources from the cluster spec
@@ -333,8 +394,13 @@ func IsPodNeedingRollout(
 			}
 		}
 	}
-	// KILL above?
+	return Rollout{}
+}
 
+func checkClusterHasNewerRestartAnnotation(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) Rollout {
 	// check if pod needs to be restarted because of some config requiring it
 	// or if the cluster have been explicitly restarted
 	needingRestart, reason := isPodNeedingRestart(cluster, status)
@@ -453,6 +519,7 @@ func isPodNeedingRestart(
 	// which has not been restarted yet, or restarted at a different
 	// time, let's restart it.
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
+		// FIX: this seems wrong. We add the restart annotation to the pod, and it will not match
 		podRestart := instanceStatus.Pod.Annotations[specs.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
 			return true, "cluster has been explicitly restarted via annotation"
@@ -461,16 +528,6 @@ func isPodNeedingRestart(
 
 	if instanceStatus.PendingRestart {
 		return true, "configuration needs a restart to apply some configuration changes"
-	}
-
-	return false, ""
-}
-
-func hasInstanceDescriptionChanged(cluster apiv1.Cluster, pod corev1.Pod) (bool, string) {
-	instanceHash, _ := specs.ComputeInstaceHash(cluster)
-	podContentHash, hasPodContenthash := pod.Annotations[utils.PodContentHashAnnotationName]
-	if hasPodContenthash && podContentHash != instanceHash {
-		return true, "pod instance hash has changed"
 	}
 
 	return false, ""
