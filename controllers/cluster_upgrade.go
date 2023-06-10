@@ -291,6 +291,10 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		return restartRequired, false, reason
 	}
 
+	if restartRequired, reason := isPodNeedingUpdatedTopology(cluster, status.Pod); restartRequired {
+		return restartRequired, false, reason
+	}
+
 	// Detect changes in the postgres container configuration
 	for _, container := range status.Pod.Spec.Containers {
 		// we go to the next array element if it isn't the postgres container
@@ -310,6 +314,18 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	// or if the cluster have been explicitly restarted
 	needingRestart, reason := isPodNeedingRestart(cluster, status)
 	return needingRestart, true, reason
+}
+
+func isPodNeedingUpdatedTopology(cluster *apiv1.Cluster, pod corev1.Pod) (bool, string) {
+	if reflect.DeepEqual(cluster.Spec.TopologySpreadConstraints, pod.Spec.TopologySpreadConstraints) {
+		return false, ""
+	}
+	reason := fmt.Sprintf(
+		"Pod '%s' does not have up-to-date TopologySpreadConstraints. It needs to match the cluster's constraints.",
+		pod.Name,
+	)
+
+	return true, reason
 }
 
 // isPodNeedingUpdatedScheduler returns a boolean indicating if a restart is required and the relative message
