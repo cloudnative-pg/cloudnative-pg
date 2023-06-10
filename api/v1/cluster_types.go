@@ -243,6 +243,12 @@ type ClusterSpec struct {
 	// +optional
 	Affinity AffinityConfiguration `json:"affinity,omitempty"`
 
+	// TopologySpreadConstraints specifies how to spread matching pods among the given topology.
+	// More info:
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+	// +optional
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+
 	// Resources requirements of every generated Pod. Please refer to
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// for more information.

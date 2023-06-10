@@ -142,6 +142,12 @@ Kubernetes cluster. In particular, the operator supports:
 - node selector
 - taints and tolerations
 
+### Topology spread constraints
+
+The cluster's `topologySpreadConstraints` section enables additional control of
+the scheduling of pods across topologies, enhancing what affinity and
+anti-affinity can offer.
+
 ### Command line interface
 
 CloudNativePG does not have its own command line interface.

@@ -332,6 +332,8 @@ TOC
 TODO
 TimelineId
 TopologyKey
+TopologySpreadConstraint
+TopologySpreadConstraints
 TypedLocalObjectReference
 UID
 Uncomment
@@ -928,6 +930,7 @@ tls
 tmp
 tmpfs
 tolerations
+topologies
 topologyKey
 transactional
 transactionid
