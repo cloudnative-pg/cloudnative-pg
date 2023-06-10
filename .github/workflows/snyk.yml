@@ -1,0 +1,27 @@
+# Run the Snyk scanning on the project only when something
+# is pushed into main
+
+name: Snyk scanning
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  security:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/golang@V0.4.0
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: snyk.sarif
