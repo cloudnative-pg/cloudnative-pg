@@ -18,6 +18,7 @@ package controllers
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -131,5 +132,74 @@ var _ = Describe("Pod upgrade", func() {
 			needRollout, _ := isPodNeedingUpdatedEnvironment(*cluster, *pod)
 			Expect(needRollout).To(BeTrue())
 		})
+	})
+})
+
+var _ = Describe("Test isPodNeedingUpdatedTopology", func() {
+	var cluster *apiv1.Cluster
+	var pod corev1.Pod
+
+	BeforeEach(func() {
+		topology := corev1.TopologySpreadConstraint{
+			MaxSkew:           1,
+			TopologyKey:       "zone",
+			WhenUnsatisfiable: corev1.DoNotSchedule,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "test-app"},
+			},
+		}
+		cluster = &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				TopologySpreadConstraints: []corev1.TopologySpreadConstraint{topology},
+			},
+		}
+		pod = corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod",
+			},
+			Spec: corev1.PodSpec{
+				TopologySpreadConstraints: []corev1.TopologySpreadConstraint{topology},
+			},
+		}
+	})
+
+	It("should return false when the cluster and pod have the same TopologySpreadConstraints", func() {
+		needsUpdate, reason := isPodNeedingUpdatedTopology(cluster, pod)
+		Expect(needsUpdate).To(BeFalse())
+		Expect(reason).To(BeEmpty())
+	})
+
+	It("should return true when the cluster and pod do not have the same TopologySpreadConstraints", func() {
+		pod.Spec.TopologySpreadConstraints[0].MaxSkew = 2
+		needsUpdate, reason := isPodNeedingUpdatedTopology(cluster, pod)
+		Expect(needsUpdate).To(BeTrue())
+		Expect(reason).ToNot(BeEmpty())
+	})
+
+	It("should return true when the LabelSelector maps are different", func() {
+		pod.Spec.TopologySpreadConstraints[0].LabelSelector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{"app": "different-app"},
+		}
+
+		needsUpdate, reason := isPodNeedingUpdatedTopology(cluster, pod)
+		Expect(needsUpdate).To(BeTrue())
+		Expect(reason).ToNot(BeEmpty())
+	})
+
+	It("should return true when TopologySpreadConstraints is nil in one of the objects", func() {
+		pod.Spec.TopologySpreadConstraints = nil
+
+		needsUpdate, reason := isPodNeedingUpdatedTopology(cluster, pod)
+		Expect(needsUpdate).To(BeTrue())
+		Expect(reason).ToNot(BeEmpty())
+	})
+
+	It("should return false if both are nil", func() {
+		cluster.Spec.TopologySpreadConstraints = nil
+		pod.Spec.TopologySpreadConstraints = nil
+
+		needsUpdate, reason := isPodNeedingUpdatedTopology(cluster, pod)
+		Expect(needsUpdate).To(BeFalse())
+		Expect(reason).To(BeEmpty())
 	})
 })
