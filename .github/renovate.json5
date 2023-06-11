@@ -98,7 +98,7 @@
         "^pkg\\/specs\\/pgbouncer\\/deployments\\.go$"
       ],
       "matchStrings": [
-        "DefaultImageName = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
+        "DefaultImage = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
         "DefaultPgbouncerImage = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
       ],
       "datasourceTemplate": "docker",

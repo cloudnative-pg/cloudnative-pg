@@ -45,7 +45,7 @@ jobs:
       - name: Get the current version of PostgreSQL
         id: current
         run: |
-          CURRENT_POSTGRES_VERSION_IMAGE=$(awk -F '"' '/DefaultImageName *=/{print $2}' pkg/versions/versions.go)
+          CURRENT_POSTGRES_VERSION_IMAGE=$(awk -F '"' '/DefaultImage *=/{print $2}' pkg/versions/versions.go)
           CURRENT_POSTGRES_VERSION=${CURRENT_POSTGRES_VERSION_IMAGE##*:}
           echo "CURRENT_POSTGRES_VERSION=$CURRENT_POSTGRES_VERSION" >> $GITHUB_ENV
           echo "CURRENT_POSTGRES_VERSION_IMAGE=$CURRENT_POSTGRES_VERSION_IMAGE" >> $GITHUB_ENV
@@ -60,7 +60,7 @@ jobs:
           echo "New PostgreSQL version detected ; updating!"
 
           # Update pkg/versions/versions.go
-          sed -i '/DefaultImageName *=/s@".*"@"'"${LATEST_POSTGRES_VERSION_IMAGE}"'"@' pkg/versions/versions.go
+          sed -i '/DefaultImage *=/s@".*"@"'"${LATEST_POSTGRES_VERSION_IMAGE}"'"@' pkg/versions/versions.go
 
           # Update docs directory (only .md and .yaml filename extensions)
           find docs -type f \( -name '*.md' -o -name '*.yaml' \) \! -path '*release_notes*' -exec sed -i "/[ :]${CURRENT_POSTGRES_VERSION//./\\.}/s/${CURRENT_POSTGRES_VERSION//./\\.}/${LATEST_POSTGRES_VERSION}/g" {} +

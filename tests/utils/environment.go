@@ -111,7 +111,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Log = ctrl.Log.WithName("e2e")
 	env.createdNamespaces = &uniqueStringSlice{}
 
-	postgresImage := versions.DefaultImageName
+	postgresImage := versions.DefaultImage
 
 	// Fetching postgres image version.
 	if postgresImageFromUser, exist := os.LookupEnv("POSTGRES_IMG"); exist {

@@ -44,7 +44,7 @@ var _ = Describe("Filtering cluster", func() {
 
 	cluster := apiv1.Cluster{
 		Spec: apiv1.ClusterSpec{
-			ImageName: "postgres:13.0",
+			Image: "postgres:13.0",
 		},
 		Status: apiv1.ClusterStatus{
 			SecretsResourceVersion:   apiv1.SecretsResourceVersion{Metrics: metrics},

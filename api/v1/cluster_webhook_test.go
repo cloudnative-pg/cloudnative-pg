@@ -565,17 +565,17 @@ var _ = Describe("Defaulting webhook", func() {
 	It("should fill the image name if isn't already set", func() {
 		cluster := Cluster{}
 		cluster.Default()
-		Expect(cluster.Spec.ImageName).To(Equal(configuration.Current.PostgresImage))
+		Expect(cluster.Spec.Image).To(Equal(configuration.Current.PostgresImage))
 	})
 
 	It("shouldn't set the image name if already present", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "test:13",
+				Image: "test:13",
 			},
 		}
 		cluster.Default()
-		Expect(cluster.Spec.ImageName).To(Equal("test:13"))
+		Expect(cluster.Spec.Image).To(Equal("test:13"))
 	})
 
 	It("should setup the application database name", func() {
@@ -630,7 +630,7 @@ var _ = Describe("Image name validation", func() {
 	It("complains when the 'latest' tag is detected", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:latest",
+				Image: "postgres:latest",
 			},
 		}
 		Expect(len(cluster.validateImage())).To(Equal(1))
@@ -639,7 +639,7 @@ var _ = Describe("Image name validation", func() {
 	It("doesn't complain when a alpha tag is used", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:15alpha1",
+				Image: "postgres:15alpha1",
 			},
 		}
 		Expect(len(cluster.validateImage())).To(Equal(0))
@@ -648,7 +648,7 @@ var _ = Describe("Image name validation", func() {
 	It("doesn't complain when a beta tag is used", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:15beta1",
+				Image: "postgres:15beta1",
 			},
 		}
 		Expect(len(cluster.validateImage())).To(Equal(0))
@@ -657,7 +657,7 @@ var _ = Describe("Image name validation", func() {
 	It("doesn't complain when a release candidate tag is used", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:15rc1",
+				Image: "postgres:15rc1",
 			},
 		}
 		Expect(len(cluster.validateImage())).To(Equal(0))
@@ -666,7 +666,7 @@ var _ = Describe("Image name validation", func() {
 	It("complains when only the sha is passed", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
+				Image: "postgres@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
 			},
 		}
 		Expect(len(cluster.validateImage())).To(Equal(1))
@@ -675,7 +675,7 @@ var _ = Describe("Image name validation", func() {
 	It("doesn't complain if the tag is valid", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:10.4",
+				Image: "postgres:10.4",
 			},
 		}
 		Expect(cluster.validateImage()).To(BeEmpty())
@@ -684,7 +684,7 @@ var _ = Describe("Image name validation", func() {
 	It("doesn't complain if the tag is valid", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:14.4-1",
+				Image: "postgres:14.4-1",
 			},
 		}
 		Expect(cluster.validateImage()).To(BeEmpty())
@@ -693,7 +693,7 @@ var _ = Describe("Image name validation", func() {
 	It("doesn't complain if the tag is valid and has sha", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:10.4@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
+				Image: "postgres:10.4@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
 			},
 		}
 		Expect(cluster.validateImage()).To(BeEmpty())
@@ -702,7 +702,7 @@ var _ = Describe("Image name validation", func() {
 	It("complain when the tag name is not a PostgreSQL version", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:test_12",
+				Image: "postgres:test_12",
 			},
 		}
 		Expect(len(cluster.validateImage())).To(Equal(1))
@@ -737,7 +737,7 @@ var _ = Describe("configuration change validation", func() {
 	It("doesn't complain when the configuration is exactly the same", func() {
 		clusterOld := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:10.4",
+				Image: "postgres:10.4",
 			},
 		}
 		clusterNew := clusterOld
@@ -747,12 +747,12 @@ var _ = Describe("configuration change validation", func() {
 	It("doesn't complain when we change a setting which is not fixed", func() {
 		clusterOld := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:10.4",
+				Image: "postgres:10.4",
 			},
 		}
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:10.4",
+				Image: "postgres:10.4",
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
 						"shared_buffers": "4G",
@@ -766,12 +766,12 @@ var _ = Describe("configuration change validation", func() {
 	It("complains when changing postgres major version and settings", func() {
 		clusterOld := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:10.4",
+				Image: "postgres:10.4",
 			},
 		}
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:10.5",
+				Image: "postgres:10.5",
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
 						"shared_buffers": "4G",
@@ -1065,7 +1065,7 @@ var _ = Describe("validate image name change", func() {
 	It("complains if versions are wrong", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
+				Image: "postgres:12.0",
 			},
 		}
 		Expect(len(clusterNew.validateImageChange("12:1"))).To(Equal(1))
@@ -1074,7 +1074,7 @@ var _ = Describe("validate image name change", func() {
 	It("complains if can't upgrade between mayor versions", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:11.0",
+				Image: "postgres:11.0",
 			},
 		}
 		Expect(len(clusterNew.validateImageChange("postgres:12.0"))).To(Equal(1))
@@ -1083,7 +1083,7 @@ var _ = Describe("validate image name change", func() {
 	It("doesn't complain if image change it's valid", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
+				Image: "postgres:12.0",
 			},
 		}
 		Expect(len(clusterNew.validateImageChange("postgres:12.1"))).To(Equal(0))
@@ -2576,7 +2576,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 	It("prevents using replication slots on PostgreSQL 10 and older", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
-				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
+				Image: "ghcr.io/cloudnative-pg/postgresql:10.5",
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
 						Enabled: pointer.Bool(true),
@@ -2594,7 +2594,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 	It("can be enabled on the default PostgreSQL image", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
-				ImageName: versions.DefaultImageName,
+				Image: versions.DefaultImage,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
 						Enabled: pointer.Bool(true),
@@ -2612,7 +2612,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 	It("allows enabling replication slots on the fly", func() {
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
-				ImageName: versions.DefaultImageName,
+				Image: versions.DefaultImage,
 			},
 		}
 		oldCluster.Default()
@@ -2632,7 +2632,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		trueValue := true
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
-				ImageName: versions.DefaultImageName,
+				Image: versions.DefaultImage,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
 						Enabled:    &trueValue,
@@ -2651,7 +2651,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 	It("prevents removing the replication slot section when replication slots are enabled", func() {
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
-				ImageName: versions.DefaultImageName,
+				Image: versions.DefaultImage,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
 						Enabled:    pointer.Bool(true),
@@ -2670,7 +2670,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 	It("allows disabling the replication slots", func() {
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
-				ImageName: versions.DefaultImageName,
+				Image: versions.DefaultImage,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
 						Enabled:    pointer.Bool(true),

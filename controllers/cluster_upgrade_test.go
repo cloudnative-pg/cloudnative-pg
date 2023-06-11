@@ -34,7 +34,7 @@ var _ = Describe("Pod upgrade", func() {
 	BeforeEach(func() {
 		cluster = apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:13.0",
+				Image: "postgres:13.0",
 			},
 		}
 	})

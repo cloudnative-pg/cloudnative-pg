@@ -55,9 +55,9 @@ func IsPodStandby(pod corev1.Pod) bool {
 	return !IsPodPrimary(pod)
 }
 
-// GetPostgresImageName get the PostgreSQL image name used in this Pod
-func GetPostgresImageName(pod corev1.Pod) (string, error) {
-	return GetContainerImageName(pod, PostgresContainerName)
+// GetPostgresImage get the PostgreSQL image name used in this Pod
+func GetPostgresImage(pod corev1.Pod) (string, error) {
+	return GetContainerImage(pod, PostgresContainerName)
 }
 
 // GetBootstrapControllerImageName get the controller image name used to bootstrap a Pod
@@ -65,8 +65,8 @@ func GetBootstrapControllerImageName(pod corev1.Pod) (string, error) {
 	return GetInitContainerImageName(pod, BootstrapControllerContainerName)
 }
 
-// GetContainerImageName get the name of the image used in a container
-func GetContainerImageName(pod corev1.Pod, containerName string) (string, error) {
+// GetContainerImage get the name of the image used in a container
+func GetContainerImage(pod corev1.Pod, containerName string) (string, error) {
 	for _, container := range pod.Spec.Containers {
 		if container.Name == containerName {
 			return container.Image, nil

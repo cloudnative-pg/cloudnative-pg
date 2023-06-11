@@ -64,7 +64,7 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 			Containers: []corev1.Container{
 				{
 					Name:  specs.PostgresContainerName,
-					Image: versions.DefaultImageName,
+					Image: versions.DefaultImage,
 					// override the default Entrypoint ("docker-entrypoint.sh") of the image
 					Command: []string{"bash", "-c"},
 					// override the default Cmd ("postgres") of the image

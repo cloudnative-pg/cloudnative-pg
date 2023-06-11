@@ -650,7 +650,7 @@ var _ = Describe("PostgreSQL version detection", func() {
 	It("correctly extract PostgreSQL versions", func() {
 		cluster := Cluster{}
 		for _, test := range tests {
-			cluster.Spec.ImageName = test.image
+			cluster.Spec.Image = test.image
 			Expect(cluster.GetPostgresqlVersion()).To(Equal(test.postgresVersion))
 		}
 	})

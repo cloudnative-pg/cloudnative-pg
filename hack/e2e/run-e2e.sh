@@ -26,7 +26,7 @@ fi
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-image)}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
-POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 
 notinpath () {
     case "$PATH" in

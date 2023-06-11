@@ -376,20 +376,20 @@ func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVol
 func isPodNeedingUpgradedImage(
 	cluster *apiv1.Cluster,
 	pod corev1.Pod,
-) (oldImage string, targetImage string, err error) {
-	targetImageName := cluster.GetImageName()
+) (oldImage string, newImage string, err error) {
+	targetImage := cluster.GetImage()
 
-	pgCurrentImageName, err := specs.GetPostgresImageName(pod)
+	pgCurrentImage, err := specs.GetPostgresImage(pod)
 	if err != nil {
 		return "", "", err
 	}
 
-	if pgCurrentImageName != targetImageName {
+	if pgCurrentImage != targetImage {
 		// We need to apply a different PostgreSQL version
-		return pgCurrentImageName, targetImageName, nil
+		return pgCurrentImage, targetImage, nil
 	}
 
-	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
+	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImage, targetImage)
 	if err != nil {
 		return "", "", err
 	}

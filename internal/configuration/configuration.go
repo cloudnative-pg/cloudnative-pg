@@ -98,7 +98,7 @@ func newDefaultConfig() *Data {
 	return &Data{
 		OperatorPullSecretName: DefaultOperatorPullSecretName,
 		OperatorImageName:      versions.DefaultOperatorImageName,
-		PostgresImage:          versions.DefaultImageName,
+		PostgresImage:          versions.DefaultImage,
 		CreateAnyService:       false,
 	}
 }

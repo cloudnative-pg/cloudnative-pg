@@ -36,7 +36,7 @@ OPERATOR_MANIFEST_PATH := ${DIST_PATH}/operator-manifest.yaml
 LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
-POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
+POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImage.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
 KUSTOMIZE_VERSION ?= v5.0.3
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.27.2

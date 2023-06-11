@@ -73,20 +73,19 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		timeout := 900
 
 		// Update to the latest minor
-		updatedImageName := os.Getenv("POSTGRES_IMG")
-		if updatedImageName == "" {
-			updatedImageName = configuration.Current.PostgresImage
+		updatedImage := os.Getenv("POSTGRES_IMG")
+		if updatedImage == "" {
+			updatedImage = configuration.Current.PostgresImage
 		}
 
-		// We should be able to apply the conf containing the new
-		// image
+		// We should be able to apply the conf containing the new image
 		var cluster *apiv1.Cluster
 		Eventually(func(g Gomega) error {
 			var err error
 			cluster, err = env.GetCluster(namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 
-			cluster.Spec.Image = updatedImageName
+			cluster.Spec.Image = updatedImage
 			return env.Client.Update(env.Ctx, cluster)
 		}, RetryTimeout, PollingTime).Should(BeNil())
 
@@ -104,7 +103,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 							continue
 						}
 
-						if data.Image == updatedImageName {
+						if data.Image == updatedImage {
 							updatedPods++
 						}
 					}

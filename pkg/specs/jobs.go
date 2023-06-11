@@ -275,7 +275,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 					Containers: []corev1.Container{
 						{
 							Name:            string(role),
-							Image:           cluster.GetImageName(),
+							Image:           cluster.GetImage(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env:             envConfig.EnvVars,
 							EnvFrom:         envConfig.EnvFrom,

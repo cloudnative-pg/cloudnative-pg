@@ -22,8 +22,8 @@ const (
 	// Version is the version of the operator
 	Version = "1.20.0"
 
-	// DefaultImageName is the default image used by the operator to create pods
-	DefaultImageName = "ghcr.io/cloudnative-pg/postgresql:15.3"
+	// DefaultImage is the default image used by the operator to create pods
+	DefaultImage = "ghcr.io/cloudnative-pg/postgresql:15.3"
 
 	// DefaultOperatorImageName is the default operator image used by the controller in the pods running PostgreSQL
 	DefaultOperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:1.20.0"

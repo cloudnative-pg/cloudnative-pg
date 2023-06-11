@@ -1858,11 +1858,11 @@ func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion
 	}
 }
 
-// GetImageName get the name of the image that should be used
+// GetImage get the name of the image that should be used
 // to create the pods
-func (cluster *Cluster) GetImageName() string {
-	if len(cluster.Spec.ImageName) > 0 {
-		return cluster.Spec.ImageName
+func (cluster *Cluster) GetImage() string {
+	if len(cluster.Spec.Image) > 0 {
+		return cluster.Spec.Image
 	}
 
 	return configuration.Current.PostgresImage
@@ -1876,7 +1876,7 @@ func (cluster *Cluster) GetImageName() string {
 // ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version 130002
 // ghcr.io/cloudnative-pg/postgresql:9.6.3 corresponds to version 90603
 func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
-	image := cluster.GetImageName()
+	image := cluster.GetImage()
 	tag := utils.GetImageTag(image)
 	return postgres.GetPostgresVersionFromTag(tag)
 }

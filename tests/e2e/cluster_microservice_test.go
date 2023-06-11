@@ -196,7 +196,7 @@ func shouldSkip(postgresImage string) bool {
 	currentImageVersion, err := postgres.GetPostgresVersionFromTag(currentImageReference.Tag)
 	Expect(err).ToNot(HaveOccurred())
 	// Get the default tag
-	defaultImageReference := utils.NewReference(versions.DefaultImageName)
+	defaultImageReference := utils.NewReference(versions.DefaultImage)
 	defaultImageVersion, err := postgres.GetPostgresVersionFromTag(defaultImageReference.Tag)
 	Expect(err).ToNot(HaveOccurred())
 

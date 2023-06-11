@@ -34,17 +34,17 @@ var _ = Describe("Guess the correct version of a postgres image", func() {
 	})
 
 	It("works with latest image", func() {
-		version, err := BumpPostgresImageMajorVersion(versions.DefaultImageName)
+		version, err := BumpPostgresImageMajorVersion(versions.DefaultImage)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(version).To(Equal(versions.DefaultImageName))
+		Expect(version).To(Equal(versions.DefaultImage))
 	})
 
 	It("can pull the default image", func() {
 		var stderr bytes.Buffer
-		cmd := exec.Command("docker", "pull", versions.DefaultImageName) // #nosec G204
+		cmd := exec.Command("docker", "pull", versions.DefaultImage) // #nosec G204
 		cmd.Stderr = &stderr
 		err := cmd.Run()
-		Expect(stderr.String()).To(BeEmpty(), "while pulling "+versions.DefaultImageName)
+		Expect(stderr.String()).To(BeEmpty(), "while pulling "+versions.DefaultImage)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 })

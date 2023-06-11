@@ -32,7 +32,7 @@ function get_default_storage_class() {
 }
 
 function get_postgres_image() {
-  grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
+  grep 'DefaultImage.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
 }
 
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_storage_class)}

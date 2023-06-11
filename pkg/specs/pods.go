@@ -153,7 +153,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
-			Image:           cluster.GetImageName(),
+			Image:           cluster.GetImage(),
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,

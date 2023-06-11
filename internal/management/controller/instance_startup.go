@@ -214,7 +214,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			return err
 		}
 
-		tag := pkgUtils.GetImageTag(cluster.GetImageName())
+		tag := pkgUtils.GetImageTag(cluster.GetImage())
 		pgMajorVersion, err := postgresSpec.GetPostgresMajorVersionFromTag(tag)
 		if err != nil {
 			return err
