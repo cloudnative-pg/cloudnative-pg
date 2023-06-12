@@ -230,6 +230,10 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
 
+	if err := r.reconcileMetadata(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if instancesStatus.AllReadyInstancesStatusUnreachable() {
 		contextLogger.Warning(
 			"Failed to extract instance status from ready instances. Attempting to requeue...",
@@ -449,29 +453,6 @@ func (r *ClusterReconciler) reconcileResources(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// TODO: refactor how we handle label and annotation reconciliation.
-	// TODO: We should generate a fake pod containing the expected labels and annotations and compare it to the living pod
-
-	// Update the labels for the -rw service to work correctly
-	if err := r.updateRoleLabelsOnPods(ctx, cluster, resources.instances); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pods: %w", err)
-	}
-
-	// updated any labels that are coming from the operator
-	if err := r.updateOperatorLabelsOnInstances(ctx, resources.instances); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update instance labels on pods: %w", err)
-	}
-
-	// Update any modified/new labels coming from the cluster resource
-	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.instances); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pods: %w", err)
-	}
-
-	// Update any modified/new annotations coming from the cluster resource
-	if err := r.updateClusterAnnotationsOnPods(ctx, cluster, resources.instances); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pods: %w", err)
-	}
-
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
 		contextLogger.Debug("A job is currently running. Waiting", "count", runningJobs)
@@ -536,6 +517,36 @@ func (r *ClusterReconciler) reconcileResources(
 	r.cleanupCompletedJobs(ctx, resources.jobs)
 
 	return ctrl.Result{}, nil
+}
+
+func (r *ClusterReconciler) reconcileMetadata(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) error {
+	// TODO: refactor how we handle label and annotation reconciliation.
+
+	// Update the labels for the -rw service to work correctly
+	if err := r.updateRoleLabelsOnPods(ctx, cluster, resources.instances); err != nil {
+		return fmt.Errorf("cannot update role labels on pods: %w", err)
+	}
+
+	// updated any labels that are coming from the operator
+	if err := r.updateOperatorLabelsOnInstances(ctx, resources.instances); err != nil {
+		return fmt.Errorf("cannot update instance labels on pods: %w", err)
+	}
+
+	// Update any modified/new labels coming from the cluster resource
+	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.instances); err != nil {
+		return fmt.Errorf("cannot update cluster labels on pods: %w", err)
+	}
+
+	// Update any modified/new annotations coming from the cluster resource
+	if err := r.updateClusterAnnotationsOnPods(ctx, cluster, resources.instances); err != nil {
+		return fmt.Errorf("cannot update annotations on pods: %w", err)
+	}
+
+	return nil
 }
 
 // deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
