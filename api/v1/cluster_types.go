@@ -398,6 +398,11 @@ type Topology struct {
 	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
 	// Instances contains the pod topology of the instances
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
+
+	// NodesUsed represents the count of distinct nodes accommodating the instances.
+	// A value of '1' suggests that all instances are hosted on a single node,
+	// implying the absence of High Availability (HA).
+	NodesUsed int32 `json:"nodesUsed,omitempty"`
 }
 
 // RoleStatus represents the status of a managed role in the cluster

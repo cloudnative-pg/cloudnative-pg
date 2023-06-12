@@ -34,8 +34,13 @@ import (
 )
 
 var _ = Describe("ensure timestamp metric it's set properly", func() {
-	instance := postgres.NewInstance()
-	exporter := NewExporter(instance)
+	var exporter *Exporter
+
+	BeforeEach(func() {
+		cache.Delete(cache.ClusterKey)
+		instance := postgres.NewInstance()
+		exporter = NewExporter(instance)
+	})
 
 	It("fails if there's no cluster in the cache", func() {
 		exporter.collectFromPrimaryFirstPointOnTimeRecovery()
@@ -129,4 +134,124 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 			Expect(m[0].GetGauge().GetValue()).To(BeEquivalentTo(-1))
 		}
 	})
+
+	Context("collectUsedNodes", func() {
+		const (
+			nodesUsedName         = "cnpg_collector_nodes_used"
+			errorMetricName       = "cnpg_collector_last_collection_error"
+			pgCollectionErrorName = "cnpg_collector_collection_errors_total"
+		)
+
+		It("should return an error when no custer is defined", func() {
+			exporter.collectNodesUsed()
+
+			registry := prometheus.NewRegistry()
+			registry.MustRegister(exporter.Metrics.Error)
+			registry.MustRegister(exporter.Metrics.PgCollectionErrors)
+			registry.MustRegister(exporter.Metrics.NodesUsed)
+			metrics, err := registry.Gather()
+			Expect(err).To(BeNil())
+
+			nodesUsedMetric := getMetric(metrics, nodesUsedName)
+			Expect(nodesUsedMetric).ToNot(BeNil())
+			Expect(nodesUsedMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(-1))
+
+			errorMetric := getMetric(metrics, errorMetricName)
+			Expect(errorMetric).ToNot(BeNil())
+			Expect(errorMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(1))
+
+			pgCollectionErrorMetric := getMetric(metrics, pgCollectionErrorName)
+			Expect(pgCollectionErrorMetric).ToNot(BeNil())
+			Expect(pgCollectionErrorMetric.GetMetric()[0].GetCounter().GetValue()).To(BeEquivalentTo(1))
+		})
+
+		It("it should return -1 without an error when Topology.SuccessfullyExtracted is false", func() {
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-example",
+				},
+				Status: apiv1.ClusterStatus{
+					Topology: apiv1.Topology{
+						SuccessfullyExtracted: false,
+					},
+				},
+			}
+			cache.Store(cache.ClusterKey, cluster)
+
+			exporter.collectNodesUsed()
+
+			registry := prometheus.NewRegistry()
+			registry.MustRegister(exporter.Metrics.Error)
+			registry.MustRegister(exporter.Metrics.PgCollectionErrors)
+			registry.MustRegister(exporter.Metrics.NodesUsed)
+			metrics, err := registry.Gather()
+			Expect(err).To(BeNil())
+
+			nodesUsedMetric := getMetric(metrics, nodesUsedName)
+			Expect(nodesUsedMetric).ToNot(BeNil())
+			Expect(nodesUsedMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(-1))
+
+			errorMetric := getMetric(metrics, errorMetricName)
+			Expect(errorMetric).ToNot(BeNil())
+			Expect(errorMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(0))
+
+			pgCollectionErrorMetric := getMetric(metrics, pgCollectionErrorName)
+			Expect(pgCollectionErrorMetric).To(BeNil())
+		})
+
+		It("should return the number of used nodes", func() {
+			// Create a cluster with successfully extracted topology and 3 used nodes
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-example",
+				},
+				Status: apiv1.ClusterStatus{
+					Topology: apiv1.Topology{
+						SuccessfullyExtracted: true,
+						NodesUsed:             3,
+					},
+				},
+			}
+			cache.Store(cache.ClusterKey, cluster)
+
+			exporter.collectNodesUsed()
+
+			registry := prometheus.NewRegistry()
+			registry.MustRegister(exporter.Metrics.Error)
+			registry.MustRegister(exporter.Metrics.PgCollectionErrors)
+			registry.MustRegister(exporter.Metrics.NodesUsed)
+			metrics, err := registry.Gather()
+			Expect(err).To(BeNil())
+
+			nodesUsedMetric := getMetric(metrics, nodesUsedName)
+			Expect(nodesUsedMetric).ToNot(BeNil())
+			Expect(nodesUsedMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(3))
+
+			errorMetric := getMetric(metrics, errorMetricName)
+			Expect(errorMetric).ToNot(BeNil())
+			Expect(errorMetric.GetMetric()[0].GetGauge().GetValue()).To(BeEquivalentTo(0))
+
+			pgCollectionErrorMetric := getMetric(metrics, pgCollectionErrorName)
+			Expect(pgCollectionErrorMetric).To(BeNil())
+		})
+	})
 })
+
+type nameGetter interface {
+	GetName() string
+}
+
+// getMetric is used to avoid having the direct dependency on: github.com/prometheus/client_model library
+func getMetric[T nameGetter](
+	metrics []T,
+	metricName string,
+) T {
+	var t T
+	for _, metric := range metrics {
+		if metric.GetName() == metricName {
+			return metric
+		}
+	}
+
+	return t
+}

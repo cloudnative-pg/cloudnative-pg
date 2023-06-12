@@ -67,6 +67,7 @@ type metrics struct {
 	LastFailedBackupTimestamp    prometheus.Gauge
 	FencingOn                    prometheus.Gauge
 	PgStatWalMetrics             PgStatWalMetrics
+	NodesUsed                    prometheus.Gauge
 }
 
 // PgStatWalMetrics is available from PG14+
@@ -186,6 +187,15 @@ func newMetrics() *metrics {
 			Name:      "fencing_on",
 			Help:      "1 if the instance is fenced, 0 otherwise",
 		}),
+		NodesUsed: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "nodes_used",
+			Help: "NodesUsed represents the count of distinct nodes accommodating the instances. " +
+				"A value of '-1' suggests that the metric is not available. " +
+				"A value of '1' suggests that all instances are hosted on a single node, " +
+				"implying the absence of High Availability (HA).",
+		}),
 		PgStatWalMetrics: PgStatWalMetrics{
 			WalRecords: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: PrometheusNamespace,
@@ -263,6 +273,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.FencingOn.Describe(ch)
 	e.Metrics.LastFailedBackupTimestamp.Describe(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Describe(ch)
+	e.Metrics.NodesUsed.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -365,6 +376,8 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		log.Error(err, "unable to get if primary")
 	}
 
+	e.collectNodesUsed()
+
 	// metrics collected only on primary server
 	if isPrimary {
 		// getting required synchronous standby number from postgres itself
@@ -451,6 +464,26 @@ func (e *Exporter) setTimestampMetric(
 	// number. See:
 	// https://prometheus.io/docs/practices/instrumentation/#timestamps-not-time-since
 	gauge.Set(float64(parsedTS.Unix()))
+}
+
+func (e *Exporter) collectNodesUsed() {
+	const notExtractedValue float64 = -1
+
+	cluster, err := cache.LoadCluster()
+	if err != nil {
+		log.Error(err, "unable to collect metrics")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.NodesUsed").Inc()
+		e.Metrics.NodesUsed.Set(notExtractedValue)
+		return
+	}
+
+	if !cluster.Status.Topology.SuccessfullyExtracted {
+		e.Metrics.NodesUsed.Set(notExtractedValue)
+		return
+	}
+
+	e.Metrics.NodesUsed.Set(float64(cluster.Status.Topology.NodesUsed))
 }
 
 func (e *Exporter) collectFromPrimaryLastFailedBackupTimestamp() {

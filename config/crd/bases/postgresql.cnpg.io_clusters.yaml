@@ -4003,6 +4003,13 @@ spec:
                       type: object
                     description: Instances contains the pod topology of the instances
                     type: object
+                  nodesUsed:
+                    description: NodesUsed represents the count of distinct nodes
+                      accommodating the instances. A value of '1' suggests that all
+                      instances are hosted on a single node, implying the absence
+                      of High Availability (HA).
+                    format: int32
+                    type: integer
                   successfullyExtracted:
                     description: SuccessfullyExtracted indicates if the topology data
                       was extract. It is useful to enact fallback behaviors in synchronous
