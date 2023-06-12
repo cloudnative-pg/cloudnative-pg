@@ -67,7 +67,6 @@ Git tags for versions are prepended with `v`.
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|-----------------------------|
 | 1.20.x          | Yes                  | April 27, 2023    | ~ September 28, 2023     | 1.24, 1.25, 1.26, 1.27        | 1.23                      | 11 - 15                     |
 | 1.19.x          | Yes                  | February 14, 2023 | ~ July 15, 2023          | 1.23, 1.24, 1.25, 1.26        | 1.27                      | 11 - 15                     |
-| 1.18.x          | Yes                  | November 10, 2022 | May 27, 2023             | 1.23, 1.24, 1.25, 1.26        | 1.27                      | 11 - 15                     |
 | main            | No, development only |                   |                          |                               |                           | 11 - 15                     |
 
 The list of supported Kubernetes versions in the above table depends on what
@@ -119,6 +118,7 @@ version of PostgreSQL, we might not be able to help you.
 | 1.15.x          | April 21, 2022    | October 6, 2022          | 1.21, 1.22, 1.23               |
 | 1.16.x          | July 7, 2022      | December 21, 2022        | 1.22, 1.23, 1.24               |
 | 1.17.x          | September 6, 2022 | March 20, 2023           | 1.22, 1.23, 1.24               |
+| 1.18.x          | Nov 10, 2022      | June 12, 2023            | 1.23, 1.24, 1.25, 1.26, 1.27   |
 
 ## What we mean by support
 
