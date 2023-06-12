@@ -10,7 +10,7 @@ refer to ["Supported releases"](supported_releases.md).
 
 Older releases:
 
-- [CloudNativePG 1.18](release_notes/v1.18.md)
+- [CloudNativePG 1.18](release_notes/old/v1.18.md)
 - [CloudNativePG 1.17](release_notes/old/v1.17.md)
 - [CloudNativePG 1.16](release_notes/old/v1.16.md)
 - [CloudNativePG 1.15](release_notes/old/v1.15.md)
