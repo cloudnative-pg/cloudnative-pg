@@ -45,9 +45,9 @@ spec:
     - alert: LastFailedArchiveTime 
       annotations:
         description: Archiving failed for {{ $labels.pod }}
-        summary: Checks the last time archiving failed. Will be -1 when it has not failed.
+        summary: Checks the last time archiving failed. Will be < 0 when it has not failed.
       expr: |-
-        cnpg_pg_stat_archiver_last_failed_time > 1
+        (cnpg_pg_stat_archiver_last_failed_time - cnpg_pg_stat_archiver_last_archived_time) > 1
       for: 1m
       labels:
         severity: warning
