@@ -194,7 +194,8 @@ func newMetrics() *metrics {
 			Help: "NodesUsed represents the count of distinct nodes accommodating the instances. " +
 				"A value of '-1' suggests that the metric is not available. " +
 				"A value of '1' suggests that all instances are hosted on a single node, " +
-				"implying the absence of High Availability (HA).",
+				"implying the absence of High Availability (HA). Ideally this value " +
+				"should match the number of instances in the cluster.",
 		}),
 		PgStatWalMetrics: PgStatWalMetrics{
 			WalRecords: prometheus.NewGaugeVec(prometheus.GaugeOpts{
