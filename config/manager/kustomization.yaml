@@ -5,24 +5,24 @@ resources:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 vars:
-  - name: OPERATOR_IMAGE_NAME
-    objref:
-      kind: Deployment
-      name: controller-manager
-      apiVersion: apps/v1
-    fieldref:
-      fieldpath: spec.template.spec.containers[0].image
-  - name: OPERATOR_DEPLOYMENT_NAME
-    objref:
-      kind: Deployment
-      name: controller-manager
-      apiVersion: apps/v1
-    fieldref:
-      fieldpath: metadata.name
-  - name: DEFAULT_MONITORING_CONFIGMAP
-    objref:
-      kind: ConfigMap
-      name: default-monitoring
-      apiVersion: v1
-    fieldref:
-      fieldpath: metadata.name
+- fieldref:
+    fieldPath: spec.template.spec.containers[0].image
+  name: OPERATOR_IMAGE_NAME
+  objref:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: controller-manager
+- fieldref:
+    fieldPath: metadata.name
+  name: OPERATOR_DEPLOYMENT_NAME
+  objref:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: controller-manager
+- fieldref:
+    fieldPath: metadata.name
+  name: DEFAULT_MONITORING_CONFIGMAP
+  objref:
+    apiVersion: v1
+    kind: ConfigMap
+    name: default-monitoring
