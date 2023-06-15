@@ -657,7 +657,7 @@ func waitForConnectionAvailable(db *sql.DB) error {
 	})
 }
 
-// waitForConfigReloaded waits until the config has been reloaded
+// waitUntilConfigShaMatches waits until the configuration is correctly set
 func (instance *Instance) waitUntilConfigShaMatches() error {
 	errorIsRetryable := func(err error) bool {
 		return err != nil
