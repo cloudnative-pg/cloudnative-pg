@@ -107,7 +107,10 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.APIExtensionClient = apiextensionsclientset.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
+
 	env.Log = ctrl.Log.WithName("e2e")
+	ctrl.SetLogger(env.Log)
+
 	env.createdNamespaces = &uniqueStringSlice{}
 
 	postgresImage := versions.DefaultImageName
