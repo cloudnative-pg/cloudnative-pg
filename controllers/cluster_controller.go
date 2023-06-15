@@ -46,6 +46,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -230,7 +231,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
 
-	if err := r.reconcileMetadata(ctx, cluster, resources); err != nil {
+	if err := instance.ReconcileInstanceMetadata(ctx, r.Client, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -517,36 +518,6 @@ func (r *ClusterReconciler) reconcileResources(
 	r.cleanupCompletedJobs(ctx, resources.jobs)
 
 	return ctrl.Result{}, nil
-}
-
-func (r *ClusterReconciler) reconcileMetadata(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	resources *managedResources,
-) error {
-	// TODO: refactor how we handle label and annotation reconciliation.
-
-	// Update the labels for the -rw service to work correctly
-	if err := r.updateRoleLabelsOnPods(ctx, cluster, resources.instances); err != nil {
-		return fmt.Errorf("cannot update role labels on pods: %w", err)
-	}
-
-	// updated any labels that are coming from the operator
-	if err := r.updateOperatorLabelsOnInstances(ctx, resources.instances); err != nil {
-		return fmt.Errorf("cannot update instance labels on pods: %w", err)
-	}
-
-	// Update any modified/new labels coming from the cluster resource
-	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.instances); err != nil {
-		return fmt.Errorf("cannot update cluster labels on pods: %w", err)
-	}
-
-	// Update any modified/new annotations coming from the cluster resource
-	if err := r.updateClusterAnnotationsOnPods(ctx, cluster, resources.instances); err != nil {
-		return fmt.Errorf("cannot update annotations on pods: %w", err)
-	}
-
-	return nil
 }
 
 // deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
