@@ -310,7 +310,10 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.Metrics.PgVersion.Collect(ch)
 	e.Metrics.FirstRecoverabilityPoint.Collect(ch)
 	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
+	e.Metrics.FencingOn.Collect(ch)
 	e.Metrics.LastFailedBackupTimestamp.Collect(ch)
+	e.Metrics.LastAvailableBackupTimestamp.Collect(ch)
+	e.Metrics.NodesUsed.Collect(ch)
 
 	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
 		e.Metrics.PgStatWalMetrics.WalSync.Collect(ch)
