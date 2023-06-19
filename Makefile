@@ -37,7 +37,7 @@ LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v5.0.3
+KUSTOMIZE_VERSION ?= v5.1.0
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.27.3
 CONTROLLER_TOOLS_VERSION ?= v0.12.0
