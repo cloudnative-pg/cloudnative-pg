@@ -101,8 +101,12 @@ metrics, which can be classified in two major categories:
     - number of `.ready` and `.done` files in the archive status folder
     - requested minimum and maximum number of synchronous replicas, as well as
       the expected and actually observed values
+    - number of distinct nodes accommodating the instances
+    - timestamps indicating last failed and last available backup, as well
+      as the first point of recoverability for the cluster
     - flag indicating if replica cluster mode is enabled or disabled
     - flag indicating if a manual switchover is required
+    - flag indicating if fencing is enabled or disabled
 
 - Go runtime related metrics, starting with `go_*`
 
