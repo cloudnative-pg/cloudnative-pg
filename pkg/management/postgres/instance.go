@@ -657,8 +657,8 @@ func waitForConnectionAvailable(db *sql.DB) error {
 	})
 }
 
-// WaitForConfigReloaded waits until the config has been reloaded
-func (instance *Instance) WaitForConfigReloaded() error {
+// waitUntilConfigShaMatches waits until the configuration is correctly set
+func (instance *Instance) waitUntilConfigShaMatches() error {
 	errorIsRetryable := func(err error) bool {
 		return err != nil
 	}
@@ -675,10 +675,44 @@ func (instance *Instance) WaitForConfigReloaded() error {
 			return err
 		}
 		if sha != instance.ConfigSha256 {
-			return fmt.Errorf("configuration not yet updated: got %s, wanted %s", sha, instance.ConfigSha256)
+			return fmt.Errorf("configuration not yet matching: got %s, wanted %s", sha, instance.ConfigSha256)
 		}
 		return nil
 	})
+}
+
+// WaitForConfigReload returns the postgresqlStatus and any error encountered
+func (instance *Instance) WaitForConfigReload() (*postgres.PostgresqlStatus, error) {
+	// This function could also be called while the server is being
+	// started up, so we are not sure that the server is really active.
+	// Let's wait for that.
+	if instance.ConfigSha256 == "" {
+		return nil, nil
+	}
+
+	err := instance.WaitForSuperuserConnectionAvailable()
+	if err != nil {
+		return nil, fmt.Errorf("while applying new configuration: %w", err)
+	}
+
+	err = instance.waitUntilConfigShaMatches()
+	if err != nil {
+		return nil, fmt.Errorf("while waiting for new configuration to be reloaded: %w", err)
+	}
+
+	status, err := instance.GetStatus()
+	if err != nil {
+		return nil, fmt.Errorf("while applying new configuration: %w", err)
+	}
+
+	if status.MightBeUnavailableMaskedError != "" {
+		return nil, fmt.Errorf(
+			"while applying new configuration encountered an error masked by mightBeUnavailable: %s",
+			status.MightBeUnavailableMaskedError,
+		)
+	}
+
+	return status, nil
 }
 
 // waitForStreamingConnectionAvailable waits until we can connect to the passed
