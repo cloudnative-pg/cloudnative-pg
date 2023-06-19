@@ -26,12 +26,6 @@ resources:
 #- ../prometheus
 
 patches:
-  # Protect the /metrics endpoint by putting it behind auth.
-  # If you want your controller-manager to expose the /metrics
-  # endpoint w/o any authn/z, please comment the following line.
-#- manager_auth_proxy_patch.yaml
-
-patches:
   # add 9443 port to ports exposed by manager container
 - patch: |-
     - op: add
@@ -44,6 +38,12 @@ patches:
     group: apps
     kind: Deployment
     name: controller-manager
+    version: v1
+
+# Protect the /metrics endpoint by putting it behind auth.
+# If you want your controller-manager to expose the /metrics
+# endpoint w/o any authn/z, please comment the following line.
+#- manager_auth_proxy_patch.yaml
 
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'.
 # Uncomment 'CERTMANAGER' sections in crd/kustomization.yaml to enable the CA injection in the admission webhooks.
