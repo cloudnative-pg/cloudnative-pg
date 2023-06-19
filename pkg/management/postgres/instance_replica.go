@@ -14,35 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package postgres
 
 import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// refreshReplicaConfiguration writes the PostgreSQL correct
+// RefreshReplicaConfiguration writes the PostgreSQL correct
 // replication configuration for connecting to the right primary server,
 // depending on the cluster replica mode
-func (r *InstanceReconciler) refreshReplicaConfiguration(
+func (instance *Instance) RefreshReplicaConfiguration(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
+	cli client.Client,
 ) (changed bool, err error) {
 	// The "archive_mode" setting was used to be overridden in the "postgresql.auto.conf"
 	// if the server was a designated primary. We need make sure to remove it
 	// and fall back on the value defined in "custom.conf".
 	// TODO: Removed this code together the RemoveArchiveModeFromPostgresAutoConf function
 	// TODO: when enough time passed since 1.12 release
-	changed, err = postgres.RemoveArchiveModeFromPostgresAutoConf(r.instance.PgData)
+	changed, err = removeArchiveModeFromPostgresAutoConf(instance.PgData)
 	if err != nil {
 		return changed, err
 	}
 
-	primary, err := r.instance.IsPrimary()
+	primary, err := instance.IsPrimary()
 	if err != nil {
 		return false, err
 	}
@@ -51,20 +53,22 @@ func (r *InstanceReconciler) refreshReplicaConfiguration(
 		return false, nil
 	}
 
-	if cluster.IsReplica() && cluster.Status.TargetPrimary == r.instance.PodName {
-		return r.writeReplicaConfigurationForDesignatedPrimary(ctx, cluster)
+	if cluster.IsReplica() && cluster.Status.TargetPrimary == instance.PodName {
+		return instance.writeReplicaConfigurationForDesignatedPrimary(ctx, cli, cluster)
 	}
 
-	return r.writeReplicaConfigurationForReplica(cluster)
+	return instance.writeReplicaConfigurationForReplica(cluster)
 }
 
-func (r *InstanceReconciler) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
-	slotName := cluster.GetSlotNameFromInstanceName(r.instance.PodName)
-	return postgres.UpdateReplicaConfiguration(r.instance.PgData, r.instance.GetPrimaryConnInfo(), slotName)
+func (instance *Instance) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
+	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	return UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 }
 
-func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
-	ctx context.Context, cluster *apiv1.Cluster,
+func (instance *Instance) writeReplicaConfigurationForDesignatedPrimary(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
 ) (changed bool, err error) {
 	server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 	if !ok {
@@ -72,7 +76,7 @@ func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
 	}
 
 	connectionString, pgpassfile, err := external.ConfigureConnectionToServer(
-		ctx, r.client, r.instance.Namespace, &server)
+		ctx, cli, instance.Namespace, &server)
 	if err != nil {
 		return false, err
 	}
@@ -83,6 +87,6 @@ func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
 			pgpassfile)
 	}
 
-	slotName := cluster.GetSlotNameFromInstanceName(r.instance.PodName)
-	return postgres.UpdateReplicaConfiguration(r.instance.PgData, connectionString, slotName)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	return UpdateReplicaConfiguration(instance.PgData, connectionString, slotName)
 }
