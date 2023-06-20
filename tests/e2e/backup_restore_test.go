@@ -83,9 +83,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			if !IsLocal() {
 				Skip("This test is only run on local cluster")
 			}
-			if env.IsIBM() {
-				Skip("This test is not run on IBM architecture")
-			}
 			const namespacePrefix = "cluster-backup-minio"
 			var err error
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
@@ -675,11 +672,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		)
 
 		BeforeAll(func() {
-			if !IsLocal() || !IsGKE() {
+			if !(IsLocal() || IsGKE()) {
 				Skip("This test is only executed on gke, openshift and local")
-			}
-			if env.IsIBM() {
-				Skip("This test is not run on an IBM architecture")
 			}
 			const namespacePrefix = "cluster-backup-azurite"
 			var err error
@@ -817,9 +811,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		BeforeAll(func() {
 			if !IsLocal() {
 				Skip("This test is only executed on openshift and local")
-			}
-			if env.IsIBM() {
-				Skip("This test is not run on an IBM architecture")
 			}
 			const namespacePrefix = "recovery-barman-object-minio"
 			var err error
@@ -1162,9 +1153,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			if IsAKS() {
 				Skip("This test is not run on AKS")
 			}
-			if env.IsIBM() {
-				Skip("This test is not run on an IBM architecture")
-			}
 			const namespacePrefix = "recovery-barman-object-azurite"
 			var err error
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
@@ -1266,9 +1254,6 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 		BeforeAll(func() {
 			if !IsLocal() {
 				Skip("This test is only run on local cluster")
-			}
-			if env.IsIBM() {
-				Skip("This test is not run on IBM architecture")
 			}
 			// This name is used in yaml file, keep it as const
 			namespace = "backup-safety-1"

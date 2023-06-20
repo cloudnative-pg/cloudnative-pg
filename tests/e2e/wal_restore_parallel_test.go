@@ -49,9 +49,6 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		if !IsLocal() {
 			Skip("This test is only run on local cluster")
 		}
-		if env.IsIBM() {
-			Skip("This test is not run on IBM architecture")
-		}
 	})
 
 	It("Wal-restore in parallel using minio as object storage for backup", func() {
