@@ -26,6 +26,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -139,12 +140,22 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
 				nil, false, []byte("This is postgres user"), 11, []byte("{}")).
 			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
-				testDate, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`))
+				pgtype.Timestamp{
+					Valid:            true,
+					Time:             testDate,
+					InfinityModifier: pgtype.Finite,
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`)).
+			AddRow("future_man", false, false, true, true, false, true, 10, []byte("54321"),
+				pgtype.Timestamp{
+					Valid:            true,
+					Time:             time.Time{},
+					InfinityModifier: pgtype.Infinity,
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := prm.List(ctx)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(roles).To(HaveLen(2))
+		Expect(roles).To(HaveLen(3))
 		password1 := sql.NullString{
 			Valid:  true,
 			String: "12345",
@@ -197,7 +208,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectQuery(expectedSelStmt).WillReturnError(dbError)
 		roles, err := prm.List(ctx)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeEquivalentTo(dbError))
+		Expect(err.Error()).To(BeEquivalentTo("while listing DB roles for DRM: Kaboom"))
 		Expect(roles).To(BeEmpty())
 	})
 	// Testing Create

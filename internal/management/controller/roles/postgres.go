@@ -21,12 +21,19 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
+
+// LongDuration denotes a timestamp far into the future or the past.
+// It will be used to interpret timestamps with values 'infinity' or '-infinity'
+// from PostgreSQL
+const LongDuration = 100 * 365 * 24 * time.Hour
 
 // PostgresRoleManager is a RoleManager for a database instance
 type PostgresRoleManager struct {
@@ -41,10 +48,14 @@ func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 }
 
 // List the available roles
+// NOTE: PostgreSQL supports values 'infinity' and '-infinity' for timestamps.
+// In the Declarative Roles Manager we are interested in "proper" times, so we
+// convert infinities to values 100 years in the future or past
 func (sm PostgresRoleManager) List(
 	ctx context.Context,
 ) ([]DatabaseRole, error) {
 	logger := log.FromContext(ctx).WithName("roles_reconciler")
+	wrapErr := func(err error) error { return fmt.Errorf("while listing DB roles for DRM: %w", err) }
 
 	rows, err := sm.superUserDB.QueryContext(
 		ctx,
@@ -59,7 +70,7 @@ func (sm PostgresRoleManager) List(
 		) mem ON member = oid
 		WHERE rolname not like 'pg_%'`)
 	if err != nil {
-		return nil, err
+		return nil, wrapErr(err)
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -69,7 +80,7 @@ func (sm PostgresRoleManager) List(
 
 	var roles []DatabaseRole
 	for rows.Next() {
-		var validuntil sql.NullTime
+		var validuntil pgtype.Timestamp
 		var comment sql.NullString
 		var role DatabaseRole
 		var inRoles pq.StringArray
@@ -90,10 +101,18 @@ func (sm PostgresRoleManager) List(
 			&inRoles,
 		)
 		if err != nil {
-			return nil, err
+			return nil, wrapErr(err)
 		}
-		if validuntil.Valid {
+		if validuntil.Valid && validuntil.InfinityModifier == pgtype.Finite {
 			role.ValidUntil = &validuntil.Time
+		}
+		if validuntil.Valid && validuntil.InfinityModifier == pgtype.Infinity {
+			theFuture := time.Now().Add(LongDuration)
+			role.ValidUntil = &theFuture
+		}
+		if validuntil.Valid && validuntil.InfinityModifier == pgtype.NegativeInfinity {
+			thePast := time.Now().Add(-LongDuration)
+			role.ValidUntil = &thePast
 		}
 		if comment.Valid {
 			role.Comment = comment.String
@@ -105,7 +124,7 @@ func (sm PostgresRoleManager) List(
 	}
 
 	if rows.Err() != nil {
-		return nil, rows.Err()
+		return nil, wrapErr(rows.Err())
 	}
 
 	return roles, nil
@@ -115,6 +134,9 @@ func (sm PostgresRoleManager) List(
 func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while updating role %s with DRM: %w", role.Name, err)
+	}
 	var query strings.Builder
 
 	query.WriteString(fmt.Sprintf("ALTER ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
@@ -126,7 +148,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 
 	_, err := sm.superUserDB.ExecContext(ctx, query.String())
 	if err != nil {
-		return fmt.Errorf("could not update role %s: %w", role.Name, err)
+		return wrapErr(err)
 	}
 	return nil
 }
@@ -136,6 +158,9 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while creating role %s with DRM: %w", role.Name, err)
+	}
 
 	var query strings.Builder
 	query.WriteString(fmt.Sprintf("CREATE ROLE %s ", pgx.Identifier{role.Name}.Sanitize()))
@@ -148,7 +173,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
 	if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
-		return fmt.Errorf("could not create role %s: %w ", role.Name, err)
+		return wrapErr(err)
 	}
 
 	if len(role.Comment) > 0 {
@@ -157,7 +182,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
 
 		if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
-			return fmt.Errorf("could not create comment for role %s: %w ", role.Name, err)
+			wrapErr(err)
 		}
 	}
 
@@ -168,12 +193,15 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while deleting role %s with DRM: %w", role.Name, err)
+	}
 
 	query := fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize())
 	contextLog.Debug("Dropping", "query", query)
 	_, err := sm.superUserDB.ExecContext(ctx, query)
 	if err != nil {
-		return fmt.Errorf("could not delete role %s: %w", role.Name, err)
+		return wrapErr(err)
 	}
 
 	return nil
@@ -184,16 +212,19 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while getting last xmin for role %s with DRM: %w", role.Name, err)
+	}
 
 	var xmin int64
 	err := sm.superUserDB.QueryRowContext(ctx,
 		`SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1`,
 		role.Name).Scan(&xmin)
 	if err == sql.ErrNoRows {
-		return 0, fmt.Errorf("while getting last transaction ID. Role %s not found", role.Name)
+		return 0, wrapErr(err)
 	}
 	if err != nil {
-		return 0, fmt.Errorf("while getting last transaction ID for %s: %w", role.Name, err)
+		return 0, wrapErr(err)
 	}
 
 	return xmin, nil
@@ -203,13 +234,16 @@ func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role Dat
 func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while updating comment for role %s with DRM: %w", role.Name, err)
+	}
 
 	query := fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 		pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment))
 	contextLog.Debug("Updating comment", "query", query)
 	_, err := sm.superUserDB.ExecContext(ctx, query)
 	if err != nil {
-		return fmt.Errorf("could not update comment of role %s: %w", role.Name, err)
+		return wrapErr(err)
 	}
 
 	return nil
@@ -228,8 +262,11 @@ func (sm PostgresRoleManager) UpdateMembership(
 ) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while updating memberships for role %s with DRM: %w", role.Name, err)
+	}
 	if len(rolesToRevoke)+len(rolesToGrant) == 0 {
-		log.Debug("No membership change query to execute for role")
+		contextLog.Debug("No membership change query to execute for role")
 		return nil
 	}
 	queries := make([]string, 0, len(rolesToRevoke)+len(rolesToGrant))
@@ -248,20 +285,20 @@ func (sm PostgresRoleManager) UpdateMembership(
 
 	tx, err := sm.superUserDB.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return wrapErr(err)
 	}
 	defer func() {
 		rollbackErr := tx.Rollback()
 		if rollbackErr != nil && rollbackErr != sql.ErrTxDone {
-			log.Error(rollbackErr, "rolling back transaction")
+			contextLog.Error(rollbackErr, "rolling back transaction")
 		}
 	}()
 
 	for _, sqlQuery := range queries {
-		log.Debug("Executing query", "sqlQuery", sqlQuery)
+		contextLog.Debug("Executing query", "sqlQuery", sqlQuery)
 		if _, err := sm.superUserDB.ExecContext(ctx, sqlQuery); err != nil {
-			log.Error(err, "executing query", "sqlQuery", sqlQuery, "err", err)
-			return err
+			contextLog.Error(err, "executing query", "sqlQuery", sqlQuery, "err", err)
+			return wrapErr(err)
 		}
 	}
 	return tx.Commit()
@@ -274,6 +311,9 @@ func (sm PostgresRoleManager) GetParentRoles(
 ) ([]string, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while getting parents for role %s with DRM: %w", role.Name, err)
+	}
 	query := `SELECT mem.inroles 
 		FROM pg_catalog.pg_authid as auth
 		LEFT JOIN (
@@ -285,10 +325,10 @@ func (sm PostgresRoleManager) GetParentRoles(
 	var parentRoles pq.StringArray
 	err := sm.superUserDB.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("while getting parent roles. Role %s not found", role.Name)
+		return nil, wrapErr(err)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("while getting parent roles for %s: %w", role.Name, err)
+		return nil, wrapErr(err)
 	}
 
 	return parentRoles, nil
