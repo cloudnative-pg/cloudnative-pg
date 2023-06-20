@@ -463,7 +463,7 @@ keeping the database PVCs. This feature simulates scaling to 0 instances.
 
 ### Hibernation (imperative)
 
-CloudNativePG supports [hibernation of a running PostgreSQL cluster](cnpg-plugin.md#cluster-hibernation)
+CloudNativePG supports [hibernation of a running PostgreSQL cluster](kubectl-plugin.md#cluster-hibernation)
 via the `cnpg` plugin. Hibernation shuts down all Postgres instances in the
 High Availability cluster, and keeps a static copy of the PVC group of the
 primary, containing `PGDATA` and WALs. The plugin enables to exit the

@@ -18,7 +18,7 @@ configuration in the `bootstrap` section).
 ## Issuing a new certificate
 
 !!! Seealso "About CNPG plugin for kubectl"
-    Please refer to the ["Certificates" section in the "CloudNativePG Plugin"](cnpg-plugin.md#certificates)
+    Please refer to the ["Certificates" section in the "CloudNativePG Plugin"](kubectl-plugin.md#certificates)
     page for details on how to use the plugin for `kubectl`.
 
 You can create a certificate for the `app` user in the `cluster-example` PostgreSQL cluster as follows:
