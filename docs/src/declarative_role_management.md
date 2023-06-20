@@ -120,6 +120,42 @@ NOTE: it is considered an error to set both `passwordSecret` and
 `disablePassword` on a given role.
 This configuration will be rejected by the validation webhook.
 
+### Password expiry, VALID UNTIL
+
+Password expiry via the `VALID UNTIL` role attribute requires special mention.
+By default, roles that are not given a specific `VALID UNTIL` on creation have
+non-expiring passwords.
+
+PostgreSQL uses a timestamp type for password expiry, and that includes support
+for values like `'infinity'`, `'tomorrow'`, or `'allballs'` (sic). Please see
+to the [PostgreSQL documentation](https://www.postgresql.org/docs/current/datatype-datetime.html)
+for reference.
+
+With declarative role management we support the `validUntil`
+attribute for managed roles, but it can only accept a valid Kubernetes
+timestamp, or be omitted (defaulting to null).
+
+While `'tomorrow'` will be converted to a valid date by the database, `infinity`
+and `-infinity` cannot.
+Internally, expiry values set to `infinity` or `-infinity` will be converted to
+timestamps far in the future or the past, respectively. This will be completely
+transparent to the user of managed roles, but it ensures CloudNativePG can
+read and manage roles that may have been created directly in PostgreSQL.
+
+By coherence with the way we manage passwords, a managed role with
+no `validUntil` will ignore the existing `VALID UNTIL` set in the database role.
+In a role with a `validUntil` timestamp set, the database role will be updated
+to this value.
+
+We don't have a way to set a managed role  to `infinity`,
+`-infinity`, or NULL on Postgres.
+You will need to set explicit timestamps far in the future or the past for
+equivalent behavior.
+
+There is some similarity to the way Postgres deals with NULL expiry dates.
+Note that `VALID UNTIL` cannot be explicitly set back to NULL
+([see reference](https://www.postgresql.org/docs/current/sql-alterrole.html)).
+
 !!! Warning
     The declarative role management feature has changed behavior since its
     initial version (1.20.0). In 1.20.0, a role without a `passwordSecret` would

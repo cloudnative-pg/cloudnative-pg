@@ -147,7 +147,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 		Expect(res).To(BeFalse())
 	})
 
-	It("Detects difference in VALID UNTIL if db has it but spec does not", func() {
+	It("Ignores difference in VALID UNTIL if db has it but spec does not", func() {
 		role := DatabaseRole{
 			Name:       "abc",
 			ValidUntil: &fixedTime,
@@ -159,7 +159,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 			},
 		}
 		res := role.hasSameValidUntilAs(inSpec)
-		Expect(res).To(BeFalse())
+		Expect(res).To(BeTrue())
 	})
 
 	It("Detects difference in VALID UNTIL if spec has it but db does not", func() {

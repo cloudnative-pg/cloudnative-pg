@@ -55,7 +55,8 @@ var _ = Describe("Role reconciler test", func() {
 				},
 			},
 		}
-		pgStringError := "while listing DB roles for DRM: failed to connect to `host=/controller/run user=postgres database=postgres`: dial " +
+		pgStringError := "while listing DB roles for DRM: " +
+			"failed to connect to `host=/controller/run user=postgres database=postgres`: dial " +
 			"error (dial unix /controller/run/.s.PGSQL.5432: connect: no such file or directory)"
 		result, err := Reconcile(context.TODO(), instance, cluster, mockClient)
 		Expect(err.Error()).To(BeEquivalentTo(pgStringError))

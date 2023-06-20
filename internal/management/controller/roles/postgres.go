@@ -182,7 +182,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
 
 		if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
-			wrapErr(err)
+			return wrapErr(err)
 		}
 	}
 

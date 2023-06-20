@@ -81,6 +81,11 @@ func (d *DatabaseRole) hasSameValidUntilAs(inSpec apiv1.RoleConfiguration) bool 
 	if inSpec.ValidUntil != nil && d.ValidUntil != nil {
 		return d.ValidUntil.Equal(inSpec.ValidUntil.Time)
 	}
+	// NOTE: by coherence with the way we treat passwords, if the spec
+	// does not have a ValidUntil setting, we ignore the VALID UNTIL in the database
+	if inSpec.ValidUntil == nil {
+		return true
+	}
 
 	return false
 }
