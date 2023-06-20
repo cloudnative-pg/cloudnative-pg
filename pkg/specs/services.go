@@ -67,6 +67,7 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
 				utils.ClusterLabelName: cluster.Name,
+				utils.PodRoleLabelName: string(utils.PodRoleInstance),
 			},
 		},
 	}

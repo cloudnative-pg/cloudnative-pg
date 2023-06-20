@@ -45,6 +45,7 @@ var _ = Describe("Services specification", func() {
 		Expect(service.Name).To(Equal("clustername-r"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
+		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
 	})
 
 	It("create a configured -ro service", func() {
