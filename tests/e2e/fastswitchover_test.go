@@ -48,9 +48,6 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if env.IsIBM() {
-			Skip("This test is not run on an IBM architecture")
-		}
 	})
 
 	// Confirm that a standby closely following the primary doesn't need more

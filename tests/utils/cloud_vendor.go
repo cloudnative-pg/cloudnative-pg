@@ -56,35 +56,6 @@ func TestCloudVendor() (*TestEnvVendor, error) {
 		}
 		return nil, fmt.Errorf("unknow cloud vendor %s", vendorEnv)
 	}
-	// if the env variable doesn't exist, fall back to using the old of detecting
-	// the current env and print a warning
-	env, err := NewTestingEnvironment()
-	if err != nil {
-		return nil, err
-	}
-	isAKS, err := env.IsAKS()
-	if err != nil {
-		return nil, err
-	}
-	if isAKS {
-		return &AKS, nil
-	}
-
-	isGKE, err := env.IsGKE()
-	if err != nil {
-		return nil, err
-	}
-	if isGKE {
-		return &GKE, nil
-	}
-
-	isEKS, err := env.IsEKS()
-	if err != nil {
-		return nil, err
-	}
-	if isEKS {
-		return &EKS, nil
-	}
 	// if none above, it is a local
 	return &LOCAL, nil
 }
