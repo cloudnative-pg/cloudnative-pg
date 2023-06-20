@@ -121,9 +121,6 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 			if !IsLocal() {
 				Skip("This test is only run on local cluster")
 			}
-			if env.IsIBM() {
-				Skip("This test is not run on IBM architecture")
-			}
 			const namespacePrefix = "single-instance-pod-eviction"
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -180,9 +177,6 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 			}
 			if !IsLocal() {
 				Skip("This test is only run on local cluster")
-			}
-			if env.IsIBM() {
-				Skip("This test is not run on IBM architecture")
 			}
 		})
 		JustAfterEach(func() {

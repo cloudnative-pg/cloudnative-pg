@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -270,74 +269,6 @@ func (env TestingEnvironment) GetScheduledBackupList(namespace string) (*apiv1.S
 		env.Ctx, scheduledBackupList, client.InNamespace(namespace),
 	)
 	return scheduledBackupList, err
-}
-
-// IsGKE returns true if we run on Google Kubernetes Engine. We check that
-// by verifying if all the node names start with "gke-"
-// Deprecated.
-// Using testCloudVendorEnv
-func (env TestingEnvironment) IsGKE() (bool, error) {
-	nodeList := &corev1.NodeList{}
-	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
-		return false, err
-	}
-	for _, node := range nodeList.Items {
-		re := regexp.MustCompile("^gke-")
-		if len(re.FindAllString(node.Name, -1)) == 0 {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// IsAKS returns true if we run on Azure Kubernetes Service. We check that
-// by verifying if all the node names start with "aks-"
-// Deprecated.
-// Using testCloudVendorEnv
-func (env TestingEnvironment) IsAKS() (bool, error) {
-	nodeList := &corev1.NodeList{}
-	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
-		return false, err
-	}
-	for _, node := range nodeList.Items {
-		re := regexp.MustCompile("^aks-")
-		if len(re.FindAllString(node.Name, -1)) == 0 {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// IsEKS returns true if we run on amazon EKS Service. We check that
-// by verifying if all the node names start with "ip-"
-// Deprecated.
-// Using testCloudVendorEnv
-func (env TestingEnvironment) IsEKS() (bool, error) {
-	nodeList := &corev1.NodeList{}
-	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
-		return false, err
-	}
-	for _, node := range nodeList.Items {
-		re := regexp.MustCompile("^ip-")
-		if len(re.FindAllString(node.Name, -1)) == 0 {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// IsIBM returns true if we are running on IBM architecture. We check that
-// by verifying if IBM_ARCH env is equals to "true"
-func (env TestingEnvironment) IsIBM() bool {
-	ibmArch, ok := os.LookupEnv("IBM_ARCH")
-	if !ok {
-		return false
-	}
-	if ibmArch == "true" {
-		fmt.Println("This is an IBM architecture")
-		return true
-	}
-	return false
 }
 
 // GetResourceNamespacedNameFromYAML returns the NamespacedName representing a resource in a YAML file
