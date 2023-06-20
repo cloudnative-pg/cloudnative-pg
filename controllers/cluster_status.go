@@ -743,7 +743,7 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 		Message: "Cluster Is Not Ready",
 	}
 
-	if cluster.Status.Phase == apiv1.PhaseHealthy {
+	if phase == apiv1.PhaseHealthy || phase == apiv1.PhaseReplicaLagThresholdExceeded {
 		condition = metav1.Condition{
 			Type:    string(apiv1.ConditionClusterReady),
 			Status:  metav1.ConditionTrue,
@@ -772,12 +772,33 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	existingClusterStatus := cluster.Status
 	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
+	primary := statuses.GetPrimary()
+	if primary == nil {
+		return fmt.Errorf("no primary found")
+	}
+
+	primaryLSN, err := primary.CurrentLsn.Parse()
+	if err != nil {
+		return err
+	}
+
 	// we extract the instances reported state
 	for _, item := range statuses.Items {
-		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = apiv1.InstanceReportedState{
-			IsPrimary:  item.IsPrimary,
-			TimeLineID: item.TimeLineID,
+		reportedState := apiv1.InstanceReportedState{
+			IsPrimary:           item.IsPrimary,
+			TimeLineID:          item.TimeLineID,
+			IsWalReceiverActive: item.IsWalReceiverActive,
 		}
+
+		if !item.IsPrimary {
+			replicaLSN, err := item.CurrentLsn.Parse()
+			if err != nil {
+				return err
+			}
+			reportedState.ReplicaLag = primaryLSN - replicaLSN
+		}
+
+		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = reportedState
 	}
 
 	// we update any relevant cluster status that depends on the primary instance

@@ -2829,6 +2829,16 @@ spec:
                 required:
                 - source
                 type: object
+              replicaLagThreshold:
+                default: 30000000
+                description: ReplicaLagThreshold is a user-customizable field that
+                  represents the acceptable lag limit (in megabytes) between the primary
+                  database and its replicas. If a replica's lag exceeds this threshold,
+                  the cluster will enter the PhaseReplicaLagThresholdExceeded phase.
+                  The default value is 30MB. Adjust this according to your application's
+                  tolerance for data latency.
+                format: int64
+                type: integer
               replicationSlots:
                 description: Replication slots management configuration
                 properties:
@@ -3823,9 +3833,22 @@ spec:
                   description: InstanceReportedState describes the last reported state
                     of an instance during a reconciliation loop
                   properties:
+                    IsWalReceiverActive:
+                      description: IsWalReceiverActive indicates whether the WAL receiver
+                        process is active. This will always be false if 'IsPrimary'
+                        is true. For a standby instance, a true value denotes that
+                        it's actively receiving and logging transactions from the
+                        primary instance.
+                      type: boolean
                     isPrimary:
                       description: indicates if an instance is the primary one
                       type: boolean
+                    replicaLag:
+                      description: ReplicaLag represents the current lag of the replica
+                        against the primary instance in bytes. This is the difference
+                        WAL position between the primary and this replica.
+                      format: int64
+                      type: integer
                     timeLineID:
                       description: indicates on which TimelineId the instance is
                       type: integer

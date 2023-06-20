@@ -154,6 +154,8 @@ InfoSec
 Innocenti
 InstanceID
 InstanceReportedState
+IsPrimary
+IsWalReceiverActive
 Istio
 Istio's
 JSON
@@ -240,6 +242,7 @@ PgBouncerPoolMode
 PgBouncerSecrets
 PgBouncerSecretsVersions
 PgBouncerSpec
+PhaseReplicaLagThresholdExceeded
 Philippe
 PoLA
 PodAffinity
@@ -286,6 +289,8 @@ ReadWriteOnce
 RedHat
 RedHat's
 ReplicaClusterConfiguration
+ReplicaLag
+ReplicaLagThreshold
 ReplicaSet
 ReplicationSlotsConfiguration
 ReplicationSlotsHAConfiguration

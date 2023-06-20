@@ -309,6 +309,13 @@ type ClusterSpec struct {
 	// The SeccompProfile applied to every Pod and Container.
 	// Defaults to: `RuntimeDefault`
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
+
+	// ReplicaLagThreshold is a user-customizable field that represents the acceptable lag limit (in megabytes)
+	// between the primary database and its replicas. If a replica's lag exceeds this threshold,
+	// the cluster will enter the PhaseReplicaLagThresholdExceeded phase.
+	// The default value is 30MB. Adjust this according to your application's tolerance for data latency.
+	// +kubebuilder:default:=30000000
+	ReplicaLagThreshold int64 `json:"replicaLagThreshold,omitempty"`
 }
 
 const (
@@ -348,6 +355,12 @@ const (
 	// PhaseApplyingConfiguration is set by the instance manager when a configuration
 	// change is being detected
 	PhaseApplyingConfiguration = "Applying configuration"
+
+	// PhaseReplicaLagThresholdExceeded indicates that one or more replicas' lag
+	// has surpassed the defined threshold. This phase highlights a state
+	// where the replication process may require attention to ensure data
+	// consistency across the primary and replicas.
+	PhaseReplicaLagThresholdExceeded = "Replica lag threshold exceeded"
 )
 
 // ServiceAccountTemplate contains the template needed to generate the service accounts
@@ -571,6 +584,16 @@ type InstanceReportedState struct {
 	IsPrimary bool `json:"isPrimary"`
 	// indicates on which TimelineId the instance is
 	TimeLineID int `json:"timeLineID,omitempty"`
+
+	// IsWalReceiverActive indicates whether the WAL receiver process is active. This will always be false if 'IsPrimary'
+	// is true.
+	// For a standby instance, a true value denotes that it's actively receiving and logging transactions from the
+	// primary instance.
+	IsWalReceiverActive bool `json:"IsWalReceiverActive,omitempty"`
+
+	// ReplicaLag represents the current lag of the replica against the primary instance in bytes. This is the difference
+	// WAL position between the primary and this replica.
+	ReplicaLag int64 `json:"replicaLag,omitempty"`
 }
 
 // ClusterConditionType defines types of cluster conditions
@@ -2526,6 +2549,34 @@ func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
 	utils.LabelClusterName(obj, cluster.GetName())
 	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(obj, versions.Version)
+}
+
+// GetReplicaLagThreshold returns the user-defined threshold for acceptable replica lag.
+// On an existing cluster without this field the default value will be 0, this function defaults to ~30MB.
+// The threshold is used to trigger the PhaseReplicaLagThresholdExceeded phase when a replica's lag
+// surpasses this value. The returned value is in bytes.
+func (cluster *Cluster) GetReplicaLagThreshold() int64 {
+	if cluster.Spec.ReplicaLagThreshold == 0 {
+		return 30000000
+	}
+
+	return cluster.Spec.ReplicaLagThreshold
+}
+
+// IsAnyReplicaExceedingLagLimit checks if any replica is lagging behind
+// the primary's LSN by more than an acceptable limit.
+func (cluster *Cluster) IsAnyReplicaExceedingLagLimit() bool {
+	for _, i := range cluster.Status.InstancesReportedState {
+		if i.IsPrimary {
+			continue
+		}
+
+		if i.ReplicaLag > cluster.Spec.ReplicaLagThreshold {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ShouldForceLegacyBackup if present takes a backup without passing the name argument even on barman version 3.3.0+.

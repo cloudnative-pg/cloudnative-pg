@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -510,6 +511,10 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
+	if res, err := r.reconcileLagLimit(ctx, cluster); !res.IsZero() || err != nil {
+		return res, err
+	}
+
 	// When everything is reconciled, update the status
 	if err = r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
 		return ctrl.Result{}, err
@@ -518,6 +523,48 @@ func (r *ClusterReconciler) reconcileResources(
 	r.cleanupCompletedJobs(ctx, resources.jobs)
 
 	return ctrl.Result{}, nil
+}
+
+func (r *ClusterReconciler) reconcileLagLimit(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	const condition = "ReplicaLagThresholdExceeded"
+
+	if !cluster.IsAnyReplicaExceedingLagLimit() {
+		if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, condition, metav1.ConditionTrue) {
+			origCluster := cluster.DeepCopy()
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, condition)
+			if err := r.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	if cluster.Status.Phase == apiv1.PhaseReplicaLagThresholdExceeded {
+		return ctrl.Result{}, nil
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    condition,
+		Status:  metav1.ConditionTrue,
+		Reason:  "ReplicaLagExceeded",
+		Message: "One or more replicas are lagging beyond the user-defined acceptable limit.",
+	})
+
+	if err := r.RegisterPhase(
+		ctx,
+		cluster,
+		apiv1.PhaseReplicaLagThresholdExceeded,
+		"One or more replicas are lagging beyond the user-defined acceptable limit. "+
+			"Immediate action may be required to ensure data consistency.",
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 }
 
 // deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
