@@ -592,8 +592,8 @@ type InstanceReportedState struct {
 	IsWalReceiverActive bool `json:"IsWalReceiverActive,omitempty"`
 
 	// ReplicaLag represents the current lag of the replica against the primary instance in bytes. This is the difference
-	// WAL position between the primary and this replica.
-	ReplicaLag int64 `json:"replicaLag,omitempty"`
+	// WAL position between the primary and this replica. The value is set to "nil" if it could not be calculated.
+	ReplicaLag *int64 `json:"replicaLag,omitempty"`
 }
 
 // ClusterConditionType defines types of cluster conditions
@@ -2571,7 +2571,11 @@ func (cluster *Cluster) IsAnyReplicaExceedingLagLimit() bool {
 			continue
 		}
 
-		if i.ReplicaLag > cluster.Spec.ReplicaLagThreshold {
+		if i.ReplicaLag == nil {
+			continue
+		}
+
+		if *i.ReplicaLag > cluster.Spec.ReplicaLagThreshold {
 			return true
 		}
 	}

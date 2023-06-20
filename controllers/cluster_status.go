@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/pointer"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -773,10 +774,6 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
 	primary := statuses.GetPrimary()
-	if primary == nil {
-		return fmt.Errorf("no primary found")
-	}
-
 	primaryLSN, err := primary.CurrentLsn.Parse()
 	if err != nil {
 		return err
@@ -790,12 +787,12 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 			IsWalReceiverActive: item.IsWalReceiverActive,
 		}
 
-		if !item.IsPrimary {
+		if !item.IsPrimary && primary != nil {
 			replicaLSN, err := item.CurrentLsn.Parse()
 			if err != nil {
 				return err
 			}
-			reportedState.ReplicaLag = primaryLSN - replicaLSN
+			reportedState.ReplicaLag = pointer.Int64(primaryLSN - replicaLSN)
 		}
 
 		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = reportedState

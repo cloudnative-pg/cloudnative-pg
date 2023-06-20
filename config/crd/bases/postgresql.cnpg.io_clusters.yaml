@@ -3846,7 +3846,8 @@ spec:
                     replicaLag:
                       description: ReplicaLag represents the current lag of the replica
                         against the primary instance in bytes. This is the difference
-                        WAL position between the primary and this replica.
+                        WAL position between the primary and this replica. The value
+                        is set to "nil" if it could not be calculated.
                       format: int64
                       type: integer
                     timeLineID:

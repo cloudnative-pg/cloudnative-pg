@@ -571,12 +571,12 @@ Name        | Description      | Type
 
 InstanceReportedState describes the last reported state of an instance during a reconciliation loop
 
-Name                | Description                                                                                                                                                                                                                                               | Type 
-------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----
-`isPrimary          ` | indicates if an instance is the primary one                                                                                                                                                                                                               - *mandatory*  | bool 
-`timeLineID         ` | indicates on which TimelineId the instance is                                                                                                                                                                                                             | int  
-`IsWalReceiverActive` | IsWalReceiverActive indicates whether the WAL receiver process is active. This will always be false if 'IsPrimary' is true. For a standby instance, a true value denotes that it's actively receiving and logging transactions from the primary instance. | bool 
-`replicaLag         ` | ReplicaLag represents the current lag of the replica against the primary instance in bytes. This is the difference WAL position between the primary and this replica.                                                                                     | int64
+Name                | Description                                                                                                                                                                                                                                               | Type  
+------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
+`isPrimary          ` | indicates if an instance is the primary one                                                                                                                                                                                                               - *mandatory*  | bool  
+`timeLineID         ` | indicates on which TimelineId the instance is                                                                                                                                                                                                             | int   
+`IsWalReceiverActive` | IsWalReceiverActive indicates whether the WAL receiver process is active. This will always be false if 'IsPrimary' is true. For a standby instance, a true value denotes that it's actively receiving and logging transactions from the primary instance. | bool  
+`replicaLag         ` | ReplicaLag represents the current lag of the replica against the primary instance in bytes. This is the difference WAL position between the primary and this replica. The value is set to "nil" if it could not be calculated.                            | *int64
 
 <a id='LDAPBindAsAuth'></a>
 
