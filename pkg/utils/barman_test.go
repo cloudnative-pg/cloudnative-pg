@@ -31,13 +31,13 @@ var _ = Describe("parsing policy", func() {
 
 	It("must complain with a wrong policy", func() {
 		_, err := ParsePolicy("30")
-		Expect(err).ToNot(BeNil())
+		Expect(err).To(HaveOccurred())
 
 		_, err = ParsePolicy("www")
-		Expect(err).ToNot(BeNil())
+		Expect(err).To(HaveOccurred())
 
 		_, err = ParsePolicy("00d")
-		Expect(err).ToNot(BeNil())
+		Expect(err).To(HaveOccurred())
 	})
 })
 

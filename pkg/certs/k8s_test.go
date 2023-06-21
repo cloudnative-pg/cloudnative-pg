@@ -138,30 +138,30 @@ var _ = Describe("Root CA secret generation", func() {
 	It("must generate a new CA secret when it doesn't already exist", func(ctx SpecContext) {
 		kubeClient := generateFakeClient()
 		err := createFakeOperatorDeployment(ctx, kubeClient)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		secret, err := pki.ensureRootCACertificate(ctx, kubeClient)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		Expect(secret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(secret.Name).To(Equal("ca-secret-name"))
 
 		caSecret := corev1.Secret{}
 		err = kubeClient.Get(ctx, client.ObjectKey{Name: "ca-secret-name", Namespace: operatorNamespaceName}, &caSecret)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("must adopt the current certificate if it is valid", func(ctx SpecContext) {
 		kubeClient := generateFakeClient()
 		ca, err := CreateRootCA("ca-secret-name", operatorNamespaceName)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		secret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 		err = kubeClient.Create(ctx, secret)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		resultingSecret, err := pki.ensureRootCACertificate(ctx, kubeClient)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(resultingSecret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
 	})
@@ -172,23 +172,23 @@ var _ = Describe("Root CA secret generation", func() {
 		notBefore := notAfter.Add(-90 * 24 * time.Hour)
 		ca, err := createCAWithValidity(notBefore, notAfter,
 			nil, nil, "root", operatorNamespaceName)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		secret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 		err = kubeClient.Create(ctx, secret)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		// The secret should have been renewed now
 		resultingSecret, err := pki.ensureRootCACertificate(ctx, kubeClient)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(resultingSecret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
 
 		caPair, err := ParseCASecret(resultingSecret)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		cert, err := caPair.ParseCertificate()
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
 		Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
@@ -204,25 +204,25 @@ var _ = Describe("Webhook certificate validation", func() {
 
 		It("sets us the root CA environment", func(ctx SpecContext) {
 			err := createFakeOperatorDeployment(ctx, kubeClient)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			ca, _ := CreateRootCA("ca-secret-name", operatorNamespaceName)
 			caSecret = ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 			err = kubeClient.Create(ctx, caSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should correctly generate a pki certificate", func(ctx SpecContext) {
 			webhookSecret, err := pki.ensureCertificate(ctx, kubeClient, caSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 			Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
 
 			pair, err := ParseServerSecret(webhookSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			cert, err := pair.ParseCertificate()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
 			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
@@ -236,19 +236,19 @@ var _ = Describe("Webhook certificate validation", func() {
 
 		It("should create the secret", func(ctx SpecContext) {
 			err := createFakeOperatorDeployment(ctx, kubeClient)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			ca, _ := CreateRootCA("ca-secret-name", operatorNamespaceName)
 
 			caSecret = ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 			err = kubeClient.Create(ctx, caSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			webhookSecret, _ = pki.ensureCertificate(ctx, kubeClient, caSecret)
 		})
 
 		It("must reuse them", func(ctx SpecContext) {
 			currentWebhookSecret, err := pki.ensureCertificate(ctx, kubeClient, caSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(webhookSecret.Data).To(BeEquivalentTo(currentWebhookSecret.Data))
 		})
 	})
@@ -262,7 +262,7 @@ var _ = Describe("Webhook certificate validation", func() {
 
 		It("sets up the environment", func(ctx SpecContext) {
 			err := createFakeOperatorDeployment(ctx, kubeClient)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			ca, _ := CreateRootCA("ca-secret-name", operatorNamespaceName)
 			caSecret = ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
@@ -273,22 +273,22 @@ var _ = Describe("Webhook certificate validation", func() {
 			serverSecret = server.GenerateCertificateSecret(operatorNamespaceName, "pki-secret-name")
 
 			err = kubeClient.Create(ctx, caSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			err = kubeClient.Create(ctx, serverSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("must renew the secret", func(ctx SpecContext) {
 			currentServerSecret, err := pki.ensureCertificate(ctx, kubeClient, caSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(serverSecret.Data).To(Not(BeEquivalentTo(currentServerSecret.Data)))
 
 			pair, err := ParseServerSecret(currentServerSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			cert, err := pair.ParseCertificate()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
 			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
@@ -309,7 +309,7 @@ var _ = Describe("TLS certificates injection", func() {
 
 	It("set up the environment", func(ctx SpecContext) {
 		err := kubeClient.Create(ctx, webhookSecret)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("inject the pki certificate in the mutating pki", func(ctx SpecContext) {
@@ -317,15 +317,15 @@ var _ = Describe("TLS certificates injection", func() {
 		mutatingWebhook := mutatingWebhookTemplate
 
 		err := kubeClient.Create(ctx, &mutatingWebhook)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		err = pki.injectPublicKeyIntoMutatingWebhook(ctx, kubeClient, webhookSecret)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		updatedWebhook := admissionregistrationv1.MutatingWebhookConfiguration{}
 
 		err = kubeClient.Get(ctx, client.ObjectKey{Name: pki.MutatingWebhookConfigurationName}, &updatedWebhook)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 	})
@@ -335,14 +335,14 @@ var _ = Describe("TLS certificates injection", func() {
 		validatingWebhook := validatingWebhookTemplate
 
 		err := kubeClient.Create(ctx, &validatingWebhook)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		err = pki.injectPublicKeyIntoValidatingWebhook(ctx, kubeClient, webhookSecret)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		updatedWebhook := admissionregistrationv1.ValidatingWebhookConfiguration{}
 		err = kubeClient.Get(ctx, client.ObjectKey{Name: pki.ValidatingWebhookConfigurationName}, &updatedWebhook)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 	})
@@ -351,10 +351,10 @@ var _ = Describe("TLS certificates injection", func() {
 var _ = Describe("Webhook environment creation", func() {
 	It("should setup the certificates and the webhooks", func(ctx SpecContext) {
 		tempDirName, err := os.MkdirTemp("/tmp", "cert_*")
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		defer func() {
 			err = os.RemoveAll(tempDirName)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		}()
 
 		pki := pkiEnvironmentTemplate
@@ -366,32 +366,32 @@ var _ = Describe("Webhook environment creation", func() {
 		kubeClient := generateFakeClient()
 
 		err = createFakeOperatorDeployment(ctx, kubeClient)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		err = kubeClient.Create(ctx, &firstCrd)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		err = kubeClient.Create(ctx, &secondCrd)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		err = kubeClient.Create(ctx, &mutatingWebhook)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		err = kubeClient.Create(ctx, &validatingWebhook)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		ca, err := pki.ensureRootCACertificate(ctx, kubeClient)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		_, err = pki.setupWebhooksCertificate(ctx, kubeClient, ca)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		webhookSecret := corev1.Secret{}
 		err = kubeClient.Get(
 			ctx,
 			client.ObjectKey{Namespace: pki.OperatorNamespace, Name: pki.SecretName},
 			&webhookSecret)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
 		Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 
@@ -400,7 +400,7 @@ var _ = Describe("Webhook environment creation", func() {
 			ctx,
 			client.ObjectKey{Name: pki.MutatingWebhookConfigurationName},
 			&updatedMutatingWebhook)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedMutatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 
 		updatedValidatingWebhook := admissionregistrationv1.ValidatingWebhookConfiguration{}
@@ -408,7 +408,7 @@ var _ = Describe("Webhook environment creation", func() {
 			ctx,
 			client.ObjectKey{Name: pki.ValidatingWebhookConfigurationName},
 			&updatedValidatingWebhook)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 
 		updatedFirstCrd := apiextensionv1.CustomResourceDefinition{}
@@ -416,7 +416,7 @@ var _ = Describe("Webhook environment creation", func() {
 			ctx,
 			client.ObjectKey{Name: pki.CustomResourceDefinitionsName[0]},
 			&updatedFirstCrd)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedFirstCrd.Spec.Conversion.Webhook.ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 
 		updatedSecondCrd := apiextensionv1.CustomResourceDefinition{}
@@ -424,7 +424,7 @@ var _ = Describe("Webhook environment creation", func() {
 			ctx,
 			client.ObjectKey{Name: pki.CustomResourceDefinitionsName[1]},
 			&updatedSecondCrd)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedSecondCrd.Spec.Conversion.Webhook.ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 	})
 })

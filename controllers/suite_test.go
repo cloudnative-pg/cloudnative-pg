@@ -85,10 +85,10 @@ var _ = BeforeSuite(func() {
 	utilruntime.Must(apiv1.AddToScheme(scheme))
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	discoveryClient, err = discovery.NewDiscoveryClientForConfig(cfg)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	clusterReconciler = &ClusterReconciler{
 		Client:          k8sClient,
@@ -144,7 +144,7 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	}
 
 	err := k8sClient.Create(context.Background(), pooler)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
 	pooler.TypeMeta = metav1.TypeMeta{
@@ -185,7 +185,7 @@ func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluste
 	}
 
 	err := k8sClient.Create(context.Background(), cluster)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	cluster.Status = apiv1.ClusterStatus{
 		Instances:                instances,
@@ -205,9 +205,9 @@ func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluste
 	}
 
 	err = k8sClient.Status().Update(context.Background(), cluster)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	err = k8sClient.Update(context.Background(), cluster)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
 	cluster.TypeMeta = metav1.TypeMeta{
@@ -258,7 +258,7 @@ func newFakeCNPGClusterWithPGWal(namespace string) *apiv1.Cluster {
 	cluster.SetDefaults()
 
 	err := k8sClient.Create(context.Background(), cluster)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
 	cluster.TypeMeta = metav1.TypeMeta{
@@ -280,7 +280,7 @@ func newFakeNamespace() string {
 		},
 	}
 	err := k8sClient.Create(context.Background(), namespace)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	return name
 }
@@ -292,7 +292,7 @@ func getPoolerDeployment(ctx context.Context, pooler *apiv1.Pooler) *appsv1.Depl
 		types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace},
 		deployment,
 	)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	return deployment
 }
@@ -310,7 +310,7 @@ func generateFakeClusterPods(
 		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
 
 		err := c.Create(context.Background(), pod)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		// we overwrite local status, needed for certain tests. The status returned from fake api server will be always
 		// 'Pending'
@@ -343,7 +343,7 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 
 		err := c.Create(context.Background(), job)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		jobs = append(jobs, *job)
 	}
 	return jobs
@@ -382,11 +382,11 @@ func newFakePVC(
 			Role:       utils.PVCRolePgData,
 			Storage:    cluster.Spec.StorageConfiguration,
 		})
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
 
 	err = c.Create(context.Background(), pvc)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	pvcGroup = append(pvcGroup, *pvc)
 
 	if cluster.ShouldCreateWalArchiveVolume() {
@@ -399,10 +399,10 @@ func newFakePVC(
 				Storage:    cluster.Spec.StorageConfiguration,
 			},
 		)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta)
 		err = c.Create(context.Background(), pvcWal)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		pvcGroup = append(pvcGroup, *pvcWal)
 	}
 
@@ -416,7 +416,7 @@ func generateFakePVCWithDefaultClient(cluster *apiv1.Cluster) []corev1.Persisten
 // generateFakeCASecret follows the conventions established by cert.GenerateCASecret
 func generateFakeCASecret(c client.Client, name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
 	keyPair, err := certs.CreateRootCA(domain, namespace)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	secret := &corev1.Secret{
 		Type: corev1.SecretTypeOpaque,
 		ObjectMeta: metav1.ObjectMeta{
@@ -430,7 +430,7 @@ func generateFakeCASecret(c client.Client, name, namespace, domain string) (*cor
 	}
 
 	err = c.Create(context.Background(), secret)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	return secret, keyPair
 }

@@ -68,7 +68,7 @@ var _ = Describe("psql launcher", func() {
 		}
 
 		_, err := cmd.getPodName()
-		Expect(err).ToNot(BeNil())
+		Expect(err).To(HaveOccurred())
 		Expect(err.(*ErrMissingPod)).ToNot(BeNil())
 	})
 
