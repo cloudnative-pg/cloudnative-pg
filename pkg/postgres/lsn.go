@@ -19,7 +19,6 @@ limitations under the License.
 package postgres
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -27,8 +26,6 @@ import (
 
 // LSN is a string composed by two hexadecimal numbers, separated by "/"
 type LSN string
-
-var errEmptyLSN = errors.New("empty LSN")
 
 // Less compares two LSNs
 func (lsn LSN) Less(other LSN) bool {
@@ -47,10 +44,6 @@ func (lsn LSN) Less(other LSN) bool {
 
 // Parse an LSN in its components
 func (lsn LSN) Parse() (int64, error) {
-	if lsn == "" {
-		return 0, errEmptyLSN
-	}
-
 	components := strings.Split(string(lsn), "/")
 	if len(components) != 2 {
 		return 0, fmt.Errorf("error parsing LSN %s", lsn)
@@ -69,4 +62,22 @@ func (lsn LSN) Parse() (int64, error) {
 	}
 
 	return (segment << 32) + displacement, nil
+}
+
+// Diff is a method on the LSN (Log Sequence Number) type.
+// It subtracts the LSN value of another LSN from the current LSN and returns the result as a pointer to an int64.
+// If any of the LSNs cannot be parsed to an int64, it returns nil
+func (lsn LSN) Diff(other LSN) *int64 {
+	lsn64, err := lsn.Parse()
+	if err != nil {
+		return nil
+	}
+
+	other64, err := other.Parse()
+	if err != nil {
+		return nil
+	}
+
+	res := lsn64 - other64
+	return &res
 }

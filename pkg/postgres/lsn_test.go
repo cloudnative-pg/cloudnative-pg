@@ -38,4 +38,32 @@ var _ = Describe("LSN handling functions", func() {
 			Expect(LSN("3BB/A9FFFBE8").Parse()).Should(Equal(int64(4104545893352)))
 		})
 	})
+
+	Describe("#Diff", func() {
+		Context("when the LSNs can be parsed to int64", func() {
+			It("should return the difference of the LSNs", func() {
+				lsn1 := LSN("1/10")
+				lsn2 := LSN("1/B")
+				res := lsn1.Diff(lsn2)
+				Expect(res).NotTo(BeNil())
+				Expect(*res).To(Equal(int64(5)))
+			})
+		})
+
+		Context("when the LSNs cannot be parsed to int64", func() {
+			It("should return nil", func() {
+				lsn1 := LSN("1/10")
+				lsn2 := LSN("wrong_format")
+				res := lsn1.Diff(lsn2)
+				Expect(res).To(BeNil())
+			})
+
+			It("should return nil when LSN is empty", func() {
+				lsn1 := LSN("1/10")
+				lsn2 := LSN("")
+				res := lsn1.Diff(lsn2)
+				Expect(res).To(BeNil())
+			})
+		})
+	})
 })

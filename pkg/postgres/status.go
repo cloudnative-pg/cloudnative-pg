@@ -18,7 +18,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -319,8 +318,8 @@ func (list PostgresqlStatusList) IsAnyStandbyWalReceiverDown(primaryName string)
 	return false
 }
 
-// GetPrimaryLSN returns the primary LSN or default value
-func (list PostgresqlStatusList) GetPrimaryLSN() (int64, error) {
+// GetPrimary returns the primary
+func (list PostgresqlStatusList) GetPrimary() *PostgresqlStatus {
 	var primary *PostgresqlStatus
 	for idx := range list.Items {
 		item := &list.Items[idx]
@@ -330,19 +329,7 @@ func (list PostgresqlStatusList) GetPrimaryLSN() (int64, error) {
 		}
 	}
 
-	if primary == nil {
-		return 0, nil
-	}
-
-	primaryLSN, err := primary.CurrentLsn.Parse()
-	if errors.Is(err, errEmptyLSN) {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-
-	return primaryLSN, nil
+	return primary
 }
 
 // IsPodReporting if a pod is ready
