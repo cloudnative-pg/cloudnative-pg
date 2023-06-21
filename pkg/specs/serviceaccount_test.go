@@ -30,14 +30,14 @@ var _ = Describe("Service accounts", func() {
 	It("create a service account with the cluster name", func() {
 		sa := &v1.ServiceAccount{}
 		err := UpdateServiceAccount(nil, sa)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(sa.Annotations[OperatorManagedSecretsName]).To(Equal("null"))
 	})
 
 	It("correctly create the annotation storing the secret names", func() {
 		sa := &v1.ServiceAccount{}
 		err := UpdateServiceAccount([]string{"one", "two"}, sa)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(sa.Annotations[OperatorManagedSecretsName]).To(Equal(`["one","two"]`))
 	})
 
@@ -45,7 +45,7 @@ var _ = Describe("Service accounts", func() {
 		It("can detect that the ServiceAccount is needing a refresh", func(ctx SpecContext) {
 			sa := &v1.ServiceAccount{}
 			err := UpdateServiceAccount([]string{"one", "two"}, sa)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two"}, emptyMeta)).To(BeTrue())
 			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two", "three"}, emptyMeta)).To(BeFalse())
 		})
@@ -61,7 +61,7 @@ var _ = Describe("Service accounts", func() {
 			sa.ImagePullSecrets = append(sa.ImagePullSecrets, v1.LocalObjectReference{
 				Name: "token",
 			})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two"}, emptyMeta)).To(BeTrue())
 			Expect(IsServiceAccountAligned(ctx, sa, []string{"one", "two", "three"}, emptyMeta)).To(BeFalse())
@@ -85,7 +85,7 @@ var _ = Describe("Service accounts", func() {
 				ObjectMeta: meta,
 			}
 			err := UpdateServiceAccount([]string{}, sa)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(IsServiceAccountAligned(ctx, sa, nil, meta)).To(BeTrue())
 			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta)).To(BeFalse())
@@ -109,7 +109,7 @@ var _ = Describe("Service accounts", func() {
 				ObjectMeta: meta,
 			}
 			err := UpdateServiceAccount([]string{}, sa)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(IsServiceAccountAligned(ctx, sa, nil, meta)).To(BeTrue())
 			Expect(IsServiceAccountAligned(ctx, sa, nil, updatedMeta)).To(BeFalse())

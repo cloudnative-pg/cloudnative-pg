@@ -42,7 +42,7 @@ var _ = Describe("pgbouncer log parsing", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// Check if we received the correct records
-		Expect(len(spy.Records)).To(Equal(27))
+		Expect(spy.Records).To(HaveLen(27))
 
 		// Check that we parse every line of the log file
 		for _, record := range spy.Records {

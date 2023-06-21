@@ -61,7 +61,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure that updateDeployment creates the deployment", func() {
 			err := poolerReconciler.updateDeployment(ctx, pooler, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(res.Deployment).ToNot(BeNil())
 
 			deployment := getPoolerDeployment(ctx, pooler)
@@ -72,7 +72,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			beforeDep := getPoolerDeployment(ctx, pooler)
 
 			err := poolerReconciler.updateDeployment(ctx, pooler, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			afterDep := getPoolerDeployment(ctx, pooler)
 			Expect(beforeDep.ResourceVersion).To(Equal(afterDep.ResourceVersion))
@@ -88,7 +88,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			beforeDep := getPoolerDeployment(ctx, poolerUpdate)
 
 			err := poolerReconciler.updateDeployment(ctx, poolerUpdate, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			afterDep := getPoolerDeployment(ctx, poolerUpdate)
 
@@ -115,12 +115,12 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure that updateServiceAccount function creates the SA", func() {
 			err := poolerReconciler.updateServiceAccount(ctx, pooler, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			sa := &corev1.ServiceAccount{}
 
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}, sa)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(sa.ImagePullSecrets).To(BeEmpty())
 
@@ -132,12 +132,12 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			beforeResourceVersion := res.ServiceAccount.ResourceVersion
 
 			err := poolerReconciler.updateServiceAccount(ctx, pooler, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			afterSa := &corev1.ServiceAccount{}
 
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}, afterSa)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(beforeResourceVersion).To(Equal(afterSa.ResourceVersion))
 		})
@@ -161,7 +161,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			}
 
 			err := k8sClient.Create(ctx, pullSecret)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("making sure it updates the SA if there are changes", func() {
@@ -169,11 +169,11 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			beforeResourceVersion := res.ServiceAccount.ResourceVersion
 
 			err := poolerReconciler.updateServiceAccount(ctx, pooler, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			afterSa := &corev1.ServiceAccount{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}, afterSa)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(afterSa.ImagePullSecrets).To(HaveLen(1))
 			Expect(afterSa.ImagePullSecrets).To(ContainElement(corev1.LocalObjectReference{
@@ -194,19 +194,19 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure that updateRBAC function creates the RBAC", func() {
 			err := poolerReconciler.updateRBAC(ctx, pooler, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			expectedRole := pgbouncer.Role(pooler)
 			role := &rbacv1.Role{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedRole.Name, Namespace: expectedRole.Namespace}, role)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(expectedRole.Rules).To(Equal(role.Rules))
 
 			expectedRb := pgbouncer.RoleBinding(pooler)
 			roleBinding := &rbacv1.RoleBinding{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedRb.Name, Namespace: expectedRb.Namespace}, roleBinding)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(expectedRb.Subjects).To(Equal(roleBinding.Subjects))
 			Expect(expectedRb.RoleRef).To(Equal(roleBinding.RoleRef))
@@ -229,12 +229,12 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure it updateService creates the service", func() {
 			err := poolerReconciler.updateService(ctx, pooler, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
 			expectedSVC := pgbouncer.Service(pooler)
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(expectedSVC.Spec.Selector).To(Equal(svc.Spec.Selector))
 			Expect(expectedSVC.Spec.Ports).To(Equal(svc.Spec.Ports))
@@ -245,12 +245,12 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		By("making sure the svc doesn't get updated if there are not changes", func() {
 			previousResourceVersion := res.Service.ResourceVersion
 			err := poolerReconciler.updateService(ctx, pooler, res)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
 			expectedSVC := pgbouncer.Service(pooler)
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(previousResourceVersion).To(Equal(svc.ResourceVersion))
 		})
