@@ -44,6 +44,16 @@ var (
 	}
 )
 
+// NewFlags creates a new instance of Flags
+func NewFlags(options zap.Options) Flags {
+	return Flags{zapOptions: options}
+}
+
+// SetLogLevel sets manually the logLevel
+func SetLogLevel(level string) {
+	logLevel = level
+}
+
 // AddFlags binds manager configuration flags to a given flagset
 func (l *Flags) AddFlags(flags *pflag.FlagSet) {
 	loggingFlagSet := &flag.FlagSet{}
