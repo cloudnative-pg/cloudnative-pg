@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -334,6 +335,9 @@ func (list PostgresqlStatusList) GetPrimaryLSN() (int64, error) {
 	}
 
 	primaryLSN, err := primary.CurrentLsn.Parse()
+	if errors.Is(err, errEmptyLSN) {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, err
 	}

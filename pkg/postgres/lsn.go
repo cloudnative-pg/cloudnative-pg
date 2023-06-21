@@ -19,6 +19,7 @@ limitations under the License.
 package postgres
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,6 +27,8 @@ import (
 
 // LSN is a string composed by two hexadecimal numbers, separated by "/"
 type LSN string
+
+var errEmptyLSN = errors.New("empty LSN")
 
 // Less compares two LSNs
 func (lsn LSN) Less(other LSN) bool {
@@ -45,7 +48,7 @@ func (lsn LSN) Less(other LSN) bool {
 // Parse an LSN in its components
 func (lsn LSN) Parse() (int64, error) {
 	if lsn == "" {
-		return 0, nil
+		return 0, errEmptyLSN
 	}
 
 	components := strings.Split(string(lsn), "/")
