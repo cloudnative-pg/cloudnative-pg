@@ -128,7 +128,7 @@ var _ = Describe("Keypair generation", func() {
 			Expect(cert.ExtKeyUsage).To(Equal([]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}))
 			Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
 			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
-			Expect(cert.VerifyHostname("this.host.name.com")).ToNot(HaveOccurred())
+			Expect(cert.VerifyHostname("this.host.name.com")).To(Succeed())
 
 			caCert, err := rootCA.ParseCertificate()
 			Expect(err).ToNot(HaveOccurred())
