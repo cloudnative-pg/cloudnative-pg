@@ -172,19 +172,19 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile1) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#1 wal is in the output location")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile2) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#2 wal is in the spool directory")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile3) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#3 wal is in the spool directory")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(false),
+				Should(BeFalse(),
 					"end-of-wal-stream flag is unset")
 		})
 
@@ -202,15 +202,15 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile2) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#2 wal is in the output location")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile3) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#3 wal is in the spool directory")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(false),
+				Should(BeFalse(),
 					"end-of-wal-stream flag is unset")
 		})
 
@@ -228,11 +228,11 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile3) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#3 wal is in the output location")
 			Eventually(func() bool { return testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"spool directory is empty, end-of-wal-stream flag is unset")
 		})
 
@@ -250,15 +250,15 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile4) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#4 wal is in the output location")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile5) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#5 wal is in the spool directory")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"end-of-wal-stream flag is set for #6 wal is not present")
 		})
 
@@ -282,15 +282,15 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile5) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#5 wal is in the output location")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "00000001*") }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(false),
+				Should(BeFalse(),
 					"no wal files exist in the spool directory")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"end-of-wal-stream flag is still there")
 		})
 
@@ -308,11 +308,11 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				"exit code should 1 since #6 wal is not in the output location or spool directory and flag is set")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile6) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(false),
+				Should(BeFalse(),
 					"#6 wal is not in the output location")
 			Eventually(func() bool { return testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"spool directory is empty, end-of-wal-stream flag is unset")
 		})
 
@@ -330,15 +330,15 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile6) }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"#6 wal is in the output location")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "00000001*") }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(false),
+				Should(BeFalse(),
 					"no wals in the spool directory")
 			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
 				WithTimeout(RetryTimeout).
-				Should(Equal(true),
+				Should(BeTrue(),
 					"end-of-wal-stream flag is set for #7 and #8 wal is not present")
 		})
 	})

@@ -395,7 +395,7 @@ var _ = Describe("look up for secrets", func() {
 		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
 	})
 	It("retrieves all names needed to build a server CA certificate are 9", func() {
-		Expect(len(cluster.GetClusterAltDNSNames())).To(Equal(9))
+		Expect(cluster.GetClusterAltDNSNames()).To(HaveLen(9))
 	})
 })
 
