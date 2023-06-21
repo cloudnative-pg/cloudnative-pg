@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
 - ../crd
 commonAnnotations:
-  helm.sh/resource-policy: keep
+  "helm.sh/resource-policy": keep
