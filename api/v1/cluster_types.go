@@ -310,10 +310,11 @@ type ClusterSpec struct {
 	// Defaults to: `RuntimeDefault`
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 
-	// ReplicaLagThreshold is a user-customizable field that represents the acceptable lag limit (in megabytes)
-	// between the primary database and its replicas. If a replica's lag exceeds this threshold,
-	// the cluster will enter the PhaseReplicaLagThresholdExceeded phase.
-	// The default value is 30MB. Adjust this according to your application's tolerance for data latency.
+	// ReplicaLagThreshold is a user-customizable field that represents the acceptable lag limit (in megabytes,
+	// where 1MB = 1,000,000 Bytes) between the primary database and its replicas. If a replica's lag exceeds this
+	// threshold, the cluster will enter the PhaseReplicaLagThresholdExceeded phase.
+	// The default value is 30MB (30,000,000 Bytes). Adjust this according to your application's tolerance for data
+	// latency.
 	// +kubebuilder:default:=30000000
 	ReplicaLagThreshold int64 `json:"replicaLagThreshold,omitempty"`
 }
@@ -593,6 +594,7 @@ type InstanceReportedState struct {
 
 	// ReplicaLag represents the current lag of the replica against the primary instance in bytes. This is the difference
 	// WAL position between the primary and this replica. The value is set to "nil" if it could not be calculated.
+	// The value is expressed in megabytes, where 1MB = 1,000,000 Bytes
 	ReplicaLag *int64 `json:"replicaLag,omitempty"`
 }
 
