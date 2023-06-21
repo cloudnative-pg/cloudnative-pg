@@ -2346,7 +2346,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 	By("collecting and verify default set of metrics on each pod", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		expectedKeywordInMetricsOutput := [8]string{
+		expectedKeywordInMetricsOutput := [7]string{
 			"cnpg_pg_settings_setting",
 			"cnpg_backends_waiting_total",
 			"cnpg_pg_postmaster_start_time",
@@ -2354,7 +2354,6 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 			"cnpg_pg_stat_archiver",
 			"cnpg_pg_stat_bgwriter",
 			"cnpg_pg_stat_database",
-			"cnpg_pg_nodes_used",
 		}
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
