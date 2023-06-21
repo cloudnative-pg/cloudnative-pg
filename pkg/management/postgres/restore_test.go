@@ -88,7 +88,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 
 			GinkgoWriter.Println(fileNames)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(fileNames)).To(Equal(len(fileNameAndContent)))
+			Expect(fileNames).To(HaveLen(len(fileNameAndContent)))
 		})
 
 		By("executing the restore custom wal dir function", func() {
@@ -100,7 +100,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		By("ensuring that the content was migrated", func() {
 			files, err := fileutils.GetDirectoryContent(initInfo.PgWal)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(files)).To(Equal(len(fileNameAndContent)))
+			Expect(files).To(HaveLen(len(fileNameAndContent)))
 			GinkgoWriter.Println(files)
 
 			for name, expectedContent := range fileNameAndContent {
