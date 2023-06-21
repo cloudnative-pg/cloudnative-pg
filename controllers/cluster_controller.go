@@ -551,14 +551,14 @@ func (r *ClusterReconciler) reconcileLagLimit(
 		Type:    condition,
 		Status:  metav1.ConditionTrue,
 		Reason:  "ReplicaLagExceeded",
-		Message: "One or more replicas are lagging beyond the user-defined acceptable limit.",
+		Message: "One or more replicas are lagging beyond the defined acceptable limit.",
 	})
 
 	if err := r.RegisterPhase(
 		ctx,
 		cluster,
 		apiv1.PhaseReplicaLagThresholdExceeded,
-		"One or more replicas are lagging beyond the user-defined acceptable limit. "+
+		"One or more replicas are lagging beyond the defined acceptable limit. "+
 			"Immediate action may be required to ensure data consistency.",
 	); err != nil {
 		return ctrl.Result{}, err
