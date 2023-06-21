@@ -114,7 +114,7 @@ var _ = Describe("Slot synchronization", func() {
 	It("can create slots in local from those on primary", func() {
 		localSlotsBefore, err := local.List(ctx, &config)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(localSlotsBefore.Items).Should(HaveLen(0))
+		Expect(localSlotsBefore.Items).Should(BeEmpty())
 
 		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
 		Expect(err).ShouldNot(HaveOccurred())

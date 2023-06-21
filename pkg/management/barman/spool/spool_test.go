@@ -86,7 +86,7 @@ var _ = Describe("Spool", func() {
 		err = spool.MoveOut(walFile, destinationPath)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(spool.Contains(walFile)).To(BeFalse())
-		Expect(fileutils.FileExists(destinationPath))
+		Expect(fileutils.FileExists(destinationPath)).To(BeTrue())
 	})
 
 	It("can determine names for each WAL files", func() {

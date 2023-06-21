@@ -54,7 +54,7 @@ var _ = Describe("CSV file reader", func() {
 				fieldsValidator: LogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
-			Expect(len(spy.records)).To(Equal(2))
+			Expect(spy.records).To(HaveLen(2))
 		})
 
 		It("can read multiple CSV lines on PostgreSQL version <= 12", func() {
@@ -70,7 +70,7 @@ var _ = Describe("CSV file reader", func() {
 				fieldsValidator: LogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
-			Expect(len(spy.records)).To(Equal(2))
+			Expect(spy.records).To(HaveLen(2))
 		})
 
 		It("can read multiple CSV lines on PostgreSQL version == 14", func() {
@@ -86,7 +86,7 @@ var _ = Describe("CSV file reader", func() {
 				fieldsValidator: LogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
-			Expect(len(spy.records)).To(Equal(2))
+			Expect(spy.records).To(HaveLen(2))
 		})
 
 		It("can read pgAudit CSV lines", func() {
@@ -102,7 +102,7 @@ var _ = Describe("CSV file reader", func() {
 				fieldsValidator: LogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
-			Expect(len(spy.records)).To(Equal(2))
+			Expect(spy.records).To(HaveLen(2))
 		})
 
 		When("correctly handles a record with an invalid number of fields", func() {
@@ -121,11 +121,11 @@ var _ = Describe("CSV file reader", func() {
 				}
 				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
-				Expect(len(spy.records)).To(Equal(0))
+				Expect(spy.records).To(BeEmpty())
 
 				extendedError := &ErrFieldCountExtended{}
 				Expect(errors.As(err, &extendedError)).To(BeTrue())
-				Expect(len(extendedError.Fields)).To(Equal(FieldsPerRecord13 + 1))
+				Expect(extendedError.Fields).To(HaveLen(FieldsPerRecord13 + 1))
 			})
 
 			It("there are not enough fields", func() {
@@ -139,11 +139,11 @@ var _ = Describe("CSV file reader", func() {
 				}
 				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
-				Expect(len(spy.records)).To(Equal(0))
+				Expect(spy.records).To(BeEmpty())
 
 				extendedError := &ErrFieldCountExtended{}
 				Expect(errors.As(err, &extendedError)).To(BeTrue())
-				Expect(len(extendedError.Fields)).To(Equal(3))
+				Expect(extendedError.Fields).To(HaveLen(3))
 			})
 
 			It("there is a trailing comma", func() {
@@ -157,11 +157,11 @@ var _ = Describe("CSV file reader", func() {
 				}
 				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
-				Expect(len(spy.records)).To(Equal(0))
+				Expect(spy.records).To(BeEmpty())
 
 				extendedError := &ErrFieldCountExtended{}
 				Expect(errors.As(err, &extendedError)).To(BeTrue())
-				Expect(len(extendedError.Fields)).To(Equal(FieldsPerRecord13 + 1))
+				Expect(extendedError.Fields).To(HaveLen(FieldsPerRecord13 + 1))
 			})
 
 			It("there is a wrong number of fields on a line that is not the first", func() {
@@ -175,11 +175,11 @@ var _ = Describe("CSV file reader", func() {
 				}
 				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
-				Expect(len(spy.records)).To(Equal(1))
+				Expect(spy.records).To(HaveLen(1))
 
 				extendedError := &ErrFieldCountExtended{}
 				Expect(errors.As(err, &extendedError)).To(BeTrue())
-				Expect(len(extendedError.Fields)).To(Equal(3))
+				Expect(extendedError.Fields).To(HaveLen(3))
 			})
 		})
 
@@ -190,7 +190,7 @@ var _ = Describe("CSV file reader", func() {
 				fieldsValidator: LogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(ctx, strings.NewReader(""), &spy)).To(Succeed())
-			Expect(len(spy.records)).To(Equal(0))
+			Expect(spy.records).To(BeEmpty())
 		})
 	})
 })

@@ -29,7 +29,7 @@ var _ = Describe("Writing to a LogWriter", func() {
 		n, err := l.Write(nil)
 		It("does not crash", func() {
 			Expect(n).To(Equal(0))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })
