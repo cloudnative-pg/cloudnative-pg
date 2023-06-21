@@ -44,6 +44,10 @@ func (lsn LSN) Less(other LSN) bool {
 
 // Parse an LSN in its components
 func (lsn LSN) Parse() (int64, error) {
+	if lsn == "" {
+		return 0, nil
+	}
+
 	components := strings.Split(string(lsn), "/")
 	if len(components) != 2 {
 		return 0, fmt.Errorf("error parsing LSN %s", lsn)

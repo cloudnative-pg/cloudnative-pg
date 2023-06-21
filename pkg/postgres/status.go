@@ -318,15 +318,27 @@ func (list PostgresqlStatusList) IsAnyStandbyWalReceiverDown(primaryName string)
 	return false
 }
 
-// GetPrimary returns the primary instance if found otherwise nil
-func (list PostgresqlStatusList) GetPrimary() *PostgresqlStatus {
-	for _, item := range list.Items {
+// GetPrimaryLSN returns the primary LSN or default value
+func (list PostgresqlStatusList) GetPrimaryLSN() (int64, error) {
+	var primary *PostgresqlStatus
+	for idx := range list.Items {
+		item := &list.Items[idx]
 		if item.IsPrimary {
-			return &item
+			primary = item
+			break
 		}
 	}
 
-	return nil
+	if primary == nil {
+		return 0, nil
+	}
+
+	primaryLSN, err := primary.CurrentLsn.Parse()
+	if err != nil {
+		return 0, err
+	}
+
+	return primaryLSN, nil
 }
 
 // IsPodReporting if a pod is ready

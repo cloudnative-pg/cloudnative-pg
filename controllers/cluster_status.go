@@ -773,8 +773,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	existingClusterStatus := cluster.Status
 	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
-	primary := statuses.GetPrimary()
-	primaryLSN, err := primary.CurrentLsn.Parse()
+	primaryLSN, err := statuses.GetPrimaryLSN()
 	if err != nil {
 		return err
 	}
@@ -787,7 +786,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 			IsWalReceiverActive: item.IsWalReceiverActive,
 		}
 
-		if !item.IsPrimary && primary != nil {
+		if !item.IsPrimary && primaryLSN != 0 {
 			replicaLSN, err := item.CurrentLsn.Parse()
 			if err != nil {
 				return err
