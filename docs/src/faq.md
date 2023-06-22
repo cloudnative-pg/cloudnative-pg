@@ -77,17 +77,25 @@ defined by Ibryam and Huß in
 
 > Principles, Patterns, Tools to automate containerized microservices at scale
 
-
-<!--
 **Can I run CloudNativePG on bare metal Kubernetes?**
 
-TODO
+Yes, definitely. You can run Kubernetes on bare metal. And you can dedicate one
+or more physical worker nodes with locally attached storage to PostgreSQL
+workloads for maximum and predictable I/O performance.
+
+The actual Cloud Native PostgreSQL project, from which CloudNativePG
+originated, was born after a pilot project in 2019 that benchmarked storage and
+PostgreSQL on the same bare metal server, first directly in Linux, and then
+inside Kubernetes. As expected, the experiment showed only negligible
+performance impact introduced by the container running in Kubernetes through
+local persistent volumes, allowing the Cloud Native initiative to continue.
 
 **Why should I use PostgreSQL replication instead of file system
 replication?**
 
-TODO
--->
+Please read the ["Architecture: Synchronizing the state"](architecture.md#synchronizing-the-state)
+section.
+
 
 **Why should I use an operator instead of running PostgreSQL as a
 container?**
@@ -182,12 +190,21 @@ an outage of the operator does not necessarily imply a PostgreSQL
 database outage; it's like running a database without a DBA or system
 administrator.
 
+**What are the reasons behind CloudNativePG not relying on a failover
+management tool like Patroni, repmgr, or Stolon?**
+
+Although part of the team that develops CloudNativePG has been heavily
+involved in repmgr in the past, we decided to take a different approach
+and directly extend the Kubernetes controller and rely on the Kubernetes API
+server to hold the status of a Postgres cluster, and use it as the only source
+of truth to:
+
+- control High Availability of a Postgres cluster primarily via automated
+  failover and switchover, coordinating itself with the [instance manager](instance_manager.md)
+- control the Kubernetes services, that is the entry points for your
+  applications
+
 <!--
-What are the reasons behind CloudNativePG not relying on a failover
-management tool like Patroni, repmgr, or Stolon?
-
-TODO
-
 How can I ensure that failover (unplanned) and switchover (planned)
 times are within our SLA of 99.995% per year?
 
@@ -389,22 +406,59 @@ $ kubectl exec -ti pg-italy-1 -c postgres -- psql -x -c "SHOW timezone"
 TimeZone | Europe/Rome
 ```
 
-<!--
 **What is the recommended architecture for best business continuity
 outcomes?**
 
-TODO
+As covered in the ["Architecture"](architecture.md) section, the main
+recommendation is to adopt shared nothing archictures as much as possible, by
+leveraging the native capabilities and resource that Kubernetes provides in a
+single cluster, namely:
+
+- availability zones: spread your instances across different availability zones
+  in the same Kubernetes cluster
+- worker nodes: as a consequence, make sure that your Postgres instances reside
+  on different Kubernetes worker nodes
+- storage: use dedicated storage for each worker node running Postgres
+
+Use at least one standby, preferably at least two, so that you can configure
+synchronous replication in the cluster, introducing RPO=0 for high
+availability.
+
+If you do not have availability zones - normally the case of on-premise
+installations - separate on worker nodes and storage.
+
+Properly setup continuous backup on a local/regional object store.
+
+The same architecture that is in a single Kubernetes cluster can be replicated
+in another Kubernetes cluster (normally in another geographical area or region)
+through the [replica cluster](replica_cluster.md) feature, providing disaster
+recovery and high availability at global scale.
+
+You can use the WAL archive in the primary object store to feed the replica in
+the other region, without having to provide a streaming connection, if the default
+maximum RPO of 5 minutes is enough for you.
+
+**How can instances be stopped or started?**
+
+Please look at ["Fencing"](fencing.md) or ["Hibernation"](declarative_hibernation.md).
+
 
 **What are the global objects such as roles and databases that are
 automatically created by CloudNativePG?**
 
-TODO
+The operator automatically creates a user for the application (by default
+called `app`) and a database for the application (by default called `app`)
+which is owned by the aforementioned user.
 
-Q: Support for management of Postgres roles via declarative
-configuration
+This way, the database is ready for a microservice adoption, as developers
+can control migrations using the `app` user, without requiring *superuser*
+access.
 
-TODO
+Teams can then create another user for read-write operations throught the
+["Declarative role management"](declarative_role_management.md) feature
+and assign the required `GRANT` to the tables.
 
+<!--
 Q: Support for tablespaces
 
 TODO
@@ -421,7 +475,6 @@ Q: Logging
 
 TODO
 
-How can instances be stopped or started?
 
 TODO
 -->
