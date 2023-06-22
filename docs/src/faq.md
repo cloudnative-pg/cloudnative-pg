@@ -410,7 +410,7 @@ TimeZone | Europe/Rome
 outcomes?**
 
 As covered in the ["Architecture"](architecture.md) section, the main
-recommendation is to adopt shared nothing archictures as much as possible, by
+recommendation is to adopt shared nothing architectures as much as possible, by
 leveraging the native capabilities and resources that Kubernetes provides in a
 single cluster, namely:
 
@@ -454,7 +454,7 @@ This way, the database is ready for a microservice adoption, as developers
 can control migrations using the `app` user, without requiring *superuser*
 access.
 
-Teams can then create another user for read-write operations throught the
+Teams can then create another user for read-write operations through the
 ["Declarative role management"](declarative_role_management.md) feature
 and assign the required `GRANT` to the tables.
 
