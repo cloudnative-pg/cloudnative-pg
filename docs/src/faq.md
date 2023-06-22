@@ -411,7 +411,7 @@ outcomes?**
 
 As covered in the ["Architecture"](architecture.md) section, the main
 recommendation is to adopt shared nothing archictures as much as possible, by
-leveraging the native capabilities and resource that Kubernetes provides in a
+leveraging the native capabilities and resources that Kubernetes provides in a
 single cluster, namely:
 
 - availability zones: spread your instances across different availability zones
