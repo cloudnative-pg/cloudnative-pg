@@ -150,7 +150,7 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 			registry.MustRegister(exporter.Metrics.PgCollectionErrors)
 			registry.MustRegister(exporter.Metrics.NodesUsed)
 			metrics, err := registry.Gather()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			nodesUsedMetric := getMetric(metrics, nodesUsedName)
 			Expect(nodesUsedMetric).ToNot(BeNil())
@@ -185,7 +185,7 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 			registry.MustRegister(exporter.Metrics.PgCollectionErrors)
 			registry.MustRegister(exporter.Metrics.NodesUsed)
 			metrics, err := registry.Gather()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			nodesUsedMetric := getMetric(metrics, nodesUsedName)
 			Expect(nodesUsedMetric).ToNot(BeNil())
@@ -221,7 +221,7 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 			registry.MustRegister(exporter.Metrics.PgCollectionErrors)
 			registry.MustRegister(exporter.Metrics.NodesUsed)
 			metrics, err := registry.Gather()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			nodesUsedMetric := getMetric(metrics, nodesUsedName)
 			Expect(nodesUsedMetric).ToNot(BeNil())
