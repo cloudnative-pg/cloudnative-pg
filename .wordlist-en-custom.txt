@@ -553,6 +553,8 @@ fastpath
 fb
 fd
 ffd
+fieldPath
+fieldref
 filesystem
 findstr
 fio
@@ -712,6 +714,7 @@ num
 oauth
 objectmeta
 objid
+objref
 objsubid
 observability
 oc

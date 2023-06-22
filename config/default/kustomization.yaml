@@ -1,3 +1,5 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 # Adds namespace to all resources.
 namespace: cnpg-system
 
@@ -12,7 +14,7 @@ namePrefix: cnpg-
 #commonLabels:
 #  someName: someValue
 
-bases:
+resources:
 - ../crd
 - ../rbac
 - ../manager
@@ -23,27 +25,25 @@ bases:
 # [PROMETHEUS] To enable prometheus monitor, uncomment all sections with 'PROMETHEUS'. 
 #- ../prometheus
 
-patchesStrategicMerge:
-  # Protect the /metrics endpoint by putting it behind auth.
-  # If you want your controller-manager to expose the /metrics
-  # endpoint w/o any authn/z, please comment the following line.
-#- manager_auth_proxy_patch.yaml
-
-patchesJson6902:
+patches:
   # add 9443 port to ports exposed by manager container
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: controller-manager
-      namespace: system
-    patch: |-
-      - op: add
-        path: "/spec/template/spec/containers/0/ports/-"
-        value:
-          containerPort: 9443
-          name: webhook-server
-          protocol: TCP
+- patch: |-
+    - op: add
+      path: "/spec/template/spec/containers/0/ports/-"
+      value:
+        containerPort: 9443
+        name: webhook-server
+        protocol: TCP
+  target:
+    group: apps
+    kind: Deployment
+    name: controller-manager
+    version: v1
+
+# Protect the /metrics endpoint by putting it behind auth.
+# If you want your controller-manager to expose the /metrics
+# endpoint w/o any authn/z, please comment the following line.
+#- manager_auth_proxy_patch.yaml
 
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'.
 # Uncomment 'CERTMANAGER' sections in crd/kustomization.yaml to enable the CA injection in the admission webhooks.
