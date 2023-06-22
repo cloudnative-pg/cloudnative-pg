@@ -66,6 +66,21 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "mySecret",
 		},
 	}
+	wantedRoleWithPerpetualPass := apiv1.RoleConfiguration{
+		Name:                 "foo",
+		BypassRLS:            true,
+		CreateDB:             false,
+		CreateRole:           true,
+		Login:                true,
+		Inherit:              &falseValue,
+		ConnectionLimit:      2,
+		Comment:              "this user is a test",
+		PasswordNeverExpires: true,
+		InRoles:              []string{"pg_monitoring"},
+		PasswordSecret: &apiv1.LocalObjectReference{
+			Name: "mySecret",
+		},
+	}
 	wantedRoleWithPassDeletion := apiv1.RoleConfiguration{
 		Name:            "foo",
 		BypassRLS:       true,
@@ -90,6 +105,11 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	wantedRoleWithPassExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
+		wantedRole.Name)
+
+	wantedRoleWithPerpetualPassExpectedCrtStmt := fmt.Sprintf(
+		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
+			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD 'myPassword' VALID UNTIL 'infinity'",
 		wantedRole.Name)
 
 	wantedRoleWithPassDeletionExpectedCrtStmt := fmt.Sprintf(
@@ -174,7 +194,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Replication:     false,
 			BypassRLS:       false,
 			ConnectionLimit: -1,
-			ValidUntil:      nil,
+			ValidUntil:      pgtype.Timestamp{},
 			Comment:         "This is postgres user",
 			password:        password1,
 			transactionID:   11,
@@ -189,7 +209,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Replication:     true,
 			BypassRLS:       false,
 			ConnectionLimit: 10,
-			ValidUntil:      &testDate,
+			ValidUntil:      pgtype.Timestamp{Valid: true, Time: testDate},
 			Comment:         "This is streaming_replica user",
 			password:        password2,
 			transactionID:   22,
@@ -249,6 +269,23 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 		dbRole := roleFromSpec(wantedRoleWithPass)
+		// In this unit test we are not testing the retrieval of secrets, so let's
+		// fetch the password content by hand
+		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		err = prm.Create(ctx, dbRole)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+	It("Create will send a correct CREATE with perpetual password to the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		mock.ExpectExec(wantedRoleWithPerpetualPassExpectedCrtStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+
+		mock.ExpectExec(wantedRoleCommentStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+		dbRole := roleFromSpec(wantedRoleWithPerpetualPass)
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
 		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}

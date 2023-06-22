@@ -21,7 +21,8 @@ import (
 	"database/sql"
 	"reflect"
 	"sort"
-	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -30,21 +31,21 @@ import (
 // The password management in the apiv1.RoleConfiguration assumes the use of Secrets,
 // so cannot cleanly be mapped to Postgres
 type DatabaseRole struct {
-	Name            string         `json:"name"`
-	Comment         string         `json:"comment,omitempty"`
-	Superuser       bool           `json:"superuser,omitempty"`
-	CreateDB        bool           `json:"createdb,omitempty"`
-	CreateRole      bool           `json:"createrole,omitempty"`
-	Inherit         bool           `json:"inherit,omitempty"` // defaults to true
-	Login           bool           `json:"login,omitempty"`
-	Replication     bool           `json:"replication,omitempty"`
-	BypassRLS       bool           `json:"bypassrls,omitempty"`       // Row-Level Security
-	ConnectionLimit int64          `json:"connectionLimit,omitempty"` // default is -1
-	ValidUntil      *time.Time     `json:"validUntil,omitempty"`
-	InRoles         []string       `json:"inRoles,omitempty"`
-	password        sql.NullString `json:"-"`
-	ignorePassword  bool           `json:"-"`
-	transactionID   int64          `json:"-"`
+	Name            string           `json:"name"`
+	Comment         string           `json:"comment,omitempty"`
+	Superuser       bool             `json:"superuser,omitempty"`
+	CreateDB        bool             `json:"createdb,omitempty"`
+	CreateRole      bool             `json:"createrole,omitempty"`
+	Inherit         bool             `json:"inherit,omitempty"` // defaults to true
+	Login           bool             `json:"login,omitempty"`
+	Replication     bool             `json:"replication,omitempty"`
+	BypassRLS       bool             `json:"bypassrls,omitempty"`       // Row-Level Security
+	ConnectionLimit int64            `json:"connectionLimit,omitempty"` // default is -1
+	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
+	InRoles         []string         `json:"inRoles,omitempty"`
+	password        sql.NullString   `json:"-"`
+	ignorePassword  bool             `json:"-"`
+	transactionID   int64            `json:"-"`
 }
 
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
@@ -74,16 +75,18 @@ func (d *DatabaseRole) isInSameRolesAs(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(d.InRoles, inSpec.InRoles)
 }
 
-func (d *DatabaseRole) hasSameValidUntilAs(inSpec apiv1.RoleConfiguration) bool {
-	if inSpec.ValidUntil == nil && d.ValidUntil == nil {
+func (d *DatabaseRole) hasSamePasswordExpiryAs(inSpec apiv1.RoleConfiguration) bool {
+	// NOTE: by coherence with the way we treat passwords, if the spec
+	// does not have a ValidUntil timestamp and is not explicitly perpetual,
+	// we ignore the VALID UNTIL in the database
+	if inSpec.ValidUntil == nil && !inSpec.PasswordNeverExpires {
 		return true
 	}
-	if inSpec.ValidUntil != nil && d.ValidUntil != nil {
-		return d.ValidUntil.Equal(inSpec.ValidUntil.Time)
+	if inSpec.ValidUntil != nil && d.ValidUntil.Valid && !d.ValidUntil.Time.IsZero() {
+		return d.ValidUntil.Time.Equal(inSpec.ValidUntil.Time)
 	}
-	// NOTE: by coherence with the way we treat passwords, if the spec
-	// does not have a ValidUntil setting, we ignore the VALID UNTIL in the database
-	if inSpec.ValidUntil == nil {
+	if inSpec.PasswordNeverExpires && d.ValidUntil.Valid &&
+		d.ValidUntil.InfinityModifier == pgtype.Infinity {
 		return true
 	}
 
@@ -127,7 +130,7 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 		ConnectionLimit: inSpec.ConnectionLimit,
 	}
 
-	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
+	return reflect.DeepEqual(role, spec) && d.hasSamePasswordExpiryAs(inSpec)
 }
 
 // roleFromSpec converts an apiv1.RoleConfiguration into the equivalent DatabaseRole
@@ -148,8 +151,17 @@ func roleFromSpec(role apiv1.RoleConfiguration) DatabaseRole {
 		ConnectionLimit: role.ConnectionLimit,
 		InRoles:         role.InRoles,
 	}
-	if role.ValidUntil != nil {
-		dbRole.ValidUntil = &role.ValidUntil.Time
+	switch {
+	case role.ValidUntil != nil:
+		dbRole.ValidUntil = pgtype.Timestamp{
+			Valid: true,
+			Time:  role.ValidUntil.Time,
+		}
+	case role.PasswordNeverExpires:
+		dbRole.ValidUntil = pgtype.Timestamp{
+			Valid:            true,
+			InfinityModifier: pgtype.Infinity,
+		}
 	}
 	switch {
 	case role.PasswordSecret == nil && !role.DisablePassword:

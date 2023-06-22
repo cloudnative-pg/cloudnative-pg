@@ -123,11 +123,13 @@ This configuration will be rejected by the validation webhook.
 ### Password expiry, VALID UNTIL
 
 Password expiry via the `VALID UNTIL` role attribute requires a special mention.
-By default, roles that are not given a specific `VALID UNTIL` on creation have
-non-expiring passwords.
+By default in PostgreSQL, roles that are not given a specific `VALID UNTIL` on
+creation have non-expiring passwords.
 
 PostgreSQL uses a timestamp type for password expiry, and that includes support
-for values like `'infinity'`, `'tomorrow'`, or `'allballs'` (sic). Please see
+for values like `'infinity'`, `'tomorrow'`, or `'allballs'` (sic). The latter
+values are aliases for proper timestamps, but `'infinity'` cannot be translated
+to a Kubernetes timestamp. Please see
 the [PostgreSQL documentation](https://www.postgresql.org/docs/current/datatype-datetime.html)
 for reference.
 
@@ -135,29 +137,27 @@ With declarative role management we support the `validUntil`
 attribute for managed roles, but it can only accept a valid Kubernetes
 timestamp, or be omitted (defaulting to null).
 
-While `'tomorrow'` will be converted to a valid date by the database, `infinity`
-and `-infinity` can not.
-The declarative role manager will read expiry values set to `infinity` or
-`-infinity` in the database as timestamps far in the future or the past,
-respectively. This will be completely transparent to the user of managed roles,
-but it ensures CloudNativePG can read and manage roles that may have been
-created directly in PostgreSQL.
+To support the equivalent of a PostgreSQL role with VALID UNTIL set to
+`'infinity'`, managed roles can use the attribute `passwordNeverExpires`.
+
+NOTE: it is considered an error to set both `validUntil` and
+`passwordNeverExpires` on a role.
+This configuration will be rejected by the validation webhook.
 
 By coherence with the way we manage passwords, a managed role with
-no `validUntil` will not change the `VALID UNTIL` set in the database role.
-This is also consistent with PostgreSQL's policy of leaving the field NULL
-unless explicitly set to a timestamp.
-In a role with a `validUntil` timestamp set, the database role will be updated
-to this value.
-
-We don't have a way to set a managed role  to `infinity`,
-`-infinity`, or NULL on the database.
-You will need to set explicit timestamps far in the future or the past for
-equivalent behavior.
+no `validUntil` (and `passwordNeverExpires` unset) will not change the
+`VALID UNTIL` set in the database role.
 
 Note that in Postgres there is no way to set a `VALID UNTIL` that is not null
 back to NULL
 ([see reference](https://www.postgresql.org/docs/current/sql-alterrole.html)).
+Similarly, in a managed role that had a set `validUntil`, the only way to make
+the password never expire it to explicitly set `passwordNeverExpires`.
+
+NOTE: in PostgreSQL it is technically possible to set a role as VALID UNTIL
+`'-infinity'` (thought it's not clear what purpose that would serve).
+Managed roles don't support this. To mark a role as expired, one can simply set
+a `validUntil` anytime in the past.
 
 !!! Warning
     The declarative role management feature has changed behavior since its

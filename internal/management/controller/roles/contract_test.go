@@ -19,6 +19,7 @@ package roles
 import (
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -104,7 +105,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 	It("Detects that spec and db role have the same ValidUntil", func() {
 		role := DatabaseRole{
 			Name:       "abc",
-			ValidUntil: &fixedTime,
+			ValidUntil: pgtype.Timestamp{Valid: true, Time: fixedTime},
 		}
 		inSpec := apiv1.RoleConfiguration{
 			Name:       "abc",
@@ -113,7 +114,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSameValidUntilAs(inSpec)
+		res := role.hasSamePasswordExpiryAs(inSpec)
 		Expect(res).To(BeTrue())
 	})
 
@@ -127,14 +128,14 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSameValidUntilAs(inSpec)
+		res := role.hasSamePasswordExpiryAs(inSpec)
 		Expect(res).To(BeTrue())
 	})
 
 	It("Detects the VALID UNTIL has drifted", func() {
 		role := DatabaseRole{
 			Name:       "abc",
-			ValidUntil: &fixedTime,
+			ValidUntil: pgtype.Timestamp{Valid: true, Time: fixedTime},
 		}
 		inSpec := apiv1.RoleConfiguration{
 			Name:       "abc",
@@ -143,14 +144,14 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSameValidUntilAs(inSpec)
+		res := role.hasSamePasswordExpiryAs(inSpec)
 		Expect(res).To(BeFalse())
 	})
 
 	It("Ignores difference in VALID UNTIL if db has it but spec does not", func() {
 		role := DatabaseRole{
 			Name:       "abc",
-			ValidUntil: &fixedTime,
+			ValidUntil: pgtype.Timestamp{Valid: true, Time: fixedTime},
 		}
 		inSpec := apiv1.RoleConfiguration{
 			Name: "abc",
@@ -158,7 +159,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSameValidUntilAs(inSpec)
+		res := role.hasSamePasswordExpiryAs(inSpec)
 		Expect(res).To(BeTrue())
 	})
 
@@ -173,8 +174,25 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSameValidUntilAs(inSpec)
+		res := role.hasSamePasswordExpiryAs(inSpec)
 		Expect(res).To(BeFalse())
+	})
+
+	It("Detects that spec and db role have never-expiring passwords", func() {
+		role := DatabaseRole{
+			Name:       "abc",
+			ValidUntil: pgtype.Timestamp{Valid: true, Time: time.Time{}, InfinityModifier: pgtype.Infinity},
+		}
+		inSpec := apiv1.RoleConfiguration{
+			Name:                 "abc",
+			ValidUntil:           &metav1.Time{},
+			PasswordNeverExpires: true,
+			PasswordSecret: &apiv1.LocalObjectReference{
+				Name: "test",
+			},
+		}
+		res := role.hasSamePasswordExpiryAs(inSpec)
+		Expect(res).To(BeTrue())
 	})
 
 	It("should return Correct Role to grant/revoke", func() {

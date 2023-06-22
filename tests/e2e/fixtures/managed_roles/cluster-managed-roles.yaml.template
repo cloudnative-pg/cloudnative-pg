@@ -34,9 +34,14 @@ spec:
         name: cluster-example-dante
     - name: petrarca
       ensure: present
-      comment: Dante Alighieri
+      comment: Francesco Petrarca
       inRoles:
         - foobar
+    - name:  boccaccio
+      ensure: present
+      comment: Giovanni Boccaccio
+      login: true
+      passwordNeverExpires: true
     - name: app
       createdb: true
       login: true

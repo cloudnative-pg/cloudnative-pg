@@ -21,7 +21,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -29,11 +28,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
-
-// LongDuration denotes a timestamp far into the future or the past.
-// It will be used to interpret timestamps with values 'infinity' or '-infinity'
-// from PostgreSQL
-const LongDuration = 100 * 365 * 24 * time.Hour
 
 // PostgresRoleManager is a RoleManager for a database instance
 type PostgresRoleManager struct {
@@ -80,7 +74,6 @@ func (sm PostgresRoleManager) List(
 
 	var roles []DatabaseRole
 	for rows.Next() {
-		var validuntil pgtype.Timestamp
 		var comment sql.NullString
 		var role DatabaseRole
 		var inRoles pq.StringArray
@@ -94,7 +87,7 @@ func (sm PostgresRoleManager) List(
 			&role.Replication,
 			&role.ConnectionLimit,
 			&role.password,
-			&validuntil,
+			&role.ValidUntil,
 			&role.BypassRLS,
 			&comment,
 			&role.transactionID,
@@ -102,17 +95,6 @@ func (sm PostgresRoleManager) List(
 		)
 		if err != nil {
 			return nil, wrapErr(err)
-		}
-		if validuntil.Valid && validuntil.InfinityModifier == pgtype.Finite {
-			role.ValidUntil = &validuntil.Time
-		}
-		if validuntil.Valid && validuntil.InfinityModifier == pgtype.Infinity {
-			theFuture := time.Now().Add(LongDuration)
-			role.ValidUntil = &theFuture
-		}
-		if validuntil.Valid && validuntil.InfinityModifier == pgtype.NegativeInfinity {
-			thePast := time.Now().Add(-LongDuration)
-			role.ValidUntil = &thePast
 		}
 		if comment.Valid {
 			role.Comment = comment.String
@@ -402,8 +384,11 @@ func appendPasswordOption(role DatabaseRole,
 		query.WriteString(fmt.Sprintf(" PASSWORD %s", pq.QuoteLiteral(role.password.String)))
 	}
 
-	if role.ValidUntil != nil {
-		ts := string(pq.FormatTimestamp(*role.ValidUntil))
+	if role.ValidUntil.Valid && !role.ValidUntil.Time.IsZero() {
+		ts := string(pq.FormatTimestamp(role.ValidUntil.Time))
 		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(ts)))
+	}
+	if role.ValidUntil.Valid && role.ValidUntil.InfinityModifier == pgtype.Infinity {
+		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral("infinity")))
 	}
 }

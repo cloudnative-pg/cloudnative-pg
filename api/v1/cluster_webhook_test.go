@@ -18,6 +18,7 @@ package v1
 
 import (
 	"strings"
+	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -2879,6 +2880,25 @@ var _ = Describe("Role management validation", func() {
 								Name: "myPassword",
 							},
 							ConnectionLimit: -1,
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateManagedRoles()).To(HaveLen(1))
+	})
+	It("should produce an error if we have a ValidUntil and PasswordNeverExpires in a role", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name:                 "my_test",
+							Superuser:            true,
+							BypassRLS:            true,
+							PasswordNeverExpires: true,
+							ValidUntil:           &metav1.Time{Time: time.Now()},
+							ConnectionLimit:      -1,
 						},
 					},
 				},

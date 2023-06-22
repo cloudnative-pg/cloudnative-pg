@@ -1956,6 +1956,14 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 					role.Name,
 					"This role both sets and disables a password"))
 		}
+		if role.PasswordNeverExpires && role.ValidUntil != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "managed", "roles"),
+					role.Name,
+					"This role both sets a ValidUntil and PasswordNeverExpires"))
+		}
 	}
 
 	return result
