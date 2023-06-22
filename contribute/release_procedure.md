@@ -1,12 +1,11 @@
 # Release procedure
 
-
 This section describes how to release a new set of supported versions of
 CloudNativePG, which should be done by one of the project's maintainers.
 It is a semi-automated process that requires human supervision.
 
 You can only release from a release branch, that is a branch in the
-Git repository called `release-X.Y`, i.e., `release-1.16`, which corresponds
+Git repository called `release-X.Y`, e.g., `release-1.16`, which corresponds
 to a minor release.
 
 The release procedure must be repeated for all the supported minor releases,
@@ -61,6 +60,10 @@ activities:
   also help you to compile the release notes. Note that
   backporting/cherry-picking should be done as soon as possible. Delaying
   backporting increases the risk of conflicts due to code drift.
+
+- **CI/CD health for branches:** the release branches should have no or few
+  failures. Make sure to run full E2E tests on each branch. The nightly smoke
+  test on the branches only covers a few combinations.
 
 - **Release notes:** You should create/update the release note documents in
   `docs/src/release_notes/` for each version to release. Remember to
@@ -152,6 +155,12 @@ I.e., the just created release branch must have the same commit hash as main.
 If you are releasing a new minor version, you should have created the new
 release branch as per the previous section.
 
+**IMPORTANT:** You should follow the steps below in order of ascending release,
+i.e. you should start with the least advanced release, and end with the most
+advanced. In fact, you should not even trigger the most advanced release until
+the other ones have been published. This ensures the `latest` tag in the image
+repos will point to the right version.
+
 As a maintainer, you need to repeat this process for each of the supported
 releases of CloudNativePG:
 
@@ -160,6 +169,9 @@ releases of CloudNativePG:
    approve it
 3. Merge the PR, making sure that the commit message title is:
    `Version tag to X.Y.Z`, without prefixes (e.g.: `Version tag to 1.16.0`)
+   **IMPORTANT**, if you make commits to the PR, the merge message
+   proposed by GH will be different. Make sure the title is
+   `Version tag to X.Y.Z`, otherwise some of the automation won't work.
 4. Wait until all [GitHub Actions](https://github.com/cloudnative-pg/cloudnative-pg/actions)
    complete successfully.
 5. Perform manual smoke tests to verify that installation instructions work on
@@ -174,11 +186,13 @@ releases of CloudNativePG:
    with `git merge --ff-only release-X.Y` followed by `git push`.
    Say you're releasing 1.18.0 and the latest minor release branch is
    release-1.18; merge the release commit from that branch on main.
+   **NOTE:** this needs to be done by a maintainer.
 7. If the current release is the latest **minor** release, but the branch is not new
    (the patch version is 1 or higher), cherry-pick the new release commit on `main`
    with `git cherry-pick release-X.Y` followed by `git push`.
    Say you're releasing 1.18.1, 1.17.2, and 1.16.4; the latest minor release branch
    is release-1.18; cherry-pick the release commit from that branch on main.
+   **NOTE:** this needs to be done by a maintainer.
 
 ## Documentation on the website
 
