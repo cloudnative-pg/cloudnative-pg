@@ -362,7 +362,7 @@ the credentials, the cluster name, and a user for this certificate
 kubectl cnpg certificate cluster-cert --cnpg-cluster cluster-example --cnpg-user appuser
 ```
 
-After the secrete it's created, you can get it using `kubectl`
+After the secret is created, you can get it using `kubectl`
 
 ```shell
 kubectl get secret cluster-cert
