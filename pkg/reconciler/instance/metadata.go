@@ -30,8 +30,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// ReconcileInstanceMetadata ensures that all the metadata informations is present on the instances
-func ReconcileInstanceMetadata(
+// ReconcileMetadata ensures that the instance metadata is kept up to date
+func ReconcileMetadata(
 	ctx context.Context,
 	cli client.Client,
 	cluster *apiv1.Cluster,
@@ -43,17 +43,10 @@ func ReconcileInstanceMetadata(
 		origInstance := instances.Items[idx].DeepCopy()
 		instance := &instances.Items[idx]
 
-		// Update the labels for the -rw service to work correctly
-		modified := updateRoleLabels(ctx, cluster, instance)
-
-		// updated any labels that are coming from the operator
-		modified = updateOperatorLabels(ctx, instance) || modified
-
-		// Update any modified/new labels coming from the cluster resource
-		modified = updateClusterLabels(ctx, cluster, instance) || modified
-
-		// Update any modified/new annotations coming from the cluster resource
-		modified = updateClusterAnnotations(ctx, cluster, instance) || modified
+		modified := updateRoleLabels(ctx, cluster, instance) ||
+			updateOperatorLabels(ctx, instance) ||
+			updateClusterLabels(ctx, cluster, instance) ||
+			updateClusterAnnotations(ctx, cluster, instance)
 
 		if !modified {
 			continue
@@ -72,8 +65,11 @@ func ReconcileInstanceMetadata(
 	return nil
 }
 
-// updateClusterAnnotations we check if we need to add or modify existing annotations specified in the cluster but
-// not existing in the pods. We do not support the case of removed annotations from the cluster resource.
+// updateClusterAnnotations checks if there are annotations specified in the cluster that are
+// not present in the pods, and if so applies them.
+// We do not support the case of removed annotations from the cluster resource.
+//
+// Returns true iff the instance needed updating
 func updateClusterAnnotations(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -82,7 +78,7 @@ func updateClusterAnnotations(
 	contextLogger := log.FromContext(ctx)
 
 	// if all the required annotations are already set and with the correct value,
-	// we proceed to the next item
+	// we are done
 	if utils.IsAnnotationSubset(instance.Annotations, cluster.Annotations, cluster.GetFixedInheritedAnnotations(),
 		configuration.Current) &&
 		utils.IsAnnotationAppArmorPresentInObject(&instance.ObjectMeta, cluster.Annotations) {
@@ -106,8 +102,11 @@ func updateClusterAnnotations(
 	return true
 }
 
-// updateClusterAnnotations we check if we need to add or modify existing labels specified in the cluster but
-// not existing in the pods. We do not support the case of removed labels from the cluster resource.
+// updateClusterLabels checks if there are labels in the cluster that are
+// not present in the pods, and if so applies them.
+// We do not support the case of removed labels from the cluster resource.
+//
+// Returns true iff the instance needed updating
 func updateClusterLabels(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -116,7 +115,7 @@ func updateClusterLabels(
 	contextLogger := log.FromContext(ctx)
 
 	// if all the required labels are already set and with the correct value,
-	// we proceed to the next item
+	// there's nothing more to do
 	if utils.IsLabelSubset(instance.Labels, cluster.Labels, cluster.GetFixedInheritedLabels(),
 		configuration.Current) {
 		contextLogger.Debug(
@@ -134,7 +133,9 @@ func updateClusterLabels(
 	return true
 }
 
-// Make sure that only the currentPrimary has the label forward write traffic to him
+// Make sure that primary and replicas are correctly labelled as such
+//
+// Returns true iff the instance needed updating
 func updateRoleLabels(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -174,7 +175,10 @@ func updateRoleLabels(
 	return false
 }
 
-// updateOperatorLabels ensures that the instances have the correct labels
+// updateOperatorLabels ensures that the instances are labelled as instances,
+// and have the correct instance name
+//
+// Returns true iff the instance needed updating
 func updateOperatorLabels(
 	ctx context.Context,
 	instance *corev1.Pod,

@@ -46,7 +46,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
+	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -231,7 +231,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
 
-	if err := instance.ReconcileInstanceMetadata(ctx, r.Client, cluster, resources.instances); err != nil {
+	if err := instanceReconciler.ReconcileMetadata(ctx, r.Client, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, err
 	}
 
