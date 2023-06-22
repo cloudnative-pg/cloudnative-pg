@@ -421,7 +421,7 @@ Options:
 
     -k|--k8s-version
         <K8S_VERSION>     Use the specified kubernetes full version number
-                          (e.g., v1.26.0). Env: K8S_VERSION
+                          (e.g., v1.27.0). Env: K8S_VERSION
 
     -n|--nodes
         <NODES>           Create a cluster with the required number of nodes.
