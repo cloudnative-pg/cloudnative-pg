@@ -1750,7 +1750,7 @@ type RoleConfiguration struct {
 	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
 
 	// Set the password to be perpetual, the equivalent behavior to
-	// VALID UNTIL set to 'infinity'
+	// VALID UNTIL set to 'infinity'.
 	PasswordNeverExpires bool `json:"passwordNeverExpires,omitempty"`
 
 	// List of one or more existing roles to which this role will be

@@ -122,11 +122,12 @@ This configuration will be rejected by the validation webhook.
 
 ### Password expiry, VALID UNTIL
 
-Password expiry via the `VALID UNTIL` role attribute requires a special mention.
+Password expiry set via the `VALID UNTIL` role attribute requires special
+mention.
 By default in PostgreSQL, roles that are not given a specific `VALID UNTIL` on
 creation have non-expiring passwords.
 
-PostgreSQL uses a timestamp type for password expiry, and that includes support
+PostgreSQL uses a timestamp type for VALID UNTIL, and that includes support
 for values like `'infinity'`, `'tomorrow'`, or `'allballs'` (sic). The latter
 values are aliases for proper timestamps, but `'infinity'` cannot be translated
 to a Kubernetes timestamp. Please see
@@ -138,14 +139,14 @@ attribute for managed roles, but it can only accept a valid Kubernetes
 timestamp, or be omitted (defaulting to null).
 
 To support the equivalent of a PostgreSQL role with VALID UNTIL set to
-`'infinity'`, managed roles can use the attribute `passwordNeverExpires`.
+`'infinity'`, managed roles can set the attribute `passwordNeverExpires`.
 
 NOTE: it is considered an error to set both `validUntil` and
 `passwordNeverExpires` on a role.
 This configuration will be rejected by the validation webhook.
 
 By coherence with the way we manage passwords, a managed role with
-no `validUntil` (and `passwordNeverExpires` unset) will not change the
+no `validUntil` (and `passwordNeverExpires` unset) will not alter the
 `VALID UNTIL` set in the database role.
 
 Note that in Postgres there is no way to set a `VALID UNTIL` that is not null
@@ -155,8 +156,8 @@ Similarly, in a managed role that had a set `validUntil`, the only way to make
 the password never expire it to explicitly set `passwordNeverExpires`.
 
 NOTE: in PostgreSQL it is technically possible to set a role as VALID UNTIL
-`'-infinity'` (thought it's not clear what purpose that would serve).
-Managed roles don't support this. To mark a role as expired, one can simply set
+`'-infinity'`, thought it's not clear what purpose that would serve.
+Managed roles don't support this. To mark a role as already expired, set
 a `validUntil` anytime in the past.
 
 !!! Warning

@@ -42,9 +42,6 @@ func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 }
 
 // List the available roles
-// NOTE: PostgreSQL supports values 'infinity' and '-infinity' for timestamps.
-// In the Declarative Roles Manager we are interested in "proper" times, so we
-// convert infinities to values 100 years in the future or past
 func (sm PostgresRoleManager) List(
 	ctx context.Context,
 ) ([]DatabaseRole, error) {

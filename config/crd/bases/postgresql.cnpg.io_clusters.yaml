@@ -2308,7 +2308,7 @@ spec:
                           type: string
                         passwordNeverExpires:
                           description: Set the password to be perpetual, the equivalent
-                            behavior to VALID UNTIL set to 'infinity'
+                            behavior to VALID UNTIL set to 'infinity'.
                           type: boolean
                         passwordSecret:
                           description: Secret containing the password of the role
