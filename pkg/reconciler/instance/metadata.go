@@ -43,10 +43,17 @@ func ReconcileMetadata(
 		origInstance := instances.Items[idx].DeepCopy()
 		instance := &instances.Items[idx]
 
-		modified := updateRoleLabels(ctx, cluster, instance) ||
-			updateOperatorLabels(ctx, instance) ||
-			updateClusterLabels(ctx, cluster, instance) ||
-			updateClusterAnnotations(ctx, cluster, instance)
+		// Update the labels for the -rw service to work correctly
+		modified := updateRoleLabels(ctx, cluster, instance)
+
+		// updated any labels that are coming from the operator
+		modified = updateOperatorLabels(ctx, instance) || modified
+
+		// Update any modified/new labels coming from the cluster resource
+		modified = updateClusterLabels(ctx, cluster, instance) || modified
+
+		// Update any modified/new annotations coming from the cluster resource
+		modified = updateClusterAnnotations(ctx, cluster, instance) || modified
 
 		if !modified {
 			continue
@@ -69,13 +76,17 @@ func ReconcileMetadata(
 // not present in the pods, and if so applies them.
 // We do not support the case of removed annotations from the cluster resource.
 //
-// Returns true iff the instance needed updating
+// Returns true if the instance needed updating
 func updateClusterAnnotations(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instance *corev1.Pod,
 ) bool {
 	contextLogger := log.FromContext(ctx)
+
+	if instance.Annotations == nil {
+		instance.Annotations = make(map[string]string)
+	}
 
 	// if all the required annotations are already set and with the correct value,
 	// we are done
@@ -113,6 +124,10 @@ func updateClusterLabels(
 	instance *corev1.Pod,
 ) bool {
 	contextLogger := log.FromContext(ctx)
+
+	if instance.Labels == nil {
+		instance.Labels = make(map[string]string)
+	}
 
 	// if all the required labels are already set and with the correct value,
 	// there's nothing more to do
@@ -154,6 +169,10 @@ func updateRoleLabels(
 		return false
 	}
 
+	if instance.Labels == nil {
+		instance.Labels = make(map[string]string)
+	}
+
 	podRole, hasRole := instance.ObjectMeta.Labels[specs.ClusterRoleLabelName]
 
 	switch {
@@ -186,7 +205,7 @@ func updateOperatorLabels(
 	contextLogger := log.FromContext(ctx)
 
 	if instance.Labels == nil {
-		instance.Labels = map[string]string{}
+		instance.Labels = make(map[string]string)
 	}
 
 	var modified bool

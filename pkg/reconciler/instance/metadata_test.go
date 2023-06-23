@@ -21,8 +21,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -393,6 +395,117 @@ var _ = Describe("object metadata test", func() {
 				Expect(updated).To(BeFalse())
 				Expect(len(pod.Annotations)).To(Equal(0))
 			})
+		})
+	})
+})
+
+var _ = Describe("metadata reconciliation test", func() {
+	Context("ReconcileMetadata", func() {
+		It("Should update all pods metadata successfully", func() {
+			instanceList := corev1.PodList{
+				Items: []corev1.Pod{
+					{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
+				},
+			}
+
+			cluster := &apiv1.Cluster{
+				Status: apiv1.ClusterStatus{
+					CurrentPrimary: "pod1",
+				},
+				Spec: apiv1.ClusterSpec{
+					InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
+						Labels:      map[string]string{"label1": "value1"},
+						Annotations: map[string]string{"annotation1": "value1"},
+					},
+				},
+			}
+
+			cli := fake.NewClientBuilder().
+				WithScheme(scheme.BuildWithAllKnownScheme()).
+				WithObjects(&instanceList.Items[0], &instanceList.Items[1]).
+				Build()
+
+			err := ReconcileMetadata(context.Background(), cli, cluster, instanceList)
+			Expect(err).ToNot(HaveOccurred())
+
+			var updatedInstanceList corev1.PodList
+			err = cli.List(context.Background(), &updatedInstanceList)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedInstanceList.Items).To(HaveLen(len(instanceList.Items)))
+
+			for _, pod := range updatedInstanceList.Items {
+				Expect(pod.Labels[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
+				Expect(pod.Labels[utils.InstanceNameLabelName]).To(Equal(pod.Name))
+				Expect(pod.Labels[specs.ClusterRoleLabelName]).To(Or(Equal(specs.ClusterRoleLabelPrimary),
+					Equal(specs.ClusterRoleLabelReplica)))
+				Expect(pod.Labels["label1"]).To(Equal("value1"))
+				Expect(pod.Annotations["annotation1"]).To(Equal("value1"))
+			}
+		})
+	})
+})
+
+var _ = Describe("metadata update functions", func() {
+	Context("Given nil labels or annotations in the pod", func() {
+		var (
+			ctx      context.Context
+			cluster  *apiv1.Cluster
+			instance *corev1.Pod
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			cluster = &apiv1.Cluster{
+				Status: apiv1.ClusterStatus{
+					CurrentPrimary: "pod1",
+				},
+				Spec: apiv1.ClusterSpec{
+					InheritedMetadata: &apiv1.EmbeddedObjectMetadata{
+						Labels: map[string]string{
+							"label1": "value1",
+						},
+						Annotations: map[string]string{
+							"annotation1": "value1",
+						},
+					},
+				},
+			}
+
+			instance = &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "pod1",
+					Labels:      nil,
+					Annotations: nil,
+				},
+			}
+		})
+
+		It("Should updateRoleLabels correctly", func() {
+			modified := updateRoleLabels(ctx, cluster, instance)
+			Expect(modified).To(BeTrue())
+			Expect(instance.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
+		})
+
+		It("Should updateOperatorLabels correctly", func() {
+			modified := updateOperatorLabels(ctx, instance)
+			Expect(modified).To(BeTrue())
+			Expect(instance.Labels).To(Equal(map[string]string{
+				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
+				utils.InstanceNameLabelName: "pod1",
+			}))
+		})
+
+		It("Should updateClusterLabels correctly", func() {
+			modified := updateClusterLabels(ctx, cluster, instance)
+			Expect(modified).To(BeTrue())
+			Expect(instance.Labels).To(Equal(cluster.Spec.InheritedMetadata.Labels))
+		})
+
+		It("Should updateClusterAnnotations correctly", func() {
+			modified := updateClusterAnnotations(ctx, cluster, instance)
+			Expect(modified).To(BeTrue())
+			Expect(instance.Annotations).To(Equal(cluster.Spec.InheritedMetadata.Annotations))
 		})
 	})
 })
