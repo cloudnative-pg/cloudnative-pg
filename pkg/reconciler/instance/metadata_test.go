@@ -393,7 +393,7 @@ var _ = Describe("object metadata test", func() {
 
 				updated := updateClusterAnnotations(context.Background(), cluster, pod)
 				Expect(updated).To(BeFalse())
-				Expect(len(pod.Annotations)).To(Equal(0))
+				Expect(pod.Annotations).To(BeEmpty())
 			})
 		})
 	})
