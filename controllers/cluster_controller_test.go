@@ -121,7 +121,7 @@ var _ = Describe("Updating target primary", func() {
 				managedResources,
 			)
 
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 		})
 	})
@@ -185,7 +185,7 @@ var _ = Describe("Updating target primary", func() {
 				managedResources,
 			)
 
-			Expect(err).NotTo(BeNil())
+			Expect(err).To(HaveOccurred())
 			Expect(err).To(Equal(ErrWaitingOnFailOverDelay))
 			Expect(selectedPrimary).To(Equal(""))
 		})
@@ -198,7 +198,7 @@ var _ = Describe("Updating target primary", func() {
 					statusList,
 					managedResources,
 				)
-				g.Expect(err).To(BeNil())
+				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
 			}).WithTimeout(5 * time.Second).Should(Succeed())
 		})
@@ -268,3 +268,4 @@ var _ = Describe("Updating target primary", func() {
 		})
 	})
 })
+

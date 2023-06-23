@@ -395,7 +395,7 @@ var _ = Describe("look up for secrets", func() {
 		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
 	})
 	It("retrieves all names needed to build a server CA certificate are 9", func() {
-		Expect(len(cluster.GetClusterAltDNSNames())).To(Equal(9))
+		Expect(cluster.GetClusterAltDNSNames()).To(HaveLen(9))
 	})
 })
 
@@ -866,7 +866,7 @@ var _ = Describe("Managed Roles", func() {
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeTrue())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets1")).To(BeFalse())
 		Expect(cluster.Spec.Managed.Roles[0].GetRoleInherit()).To(BeTrue())
-		Expect(cluster.Spec.Managed.Roles[0].GetRoleSecretsName() == "test_user_secrets").To(BeTrue())
+		Expect(cluster.Spec.Managed.Roles[0].GetRoleSecretsName()).To(Equal("test_user_secrets"))
 	})
 
 	It("Verifies default values when there are no managed roles", func() {

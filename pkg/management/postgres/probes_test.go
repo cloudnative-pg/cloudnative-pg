@@ -76,9 +76,9 @@ var _ = Describe("probes", func() {
 
 		status := &postgres.PostgresqlStatus{}
 		err = fillArchiverStatus(db, status)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
-		Expect(mock.ExpectationsWereMet()).To(BeNil())
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
 
 		Expect(status.LastArchivedWAL).To(Equal("000000010000000000000001"))
 		Expect(status.LastArchivedWALTime).To(Equal("2021-05-05 12:00:00"))
