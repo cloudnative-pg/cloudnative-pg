@@ -45,7 +45,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			const namespacePrefix = "cluster-scale-e2e-with-slots"
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")

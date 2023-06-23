@@ -482,6 +482,26 @@ jobs:
           repository: cloudnative-pg/artifacts
           branch: ${{ needs.buildx.outputs.branch_name }}
 
+  notify-on-failure:
+    name: If pipeline has failed before Test Suite, send Slack
+    if: |
+      failure()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Send Slack if pipeline failed
+        uses: rtCamp/action-slack-notify@v2
+        if: |
+          github.organization == 'cloudnative-pg' &&
+        env:
+          SLACK_COLOR: "danger"
+          SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
+          SLACK_USERNAME: cnpg-bot
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_TITLE: Nightly CI/CD failed before running Test Suite
+          SLACK_MESSAGE: |
+            :warning:
+            <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|See full CI run>
+
   generate-jobs:
     name: Generate jobs for E2E tests
     needs:
