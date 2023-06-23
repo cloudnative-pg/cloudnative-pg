@@ -484,6 +484,9 @@ jobs:
 
   notify-on-failure:
     name: If pipeline has failed before Test Suite, send Slack
+    needs:
+      - buildx
+      - evaluate_options
     if: |
       failure()
     runs-on: ubuntu-22.04
@@ -507,6 +510,7 @@ jobs:
     needs:
       - buildx
       - evaluate_options
+      - notify-on-failure
     # We try to avoid running the E2E Test Suite in general, to reduce load on
     # GitHub resources.
     # Currently it's executed in the following cases:
