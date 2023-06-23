@@ -302,6 +302,7 @@ you need to add this entry in the `pg_hba` section:
   postgresql:
     pg_hba:
       - hostssl app streaming_replica all cert
+```
 
 ## The `pg_hba` section
 
