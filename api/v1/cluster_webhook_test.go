@@ -2906,6 +2906,25 @@ var _ = Describe("Role management validation", func() {
 		}
 		Expect(cluster.validateManagedRoles()).To(HaveLen(1))
 	})
+	It("should not produce an error if PasswordNeverExpires is false and ValidUntil", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Roles: []RoleConfiguration{
+						{
+							Name:                 "my_test",
+							Superuser:            true,
+							BypassRLS:            true,
+							PasswordNeverExpires: false,
+							ValidUntil:           &metav1.Time{Time: time.Now()},
+							ConnectionLimit:      -1,
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateManagedRoles()).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Managed Extensions validation", func() {

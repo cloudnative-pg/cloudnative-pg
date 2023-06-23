@@ -125,6 +125,11 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("reconciling managed roles")
 
+	if sr.instance.IsServerHealthy() != nil {
+		contextLog.Debug("database not ready, skipping roles reconciling")
+		return nil
+	}
+
 	superUserDB, err := sr.instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while reconciling managed roles: %w", err)

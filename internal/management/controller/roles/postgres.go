@@ -41,7 +41,7 @@ func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 	}
 }
 
-// List the available roles
+// List the available roles excluding all the roles that start with `pg_`
 func (sm PostgresRoleManager) List(
 	ctx context.Context,
 ) ([]DatabaseRole, error) {
@@ -59,7 +59,7 @@ func (sm PostgresRoleManager) List(
 			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
 			FROM pg_auth_members GROUP BY member
 		) mem ON member = oid
-		WHERE rolname not like 'pg_%'`)
+		WHERE rolname not like 'pg\_%'`)
 	if err != nil {
 		return nil, wrapErr(err)
 	}

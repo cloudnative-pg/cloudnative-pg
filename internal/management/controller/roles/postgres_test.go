@@ -134,7 +134,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
 			FROM pg_auth_members GROUP BY member
 		) mem ON member = oid
-		WHERE rolname not like 'pg_%'`
+		WHERE rolname not like 'pg\_%'`
 
 	expectedMembershipStmt := `SELECT mem.inroles 
 		FROM pg_catalog.pg_authid as auth
