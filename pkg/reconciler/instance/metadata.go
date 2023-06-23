@@ -117,7 +117,7 @@ func updateClusterAnnotations(
 // not present in the pods, and if so applies them.
 // We do not support the case of removed labels from the cluster resource.
 //
-// Returns true iff the instance needed updating
+// Returns true if the instance needed updating
 func updateClusterLabels(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -150,7 +150,7 @@ func updateClusterLabels(
 
 // Make sure that primary and replicas are correctly labelled as such
 //
-// Returns true iff the instance needed updating
+// Returns true if the instance needed updating
 func updateRoleLabels(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -197,7 +197,7 @@ func updateRoleLabels(
 // updateOperatorLabels ensures that the instances are labelled as instances,
 // and have the correct instance name
 //
-// Returns true iff the instance needed updating
+// Returns true if the instance needed updating
 func updateOperatorLabels(
 	ctx context.Context,
 	instance *corev1.Pod,
