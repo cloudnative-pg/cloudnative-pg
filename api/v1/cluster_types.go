@@ -590,7 +590,7 @@ type InstanceReportedState struct {
 	// is true.
 	// For a standby instance, a true value denotes that it's actively receiving and logging transactions from the
 	// primary instance.
-	IsWalReceiverActive bool `json:"IsWalReceiverActive,omitempty"`
+	IsWalReceiverActive bool `json:"isWalReceiverActive,omitempty"`
 
 	// ReplicaLag represents the current lag of the replica against the primary instance in bytes. This is the difference
 	// WAL position between the primary and this replica. The value is set to "nil" if it could not be calculated.

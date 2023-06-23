@@ -191,3 +191,31 @@ var _ = Describe("PostgreSQL status real", func() {
 		})
 	})
 })
+
+var _ = Describe("GetPrimary", func() {
+	Context("When there is a primary item", func() {
+		It("should return the primary item", func() {
+			items := []PostgresqlStatus{
+				{IsPrimary: false},
+				{IsPrimary: true},
+				{IsPrimary: false},
+			}
+			list := PostgresqlStatusList{Items: items}
+
+			Expect(list.GetPrimary().IsPrimary).To(Equal(true))
+		})
+	})
+
+	Context("When there is no primary item", func() {
+		It("should return nil", func() {
+			items := []PostgresqlStatus{
+				{IsPrimary: false},
+				{IsPrimary: false},
+				{IsPrimary: false},
+			}
+			list := PostgresqlStatusList{Items: items}
+
+			Expect(list.GetPrimary()).To(BeNil())
+		})
+	})
+})

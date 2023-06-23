@@ -39,7 +39,7 @@ var _ = Describe("LSN handling functions", func() {
 		})
 	})
 
-	Describe("#Diff", func() {
+	Describe("Diff", func() {
 		Context("when the LSNs can be parsed to int64", func() {
 			It("should return the difference of the LSNs", func() {
 				lsn1 := LSN("1/10")

@@ -300,25 +300,7 @@ func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) bool {
 	return true
 }
 
-// IsAnyStandbyWalReceiverDown iterates over a list of PostgreSQL instance statuses.
-// It checks if any standby instances (non-primary) have an inactive WAL receiver.
-// If an inactive WAL receiver is found, the function returns true indicating there's a standby instance not
-// receiving updates from the primary.
-// Otherwise, it returns false.
-func (list PostgresqlStatusList) IsAnyStandbyWalReceiverDown(primaryName string) bool {
-	for idx := range list.Items {
-		if list.Items[idx].Pod.Name == primaryName {
-			continue
-		}
-		if !list.Items[idx].IsWalReceiverActive {
-			return true
-		}
-	}
-
-	return false
-}
-
-// GetPrimary returns the primary
+// GetPrimary returns the primary instance or nil if not found
 func (list PostgresqlStatusList) GetPrimary() *PostgresqlStatus {
 	var primary *PostgresqlStatus
 	for idx := range list.Items {

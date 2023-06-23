@@ -3833,15 +3833,15 @@ spec:
                   description: InstanceReportedState describes the last reported state
                     of an instance during a reconciliation loop
                   properties:
-                    IsWalReceiverActive:
+                    isPrimary:
+                      description: indicates if an instance is the primary one
+                      type: boolean
+                    isWalReceiverActive:
                       description: IsWalReceiverActive indicates whether the WAL receiver
                         process is active. This will always be false if 'IsPrimary'
                         is true. For a standby instance, a true value denotes that
                         it's actively receiving and logging transactions from the
                         primary instance.
-                      type: boolean
-                    isPrimary:
-                      description: indicates if an instance is the primary one
                       type: boolean
                     replicaLag:
                       description: ReplicaLag represents the current lag of the replica
