@@ -491,7 +491,7 @@ jobs:
       - name: Send Slack if pipeline failed
         uses: rtCamp/action-slack-notify@v2
         if: |
-          github.organization == 'cloudnative-pg' &&
+          github.organization == 'cloudnative-pg'
         env:
           SLACK_COLOR: "danger"
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
