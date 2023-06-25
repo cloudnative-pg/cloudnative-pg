@@ -110,6 +110,10 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 					"Metric collection issues on %v.\nCollected metrics:\n%v", pod.GetName(), out)
 			}
 		})
+
+		// verify cnpg_collector_x metrics is exists in each pod
+		collectAndAsserCollectorMetricsPresentOnEachPod(namespace, metricsClusterName,
+			curlPodName)
 	})
 
 	It("can gather metrics with multiple target databases", func() {

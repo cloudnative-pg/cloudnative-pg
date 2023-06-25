@@ -2343,10 +2343,8 @@ func DeleteTableUsingPgBouncerService(
 }
 
 func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curlPodName string, expectPresent bool) {
-	By("collecting and verify default set of metrics on each pod", func() {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		expectedKeywordInMetricsOutput := [7]string{
+	By("collecting and verify a set of default metrics on each pod", func() {
+		defaultMetrics := []string{
 			"cnpg_pg_settings_setting",
 			"cnpg_backends_waiting_total",
 			"cnpg_pg_postmaster_start_time",
@@ -2355,6 +2353,8 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 			"cnpg_pg_stat_bgwriter",
 			"cnpg_pg_stat_database",
 		}
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
 			podIP := pod.Status.PodIP
@@ -2365,7 +2365,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 			Expect(strings.Contains(out, "cnpg_collector_last_collection_error 0")).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
 			// verify that, default set of monitoring queries should not be existed on each pod
-			for _, data := range expectedKeywordInMetricsOutput {
+			for _, data := range defaultMetrics {
 				if expectPresent {
 					Expect(strings.Contains(out, data)).Should(BeTrue(),
 						"Metric collection issues on pod %v."+
@@ -2375,6 +2375,57 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 						"Metric collection issues on pod %v."+
 							"\nFor expected keyword '%v'.\nCollected metrics:\n%v", podName, data, out)
 				}
+			}
+		}
+	})
+}
+
+// collectAndAssertMetricsPresentOnEachPod verify a set of metrics is existed in each pod
+func collectAndAsserCollectorMetricsPresentOnEachPod(namespace, clusterName, curlPodName string) {
+	cnpgCollectorMetrics := []string{
+		"cnpg_collector_collection_duration_seconds",
+		"cnpg_collector_fencing_on",
+		"cnpg_collector_nodes_used",
+		"cnpg_collector_pg_wal",
+		"cnpg_collector_pg_wal_archive_status",
+		"cnpg_collector_postgres_version",
+		"cnpg_collector_collections_total",
+		"cnpg_collector_last_collection_error",
+		"cnpg_collector_collection_duration_seconds",
+		"cnpg_collector_manual_switchover_required",
+		"cnpg_collector_sync_replicas",
+		"cnpg_collector_replica_mode",
+	}
+
+	if env.PostgresVersion > 14 {
+		cnpgCollectorMetrics = append(cnpgCollectorMetrics,
+			"cnpg_collector_wal_records",
+			"cnpg_collector_wal_fpi",
+			"cnpg_collector_wal_bytes",
+			"cnpg_collector_wal_buffers_full",
+			"cnpg_collector_wal_write",
+			"cnpg_collector_wal_sync",
+			"cnpg_collector_wal_write_time",
+			"cnpg_collector_wal_sync_time",
+		)
+	}
+	By("collecting and verify set of collector metrics on each pod", func() {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		for _, pod := range podList.Items {
+			podName := pod.GetName()
+			podIP := pod.Status.PodIP
+			out, err := testsUtils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
+			Expect(err).ToNot(HaveOccurred())
+
+			// error should be zero on each pod metrics
+			Expect(strings.Contains(out, "cnpg_collector_last_collection_error 0")).Should(BeTrue(),
+				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
+			// verify that, default set of monitoring queries should not be existed on each pod
+			for _, data := range cnpgCollectorMetrics {
+				Expect(strings.Contains(out, data)).Should(BeTrue(),
+					"Metric collection issues on pod %v."+
+						"\nFor expected keyword '%v'.\nCollected metrics:\n%v", podName, data, out)
 			}
 		}
 	})
