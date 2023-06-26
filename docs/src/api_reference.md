@@ -1029,10 +1029,11 @@ Name                   | Description                                            
 
 Topology contains the cluster topology
 
-Name                  | Description                                                                                                                                                    | Type                         
---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------
-`successfullyExtracted` | SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors in synchronous replica election in case of failures | bool                         
-`instances            ` | Instances contains the pod topology of the instances                                                                                                           | map[PodName]PodTopologyLabels
+Name                  | Description                                                                                                                                                                                                                                                                                                                                                   | Type                         
+--------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------
+`successfullyExtracted` | SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors in synchronous replica election in case of failures                                                                                                                                                                                                | bool                         
+`instances            ` | Instances contains the pod topology of the instances                                                                                                                                                                                                                                                                                                          | map[PodName]PodTopologyLabels
+`nodesUsed            ` | NodesUsed represents the count of distinct nodes accommodating the instances. A value of '1' suggests that all instances are hosted on a single node, implying the absence of High Availability (HA). Ideally, this value should be the same as the number of instances in the Postgres HA cluster, implying shared nothing architecture on the compute side. | int32                        
 
 <a id='WalBackupConfiguration'></a>
 

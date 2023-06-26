@@ -395,6 +395,13 @@ type Topology struct {
 	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
 	// Instances contains the pod topology of the instances
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
+
+	// NodesUsed represents the count of distinct nodes accommodating the instances.
+	// A value of '1' suggests that all instances are hosted on a single node,
+	// implying the absence of High Availability (HA). Ideally, this value should
+	// be the same as the number of instances in the Postgres HA cluster, implying
+	// shared nothing architecture on the compute side.
+	NodesUsed int32 `json:"nodesUsed,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
