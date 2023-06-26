@@ -18,6 +18,7 @@ package controllers
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -83,13 +84,13 @@ var _ = Describe("Pod upgrade", func() {
 		Expect(reason).ToNot(BeEmpty())
 	})
 
-	It("checks when a rollout is needed for any reason", func() {
+	It("checks when a rollout is needed for any reason", func(ctx SpecContext) {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
 			PendingRestart: true,
 		}
-		rollout := IsPodNeedingRollout(status, &cluster)
+		rollout := IsPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.Required).To(BeFalse())
 		Expect(rollout.CanBeInPlace).To(BeFalse())
 		Expect(rollout.Reason).To(BeEmpty())
@@ -99,7 +100,7 @@ var _ = Describe("Pod upgrade", func() {
 			PendingRestart: true,
 			IsPodReady:     true,
 		}
-		rollout = IsPodNeedingRollout(status, &cluster)
+		rollout = IsPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.Required).To(BeTrue())
 		Expect(rollout.CanBeInPlace).To(BeFalse())
 		Expect(rollout.Reason).To(BeEmpty())
@@ -110,7 +111,7 @@ var _ = Describe("Pod upgrade", func() {
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout = IsPodNeedingRollout(status, &cluster)
+		rollout = IsPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.Required).To(BeTrue())
 		Expect(rollout.CanBeInPlace).To(BeTrue())
 		Expect(rollout.Reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
@@ -123,6 +124,51 @@ var _ = Describe("Pod upgrade", func() {
 		rollout, reason := isPodNeedingUpdatedScheduler(&cluster, *pod)
 		Expect(rollout).To(BeTrue())
 		Expect(reason).ToNot(BeEmpty())
+	})
+
+	When("cluster has resources specified", func() {
+		clusterWithResources := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.0",
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+					Limits: corev1.ResourceList{
+						"cpu":    resource.MustParse("2"),
+						"memory": resource.MustParse("1Gi"),
+					},
+				},
+			},
+		}
+		It("should trigger a rollout when the cluster has a Resource changed", func(ctx SpecContext) {
+			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
+			clusterWithResources.Spec.Resources.Limits["cpu"] = resource.MustParse("3") // was "2"
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			rollout := IsPodNeedingRollout(ctx, status, &clusterWithResources)
+			Expect(rollout.Required).To(BeTrue())
+			Expect(rollout.Reason).To(ContainSubstring("the instance resources don't match"))
+		})
+		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
+			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
+			clusterWithResources.Spec.Resources = corev1.ResourceRequirements{}
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			rollout := IsPodNeedingRollout(ctx, status, &clusterWithResources)
+			Expect(rollout.Required).To(BeTrue())
+			Expect(rollout.Reason).To(ContainSubstring("the instance resources don't match"))
+		})
 	})
 
 	When("there's a custom environment variable set", func() {

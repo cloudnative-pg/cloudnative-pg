@@ -75,6 +75,10 @@ const (
 	// PodEnvHashAnnotationName is the name of the annotation containing the podEnvHash value
 	PodEnvHashAnnotationName = "cnpg.io/podEnvHash"
 
+	// PodResourcesAnnotationName is the name of the annotation with the cluster resources used
+	// when creating a Pod
+	PodResourcesAnnotationName = "cnpg.io/podResources"
+
 	// PodContentHashAnnotationName is the name of the annotation containing the podContentHash value
 	PodContentHashAnnotationName = "cnpg.io/podContentHash"
 
