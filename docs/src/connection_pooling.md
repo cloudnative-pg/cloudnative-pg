@@ -585,7 +585,7 @@ service defined in the `Pooler`.
     features to reduce the perceived downtime by client applications.
     At the moment, you can achieve the same results by setting the `paused`
     attribute to `true`, then issuing the switchover command through the
-    [`cnpg` plugin](cnpg-plugin.md#promote), and finally restoring the `paused`
+    [`cnpg` plugin](kubectl-plugin.md#promote), and finally restoring the `paused`
     attribute to `false`.
 
 ## Limitations
