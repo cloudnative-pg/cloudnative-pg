@@ -90,4 +90,4 @@ You can trigger a restart with:
 kubectl cnpg restart [cluster] [current_primary]
 ```
 
-You can find more information in the [`cnpg` plugin page](cnpg-plugin.md).
+You can find more information in the [`cnpg` plugin page](kubectl-plugin.md).

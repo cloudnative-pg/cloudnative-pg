@@ -32,7 +32,7 @@ Make sure you know:
 On top of the mandatory `kubectl` utility, for troubleshooting, we recommend the
 following plugins/utilities to be available in your system:
 
-- [`cnpg` plugin](cnpg-plugin.md) for `kubectl`
+- [`cnpg` plugin](kubectl-plugin.md) for `kubectl`
 - [`jq`](https://stedolan.github.io/jq/), a lightweight and flexible command-line JSON processor
 - [`grep`](https://www.gnu.org/software/grep/), searches one or more input files
   for lines containing a match to a specified pattern. It is already available in most \*nix distros.
@@ -245,7 +245,7 @@ kubectl cnpg status -n <NAMESPACE> <CLUSTER>
     Manage certificates.<br />
     Make a rollout restart cluster to apply configuration changes.<br />
     Make a reconciliation loop to reload and apply configuration changes.<br />
-    For more information, please see [`cnpg` plugin](cnpg-plugin.md) documentation.
+    For more information, please see [`cnpg` plugin](kubectl-plugin.md) documentation.
 
 Get PostgreSQL container image version:
 

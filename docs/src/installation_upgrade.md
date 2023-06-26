@@ -35,7 +35,7 @@ kubectl cnpg install generate \
   > cnpg_for_specific_namespace.yaml
 ```
 
-Please refer to ["`cnpg` plugin"](./cnpg-plugin.md#generation-of-installation-manifests) documentation
+Please refer to ["`cnpg` plugin"](./kubectl-plugin.md#generation-of-installation-manifests) documentation
 for a more comprehensive example. 
 
 !!! Warning

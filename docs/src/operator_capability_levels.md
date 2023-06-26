@@ -450,7 +450,7 @@ purposes.
 
 ### Hibernation
 
-CloudNativePG supports [hibernation of a running PostgreSQL cluster](cnpg-plugin.md#cluster-hibernation)
+CloudNativePG supports [hibernation of a running PostgreSQL cluster](kubectl-plugin.md#cluster-hibernation)
 via the `cnpg` plugin. Hibernation shuts down all Postgres instances in the
 High Availability cluster, and keep a static copy of the PVCs of the primary
 that contain `PGDATA` and WALs. The plugin enables to exit the hibernation
