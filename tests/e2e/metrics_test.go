@@ -112,7 +112,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		})
 
 		// verify cnpg_collector_x metrics is exists in each pod
-		collectAndAsserCollectorMetricsPresentOnEachPod(namespace, metricsClusterName,
+		collectAndAssertCollectorMetricsPresentOnEachPod(namespace, metricsClusterName,
 			curlPodName)
 	})
 

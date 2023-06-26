@@ -2381,7 +2381,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 }
 
 // collectAndAssertMetricsPresentOnEachPod verify a set of metrics is existed in each pod
-func collectAndAsserCollectorMetricsPresentOnEachPod(namespace, clusterName, curlPodName string) {
+func collectAndAssertCollectorMetricsPresentOnEachPod(namespace, clusterName, curlPodName string) {
 	cnpgCollectorMetrics := []string{
 		"cnpg_collector_collection_duration_seconds",
 		"cnpg_collector_fencing_on",
