@@ -850,6 +850,8 @@ func getPodsTopology(
 ) apiv1.Topology {
 	contextLogger := log.FromContext(ctx)
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
+	nodesMap := make(map[string][]apiv1.PodName)
+
 	for _, pod := range pods {
 		podName := apiv1.PodName(pod.Name)
 		data[podName] = make(map[string]string, 0)
@@ -861,10 +863,13 @@ func getPodsTopology(
 			contextLogger.Debug("node not found, skipping pod topology matching")
 			return apiv1.Topology{}
 		}
+
+		nodesMap[pod.Spec.NodeName] = append(nodesMap[pod.Spec.NodeName], podName)
+
 		for _, labelName := range topology.NodeLabelsAntiAffinity {
 			data[podName][labelName] = node.Labels[labelName]
 		}
 	}
 
-	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data}
+	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: int32(len(nodesMap))}
 }
