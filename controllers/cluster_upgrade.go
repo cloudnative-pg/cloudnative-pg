@@ -210,7 +210,7 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 }
 
 // Rollout describes whether a rollout should happen, and if so whether it can
-// be done in-place, and what the reason for rollout is
+// be done in-place, and what the reason for the rollout is
 type Rollout struct {
 	Required     bool
 	CanBeInPlace bool
@@ -233,11 +233,7 @@ type rolloutChecker func(
 //
 // Returns:
 //
-// - a boolean indicating if a rollout is needed.
-//
-// - a boolean indicating if an in-place restart is possible
-//
-// - a string indicating the reason of the rollout.
+// - a Rollout object including whether a restart is required, and the reason
 func IsPodNeedingRollout(
 	ctx context.Context,
 	status postgres.PostgresqlStatus,
@@ -265,6 +261,7 @@ func IsPodNeedingRollout(
 		rollout, err := check(status, cluster)
 		if err != nil {
 			contextLogger.Error(err, "while checking if pod needs rollout")
+			continue
 		}
 		if rollout.Required {
 			if rollout.Reason == "" {
@@ -311,10 +308,24 @@ func checkProjectedVolumeIsOutdated(
 	cluster *apiv1.Cluster,
 ) (Rollout, error) {
 	// Check if there is a change in the projected volume configuration
-	if needsUpdate, reason := isPodNeedingUpdateOfProjectedVolume(cluster, *status.Pod); needsUpdate {
-		return Rollout{Required: true, Reason: reason}, nil
+	currentProjectedVolumeConfiguration := getProjectedVolumeConfigurationFromPod(*status.Pod)
+
+	desiredProjectedVolumeConfiguration := cluster.Spec.ProjectedVolumeTemplate.DeepCopy()
+	if desiredProjectedVolumeConfiguration != nil && desiredProjectedVolumeConfiguration.DefaultMode == nil {
+		defaultMode := corev1.ProjectedVolumeSourceDefaultMode
+		desiredProjectedVolumeConfiguration.DefaultMode = &defaultMode
 	}
-	return Rollout{}, nil
+
+	if reflect.DeepEqual(currentProjectedVolumeConfiguration, desiredProjectedVolumeConfiguration) {
+		return Rollout{}, nil
+	}
+
+	return Rollout{
+		Required: true,
+		Reason: fmt.Sprintf("projected volume configuration changed, old: %+v, new: %+v",
+			currentProjectedVolumeConfiguration,
+			desiredProjectedVolumeConfiguration),
+	}, nil
 }
 
 func checkResourcesAreOutdated(
@@ -345,17 +356,31 @@ func checkPodImageIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (Rollout, error) {
-	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, *status.Pod)
+	targetImageName := cluster.GetImageName()
+
+	pgCurrentImageName, err := specs.GetPostgresImageName(*status.Pod)
 	if err != nil {
 		return Rollout{}, err
 	}
-	if newImage != "" {
+
+	if pgCurrentImageName != targetImageName {
+		// We need to apply a different PostgreSQL version
 		return Rollout{
 			Required: true,
 			Reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
-				oldImage, newImage),
+				pgCurrentImageName, targetImageName),
 		}, nil
 	}
+
+	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
+	if err != nil {
+		return Rollout{}, err
+	}
+
+	if !canUpgradeImage {
+		return Rollout{}, nil
+	}
+
 	return Rollout{}, nil
 }
 
@@ -364,20 +389,21 @@ func checkPodInitContainerIsOutdated(
 	_ *apiv1.Cluster,
 ) (Rollout, error) {
 	if !configuration.Current.EnableInstanceManagerInplaceUpdates {
-		oldImage, newImage, err := isPodNeedingUpgradedInitContainerImage(*status.Pod)
+		opCurrentImageName, err := specs.GetBootstrapControllerImageName(*status.Pod)
 		if err != nil {
-			log.Error(err, "while checking if init container image could be upgraded")
-			return Rollout{}, nil
+			return Rollout{}, err
 		}
 
-		if newImage != "" {
+		if opCurrentImageName != configuration.Current.OperatorImageName {
+			// We need to apply a different version of the instance manager
 			return Rollout{
 				Required: true,
 				Reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
-					oldImage, newImage),
+					opCurrentImageName, configuration.Current.OperatorImageName),
 			}, nil
 		}
 	}
+
 	return Rollout{}, nil
 }
 
@@ -396,9 +422,44 @@ func checkPodEnvironmentIsOutdated(
 	cluster *apiv1.Cluster,
 ) (Rollout, error) {
 	// Check if there is a change in the environment section
-	if restartRequired, reason := isPodNeedingUpdatedEnvironment(*cluster, *status.Pod); restartRequired {
-		return Rollout{Required: true, Reason: reason}, nil
+	envConfig := specs.CreatePodEnvConfig(*cluster, status.Pod.Name)
+
+	// Use the hash to detect if the environment needs a refresh
+	podEnvHash, hasPodEnvhash := status.Pod.Annotations[utils.PodEnvHashAnnotationName]
+	if hasPodEnvhash {
+		if podEnvHash != envConfig.Hash {
+			return Rollout{
+				Required: true,
+				Reason:   "environment variable configuration hash changed",
+			}, nil
+		}
+
+		return Rollout{}, nil
 	}
+
+	// Fall back to comparing the container environment configuration
+	for _, container := range status.Pod.Spec.Containers {
+		// we go to the next array element if it isn't the postgres container
+		if container.Name != specs.PostgresContainerName {
+			continue
+		}
+
+		if !envConfig.IsEnvEqual(container) {
+			return Rollout{
+				Required: true,
+				Reason: fmt.Sprintf("environment variable configuration changed, "+
+					"oldEnv: %+v, oldEnvFrom: %+v, newEnv: %+v, newEnvFrom: %+v",
+					container.Env,
+					container.EnvFrom,
+					envConfig.EnvVars,
+					envConfig.EnvFrom,
+				),
+			}, nil
+		}
+
+		break
+	}
+
 	return Rollout{}, nil
 }
 
@@ -406,11 +467,19 @@ func checkSchedulerIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (Rollout, error) {
-	restartRequired, reason := isPodNeedingUpdatedScheduler(cluster, *status.Pod)
-	if restartRequired {
-		return Rollout{Required: restartRequired, Reason: reason}, nil
+	if cluster.Spec.SchedulerName == "" || cluster.Spec.SchedulerName == status.Pod.Spec.SchedulerName {
+		return Rollout{}, nil
 	}
-	return Rollout{}, nil
+
+	message := fmt.Sprintf(
+		"scheduler name changed from: '%s', to '%s'",
+		status.Pod.Spec.SchedulerName,
+		cluster.Spec.SchedulerName,
+	)
+	return Rollout{
+		Required: true,
+		Reason:   message,
+	}, nil
 }
 
 func checkClusterHasNewerRestartAnnotation(
@@ -419,60 +488,47 @@ func checkClusterHasNewerRestartAnnotation(
 ) (Rollout, error) {
 	// check if pod needs to be restarted because of some config requiring it
 	// or if the cluster have been explicitly restarted
-	needingRestart, reason := isPodNeedingRestart(cluster, status)
-	return Rollout{Required: needingRestart, CanBeInPlace: true, Reason: reason}, nil
+	// If the cluster has been restarted and we are working with a Pod
+	// which has not been restarted yet, or restarted at a different
+	// time, let's restart it.
+	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
+		podRestart := status.Pod.Annotations[specs.ClusterRestartAnnotationName]
+		if clusterRestart != podRestart {
+			return Rollout{
+				Required:     true,
+				Reason:       "cluster has been explicitly restarted via annotation",
+				CanBeInPlace: true,
+			}, nil
+		}
+	}
+
+	if status.PendingRestart {
+		return Rollout{
+			Required:     true,
+			Reason:       "configuration needs a restart to apply some configuration changes",
+			CanBeInPlace: true,
+		}, nil
+	}
+
+	return Rollout{}, nil
 }
 
 func checkPodNeedsUpdatedTopology(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (Rollout, error) {
-	needingRestart, reason := isPodNeedingUpdatedTopology(cluster, *status.Pod)
-	return Rollout{Required: needingRestart, Reason: reason}, nil
-}
-
-func isPodNeedingUpdatedTopology(cluster *apiv1.Cluster, pod corev1.Pod) (bool, string) {
-	if reflect.DeepEqual(cluster.Spec.TopologySpreadConstraints, pod.Spec.TopologySpreadConstraints) {
-		return false, ""
+	if reflect.DeepEqual(cluster.Spec.TopologySpreadConstraints, status.Pod.Spec.TopologySpreadConstraints) {
+		return Rollout{}, nil
 	}
 	reason := fmt.Sprintf(
 		"Pod '%s' does not have up-to-date TopologySpreadConstraints. It needs to match the cluster's constraints.",
-		pod.Name,
+		status.Pod.Name,
 	)
 
-	return true, reason
-}
-
-// isPodNeedingUpdatedScheduler returns a boolean indicating if a restart is required and the relative message
-func isPodNeedingUpdatedScheduler(cluster *apiv1.Cluster, pod corev1.Pod) (bool, string) {
-	if cluster.Spec.SchedulerName == "" || cluster.Spec.SchedulerName == pod.Spec.SchedulerName {
-		return false, ""
-	}
-
-	message := fmt.Sprintf(
-		"scheduler name changed from: '%s', to '%s'",
-		pod.Spec.SchedulerName,
-		cluster.Spec.SchedulerName,
-	)
-	return true, message
-}
-
-func isPodNeedingUpdateOfProjectedVolume(cluster *apiv1.Cluster, pod corev1.Pod) (needsUpdate bool, reason string) {
-	currentProjectedVolumeConfiguration := getProjectedVolumeConfigurationFromPod(pod)
-
-	desiredProjectedVolumeConfiguration := cluster.Spec.ProjectedVolumeTemplate.DeepCopy()
-	if desiredProjectedVolumeConfiguration != nil && desiredProjectedVolumeConfiguration.DefaultMode == nil {
-		defaultMode := corev1.ProjectedVolumeSourceDefaultMode
-		desiredProjectedVolumeConfiguration.DefaultMode = &defaultMode
-	}
-
-	if reflect.DeepEqual(currentProjectedVolumeConfiguration, desiredProjectedVolumeConfiguration) {
-		return false, ""
-	}
-
-	return true, fmt.Sprintf("projected volume configuration changed, old: %+v, new: %+v",
-		currentProjectedVolumeConfiguration,
-		desiredProjectedVolumeConfiguration)
+	return Rollout{
+		Required: true,
+		Reason:   reason,
+	}, nil
 }
 
 func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVolumeSource {
@@ -485,111 +541,6 @@ func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVol
 	}
 
 	return nil
-}
-
-// isPodNeedingUpgradedImage checks whether an image in a pod has to be changed
-func isPodNeedingUpgradedImage(
-	cluster *apiv1.Cluster,
-	pod corev1.Pod,
-) (oldImage string, targetImage string, err error) {
-	targetImageName := cluster.GetImageName()
-
-	pgCurrentImageName, err := specs.GetPostgresImageName(pod)
-	if err != nil {
-		return "", "", err
-	}
-
-	if pgCurrentImageName != targetImageName {
-		// We need to apply a different PostgreSQL version
-		return pgCurrentImageName, targetImageName, nil
-	}
-
-	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
-	if err != nil {
-		return "", "", err
-	}
-
-	if !canUpgradeImage {
-		return "", "", nil
-	}
-
-	return "", "", nil
-}
-
-// isPodNeedingUpgradedInitContainerImage checks whether an image in init container has to be changed
-func isPodNeedingUpgradedInitContainerImage(
-	pod corev1.Pod,
-) (oldImage string, targetImage string, err error) {
-	opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
-	if err != nil {
-		return "", "", err
-	}
-
-	if opCurrentImageName != configuration.Current.OperatorImageName {
-		// We need to apply a different version of the instance manager
-		return opCurrentImageName, configuration.Current.OperatorImageName, nil
-	}
-
-	return "", "", nil
-}
-
-// isPodNeedingRestart returns true if we need to restart the
-// Pod to apply a configuration change or there is a request of restart for the cluster
-func isPodNeedingRestart(
-	cluster *apiv1.Cluster,
-	instanceStatus postgres.PostgresqlStatus,
-) (bool, rolloutReason) {
-	// If the cluster has been restarted and we are working with a Pod
-	// which has not been restarted yet, or restarted at a different
-	// time, let's restart it.
-	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
-		podRestart := instanceStatus.Pod.Annotations[specs.ClusterRestartAnnotationName]
-		if clusterRestart != podRestart {
-			return true, "cluster has been explicitly restarted via annotation"
-		}
-	}
-
-	if instanceStatus.PendingRestart {
-		return true, "configuration needs a restart to apply some configuration changes"
-	}
-
-	return false, ""
-}
-
-func isPodNeedingUpdatedEnvironment(cluster apiv1.Cluster, pod corev1.Pod) (bool, string) {
-	envConfig := specs.CreatePodEnvConfig(cluster, pod.Name)
-
-	// Use the hash to detect if the environment needs a refresh
-	podEnvHash, hasPodEnvhash := pod.Annotations[utils.PodEnvHashAnnotationName]
-	if hasPodEnvhash {
-		if podEnvHash != envConfig.Hash {
-			return true, "environment variable configuration hash changed"
-		}
-
-		return false, ""
-	}
-
-	// Fall back to comparing the container environment configuration
-	for _, container := range pod.Spec.Containers {
-		// we go to the next array element if it isn't the postgres container
-		if container.Name != specs.PostgresContainerName {
-			continue
-		}
-
-		if !envConfig.IsEnvEqual(container) {
-			return true, fmt.Sprintf("environment variable configuration changed, "+
-				"oldEnv: %+v, oldEnvFrom: %+v, newEnv: %+v, newEnvFrom: %+v",
-				container.Env,
-				container.EnvFrom,
-				envConfig.EnvVars,
-				envConfig.EnvFrom,
-			)
-		}
-
-		break
-	}
-
-	return false, ""
 }
 
 // upgradePod deletes a Pod to let the operator recreate it using an
