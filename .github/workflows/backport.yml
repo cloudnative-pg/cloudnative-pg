@@ -1,4 +1,4 @@
-name: pull_request_backport
+name: Backport Pull Request
 on:
   pull_request_target:
     types:
@@ -15,7 +15,7 @@ jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
   # we backport everything, except those PR that are created or contain `do not backport` explicitly.
   label-source-pr:
-    name: label the source pr
+    name: Add labels to PR
     if: github.event.pull_request.merged == false &&
         !contains(github.event.pull_request.labels.*.name, 'backport-requested') &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
@@ -47,7 +47,7 @@ jobs:
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
-    name: backport to release branches
+    name: Backport to release branches
     if: |
         github.event.pull_request.merged == true &&
         (
@@ -119,7 +119,7 @@ jobs:
           git push
 
   create-tickets:
-    name: create tickets for failure
+    name: Create tickets for failures
     needs:
       - back-porting-pr
     if: |
