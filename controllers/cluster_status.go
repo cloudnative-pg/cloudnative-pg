@@ -783,7 +783,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		}
 
 		if !item.IsPrimary && primary != nil {
-			reportedState.ReplicaLag = primary.CurrentLsn.Diff(item.ReceivedLsn)
+			reportedState.ReplicaLag = primary.CurrentLsn.Diff(item.ReplayLsn)
 		}
 
 		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = reportedState
