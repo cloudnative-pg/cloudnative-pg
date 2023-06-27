@@ -13,11 +13,12 @@ env:
 
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
-  # we backport everything
+  # we backport everything, except those PR that are created or contain `do not backport` explicitly.
   label-source-pr:
     name: label the source pr
     if: github.event.pull_request.merged == false &&
-        !contains(github.event.pull_request.labels.*.name, 'backport-requested')
+        !contains(github.event.pull_request.labels.*.name, 'backport-requested') &&
+        !contains(github.event.pull_request.labels.*.name, 'do not backport')
     runs-on: ubuntu-22.04
     steps:
       -
