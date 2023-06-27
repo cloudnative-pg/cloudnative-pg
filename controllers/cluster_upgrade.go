@@ -42,7 +42,7 @@ import (
 
 type rolloutReason = string
 
-func (r *ClusterReconciler) rolloutDueToCondition(
+func (r *ClusterReconciler) rolloutRequiredInstances(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	podList *postgres.PostgresqlStatusList,
