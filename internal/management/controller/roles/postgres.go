@@ -381,11 +381,13 @@ func appendPasswordOption(role DatabaseRole,
 		query.WriteString(fmt.Sprintf(" PASSWORD %s", pq.QuoteLiteral(role.password.String)))
 	}
 
-	if role.ValidUntil.Valid && !role.ValidUntil.Time.IsZero() {
-		ts := string(pq.FormatTimestamp(role.ValidUntil.Time))
-		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(ts)))
-	}
-	if role.ValidUntil.Valid && role.ValidUntil.InfinityModifier == pgtype.Infinity {
-		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral("infinity")))
+	if role.ValidUntil.Valid {
+		var value string
+		if role.ValidUntil.InfinityModifier == pgtype.Finite {
+			value = string(pq.FormatTimestamp(role.ValidUntil.Time))
+		} else {
+			value = role.ValidUntil.InfinityModifier.String()
+		}
+		query.WriteString(fmt.Sprintf(" VALID UNTIL %s", pq.QuoteLiteral(value)))
 	}
 }

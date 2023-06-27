@@ -114,7 +114,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSamePasswordExpiryAs(inSpec)
+		res := role.hasSameValidUntilAs(inSpec)
 		Expect(res).To(BeTrue())
 	})
 
@@ -128,7 +128,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSamePasswordExpiryAs(inSpec)
+		res := role.hasSameValidUntilAs(inSpec)
 		Expect(res).To(BeTrue())
 	})
 
@@ -144,11 +144,11 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSamePasswordExpiryAs(inSpec)
+		res := role.hasSameValidUntilAs(inSpec)
 		Expect(res).To(BeFalse())
 	})
 
-	It("Ignores difference in VALID UNTIL if db has it but spec does not", func() {
+	It("Detects difference in VALID UNTIL if db has it but spec does not", func() {
 		role := DatabaseRole{
 			Name:       "abc",
 			ValidUntil: pgtype.Timestamp{Valid: true, Time: fixedTime},
@@ -159,8 +159,8 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSamePasswordExpiryAs(inSpec)
-		Expect(res).To(BeTrue())
+		res := role.hasSameValidUntilAs(inSpec)
+		Expect(res).To(BeFalse())
 	})
 
 	It("Detects difference in VALID UNTIL if spec has it but db does not", func() {
@@ -174,7 +174,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				Name: "test",
 			},
 		}
-		res := role.hasSamePasswordExpiryAs(inSpec)
+		res := role.hasSameValidUntilAs(inSpec)
 		Expect(res).To(BeFalse())
 	})
 
@@ -184,14 +184,13 @@ var _ = Describe("DatabaseRole implementation test", func() {
 			ValidUntil: pgtype.Timestamp{Valid: true, Time: time.Time{}, InfinityModifier: pgtype.Infinity},
 		}
 		inSpec := apiv1.RoleConfiguration{
-			Name:                 "abc",
-			ValidUntil:           &metav1.Time{},
-			PasswordNeverExpires: true,
+			Name:       "abc",
+			ValidUntil: nil,
 			PasswordSecret: &apiv1.LocalObjectReference{
 				Name: "test",
 			},
 		}
-		res := role.hasSamePasswordExpiryAs(inSpec)
+		res := role.hasSameValidUntilAs(inSpec)
 		Expect(res).To(BeTrue())
 	})
 

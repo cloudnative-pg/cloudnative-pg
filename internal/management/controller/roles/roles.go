@@ -18,6 +18,9 @@ package roles
 
 import (
 	"context"
+	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -25,9 +28,57 @@ import (
 )
 
 type (
-	rolesByAction map[roleAction][]apiv1.RoleConfiguration
-	rolesByStatus map[apiv1.RoleStatus][]apiv1.RoleConfiguration
+	rolesByAction map[roleAction][]internalRoleConfiguration
+	rolesByStatus map[apiv1.RoleStatus][]internalRoleConfiguration
 )
+
+type internalRoleConfiguration struct {
+	apiv1.RoleConfiguration
+	ignoreValidUntil bool `json:"-"`
+}
+
+func internalRoleFromName(name string) internalRoleConfiguration {
+	return internalRoleConfiguration{RoleConfiguration: apiv1.RoleConfiguration{Name: name}}
+}
+
+// roleFromSpec converts an internalRoleConfiguration into the equivalent DatabaseRole
+//
+// NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
+// provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
+func roleFromSpec(role internalRoleConfiguration) DatabaseRole {
+	dbRole := DatabaseRole{
+		Name:            role.Name,
+		Comment:         role.Comment,
+		Superuser:       role.Superuser,
+		CreateDB:        role.CreateDB,
+		CreateRole:      role.CreateRole,
+		Inherit:         role.GetRoleInherit(),
+		Login:           role.Login,
+		Replication:     role.Replication,
+		BypassRLS:       role.BypassRLS,
+		ConnectionLimit: role.ConnectionLimit,
+		InRoles:         role.InRoles,
+	}
+	switch {
+	case role.ValidUntil != nil:
+		dbRole.ValidUntil = pgtype.Timestamp{
+			Valid: true,
+			Time:  role.ValidUntil.Time,
+		}
+	case role.ValidUntil == nil && !role.ignoreValidUntil:
+		dbRole.ValidUntil = pgtype.Timestamp{
+			Valid:            true,
+			InfinityModifier: pgtype.Infinity,
+		}
+	}
+	switch {
+	case role.PasswordSecret == nil && !role.DisablePassword:
+		dbRole.ignorePassword = true
+	case role.PasswordSecret == nil && role.DisablePassword:
+		dbRole.password = sql.NullString{}
+	}
+	return dbRole
+}
 
 // convertToRolesByStatus gets the status of every role in the Spec and/or in the DB
 func (r rolesByAction) convertToRolesByStatus() rolesByStatus {
@@ -79,21 +130,31 @@ func evaluateNextRoleActions(
 		inSpec, isInSpec := roleInSpecNamed[role.Name]
 		switch {
 		case postgres.IsRoleReserved(role.Name):
-			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], apiv1.RoleConfiguration{Name: role.Name})
+			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], internalRoleFromName(role.Name))
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
-			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
+			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], internalRoleFromName(role.Name))
 		case isInSpec &&
 			(!role.isEquivalentTo(inSpec) ||
 				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
-			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
+			internalRole := internalRoleConfiguration{
+				RoleConfiguration: inSpec,
+				ignoreValidUntil:  role.hasSameValidUntilAs(inSpec),
+			}
+			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], internalRole)
 		case isInSpec && !role.hasSameCommentAs(inSpec):
-			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], inSpec)
+			internalRole := internalRoleConfiguration{
+				RoleConfiguration: inSpec,
+			}
+			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], internalRole)
 		case isInSpec && !role.isInSameRolesAs(inSpec):
-			rolesByAction[roleUpdateMemberships] = append(rolesByAction[roleUpdateMemberships], inSpec)
+			internalRole := internalRoleConfiguration{
+				RoleConfiguration: inSpec,
+			}
+			rolesByAction[roleUpdateMemberships] = append(rolesByAction[roleUpdateMemberships], internalRole)
 		case !isInSpec:
-			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})
+			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], internalRoleFromName(role.Name))
 		default:
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], apiv1.RoleConfiguration{Name: role.Name})
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], internalRoleFromName(role.Name))
 		}
 	}
 
@@ -103,10 +164,13 @@ func evaluateNextRoleActions(
 		if isInDB {
 			continue // covered by the previous loop
 		}
+		internalRole := internalRoleConfiguration{
+			RoleConfiguration: r,
+		}
 		if r.Ensure == apiv1.EnsurePresent {
-			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], r)
+			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], internalRole)
 		} else {
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], r)
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], internalRole)
 		}
 	}
 

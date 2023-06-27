@@ -75,22 +75,11 @@ func (d *DatabaseRole) isInSameRolesAs(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(d.InRoles, inSpec.InRoles)
 }
 
-func (d *DatabaseRole) hasSamePasswordExpiryAs(inSpec apiv1.RoleConfiguration) bool {
-	// NOTE: by coherence with the way we treat passwords, if the spec
-	// does not have a ValidUntil timestamp and is not explicitly perpetual,
-	// we ignore the VALID UNTIL in the database
-	if inSpec.ValidUntil == nil && !inSpec.PasswordNeverExpires {
-		return true
+func (d *DatabaseRole) hasSameValidUntilAs(inSpec apiv1.RoleConfiguration) bool {
+	if inSpec.ValidUntil == nil {
+		return !d.ValidUntil.Valid || d.ValidUntil.InfinityModifier == pgtype.Infinity
 	}
-	if inSpec.ValidUntil != nil && d.ValidUntil.Valid && !d.ValidUntil.Time.IsZero() {
-		return d.ValidUntil.Time.Equal(inSpec.ValidUntil.Time)
-	}
-	if inSpec.PasswordNeverExpires && d.ValidUntil.Valid &&
-		d.ValidUntil.InfinityModifier == pgtype.Infinity {
-		return true
-	}
-
-	return false
+	return d.ValidUntil.Valid && d.ValidUntil.Time.Equal(inSpec.ValidUntil.Time)
 }
 
 // isEquivalentTo checks a subset of the attributes of roles in DB and Spec
@@ -130,46 +119,7 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 		ConnectionLimit: inSpec.ConnectionLimit,
 	}
 
-	return reflect.DeepEqual(role, spec) && d.hasSamePasswordExpiryAs(inSpec)
-}
-
-// roleFromSpec converts an apiv1.RoleConfiguration into the equivalent DatabaseRole
-//
-// NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
-// provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
-func roleFromSpec(role apiv1.RoleConfiguration) DatabaseRole {
-	dbRole := DatabaseRole{
-		Name:            role.Name,
-		Comment:         role.Comment,
-		Superuser:       role.Superuser,
-		CreateDB:        role.CreateDB,
-		CreateRole:      role.CreateRole,
-		Inherit:         role.GetRoleInherit(),
-		Login:           role.Login,
-		Replication:     role.Replication,
-		BypassRLS:       role.BypassRLS,
-		ConnectionLimit: role.ConnectionLimit,
-		InRoles:         role.InRoles,
-	}
-	switch {
-	case role.ValidUntil != nil:
-		dbRole.ValidUntil = pgtype.Timestamp{
-			Valid: true,
-			Time:  role.ValidUntil.Time,
-		}
-	case role.PasswordNeverExpires:
-		dbRole.ValidUntil = pgtype.Timestamp{
-			Valid:            true,
-			InfinityModifier: pgtype.Infinity,
-		}
-	}
-	switch {
-	case role.PasswordSecret == nil && !role.DisablePassword:
-		dbRole.ignorePassword = true
-	case role.PasswordSecret == nil && role.DisablePassword:
-		dbRole.password = sql.NullString{}
-	}
-	return dbRole
+	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
 }
 
 // RoleManager abstracts the functionality of reconciling with PostgreSQL roles
