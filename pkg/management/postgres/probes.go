@@ -483,7 +483,7 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 
 	// Sometimes pg_last_wal_replay_lsn is getting evaluated after
 	// pg_last_wal_receive_lsn and this, if other WALs are received,
-	// can result in a replay being greater then received. Since
+	// can result in a replay being greater than received. Since
 	// we can't force the planner to execute functions in a required
 	// order, we fix the result here
 	if result.ReceivedLsn.Less(result.ReplayLsn) {
