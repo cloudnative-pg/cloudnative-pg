@@ -248,24 +248,28 @@ func IsPodNeedingRollout(
 		return Rollout{}
 	}
 
-	checkers := []rolloutChecker{
-		checkHasExecutableHash,
-		checkHasResizingPVC,
-		checkProjectedVolumeIsOutdated,
-		checkResourcesAreOutdated,
-		checkPodImageIsOutdated,
-		checkPodInitContainerIsOutdated,
-		checkHasMissingPVCs,
-		checkPodEnvironmentIsOutdated,
-		checkSchedulerIsOutdated,
-		checkClusterHasNewerRestartAnnotation,
+	checkers := map[string]rolloutChecker{
+		"missing executable hash":              checkHasExecutableHash,
+		"has PVC requiring resizing":           checkHasResizingPVC,
+		"projected volume is outdated":         checkProjectedVolumeIsOutdated,
+		"resources are outdated":               checkResourcesAreOutdated,
+		"pod image is outdated":                checkPodImageIsOutdated,
+		"pod init container is outdated":       checkPodInitContainerIsOutdated,
+		"has missing PVCs":                     checkHasMissingPVCs,
+		"pod environment is outdated":          checkPodEnvironmentIsOutdated,
+		"scheduler is outdated":                checkSchedulerIsOutdated,
+		"cluster has newer restart annotation": checkClusterHasNewerRestartAnnotation,
+		"pod needs updated topology":           checkPodNeedsUpdatedTopology,
 	}
-	for _, check := range checkers {
+	for message, check := range checkers {
 		rollout, err := check(status, cluster)
 		if err != nil {
 			contextLogger.Error(err, "while checking if pod needs rollout")
 		}
 		if rollout.Required {
+			if rollout.Reason == "" {
+				rollout.Reason = message
+			}
 			return rollout
 		}
 	}
@@ -343,8 +347,7 @@ func checkPodImageIsOutdated(
 ) (Rollout, error) {
 	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, *status.Pod)
 	if err != nil {
-		log.Error(err, "while checking if image could be upgraded")
-		return Rollout{}, nil
+		return Rollout{}, err
 	}
 	if newImage != "" {
 		return Rollout{
@@ -403,7 +406,8 @@ func checkSchedulerIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (Rollout, error) {
-	if restartRequired, reason := isPodNeedingUpdatedScheduler(cluster, *status.Pod); restartRequired {
+	restartRequired, reason := isPodNeedingUpdatedScheduler(cluster, *status.Pod)
+	if restartRequired {
 		return Rollout{Required: restartRequired, Reason: reason}, nil
 	}
 	return Rollout{}, nil
@@ -417,6 +421,14 @@ func checkClusterHasNewerRestartAnnotation(
 	// or if the cluster have been explicitly restarted
 	needingRestart, reason := isPodNeedingRestart(cluster, status)
 	return Rollout{Required: needingRestart, CanBeInPlace: true, Reason: reason}, nil
+}
+
+func checkPodNeedsUpdatedTopology(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) (Rollout, error) {
+	needingRestart, reason := isPodNeedingUpdatedTopology(cluster, *status.Pod)
+	return Rollout{Required: needingRestart, Reason: reason}, nil
 }
 
 func isPodNeedingUpdatedTopology(cluster *apiv1.Cluster, pod corev1.Pod) (bool, string) {
@@ -531,7 +543,6 @@ func isPodNeedingRestart(
 	// which has not been restarted yet, or restarted at a different
 	// time, let's restart it.
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
-		// FIX: this seems wrong. We add the restart annotation to the pod, and it will not match
 		podRestart := instanceStatus.Pod.Annotations[specs.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
 			return true, "cluster has been explicitly restarted via annotation"
