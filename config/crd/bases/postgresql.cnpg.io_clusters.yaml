@@ -2832,10 +2832,10 @@ spec:
               replicaLagThreshold:
                 default: 30000000
                 description: ReplicaLagThreshold is a user-customizable field that
-                  represents the acceptable lag limit (in megabytes, where 1MB = 1,000,000
+                  represents the acceptable lag limit (in bytes, where 1MB = 1,000,000
                   Bytes) between the primary database and its replicas. If a replica's
                   lag exceeds this threshold, the cluster will enter the PhaseReplicaLagThresholdExceeded
-                  phase. The default value is 30MB (30,000,000 Bytes). Adjust this
+                  phase. The default value is 30,000,000 Bytes (30MB). Adjust this
                   according to your application's tolerance for data latency.
                 format: int64
                 type: integer
