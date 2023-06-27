@@ -303,6 +303,43 @@ func checkHasResizingPVC(
 	return Rollout{}, nil
 }
 
+func checkPodNeedsUpdatedTopology(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) (Rollout, error) {
+	if reflect.DeepEqual(cluster.Spec.TopologySpreadConstraints, status.Pod.Spec.TopologySpreadConstraints) {
+		return Rollout{}, nil
+	}
+	reason := fmt.Sprintf(
+		"Pod '%s' does not have up-to-date TopologySpreadConstraints. It needs to match the cluster's constraints.",
+		status.Pod.Name,
+	)
+
+	return Rollout{
+		Required: true,
+		Reason:   reason,
+	}, nil
+}
+
+func checkSchedulerIsOutdated(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) (Rollout, error) {
+	if cluster.Spec.SchedulerName == "" || cluster.Spec.SchedulerName == status.Pod.Spec.SchedulerName {
+		return Rollout{}, nil
+	}
+
+	message := fmt.Sprintf(
+		"scheduler name changed from: '%s', to '%s'",
+		status.Pod.Spec.SchedulerName,
+		cluster.Spec.SchedulerName,
+	)
+	return Rollout{
+		Required: true,
+		Reason:   message,
+	}, nil
+}
+
 func checkProjectedVolumeIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
@@ -326,30 +363,6 @@ func checkProjectedVolumeIsOutdated(
 			currentProjectedVolumeConfiguration,
 			desiredProjectedVolumeConfiguration),
 	}, nil
-}
-
-func checkResourcesAreOutdated(
-	status postgres.PostgresqlStatus,
-	cluster *apiv1.Cluster,
-) (Rollout, error) {
-	res, ok := status.Pod.ObjectMeta.Annotations[utils.PodResourcesAnnotationName]
-	if !ok {
-		return Rollout{}, nil
-	}
-
-	var resources corev1.ResourceRequirements
-	err := (&resources).Unmarshal([]byte(res))
-	if err != nil {
-		return Rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
-	}
-	if !reflect.DeepEqual(resources, cluster.Spec.Resources) {
-		return Rollout{
-			Required: true,
-			Reason:   "the instance resources don't match the current cluster spec",
-		}, nil
-	}
-
-	return Rollout{}, nil
 }
 
 func checkPodImageIsOutdated(
@@ -417,6 +430,37 @@ func checkHasMissingPVCs(
 	return Rollout{}, nil
 }
 
+func checkClusterHasNewerRestartAnnotation(
+	status postgres.PostgresqlStatus,
+	cluster *apiv1.Cluster,
+) (Rollout, error) {
+	// check if pod needs to be restarted because of some config requiring it
+	// or if the cluster have been explicitly restarted
+	// If the cluster has been restarted and we are working with a Pod
+	// which has not been restarted yet, or restarted at a different
+	// time, let's restart it.
+	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
+		podRestart := status.Pod.Annotations[specs.ClusterRestartAnnotationName]
+		if clusterRestart != podRestart {
+			return Rollout{
+				Required:     true,
+				Reason:       "cluster has been explicitly restarted via annotation",
+				CanBeInPlace: true,
+			}, nil
+		}
+	}
+
+	if status.PendingRestart {
+		return Rollout{
+			Required:     true,
+			Reason:       "configuration needs a restart to apply some configuration changes",
+			CanBeInPlace: true,
+		}, nil
+	}
+
+	return Rollout{}, nil
+}
+
 func checkPodEnvironmentIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
@@ -463,72 +507,28 @@ func checkPodEnvironmentIsOutdated(
 	return Rollout{}, nil
 }
 
-func checkSchedulerIsOutdated(
+func checkResourcesAreOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (Rollout, error) {
-	if cluster.Spec.SchedulerName == "" || cluster.Spec.SchedulerName == status.Pod.Spec.SchedulerName {
+	res, ok := status.Pod.ObjectMeta.Annotations[utils.PodResourcesAnnotationName]
+	if !ok {
 		return Rollout{}, nil
 	}
 
-	message := fmt.Sprintf(
-		"scheduler name changed from: '%s', to '%s'",
-		status.Pod.Spec.SchedulerName,
-		cluster.Spec.SchedulerName,
-	)
-	return Rollout{
-		Required: true,
-		Reason:   message,
-	}, nil
-}
-
-func checkClusterHasNewerRestartAnnotation(
-	status postgres.PostgresqlStatus,
-	cluster *apiv1.Cluster,
-) (Rollout, error) {
-	// check if pod needs to be restarted because of some config requiring it
-	// or if the cluster have been explicitly restarted
-	// If the cluster has been restarted and we are working with a Pod
-	// which has not been restarted yet, or restarted at a different
-	// time, let's restart it.
-	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
-		podRestart := status.Pod.Annotations[specs.ClusterRestartAnnotationName]
-		if clusterRestart != podRestart {
-			return Rollout{
-				Required:     true,
-				Reason:       "cluster has been explicitly restarted via annotation",
-				CanBeInPlace: true,
-			}, nil
-		}
+	var resources corev1.ResourceRequirements
+	err := (&resources).Unmarshal([]byte(res))
+	if err != nil {
+		return Rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
 	}
-
-	if status.PendingRestart {
+	if !reflect.DeepEqual(resources, cluster.Spec.Resources) {
 		return Rollout{
-			Required:     true,
-			Reason:       "configuration needs a restart to apply some configuration changes",
-			CanBeInPlace: true,
+			Required: true,
+			Reason:   "the instance resources don't match the current cluster spec",
 		}, nil
 	}
 
 	return Rollout{}, nil
-}
-
-func checkPodNeedsUpdatedTopology(
-	status postgres.PostgresqlStatus,
-	cluster *apiv1.Cluster,
-) (Rollout, error) {
-	if reflect.DeepEqual(cluster.Spec.TopologySpreadConstraints, status.Pod.Spec.TopologySpreadConstraints) {
-		return Rollout{}, nil
-	}
-	reason := fmt.Sprintf(
-		"Pod '%s' does not have up-to-date TopologySpreadConstraints. It needs to match the cluster's constraints.",
-		status.Pod.Name,
-	)
-
-	return Rollout{
-		Required: true,
-		Reason:   reason,
-	}, nil
 }
 
 func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVolumeSource {
