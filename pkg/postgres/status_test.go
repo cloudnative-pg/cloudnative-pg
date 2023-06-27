@@ -202,7 +202,7 @@ var _ = Describe("GetPrimary", func() {
 			}
 			list := PostgresqlStatusList{Items: items}
 
-			Expect(list.GetPrimary().IsPrimary).To(Equal(true))
+			Expect(list.GetPrimary().IsPrimary).To(BeTrue())
 		})
 	})
 
