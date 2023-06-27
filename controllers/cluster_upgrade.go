@@ -365,6 +365,18 @@ func checkProjectedVolumeIsOutdated(
 	}, nil
 }
 
+func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVolumeSource {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name != "projected" {
+			continue
+		}
+
+		return volume.Projected
+	}
+
+	return nil
+}
+
 func checkPodImageIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
@@ -528,18 +540,6 @@ func checkResourcesAreOutdated(
 	}
 
 	return Rollout{}, nil
-}
-
-func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVolumeSource {
-	for _, volume := range pod.Spec.Volumes {
-		if volume.Name != "projected" {
-			continue
-		}
-
-		return volume.Projected
-	}
-
-	return nil
 }
 
 // upgradePod deletes a Pod to let the operator recreate it using an
