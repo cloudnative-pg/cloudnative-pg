@@ -43,8 +43,10 @@ import (
 	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
@@ -107,7 +109,15 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.APIExtensionClient = apiextensionsclientset.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
-	env.Log = ctrl.Log.WithName("e2e")
+
+	flags := log.NewFlags(zap.Options{
+		Development: true,
+	})
+	log.SetLogLevel(log.DebugLevelString)
+	flags.ConfigureLogging()
+	env.Log = log.GetLogger().WithName("e2e").GetLogger()
+	log.SetLogger(env.Log)
+
 	env.createdNamespaces = &uniqueStringSlice{}
 
 	postgresImage := versions.DefaultImageName
