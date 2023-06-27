@@ -377,21 +377,20 @@ func checkPodImageIsOutdated(
 	}
 
 	if pgCurrentImageName != targetImageName {
+		canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
+		if err != nil {
+			return Rollout{}, err
+		}
+
+		if !canUpgradeImage {
+			return Rollout{}, nil
+		}
 		// We need to apply a different PostgreSQL version
 		return Rollout{
 			Required: true,
 			Reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
 				pgCurrentImageName, targetImageName),
 		}, nil
-	}
-
-	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
-	if err != nil {
-		return Rollout{}, err
-	}
-
-	if !canUpgradeImage {
-		return Rollout{}, nil
 	}
 
 	return Rollout{}, nil

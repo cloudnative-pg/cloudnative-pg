@@ -63,6 +63,19 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.Reason).To(BeEquivalentTo("the instance is using an old image: postgres:13.10 -> postgres:13.11"))
 	})
 
+	It("does not ask for rollout when update is to a different major release", func(ctx SpecContext) {
+		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod.Spec.Containers[0].Image = "postgres:12.15"
+		status := postgres.PostgresqlStatus{
+			Pod:            *pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+		rollout := IsPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.Required).To(BeFalse())
+		Expect(rollout.Reason).To(BeEmpty())
+	})
+
 	It("requires rollout when a restart annotation has been added to the cluster", func(ctx SpecContext) {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		clusterRestart := cluster
