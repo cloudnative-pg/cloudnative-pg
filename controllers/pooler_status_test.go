@@ -49,7 +49,7 @@ var _ = Describe("pooler_status unit tests", func() {
 		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
 
 		err := poolerReconciler.updatePoolerStatus(ctx, pooler, res)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		assertClusterInheritedStatus(pooler, cluster)
 	})
 
@@ -68,7 +68,7 @@ var _ = Describe("pooler_status unit tests", func() {
 		res := &poolerManagedResources{AuthUserSecret: authUserSecret, Cluster: cluster}
 
 		err := poolerReconciler.updatePoolerStatus(ctx, pooler, res)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		assertAuthUserStatus(pooler, authUserSecret)
 	})
 
@@ -79,11 +79,11 @@ var _ = Describe("pooler_status unit tests", func() {
 		pooler := newFakePooler(cluster)
 		dep, err := pgbouncer.Deployment(pooler, cluster)
 		dep.Status.Replicas = *dep.Spec.Replicas
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		res := &poolerManagedResources{Deployment: dep, Cluster: cluster}
 
 		err = poolerReconciler.updatePoolerStatus(ctx, pooler, res)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(pooler.Status.Instances).To(Equal(dep.Status.Replicas))
 	})
 
@@ -102,20 +102,20 @@ var _ = Describe("pooler_status unit tests", func() {
 		}
 		dep, err := pgbouncer.Deployment(pooler, cluster)
 		dep.Status.Replicas = *dep.Spec.Replicas
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		res := &poolerManagedResources{AuthUserSecret: authUserSecret, Cluster: cluster, Deployment: dep}
 
 		By("making sure it updates the remote stored status when there are changes", func() {
 			poolerBefore := &v1.Pooler{}
 			err := k8sClient.Get(ctx, poolerQuery, poolerBefore)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 
 			err = poolerReconciler.updatePoolerStatus(ctx, pooler, res)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 
 			poolerAfter := &v1.Pooler{}
 			err = k8sClient.Get(ctx, poolerQuery, poolerAfter)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 
 			Expect(poolerAfter.ResourceVersion).ToNot(Equal(poolerBefore.ResourceVersion))
 			Expect(pooler.Status.Instances).To(Equal(dep.Status.Replicas))
@@ -126,14 +126,14 @@ var _ = Describe("pooler_status unit tests", func() {
 		By("making sure it doesn't update the remote stored status when there aren't changes", func() {
 			poolerBefore := &v1.Pooler{}
 			err := k8sClient.Get(ctx, poolerQuery, poolerBefore)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 
 			err = poolerReconciler.updatePoolerStatus(ctx, pooler, res)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 
 			poolerAfter := &v1.Pooler{}
 			err = k8sClient.Get(ctx, poolerQuery, poolerAfter)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 
 			Expect(poolerAfter.ResourceVersion).To(Equal(poolerBefore.ResourceVersion))
 		})

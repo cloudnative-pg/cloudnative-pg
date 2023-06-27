@@ -111,7 +111,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 			}
 			pooler3.Spec.PgBouncer.AuthQuery = "SELECT usename, passwd FROM pg_shadow WHERE usename=$1"
 			err := k8sClient.Update(ctx, &pooler3)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 
 			req := reconcile.Request{
 				NamespacedName: types.NamespacedName{

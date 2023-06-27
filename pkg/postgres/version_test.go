@@ -43,16 +43,16 @@ var _ = Describe("PostgreSQL version handling", func() {
 
 		It("should gracefully handle errors", func() {
 			_, err := GetPostgresVersionFromTag("")
-			Expect(err).To(HaveOccurred())
+			Expect(err).To(Not(BeNil()))
 
 			_, err = GetPostgresVersionFromTag("8")
-			Expect(err).To(HaveOccurred())
+			Expect(err).To(Not(BeNil()))
 
 			_, err = GetPostgresVersionFromTag("9.five")
-			Expect(err).To(HaveOccurred())
+			Expect(err).To(Not(BeNil()))
 
 			_, err = GetPostgresVersionFromTag("10.old")
-			Expect(err).To(HaveOccurred())
+			Expect(err).To(Not(BeNil()))
 		})
 
 		It("should correctly detect major version from tag", func() {
@@ -63,7 +63,7 @@ var _ = Describe("PostgreSQL version handling", func() {
 		It("should return error if major version is not well-formed in the tag", func() {
 			res, err := GetPostgresMajorVersionFromTag("test.5.3")
 			Expect(res).To(Equal(0))
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(BeNil())
 		})
 	})
 
@@ -110,11 +110,11 @@ var _ = Describe("PostgreSQL version handling", func() {
 
 		It("raise errors when the image tag can't be parsed", func() {
 			status, err1 := CanUpgrade("postgres:ten_dot_three", "postgres:11.3")
-			Expect(err1).To(HaveOccurred())
+			Expect(err1).To(Not(BeNil()))
 			Expect(status).To(BeFalse())
 
 			status, err2 := CanUpgrade("postgres:10.3", "postgres:eleven_dot_tree")
-			Expect(err2).To(HaveOccurred())
+			Expect(err2).To(Not(BeNil()))
 			Expect(status).To(BeFalse())
 		})
 	})

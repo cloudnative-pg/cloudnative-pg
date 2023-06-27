@@ -25,11 +25,11 @@ var _ = Describe("LSN handling functions", func() {
 	Describe("Parse", func() {
 		It("raises errors for invalid LSNs", func() {
 			_, err := LSN("").Parse()
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(BeNil())
 			_, err = LSN("/").Parse()
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(BeNil())
 			_, err = LSN("28734982739847293874823974928738423/987429837498273498723984723").Parse()
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(BeNil())
 		})
 
 		It("works for good LSNs", func() {

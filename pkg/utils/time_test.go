@@ -84,7 +84,7 @@ var _ = Describe("Parsing targetTime", func() {
 			time2 := "2022-07-06T13:11:07.000000Z"
 			expectedSecondDifference := float64(2)
 			difference, err := DifferenceBetweenTimestamps(time1, time2)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 			Expect(difference.Seconds()).To(Equal(expectedSecondDifference))
 		})
 		By("having the first time smaller than the second", func() {
@@ -92,17 +92,17 @@ var _ = Describe("Parsing targetTime", func() {
 			time2 := "2022-07-06T13:11:09.000000Z"
 			expectedSecondDifference := float64(-2)
 			difference, err := DifferenceBetweenTimestamps(time1, time2)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 			Expect(difference.Seconds()).To(Equal(expectedSecondDifference))
 		})
 		By("having first or second time wrong", func() {
 			time1 := "2022-07-06T13:12:09.000000Z"
 
 			_, err := DifferenceBetweenTimestamps(time1, "")
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(BeNil())
 
 			_, err = DifferenceBetweenTimestamps("", time1)
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(BeNil())
 		})
 	})
 

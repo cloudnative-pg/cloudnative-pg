@@ -25,6 +25,6 @@ var _ = Describe("Executable hash detection", func() {
 	It("detect a hash", func() {
 		result, err := Get()
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(result).To(HaveLen(64))
+		Expect(len(result)).To(Equal(64))
 	})
 })

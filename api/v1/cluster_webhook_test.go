@@ -74,7 +74,7 @@ var _ = Describe("bootstrap methods validation", func() {
 			},
 		}
 		result := invalidCluster.validateBootstrapMethod()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 })
 
@@ -213,7 +213,7 @@ var _ = Describe("certificates options validation", func() {
 			},
 		}
 		result := cluster.validateCerts()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 	It("does complain if you specify the TLS secret and AltDNSNames is not empty", func() {
 		cluster := Cluster{
@@ -226,7 +226,7 @@ var _ = Describe("certificates options validation", func() {
 			},
 		}
 		result := cluster.validateCerts()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 })
 
@@ -249,7 +249,7 @@ var _ = Describe("initdb options validation", func() {
 		}
 
 		result := cluster.validateInitDB()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("complains if you specify the owner but not the database name", func() {
@@ -264,7 +264,7 @@ var _ = Describe("initdb options validation", func() {
 		}
 
 		result := cluster.validateInitDB()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("doesn't complain if you specify both database name and owner user", func() {
@@ -303,7 +303,7 @@ var _ = Describe("initdb options validation", func() {
 		}
 
 		result := cluster.validateInitDB()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("complain if name is missing in the secretRefs", func() {
@@ -326,7 +326,7 @@ var _ = Describe("initdb options validation", func() {
 		}
 
 		result := cluster.validateInitDB()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("complain if key is missing in the configMapRefs", func() {
@@ -349,7 +349,7 @@ var _ = Describe("initdb options validation", func() {
 		}
 
 		result := cluster.validateInitDB()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("complain if name is missing in the configMapRefs", func() {
@@ -372,7 +372,7 @@ var _ = Describe("initdb options validation", func() {
 		}
 
 		result := cluster.validateInitDB()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("doesn't complain if configmapRefs and secretRefs are valid", func() {
@@ -433,7 +433,7 @@ var _ = Describe("initdb options validation", func() {
 		}
 
 		result := cluster.validateSuperuserSecret()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 })
 
@@ -523,7 +523,7 @@ var _ = Describe("cluster configuration", func() {
 	It("defaults the PostgreSQL configuration with parameters from the operator", func() {
 		cluster := Cluster{}
 		cluster.Default()
-		Expect(cluster.Spec.PostgresConfiguration.Parameters).ToNot(BeEmpty())
+		Expect(len(cluster.Spec.PostgresConfiguration.Parameters)).To(BeNumerically(">", 0))
 	})
 
 	It("defaults the anti-affinity", func() {
@@ -547,7 +547,7 @@ var _ = Describe("ImagePullPolicy validation", func() {
 		}
 
 		result := cluster.validateImagePullPolicy()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 	It("does not complain if the imagePullPolicy is valid", func() {
 		cluster := Cluster{
@@ -557,7 +557,7 @@ var _ = Describe("ImagePullPolicy validation", func() {
 		}
 
 		result := cluster.validateImagePullPolicy()
-		Expect(result).To(BeEmpty())
+		Expect(len(result)).To(Equal(0))
 	})
 })
 
@@ -633,7 +633,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:latest",
 			},
 		}
-		Expect(cluster.validateImageName()).To(HaveLen(1))
+		Expect(len(cluster.validateImageName())).To(Equal(1))
 	})
 
 	It("doesn't complain when a alpha tag is used", func() {
@@ -642,7 +642,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:15alpha1",
 			},
 		}
-		Expect(cluster.validateImageName()).To(BeEmpty())
+		Expect(len(cluster.validateImageName())).To(Equal(0))
 	})
 
 	It("doesn't complain when a beta tag is used", func() {
@@ -651,7 +651,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:15beta1",
 			},
 		}
-		Expect(cluster.validateImageName()).To(BeEmpty())
+		Expect(len(cluster.validateImageName())).To(Equal(0))
 	})
 
 	It("doesn't complain when a release candidate tag is used", func() {
@@ -660,7 +660,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:15rc1",
 			},
 		}
-		Expect(cluster.validateImageName()).To(BeEmpty())
+		Expect(len(cluster.validateImageName())).To(Equal(0))
 	})
 
 	It("complains when only the sha is passed", func() {
@@ -669,7 +669,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
 			},
 		}
-		Expect(cluster.validateImageName()).To(HaveLen(1))
+		Expect(len(cluster.validateImageName())).To(Equal(1))
 	})
 
 	It("doesn't complain if the tag is valid", func() {
@@ -705,7 +705,7 @@ var _ = Describe("Image name validation", func() {
 				ImageName: "postgres:test_12",
 			},
 		}
-		Expect(cluster.validateImageName()).To(HaveLen(1))
+		Expect(len(cluster.validateImageName())).To(Equal(1))
 	})
 })
 
@@ -741,7 +741,7 @@ var _ = Describe("configuration change validation", func() {
 			},
 		}
 		clusterNew := clusterOld
-		Expect(clusterNew.validateConfigurationChange(&clusterOld)).To(BeEmpty())
+		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(0))
 	})
 
 	It("doesn't complain when we change a setting which is not fixed", func() {
@@ -760,7 +760,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfigurationChange(&clusterOld)).To(BeEmpty())
+		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(0))
 	})
 
 	It("complains when changing postgres major version and settings", func() {
@@ -779,7 +779,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfigurationChange(&clusterOld)).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(1))
 	})
 
 	It("produces no error when WAL size settings are correct", func() {
@@ -796,7 +796,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(BeEmpty())
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -814,7 +814,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(BeEmpty())
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -832,7 +832,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(BeEmpty())
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -849,7 +849,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(BeEmpty())
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -866,7 +866,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(BeEmpty())
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -875,7 +875,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(BeEmpty())
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 	})
 
 	It("produces one complaint when min_wal_size is bigger than max_wal_size", func() {
@@ -892,7 +892,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -910,7 +910,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 	})
 
 	It("produces one complaint when max_wal_size is bigger than WAL storage", func() {
@@ -929,7 +929,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -947,7 +947,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 	})
 
 	It("produces two complaints when min_wal_size is bigger than WAL storage and max_wal_size", func() {
@@ -967,7 +967,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(2))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(2))
 	})
 
 	It("complains about invalid value for min_wal_size and max_wal_size", func() {
@@ -984,7 +984,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -1002,7 +1002,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 	})
 
 	It("doesn't compare default values for min_wal_size and max_wal_size with WalStorage", func() {
@@ -1016,7 +1016,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(BeEmpty())
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(0))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -1033,7 +1033,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 
 		clusterNew = Cluster{
 			Spec: ClusterSpec{
@@ -1050,7 +1050,7 @@ var _ = Describe("configuration change validation", func() {
 				},
 			},
 		}
-		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+		Expect(len(clusterNew.validateConfiguration())).To(Equal(1))
 	})
 })
 
@@ -1059,7 +1059,7 @@ var _ = Describe("validate image name change", func() {
 		clusterNew := Cluster{
 			Spec: ClusterSpec{},
 		}
-		Expect(clusterNew.validateImageChange("")).To(BeEmpty())
+		Expect(len(clusterNew.validateImageChange(""))).To(Equal(0))
 	})
 
 	It("complains if versions are wrong", func() {
@@ -1068,7 +1068,7 @@ var _ = Describe("validate image name change", func() {
 				ImageName: "postgres:12.0",
 			},
 		}
-		Expect(clusterNew.validateImageChange("12:1")).To(HaveLen(1))
+		Expect(len(clusterNew.validateImageChange("12:1"))).To(Equal(1))
 	})
 
 	It("complains if can't upgrade between mayor versions", func() {
@@ -1077,7 +1077,7 @@ var _ = Describe("validate image name change", func() {
 				ImageName: "postgres:11.0",
 			},
 		}
-		Expect(clusterNew.validateImageChange("postgres:12.0")).To(HaveLen(1))
+		Expect(len(clusterNew.validateImageChange("postgres:12.0"))).To(Equal(1))
 	})
 
 	It("doesn't complain if image change it's valid", func() {
@@ -1086,7 +1086,7 @@ var _ = Describe("validate image name change", func() {
 				ImageName: "postgres:12.0",
 			},
 		}
-		Expect(clusterNew.validateImageChange("postgres:12.1")).To(BeEmpty())
+		Expect(len(clusterNew.validateImageChange("postgres:12.1"))).To(Equal(0))
 	})
 })
 
@@ -1110,7 +1110,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(HaveLen(1))
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
 	})
 
 	It("Requires BackupID to perform PITR with TargetName", func() {
@@ -1133,7 +1133,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(BeEmpty())
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
 	})
 
 	It("Fails when no BackupID is provided to perform PITR with TargetXID", func() {
@@ -1156,7 +1156,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(HaveLen(1))
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
 	})
 
 	It("TargetTime's format as `YYYY-MM-DD HH24:MI:SS.FF6TZH` is valid", func() {
@@ -1178,7 +1178,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(BeEmpty())
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
 	})
 
 	It("TargetTime's format as YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM` is valid", func() {
@@ -1200,7 +1200,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(BeEmpty())
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
 	})
 
 	It("TargetTime's format as YYYY-MM-DD HH24:MI:SS.FF6 TZH:TZM` is invalid", func() {
@@ -1222,7 +1222,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(HaveLen(1))
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
 	})
 
 	It("raises errors for invalid LSN", func() {
@@ -1244,7 +1244,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(HaveLen(1))
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
 	})
 
 	It("valid LSN", func() {
@@ -1266,7 +1266,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(BeEmpty())
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
 	})
 
 	It("can be specified", func() {
@@ -1282,7 +1282,7 @@ var _ = Describe("recovery target", func() {
 			},
 		}
 
-		Expect(cluster.validateRecoveryTarget()).To(BeEmpty())
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
 	})
 
 	When("recoveryTLI is specified", func() {
@@ -1298,7 +1298,7 @@ var _ = Describe("recovery target", func() {
 					},
 				},
 			}
-			Expect(cluster.validateRecoveryTarget()).To(BeEmpty())
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
 		})
 
 		It("allows a positive integer", func() {
@@ -1313,7 +1313,7 @@ var _ = Describe("recovery target", func() {
 					},
 				},
 			}
-			Expect(cluster.validateRecoveryTarget()).To(BeEmpty())
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
 		})
 
 		It("prevents 0 value", func() {
@@ -1328,7 +1328,7 @@ var _ = Describe("recovery target", func() {
 					},
 				},
 			}
-			Expect(cluster.validateRecoveryTarget()).To(HaveLen(1))
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
 		})
 
 		It("prevents negative values", func() {
@@ -1343,7 +1343,7 @@ var _ = Describe("recovery target", func() {
 					},
 				},
 			}
-			Expect(cluster.validateRecoveryTarget()).To(HaveLen(1))
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
 		})
 
 		It("prevents everything else beside the empty string", func() {
@@ -1358,7 +1358,7 @@ var _ = Describe("recovery target", func() {
 					},
 				},
 			}
-			Expect(cluster.validateRecoveryTarget()).To(HaveLen(1))
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
 		})
 	})
 })
@@ -1679,7 +1679,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 		}
 
 		result := cluster.validatePgBaseBackupApplicationDatabase()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("complains if you specify the owner but not the database name for pg_basebackup", func() {
@@ -1694,7 +1694,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 		}
 
 		result := cluster.validatePgBaseBackupApplicationDatabase()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("doesn't complain if you specify both database name and owner user for pg_basebackup", func() {
@@ -1751,7 +1751,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 		}
 
 		result := cluster.validateRecoveryApplicationDatabase()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("complains if you specify the owner but not the database name for recovery", func() {
@@ -1766,7 +1766,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 		}
 
 		result := cluster.validateRecoveryApplicationDatabase()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 
 	It("doesn't complain if you specify both database name and owner user for recovery", func() {
@@ -2233,7 +2233,7 @@ var _ = Describe("Backup validation", func() {
 			},
 		}
 		err := cluster.validateBackupConfiguration()
-		Expect(err).To(HaveLen(1))
+		Expect(len(err)).To(Equal(1))
 	})
 
 	It("doesn't complain if given policy is not provided", func() {
@@ -2268,7 +2268,7 @@ var _ = Describe("Backup validation", func() {
 			},
 		}
 		err := cluster.validateBackupConfiguration()
-		Expect(err).To(HaveLen(2))
+		Expect(len(err)).To(Equal(2))
 	})
 })
 

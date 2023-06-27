@@ -322,7 +322,7 @@ var _ = Describe("pgaudit", func() {
 		}
 		config := CreatePostgresqlConfiguration(info)
 		libraries := strings.Split(config.GetConfig(SharedPreloadLibraries), ",")
-		Expect(libraries).To(HaveLen(2))
+		Expect(len(libraries)).To(BeNumerically("==", 2))
 		Expect(libraries).ToNot(ContainElement(""))
 		Expect(libraries).To(ContainElements("pg_stat_statements", "pgaudit"))
 	})
@@ -340,7 +340,7 @@ var _ = Describe("pg_failover_slots", func() {
 		}
 		config := CreatePostgresqlConfiguration(info)
 		libraries := strings.Split(config.GetConfig(SharedPreloadLibraries), ",")
-		Expect(libraries).To(HaveLen(1))
+		Expect(len(libraries)).To(BeNumerically("==", 1))
 		Expect(libraries).ToNot(ContainElement(""))
 		Expect(libraries).To(ContainElements("pg_failover_slots"))
 	})

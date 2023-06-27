@@ -48,7 +48,7 @@ var _ = Describe("Backup catalog", func() {
 	})
 
 	It("contains sorted data", func() {
-		Expect(catalog.List).To(HaveLen(3))
+		Expect(len(catalog.List)).To(Equal(3))
 		Expect(catalog.List[0].ID).To(Equal("202101011200"))
 		Expect(catalog.List[1].ID).To(Equal("202101021200"))
 		Expect(catalog.List[2].ID).To(Equal("202101031200"))
@@ -155,8 +155,8 @@ var _ = Describe("barman-cloud-backup-list parsing", func() {
 
 	It("must parse a correct output", func() {
 		result, err := NewCatalogFromBarmanCloudBackupList(barmanCloudListOutput)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(result.List).To(HaveLen(2))
+		Expect(err).To(BeNil())
+		Expect(len(result.List)).To(Equal(2))
 		Expect(result.List[0].ID).To(Equal("20201020T115231"))
 		Expect(result.List[0].SystemID).To(Equal("6885668674852188181"))
 		Expect(result.List[0].BeginTimeString).To(Equal("Tue Oct 20 11:52:31 2020"))
@@ -165,7 +165,7 @@ var _ = Describe("barman-cloud-backup-list parsing", func() {
 
 	It("must extract the latest backup id", func() {
 		result, err := NewCatalogFromBarmanCloudBackupList(barmanCloudListOutput)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result.LatestBackupInfo().ID).To(Equal("20201020T115231"))
 	})
 })

@@ -41,6 +41,6 @@ var _ = Describe("Validate schedule", func() {
 		}
 
 		result := schedule.validateSchedule()
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 	})
 })

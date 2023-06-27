@@ -38,18 +38,18 @@ func TestFileUtils(t *testing.T) {
 var _ = BeforeSuite(func() {
 	var err error
 	tempDir1, err = os.MkdirTemp(os.TempDir(), "fileutils1_")
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(BeNil())
 	tempDir2, err = os.MkdirTemp(os.TempDir(), "fileutils2_")
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(BeNil())
 	tempDir3, err = os.MkdirTemp(os.TempDir(), "fileutils3_")
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(BeNil())
 })
 
 var _ = AfterSuite(func() {
 	err := os.RemoveAll(tempDir1)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(BeNil())
 	err = os.RemoveAll(tempDir2)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(BeNil())
 	err = os.RemoveAll(tempDir3)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(BeNil())
 })

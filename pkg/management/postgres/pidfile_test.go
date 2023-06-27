@@ -73,11 +73,11 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		Expect(process).To(BeNil())
 
 		result, err := fileutils.FileExists(pidFile)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
 
 		result, err = fileutils.FileExists(lockFile)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
 	})
 

@@ -31,23 +31,23 @@ var _ = Describe("File writing functions", func() {
 	It("write a new file", func() {
 		changed, err := WriteStringToFile(path.Join(tempDir1, "test.txt"), "this is a test")
 		Expect(changed).To(BeTrue())
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 	})
 
 	It("detect if the file has changed or not", func() {
 		changed, err := WriteStringToFile(path.Join(tempDir1, "test2.txt"), "this is a test")
 		Expect(changed).To(BeTrue())
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		changed2, err := WriteStringToFile(path.Join(tempDir1, "test2.txt"), "this is a test")
 		Expect(changed2).To(BeFalse())
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 	})
 
 	It("create a new directory if needed", func() {
 		changed, err := WriteStringToFile(path.Join(tempDir1, "test", "test3.txt"), "this is a test")
 		Expect(changed).To(BeTrue())
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 	})
 })
 
@@ -55,34 +55,34 @@ var _ = Describe("File copying functions", func() {
 	It("copy files", func() {
 		changed, err := WriteStringToFile(path.Join(tempDir2, "test.txt"), "this is a test")
 		Expect(changed).To(BeTrue())
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		result, err := FileExists(path.Join(tempDir2, "test2.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
 
 		err = CopyFile(path.Join(tempDir2, "test.txt"), path.Join(tempDir2, "test2.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		result, err = FileExists(path.Join(tempDir2, "test2.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeTrue())
 	})
 
 	It("creates directories when needed", func() {
 		changed, err := WriteStringToFile(path.Join(tempDir2, "test3.txt"), "this is a test")
 		Expect(changed).To(BeTrue())
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		result, err := FileExists(path.Join(tempDir2, "temp", "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
 
 		err = CopyFile(path.Join(tempDir2, "test.txt"), path.Join(tempDir2, "temp", "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		result, err = FileExists(path.Join(tempDir2, "temp", "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeTrue())
 	})
 
@@ -91,38 +91,38 @@ var _ = Describe("File copying functions", func() {
 		var result bool
 
 		result, err = FileExists(path.Join(tempDir2, "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeTrue())
 
 		result, err = FileExists(path.Join(tempDir2, "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeTrue())
 
 		result, err = FileExists(path.Join(tempDir2, "temp"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeTrue())
 
 		result, err = FileExists(path.Join(tempDir2, "temp", "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeTrue())
 
 		err = RemoveDirectoryContent(tempDir2)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		result, err = FileExists(path.Join(tempDir2, "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
 
 		result, err = FileExists(path.Join(tempDir2, "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
 
 		result, err = FileExists(path.Join(tempDir2, "temp"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
 
 		result, err = FileExists(path.Join(tempDir2, "temp", "test3.txt"))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
 	})
 })

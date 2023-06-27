@@ -76,13 +76,13 @@ var _ = Describe("Annotation and label inheritance", func() {
 			config := Data{
 				WatchNamespace: "",
 			}
-			Expect(config.WatchedNamespaces()).To(BeEmpty())
+			Expect(config.WatchedNamespaces()).To(HaveLen(0))
 
 			// Additional commas and spaces doesn't change the meaning
 			config = Data{
 				WatchNamespace: ",  ,,",
 			}
-			Expect(config.WatchedNamespaces()).To(BeEmpty())
+			Expect(config.WatchedNamespaces()).To(HaveLen(0))
 		})
 	})
 

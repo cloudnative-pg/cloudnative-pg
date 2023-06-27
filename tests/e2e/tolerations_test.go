@@ -58,7 +58,7 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 		var err error
 		// Initialize empty global namespace variable
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")

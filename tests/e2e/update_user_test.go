@@ -96,7 +96,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			_, _, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig,
 				pod, specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "SELECT 1")
-			Expect(err).To(HaveOccurred())
+			Expect(err).ToNot(BeNil())
 
 			AssertUpdateSecret("username", "app", secretName, namespace, clusterName, 30, env)
 		})

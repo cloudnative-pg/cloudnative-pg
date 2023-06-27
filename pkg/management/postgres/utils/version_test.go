@@ -31,13 +31,13 @@ var _ = Describe("Parsing versions", func() {
 
 	It("properly works when version is well-formed and >= 10", func() {
 		v, err := parseVersionNum("120034")
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(v).To(Equal(&semver.Version{Major: 12, Patch: 34}))
 	})
 
 	It("properly works when version is well-formed and < 10", func() {
 		v, err := parseVersionNum("090807")
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(v).To(Equal(&semver.Version{Major: 9, Minor: 8, Patch: 7}))
 	})
 })

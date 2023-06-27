@@ -76,7 +76,7 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		number, names := cluster.GetSyncReplicasData()
 
 		Expect(number).To(BeZero())
-		Expect(names).To(BeEmpty())
+		Expect(names).To(HaveLen(0))
 		Expect(cluster.Spec.MinSyncReplicas).To(Equal(1))
 	})
 })

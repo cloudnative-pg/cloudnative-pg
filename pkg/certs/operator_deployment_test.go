@@ -70,42 +70,42 @@ var _ = Describe("Difference of values of maps", func() {
 		}
 		kubeClient := generateFakeClient()
 		err := createFakeOperatorDeploymentByName(ctx, kubeClient, operatorDeploymentName, operatorLabels)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		labelMap, err := labels.ConvertSelectorToLabelsMap(operatorLabelSelector)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		deployment, err := findOperatorDeploymentByFilter(ctx,
 			kubeClient,
 			operatorNamespaceName,
 			client.MatchingLabelsSelector{Selector: labelMap.AsSelector()})
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(deployment).ToNot(BeNil())
 
 		err = deleteFakeOperatorDeployment(ctx, kubeClient, operatorDeploymentName)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		operatorLabels = map[string]string{
 			"app.kubernetes.io/name": "some-app",
 		}
 		err = createFakeOperatorDeploymentByName(ctx, kubeClient, "some-app", operatorLabels)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		deployment, err = findOperatorDeploymentByFilter(ctx,
 			kubeClient,
 			operatorNamespaceName,
 			client.MatchingLabelsSelector{Selector: labelMap.AsSelector()})
-		Expect(err).To(HaveOccurred())
+		Expect(err).ToNot(BeNil())
 		Expect(deployment).To(BeNil())
 
 		operatorLabels = map[string]string{
 			"app.kubernetes.io/name": "cloudnative-pg",
 		}
 		err = createFakeOperatorDeploymentByName(ctx, kubeClient, operatorNamespaceName, operatorLabels)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		deployment, err = findOperatorDeploymentByFilter(ctx,
 			kubeClient,
 			operatorNamespaceName,
 			client.MatchingLabelsSelector{Selector: labelMap.AsSelector()})
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(deployment).ToNot(BeNil())
 	})
 })

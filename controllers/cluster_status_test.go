@@ -45,14 +45,14 @@ var _ = Describe("cluster_status unit tests", func() {
 			Expect(secret.Name).To(Equal(secretName))
 
 			_, expDate, err := keyPair.IsExpiring()
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 
 			certExpirationDate = expDate.String()
 		})
 		By("making sure that sets the status of the secret correctly", func() {
 			cluster.Status.Certificates.Expirations = map[string]string{}
 			err := clusterReconciler.setCertExpiration(ctx, cluster, secretName, namespace, certs.CACertKey)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 			Expect(cluster.Status.Certificates.Expirations[secretName]).To(Equal(certExpirationDate))
 		})
 	})
@@ -67,7 +67,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		poolerList := v1.PoolerList{Items: []v1.Pooler{pooler1, pooler2}}
 
 		intStatus, err := clusterReconciler.getPgbouncerIntegrationStatus(ctx, cluster, poolerList)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(intStatus.Secrets).To(HaveLen(1))
 	})
 
@@ -78,7 +78,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		pooler := newFakePooler(cluster)
 
 		version, err := clusterReconciler.getObjectResourceVersion(ctx, cluster, pooler.Name, &v1.Pooler{})
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 		Expect(version).To(Equal(pooler.ResourceVersion))
 	})
 
@@ -91,7 +91,7 @@ var _ = Describe("cluster_status unit tests", func() {
 
 		By("setting the primaryInstance and making sure the passed object is updated", func() {
 			err := clusterReconciler.setPrimaryInstance(ctx, cluster, podName)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 			Expect(cluster.Status.TargetPrimaryTimestamp).ToNot(BeEmpty())
 			Expect(cluster.Status.TargetPrimary).To(Equal(podName))
 		})
@@ -100,7 +100,7 @@ var _ = Describe("cluster_status unit tests", func() {
 			remoteCluster := &v1.Cluster{}
 
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, remoteCluster)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 			Expect(remoteCluster.Status.TargetPrimaryTimestamp).ToNot(BeEmpty())
 			Expect(remoteCluster.Status.TargetPrimary).To(Equal(podName))
 		})
@@ -114,7 +114,7 @@ var _ = Describe("cluster_status unit tests", func() {
 
 		By("registering the phase and making sure the passed object is updated", func() {
 			err := clusterReconciler.RegisterPhase(ctx, cluster, v1.PhaseSwitchover, phaseReason)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 			Expect(cluster.Status.Phase).To(Equal(v1.PhaseSwitchover))
 			Expect(cluster.Status.PhaseReason).To(Equal(phaseReason))
 		})
@@ -122,7 +122,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		By("making sure the remote resource is updated", func() {
 			remoteCluster := &v1.Cluster{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, remoteCluster)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(BeNil())
 			Expect(remoteCluster.Status.Phase).To(Equal(v1.PhaseSwitchover))
 			Expect(remoteCluster.Status.PhaseReason).To(Equal(phaseReason))
 		})

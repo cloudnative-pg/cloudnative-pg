@@ -36,7 +36,6 @@ linters:
     - gosec
     - gosimple
     - govet
-    - ginkgolinter
     - importas
     - ineffassign
     - lll

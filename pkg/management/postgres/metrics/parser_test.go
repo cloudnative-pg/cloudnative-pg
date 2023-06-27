@@ -24,16 +24,16 @@ import (
 var _ = Describe("Metrics parser", func() {
 	It("correctly handles the postgres_exporter example queries", func() {
 		result, err := ParseQueries([]byte(pgExporterQueries))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		Expect(result).ToNot(BeNil())
-		Expect(result).To(HaveLen(7))
+		Expect(len(result)).To(Equal(7))
 
 		Expect(result["pg_replication"].Query).To(Equal("SELECT CASE WHEN NOT pg_is_in_recovery() [...]"))
 		Expect(result["pg_replication"].Primary).To(BeTrue())
 		Expect(result["pg_replication"].Master).To(BeFalse()) // wokeignore:rule=master
-		Expect(result["pg_replication"].Metrics).To(HaveLen(2))
-		Expect(result["pg_replication"].Metrics[0]).To(HaveLen(1))
+		Expect(len(result["pg_replication"].Metrics)).To(Equal(2))
+		Expect(len(result["pg_replication"].Metrics[0])).To(Equal(1))
 		Expect(result["pg_replication"].Metrics[0]["lag"].Usage).To(Equal(ColumnUsage("GAUGE")))
 		Expect(result["pg_replication"].Metrics[0]["lag"].Description).To(Equal(
 			"Replication lag behind primary in seconds"))
@@ -60,10 +60,10 @@ some_query:
   - test
   - app
 `))
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).To(BeNil())
 
 		Expect(result).ToNot(BeNil())
-		Expect(result).To(HaveLen(1))
+		Expect(len(result)).To(Equal(1))
 
 		Expect(result["some_query"].Query).To(Equal("SELECT current_database() as datname, count(*)" +
 			" as rows FROM some_table\n"))
@@ -71,7 +71,7 @@ some_query:
 		Expect(result["some_query"].TargetDatabases).To(ContainElements("test", "app"))
 		Expect(result["some_query"].CacheSeconds).To(BeEquivalentTo(100))
 		Expect(result["some_query"].Master).To(BeFalse()) // wokeignore:rule=master
-		Expect(result["some_query"].Metrics).To(HaveLen(2))
+		Expect(len(result["some_query"].Metrics)).To(Equal(2))
 		Expect(result["some_query"].Metrics[0]["datname"].Usage).To(Equal(ColumnUsage("LABEL")))
 		Expect(result["some_query"].Metrics[0]["datname"].Description).To(Equal(
 			"Name of current database"))
@@ -83,7 +83,7 @@ some_query:
 test:
   toast
     bread`))
-		Expect(err).To(HaveOccurred())
+		Expect(err).ToNot(BeNil())
 		Expect(result).To(BeNil())
 	})
 })

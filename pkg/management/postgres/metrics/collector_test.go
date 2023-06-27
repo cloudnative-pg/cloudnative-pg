@@ -91,7 +91,7 @@ var _ = Describe("QueryCollector tests", func() {
 				// int are not converted
 				qc.collectConstMetric(metricMap, 12, []string{"TEST"}, ch)
 			}
-			Expect(ch).To(BeEmpty())
+			Expect(ch).To(HaveLen(0))
 		})
 
 		It("should ensure that a correctly formed counter is sent", func() {

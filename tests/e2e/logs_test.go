@@ -69,7 +69,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 				// Gather pod logs in the form of a Json Array
 				logEntries, err := testsUtils.ParseJSONLogs(namespace, pod.GetName(), env)
 				Expect(err).NotTo(HaveOccurred(), "unable to parse json logs")
-				Expect(logEntries).ToNot(BeEmpty(), "no logs found")
+				Expect(len(logEntries) > 0).To(BeTrue(), "no logs found")
 
 				// Logger field Assertions
 				isPgControlDataLoggerFound := testsUtils.HasLogger(logEntries, "pg_controldata")
@@ -156,7 +156,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 				// Gather pod logs in the form of a Json Array
 				logEntries, err := testsUtils.ParseJSONLogs(namespace, pod.GetName(), env)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(logEntries).ToNot(BeEmpty())
+				Expect(len(logEntries) > 0).To(BeTrue())
 
 				// No record should be returned in this case
 				isQueryRecordContained := testsUtils.AssertQueryRecord(
@@ -226,7 +226,7 @@ var _ = Describe("JSON log output unit tests", Label(tests.LabelObservability), 
 		"\"backend_type\":\"client backend\"}}"
 	var parsedRecord map[string]interface{}
 	err := json.Unmarshal([]byte(record), &parsedRecord)
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).To(BeNil())
 	It("Can check valid logging_collector record for query", func() {
 		Expect(parsedRecord).NotTo(BeNil())
 		Expect(testsUtils.CheckRecordForQuery(parsedRecord, errorTestQuery, user, database, message)).To(BeTrue())

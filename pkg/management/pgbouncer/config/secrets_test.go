@@ -59,6 +59,6 @@ var _ = Describe("Secret type detection", func() {
 
 		detectedType, err := detectSecretType(secret)
 		Expect(detectedType).To(BeEmpty())
-		Expect(err).To(HaveOccurred())
+		Expect(err).ToNot(BeNil())
 	})
 })

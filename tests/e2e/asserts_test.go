@@ -57,7 +57,7 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 		Eventually(func(g Gomega) {
 			var err error
 			cluster, err = env.GetCluster(namespace, clusterName)
-			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).To(BeNil())
 			g.Expect(cluster.Status.CurrentPrimary, err).To(
 				BeEquivalentTo(cluster.Status.TargetPrimary),
 			)
@@ -244,9 +244,9 @@ func AssertClusterDefault(namespace string, clusterName string,
 
 		validationErr := cluster.Validate()
 		if isExpectedToDefault {
-			Expect(validationErr).Should(BeEmpty(), validationErr)
+			Expect(len(validationErr)).Should(BeZero(), validationErr)
 		} else {
-			Expect(validationErr).ShouldNot(BeEmpty(), validationErr)
+			Expect(len(validationErr)).ShouldNot(BeZero(), validationErr)
 		}
 	})
 }
@@ -2681,7 +2681,7 @@ func AssertPVCCount(namespace, clusterName string, pvcCount, timeout int) {
 				env.Ctx, pvcList, ctrlclient.MatchingLabels{utils.ClusterLabelName: clusterName},
 				ctrlclient.InNamespace(namespace),
 			)
-			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).To(BeNil())
 
 			g.Expect(cluster.Status.PVCCount).To(BeEquivalentTo(len(pvcList.Items)))
 		}, timeout, 4).Should(Succeed())

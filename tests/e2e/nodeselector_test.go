@@ -152,7 +152,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 				Expect(err).ToNot(HaveOccurred())
 				for _, podDetails := range podList.Items {
 					if podDetails.Status.Phase == "Running" {
-						Expect(podDetails.Spec.NodeName).Should(Equal(nodeName))
+						Expect(podDetails.Spec.NodeName == nodeName).Should(Equal(true))
 					}
 				}
 			})
