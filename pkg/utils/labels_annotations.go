@@ -79,9 +79,6 @@ const (
 	// when creating a Pod
 	PodResourcesAnnotationName = "cnpg.io/podResources"
 
-	// PodContentHashAnnotationName is the name of the annotation containing the podContentHash value
-	PodContentHashAnnotationName = "cnpg.io/podContentHash"
-
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"
 )
