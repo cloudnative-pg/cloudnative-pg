@@ -45,9 +45,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			ExecutableHash: "test_hash",
 		}
 
-		rollout := IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Reason).To(BeEmpty())
-		Expect(rollout.Required).To(BeFalse())
+		rollout := isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.reason).To(BeEmpty())
+		Expect(rollout.required).To(BeFalse())
 	})
 
 	It("requires rollout when running a different image name", func(ctx SpecContext) {
@@ -58,22 +58,22 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout := IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeTrue())
-		Expect(rollout.Reason).To(BeEquivalentTo("the instance is using an old image: postgres:13.10 -> postgres:13.11"))
+		rollout := isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(BeEquivalentTo("the instance is using an old image: postgres:13.10 -> postgres:13.11"))
 	})
 
 	It("does not ask for rollout when update is to a different major release", func(ctx SpecContext) {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		pod.Spec.Containers[0].Image = "postgres:12.15"
 		status := postgres.PostgresqlStatus{
-			Pod:            *pod,
+			Pod:            pod,
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout := IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeFalse())
-		Expect(rollout.Reason).To(BeEmpty())
+		rollout := isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeFalse())
+		Expect(rollout.reason).To(BeEmpty())
 	})
 
 	It("requires rollout when a restart annotation has been added to the cluster", func(ctx SpecContext) {
@@ -88,14 +88,14 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			ExecutableHash: "test_hash",
 		}
 
-		rollout := IsPodNeedingRollout(ctx, status, &clusterRestart)
-		Expect(rollout.Required).To(BeTrue())
-		Expect(rollout.Reason).To(Equal("cluster has been explicitly restarted via annotation"))
-		Expect(rollout.CanBeInPlace).To(BeTrue())
+		rollout := isPodNeedingRollout(ctx, status, &clusterRestart)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(Equal("cluster has been explicitly restarted via annotation"))
+		Expect(rollout.canBeInPlace).To(BeTrue())
 
-		rollout = IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeFalse())
-		Expect(rollout.Reason).To(BeEmpty())
+		rollout = isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeFalse())
+		Expect(rollout.reason).To(BeEmpty())
 	})
 
 	It("requires rollout when PostgreSQL needs to be restarted", func(ctx SpecContext) {
@@ -107,9 +107,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			ExecutableHash: "test_hash",
 		}
 
-		rollout := IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeFalse())
-		Expect(rollout.Reason).To(BeEmpty())
+		rollout := isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeFalse())
+		Expect(rollout.reason).To(BeEmpty())
 
 		status = postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -117,9 +117,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			PendingRestart: true,
 			ExecutableHash: "test_hash",
 		}
-		rollout = IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeTrue())
-		Expect(rollout.Reason).To(Equal("configuration needs a restart to apply some configuration changes"))
+		rollout = isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(Equal("configuration needs a restart to apply some configuration changes"))
 	})
 
 	It("requires pod rollout if executable does not have a hash", func(ctx SpecContext) {
@@ -129,10 +129,10 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			PendingRestart: false,
 			IsPodReady:     true,
 		}
-		rollout := IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeTrue())
-		Expect(rollout.Reason).To(Equal("missing executable hash"))
-		Expect(rollout.CanBeInPlace).To(BeFalse())
+		rollout := isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(Equal("missing executable hash"))
+		Expect(rollout.canBeInPlace).To(BeFalse())
 	})
 
 	It("checks when a rollout is needed for any reason", func(ctx SpecContext) {
@@ -141,10 +141,10 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Pod:            pod,
 			PendingRestart: true,
 		}
-		rollout := IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeFalse())
-		Expect(rollout.CanBeInPlace).To(BeFalse())
-		Expect(rollout.Reason).To(BeEmpty())
+		rollout := isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeFalse())
+		Expect(rollout.canBeInPlace).To(BeFalse())
+		Expect(rollout.reason).To(BeEmpty())
 
 		status = postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -152,10 +152,10 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout = IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeTrue())
-		Expect(rollout.Reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
-		Expect(rollout.CanBeInPlace).To(BeTrue())
+		rollout = isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
+		Expect(rollout.canBeInPlace).To(BeTrue())
 	})
 
 	It("should trigger a rollout when the scheduler changes", func(ctx SpecContext) {
@@ -169,9 +169,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			ExecutableHash: "test_hash",
 		}
 
-		rollout := IsPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.Required).To(BeTrue())
-		Expect(rollout.Reason).To(ContainSubstring("scheduler name changed"))
+		rollout := isPodNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(ContainSubstring("scheduler name changed"))
 	})
 
 	When("cluster has resources specified", func() {
@@ -198,9 +198,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				ExecutableHash: "test_hash",
 			}
 
-			rollout := IsPodNeedingRollout(ctx, status, &clusterWithResources)
-			Expect(rollout.Required).To(BeTrue())
-			Expect(rollout.Reason).To(ContainSubstring("the instance resources don't match"))
+			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.reason).To(ContainSubstring("the instance resources don't match"))
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
 			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
@@ -213,9 +213,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				ExecutableHash: "test_hash",
 			}
 
-			rollout := IsPodNeedingRollout(ctx, status, &clusterWithResources)
-			Expect(rollout.Required).To(BeTrue())
-			Expect(rollout.Reason).To(ContainSubstring("the instance resources don't match"))
+			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.reason).To(ContainSubstring("the instance resources don't match"))
 		})
 	})
 
@@ -237,9 +237,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				ExecutableHash: "test_hash",
 			}
 
-			rollout := IsPodNeedingRollout(ctx, status, cluster)
-			Expect(rollout.Required).To(BeTrue())
-			Expect(rollout.Reason).To(Equal("environment variable configuration hash changed"))
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.reason).To(Equal("environment variable configuration hash changed"))
 		})
 	})
 })
@@ -271,9 +271,9 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout := IsPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.Reason).To(BeEmpty())
-		Expect(rollout.Required).To(BeFalse())
+		rollout := isPodNeedingRollout(ctx, status, cluster)
+		Expect(rollout.reason).To(BeEmpty())
+		Expect(rollout.required).To(BeFalse())
 	})
 
 	It("should require rollout when the cluster and pod do not have "+
@@ -285,9 +285,9 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout := IsPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.Reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
-		Expect(rollout.Required).To(BeTrue())
+		rollout := isPodNeedingRollout(ctx, status, cluster)
+		Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+		Expect(rollout.required).To(BeTrue())
 	})
 
 	It("should require rollout when the LabelSelector maps are different", func(ctx SpecContext) {
@@ -301,9 +301,9 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout := IsPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.Reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
-		Expect(rollout.Required).To(BeTrue())
+		rollout := isPodNeedingRollout(ctx, status, cluster)
+		Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+		Expect(rollout.required).To(BeTrue())
 	})
 
 	It("should require rollout when TopologySpreadConstraints is nil in one of the objects", func(ctx SpecContext) {
@@ -315,9 +315,9 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout := IsPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.Reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
-		Expect(rollout.Required).To(BeTrue())
+		rollout := isPodNeedingRollout(ctx, status, cluster)
+		Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+		Expect(rollout.required).To(BeTrue())
 	})
 
 	It("should not require rollout if pod and spec both lack TopologySpreadConstraints", func(ctx SpecContext) {
@@ -330,8 +330,8 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			IsPodReady:     true,
 			ExecutableHash: "test_hash",
 		}
-		rollout := IsPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.Reason).To(BeEmpty())
-		Expect(rollout.Required).To(BeFalse())
+		rollout := isPodNeedingRollout(ctx, status, cluster)
+		Expect(rollout.reason).To(BeEmpty())
+		Expect(rollout.required).To(BeFalse())
 	})
 })

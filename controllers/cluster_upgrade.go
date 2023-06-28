@@ -65,13 +65,13 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 			continue
 		}
 
-		rollout := IsPodNeedingRollout(ctx, postgresqlStatus, cluster)
-		if !rollout.Required {
+		rollout := isPodNeedingRollout(ctx, postgresqlStatus, cluster)
+		if !rollout.required {
 			continue
 		}
 
 		restartMessage := fmt.Sprintf("Restarting instance %s, because: %s",
-			postgresqlStatus.Pod.Name, rollout.Reason)
+			postgresqlStatus.Pod.Name, rollout.reason)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade, restartMessage); err != nil {
 			return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 		}
@@ -92,8 +92,8 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	// we first check whether a restart is needed given the provided condition
-	rollout := IsPodNeedingRollout(ctx, *primaryPostgresqlStatus, cluster)
-	if !rollout.Required {
+	rollout := isPodNeedingRollout(ctx, *primaryPostgresqlStatus, cluster)
+	if !rollout.required {
 		return false, nil
 	}
 
@@ -104,7 +104,7 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
-		rollout.CanBeInPlace, rollout.Reason)
+		rollout.canBeInPlace, rollout.reason)
 }
 
 func (r *ClusterReconciler) updatePrimaryPod(
@@ -209,20 +209,20 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 	return nil
 }
 
-// Rollout describes whether a rollout should happen, and if so whether it can
+// rollout describes whether a rollout should happen, and if so whether it can
 // be done in-place, and what the reason for the rollout is
-type Rollout struct {
-	Required     bool
-	CanBeInPlace bool
-	Reason       string
+type rollout struct {
+	required     bool
+	canBeInPlace bool
+	reason       string
 }
 
 type rolloutChecker func(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error)
+) (rollout, error)
 
-// IsPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its current state
+// isPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its current state
 // with its expected state defined inside the cluster struct.
 //
 // Arguments:
@@ -233,15 +233,15 @@ type rolloutChecker func(
 //
 // Returns:
 //
-// - a Rollout object including whether a restart is required, and the reason
-func IsPodNeedingRollout(
+// - a rollout object including whether a restart is required, and the reason
+func isPodNeedingRollout(
 	ctx context.Context,
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) Rollout {
+) rollout {
 	contextLogger := log.FromContext(ctx)
 	if !status.IsPodReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
-		return Rollout{}
+		return rollout{}
 	}
 
 	checkers := map[string]rolloutChecker{
@@ -263,70 +263,70 @@ func IsPodNeedingRollout(
 			contextLogger.Error(err, "while checking if pod needs rollout")
 			continue
 		}
-		if rollout.Required {
-			if rollout.Reason == "" {
-				rollout.Reason = message
+		if rollout.required {
+			if rollout.reason == "" {
+				rollout.reason = message
 			}
 			return rollout
 		}
 	}
-	return Rollout{}
+	return rollout{}
 }
 
 func checkHasExecutableHash(
 	status postgres.PostgresqlStatus,
 	_ *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	if status.ExecutableHash == "" {
 		// This is an old instance manager.
 		// We need to replace it with one supporting the online operator upgrade feature
-		return Rollout{Required: true}, nil
+		return rollout{required: true}, nil
 	}
-	return Rollout{}, nil
+	return rollout{}, nil
 }
 
 func checkHasResizingPVC(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, pvcName := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC begins with the name of the pod using it.
 			if persistentvolumeclaim.BelongToInstance(cluster, status.Pod.Name, pvcName) {
-				return Rollout{
-					Required: true,
-					Reason:   fmt.Sprintf("rebooting pod to complete resizing %s", pvcName),
+				return rollout{
+					required: true,
+					reason:   fmt.Sprintf("rebooting pod to complete resizing %s", pvcName),
 				}, nil
 			}
 		}
 	}
-	return Rollout{}, nil
+	return rollout{}, nil
 }
 
 func checkPodNeedsUpdatedTopology(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	if reflect.DeepEqual(cluster.Spec.TopologySpreadConstraints, status.Pod.Spec.TopologySpreadConstraints) {
-		return Rollout{}, nil
+		return rollout{}, nil
 	}
 	reason := fmt.Sprintf(
 		"Pod '%s' does not have up-to-date TopologySpreadConstraints. It needs to match the cluster's constraints.",
 		status.Pod.Name,
 	)
 
-	return Rollout{
-		Required: true,
-		Reason:   reason,
+	return rollout{
+		required: true,
+		reason:   reason,
 	}, nil
 }
 
 func checkSchedulerIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	if cluster.Spec.SchedulerName == "" || cluster.Spec.SchedulerName == status.Pod.Spec.SchedulerName {
-		return Rollout{}, nil
+		return rollout{}, nil
 	}
 
 	message := fmt.Sprintf(
@@ -334,16 +334,16 @@ func checkSchedulerIsOutdated(
 		status.Pod.Spec.SchedulerName,
 		cluster.Spec.SchedulerName,
 	)
-	return Rollout{
-		Required: true,
-		Reason:   message,
+	return rollout{
+		required: true,
+		reason:   message,
 	}, nil
 }
 
 func checkProjectedVolumeIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	// Check if there is a change in the projected volume configuration
 	currentProjectedVolumeConfiguration := getProjectedVolumeConfigurationFromPod(*status.Pod)
 
@@ -354,12 +354,12 @@ func checkProjectedVolumeIsOutdated(
 	}
 
 	if reflect.DeepEqual(currentProjectedVolumeConfiguration, desiredProjectedVolumeConfiguration) {
-		return Rollout{}, nil
+		return rollout{}, nil
 	}
 
-	return Rollout{
-		Required: true,
-		Reason: fmt.Sprintf("projected volume configuration changed, old: %+v, new: %+v",
+	return rollout{
+		required: true,
+		reason: fmt.Sprintf("projected volume configuration changed, old: %+v, new: %+v",
 			currentProjectedVolumeConfiguration,
 			desiredProjectedVolumeConfiguration),
 	}, nil
@@ -380,71 +380,71 @@ func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVol
 func checkPodImageIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	targetImageName := cluster.GetImageName()
 
 	pgCurrentImageName, err := specs.GetPostgresImageName(*status.Pod)
 	if err != nil {
-		return Rollout{}, err
+		return rollout{}, err
 	}
 
 	if pgCurrentImageName != targetImageName {
 		canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
 		if err != nil {
-			return Rollout{}, err
+			return rollout{}, err
 		}
 
 		if !canUpgradeImage {
-			return Rollout{}, nil
+			return rollout{}, nil
 		}
 		// We need to apply a different PostgreSQL version
-		return Rollout{
-			Required: true,
-			Reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
+		return rollout{
+			required: true,
+			reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
 				pgCurrentImageName, targetImageName),
 		}, nil
 	}
 
-	return Rollout{}, nil
+	return rollout{}, nil
 }
 
 func checkPodInitContainerIsOutdated(
 	status postgres.PostgresqlStatus,
 	_ *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	if !configuration.Current.EnableInstanceManagerInplaceUpdates {
 		opCurrentImageName, err := specs.GetBootstrapControllerImageName(*status.Pod)
 		if err != nil {
-			return Rollout{}, err
+			return rollout{}, err
 		}
 
 		if opCurrentImageName != configuration.Current.OperatorImageName {
 			// We need to apply a different version of the instance manager
-			return Rollout{
-				Required: true,
-				Reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
+			return rollout{
+				required: true,
+				reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
 					opCurrentImageName, configuration.Current.OperatorImageName),
 			}, nil
 		}
 	}
 
-	return Rollout{}, nil
+	return rollout{}, nil
 }
 
 func checkHasMissingPVCs(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
-		return Rollout{Required: true, Reason: string(apiv1.DetachedVolume)}, nil
+		return rollout{required: true, reason: string(apiv1.DetachedVolume)}, nil
 	}
-	return Rollout{}, nil
+	return rollout{}, nil
 }
 
 func checkClusterHasNewerRestartAnnotation(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	// check if pod needs to be restarted because of some config requiring it
 	// or if the cluster have been explicitly restarted
 	// If the cluster has been restarted and we are working with a Pod
@@ -453,29 +453,29 @@ func checkClusterHasNewerRestartAnnotation(
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
 		podRestart := status.Pod.Annotations[specs.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
-			return Rollout{
-				Required:     true,
-				Reason:       "cluster has been explicitly restarted via annotation",
-				CanBeInPlace: true,
+			return rollout{
+				required:     true,
+				reason:       "cluster has been explicitly restarted via annotation",
+				canBeInPlace: true,
 			}, nil
 		}
 	}
 
 	if status.PendingRestart {
-		return Rollout{
-			Required:     true,
-			Reason:       "configuration needs a restart to apply some configuration changes",
-			CanBeInPlace: true,
+		return rollout{
+			required:     true,
+			reason:       "configuration needs a restart to apply some configuration changes",
+			canBeInPlace: true,
 		}, nil
 	}
 
-	return Rollout{}, nil
+	return rollout{}, nil
 }
 
 func checkPodEnvironmentIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	// Check if there is a change in the environment section
 	envConfig := specs.CreatePodEnvConfig(*cluster, status.Pod.Name)
 
@@ -483,13 +483,13 @@ func checkPodEnvironmentIsOutdated(
 	podEnvHash, hasPodEnvhash := status.Pod.Annotations[utils.PodEnvHashAnnotationName]
 	if hasPodEnvhash {
 		if podEnvHash != envConfig.Hash {
-			return Rollout{
-				Required: true,
-				Reason:   "environment variable configuration hash changed",
+			return rollout{
+				required: true,
+				reason:   "environment variable configuration hash changed",
 			}, nil
 		}
 
-		return Rollout{}, nil
+		return rollout{}, nil
 	}
 
 	// Fall back to comparing the container environment configuration
@@ -500,9 +500,9 @@ func checkPodEnvironmentIsOutdated(
 		}
 
 		if !envConfig.IsEnvEqual(container) {
-			return Rollout{
-				Required: true,
-				Reason: fmt.Sprintf("environment variable configuration changed, "+
+			return rollout{
+				required: true,
+				reason: fmt.Sprintf("environment variable configuration changed, "+
 					"oldEnv: %+v, oldEnvFrom: %+v, newEnv: %+v, newEnvFrom: %+v",
 					container.Env,
 					container.EnvFrom,
@@ -515,31 +515,31 @@ func checkPodEnvironmentIsOutdated(
 		break
 	}
 
-	return Rollout{}, nil
+	return rollout{}, nil
 }
 
 func checkResourcesAreOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
-) (Rollout, error) {
+) (rollout, error) {
 	res, ok := status.Pod.ObjectMeta.Annotations[utils.PodResourcesAnnotationName]
 	if !ok {
-		return Rollout{}, nil
+		return rollout{}, nil
 	}
 
 	var resources corev1.ResourceRequirements
 	err := (&resources).Unmarshal([]byte(res))
 	if err != nil {
-		return Rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
+		return rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
 	}
 	if !reflect.DeepEqual(resources, cluster.Spec.Resources) {
-		return Rollout{
-			Required: true,
-			Reason:   "the instance resources don't match the current cluster spec",
+		return rollout{
+			required: true,
+			reason:   "the instance resources don't match the current cluster spec",
 		}, nil
 	}
 
-	return Rollout{}, nil
+	return rollout{}, nil
 }
 
 // upgradePod deletes a Pod to let the operator recreate it using an
