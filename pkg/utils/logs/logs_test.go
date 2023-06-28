@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -135,6 +137,27 @@ var _ = Describe("StreamingRequest default options", func() {
 			defer GinkgoRecover()
 			defer wait.Done()
 			err := TailPodLogs(ctx, client, *pod, &logBuffer, true)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		// calling ctx.Done is not strictly necessary because the fake client
+		// will terminate the pod stream anyway, ending TailPodLogs.
+		// But in "production", TailPodLogs will follow
+		// the pod logs until the context, or the logs, are over
+		ctx.Done()
+		wait.Wait()
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+	})
+
+	It("TailClusterLogs defaults to non-zero lines shown if set to zero", func(ctx context.Context) {
+		client := fake.NewSimpleClientset(pod)
+		var logBuffer bytes.Buffer
+		cluster := apiv1.Cluster{}
+		var wait sync.WaitGroup
+		wait.Add(1)
+		go func() {
+			defer GinkgoRecover()
+			defer wait.Done()
+			err := TailClusterLogs(ctx, client, cluster, &logBuffer, true)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		// calling ctx.Done is not strictly necessary because the fake client

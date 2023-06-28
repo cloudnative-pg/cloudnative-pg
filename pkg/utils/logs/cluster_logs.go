@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,22 +73,54 @@ func safeWriterFrom(w io.Writer) *safeWriter {
 	}
 }
 
+// activeStreams is goroutine-safe counter of active streams. It is similar
+// in idea to a WaitGroup, but does not block when we check for zero
+type activeStreams struct {
+	m     sync.Mutex
+	count int
+}
+
+func (ww *activeStreams) Increment() {
+	ww.m.Lock()
+	defer ww.m.Unlock()
+	ww.count++
+}
+
+func (ww *activeStreams) Decrement() {
+	ww.m.Lock()
+	defer ww.m.Unlock()
+	ww.count--
+}
+
+func (ww *activeStreams) IsZero() bool {
+	return ww.count == 0
+}
+
 // Stream streams the cluster's pod logs and shunts them to the `writer`.
 func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer) (err error) {
 	contextLogger := log.FromContext(ctx)
 	client := csr.getKubernetesClient()
-	podList, err := client.CoreV1().Pods(csr.getPodNamespace()).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	if len(podList.Items) == 0 {
-		contextLogger.Warning("no pods found in namespace", "namespace", csr.getPodNamespace())
-		return nil
-	}
-
 	podBeingLogged := make(map[string]bool)
-	var wg sync.WaitGroup
+	var streamSet activeStreams
+	var errChan chan error
+
 	for {
+		podList, err := client.CoreV1().Pods(csr.getPodNamespace()).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(podList.Items) == 0 {
+			contextLogger.Warning("no pods found in namespace", "namespace", csr.getPodNamespace())
+			return nil
+		}
+
+		select {
+		case routineErr := <-errChan:
+			contextLogger.Error(routineErr, "error in streaming from cluster pod")
+			return routineErr
+		default:
+		}
+
 		for _, pod := range podList.Items {
 			if pod.Labels[utils.ClusterLabelName] != csr.getClusterName() {
 				continue
@@ -96,30 +129,63 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 				continue
 			}
 			podBeingLogged[pod.Name] = true
-			wg.Add(1)
-			go func(ctx context.Context, podName string, w io.Writer) {
-				defer wg.Done()
+			streamSet.Increment()
+			go func(ctx context.Context, podName string, w io.Writer, errch chan error) {
+				defer func() {
+					streamSet.Decrement()
+				}()
 				pods := client.CoreV1().Pods(csr.getPodNamespace())
 				logsRequest := pods.GetLogs(
 					podName,
 					csr.getLogOptions())
 				logStream, err := logsRequest.Stream(ctx)
 				if err != nil {
+					errch <- err
 					return
 				}
 				defer func() {
 					innerErr := logStream.Close()
-					if err == nil && innerErr != nil {
-						err = innerErr
+					if innerErr != nil {
+						errch <- innerErr
 					}
 				}()
 
 				_, err = io.Copy(w, logStream)
 				if err != nil {
+					errch <- err
 					return
 				}
-			}(ctx, pod.Name, safeWriterFrom(writer))
+			}(ctx, pod.Name, safeWriterFrom(writer), errChan)
 		}
-		wg.Wait()
+		if streamSet.IsZero() {
+			return nil
+		}
+		// sleep a bit so we're not in a busy waiting cycle
+		time.Sleep(5 * time.Second)
 	}
+}
+
+// TailClusterLogs streams the cluster pod logs starting from the current time, and keeps
+// waiting for any new pods, and any new logs, until the  context is cancelled
+// by the calling process
+// If `parseTimestamps` is true, the log line will have the timestamp in
+// human-readable prepended. NOTE: this will make log-lines NON-JSON
+func TailClusterLogs(
+	ctx context.Context,
+	client kubernetes.Interface,
+	cluster apiv1.Cluster,
+	writer io.Writer,
+	parseTimestamps bool,
+) (err error) {
+	now := metav1.Now()
+	streamClusterLogs := ClusterStreamingRequest{
+		Cluster: cluster,
+		Options: &v1.PodLogOptions{
+			Timestamps: parseTimestamps,
+			Follow:     true,
+			SinceTime:  &now,
+		},
+		client: client,
+	}
+	return streamClusterLogs.Stream(ctx, writer)
 }
