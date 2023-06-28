@@ -245,15 +245,15 @@ func isPodNeedingRollout(
 	}
 
 	checkers := map[string]rolloutChecker{
-		"missing executable hash":              checkHasExecutableHash,
-		"has PVC requiring resizing":           checkHasResizingPVC,
-		"projected volume is outdated":         checkProjectedVolumeIsOutdated,
-		"resources are outdated":               checkResourcesAreOutdated,
+		"instance is missing executable hash":  checkHasExecutableHash,
+		"pod has PVC requiring resizing":       checkHasResizingPVC,
+		"pod projected volume is outdated":     checkProjectedVolumeIsOutdated,
+		"pod resources are outdated":           checkResourcesAreOutdated,
 		"pod image is outdated":                checkPodImageIsOutdated,
 		"pod init container is outdated":       checkPodInitContainerIsOutdated,
-		"has missing PVCs":                     checkHasMissingPVCs,
+		"pod has missing PVCs":                 checkHasMissingPVCs,
 		"pod environment is outdated":          checkPodEnvironmentIsOutdated,
-		"scheduler is outdated":                checkSchedulerIsOutdated,
+		"pod scheduler is outdated":            checkSchedulerIsOutdated,
 		"cluster has newer restart annotation": checkClusterHasNewerRestartAnnotation,
 		"pod needs updated topology":           checkPodNeedsUpdatedTopology,
 	}
