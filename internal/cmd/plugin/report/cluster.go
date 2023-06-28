@@ -26,8 +26,8 @@ import (
 
 func clusterCmd() *cobra.Command {
 	var (
-		file, output              string
-		includeLogs, logTimeStamp bool
+		file, output                      string
+		includeLogs, logTimeStamp, follow bool
 	)
 
 	const filePlaceholder = "report_cluster_<name>_<timestamp>.zip"
@@ -43,6 +43,10 @@ func clusterCmd() *cobra.Command {
 			if file == filePlaceholder {
 				file = reportName("cluster", now, clusterName) + ".zip"
 			}
+			if follow {
+				return followCluster(cmd.Context(), clusterName, plugin.Namespace,
+					plugin.OutputFormat(output), file, includeLogs, logTimeStamp, now)
+			}
 			return cluster(cmd.Context(), clusterName, plugin.Namespace,
 				plugin.OutputFormat(output), file, includeLogs, logTimeStamp, now)
 		},
@@ -55,6 +59,8 @@ func clusterCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&includeLogs, "logs", "l", false, "include logs")
 	cmd.Flags().BoolVarP(&logTimeStamp, "timestamps", "t", false,
 		"Prepend human-readable timestamp to each log line")
+	cmd.Flags().BoolVarP(&follow, "follow", "w", false,
+		"Follow cluster logs")
 
 	return cmd
 }
