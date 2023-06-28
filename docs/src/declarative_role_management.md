@@ -122,44 +122,16 @@ This configuration will be rejected by the validation webhook.
 
 ### Password expiry, VALID UNTIL
 
-Password expiry set via the `VALID UNTIL` role attribute requires special
-mention.
-By default in PostgreSQL, roles that are not given a specific `VALID UNTIL` on
-creation have non-expiring passwords.
 
-PostgreSQL uses a timestamp type for VALID UNTIL, and that includes support
-for values like `'infinity'`, `'tomorrow'`, or `'allballs'` (sic). The latter
-values are aliases for proper timestamps, but `'infinity'` cannot be translated
-to a Kubernetes timestamp. Please see
-the [PostgreSQL documentation](https://www.postgresql.org/docs/current/datatype-datetime.html)
-for reference.
+The `validUntil` attribute plays a crucial role in managing the expiration of user passwords. Its behavior is outlined as follows:
 
-With declarative role management we support the `validUntil`
-attribute for managed roles, but it can only accept a valid Kubernetes
-timestamp, or be omitted (defaulting to null).
+- When a role is created without a specific `validUntil` attribute, the Role Manager interprets it as a `'infinity'`
+value for  `VALID UNTIL`. This means that the password associated with this role will never expire.
+- If a role was initially created with a `validUntil` timestamp (indicating a password expiration date), setting the `validUntil`
+value to null within will cause the Role Manager to interpret it as `'infinity'`.
+As a result, the expiry of the password will be reset to never expire.
 
-To support the equivalent of a PostgreSQL role with VALID UNTIL set to
-`'infinity'`, managed roles can set the attribute `passwordNeverExpires`.
-
-NOTE: it is considered an error to set both `validUntil` and
-`passwordNeverExpires` on a role.
-This configuration will be rejected by the validation webhook.
-
-By coherence with the way we manage passwords, a managed role with
-no `validUntil` (and `passwordNeverExpires` unset) will not alter the
-`VALID UNTIL` set in the database role.
-
-Note that in Postgres there is no way to set a `VALID UNTIL` that is not null
-back to NULL
-([see reference](https://www.postgresql.org/docs/current/sql-alterrole.html)).
-Similarly, in a managed role that had a set `validUntil`, the only way to make
-the password never expire it to explicitly set `passwordNeverExpires`.
-
-NOTE: in PostgreSQL it is technically possible to set a role as VALID UNTIL
-`'-infinity'`, thought it's not clear what purpose that would serve.
-Managed roles don't support this. To mark a role as already expired, set
-a `validUntil` anytime in the past.
-
+This functionality offers flexibility in controlling password expiry by adjusting the `validUntil` field within the Role Manager.
 !!! Warning
     The declarative role management feature has changed behavior since its
     initial version (1.20.0). In 1.20.0, a role without a `passwordSecret` would

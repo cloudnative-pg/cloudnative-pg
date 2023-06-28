@@ -258,15 +258,15 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				}
 				handleRoleError(err, role.Name, action)
 			case roleDelete:
-				err := roleManager.Delete(ctx, roleFromSpec(role))
+				err := roleManager.Delete(ctx, role.toDatabaseRole())
 				handleRoleError(err, role.Name, action)
 			case roleSetComment:
 				// NOTE: adding/updating a comment on a role does not alter its TransactionID
-				err := roleManager.UpdateComment(ctx, roleFromSpec(role))
+				err := roleManager.UpdateComment(ctx, role.toDatabaseRole())
 				handleRoleError(err, role.Name, action)
 			case roleUpdateMemberships:
 				// NOTE: revoking / granting to a role does not alter its TransactionID
-				dbRole := roleFromSpec(role)
+				dbRole := role.toDatabaseRole()
 				grants, revokes, err := getRoleMembershipDiff(ctx, roleManager, role, dbRole)
 				if err != nil {
 					contextLog.Error(err, "while performing "+string(action), "role", role.Name)
@@ -306,7 +306,7 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	action roleAction,
 ) (apiv1.PasswordState, error) {
 	var passVersion string
-	databaseRole := roleFromSpec(role)
+	databaseRole := role.toDatabaseRole()
 	switch {
 	case role.PasswordSecret == nil && !role.DisablePassword:
 		databaseRole.ignorePassword = true

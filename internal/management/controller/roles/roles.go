@@ -34,18 +34,18 @@ type (
 
 type internalRoleConfiguration struct {
 	apiv1.RoleConfiguration
-	ignoreValidUntil bool `json:"-"`
+	ignoreValidUntil bool
 }
 
-func internalRoleFromName(name string) internalRoleConfiguration {
+func newInternalRoleFromName(name string) internalRoleConfiguration {
 	return internalRoleConfiguration{RoleConfiguration: apiv1.RoleConfiguration{Name: name}}
 }
 
-// roleFromSpec converts an internalRoleConfiguration into the equivalent DatabaseRole
+// toDatabaseRole converts an internalRoleConfiguration into the equivalent DatabaseRole
 //
 // NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
 // provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
-func roleFromSpec(role internalRoleConfiguration) DatabaseRole {
+func (role internalRoleConfiguration) toDatabaseRole() DatabaseRole {
 	dbRole := DatabaseRole{
 		Name:            role.Name,
 		Comment:         role.Comment,
@@ -130,9 +130,9 @@ func evaluateNextRoleActions(
 		inSpec, isInSpec := roleInSpecNamed[role.Name]
 		switch {
 		case postgres.IsRoleReserved(role.Name):
-			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], internalRoleFromName(role.Name))
+			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], newInternalRoleFromName(role.Name))
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
-			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], internalRoleFromName(role.Name))
+			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], newInternalRoleFromName(role.Name))
 		case isInSpec &&
 			(!role.isEquivalentTo(inSpec) ||
 				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
@@ -152,9 +152,9 @@ func evaluateNextRoleActions(
 			}
 			rolesByAction[roleUpdateMemberships] = append(rolesByAction[roleUpdateMemberships], internalRole)
 		case !isInSpec:
-			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], internalRoleFromName(role.Name))
+			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], newInternalRoleFromName(role.Name))
 		default:
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], internalRoleFromName(role.Name))
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], newInternalRoleFromName(role.Name))
 		}
 	}
 
