@@ -41,6 +41,13 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 
 	go func() {
 		defer close(errChan)
+
+		// return error early if PGDATA does not exist
+		if _, err := os.Stat(i.instance.PgData); os.IsNotExist(err) {
+			errChan <- err
+			return
+		}
+
 		err := verifyPgDataCoherence(ctx, i.instance)
 		if err != nil {
 			errChan <- err
