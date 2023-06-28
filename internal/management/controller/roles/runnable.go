@@ -165,7 +165,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(&remoteCluster))
 }
 
-func getRoleNames(roles []internalRoleConfiguration) []string {
+func getRoleNames(roles []roleConfigurationAdapter) []string {
 	names := make([]string, len(roles))
 	for i, role := range roles {
 		names[i] = role.Name
@@ -284,7 +284,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 func getRoleMembershipDiff(
 	ctx context.Context,
 	roleManager RoleManager,
-	role internalRoleConfiguration,
+	role roleConfigurationAdapter,
 	dbRole DatabaseRole,
 ) ([]string, []string, error) {
 	inRoleInDB, err := roleManager.GetParentRoles(ctx, dbRole)
@@ -302,7 +302,7 @@ func getRoleMembershipDiff(
 func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	ctx context.Context,
 	roleManager RoleManager,
-	role internalRoleConfiguration,
+	role roleConfigurationAdapter,
 	action roleAction,
 ) (apiv1.PasswordState, error) {
 	var passVersion string
@@ -362,7 +362,7 @@ type passwordSecret struct {
 func getPassword(
 	ctx context.Context,
 	cl client.Client,
-	roleInSpec internalRoleConfiguration,
+	roleInSpec roleConfigurationAdapter,
 	namespace string,
 ) (passwordSecret, error) {
 	secretName := roleInSpec.GetRoleSecretsName()
@@ -410,7 +410,7 @@ func getPasswordSecretResourceVersion(
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
-		passwordSecret, err := getPassword(ctx, client, internalRoleConfiguration{RoleConfiguration: role}, namespace)
+		passwordSecret, err := getPassword(ctx, client, roleConfigurationAdapter{RoleConfiguration: role}, namespace)
 		if err != nil {
 			return nil, err
 		}

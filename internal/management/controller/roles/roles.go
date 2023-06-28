@@ -28,24 +28,26 @@ import (
 )
 
 type (
-	rolesByAction map[roleAction][]internalRoleConfiguration
-	rolesByStatus map[apiv1.RoleStatus][]internalRoleConfiguration
+	rolesByAction map[roleAction][]roleConfigurationAdapter
+	rolesByStatus map[apiv1.RoleStatus][]roleConfigurationAdapter
 )
 
-type internalRoleConfiguration struct {
+// roleConfigurationAdapter serves as an intermediary structure used to adapt apiv1.RoleConfiguration
+// to a DatabaseRole. It is capable of handling the various 'VALID UNTIL' field values.
+type roleConfigurationAdapter struct {
 	apiv1.RoleConfiguration
 	ignoreValidUntil bool
 }
 
-func newInternalRoleFromName(name string) internalRoleConfiguration {
-	return internalRoleConfiguration{RoleConfiguration: apiv1.RoleConfiguration{Name: name}}
+func newRoleConfigurationAdapterFromName(name string) roleConfigurationAdapter {
+	return roleConfigurationAdapter{RoleConfiguration: apiv1.RoleConfiguration{Name: name}}
 }
 
-// toDatabaseRole converts an internalRoleConfiguration into the equivalent DatabaseRole
+// toDatabaseRole converts the contained apiv1.RoleConfiguration into the equivalent DatabaseRole
 //
 // NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
 // provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
-func (role internalRoleConfiguration) toDatabaseRole() DatabaseRole {
+func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
 	dbRole := DatabaseRole{
 		Name:            role.Name,
 		Comment:         role.Comment,
@@ -130,31 +132,35 @@ func evaluateNextRoleActions(
 		inSpec, isInSpec := roleInSpecNamed[role.Name]
 		switch {
 		case postgres.IsRoleReserved(role.Name):
-			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], newInternalRoleFromName(role.Name))
+			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved],
+				newRoleConfigurationAdapterFromName(role.Name))
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
-			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], newInternalRoleFromName(role.Name))
+			rolesByAction[roleDelete] = append(rolesByAction[roleDelete],
+				newRoleConfigurationAdapterFromName(role.Name))
 		case isInSpec &&
 			(!role.isEquivalentTo(inSpec) ||
 				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
-			internalRole := internalRoleConfiguration{
+			internalRole := roleConfigurationAdapter{
 				RoleConfiguration: inSpec,
 				ignoreValidUntil:  role.hasSameValidUntilAs(inSpec),
 			}
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], internalRole)
 		case isInSpec && !role.hasSameCommentAs(inSpec):
-			internalRole := internalRoleConfiguration{
+			internalRole := roleConfigurationAdapter{
 				RoleConfiguration: inSpec,
 			}
 			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], internalRole)
 		case isInSpec && !role.isInSameRolesAs(inSpec):
-			internalRole := internalRoleConfiguration{
+			internalRole := roleConfigurationAdapter{
 				RoleConfiguration: inSpec,
 			}
 			rolesByAction[roleUpdateMemberships] = append(rolesByAction[roleUpdateMemberships], internalRole)
 		case !isInSpec:
-			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], newInternalRoleFromName(role.Name))
+			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore],
+				newRoleConfigurationAdapterFromName(role.Name))
 		default:
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], newInternalRoleFromName(role.Name))
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled],
+				newRoleConfigurationAdapterFromName(role.Name))
 		}
 	}
 
@@ -164,7 +170,7 @@ func evaluateNextRoleActions(
 		if isInDB {
 			continue // covered by the previous loop
 		}
-		internalRole := internalRoleConfiguration{
+		internalRole := roleConfigurationAdapter{
 			RoleConfiguration: r,
 		}
 		if r.Ensure == apiv1.EnsurePresent {
