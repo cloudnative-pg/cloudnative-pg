@@ -29,18 +29,16 @@ import (
 
 var _ = Describe("getSecrets tests", func() {
 	var (
-		ctx    context.Context
 		client client.WithWatch
 		pooler *apiv1.Pooler
 	)
 
 	BeforeEach(func() {
-		ctx = context.TODO()
 		client, pooler = buildTestEnv()
 	})
 
 	Context("when status is not populated yet", func() {
-		It("should return error", func() {
+		It("should return error", func(ctx context.Context) {
 			pooler.Status.Secrets = nil
 
 			_, err := getSecrets(ctx, client, pooler)
@@ -51,7 +49,7 @@ var _ = Describe("getSecrets tests", func() {
 	})
 
 	Context("when all secrets are found", func() {
-		It("should return secrets without error", func() {
+		It("should return secrets without error", func(ctx context.Context) {
 			res, err := getSecrets(ctx, client, pooler)
 
 			Expect(err).ToNot(HaveOccurred())
@@ -67,7 +65,7 @@ var _ = Describe("getSecrets tests", func() {
 			pooler.Status.Secrets.ServerCA = apiv1.SecretVersion{Name: "nonexistent"}
 		})
 
-		It("should return error", func() {
+		It("should return error", func(ctx context.Context) {
 			_, err := getSecrets(ctx, client, pooler)
 
 			Expect(err).To(HaveOccurred())

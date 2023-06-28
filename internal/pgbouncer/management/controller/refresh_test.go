@@ -71,9 +71,9 @@ var _ = Describe("RefreshConfigurationFiles", func() {
 		})
 	})
 
-	Context("when error occurs while writing file", func() {
+	Context("when given an invalid file path", func() {
 		BeforeEach(func() {
-			files["/invalid/path"] = []byte("content")
+			files["/dev/null"] = []byte("content")
 		})
 
 		It("should return an error", func() {

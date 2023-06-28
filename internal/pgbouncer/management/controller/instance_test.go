@@ -39,7 +39,7 @@ var _ = Describe("PgBouncerInstance", func() {
 	})
 
 	AfterEach(func() {
-		Expect(mock.ExpectationsWereMet()).ToNot(HaveOccurred())
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 
 	Context("when the instance is paused", func() {
