@@ -122,32 +122,31 @@ This configuration will be rejected by the validation webhook.
 
 ### Password expiry, VALID UNTIL
 
-The `VALID UNTIL` role attribute in PostgreSQL controls password expiry.
-By default, roles that are created without `VALID UNTIL`
-specified get NULL by default. This means their password will never expire.
+The `VALID UNTIL` role attribute in PostgreSQL controls password expiry. Roles
+created without `VALID UNTIL` specified get NULL by default, which means their
+password will never expire.
 
-PostgreSQL uses a timestamp type for `VALID UNTIL`, and that includes support
-for the value `'infinity'` indicating the password never expires. Please see
-the [PostgreSQL documentation](https://www.postgresql.org/docs/current/datatype-datetime.html)
+PostgreSQL uses a timestamp type for `VALID UNTIL`, which includes support for
+the value `'infinity'` indicating the password never expires. Please see the
+[PostgreSQL documentation](https://www.postgresql.org/docs/current/datatype-datetime.html)
 for reference.
 
-With declarative role management, the `validUntil` attribute
-for managed roles controls password expiry. `validUntil` can only take a
-Kubernetes timestamp, or be omitted (defaulting to null).
+With declarative role management, the `validUntil` attribute for managed roles
+controls password expiry. `validUntil` can only take a Kubernetes timestamp or
+be omitted (defaulting to null).
 
-For a managed role without `validUntil` specified, the operator will
-ensure the password never expires, mirroring  the behavior of PostgreSQL.
-If the role already existed in the database, and had a NULL value for
-`VALID UNTIL`, that value will be preserved.
-If the role in the database had a timestamp as `VALID UNTIL`, the operator
-will set it to `'infinity'` on reconciliation.
+For a managed role without `validUntil` specified, the operator will ensure the
+password never expires, mirroring the behavior of PostgreSQL. If the role
+already existed in the database and had a NULL value for `VALID UNTIL`, the
+operator will preserve it. If the role in the database had a timestamp as `VALID
+UNTIL`, the operator will set it to `'infinity'` on reconciliation.
 
-A managed role with a `validUntil` timestamp specified will in all cases result
-in a database role with matching `VALID UNTIL`.
+A managed role with a `validUntil` timestamp specified will, in all cases,
+result in a database role with matching `VALID UNTIL`.
 
-A managed role that did not exist previously in the database and does not
-have a `validUntil` set will result in a database role with a NULL
-`VALID UNTIL`, keeping the same default behavior as PostgreSQL.
+A managed role that did not exist previously in the database and did not have a
+`validUntil` set will result in a database role with a NULL `VALID UNTIL`,
+keeping the same default behavior as PostgreSQL.
 
 !!! Warning
     The declarative role management feature has changed behavior since its
