@@ -6,12 +6,13 @@ import (
 	"os"
 	"time"
 
-	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
 // cluster implements the "report cluster" subcommand
@@ -21,8 +22,8 @@ import (
 //   - events in the cluster namespace
 //   - logs from the cluster pods (optional - activated with `includeLogs`)
 //   - logs from the cluster jobs (optional - activated with `includeLogs`)
-func followCluster(ctx context.Context, clusterName, namespace string, format plugin.OutputFormat,
-	file string, includeLogs, logTimeStamp bool, timestamp time.Time,
+func followCluster(ctx context.Context, clusterName, namespace string,
+	logTimeStamp bool, timestamp time.Time,
 ) error {
 	var cluster cnpgv1.Cluster
 	err := plugin.Client.Get(ctx,
@@ -32,13 +33,12 @@ func followCluster(ctx context.Context, clusterName, namespace string, format pl
 		return fmt.Errorf("could not get cluster: %w", err)
 	}
 
-	now := metav1.Now()
 	streamClusterLogs := logs.ClusterStreamingRequest{
 		Cluster: cluster,
 		Options: &v1.PodLogOptions{
 			Timestamps: logTimeStamp,
 			Follow:     true,
-			SinceTime:  &now,
+			SinceTime:  &metav1.Time{Time: timestamp},
 		},
 	}
 	return streamClusterLogs.Stream(ctx, os.Stdout)

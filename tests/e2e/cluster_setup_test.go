@@ -19,7 +19,7 @@ package e2e
 import (
 	"bytes"
 	"fmt"
-	"io"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -57,37 +57,35 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		// Create a cluster in a namespace we'll delete after the test
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		cluster, err := env.GetCluster(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
-		var buf bytes.Buffer
-		go func() {
-			err = logs.TailClusterLogs(context.TODO(), env.Interface, *cluster, &buf, false)
-			if err != nil {
-				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
-			}
-			buf.WriteString("\nXXXXXgoroutine with tail call ended now\n")
-		}()
-		DeferCleanup(func(ctx SpecContext) {
-			By("cleanup: delete cluster, close logs")
-			err := testsUtils.DeleteObject(env, cluster)
-			if err != nil {
-				GinkgoWriter.Printf("XXXX error deleting cluster: %v", err)
-			}
-			specName := CurrentSpecReport().FullText()
-			capLines := 50
-			GinkgoWriter.Printf("DUMPING tailed Cluster Logs (at most %v lines). Failed Spec: %v\n",
-				capLines, specName)
-			GinkgoWriter.Println("================================================================================")
-			io.Copy(GinkgoWriter, &buf)
-			GinkgoWriter.Println("================================================================================")
-		})
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 			return env.DeleteNamespace(namespace)
+		})
+
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		var buf bytes.Buffer
+		GinkgoWriter.Println("Putting Tail on the cluster logs")
+		go func() {
+			err = logs.TailClusterLogs(context.TODO(), env.Interface, *cluster, &buf, false)
+			if err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
+			}
+		}()
+		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().Failed() {
+				specName := CurrentSpecReport().FullText()
+				capLines := 50
+				GinkgoWriter.Printf("DUMPING tailed Cluster Logs (at most %v lines). Failed Spec: %v\n",
+					capLines, specName)
+				GinkgoWriter.Println("================================================================================")
+				saveLogs(&buf, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
+				GinkgoWriter.Println("================================================================================")
+			}
 		})
 
 		By("having three PostgreSQL pods with status ready", func() {
@@ -150,7 +148,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				}
 
 				return int32(-1), nil
-			}, timeout).Should(BeEquivalentTo(restart + 1))
+			}, timeout).Should(BeEquivalentTo(restart + 10))
 
 			Eventually(func() (bool, error) {
 				query = "SELECT * FROM test"

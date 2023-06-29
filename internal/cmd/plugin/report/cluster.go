@@ -45,7 +45,7 @@ func clusterCmd() *cobra.Command {
 			}
 			if follow {
 				return followCluster(cmd.Context(), clusterName, plugin.Namespace,
-					plugin.OutputFormat(output), file, includeLogs, logTimeStamp, now)
+					logTimeStamp, now)
 			}
 			return cluster(cmd.Context(), clusterName, plugin.Namespace,
 				plugin.OutputFormat(output), file, includeLogs, logTimeStamp, now)

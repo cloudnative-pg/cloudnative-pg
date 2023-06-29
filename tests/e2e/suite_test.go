@@ -110,15 +110,15 @@ var _ = SynchronizedAfterSuite(func() {
 }, func() {
 })
 
-// saveOperatorLogs does 2 things:
-//   - displays the last `capLines` of non-DEBUG operator logs on the `output` io.Writer (likely GinkgoWriter)
+// saveLogs does 2 things:
+//   - displays the last `capLines` of non-DEBUG logs on the `output` io.Writer (likely GinkgoWriter)
 //   - saves the full logs to a file
 //
 // along the way it parses the timestamps for convenience, BUT the lines
 // of output are not legal JSON
-func saveOperatorLogs(buf bytes.Buffer, specName string, output io.Writer, capLines int) {
-	scanner := bufio.NewScanner(&buf)
-	filename := "out/operator_logs_" + specName + ".log"
+func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, capLines int) {
+	scanner := bufio.NewScanner(buf)
+	filename := fmt.Sprintf("out/%s_%s.log", logsType, specName)
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
@@ -209,7 +209,7 @@ var _ = BeforeEach(func() {
 			GinkgoWriter.Printf("DUMPING tailed Operator Logs (at most %v lines). Failed Spec: %v\n",
 				capLines, specName)
 			GinkgoWriter.Println("================================================================================")
-			saveOperatorLogs(buf, strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
+			saveLogs(&buf, "operator_logs", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
 			GinkgoWriter.Println("================================================================================")
 		}
 	})

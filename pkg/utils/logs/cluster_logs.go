@@ -90,7 +90,7 @@ func safeWriterFrom(w io.Writer) *safeWriter {
 	}
 }
 
-// activeStreams is goroutine-safe counter of active streams. It is similar
+// activeStreams is a goroutine-safe counter of active streams. It is similar
 // in idea to a WaitGroup, but does not block when we check for zero
 type activeStreams struct {
 	m     sync.Mutex
@@ -121,7 +121,14 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 	var streamSet activeStreams
 	var errChan chan error // so the goroutines streaming can communicate errors
 	defer func() {
-		fmt.Fprintf(writer, "\nClosing cluster log streaming. %d pods streming\n", streamSet.count)
+		// try to cancel the streaming goroutines
+		ctx.Done()
+		if streamSet.count != 0 {
+			contextLogger.Info(
+				fmt.Sprintf("Closing cluster log streaming with %d pods streming", streamSet.count),
+				"cluster", csr.getClusterName(),
+			)
+		}
 	}()
 
 	for {
@@ -143,8 +150,7 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 		}
 
 		for _, pod := range podList.Items {
-			if pod.Labels[utils.ClusterLabelName] != csr.getClusterName() ||
-				pod.Labels[utils.PodRoleLabelName] != "instance" {
+			if pod.Labels[utils.ClusterLabelName] != csr.getClusterName() {
 				continue
 			}
 			if podBeingLogged[pod.Name] {
@@ -152,39 +158,53 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 			}
 			podBeingLogged[pod.Name] = true
 			streamSet.Increment()
-			go func(ctx context.Context, podName string, w io.Writer, errch chan error) {
-				defer func() {
-					streamSet.Decrement()
-				}()
-				pods := client.CoreV1().Pods(csr.getClusterNamespace())
-				logsRequest := pods.GetLogs(
-					podName,
-					csr.getLogOptions())
-				logStream, err := logsRequest.Stream(ctx)
-				if err != nil {
-					errch <- err
-					return
-				}
-				defer func() {
-					innerErr := logStream.Close()
-					if innerErr != nil {
-						errch <- innerErr
-					}
-				}()
-
-				_, err = io.Copy(w, logStream)
-				if err != nil {
-					errch <- err
-					return
-				}
-			}(ctx, pod.Name, safeWriterFrom(writer), errChan)
+			go csr.streamInGoroutine(ctx, pod.Name, safeWriterFrom(writer),
+				client, &streamSet, errChan)
 		}
 		if streamSet.IsZero() {
-			writer.Write([]byte("\n<- EOF ->\n"))
 			return nil
 		}
-		// sleep a bit so we're not in a busy waiting cycle
-		time.Sleep(5 * time.Second)
+		// sleep a bit to avoid busy waiting cycle
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// streamInGoroutine streams a pod's logs to a writer. It is designed
+// to be called as a goroutine, so it uses an error channel to convey errors
+// to the calling routine
+//
+// IMPORTANT: the writer should be goroutine-safe
+func (csr *ClusterStreamingRequest) streamInGoroutine(
+	ctx context.Context,
+	podName string,
+	w io.Writer,
+	client kubernetes.Interface,
+	streamSet *activeStreams,
+	errChan chan error,
+) {
+	defer func() {
+		streamSet.Decrement()
+	}()
+	pods := client.CoreV1().Pods(csr.getClusterNamespace())
+	logsRequest := pods.GetLogs(
+		podName,
+		csr.getLogOptions())
+	logStream, err := logsRequest.Stream(ctx)
+	if err != nil {
+		errChan <- err
+		return
+	}
+	defer func() {
+		innerErr := logStream.Close()
+		if innerErr != nil {
+			errChan <- innerErr
+		}
+	}()
+
+	_, err = io.Copy(w, logStream)
+	if err != nil {
+		errChan <- err
+		return
 	}
 }
 

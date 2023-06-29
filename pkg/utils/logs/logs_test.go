@@ -160,10 +160,6 @@ var _ = Describe("StreamingRequest default options", func() {
 			err := TailClusterLogs(ctx, client, cluster, &logBuffer, true)
 			Expect(err).NotTo(HaveOccurred())
 		}()
-		// calling ctx.Done is not strictly necessary because the fake client
-		// will terminate the pod stream anyway, ending TailPodLogs.
-		// But in "production", TailPodLogs will follow
-		// the pod logs until the context, or the logs, are over
 		ctx.Done()
 		wait.Wait()
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
