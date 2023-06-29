@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -46,20 +48,43 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		}
 	})
 
-	It("sets up a cluster", func() {
+	It("sets up a cluster", func(ctx SpecContext) {
 		const namespacePrefix = "cluster-storageclass-e2e"
 		var err error
 
 		// Create a cluster in a namespace we'll delete after the test
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		var buf bytes.Buffer
+		go func() {
+			// buf.WriteString("ola K ase")
+			// get logs without timestamp parsing; for JSON parseability
+			err = logs.TailClusterLogs(ctx, env.Interface, *cluster, GinkgoWriter, false)
+			if err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
+			}
+			buf.WriteString("\ngoroutine with tail call ended now\n")
+		}()
+		// DeferCleanup(func(ctx SpecContext) {
+		// 	GinkgoWriter.Println("XXXXXX Hello  XXXXXXXXXX")
+		// 	specName := CurrentSpecReport().FullText()
+		// 	capLines := 50
+		// 	GinkgoWriter.Printf("DUMPING tailed Cluster Logs (at most %v lines). Failed Spec: %v\n",
+		// 		capLines, specName)
+		// 	GinkgoWriter.Println("================================================================================")
+		// 	io.Copy(GinkgoWriter, GinkgoWriter)
+		// 	GinkgoWriter.Println("================================================================================")
+		// })
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 			return env.DeleteNamespace(namespace)
 		})
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("having three PostgreSQL pods with status ready", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)

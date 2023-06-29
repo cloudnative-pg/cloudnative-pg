@@ -18,6 +18,7 @@ package logs
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -119,6 +120,9 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 	podBeingLogged := make(map[string]bool)
 	var streamSet activeStreams
 	var errChan chan error
+	defer func() {
+		writer.Write([]byte(fmt.Sprintf("\nXXXXXXCX goodbye cruel world: %d\n", streamSet.count)))
+	}()
 
 	for {
 		podList, err := client.CoreV1().Pods(csr.getPodNamespace()).List(ctx, metav1.ListOptions{})
@@ -149,6 +153,7 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 			go func(ctx context.Context, podName string, w io.Writer, errch chan error) {
 				defer func() {
 					streamSet.Decrement()
+					writer.Write([]byte("\nXXXXtop defer in goroutine\n"))
 				}()
 				pods := client.CoreV1().Pods(csr.getPodNamespace())
 				logsRequest := pods.GetLogs(
@@ -164,8 +169,16 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 					if innerErr != nil {
 						errch <- innerErr
 					}
+					_, lerr := w.Write([]byte("\nXXXXClosing Stream for pod " + podName + "\n"))
+					if lerr != nil {
+						errch <- lerr
+					}
 				}()
 
+				_, lerr := w.Write([]byte("\nXXXXStarting Stream for pod " + podName + "\n"))
+				if lerr != nil {
+					errch <- lerr
+				}
 				_, err = io.Copy(w, logStream)
 				if err != nil {
 					errch <- err
@@ -174,6 +187,7 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 			}(ctx, pod.Name, safeWriterFrom(writer), errChan)
 		}
 		if streamSet.IsZero() {
+			writer.Write([]byte("\nXXXXXXCX Finished with zero streams\n"))
 			return nil
 		}
 		// sleep a bit so we're not in a busy waiting cycle
