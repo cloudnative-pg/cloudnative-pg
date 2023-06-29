@@ -30,6 +30,7 @@ import (
 	"sort"
 
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/sys/unix"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -135,6 +136,7 @@ func (info InitInfo) CreateDataDirectory() error {
 		"initDbOptions", options)
 
 	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
+	_ = os.FileMode(unix.Umask(0o077))
 	err := execlog.RunBuffering(initdbCmd, constants.InitdbName)
 	if err != nil {
 		return fmt.Errorf("error while creating the PostgreSQL instance: %w", err)
