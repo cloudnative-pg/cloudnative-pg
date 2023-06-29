@@ -498,7 +498,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 	It("Password with null and with valid until password", func() {
 		role := apiv1.RoleConfiguration{}
-		dbRole := roleConfigurationAdapter{RoleConfiguration: role, ignoreValidUntil: true}.toDatabaseRole()
+		dbRole := roleConfigurationAdapter{RoleConfiguration: role, validUntilIsSetOnDB: true}.toDatabaseRole()
 		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
 		dbRole.ignorePassword = false
 		Expect(dbRole.password.Valid).To(BeTrue())

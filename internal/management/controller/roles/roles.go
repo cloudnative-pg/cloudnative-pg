@@ -36,7 +36,7 @@ type (
 // to a DatabaseRole. It is capable of handling the various 'VALID UNTIL' field values.
 type roleConfigurationAdapter struct {
 	apiv1.RoleConfiguration
-	ignoreValidUntil bool
+	validUntilIsSetOnDB bool
 }
 
 func newRoleConfigurationAdapterFromName(name string) roleConfigurationAdapter {
@@ -67,7 +67,7 @@ func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
 			Valid: true,
 			Time:  role.ValidUntil.Time,
 		}
-	case role.ValidUntil == nil && !role.ignoreValidUntil:
+	case role.ValidUntil == nil && role.validUntilIsSetOnDB:
 		dbRole.ValidUntil = pgtype.Timestamp{
 			Valid:            true,
 			InfinityModifier: pgtype.Infinity,
@@ -141,8 +141,8 @@ func evaluateNextRoleActions(
 			(!role.isEquivalentTo(inSpec) ||
 				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
 			internalRole := roleConfigurationAdapter{
-				RoleConfiguration: inSpec,
-				ignoreValidUntil:  role.hasSameValidUntilAs(inSpec),
+				RoleConfiguration:   inSpec,
+				validUntilIsSetOnDB: role.ValidUntil.Valid,
 			}
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], internalRole)
 		case isInSpec && !role.hasSameCommentAs(inSpec):
