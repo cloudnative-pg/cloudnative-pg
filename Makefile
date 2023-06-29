@@ -17,7 +17,7 @@
 # Image URL to use all building/pushing image targets
 
 # Prevent e2e tests to proceed with empty tag which
-# will be considered as "latest".
+# will be considered as "latest". test
 ifeq (,$(CONTROLLER_IMG))
 IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
