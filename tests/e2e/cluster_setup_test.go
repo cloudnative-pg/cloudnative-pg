@@ -19,8 +19,10 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"time"
 
+	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -61,24 +63,26 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 
 		var buf bytes.Buffer
 		go func() {
-			// buf.WriteString("ola K ase")
-			// get logs without timestamp parsing; for JSON parseability
-			err = logs.TailClusterLogs(ctx, env.Interface, *cluster, GinkgoWriter, false)
+			err = logs.TailClusterLogs(context.TODO(), env.Interface, *cluster, &buf, false)
 			if err != nil {
 				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
 			}
-			buf.WriteString("\ngoroutine with tail call ended now\n")
+			buf.WriteString("\nXXXXXgoroutine with tail call ended now\n")
 		}()
-		// DeferCleanup(func(ctx SpecContext) {
-		// 	GinkgoWriter.Println("XXXXXX Hello  XXXXXXXXXX")
-		// 	specName := CurrentSpecReport().FullText()
-		// 	capLines := 50
-		// 	GinkgoWriter.Printf("DUMPING tailed Cluster Logs (at most %v lines). Failed Spec: %v\n",
-		// 		capLines, specName)
-		// 	GinkgoWriter.Println("================================================================================")
-		// 	io.Copy(GinkgoWriter, GinkgoWriter)
-		// 	GinkgoWriter.Println("================================================================================")
-		// })
+		DeferCleanup(func(ctx SpecContext) {
+			By("cleanup: delete cluster, close logs")
+			err := testsUtils.DeleteObject(env, cluster)
+			if err != nil {
+				GinkgoWriter.Printf("XXXX error deleting cluster: %v", err)
+			}
+			specName := CurrentSpecReport().FullText()
+			capLines := 50
+			GinkgoWriter.Printf("DUMPING tailed Cluster Logs (at most %v lines). Failed Spec: %v\n",
+				capLines, specName)
+			GinkgoWriter.Println("================================================================================")
+			io.Copy(GinkgoWriter, &buf)
+			GinkgoWriter.Println("================================================================================")
+		})
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")

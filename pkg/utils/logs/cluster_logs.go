@@ -47,7 +47,7 @@ func (csr *ClusterStreamingRequest) getClusterName() string {
 	return csr.Cluster.Name
 }
 
-func (csr *ClusterStreamingRequest) getPodNamespace() string {
+func (csr *ClusterStreamingRequest) getClusterNamespace() string {
 	return csr.Cluster.Namespace
 }
 
@@ -119,30 +119,32 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 	client := csr.getKubernetesClient()
 	podBeingLogged := make(map[string]bool)
 	var streamSet activeStreams
-	var errChan chan error
+	var errChan chan error // so the goroutines streaming can communicate errors
 	defer func() {
-		writer.Write([]byte(fmt.Sprintf("\nXXXXXXCX goodbye cruel world: %d\n", streamSet.count)))
+		fmt.Fprintf(writer, "\nClosing cluster log streaming. %d pods streming\n", streamSet.count)
 	}()
 
 	for {
-		podList, err := client.CoreV1().Pods(csr.getPodNamespace()).List(ctx, metav1.ListOptions{})
+		podList, err := client.CoreV1().Pods(csr.getClusterNamespace()).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
-		if len(podList.Items) == 0 {
-			contextLogger.Warning("no pods found in namespace", "namespace", csr.getPodNamespace())
+		if len(podList.Items) == 0 && streamSet.IsZero() {
+			contextLogger.Warning("no pods to log in namespace", "namespace", csr.getClusterNamespace())
 			return nil
 		}
 
 		select {
 		case routineErr := <-errChan:
-			contextLogger.Error(routineErr, "error in streaming from cluster pod")
-			return routineErr
+			contextLogger.Error(routineErr, "while streaming cluster pod logs",
+				"cluster", csr.getClusterName(),
+				"namespace", csr.getClusterNamespace())
 		default:
 		}
 
 		for _, pod := range podList.Items {
-			if pod.Labels[utils.ClusterLabelName] != csr.getClusterName() {
+			if pod.Labels[utils.ClusterLabelName] != csr.getClusterName() ||
+				pod.Labels[utils.PodRoleLabelName] != "instance" {
 				continue
 			}
 			if podBeingLogged[pod.Name] {
@@ -153,9 +155,8 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 			go func(ctx context.Context, podName string, w io.Writer, errch chan error) {
 				defer func() {
 					streamSet.Decrement()
-					writer.Write([]byte("\nXXXXtop defer in goroutine\n"))
 				}()
-				pods := client.CoreV1().Pods(csr.getPodNamespace())
+				pods := client.CoreV1().Pods(csr.getClusterNamespace())
 				logsRequest := pods.GetLogs(
 					podName,
 					csr.getLogOptions())
@@ -169,16 +170,8 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 					if innerErr != nil {
 						errch <- innerErr
 					}
-					_, lerr := w.Write([]byte("\nXXXXClosing Stream for pod " + podName + "\n"))
-					if lerr != nil {
-						errch <- lerr
-					}
 				}()
 
-				_, lerr := w.Write([]byte("\nXXXXStarting Stream for pod " + podName + "\n"))
-				if lerr != nil {
-					errch <- lerr
-				}
 				_, err = io.Copy(w, logStream)
 				if err != nil {
 					errch <- err
@@ -187,7 +180,7 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 			}(ctx, pod.Name, safeWriterFrom(writer), errChan)
 		}
 		if streamSet.IsZero() {
-			writer.Write([]byte("\nXXXXXXCX Finished with zero streams\n"))
+			writer.Write([]byte("\n<- EOF ->\n"))
 			return nil
 		}
 		// sleep a bit so we're not in a busy waiting cycle
