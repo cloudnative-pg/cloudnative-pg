@@ -188,7 +188,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 				assertUserExists(namespace, primaryPodInfo.Name, appUsername, true)
 
-				query := fmt.Sprintf("SELECT rolcreatedb FROM pg_roles WHERE rolname='%s'", appUsername)
+				query := fmt.Sprintf("SELECT rolcreatedb and rolvaliduntil='infinity' "+
+					"FROM pg_roles WHERE rolname='%s'", appUsername)
 
 				stdout, _, err := env.ExecQueryInInstancePod(
 					utils.PodLocator{
@@ -585,8 +586,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By(fmt.Sprintf("Verify valid until is removed in db for %s", newUserName), func() {
 				Eventually(func() string {
-					query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_authid"+
-						" WHERE rolname='%s' rolvaliduntil is NULL",
+					query := fmt.Sprintf("SELECT rolvaliduntil is NULL FROM pg_catalog.pg_authid"+
+						" WHERE rolname='%s'",
 						newUserName)
 
 					stdout, _, err := env.ExecQueryInInstancePod(
@@ -600,14 +601,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						return ERROR
 					}
 					return stdout
-				}).Should(Equal("1\n"))
+				}).Should(Equal("t\n"))
 			})
 
 			By(fmt.Sprintf("Verify valid until update in db for %s", username), func() {
 				Eventually(func() string {
-					query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_authid "+
-						" WHERE rolname='%s' and rolvaliduntil='%s'",
-						username, newValidUntilString)
+					query := fmt.Sprintf("SELECT rolvaliduntil='%s' FROM pg_catalog.pg_authid "+
+						" WHERE rolname='%s'",
+						newValidUntilString, username)
 
 					stdout, _, err := env.ExecQueryInInstancePod(
 						utils.PodLocator{
@@ -620,7 +621,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						return ERROR
 					}
 					return stdout
-				}, 30).Should(Equal("1\n"))
+				}, 30).Should(Equal("t\n"))
 			})
 		})
 
