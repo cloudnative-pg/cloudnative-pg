@@ -41,7 +41,6 @@ spec:
       ensure: present
       comment: Giovanni Boccaccio
       login: true
-      passwordNeverExpires: true
     - name: app
       createdb: true
       login: true

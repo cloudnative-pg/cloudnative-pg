@@ -68,7 +68,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Name: "mySecret",
 		},
 	}
-	wantedRoleWithPerpetualPass := apiv1.RoleConfiguration{
+	wantedRoleWithoutValidUntil := apiv1.RoleConfiguration{
 		Name:            "foo",
 		BypassRLS:       true,
 		CreateDB:        false,
@@ -108,9 +108,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 
-	wantedRoleWithPerpetualPassExpectedCrtStmt := fmt.Sprintf(
+	wantedRoleWithoutValidUntilExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
-			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD 'myPassword' VALID UNTIL 'infinity'",
+			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD 'myPassword'",
 		wantedRole.Name)
 
 	wantedRoleWithPassDeletionExpectedCrtStmt := fmt.Sprintf(
@@ -281,12 +281,15 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).ToNot(HaveOccurred())
 		prm := NewPostgresRoleManager(db)
 
-		mock.ExpectExec(wantedRoleWithPerpetualPassExpectedCrtStmt).
+		mock.ExpectExec(wantedRoleWithoutValidUntilExpectedCrtStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
-		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPerpetualPass}.toDatabaseRole()
+		dbRole := roleConfigurationAdapter{
+			RoleConfiguration:      wantedRoleWithoutValidUntil,
+			preserveNullValidUntil: true,
+		}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
 		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
@@ -498,7 +501,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 	It("Password with null and with valid until password", func() {
 		role := apiv1.RoleConfiguration{}
-		dbRole := roleConfigurationAdapter{RoleConfiguration: role, validUntilIsSetOnDB: true}.toDatabaseRole()
+		dbRole := roleConfigurationAdapter{RoleConfiguration: role, preserveNullValidUntil: true}.toDatabaseRole()
 		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
 		dbRole.ignorePassword = false
 		Expect(dbRole.password.Valid).To(BeTrue())

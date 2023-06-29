@@ -32,14 +32,20 @@ type (
 	rolesByStatus map[apiv1.RoleStatus][]roleConfigurationAdapter
 )
 
-// roleConfigurationAdapter serves as an intermediary structure used to adapt apiv1.RoleConfiguration
-// to a DatabaseRole. It is capable of handling the various 'VALID UNTIL' field values.
+// roleConfigurationAdapter is an intermediary structure used to adapt a apiv1.RoleConfiguration
+// to a DatabaseRole.
 type roleConfigurationAdapter struct {
 	apiv1.RoleConfiguration
-	validUntilIsSetOnDB bool
+	// preserveNullValidUntil indicates a null `validUntil` on the RoleConfiguration
+	// should not wipe out the existing NULL in Postgres, and should respect the default
+	// NULL on role CREATE.
+	// If false, a null `validUntil` will result in VALID UNTIL 'infinity' in the database.
+	preserveNullValidUntil bool
 }
 
-func newRoleConfigurationAdapterFromName(name string) roleConfigurationAdapter {
+// roleAdapterFromName creates a roleConfigurationAdapter that only has the Name field
+// populated. It is useful for operations such as DELETE or IGNORE that only need the name
+func roleAdapterFromName(name string) roleConfigurationAdapter {
 	return roleConfigurationAdapter{RoleConfiguration: apiv1.RoleConfiguration{Name: name}}
 }
 
@@ -67,7 +73,7 @@ func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
 			Valid: true,
 			Time:  role.ValidUntil.Time,
 		}
-	case role.ValidUntil == nil && role.validUntilIsSetOnDB:
+	case role.ValidUntil == nil && !role.preserveNullValidUntil:
 		dbRole.ValidUntil = pgtype.Timestamp{
 			Valid:            true,
 			InfinityModifier: pgtype.Infinity,
@@ -133,16 +139,16 @@ func evaluateNextRoleActions(
 		switch {
 		case postgres.IsRoleReserved(role.Name):
 			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved],
-				newRoleConfigurationAdapterFromName(role.Name))
+				roleAdapterFromName(role.Name))
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
 			rolesByAction[roleDelete] = append(rolesByAction[roleDelete],
-				newRoleConfigurationAdapterFromName(role.Name))
+				roleAdapterFromName(role.Name))
 		case isInSpec &&
 			(!role.isEquivalentTo(inSpec) ||
 				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
 			internalRole := roleConfigurationAdapter{
-				RoleConfiguration:   inSpec,
-				validUntilIsSetOnDB: role.ValidUntil.Valid,
+				RoleConfiguration:      inSpec,
+				preserveNullValidUntil: !role.ValidUntil.Valid,
 			}
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], internalRole)
 		case isInSpec && !role.hasSameCommentAs(inSpec):
@@ -157,10 +163,10 @@ func evaluateNextRoleActions(
 			rolesByAction[roleUpdateMemberships] = append(rolesByAction[roleUpdateMemberships], internalRole)
 		case !isInSpec:
 			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore],
-				newRoleConfigurationAdapterFromName(role.Name))
+				roleAdapterFromName(role.Name))
 		default:
 			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled],
-				newRoleConfigurationAdapterFromName(role.Name))
+				roleAdapterFromName(role.Name))
 		}
 	}
 
@@ -170,13 +176,14 @@ func evaluateNextRoleActions(
 		if isInDB {
 			continue // covered by the previous loop
 		}
-		internalRole := roleConfigurationAdapter{
-			RoleConfiguration: r,
-		}
 		if r.Ensure == apiv1.EnsurePresent {
+			internalRole := roleConfigurationAdapter{
+				RoleConfiguration:      r,
+				preserveNullValidUntil: true, // copy default Postgres behavior
+			}
 			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], internalRole)
 		} else {
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], internalRole)
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], roleAdapterFromName(r.Name))
 		}
 	}
 

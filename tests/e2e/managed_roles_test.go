@@ -161,7 +161,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					"and rolcreatedb=%v and rolcreaterole=%v and rolinherit=%v and rolreplication=%v "+
 					"and rolbypassrls=%v and rolconnlimit=%v", username, rolCanLoginInSpec, rolSuperInSpec, rolCreateDBInSpec,
 					rolCreateRoleInSpec, rolInheritInSpec, rolReplicationInSpec, rolByPassRLSInSpec, rolConnLimitInSpec)
-				query2 := fmt.Sprintf("SELECT rolvaliduntil='infinity' FROM pg_roles WHERE rolname='%s'", userWithPerpetualPass)
+				query2 := fmt.Sprintf("SELECT rolvaliduntil is NULL FROM pg_roles WHERE rolname='%s'", userWithPerpetualPass)
 
 				for _, q := range []string{query, query2} {
 					stdout, _, err := env.ExecQueryInInstancePod(
@@ -586,7 +586,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By(fmt.Sprintf("Verify valid until is removed in db for %s", newUserName), func() {
 				Eventually(func() string {
 					query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_authid"+
-						" WHERE rolname='%s' and (rolvaliduntil is NULL or rolvaliduntil='infinity')",
+						" WHERE rolname='%s' rolvaliduntil is NULL",
 						newUserName)
 
 					stdout, _, err := env.ExecQueryInInstancePod(
