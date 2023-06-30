@@ -41,7 +41,7 @@ var _ = Describe("Guess the correct version of a postgres image", func() {
 
 	It("can pull the default image", func() {
 		var stderr bytes.Buffer
-		cmd := exec.Command("docker", "pull", versions.DefaultImageName) // #nosec G204
+		cmd := exec.Command("docker", "pull", "-q", versions.DefaultImageName) // #nosec G204
 		cmd.Stderr = &stderr
 		err := cmd.Run()
 		Expect(stderr.String()).To(BeEmpty(), "while pulling "+versions.DefaultImageName)
