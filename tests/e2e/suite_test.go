@@ -111,7 +111,7 @@ var _ = SynchronizedAfterSuite(func() {
 })
 
 // saveLogs does 2 things:
-//   - displays the last `capLines` of non-DEBUG logs on the `output` io.Writer (likely GinkgoWriter)
+//   - displays the last `capLines` of error/warning logs on the `output` io.Writer (likely GinkgoWriter)
 //   - saves the full logs to a file
 //
 // along the way it parses the timestamps for convenience, BUT the lines
@@ -157,7 +157,7 @@ func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, ca
 		}
 
 		// store the latest line of non-DEBUG operator logs to the slice
-		if js["level"] != "debug" {
+		if js["level"] == "warn" || js["level"] == "error" {
 			lineBuffer[bufferIdx] = lg
 			nonDebugLines++
 			// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
@@ -205,8 +205,8 @@ var _ = BeforeEach(func() {
 	DeferCleanup(func(ctx SpecContext) {
 		if CurrentSpecReport().Failed() {
 			specName := CurrentSpecReport().FullText()
-			capLines := 50
-			GinkgoWriter.Printf("DUMPING tailed Operator Logs (at most %v lines). Failed Spec: %v\n",
+			capLines := 10
+			GinkgoWriter.Printf("DUMPING tailed Operator Logs (at most %v lines with error/warning). Failed Spec: %v\n",
 				capLines, specName)
 			GinkgoWriter.Println("================================================================================")
 			saveLogs(&buf, "operator_logs", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)

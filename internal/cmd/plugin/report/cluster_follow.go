@@ -41,5 +41,5 @@ func followCluster(ctx context.Context, clusterName, namespace string,
 			SinceTime:  &metav1.Time{Time: timestamp},
 		},
 	}
-	return streamClusterLogs.Stream(ctx, os.Stdout)
+	return streamClusterLogs.SingleStream(ctx, os.Stdout)
 }

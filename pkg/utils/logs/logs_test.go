@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -148,7 +149,7 @@ var _ = Describe("StreamingRequest default options", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 
-	It("TailClusterLogs defaults to non-zero lines shown if set to zero", func(ctx context.Context) {
+	It("Cluster non-following streaming works", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
 		var logBuffer bytes.Buffer
 		cluster := apiv1.Cluster{}
@@ -157,11 +158,38 @@ var _ = Describe("StreamingRequest default options", func() {
 		go func() {
 			defer GinkgoRecover()
 			defer wait.Done()
-			err := TailClusterLogs(ctx, client, cluster, &logBuffer, true)
+			now := metav1.Now()
+			streamClusterLogs := ClusterStreamingRequest{
+				Cluster: cluster,
+				Options: &v1.PodLogOptions{
+					Timestamps: true,
+					Follow:     false,
+					SinceTime:  &now,
+				},
+				client: client,
+			}
+			err := streamClusterLogs.SingleStream(ctx, &logBuffer)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		ctx.Done()
 		wait.Wait()
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+	})
+
+	It("Cluster Tailing works", func(ctx context.Context) {
+		client := fake.NewSimpleClientset(pod)
+		var logBuffer bytes.Buffer
+		cluster := apiv1.Cluster{}
+		var wait sync.WaitGroup
+		ctx2, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		go func() {
+			defer GinkgoRecover()
+			defer wait.Done()
+			err := TailClusterLogs(ctx2, client, cluster, &logBuffer, true)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		time.Sleep(1 * time.Second)
+		cancel()
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 })

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 	"time"
 
@@ -34,6 +35,10 @@ import (
 )
 
 // ClusterStreamingRequest represents a request to stream a cluster's pod logs
+//
+// If the Follow Option is set to true, streaming will sit in a loop looking
+// for any new / regenerated pods, and will only exit when there are no pods
+// streaming
 type ClusterStreamingRequest struct {
 	Cluster  apiv1.Cluster
 	Options  *v1.PodLogOptions
@@ -90,53 +95,81 @@ func safeWriterFrom(w io.Writer) *safeWriter {
 	}
 }
 
-// activeStreams is a goroutine-safe counter of active streams. It is similar
-// in idea to a WaitGroup, but does not block when we check for zero
-type activeStreams struct {
-	m     sync.Mutex
-	count int
+// activeSet is a goroutine-safe store of active processes. It is similar
+// in idea to a WaitGroup, but does not block when we check for zero, and it
+// also keeps a name for each active process to avoid duplication
+type activeSet struct {
+	m   sync.Mutex
+	wg  sync.WaitGroup
+	set map[string]bool
 }
 
-func (ww *activeStreams) Increment() {
+func newActiveSet() *activeSet {
+	return &activeSet{
+		set: make(map[string]bool),
+	}
+}
+
+// add name as an active process
+func (ww *activeSet) add(name string) {
+	ww.wg.Add(1)
 	ww.m.Lock()
 	defer ww.m.Unlock()
-	ww.count++
+	ww.set[name] = true
 }
 
-func (ww *activeStreams) Decrement() {
+// has returns true if and only if name is active
+func (ww *activeSet) has(name string) bool {
+	_, found := ww.set[name]
+	return found
+}
+
+// drop takes a name out of the active set
+func (ww *activeSet) drop(name string) {
+	ww.wg.Done()
 	ww.m.Lock()
 	defer ww.m.Unlock()
-	ww.count--
+	delete(ww.set, name)
 }
 
-func (ww *activeStreams) IsZero() bool {
-	return ww.count == 0
+// isZero checks if there are any active processes
+func (ww *activeSet) isZero() bool {
+	return len(ww.set) == 0
 }
 
-// Stream streams the cluster's pod logs and shunts them to the `writer`.
-func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer) (err error) {
+// wait blocks until there are no active processes
+func (ww *activeSet) wait() {
+	ww.wg.Wait()
+}
+
+// SingleStream streams the cluster's pod logs and shunts them to a single io.Writer
+func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.Writer) error {
 	contextLogger := log.FromContext(ctx)
 	client := csr.getKubernetesClient()
-	podBeingLogged := make(map[string]bool)
-	var streamSet activeStreams
+	streamSet := newActiveSet()
 	var errChan chan error // so the goroutines streaming can communicate errors
 	defer func() {
 		// try to cancel the streaming goroutines
 		ctx.Done()
-		if streamSet.count != 0 {
-			contextLogger.Info(
-				fmt.Sprintf("Closing cluster log streaming with %d pods streming", streamSet.count),
-				"cluster", csr.getClusterName(),
-			)
-		}
 	}()
+	isFirstScan := true
 
 	for {
-		podList, err := client.CoreV1().Pods(csr.getClusterNamespace()).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return err
+		var (
+			podList *v1.PodList
+			err     error
+		)
+		if isFirstScan || csr.Options.Follow {
+			podList, err = client.CoreV1().Pods(csr.getClusterNamespace()).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			isFirstScan = false
+		} else {
+			streamSet.wait()
+			return nil
 		}
-		if len(podList.Items) == 0 && streamSet.IsZero() {
+		if len(podList.Items) == 0 && streamSet.isZero() {
 			contextLogger.Warning("no pods to log in namespace", "namespace", csr.getClusterNamespace())
 			return nil
 		}
@@ -153,15 +186,14 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 			if pod.Labels[utils.ClusterLabelName] != csr.getClusterName() {
 				continue
 			}
-			if podBeingLogged[pod.Name] {
+			if streamSet.has(pod.Name) {
 				continue
 			}
-			podBeingLogged[pod.Name] = true
-			streamSet.Increment()
-			go csr.streamInGoroutine(ctx, pod.Name, safeWriterFrom(writer),
-				client, &streamSet, errChan)
+			streamSet.add(pod.Name)
+			go csr.streamInGoroutine(ctx, pod.Name, client, streamSet,
+				safeWriterFrom(writer), safeWriterFrom(os.Stderr))
 		}
-		if streamSet.IsZero() {
+		if streamSet.isZero() {
 			return nil
 		}
 		// sleep a bit to avoid busy waiting cycle
@@ -177,40 +209,43 @@ func (csr *ClusterStreamingRequest) Stream(ctx context.Context, writer io.Writer
 func (csr *ClusterStreamingRequest) streamInGoroutine(
 	ctx context.Context,
 	podName string,
-	w io.Writer,
 	client kubernetes.Interface,
-	streamSet *activeStreams,
-	errChan chan error,
+	streamSet *activeSet,
+	w io.Writer,
+	safeStderr io.Writer,
 ) {
 	defer func() {
-		streamSet.Decrement()
+		streamSet.drop(podName)
 	}()
+
 	pods := client.CoreV1().Pods(csr.getClusterNamespace())
 	logsRequest := pods.GetLogs(
 		podName,
 		csr.getLogOptions())
+
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
-		errChan <- err
+		_, _ = fmt.Fprintf(safeStderr, "error on streaming request, pod %s: %v", podName, err)
 		return
 	}
 	defer func() {
 		innerErr := logStream.Close()
 		if innerErr != nil {
-			errChan <- innerErr
+			_, _ = fmt.Fprintf(safeStderr, "error closing streaming request, pod %s: %v", podName, err)
 		}
 	}()
 
 	_, err = io.Copy(w, logStream)
 	if err != nil {
-		errChan <- err
+		_, _ = fmt.Fprintf(safeStderr, "error sending logs to writer, pod %s: %v", podName, err)
 		return
 	}
 }
 
-// TailClusterLogs streams the cluster pod logs starting from the current time, and keeps
-// waiting for any new pods, and any new logs, until the  context is cancelled
-// by the calling process
+// TailClusterLogs streams the cluster pod logs to a single output io.Writer,
+// starting from the current time, and watching for any new pods, and any new logs,
+// until the  context is cancelled or there are no pods left.
+//
 // If `parseTimestamps` is true, the log line will have the timestamp in
 // human-readable prepended. NOTE: this will make log-lines NON-JSON
 func TailClusterLogs(
@@ -219,7 +254,7 @@ func TailClusterLogs(
 	cluster apiv1.Cluster,
 	writer io.Writer,
 	parseTimestamps bool,
-) (err error) {
+) error {
 	now := metav1.Now()
 	streamClusterLogs := ClusterStreamingRequest{
 		Cluster: cluster,
@@ -230,5 +265,5 @@ func TailClusterLogs(
 		},
 		client: client,
 	}
-	return streamClusterLogs.Stream(ctx, writer)
+	return streamClusterLogs.SingleStream(ctx, writer)
 }

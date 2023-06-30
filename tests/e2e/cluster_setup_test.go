@@ -79,8 +79,8 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		DeferCleanup(func(ctx SpecContext) {
 			if CurrentSpecReport().Failed() {
 				specName := CurrentSpecReport().FullText()
-				capLines := 50
-				GinkgoWriter.Printf("DUMPING tailed Cluster Logs (at most %v lines). Failed Spec: %v\n",
+				capLines := 10
+				GinkgoWriter.Printf("DUMPING tailed Cluster Logs (at most %v lines with error/warning). Failed Spec: %v\n",
 					capLines, specName)
 				GinkgoWriter.Println("================================================================================")
 				saveLogs(&buf, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
