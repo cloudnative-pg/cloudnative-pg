@@ -111,35 +111,35 @@ func newActiveSet() *activeSet {
 }
 
 // add name as an active process
-func (ww *activeSet) add(name string) {
-	ww.wg.Add(1)
-	ww.m.Lock()
-	defer ww.m.Unlock()
-	ww.set[name] = true
+func (as *activeSet) add(name string) {
+	as.wg.Add(1)
+	as.m.Lock()
+	defer as.m.Unlock()
+	as.set[name] = true
 }
 
 // has returns true if and only if name is active
-func (ww *activeSet) has(name string) bool {
-	_, found := ww.set[name]
+func (as *activeSet) has(name string) bool {
+	_, found := as.set[name]
 	return found
 }
 
 // drop takes a name out of the active set
-func (ww *activeSet) drop(name string) {
-	ww.wg.Done()
-	ww.m.Lock()
-	defer ww.m.Unlock()
-	delete(ww.set, name)
+func (as *activeSet) drop(name string) {
+	as.wg.Done()
+	as.m.Lock()
+	defer as.m.Unlock()
+	delete(as.set, name)
 }
 
 // isZero checks if there are any active processes
-func (ww *activeSet) isZero() bool {
-	return len(ww.set) == 0
+func (as *activeSet) isZero() bool {
+	return len(as.set) == 0
 }
 
 // wait blocks until there are no active processes
-func (ww *activeSet) wait() {
-	ww.wg.Wait()
+func (as *activeSet) wait() {
+	as.wg.Wait()
 }
 
 // SingleStream streams the cluster's pod logs and shunts them to a single io.Writer
@@ -202,16 +202,15 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 }
 
 // streamInGoroutine streams a pod's logs to a writer. It is designed
-// to be called as a goroutine, so it uses an error channel to convey errors
-// to the calling routine
+// to be called as a goroutine. It sends errors to an error writer.
 //
-// IMPORTANT: the writer should be goroutine-safe
+// IMPORTANT: the writers should be goroutine-safe
 func (csr *ClusterStreamingRequest) streamInGoroutine(
 	ctx context.Context,
 	podName string,
 	client kubernetes.Interface,
 	streamSet *activeSet,
-	w io.Writer,
+	output io.Writer,
 	safeStderr io.Writer,
 ) {
 	defer func() {
@@ -235,7 +234,7 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 		}
 	}()
 
-	_, err = io.Copy(w, logStream)
+	_, err = io.Copy(output, logStream)
 	if err != nil {
 		_, _ = fmt.Fprintf(safeStderr, "error sending logs to writer, pod %s: %v", podName, err)
 		return
