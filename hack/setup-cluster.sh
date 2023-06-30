@@ -445,7 +445,7 @@ load_image_registry() {
 
   local image_local_name=${image/${registry_name}/127.0.0.1}
   docker tag "${image}" "${image_local_name}"
-  docker push "${image_local_name}"
+  docker push -q "${image_local_name}"
 }
 
 load_image() {
