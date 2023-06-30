@@ -80,7 +80,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			if CurrentSpecReport().Failed() {
 				specName := CurrentSpecReport().FullText()
 				capLines := 10
-				GinkgoWriter.Printf("DUMPING tailed Cluster Logs (at most %v lines with error/warning). Failed Spec: %v\n",
+				GinkgoWriter.Printf("DUMPING tailed Cluster Logs with error/warning (at most %v lines). Failed Spec: %v\n",
 					capLines, specName)
 				GinkgoWriter.Println("================================================================================")
 				saveLogs(&buf, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)

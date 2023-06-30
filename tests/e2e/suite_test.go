@@ -37,6 +37,7 @@ import (
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -137,8 +138,8 @@ func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, ca
 
 	// circular buffer to hold the last `capLines` of non-DEBUG operator logs
 	lineBuffer := make([]string, capLines)
-	// count of non-DEBUG operator log lines read
-	nonDebugLines := 0
+	// count of lines to be shown in Ginkgo console (error or warning logs)
+	linesToShow := 0
 	// insertion point in the lineBuffer: values 0 to capLines - 1 (i.e. modulo capLines)
 	bufferIdx := 0
 
@@ -156,22 +157,28 @@ func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, ca
 			lg = ts.Format(time.Stamp) + " - " + lg
 		}
 
-		// store the latest line of non-DEBUG operator logs to the slice
-		if js["level"] == "warning" || js["level"] == "error" {
+		// store the latest line of error or warning log to the slice
+
+		if js["level"] == log.WarningLevelString || js["level"] == log.ErrorLevelString {
 			lineBuffer[bufferIdx] = lg
-			nonDebugLines++
+			linesToShow++
 			// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
-			bufferIdx = nonDebugLines % capLines
+			bufferIdx = linesToShow % capLines
 		}
 		// write every line to the file stream
 		fmt.Fprintln(f, lg)
 	}
 
 	// print the last `capLines` lines of logs to the `output`
-	if nonDebugLines <= capLines || bufferIdx == 0 {
+	switch {
+	case linesToShow == 0:
+		fmt.Fprintln(output, "-- no error / warning logs --")
+	case linesToShow <= capLines:
+		fmt.Fprintln(output, strings.Join(lineBuffer[:linesToShow], "\n"))
+	case bufferIdx == 0:
 		// if bufferIdx == 0, the buffer just finished filling and is in order
 		fmt.Fprintln(output, strings.Join(lineBuffer, "\n"))
-	} else {
+	default:
 		// the line buffer cycled back and the items 0 to bufferIdx - 1 are newer than the rest
 		fmt.Fprintln(output, strings.Join(append(lineBuffer[bufferIdx:], lineBuffer[:bufferIdx]...), "\n"))
 	}
@@ -206,7 +213,7 @@ var _ = BeforeEach(func() {
 		if CurrentSpecReport().Failed() {
 			specName := CurrentSpecReport().FullText()
 			capLines := 10
-			GinkgoWriter.Printf("DUMPING tailed Operator Logs (at most %v lines with error/warning). Failed Spec: %v\n",
+			GinkgoWriter.Printf("DUMPING tailed Operator Logs with error/warning (at most %v lines ). Failed Spec: %v\n",
 				capLines, specName)
 			GinkgoWriter.Println("================================================================================")
 			saveLogs(&buf, "operator_logs", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
