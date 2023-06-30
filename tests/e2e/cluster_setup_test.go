@@ -18,11 +18,11 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 

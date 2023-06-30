@@ -724,10 +724,12 @@ The logs will be displayed in the terminal's standard-out.
 This command will only exit when the cluster has no more pods left, or when it
 is interrupted by the user.
 
-If `logs` is called without the `-f` option, it will write the logs from all
-cluster pods until the time of invocation, and then exit.
+If `logs` is called without the `-f` option, it will read the logs from all
+cluster pods until the time of invocation and display them in the terminal's
+standard-out, then exit.
 The `-F` or `--File` flag can be provided, to specify the name
-of the file where the logs should be saved.
+of the file where the logs should be saved, instead of displaying over
+standard-out.
 
 NOTE: unlike other `cnpg` plugin commands, the `-f` is used to denote "follow"
 rather than specify a file. This keeps with the convention of `kubectl logs`,

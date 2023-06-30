@@ -60,11 +60,11 @@ func followCluster(ctx context.Context, clusterName, namespace string,
 	return streamClusterLogs.SingleStream(ctx, os.Stdout)
 }
 
-// saveClusterLogs will tail all pods in the cluster, and will watch for any
-// new pods
+// saveClusterLogs will tail all pods in the cluster, and read their logs
+// until the present time, then exit.
 //
-// It will write lines to standard-out, and will only return when there are
-// no pods left, or it is interrupted by the user
+// It will write lines to standard-out, or to a file if the `file` argument
+// is provided.
 func saveClusterLogs(ctx context.Context, clusterName, namespace string,
 	logTimeStamp bool, file string,
 ) error {

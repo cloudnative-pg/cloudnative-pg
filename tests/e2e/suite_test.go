@@ -19,6 +19,7 @@ package e2e
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,7 +32,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/thoas/go-funk"
-	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
