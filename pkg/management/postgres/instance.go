@@ -243,6 +243,20 @@ func (instance *Instance) RoleSynchronizerChan() <-chan *apiv1.ManagedConfigurat
 	return instance.roleSynchronizerChan
 }
 
+// VerifyPgDataCoherence checks the PGDATA is correctly configured in terms
+// of file rights and users
+func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Debug("Checking PGDATA coherence")
+
+	if err := fileutils.EnsurePgDataPerms(instance.PgData); err != nil {
+		return err
+	}
+
+	return WritePostgresUserMaps(instance.PgData)
+}
+
 // InstanceCommand are commands for the goroutine managing postgres
 type InstanceCommand string
 

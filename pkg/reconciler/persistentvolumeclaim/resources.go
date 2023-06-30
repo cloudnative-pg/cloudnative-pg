@@ -139,11 +139,7 @@ func (e *expectedPVC) toCreateConfiguration(
 		NodeSerial: serial,
 		Role:       e.role,
 		Storage:    storage,
-	}
-
-	if source != nil {
-		cc.Source = source
-		cc.Status = StatusReady
+		Source:     source,
 	}
 
 	return cc

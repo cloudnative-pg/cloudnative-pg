@@ -519,6 +519,57 @@ replica through a technique known as *cold backup*, by fencing the standby
 before taking a physical copy of the volumes. For details, please refer to
 ["Snapshotting a Postgres cluster"](#snapshotting-a-postgres-cluster).
 
+### Point-in-Time Recovery (PITR) from `VolumeSnapshot` Objects
+
+You can perform a Point-in-Time Recovery (PITR) on a cluster being restored from a `VolumeSnapshot`.
+This process requires specific configurations in the `.spec.recovery` section of the `Cluster` object.
+
+For a successful PITR, the `Cluster` resource must include:
+
+- The `.spec.recovery.volumeSnapshots` section, as described in the previous section.
+- The `.spec.recovery.source` and the `.spec.externalClusters` sections.
+These are used to fetch the Write-Ahead Log (WAL) archives necessary for the PITR.
+- The `.spec.recovery.recoveryTarget` section, which specifies the `targetTime` for the recovery.
+
+Here's an example configuration:
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-snapshot
+spec:
+  # ...
+  bootstrap:
+    recovery:
+      source: cluster-example-with-backup
+      volumeSnapshots:
+        storage:
+          name: test-snapshot-1
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+      recoveryTarget:
+        targetTime: "2023-07-06T08:00:39"
+  externalClusters:
+    - name: cluster-example-with-backup
+      barmanObjectStore:
+        destinationPath: s3://backups/
+        endpointURL: http://minio:9000
+        s3Credentials:
+          accessKeyId:
+            name: minio
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: minio
+            key: ACCESS_SECRET_KEY
+      connectionParameters:
+        host: cluster-example-with-backup-rw.main.svc
+        user: postgres
+        dbname: postgres
+      password:
+        name: cluster-example-with-backup-superuser
+        key: password
+```
+
 #### Additional considerations
 
 Whether you recover from a recovery object store or an existing `Backup`

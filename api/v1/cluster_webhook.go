@@ -813,15 +813,6 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 
 	recoveryPath := field.NewPath("spec", "bootstrap", "recovery")
 	recoverySection := r.Spec.Bootstrap.Recovery
-	if recoverySection.Source != "" {
-		return field.ErrorList{
-			field.Invalid(
-				recoveryPath.Child("dataSource"),
-				r.Spec.Bootstrap.Recovery.VolumeSnapshots,
-				"Recovery from dataSource is not compatible with other types of recovery"),
-		}
-	}
-
 	if recoverySection.Backup != nil {
 		return field.ErrorList{
 			field.Invalid(
@@ -832,14 +823,6 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 	}
 
 	result := validateVolumeSnapshotSource(recoverySection.VolumeSnapshots.Storage, recoveryPath.Child("storage"))
-	if recoverySection.RecoveryTarget != nil {
-		result = append(
-			result,
-			field.Invalid(
-				recoveryPath.Child("recoveryTarget"),
-				r.Spec.Bootstrap.Recovery.RecoveryTarget,
-				"A recovery target cannot be set while recovering from a DataSource"))
-	}
 
 	if recoverySection.VolumeSnapshots.WalStorage != nil && r.Spec.WalStorage == nil {
 		walStoragePath := recoveryPath.Child("dataSource", "walStorage")

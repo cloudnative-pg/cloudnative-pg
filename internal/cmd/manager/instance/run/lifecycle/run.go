@@ -25,7 +25,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -41,7 +40,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 
 	go func() {
 		defer close(errChan)
-		err := verifyPgDataCoherence(ctx, i.instance)
+		err := i.instance.VerifyPgDataCoherence(ctx)
 		if err != nil {
 			errChan <- err
 			return
@@ -245,18 +244,4 @@ func configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, tx *sql.Tx
 	}
 
 	return nil
-}
-
-// verifyPgDataCoherence checks the PGDATA is correctly configured in terms
-// of file rights and users
-func verifyPgDataCoherence(ctx context.Context, instance *postgres.Instance) error {
-	contextLogger := log.FromContext(ctx)
-
-	contextLogger.Debug("Checking PGDATA coherence")
-
-	if err := fileutils.EnsurePgDataPerms(instance.PgData); err != nil {
-		return err
-	}
-
-	return postgres.WritePostgresUserMaps(instance.PgData)
 }
