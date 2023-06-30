@@ -148,7 +148,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				}
 
 				return int32(-1), nil
-			}, timeout).Should(BeEquivalentTo(restart + 10))
+			}, timeout).Should(BeEquivalentTo(restart + 1))
 
 			Eventually(func() (bool, error) {
 				query = "SELECT * FROM test"

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package report
+package logs
 
 import (
 	"time"
@@ -26,35 +26,33 @@ import (
 
 func clusterCmd() *cobra.Command {
 	var (
-		file, output              string
-		includeLogs, logTimeStamp bool
+		file                 string
+		logTimeStamp, follow bool
 	)
-
-	const filePlaceholder = "report_cluster_<name>_<timestamp>.zip"
 
 	cmd := &cobra.Command{
 		Use:   "cluster <clusterName>",
-		Short: "Report cluster resources, pods, events, logs (opt-in)",
-		Long:  "Collects combined information on the cluster in a Zip file",
+		Short: "Logs for cluster's pods",
+		Long:  "Collects the logs for all pods in a cluster into a single stream or file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			now := time.Now().UTC()
-			if file == filePlaceholder {
-				file = reportName("cluster", now, clusterName) + ".zip"
+			if follow {
+				return followCluster(cmd.Context(), clusterName, plugin.Namespace,
+					logTimeStamp, now)
 			}
-			return cluster(cmd.Context(), clusterName, plugin.Namespace,
-				plugin.OutputFormat(output), file, includeLogs, logTimeStamp, now)
+			return saveClusterLogs(cmd.Context(), clusterName, plugin.Namespace,
+				logTimeStamp, file)
 		},
 	}
 
-	cmd.Flags().StringVarP(&file, "file", "f", filePlaceholder,
+	cmd.Flags().StringVarP(&file, "File", "F", "",
 		"Output file")
-	cmd.Flags().StringVarP(&output, "output", "o", "yaml",
-		"Output format for manifests (yaml or json)")
-	cmd.Flags().BoolVarP(&includeLogs, "logs", "l", false, "include logs")
 	cmd.Flags().BoolVarP(&logTimeStamp, "timestamps", "t", false,
 		"Prepend human-readable timestamp to each log line")
+	cmd.Flags().BoolVarP(&follow, "follow", "f", false,
+		"Follow cluster logs (watches for new and re-created pods)")
 
 	return cmd
 }
