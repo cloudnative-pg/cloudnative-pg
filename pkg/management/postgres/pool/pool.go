@@ -28,6 +28,18 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+// Pooler represents an interface for a connection pooler.
+// It exposes functionalities for retrieving a connection, obtaining the Data Source Name (DSN),
+// and shutting down all active connections.
+type Pooler interface {
+	// Connection gets the connection for the given database
+	Connection(dbname string) (*sql.DB, error)
+	// GetDsn returns the connection string for a given database
+	GetDsn(dbname string) string
+	// ShutdownConnections closes every database connection
+	ShutdownConnections()
+}
+
 // ConnectionPool is a repository of DB connections, pointing to the same instance
 // given a base DSN without the "dbname" parameter
 type ConnectionPool struct {

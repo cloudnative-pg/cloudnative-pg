@@ -61,7 +61,7 @@ type pgBouncerInstance struct {
 
 	// This is the connection pool used to connect to pgbouncer
 	// using the administrative user and the administrative database
-	pool *pool.ConnectionPool
+	pool pool.Pooler
 }
 
 // Paused returns whether the pgbouncerInstance is paused or not, thread safe
