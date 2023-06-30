@@ -307,7 +307,9 @@ deploy_fluentd() {
   local FLUENTD_IMAGE=fluent/fluentd-kubernetes-daemonset:v1.14.3-debian-forward-1.0
   local FLUENTD_LOCAL_IMAGE="${registry_name}:5000/fluentd-kubernetes-daemonset:local"
 
-  docker pull "${FLUENTD_IMAGE}"
+  docker manifest inspect "${FLUENTD_IMAGE}" | \
+    jq -r '.manifests[].platform | .os + "/" + .architecture' | \
+    xargs -t -r -I X docker pull -q --platform=X "${FLUENTD_IMAGE}"
   docker tag "${FLUENTD_IMAGE}" "${FLUENTD_LOCAL_IMAGE}"
   load_image "${CLUSTER_NAME}" "${FLUENTD_LOCAL_IMAGE}"
 
@@ -377,7 +379,7 @@ load_image_registry() {
 
   local image_local_name=${image/${registry_name}/127.0.0.1}
   docker tag "${image}" "${image_local_name}"
-  docker push "${image_local_name}"
+  docker push -q "${image_local_name}"
 }
 
 load_image() {
