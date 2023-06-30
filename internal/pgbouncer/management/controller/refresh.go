@@ -36,8 +36,8 @@ func refreshConfigurationFiles(files config.ConfigurationFiles) (bool, error) {
 		}
 		if changedFile {
 			log.Info("updated configuration file", "name", fileName)
+			changed = true
 		}
-		changed = changed || changedFile
 	}
 
 	return changed, nil

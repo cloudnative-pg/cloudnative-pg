@@ -18,25 +18,19 @@ package infrastructure
 
 import (
 	"context"
-	"database/sql"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
-
-// pooler is an internal interface to pass a connection pooler to NewPostgresManager
-type pooler interface {
-	Connection(dbname string) (*sql.DB, error)
-	GetDsn(dbname string) string
-}
 
 // PostgresManager is a Manager for a database instance
 type PostgresManager struct {
-	pool pooler
+	pool pool.Pooler
 }
 
 // NewPostgresManager returns an implementation of Manager for postgres
-func NewPostgresManager(pool pooler) Manager {
+func NewPostgresManager(pool pool.Pooler) Manager {
 	return PostgresManager{
 		pool: pool,
 	}
