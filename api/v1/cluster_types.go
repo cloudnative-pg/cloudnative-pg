@@ -1126,7 +1126,7 @@ type BootstrapRecovery struct {
 	// The external cluster whose backup we will restore. This is also
 	// used as the name of the folder under which the backup is stored,
 	// so it must be set to the name of the source cluster
-	// Mutually exclusive with `backup` and `volumeSnapshots`.
+	// Mutually exclusive with `backup`.
 	Source string `json:"source,omitempty"`
 
 	// The static PVC data source(s) from which to initiate the
@@ -1136,7 +1136,7 @@ type BootstrapRecovery struct {
 	// a cold backup copy on a fenced Postgres instance (limitation
 	// which will be removed in the future when online backup
 	// will be implemented).
-	// Mutually exclusive with `backup` and `source`.
+	// Mutually exclusive with `backup`.
 	VolumeSnapshots *DataSource `json:"volumeSnapshots,omitempty"`
 
 	// By default, the recovery process applies all the available
