@@ -157,7 +157,7 @@ func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, ca
 		}
 
 		// store the latest line of non-DEBUG operator logs to the slice
-		if js["level"] == "warn" || js["level"] == "error" {
+		if js["level"] == "warning" || js["level"] == "error" {
 			lineBuffer[bufferIdx] = lg
 			nonDebugLines++
 			// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
