@@ -287,8 +287,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 		dbRole := roleConfigurationAdapter{
-			RoleConfiguration:      wantedRoleWithoutValidUntil,
-			preserveNullValidUntil: true,
+			RoleConfiguration: wantedRoleWithoutValidUntil,
 		}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
@@ -501,7 +500,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 	It("Password with null and with valid until password", func() {
 		role := apiv1.RoleConfiguration{}
-		dbRole := roleConfigurationAdapter{RoleConfiguration: role, preserveNullValidUntil: true}.toDatabaseRole()
+		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
 		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
 		dbRole.ignorePassword = false
 		Expect(dbRole.password.Valid).To(BeTrue())

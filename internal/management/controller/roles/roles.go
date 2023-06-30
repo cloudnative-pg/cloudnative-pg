@@ -36,11 +36,11 @@ type (
 // to a DatabaseRole.
 type roleConfigurationAdapter struct {
 	apiv1.RoleConfiguration
-	// preserveNullValidUntil indicates a null `validUntil` on the RoleConfiguration
-	// should not wipe out the existing NULL in Postgres, and should respect the default
-	// NULL on role CREATE.
-	// If false, a null `validUntil` will result in VALID UNTIL 'infinity' in the database.
-	preserveNullValidUntil bool
+	// validUntilNullIsInfinity indicates a null `validUntil` on the RoleConfiguration
+	// should be translated in VALID UNTIL 'infinity' in the database.
+	// This is needed because in Postgres you cannot restore a NULL value in the VALID UNTIL
+	// field once you changed it.
+	validUntilNullIsInfinity bool
 }
 
 // roleAdapterFromName creates a roleConfigurationAdapter that only has the Name field
@@ -73,7 +73,7 @@ func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
 			Valid: true,
 			Time:  role.ValidUntil.Time,
 		}
-	case role.ValidUntil == nil && !role.preserveNullValidUntil:
+	case role.ValidUntil == nil && role.validUntilNullIsInfinity:
 		dbRole.ValidUntil = pgtype.Timestamp{
 			Valid:            true,
 			InfinityModifier: pgtype.Infinity,
@@ -147,8 +147,8 @@ func evaluateNextRoleActions(
 			(!role.isEquivalentTo(inSpec) ||
 				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
 			internalRole := roleConfigurationAdapter{
-				RoleConfiguration:      inSpec,
-				preserveNullValidUntil: !role.ValidUntil.Valid,
+				RoleConfiguration:        inSpec,
+				validUntilNullIsInfinity: role.ValidUntil.Valid,
 			}
 			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], internalRole)
 		case isInSpec && !role.hasSameCommentAs(inSpec):
@@ -178,8 +178,7 @@ func evaluateNextRoleActions(
 		}
 		if r.Ensure == apiv1.EnsurePresent {
 			internalRole := roleConfigurationAdapter{
-				RoleConfiguration:      r,
-				preserveNullValidUntil: true, // copy default Postgres behavior
+				RoleConfiguration: r,
 			}
 			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], internalRole)
 		} else {
