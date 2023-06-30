@@ -293,6 +293,9 @@ jobs:
             branch_name=$(gh pr view "${{ github.event.issue.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
           fi
 
+          # extract tag from branch name
+          tag_name=$(echo "$branch_name" | sed 's/[^a-zA-Z0-9]/-/g')
+
           upload_artifacts=false
           if [[ ${branch_name} == main || ${branch_name} =~ ^release- ]]; then
             upload_artifacts=true
@@ -309,6 +312,7 @@ jobs:
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
           echo "author_email=${author_email}" >> $GITHUB_OUTPUT
           echo "branch_name=${branch_name}" >> $GITHUB_OUTPUT
+          echo "tag_name=${tag_name,,}" >> $GITHUB_OUTPUT
           echo "upload_artifacts=${upload_artifacts}" >> $GITHUB_OUTPUT
       -
         name: Set GoReleaser environment
@@ -359,8 +363,7 @@ jobs:
         with:
           images: ${{ env.IMAGES }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
+            type=raw,value=${{ steps.build-meta.outputs.tag_name }}
       -
         name: Detect platforms
         run: |
