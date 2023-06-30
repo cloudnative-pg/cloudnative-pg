@@ -229,8 +229,8 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 		return
 	}
 	defer func() {
-		innerErr := logStream.Close()
-		if innerErr != nil {
+		err := logStream.Close()
+		if err != nil {
 			_, _ = fmt.Fprintf(safeStderr, "error closing streaming request, pod %s: %v", podName, err)
 		}
 	}()
