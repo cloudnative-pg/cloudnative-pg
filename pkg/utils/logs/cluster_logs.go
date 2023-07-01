@@ -147,7 +147,6 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 	contextLogger := log.FromContext(ctx)
 	client := csr.getKubernetesClient()
 	streamSet := newActiveSet()
-	var errChan chan error // so the goroutines streaming can communicate errors
 	defer func() {
 		// try to cancel the streaming goroutines
 		ctx.Done()
@@ -172,14 +171,6 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 		if len(podList.Items) == 0 && streamSet.isZero() {
 			contextLogger.Warning("no pods to log in namespace", "namespace", csr.getClusterNamespace())
 			return nil
-		}
-
-		select {
-		case routineErr := <-errChan:
-			contextLogger.Error(routineErr, "while streaming cluster pod logs",
-				"cluster", csr.getClusterName(),
-				"namespace", csr.getClusterNamespace())
-		default:
 		}
 
 		for _, pod := range podList.Items {
