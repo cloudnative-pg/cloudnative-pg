@@ -18,9 +18,8 @@ package logs
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"os"
+	"log"
 	"sync"
 	"time"
 
@@ -30,7 +29,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -157,7 +155,6 @@ func (as *activeSet) wait() {
 
 // SingleStream streams the cluster's pod logs and shunts them to a single io.Writer
 func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.Writer) error {
-	contextLogger := log.FromContext(ctx)
 	client := csr.getKubernetesClient()
 	streamSet := newActiveSet()
 	defer func() {
@@ -182,7 +179,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 			return nil
 		}
 		if len(podList.Items) == 0 && streamSet.isZero() {
-			contextLogger.Warning("no pods to log in namespace", "namespace", csr.getClusterNamespace())
+			log.Printf("no pods to log in namespace %s", csr.getClusterNamespace())
 			return nil
 		}
 
@@ -195,7 +192,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 			}
 			streamSet.add(pod.Name)
 			go csr.streamInGoroutine(ctx, pod.Name, client, streamSet,
-				safeWriterFrom(writer), safeWriterFrom(os.Stderr))
+				safeWriterFrom(writer))
 		}
 		if streamSet.isZero() {
 			return nil
@@ -206,16 +203,16 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 }
 
 // streamInGoroutine streams a pod's logs to a writer. It is designed
-// to be called as a goroutine. It sends errors to an error writer.
+// to be called as a goroutine.
 //
-// IMPORTANT: the writers should be goroutine-safe
+// IMPORTANT: the output writer should be goroutine-safe
+// NOTE: the default Go `log` package is used for logging because it's goroutine-safe
 func (csr *ClusterStreamingRequest) streamInGoroutine(
 	ctx context.Context,
 	podName string,
 	client kubernetes.Interface,
 	streamSet *activeSet,
 	output io.Writer,
-	safeStderr io.Writer,
 ) {
 	defer func() {
 		streamSet.drop(podName)
@@ -228,19 +225,19 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
-		_, _ = fmt.Fprintf(safeStderr, "error on streaming request, pod %s: %v", podName, err)
+		log.Printf("error on streaming request, pod %s: %v", podName, err)
 		return
 	}
 	defer func() {
 		err := logStream.Close()
 		if err != nil {
-			_, _ = fmt.Fprintf(safeStderr, "error closing streaming request, pod %s: %v", podName, err)
+			log.Printf("error closing streaming request, pod %s: %v", podName, err)
 		}
 	}()
 
 	_, err = io.Copy(output, logStream)
 	if err != nil {
-		_, _ = fmt.Fprintf(safeStderr, "error sending logs to writer, pod %s: %v", podName, err)
+		log.Printf("error sending logs to writer, pod %s: %v", podName, err)
 		return
 	}
 }
