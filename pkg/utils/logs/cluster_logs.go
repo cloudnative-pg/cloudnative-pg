@@ -34,15 +34,20 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// DefaultFollowWaiting is the default time the cluster streaming should
+// wait before searching again for new cluster pods
+const DefaultFollowWaiting time.Duration = 1 * time.Second
+
 // ClusterStreamingRequest represents a request to stream a cluster's pod logs
 //
 // If the Follow Option is set to true, streaming will sit in a loop looking
 // for any new / regenerated pods, and will only exit when there are no pods
 // streaming
 type ClusterStreamingRequest struct {
-	Cluster  apiv1.Cluster
-	Options  *v1.PodLogOptions
-	Previous bool `json:"previous,omitempty"`
+	Cluster       apiv1.Cluster
+	Options       *v1.PodLogOptions
+	Previous      bool `json:"previous,omitempty"`
+	FollowWaiting time.Duration
 	// NOTE: the client argument may be omitted, but it is good practice to pass it
 	// Importantly, it makes the logging functions testable
 	client kubernetes.Interface
@@ -73,6 +78,14 @@ func (csr *ClusterStreamingRequest) getKubernetesClient() kubernetes.Interface {
 	csr.client = kubernetes.NewForConfigOrDie(conf)
 
 	return csr.client
+}
+
+func (csr *ClusterStreamingRequest) getFollowWaitingTime() time.Duration {
+	if csr.FollowWaiting > 0 {
+		return csr.FollowWaiting
+	}
+
+	return DefaultFollowWaiting
 }
 
 // safeWriter is an io.Writer that is safe for concurrent use. It guarantees
@@ -187,8 +200,8 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 		if streamSet.isZero() {
 			return nil
 		}
-		// sleep a bit to avoid busy waiting cycle
-		time.Sleep(2 * time.Second)
+		// wait before looking for new pods to log
+		time.Sleep(csr.getFollowWaitingTime())
 	}
 }
 
@@ -253,7 +266,8 @@ func TailClusterLogs(
 			Follow:     true,
 			SinceTime:  &now,
 		},
-		client: client,
+		FollowWaiting: DefaultFollowWaiting,
+		client:        client,
 	}
 	return streamClusterLogs.SingleStream(ctx, writer)
 }

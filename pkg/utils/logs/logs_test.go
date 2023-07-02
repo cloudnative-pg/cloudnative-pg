@@ -27,12 +27,13 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("StreamingRequest default options", func() {
+var _ = Describe("Pod logging tests", func() {
 	podNamespace := "pod-test"
 	podName := "pod-name-test"
 	pod := &v1.Pod{
@@ -128,7 +129,7 @@ var _ = Describe("StreamingRequest default options", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 
-	It("TailPodLogs defaults to non-zero lines shown if set to zero", func() {
+	It("can follow pod logs", func() {
 		client := fake.NewSimpleClientset(pod)
 		var logBuffer bytes.Buffer
 		ctx := context.TODO()
@@ -148,23 +149,38 @@ var _ = Describe("StreamingRequest default options", func() {
 		wait.Wait()
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
+})
 
-	It("Cluster non-following streaming works", func(ctx context.Context) {
+var _ = Describe("Cluster logging tests", func() {
+	clusterNamespace := "cluster-test"
+	clusterName := "myTestCluster"
+	cluster := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: clusterNamespace,
+			Name:      clusterName,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: clusterNamespace,
+			Name:      clusterName + "-1",
+			Labels: map[string]string{
+				utils.ClusterLabelName: clusterName,
+			},
+		},
+	}
+	It("should exit on ended pod logs with the non-follow option", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
 		var logBuffer bytes.Buffer
-		cluster := apiv1.Cluster{}
 		var wait sync.WaitGroup
 		wait.Add(1)
 		go func() {
 			defer GinkgoRecover()
 			defer wait.Done()
-			now := metav1.Now()
 			streamClusterLogs := ClusterStreamingRequest{
 				Cluster: cluster,
 				Options: &v1.PodLogOptions{
-					Timestamps: true,
-					Follow:     false,
-					SinceTime:  &now,
+					Follow: false,
 				},
 				client: client,
 			}
@@ -176,20 +192,30 @@ var _ = Describe("StreamingRequest default options", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 
-	It("Cluster Tailing works", func(ctx context.Context) {
+	It("should catch extra logs if given the follow option", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
 		var logBuffer bytes.Buffer
-		cluster := apiv1.Cluster{}
-		var wait sync.WaitGroup
-		ctx2, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		// let's set a short follow-wait, and keep the cluster streaming for two
+		// cycles
+		followWaiting := 200 * time.Millisecond
+		ctx2, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
-			defer wait.Done()
-			err := TailClusterLogs(ctx2, client, cluster, &logBuffer, true)
+			streamClusterLogs := ClusterStreamingRequest{
+				Cluster: cluster,
+				Options: &v1.PodLogOptions{
+					Follow: true,
+				},
+				FollowWaiting: followWaiting,
+				client:        client,
+			}
+			err := streamClusterLogs.SingleStream(ctx2, &logBuffer)
 			Expect(err).NotTo(HaveOccurred())
 		}()
-		time.Sleep(1 * time.Second)
+		// give the stream call time to do a new search for pods
+		time.Sleep(350 * time.Millisecond)
 		cancel()
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+		// the fake pod will be seen twice
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logsfake logs"))
 	})
 })
