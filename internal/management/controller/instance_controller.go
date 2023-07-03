@@ -892,7 +892,7 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 		return err
 	}
 
-	if !status.PendingRestart {
+	if status == nil || !status.PendingRestart {
 		// Everything fine
 		return nil
 	}
