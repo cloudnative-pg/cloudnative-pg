@@ -120,15 +120,44 @@ NOTE: it is considered an error to set both `passwordSecret` and
 `disablePassword` on a given role.
 This configuration will be rejected by the validation webhook.
 
+### Password expiry, `VALID UNTIL`
+
+The `VALID UNTIL` role attribute in PostgreSQL controls password expiry. Roles
+created without `VALID UNTIL` specified get NULL by default in PostgreSQL,
+meaning that their password will never expire.
+
+PostgreSQL uses a timestamp type for `VALID UNTIL`, which includes support for
+the value `'infinity'` indicating that the password never expires. Please see the
+[PostgreSQL documentation](https://www.postgresql.org/docs/current/datatype-datetime.html)
+for reference.
+
+With declarative role management, the `validUntil` attribute for managed roles
+controls password expiry. `validUntil` can only take:
+
+- a Kubernetes timestamp, or
+- be omitted (defaulting to `null`)
+
+In the first case, the given `validUntil` timestamp will be set in the database
+as the `VALID UNTIL` attribute of the role.
+
+In the second case (omitted `validUntil`) the operator will ensure password
+never expires, mirroring the behavior of PostgreSQL. Specifically:
+
+- in case of new role, it will omit the `VALID UNTIL` clause in the role
+  creation statement
+- in case of existing role, it will set `VALID UNTIL` to `infinity` if `VALID
+  UNTIL` was not set to `NULL` in the database (this is due to PostgreSQL not
+  allowing `VALID UNTIL NULL` in the `ALTER ROLE` SQL statement)
+
 !!! Warning
     The declarative role management feature has changed behavior since its
     initial version (1.20.0). In 1.20.0, a role without a `passwordSecret` would
     lead to setting the password to NULL in PostgreSQL.
     In practice there is little difference from 1.20.0.
-    New roles created without `passwordSecret` will have a NULL password.
+    New roles created without `passwordSecret` will have a `NULL` password.
     The relevant change is when using the managed roles to manage roles that
     had been previously created. In 1.20.0, doing this might inadvertently
-    result in setting existing passwords to NULL.
+    result in setting existing passwords to `NULL`.
 
 ## Unrealizable role configurations
 

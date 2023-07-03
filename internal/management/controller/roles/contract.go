@@ -21,7 +21,8 @@ import (
 	"database/sql"
 	"reflect"
 	"sort"
-	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -30,21 +31,21 @@ import (
 // The password management in the apiv1.RoleConfiguration assumes the use of Secrets,
 // so cannot cleanly be mapped to Postgres
 type DatabaseRole struct {
-	Name            string         `json:"name"`
-	Comment         string         `json:"comment,omitempty"`
-	Superuser       bool           `json:"superuser,omitempty"`
-	CreateDB        bool           `json:"createdb,omitempty"`
-	CreateRole      bool           `json:"createrole,omitempty"`
-	Inherit         bool           `json:"inherit,omitempty"` // defaults to true
-	Login           bool           `json:"login,omitempty"`
-	Replication     bool           `json:"replication,omitempty"`
-	BypassRLS       bool           `json:"bypassrls,omitempty"`       // Row-Level Security
-	ConnectionLimit int64          `json:"connectionLimit,omitempty"` // default is -1
-	ValidUntil      *time.Time     `json:"validUntil,omitempty"`
-	InRoles         []string       `json:"inRoles,omitempty"`
-	password        sql.NullString `json:"-"`
-	ignorePassword  bool           `json:"-"`
-	transactionID   int64          `json:"-"`
+	Name            string           `json:"name"`
+	Comment         string           `json:"comment,omitempty"`
+	Superuser       bool             `json:"superuser,omitempty"`
+	CreateDB        bool             `json:"createdb,omitempty"`
+	CreateRole      bool             `json:"createrole,omitempty"`
+	Inherit         bool             `json:"inherit,omitempty"` // defaults to true
+	Login           bool             `json:"login,omitempty"`
+	Replication     bool             `json:"replication,omitempty"`
+	BypassRLS       bool             `json:"bypassrls,omitempty"`       // Row-Level Security
+	ConnectionLimit int64            `json:"connectionLimit,omitempty"` // default is -1
+	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
+	InRoles         []string         `json:"inRoles,omitempty"`
+	password        sql.NullString   `json:"-"`
+	ignorePassword  bool             `json:"-"`
+	transactionID   int64            `json:"-"`
 }
 
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
@@ -75,14 +76,10 @@ func (d *DatabaseRole) isInSameRolesAs(inSpec apiv1.RoleConfiguration) bool {
 }
 
 func (d *DatabaseRole) hasSameValidUntilAs(inSpec apiv1.RoleConfiguration) bool {
-	if inSpec.ValidUntil == nil && d.ValidUntil == nil {
-		return true
+	if inSpec.ValidUntil == nil {
+		return !d.ValidUntil.Valid || d.ValidUntil.InfinityModifier == pgtype.Infinity
 	}
-	if inSpec.ValidUntil != nil && d.ValidUntil != nil {
-		return d.ValidUntil.Equal(inSpec.ValidUntil.Time)
-	}
-
-	return false
+	return d.ValidUntil.Valid && d.ValidUntil.Time.Equal(inSpec.ValidUntil.Time)
 }
 
 // isEquivalentTo checks a subset of the attributes of roles in DB and Spec
@@ -123,36 +120,6 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	}
 
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
-}
-
-// roleFromSpec converts an apiv1.RoleConfiguration into the equivalent DatabaseRole
-//
-// NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
-// provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
-func roleFromSpec(role apiv1.RoleConfiguration) DatabaseRole {
-	dbRole := DatabaseRole{
-		Name:            role.Name,
-		Comment:         role.Comment,
-		Superuser:       role.Superuser,
-		CreateDB:        role.CreateDB,
-		CreateRole:      role.CreateRole,
-		Inherit:         role.GetRoleInherit(),
-		Login:           role.Login,
-		Replication:     role.Replication,
-		BypassRLS:       role.BypassRLS,
-		ConnectionLimit: role.ConnectionLimit,
-		InRoles:         role.InRoles,
-	}
-	if role.ValidUntil != nil {
-		dbRole.ValidUntil = &role.ValidUntil.Time
-	}
-	switch {
-	case role.PasswordSecret == nil && !role.DisablePassword:
-		dbRole.ignorePassword = true
-	case role.PasswordSecret == nil && role.DisablePassword:
-		dbRole.password = sql.NullString{}
-	}
-	return dbRole
 }
 
 // RoleManager abstracts the functionality of reconciling with PostgreSQL roles

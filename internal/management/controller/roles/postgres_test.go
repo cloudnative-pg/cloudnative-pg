@@ -26,6 +26,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -50,6 +51,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		ValidUntil:      &validUntil,
 		InRoles:         []string{"pg_monitoring"},
 	}
+	internalWantedRole := roleConfigurationAdapter{RoleConfiguration: wantedRole}
+
 	wantedRoleWithPass := apiv1.RoleConfiguration{
 		Name:            "foo",
 		BypassRLS:       true,
@@ -60,6 +63,20 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		ConnectionLimit: 2,
 		Comment:         "this user is a test",
 		ValidUntil:      &validUntil,
+		InRoles:         []string{"pg_monitoring"},
+		PasswordSecret: &apiv1.LocalObjectReference{
+			Name: "mySecret",
+		},
+	}
+	wantedRoleWithoutValidUntil := apiv1.RoleConfiguration{
+		Name:            "foo",
+		BypassRLS:       true,
+		CreateDB:        false,
+		CreateRole:      true,
+		Login:           true,
+		Inherit:         &falseValue,
+		ConnectionLimit: 2,
+		Comment:         "this user is a test",
 		InRoles:         []string{"pg_monitoring"},
 		PasswordSecret: &apiv1.LocalObjectReference{
 			Name: "mySecret",
@@ -91,6 +108,11 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD 'myPassword' VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
 
+	wantedRoleWithoutValidUntilExpectedCrtStmt := fmt.Sprintf(
+		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
+			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD 'myPassword'",
+		wantedRole.Name)
+
 	wantedRoleWithPassDeletionExpectedCrtStmt := fmt.Sprintf(
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD NULL VALID UNTIL '2100-01-01 00:00:00Z'",
@@ -113,7 +135,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
 			FROM pg_auth_members GROUP BY member
 		) mem ON member = oid
-		WHERE rolname not like 'pg_%'`
+		WHERE rolname not like 'pg\_%'`
 
 	expectedMembershipStmt := `SELECT mem.inroles 
 		FROM pg_catalog.pg_authid as auth
@@ -139,12 +161,22 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
 				nil, false, []byte("This is postgres user"), 11, []byte("{}")).
 			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
-				testDate, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`))
+				pgtype.Timestamp{
+					Valid:            true,
+					Time:             testDate,
+					InfinityModifier: pgtype.Finite,
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`)).
+			AddRow("future_man", false, false, true, true, false, true, 10, []byte("54321"),
+				pgtype.Timestamp{
+					Valid:            true,
+					Time:             time.Time{},
+					InfinityModifier: pgtype.Infinity,
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`))
 		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rows)
 		mock.ExpectExec("CREATE ROLE foo").WillReturnResult(sqlmock.NewResult(11, 1))
 		roles, err := prm.List(ctx)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(roles).To(HaveLen(2))
+		Expect(roles).To(HaveLen(3))
 		password1 := sql.NullString{
 			Valid:  true,
 			String: "12345",
@@ -163,7 +195,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Replication:     false,
 			BypassRLS:       false,
 			ConnectionLimit: -1,
-			ValidUntil:      nil,
+			ValidUntil:      pgtype.Timestamp{},
 			Comment:         "This is postgres user",
 			password:        password1,
 			transactionID:   11,
@@ -178,7 +210,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			Replication:     true,
 			BypassRLS:       false,
 			ConnectionLimit: 10,
-			ValidUntil:      &testDate,
+			ValidUntil:      pgtype.Timestamp{Valid: true, Time: testDate},
 			Comment:         "This is streaming_replica user",
 			password:        password2,
 			transactionID:   22,
@@ -197,7 +229,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectQuery(expectedSelStmt).WillReturnError(dbError)
 		roles, err := prm.List(ctx)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(BeEquivalentTo(dbError))
+		Expect(err.Error()).To(BeEquivalentTo("while listing DB roles for DRM: Kaboom"))
 		Expect(roles).To(BeEmpty())
 	})
 	// Testing Create
@@ -211,7 +243,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
-		err = prm.Create(ctx, roleFromSpec(wantedRole))
+		err = prm.Create(ctx, internalWantedRole.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 	It("Create will return error if there is a problem creating the role in the DB", func(ctx context.Context) {
@@ -223,7 +255,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleExpectedCrtStmt).
 			WillReturnError(dbError)
 
-		err = prm.Create(ctx, roleFromSpec(wantedRole))
+		err = prm.Create(ctx, internalWantedRole.toDatabaseRole())
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Unwrap(err)).To(BeEquivalentTo(dbError))
 	})
@@ -237,7 +269,26 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
-		dbRole := roleFromSpec(wantedRoleWithPass)
+		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
+		// In this unit test we are not testing the retrieval of secrets, so let's
+		// fetch the password content by hand
+		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		err = prm.Create(ctx, dbRole)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+	It("Create will send a correct CREATE with perpetual password to the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		mock.ExpectExec(wantedRoleWithoutValidUntilExpectedCrtStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+
+		mock.ExpectExec(wantedRoleCommentStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+		dbRole := roleConfigurationAdapter{
+			RoleConfiguration: wantedRoleWithoutValidUntil,
+		}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
 		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
@@ -254,7 +305,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
-		err = prm.Create(ctx, roleFromSpec(wantedRoleWithPassDeletion))
+		err = prm.Create(ctx,
+			roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPassDeletion}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 	// Testing Delete
@@ -266,7 +318,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(unWantedRoleExpectedDelStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
 
-		err = prm.Delete(ctx, roleFromSpec(unWantedRole))
+		err = prm.Delete(ctx, roleConfigurationAdapter{RoleConfiguration: unWantedRole}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 	It("Delete will return error if there is a problem deleting the role in the DB", func(ctx context.Context) {
@@ -278,7 +330,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(unWantedRoleExpectedDelStmt).
 			WillReturnError(dbError)
 
-		err = prm.Delete(ctx, roleFromSpec(unWantedRole))
+		err = prm.Delete(ctx, roleConfigurationAdapter{RoleConfiguration: unWantedRole}.toDatabaseRole())
 		Expect(err).To(HaveOccurred())
 		coreErr := errors.Unwrap(err)
 		Expect(coreErr).To(BeEquivalentTo(dbError))
@@ -291,7 +343,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectExec(wantedRoleExpectedAltStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
-		err = prm.Update(ctx, roleFromSpec(wantedRole))
+		err = prm.Update(ctx, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 	It("Update will return error if there is a problem updating the role in the DB", func(ctx context.Context) {
@@ -303,7 +355,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleExpectedAltStmt).
 			WillReturnError(dbError)
 
-		err = prm.Update(ctx, roleFromSpec(wantedRole))
+		err = prm.Update(ctx, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, dbError)).To(BeTrue())
 	})
@@ -316,7 +368,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnResult(sqlmock.NewResult(2, 3))
-		err = prm.UpdateComment(ctx, roleFromSpec(wantedRole))
+		err = prm.UpdateComment(ctx, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 
@@ -329,7 +381,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectExec(wantedRoleCommentStmt).
 			WillReturnError(dbError)
 
-		err = prm.UpdateComment(ctx, roleFromSpec(wantedRole))
+		err = prm.UpdateComment(ctx, roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole())
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, dbError)).To(BeTrue())
 	})
@@ -448,7 +500,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 	It("Password with null and with valid until password", func() {
 		role := apiv1.RoleConfiguration{}
-		dbRole := roleFromSpec(role)
+		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
 		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
 		dbRole.ignorePassword = false
 		Expect(dbRole.password.Valid).To(BeTrue())
@@ -469,7 +521,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		validUntil := metav1.Date(2100, 0o1, 0o1, 0o1, 0o1, 0o0, 0o0, time.UTC)
 		role.ValidUntil = &validUntil
 
-		dbRole := roleFromSpec(role)
+		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
 		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
 		dbRole.ignorePassword = false
 		appendPasswordOption(dbRole, &queryValidUntil)
@@ -483,7 +535,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 
 		rows := mock.NewRows([]string{"xmin"})
 		lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
-		dbRole := roleFromSpec(wantedRole)
+		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole()
 
 		mock.ExpectQuery(lastTransactionQuery).WillReturnError(errors.New("Kaboom"))
 		_, err = prm.GetLastTransactionID(context.TODO(), dbRole)

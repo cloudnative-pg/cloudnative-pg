@@ -18,6 +18,9 @@ package roles
 
 import (
 	"context"
+	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -25,9 +28,65 @@ import (
 )
 
 type (
-	rolesByAction map[roleAction][]apiv1.RoleConfiguration
-	rolesByStatus map[apiv1.RoleStatus][]apiv1.RoleConfiguration
+	rolesByAction map[roleAction][]roleConfigurationAdapter
+	rolesByStatus map[apiv1.RoleStatus][]roleConfigurationAdapter
 )
+
+// roleConfigurationAdapter is an intermediary structure used to adapt a apiv1.RoleConfiguration
+// to a DatabaseRole.
+type roleConfigurationAdapter struct {
+	apiv1.RoleConfiguration
+	// validUntilNullIsInfinity indicates a null `validUntil` on the RoleConfiguration
+	// should be translated in VALID UNTIL 'infinity' in the database.
+	// This is needed because in Postgres you cannot restore a NULL value in the VALID UNTIL
+	// field once you changed it.
+	validUntilNullIsInfinity bool
+}
+
+// roleAdapterFromName creates a roleConfigurationAdapter that only has the Name field
+// populated. It is useful for operations such as DELETE or IGNORE that only need the name
+func roleAdapterFromName(name string) roleConfigurationAdapter {
+	return roleConfigurationAdapter{RoleConfiguration: apiv1.RoleConfiguration{Name: name}}
+}
+
+// toDatabaseRole converts the contained apiv1.RoleConfiguration into the equivalent DatabaseRole
+//
+// NOTE: for passwords, the default behavior, if the RoleConfiguration does not either
+// provide a PasswordSecret or explicitly set DisablePassword, is to IGNORE the password
+func (role roleConfigurationAdapter) toDatabaseRole() DatabaseRole {
+	dbRole := DatabaseRole{
+		Name:            role.Name,
+		Comment:         role.Comment,
+		Superuser:       role.Superuser,
+		CreateDB:        role.CreateDB,
+		CreateRole:      role.CreateRole,
+		Inherit:         role.GetRoleInherit(),
+		Login:           role.Login,
+		Replication:     role.Replication,
+		BypassRLS:       role.BypassRLS,
+		ConnectionLimit: role.ConnectionLimit,
+		InRoles:         role.InRoles,
+	}
+	switch {
+	case role.ValidUntil != nil:
+		dbRole.ValidUntil = pgtype.Timestamp{
+			Valid: true,
+			Time:  role.ValidUntil.Time,
+		}
+	case role.ValidUntil == nil && role.validUntilNullIsInfinity:
+		dbRole.ValidUntil = pgtype.Timestamp{
+			Valid:            true,
+			InfinityModifier: pgtype.Infinity,
+		}
+	}
+	switch {
+	case role.PasswordSecret == nil && !role.DisablePassword:
+		dbRole.ignorePassword = true
+	case role.PasswordSecret == nil && role.DisablePassword:
+		dbRole.password = sql.NullString{}
+	}
+	return dbRole
+}
 
 // convertToRolesByStatus gets the status of every role in the Spec and/or in the DB
 func (r rolesByAction) convertToRolesByStatus() rolesByStatus {
@@ -79,21 +138,35 @@ func evaluateNextRoleActions(
 		inSpec, isInSpec := roleInSpecNamed[role.Name]
 		switch {
 		case postgres.IsRoleReserved(role.Name):
-			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved], apiv1.RoleConfiguration{Name: role.Name})
+			rolesByAction[roleIsReserved] = append(rolesByAction[roleIsReserved],
+				roleAdapterFromName(role.Name))
 		case isInSpec && inSpec.Ensure == apiv1.EnsureAbsent:
-			rolesByAction[roleDelete] = append(rolesByAction[roleDelete], apiv1.RoleConfiguration{Name: role.Name})
+			rolesByAction[roleDelete] = append(rolesByAction[roleDelete],
+				roleAdapterFromName(role.Name))
 		case isInSpec &&
 			(!role.isEquivalentTo(inSpec) ||
 				role.passwordNeedsUpdating(lastPasswordState, latestSecretResourceVersion)):
-			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], inSpec)
+			internalRole := roleConfigurationAdapter{
+				RoleConfiguration:        inSpec,
+				validUntilNullIsInfinity: role.ValidUntil.Valid,
+			}
+			rolesByAction[roleUpdate] = append(rolesByAction[roleUpdate], internalRole)
 		case isInSpec && !role.hasSameCommentAs(inSpec):
-			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], inSpec)
+			internalRole := roleConfigurationAdapter{
+				RoleConfiguration: inSpec,
+			}
+			rolesByAction[roleSetComment] = append(rolesByAction[roleSetComment], internalRole)
 		case isInSpec && !role.isInSameRolesAs(inSpec):
-			rolesByAction[roleUpdateMemberships] = append(rolesByAction[roleUpdateMemberships], inSpec)
+			internalRole := roleConfigurationAdapter{
+				RoleConfiguration: inSpec,
+			}
+			rolesByAction[roleUpdateMemberships] = append(rolesByAction[roleUpdateMemberships], internalRole)
 		case !isInSpec:
-			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore], apiv1.RoleConfiguration{Name: role.Name})
+			rolesByAction[roleIgnore] = append(rolesByAction[roleIgnore],
+				roleAdapterFromName(role.Name))
 		default:
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], apiv1.RoleConfiguration{Name: role.Name})
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled],
+				roleAdapterFromName(role.Name))
 		}
 	}
 
@@ -104,9 +177,12 @@ func evaluateNextRoleActions(
 			continue // covered by the previous loop
 		}
 		if r.Ensure == apiv1.EnsurePresent {
-			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], r)
+			internalRole := roleConfigurationAdapter{
+				RoleConfiguration: r,
+			}
+			rolesByAction[roleCreate] = append(rolesByAction[roleCreate], internalRole)
 		} else {
-			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], r)
+			rolesByAction[roleIsReconciled] = append(rolesByAction[roleIsReconciled], roleAdapterFromName(r.Name))
 		}
 	}
 

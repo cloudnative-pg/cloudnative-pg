@@ -4,6 +4,11 @@ metadata:
   name: cluster-example-with-roles
 spec:
   instances: 1 # this feature only requires a primary
+  imageName: "${POSTGRES_IMG}"
+  bootstrap:
+    initdb:
+      postInitApplicationSQL:
+      - ALTER ROLE app VALID UNTIL 'infinity'
 
   storage:
     size: 1Gi
@@ -29,9 +34,13 @@ spec:
         name: cluster-example-dante
     - name: petrarca
       ensure: present
-      comment: Dante Alighieri
+      comment: Francesco Petrarca
       inRoles:
         - foobar
+    - name:  boccaccio
+      ensure: present
+      comment: Giovanni Boccaccio
+      login: true
     - name: app
       createdb: true
       login: true
