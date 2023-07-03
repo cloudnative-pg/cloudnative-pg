@@ -19,6 +19,7 @@ env:
   GOLANG_VERSION: "1.20.x"
   GOLANGCI_LINT_VERSION: "v1.53"
   KUBEBUILDER_VERSION: "2.3.1"
+  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
 
 defaults:
   run:
@@ -40,7 +41,7 @@ jobs:
           - release-1.20
     steps:
       - name: Invoke workflow with inputs
-        uses: benc-uk/workflow-dispatch@v121
+        uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: continuous-integration
           ref: ${{ matrix.branch }}
@@ -345,7 +346,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-      packages: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -372,6 +373,16 @@ jobs:
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
+          echo "PUSH=false" >> $GITHUB_ENV
+
+      - name: Check PR label conditions
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          build_label=$(gh pr view "${{ github.event.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "always push images" || :)
+          if [ -n "${build_label}" ]; then PUSH=true; fi
+          echo "PUSH=${PUSH}" >> $GITHUB_ENV
 
       - name: Set GoReleaser environment
         run: |
@@ -393,7 +404,7 @@ jobs:
         id: docker-meta
         uses: docker/metadata-action@v4
         with:
-          images: cloudnative-pg/cloudnative-pg
+          images: ${{ env.CNPG_IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -414,12 +425,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build and load
+      - name: Login to ghcr.io
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and eventually push
         uses: docker/build-push-action@v4
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
-          push: false
+          push: ${{ env.PUSH }}
           build-args: |
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
