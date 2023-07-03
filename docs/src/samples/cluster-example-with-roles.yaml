@@ -11,6 +11,7 @@ spec:
     roles:
     - name: app
       createdb: true
+      login: true
     - name: dante
       ensure: present
       comment: my database-side comment

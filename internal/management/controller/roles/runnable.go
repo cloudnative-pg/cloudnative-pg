@@ -125,6 +125,11 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("reconciling managed roles")
 
+	if sr.instance.IsServerHealthy() != nil {
+		contextLog.Debug("database not ready, skipping roles reconciling")
+		return nil
+	}
+
 	superUserDB, err := sr.instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while reconciling managed roles: %w", err)
@@ -160,7 +165,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	return sr.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(&remoteCluster))
 }
 
-func getRoleNames(roles []apiv1.RoleConfiguration) []string {
+func getRoleNames(roles []roleConfigurationAdapter) []string {
 	names := make([]string, len(roles))
 	for i, role := range roles {
 		names[i] = role.Name
@@ -253,15 +258,15 @@ func (sr *RoleSynchronizer) applyRoleActions(
 				}
 				handleRoleError(err, role.Name, action)
 			case roleDelete:
-				err := roleManager.Delete(ctx, roleFromSpec(role))
+				err := roleManager.Delete(ctx, role.toDatabaseRole())
 				handleRoleError(err, role.Name, action)
 			case roleSetComment:
 				// NOTE: adding/updating a comment on a role does not alter its TransactionID
-				err := roleManager.UpdateComment(ctx, roleFromSpec(role))
+				err := roleManager.UpdateComment(ctx, role.toDatabaseRole())
 				handleRoleError(err, role.Name, action)
 			case roleUpdateMemberships:
 				// NOTE: revoking / granting to a role does not alter its TransactionID
-				dbRole := roleFromSpec(role)
+				dbRole := role.toDatabaseRole()
 				grants, revokes, err := getRoleMembershipDiff(ctx, roleManager, role, dbRole)
 				if err != nil {
 					contextLog.Error(err, "while performing "+string(action), "role", role.Name)
@@ -279,7 +284,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 func getRoleMembershipDiff(
 	ctx context.Context,
 	roleManager RoleManager,
-	role apiv1.RoleConfiguration,
+	role roleConfigurationAdapter,
 	dbRole DatabaseRole,
 ) ([]string, []string, error) {
 	inRoleInDB, err := roleManager.GetParentRoles(ctx, dbRole)
@@ -297,11 +302,11 @@ func getRoleMembershipDiff(
 func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	ctx context.Context,
 	roleManager RoleManager,
-	role apiv1.RoleConfiguration,
+	role roleConfigurationAdapter,
 	action roleAction,
 ) (apiv1.PasswordState, error) {
 	var passVersion string
-	databaseRole := roleFromSpec(role)
+	databaseRole := role.toDatabaseRole()
 	switch {
 	case role.PasswordSecret == nil && !role.DisablePassword:
 		databaseRole.ignorePassword = true
@@ -357,7 +362,7 @@ type passwordSecret struct {
 func getPassword(
 	ctx context.Context,
 	cl client.Client,
-	roleInSpec apiv1.RoleConfiguration,
+	roleInSpec roleConfigurationAdapter,
 	namespace string,
 ) (passwordSecret, error) {
 	secretName := roleInSpec.GetRoleSecretsName()
@@ -405,7 +410,7 @@ func getPasswordSecretResourceVersion(
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
-		passwordSecret, err := getPassword(ctx, client, role, namespace)
+		passwordSecret, err := getPassword(ctx, client, roleConfigurationAdapter{RoleConfiguration: role}, namespace)
 		if err != nil {
 			return nil, err
 		}
