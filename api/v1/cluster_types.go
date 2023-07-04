@@ -310,14 +310,20 @@ type ClusterSpec struct {
 	// Defaults to: `RuntimeDefault`
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 
+	// TODO: MB? Byte? it must be coherent with the content of the status.
 	// ReplicaLagThreshold is a user-customizable field that represents the acceptable lag limit (in bytes,
 	// where 1MB = 1,000,000 Bytes) between the primary database and its replicas. If a replica's lag exceeds this
 	// threshold, the cluster will enter the PhaseReplicaLagThresholdExceeded phase.
-	// The default value is 30,000,000 Bytes (30MB). Adjust this according to your application's tolerance for data
+	// The default value is 67,108,864 Bytes (64MB). Adjust this according to your application's tolerance for data
 	// latency.
-	// +kubebuilder:default:=30000000
+	// +kubebuilder:default:=67108864
 	ReplicaLagThreshold int64 `json:"replicaLagThreshold,omitempty"`
 }
+
+const (
+	// DefaultReplicaLagThreshold is the default for ReplicaLagThreshold setting
+	DefaultReplicaLagThreshold = 67108864
+)
 
 const (
 	// PhaseSwitchover when a cluster is changing the primary node
@@ -592,6 +598,8 @@ type InstanceReportedState struct {
 	// primary instance.
 	IsWalReceiverActive bool `json:"isWalReceiverActive,omitempty"`
 
+	// TODO: remove pointer or omitempty
+	// TODO: MB? Byte? it must be coherent with the content of the status.
 	// ReplicaLag represents the current lag of the replica against the primary instance in bytes. This is the difference
 	// WAL position between the primary and this replica. The value is set to "nil" if it could not be calculated.
 	// The value is expressed in megabytes, where 1MB = 1,000,000 Bytes
@@ -2554,12 +2562,12 @@ func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
 }
 
 // GetReplicaLagThreshold returns the user-defined threshold for acceptable replica lag.
-// On an existing cluster without this field the default value will be 0, this function defaults to ~30MB.
+// On an existing cluster without this field the default value will be 0, this function defaults to 64MB.
 // The threshold is used to trigger the PhaseReplicaLagThresholdExceeded phase when a replica's lag
 // surpasses this value. The returned value is in bytes.
 func (cluster *Cluster) GetReplicaLagThreshold() int64 {
 	if cluster.Spec.ReplicaLagThreshold == 0 {
-		return 30000000
+		return DefaultReplicaLagThreshold
 	}
 
 	return cluster.Spec.ReplicaLagThreshold

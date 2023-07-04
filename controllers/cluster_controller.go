@@ -543,10 +543,6 @@ func (r *ClusterReconciler) reconcileLagLimit(
 		return ctrl.Result{}, nil
 	}
 
-	if cluster.Status.Phase == apiv1.PhaseReplicaLagThresholdExceeded {
-		return ctrl.Result{}, nil
-	}
-
 	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 		Type:    condition,
 		Status:  metav1.ConditionTrue,

@@ -772,6 +772,7 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	existingClusterStatus := cluster.Status
 	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
 
+	// TODO: this doesn't work with replica clusters
 	primary := statuses.GetPrimary()
 
 	// we extract the instances reported state
