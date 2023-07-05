@@ -320,5 +320,9 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
 	}
 
+	if cluster.Spec.PriorityClassName != "" {
+		job.Spec.Template.Spec.PriorityClassName = cluster.Spec.PriorityClassName
+	}
+
 	return job
 }
