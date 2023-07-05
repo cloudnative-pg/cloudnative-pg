@@ -71,7 +71,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		var buf bytes.Buffer
 		GinkgoWriter.Println("Putting Tail on the cluster logs")
 		go func() {
-			err = logs.TailClusterLogs(context.TODO(), env.Interface, *cluster, &buf, false)
+			err = logs.TailClusterLogs(context.TODO(), env.Interface, cluster, &buf, false)
 			if err != nil {
 				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
 			}

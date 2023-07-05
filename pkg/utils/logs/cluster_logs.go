@@ -42,13 +42,13 @@ const DefaultFollowWaiting time.Duration = 1 * time.Second
 // for any new / regenerated pods, and will only exit when there are no pods
 // streaming
 type ClusterStreamingRequest struct {
-	Cluster       apiv1.Cluster
+	Cluster       *apiv1.Cluster
 	Options       *v1.PodLogOptions
 	Previous      bool `json:"previous,omitempty"`
 	FollowWaiting time.Duration
-	// NOTE: the client argument may be omitted, but it is good practice to pass it
+	// NOTE: the Client argument may be omitted, but it is good practice to pass it
 	// Importantly, it makes the logging functions testable
-	client kubernetes.Interface
+	Client kubernetes.Interface
 }
 
 func (csr *ClusterStreamingRequest) getClusterName() string {
@@ -68,21 +68,20 @@ func (csr *ClusterStreamingRequest) getLogOptions() *v1.PodLogOptions {
 }
 
 func (csr *ClusterStreamingRequest) getKubernetesClient() kubernetes.Interface {
-	if csr.client != nil {
-		return csr.client
+	if csr.Client != nil {
+		return csr.Client
 	}
 	conf := ctrl.GetConfigOrDie()
 
-	csr.client = kubernetes.NewForConfigOrDie(conf)
+	csr.Client = kubernetes.NewForConfigOrDie(conf)
 
-	return csr.client
+	return csr.Client
 }
 
 func (csr *ClusterStreamingRequest) getFollowWaitingTime() time.Duration {
 	if csr.FollowWaiting > 0 {
 		return csr.FollowWaiting
 	}
-
 	return DefaultFollowWaiting
 }
 
@@ -169,7 +168,9 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 			err     error
 		)
 		if isFirstScan || csr.Options.Follow {
-			podList, err = client.CoreV1().Pods(csr.getClusterNamespace()).List(ctx, metav1.ListOptions{})
+			podList, err = client.CoreV1().Pods(csr.getClusterNamespace()).List(ctx, metav1.ListOptions{
+				LabelSelector: utils.ClusterLabelName + "=" + csr.getClusterName(),
+			})
 			if err != nil {
 				return err
 			}
@@ -184,12 +185,10 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 		}
 
 		for _, pod := range podList.Items {
-			if pod.Labels[utils.ClusterLabelName] != csr.getClusterName() {
-				continue
-			}
 			if streamSet.has(pod.Name) {
 				continue
 			}
+
 			streamSet.add(pod.Name)
 			go csr.streamInGoroutine(ctx, pod.Name, client, streamSet,
 				safeWriterFrom(writer))
@@ -251,7 +250,7 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 func TailClusterLogs(
 	ctx context.Context,
 	client kubernetes.Interface,
-	cluster apiv1.Cluster,
+	cluster *apiv1.Cluster,
 	writer io.Writer,
 	parseTimestamps bool,
 ) error {
@@ -264,7 +263,7 @@ func TailClusterLogs(
 			SinceTime:  &now,
 		},
 		FollowWaiting: DefaultFollowWaiting,
-		client:        client,
+		Client:        client,
 	}
 	return streamClusterLogs.SingleStream(ctx, writer)
 }

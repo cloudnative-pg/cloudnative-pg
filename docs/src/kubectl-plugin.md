@@ -727,7 +727,7 @@ is interrupted by the user.
 If `logs` is called without the `-f` option, it will read the logs from all
 cluster pods until the time of invocation and display them in the terminal's
 standard-out, then exit.
-The `-F` or `--File` flag can be provided, to specify the name
+The `-o` or `--output` flag can be provided, to specify the name
 of the file where the logs should be saved, instead of displaying over
 standard-out.
 
@@ -754,10 +754,10 @@ kubectl cnpg report cluster cluster-example -f
 …
 ```
 
-With the `-f` option omitted, and with `-File` specified:
+With the `-o` option omitted, and with `--output` specified:
 
 ``` sh
-kubectl-cnpg logs cluster cluster-example --File my-cluster.log
+kubectl-cnpg logs cluster cluster-example --output my-cluster.log
 
 Successfully written logs to "my-cluster.log"
 ```

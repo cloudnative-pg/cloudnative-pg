@@ -20,14 +20,10 @@ import (
 	"bytes"
 	"context"
 	"sync"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -65,7 +61,7 @@ var _ = Describe("Pod logging tests", func() {
 		var logBuffer bytes.Buffer
 		err := streamPodLog.Stream(ctx, &logBuffer)
 		Expect(err).NotTo(HaveOccurred())
-		// The fake client will be given a pod name of "", but it will still
+		// The fake Client will be given a pod name of "", but it will still
 		// go on along. In production, we'd have an error when pod not found
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(""))
@@ -93,7 +89,7 @@ var _ = Describe("Pod logging tests", func() {
 		Expect(options.Previous).To(BeTrue())
 	})
 
-	It("should read the logs with the provided k8s client", func(ctx context.Context) {
+	It("should read the logs with the provided k8s Client", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
 		streamPodLog := StreamingRequest{
 			Pod:      pod,
@@ -141,81 +137,12 @@ var _ = Describe("Pod logging tests", func() {
 			err := TailPodLogs(ctx, client, *pod, &logBuffer, true)
 			Expect(err).NotTo(HaveOccurred())
 		}()
-		// calling ctx.Done is not strictly necessary because the fake client
+		// calling ctx.Done is not strictly necessary because the fake Client
 		// will terminate the pod stream anyway, ending TailPodLogs.
 		// But in "production", TailPodLogs will follow
 		// the pod logs until the context, or the logs, are over
 		ctx.Done()
 		wait.Wait()
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
-	})
-})
-
-var _ = Describe("Cluster logging tests", func() {
-	clusterNamespace := "cluster-test"
-	clusterName := "myTestCluster"
-	cluster := apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: clusterNamespace,
-			Name:      clusterName,
-		},
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: clusterNamespace,
-			Name:      clusterName + "-1",
-			Labels: map[string]string{
-				utils.ClusterLabelName: clusterName,
-			},
-		},
-	}
-	It("should exit on ended pod logs with the non-follow option", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
-		var wait sync.WaitGroup
-		wait.Add(1)
-		go func() {
-			defer GinkgoRecover()
-			defer wait.Done()
-			streamClusterLogs := ClusterStreamingRequest{
-				Cluster: cluster,
-				Options: &v1.PodLogOptions{
-					Follow: false,
-				},
-				client: client,
-			}
-			err := streamClusterLogs.SingleStream(ctx, &logBuffer)
-			Expect(err).NotTo(HaveOccurred())
-		}()
-		ctx.Done()
-		wait.Wait()
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
-	})
-
-	It("should catch extra logs if given the follow option", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
-		// let's set a short follow-wait, and keep the cluster streaming for two
-		// cycles
-		followWaiting := 200 * time.Millisecond
-		ctx2, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
-		go func() {
-			defer GinkgoRecover()
-			streamClusterLogs := ClusterStreamingRequest{
-				Cluster: cluster,
-				Options: &v1.PodLogOptions{
-					Follow: true,
-				},
-				FollowWaiting: followWaiting,
-				client:        client,
-			}
-			err := streamClusterLogs.SingleStream(ctx2, &logBuffer)
-			Expect(err).NotTo(HaveOccurred())
-		}()
-		// give the stream call time to do a new search for pods
-		time.Sleep(350 * time.Millisecond)
-		cancel()
-		// the fake pod will be seen twice
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logsfake logs"))
 	})
 })

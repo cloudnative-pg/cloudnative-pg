@@ -17,41 +17,36 @@ limitations under the License.
 package logs
 
 import (
-	"time"
-
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 func clusterCmd() *cobra.Command {
-	var (
-		file                 string
-		logTimeStamp, follow bool
-	)
+	cl := clusterLogs{}
 
 	cmd := &cobra.Command{
 		Use:   "cluster <clusterName>",
 		Short: "Logs for cluster's pods",
-		Long:  "Collects the logs for all pods in a cluster into a single stream or file",
+		Long:  "Collects the logs for all pods in a cluster into a single stream or outputFile",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			clusterName := args[0]
-			now := time.Now().UTC()
-			if follow {
-				return followCluster(cmd.Context(), clusterName, plugin.Namespace,
-					logTimeStamp, now)
+			cl.clusterName = args[0]
+			cl.namespace = plugin.Namespace
+			cl.ctx = cmd.Context()
+			cl.client = plugin.ClientInterface
+			if cl.follow {
+				return followCluster(cl)
 			}
-			return saveClusterLogs(cmd.Context(), clusterName, plugin.Namespace,
-				logTimeStamp, file)
+			return saveClusterLogs(cl)
 		},
 	}
 
-	cmd.Flags().StringVarP(&file, "File", "F", "",
-		"Output file")
-	cmd.Flags().BoolVarP(&logTimeStamp, "timestamps", "t", false,
+	cmd.Flags().StringVarP(&cl.outputFile, "output", "o", "",
+		"Output outputFile")
+	cmd.Flags().BoolVarP(&cl.timestamp, "timestamps", "t", false,
 		"Prepend human-readable timestamp to each log line")
-	cmd.Flags().BoolVarP(&follow, "follow", "f", false,
+	cmd.Flags().BoolVarP(&cl.follow, "follow", "f", false,
 		"Follow cluster logs (watches for new and re-created pods)")
 
 	return cmd
