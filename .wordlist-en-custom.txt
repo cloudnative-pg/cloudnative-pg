@@ -270,6 +270,8 @@ Postgres
 PostgresConfiguration
 PrimaryUpdateMethod
 PrimaryUpdateStrategy
+PriorityClass
+PriorityClassName
 ProjectedVolumeSource
 PullPolicy
 QoS
