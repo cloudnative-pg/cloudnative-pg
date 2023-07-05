@@ -2458,6 +2458,12 @@ spec:
                 - unsupervised
                 - supervised
                 type: string
+              priorityClassName:
+                description: Name of the priority class which will be used in every
+                  generated Pod, if the PriorityClass specified does not exist, the
+                  pod will not be able to schedule.  Please refer to https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
+                  for more information
+                type: string
               projectedVolumeTemplate:
                 description: Template to be used to define projected volumes, projected
                   volumes will be mounted under `/projected` base folder
