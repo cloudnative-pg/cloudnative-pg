@@ -143,6 +143,29 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	if err := info.ensureArchiveContainsWAL(ctx, cluster, env, backup); err != nil {
+		return err
+	}
+
+	return info.ConfigureInstanceAfterRestore(cluster, env)
+}
+
+func (info InitInfo) ensureArchiveContainsWAL(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	env []string,
+	backup *apiv1.Backup,
+) error {
+	// it is a file that will contain the WAL we are trying to ensure it exists
+	const temporaryWAL = walarchive.SpoolDirectory + "/temp.wal"
+	contextLogger := log.FromContext(ctx)
+
+	defer func() {
+		if err := fileutils.RemoveFile(temporaryWAL); err != nil {
+			contextLogger.Error(err, "while deleting the temporary wal file: %w")
+		}
+	}()
+
 	rest, err := restorer.New(ctx, cluster, env, walarchive.SpoolDirectory)
 	if err != nil {
 		return err
@@ -167,11 +190,12 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := rest.Restore(value, walarchive.SpoolDirectory, opts); err != nil {
+
+	if err := rest.Restore(value, temporaryWAL, opts); err != nil {
 		return fmt.Errorf("could not find latest checkpoint redo WAL inside the backup storage: %w", err)
 	}
 
-	return info.ConfigureInstanceAfterRestore(cluster, env)
+	return nil
 }
 
 // restoreCustomWalDir moves the current pg_wal data to the specified custom wal dir and applies the symlink
