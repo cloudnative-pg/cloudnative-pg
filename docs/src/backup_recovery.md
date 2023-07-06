@@ -543,8 +543,9 @@ You can also schedule your backups periodically by creating a
 resource named `ScheduledBackup`. The latter is similar to a
 `Backup` but with an added field, called `schedule`.
 
-This field is a *cron schedule* specification, which follows the same
-[format used in Kubernetes CronJobs](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
+The schedule *does not* follow the same format used in Kubernetes 
+CronJobs as it includes an additional seconds specifier, see 
+[cron expression format](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
 
 This is an example of a scheduled backup:
 
