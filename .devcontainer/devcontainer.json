@@ -4,7 +4,14 @@
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/rio/features/k3d:1": {},
     "ghcr.io/mpriscella/features/kind:1": {},
-    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
+    "ghcr.io/rjfmachado/devcontainer-features/cloud-native:1": {
+      "kubectl": "latest",
+      "helm": "latest",
+      "kubelogin": "none",
+      "azwi": "none",
+      "flux": "none",
+      "cilium": "none"
+    },
     "ghcr.io/guiyomh/features/golangci-lint:0": {},
     "ghcr.io/devcontainers-contrib/features/kubectx-kubens:1": {}
   },
