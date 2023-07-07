@@ -18,5 +18,8 @@
   },
 
   // Needed by kind and k3s to enable kube-proxy's ipvs mode
-  "mounts":["type=bind,source=/lib/modules,target=/lib/modules"]
+  "mounts":["type=bind,source=/lib/modules,target=/lib/modules"],
+
+  // Enable kubectl short alias with completion
+  "postCreateCommand": "echo 'alias k=kubectl; complete -F __start_kubectl k' >> ~/.bash_aliases"
 }
