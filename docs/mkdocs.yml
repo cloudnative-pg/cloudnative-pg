@@ -4,6 +4,9 @@ docs_dir: src
 
 theme: readthedocs
 
+extra_css:
+  - css/override.css
+
 markdown_extensions:
   - admonition
   - def_list
