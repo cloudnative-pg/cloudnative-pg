@@ -143,14 +143,14 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.ensureArchiveContainsWAL(ctx, cluster, env, backup); err != nil {
+	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
 		return err
 	}
 
 	return info.ConfigureInstanceAfterRestore(cluster, env)
 }
 
-func (info InitInfo) ensureArchiveContainsWAL(
+func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	env []string,
