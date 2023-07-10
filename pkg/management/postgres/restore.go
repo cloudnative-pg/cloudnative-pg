@@ -156,16 +156,17 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 	env []string,
 	backup *apiv1.Backup,
 ) error {
-	// it is a file that will contain the WAL we are trying to ensure it exists
-	const temporaryWAL = walarchive.SpoolDirectory + "/temp.wal"
+	// it's the full path of the file that will temporarily contain the LastCheckpointRedoWAL
+	const temporaryWALPath = walarchive.SpoolDirectory + "/temp.wal"
 	contextLogger := log.FromContext(ctx)
 
 	defer func() {
-		if err := fileutils.RemoveFile(temporaryWAL); err != nil {
+		if err := fileutils.RemoveFile(temporaryWALPath); err != nil {
 			contextLogger.Error(err, "while deleting the temporary wal file: %w")
 		}
 	}()
 
+	// this also ensures that the spool directory exists
 	rest, err := restorer.New(ctx, cluster, env, walarchive.SpoolDirectory)
 	if err != nil {
 		return err
@@ -191,8 +192,8 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	if err := rest.Restore(value, temporaryWAL, opts); err != nil {
-		return fmt.Errorf("could not find latest checkpoint redo WAL inside the backup storage: %w", err)
+	if err := rest.Restore(value, temporaryWALPath, opts); err != nil {
+		return fmt.Errorf("encountered an error while checking LastCheckpointRedoWAL: %w", err)
 	}
 
 	return nil
