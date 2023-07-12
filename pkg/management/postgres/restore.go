@@ -157,11 +157,11 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 	backup *apiv1.Backup,
 ) error {
 	// it's the full path of the file that will temporarily contain the LastCheckpointRedoWAL
-	const temporaryWALPath = walarchive.SpoolDirectory + "/temp.wal"
+	const testWALPath = postgresSpec.RecoveryTemporaryDirectory + "/test.wal"
 	contextLogger := log.FromContext(ctx)
 
 	defer func() {
-		if err := fileutils.RemoveFile(temporaryWALPath); err != nil {
+		if err := fileutils.RemoveFile(testWALPath); err != nil {
 			contextLogger.Error(err, "while deleting the temporary wal file: %w")
 		}
 	}()

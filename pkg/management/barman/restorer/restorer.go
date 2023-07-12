@@ -253,5 +253,6 @@ func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOption
 		}
 	}
 
-	return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalRestore, err)
+	return fmt.Errorf("unexpected failure retrieving %q with %s: %w",
+		walName, barmanCapabilities.BarmanCloudWalRestore, err)
 }
