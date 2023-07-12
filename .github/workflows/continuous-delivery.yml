@@ -975,6 +975,28 @@ jobs:
                sleep 5
                attempt=$((attempt+1))
             done
+            attempt=1
+            AZURE_RESOURCEGROUP_LOCATION="$( az group show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query location -o tsv --only-show-errors )"
+            DATA_COLL_RULE_NAME="MSCI-${AZURE_RESOURCEGROUP_LOCATION}-${{ env.AZURE_AKS }}"
+            while [ "${attempt}" -le "${max_attempts}" ]; do
+               echo "Deleting data-collection rule ${DATA_COLL_RULE_NAME}. Attempt ${attempt} of ${max_attempts}"
+               az monitor data-collection rule show --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query name
+               # if not found, let it go
+               status=$?
+               if [[ $status != 0 ]]; then
+                  echo "AKS data-collection rule not found"
+                  break
+               fi
+               az monitor data-collection rule delete -y --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }}
+               status=$?
+               if [[ $status == 0 ]]; then
+                  echo "AKS data-collection rule deleted"
+                  break
+               fi
+               echo "Failed deleting data-collection rule ${ DATA_COLL_RULE_NAME }, retrying"
+               sleep 5
+               attempt=$((attempt+1))
+            done
 
   e2e-aks-teardown:
     name: Teardown Microsoft AKS shared resources
