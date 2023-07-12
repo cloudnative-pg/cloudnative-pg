@@ -106,6 +106,10 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
+		return err
+	}
+
 	if err := info.restoreDataDir(backup, env); err != nil {
 		return err
 	}
@@ -143,10 +147,6 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
-		return err
-	}
-
 	return info.ConfigureInstanceAfterRestore(cluster, env)
 }
 
@@ -172,15 +172,6 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	pgDataOutput, err := executePgControlData(info.PgData)
-	if err != nil {
-		return err
-	}
-	value, err := getValueFromPGControlData(pgDataOutput, latestCheckpointRedoWAL)
-	if err != nil {
-		return err
-	}
-
 	opts, err := barman.CloudWalRestoreOptions(&apiv1.BarmanObjectStoreConfiguration{
 		BarmanCredentials: backup.Status.BarmanCredentials,
 		EndpointCA:        backup.Status.EndpointCA,
@@ -192,8 +183,8 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	if err := rest.Restore(value, temporaryWALPath, opts); err != nil {
-		return fmt.Errorf("encountered an error while checking LastCheckpointRedoWAL: %w", err)
+	if err := rest.Restore(backup.Status.BeginWal, testWALPath, opts); err != nil {
+		return fmt.Errorf("encountered an error while checking the presence of first needed WAL in the archive: %w", err)
 	}
 
 	return nil
@@ -503,52 +494,6 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 // GetEnforcedParametersThroughPgControldata will parse the output of pg_controldata in order to get
 // the values of all the hot standby sensible parameters
 func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string, error) {
-	pgControlDataOutput, err := executePgControlData(pgData)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Debug("pg_controldata stdout", "stdout", pgControlDataOutput)
-
-	enforcedParams := map[string]string{}
-	for _, line := range strings.Split(pgControlDataOutput, "\n") {
-		matches := enforcedParametersRegex.FindStringSubmatch(line)
-		if len(matches) < 3 {
-			continue
-		}
-		if param, ok := pgControldataSettingsToParamsMap[matches[1]]; ok {
-			enforcedParams[param] = matches[2]
-		}
-	}
-	return enforcedParams, nil
-}
-
-type pgControlDataParameter string
-
-const (
-	latestCheckpointRedoWAL pgControlDataParameter = "Latest checkpoint's REDO WAL file:"
-)
-
-func getValueFromPGControlData(pgDataOutput string, parameter pgControlDataParameter) (string, error) {
-	for _, line := range strings.Split(pgDataOutput, "\n") {
-		matches := strings.HasPrefix(line, string(parameter))
-		if !matches {
-			continue
-		}
-
-		result := strings.Split(line, string(parameter))
-		if len(result) < 2 {
-			return "", fmt.Errorf("unexpected format for line: %s", line)
-		}
-
-		return strings.TrimSpace(result[1]), nil
-	}
-
-	return "", fmt.Errorf("parameter not found: %s", string(parameter))
-}
-
-// executePgControlData returns the pg_controldata output as string and any errors encountered
-func executePgControlData(pgData string) (string, error) {
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
 	pgControlDataCmd := exec.Command(pgControlDataName,
@@ -562,10 +507,22 @@ func executePgControlData(pgData string) (string, error) {
 		log.Error(err, "while reading pg_controldata",
 			"stderr", stderrBuffer.String(),
 			"stdout", stdoutBuffer.String())
-		return "", err
+		return nil, err
 	}
 
-	return stdoutBuffer.String(), nil
+	log.Debug("pg_controldata stdout", "stdout", stdoutBuffer.String())
+
+	enforcedParams := map[string]string{}
+	for _, line := range strings.Split(stdoutBuffer.String(), "\n") {
+		matches := enforcedParametersRegex.FindStringSubmatch(line)
+		if len(matches) < 3 {
+			continue
+		}
+		if param, ok := pgControldataSettingsToParamsMap[matches[1]]; ok {
+			enforcedParams[param] = matches[2]
+		}
+	}
+	return enforcedParams, nil
 }
 
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
