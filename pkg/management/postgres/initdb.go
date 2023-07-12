@@ -135,8 +135,12 @@ func (info InitInfo) CreateDataDirectory() error {
 		"pgdata", info.PgData,
 		"initDbOptions", options)
 
-	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
+	// Certain CSI drivers may add setgid permissions on newly created folders.
+	// A default umask is set to attempt to avoid this, by revoking group/other
+	// permission bits on the PGDATA
 	_ = os.FileMode(unix.Umask(0o077))
+
+	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
 	err := execlog.RunBuffering(initdbCmd, constants.InitdbName)
 	if err != nil {
 		return fmt.Errorf("error while creating the PostgreSQL instance: %w", err)
