@@ -18,10 +18,10 @@ package logicalimport
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jackc/pgx/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -29,21 +29,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-type fakePooler struct {
-	db *sql.DB
-}
-
-func (f fakePooler) Connection(_ string) (*sql.DB, error) {
-	return f.db, nil
-}
-
-func (f fakePooler) GetDsn(dbName string) string {
-	return dbName
-}
-
-func (f fakePooler) ShutdownConnections() {
-}
 
 var _ = Describe("databaseSnapshotter methods test", func() {
 	var (
@@ -141,5 +126,96 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 		mock.ExpectExec("ANALYZE VERBOSE").WillReturnResult(sqlmock.NewResult(0, 0))
 		err := ds.analyze(ctx, fp, []string{"test"})
 		Expect(err).ToNot(HaveOccurred())
+	})
+
+	Context("dropExtensionsFromDatabase testing", func() {
+		var expectedQuery *sqlmock.ExpectedQuery
+
+		BeforeEach(func() {
+			expectedQuery = mock.ExpectQuery("SELECT extname FROM pg_extension WHERE oid >= 16384")
+		})
+
+		It("should drop the user-defined extensions successfully", func() {
+			extensions := []string{"extension1", "extension2"}
+
+			rows := sqlmock.NewRows([]string{"extname"})
+			for _, ext := range extensions {
+				rows.AddRow(ext)
+				mock.ExpectExec("DROP EXTENSION " + pgx.Identifier{ext}.Sanitize()).WillReturnResult(sqlmock.NewResult(0, 1))
+			}
+			expectedQuery.WillReturnRows(rows)
+
+			err := ds.dropExtensionsFromDatabase(ctx, fp, "test")
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should correctly handle an error when querying for extensions", func() {
+			expectedErr := fmt.Errorf("querying error")
+			expectedQuery.WillReturnError(expectedErr)
+
+			err := ds.dropExtensionsFromDatabase(ctx, fp, "test")
+			Expect(err).To(Equal(expectedErr))
+		})
+
+		It("should correctly handle an error when dropping an extension", func() {
+			rows := sqlmock.NewRows([]string{"extname"}).AddRow("extension1")
+			expectedQuery.WillReturnRows(rows)
+
+			expectedErr := fmt.Errorf("dropping error")
+			mock.ExpectExec(fmt.Sprintf("DROP EXTENSION %s", pgx.Identifier{"extension1"}.Sanitize())).
+				WillReturnError(expectedErr)
+
+			err := ds.dropExtensionsFromDatabase(ctx, fp, "test")
+			Expect(err).ToNot(HaveOccurred()) // The function handles the error and logs it, so it should not return an error.
+		})
+	})
+
+	Context("getDatabaseList testing", func() {
+		const query = "SELECT datname FROM pg_database d " +
+			"WHERE datallowconn AND NOT datistemplate AND datallowconn AND datname != 'postgres' " +
+			"ORDER BY datname"
+
+		BeforeEach(func() {
+			ds.cluster.Spec.Bootstrap = &apiv1.BootstrapConfiguration{
+				InitDB: &apiv1.BootstrapInitDB{
+					Import: &apiv1.Import{},
+				},
+			}
+		})
+
+		It("should return the explicit database list if present", func() {
+			explicitDatabaseList := []string{"db1", "db2"}
+			ds.cluster.Spec.Bootstrap.InitDB.Import.Databases = explicitDatabaseList
+
+			dbs, err := ds.getDatabaseList(ctx, fp)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(dbs).To(Equal(explicitDatabaseList))
+		})
+
+		It("should query for databases if explicit list is not present", func() {
+			expectedQuery := mock.ExpectQuery(query)
+			ds.cluster.Spec.Bootstrap.InitDB.Import.Databases = []string{"*"}
+
+			queryDatabaseList := []string{"db1", "db2"}
+			rows := sqlmock.NewRows([]string{"datname"})
+			for _, db := range queryDatabaseList {
+				rows.AddRow(db)
+			}
+			expectedQuery.WillReturnRows(rows)
+
+			dbs, err := ds.getDatabaseList(ctx, fp)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(dbs).To(Equal(queryDatabaseList))
+		})
+
+		It("should return any error encountered when querying for databases", func() {
+			expectedErr := fmt.Errorf("querying error")
+			expectedQuery := mock.ExpectQuery(query)
+			ds.cluster.Spec.Bootstrap.InitDB.Import.Databases = []string{"*"}
+			expectedQuery.WillReturnError(expectedErr)
+
+			_, err := ds.getDatabaseList(ctx, fp)
+			Expect(err).To(Equal(expectedErr))
+		})
 	})
 })
