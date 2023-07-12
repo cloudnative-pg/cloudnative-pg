@@ -71,9 +71,9 @@ type Result struct {
 	EndTime time.Time
 }
 
-// New creates a new WAL archiver
+// New creates a new WAL restorer
 func New(ctx context.Context, cluster *apiv1.Cluster, env []string, spoolDirectory string) (
-	archiver *WALRestorer,
+	restorer *WALRestorer,
 	err error,
 ) {
 	contextLog := log.FromContext(ctx)
@@ -84,12 +84,12 @@ func New(ctx context.Context, cluster *apiv1.Cluster, env []string, spoolDirecto
 		return nil, fmt.Errorf("while creating spool directory: %w", err)
 	}
 
-	archiver = &WALRestorer{
+	restorer = &WALRestorer{
 		cluster: cluster,
 		spool:   walRecoverSpool,
 		env:     env,
 	}
-	return archiver, nil
+	return restorer, nil
 }
 
 // RestoreFromSpool restores a certain file from the spool, returning a boolean flag indicating
