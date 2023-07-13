@@ -212,7 +212,7 @@ var _ = Describe("UserQuery ToMetricMap", func() {
 		userQuery = UserQuery{
 			Query:           "SELECT * FROM test",
 			Metrics:         []Mapping{},
-			Master:          true,
+			Master:          true, // wokeignore:rule=master
 			Primary:         true,
 			CacheSeconds:    30,
 			RunOnServer:     "testserver",
