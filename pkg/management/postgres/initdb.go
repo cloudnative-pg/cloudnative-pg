@@ -138,7 +138,7 @@ func (info InitInfo) CreateDataDirectory() error {
 	// Certain CSI drivers may add setgid permissions on newly created folders.
 	// A default umask is set to attempt to avoid this, by revoking group/other
 	// permission bits on the PGDATA
-	_ = os.FileMode(unix.Umask(0o077))
+	_ = unix.Umask(0o077)
 
 	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
 	err := execlog.RunBuffering(initdbCmd, constants.InitdbName)
