@@ -33,8 +33,8 @@ import (
 )
 
 type roleManager struct {
-	origin      *pool.ConnectionPool
-	destination *pool.ConnectionPool
+	origin      pool.Pooler
+	destination pool.Pooler
 	cluster     *apiv1.Cluster
 }
 
@@ -59,8 +59,8 @@ type Role struct {
 func cloneRoles(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	destination *pool.ConnectionPool,
-	origin *pool.ConnectionPool,
+	destination pool.Pooler,
+	origin pool.Pooler,
 ) error {
 	rs := roleManager{origin: origin, destination: destination, cluster: cluster}
 	roles, err := rs.getRoles(ctx)

@@ -28,8 +28,8 @@ import (
 func Monolith(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	destination *pool.ConnectionPool,
-	origin *pool.ConnectionPool,
+	destination pool.Pooler,
+	origin pool.Pooler,
 ) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("starting monolith clone process")
