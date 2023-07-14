@@ -30,6 +30,7 @@ import (
 	"sort"
 
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/sys/unix"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -133,6 +134,11 @@ func (info InitInfo) CreateDataDirectory() error {
 	log.Info("Creating new data directory",
 		"pgdata", info.PgData,
 		"initDbOptions", options)
+
+	// Certain CSI drivers may add setgid permissions on newly created folders.
+	// A default umask is set to attempt to avoid this, by revoking group/other
+	// permission bits on the PGDATA
+	_ = unix.Umask(0o077)
 
 	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
 	err := execlog.RunBuffering(initdbCmd, constants.InitdbName)

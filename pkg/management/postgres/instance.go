@@ -320,6 +320,12 @@ func (instance *Instance) Startup() error {
 
 	log.Info("Starting up instance", "pgdata", instance.PgData, "options", options)
 
+	// We need to make sure that the permissions are the right ones
+	// in some systems they may be messed up even if we fix them before
+	if err := fileutils.EnsurePgDataPerms(instance.PgData); err != nil {
+		return err
+	}
+
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
 	pgCtlCmd.Env = instance.Env
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
@@ -446,6 +452,12 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 
 	options := []string{
 		"-D", instance.PgData,
+	}
+
+	// We need to make sure that the permissions are the right ones
+	// in some systems they may be messed up even if we fix them before
+	if err := fileutils.EnsurePgDataPerms(instance.PgData); err != nil {
+		return nil, err
 	}
 
 	postgresCmd := exec.Command(postgresName, options...) // #nosec
