@@ -292,7 +292,7 @@ jobs:
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
         needs.change-triage.outputs.go-code-changed == 'true' ||
-        needs.change-triage.outputs.operator-changed == 'true
+        needs.change-triage.outputs.operator-changed == 'true'
       )
     runs-on: ubuntu-22.04
     steps:
