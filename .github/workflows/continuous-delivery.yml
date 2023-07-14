@@ -107,7 +107,7 @@ jobs:
               "depth"|"d")
               DEPTH="${value}"
               ;;
-              "limit"|"lm")
+              "limit"|"l")
               LIMIT="${value}"
               ;;
               "test_level"|"level"|"tl")
