@@ -27,8 +27,8 @@ import (
 )
 
 type roleInheritanceManager struct {
-	origin      *pool.ConnectionPool
-	destination *pool.ConnectionPool
+	origin      pool.Pooler
+	destination pool.Pooler
 }
 
 // RoleInheritance contains the data needed to execute grants, based on pg_authid
@@ -39,7 +39,7 @@ type RoleInheritance struct {
 	Grantor     *string `json:"grantor,omitempty"`
 }
 
-func cloneRoleInheritance(ctx context.Context, destination *pool.ConnectionPool, origin *pool.ConnectionPool) error {
+func cloneRoleInheritance(ctx context.Context, destination pool.Pooler, origin pool.Pooler) error {
 	rs := roleInheritanceManager{
 		origin:      origin,
 		destination: destination,
