@@ -27,3 +27,8 @@ import (
 func AddInstanceRunCommands(cmd *exec.Cmd) {
 	return
 }
+
+// Umask sets the process's unix umask to prevent/allow permissions changes
+func Umask(mask int) int {
+	return mask
+}

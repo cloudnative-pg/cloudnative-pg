@@ -22,6 +22,8 @@ package compatibility
 import (
 	"os/exec"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 // AddInstanceRunCommands adds specific OS commands to the postgres exec.Cmd
@@ -29,4 +31,9 @@ func AddInstanceRunCommands(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
+}
+
+// Umask sets the process's unix umask to prevent/allow permissions changes
+func Umask(mask int) int {
+	return unix.Umask(mask)
 }
