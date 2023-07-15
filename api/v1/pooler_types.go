@@ -222,7 +222,7 @@ func init() {
 // GetAuthQuerySecretName returns the specified AuthQuerySecret name for PgBouncer
 // if provided or the default name otherwise.
 func (in *Pooler) GetAuthQuerySecretName() string {
-	if in.Spec.PgBouncer.AuthQuerySecret != nil {
+	if in.Spec.PgBouncer != nil && in.Spec.PgBouncer.AuthQuerySecret != nil {
 		return in.Spec.PgBouncer.AuthQuerySecret.Name
 	}
 

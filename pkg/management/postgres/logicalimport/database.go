@@ -34,7 +34,7 @@ type databaseSnapshotter struct {
 	cluster *apiv1.Cluster
 }
 
-func (ds *databaseSnapshotter) getDatabaseList(ctx context.Context, target *pool.ConnectionPool) ([]string, error) {
+func (ds *databaseSnapshotter) getDatabaseList(ctx context.Context, target pool.Pooler) ([]string, error) {
 	contextLogger := log.FromContext(ctx)
 
 	passedDatabases := ds.cluster.Spec.Bootstrap.InitDB.Import.Databases
@@ -86,7 +86,7 @@ func (ds *databaseSnapshotter) getDatabaseList(ctx context.Context, target *pool
 
 func (ds *databaseSnapshotter) exportDatabases(
 	ctx context.Context,
-	target *pool.ConnectionPool,
+	target pool.Pooler,
 	databases []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
@@ -121,7 +121,7 @@ func (ds *databaseSnapshotter) exportDatabases(
 
 func (ds *databaseSnapshotter) importDatabases(
 	ctx context.Context,
-	target *pool.ConnectionPool,
+	target pool.Pooler,
 	databases []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
@@ -175,7 +175,7 @@ func (ds *databaseSnapshotter) importDatabases(
 
 func (ds *databaseSnapshotter) importDatabaseContent(
 	ctx context.Context,
-	target *pool.ConnectionPool,
+	target pool.Pooler,
 	database string,
 	targetDatabase string,
 	owner string,
@@ -235,7 +235,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 }
 
 func (ds *databaseSnapshotter) databaseExists(
-	target *pool.ConnectionPool,
+	target pool.Pooler,
 	dbName string,
 ) (bool, error) {
 	db, err := target.Connection(postgresDatabase)
@@ -256,7 +256,7 @@ func (ds *databaseSnapshotter) databaseExists(
 
 func (ds *databaseSnapshotter) executePostImportQueries(
 	ctx context.Context,
-	target *pool.ConnectionPool,
+	target pool.Pooler,
 	database string,
 ) error {
 	postImportQueries := ds.cluster.Spec.Bootstrap.InitDB.Import.PostImportApplicationSQL
@@ -284,7 +284,7 @@ func (ds *databaseSnapshotter) executePostImportQueries(
 
 func (ds *databaseSnapshotter) analyze(
 	ctx context.Context,
-	target *pool.ConnectionPool,
+	target pool.Pooler,
 	databases []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
@@ -308,7 +308,7 @@ func (ds *databaseSnapshotter) analyze(
 // the "CREATE EXTENSION" commands that are needed
 func (ds *databaseSnapshotter) dropExtensionsFromDatabase(
 	ctx context.Context,
-	target *pool.ConnectionPool,
+	target pool.Pooler,
 	database string,
 ) error {
 	contextLogger := log.FromContext(ctx)
