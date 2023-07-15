@@ -130,13 +130,13 @@ var _ = Describe("Check pods not on primary node", func() {
 	item1 := postgres.PostgresqlStatus{
 		IsPrimary: false,
 		Node:      "node-1",
-		Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
+		Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1"}},
 	}
 
 	item2 := postgres.PostgresqlStatus{
 		IsPrimary: false,
 		Node:      "node-2",
-		Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-2"}},
+		Pod:       &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-2"}},
 	}
 	statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
 
