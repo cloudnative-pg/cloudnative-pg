@@ -686,9 +686,9 @@ jobs:
     name: Setup shared resources for Microsoft AKS E2Es
     if: |
       (always() && !cancelled()) &&
+      vars.AKS_ENABLED == 'true' &&
       needs.generate-jobs.outputs.aksEnabled == 'true' &&
-      needs.generate-jobs.result == 'success' &&
-      vars.AKS_ENABLED == 'true'
+      needs.generate-jobs.result == 'success'
     needs:
       - buildx
       - generate-jobs
@@ -729,6 +729,7 @@ jobs:
     name: Run E2E on Microsoft AKS
     if: |
       (always() && !cancelled()) &&
+      vars.AKS_ENABLED == 'true' &&
       needs.generate-jobs.outputs.aksEnabled == 'true' &&
       needs.generate-jobs.result == 'success' &&
       needs.e2e-aks-setup.result == 'success'
@@ -1002,6 +1003,7 @@ jobs:
     name: Teardown Microsoft AKS shared resources
     if: |
       always() &&
+      vars.AKS_ENABLED == 'true' &&
       needs.generate-jobs.outputs.aksEnabled == 'true' &&
       needs.generate-jobs.result == 'success' &&
       needs.e2e-aks-setup.result == 'success'
@@ -1051,9 +1053,9 @@ jobs:
     name: Run E2E on Amazon EKS
     if: |
       (always() && !cancelled()) &&
+      vars.EKS_ENABLED == 'true' &&
       needs.generate-jobs.outputs.eksEnabled == 'true' &&
-      needs.generate-jobs.result == 'success' &&
-      vars.EKS_ENABLED == 'true'
+      needs.generate-jobs.result == 'success'
     needs:
       - buildx
       - generate-jobs
@@ -1411,9 +1413,9 @@ jobs:
     name: Run E2E on Google GKE
     if: |
       (always() && !cancelled()) &&
+      vars.GKE_ENABLED == 'true' && 
       needs.generate-jobs.outputs.gkeEnabled == 'true' &&
-      needs.generate-jobs.result == 'success' &&
-      vars.GKE_ENABLED == 'true'
+      needs.generate-jobs.result == 'success'
     needs:
       - buildx
       - generate-jobs
