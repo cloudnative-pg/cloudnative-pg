@@ -166,6 +166,7 @@ type InstanceID struct {
 	ContainerID string `json:"ContainerID,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status

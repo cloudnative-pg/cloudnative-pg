@@ -1851,6 +1851,7 @@ func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
 	return true
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
