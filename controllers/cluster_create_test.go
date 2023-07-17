@@ -175,21 +175,30 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 
 		By("executing createOrPatchServiceAccount (patch)", func() {
-			err := clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-		})
+			By("setting owner reference to nil", func() {
+				sa.ObjectMeta.OwnerReferences = nil
+				err := k8sClient.Update(context.Background(), sa)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
-		By("making sure that the serviceaccount is patched correctly", func() {
-			updatedSA := &corev1.ServiceAccount{}
-			expectResourceExistsWithDefaultClient(cluster.Name, namespace, updatedSA)
-			Expect(updatedSA.Annotations["test"]).To(BeEquivalentTo("annotation"))
-			Expect(updatedSA.Labels["test"]).To(BeEquivalentTo("label"))
-			Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
-				Name: "cluster-pullsecret",
-			}))
-			Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
-				Name: "sa-pullsecret",
-			}))
+			By("running patch", func() {
+				err := clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("making sure that the serviceaccount is patched correctly", func() {
+				updatedSA := &corev1.ServiceAccount{}
+				expectResourceExistsWithDefaultClient(cluster.Name, namespace, updatedSA)
+				Expect(updatedSA.Annotations["test"]).To(BeEquivalentTo("annotation"))
+				Expect(updatedSA.Labels["test"]).To(BeEquivalentTo("label"))
+				Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
+					Name: "cluster-pullsecret",
+				}))
+				Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
+					Name: "sa-pullsecret",
+				}))
+				Expect(updatedSA.OwnerReferences).To(BeNil())
+			})
 		})
 	})
 
