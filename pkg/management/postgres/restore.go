@@ -166,7 +166,10 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		}
 	}()
 
-	// this also ensures that the spool directory exists
+	if err := fileutils.EnsureParentDirectoryExist(testWALPath); err != nil {
+		return err
+	}
+
 	rest, err := restorer.New(ctx, cluster, env, walarchive.SpoolDirectory)
 	if err != nil {
 		return err
