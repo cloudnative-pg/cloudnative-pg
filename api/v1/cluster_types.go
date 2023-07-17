@@ -2615,11 +2615,11 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	}
 	switch {
 	case target.Exclusive == nil:
-		result += "recovery_target_inclusive = true\n"
-	case *target.Exclusive:
-		result += "recovery_target_inclusive = true\n"
-	default:
 		result += "recovery_target_inclusive = false\n"
+	case *target.Exclusive:
+		result += "recovery_target_inclusive = false\n"
+	default:
+		result += "recovery_target_inclusive = true\n"
 	}
 
 	return result
