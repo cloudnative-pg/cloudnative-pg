@@ -22,6 +22,8 @@ package compatibility
 
 import (
 	"os"
+	"os/exec"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 )
@@ -32,4 +34,16 @@ func CreateFifo(fileName string) error {
 		return unix.Mkfifo(fileName, 0o600)
 	}
 	return nil
+}
+
+// AddInstanceRunCommands adds specific OS commands to the postgres exec.Cmd
+func AddInstanceRunCommands(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+}
+
+// Umask sets the process's unix umask to prevent/allow permissions changes
+func Umask(mask int) int {
+	return unix.Umask(mask)
 }
