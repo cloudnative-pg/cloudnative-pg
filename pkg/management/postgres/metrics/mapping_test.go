@@ -91,51 +91,50 @@ var _ = Describe("ColumnMapping ToMetricMap", func() {
 			Expect(ok).To(BeFalse())
 			Expect(math.IsNaN(val)).To(BeTrue())
 		})
+	})
+	Context("when usage is LABEL", func() {
+		It("should return expected MetricMapSet", func() {
+			columnMapping := ColumnMapping{
+				Usage: "LABEL",
+			}
+			columnName := "label_column"
 
-		Context("when usage is LABEL", func() {
-			It("should return expected MetricMapSet", func() {
-				columnMapping := ColumnMapping{
-					Usage: "LABEL",
-				}
-				columnName := "label_column"
+			expected := MetricMapSet{
+				columnName: {
+					Name:       columnName,
+					Discard:    true,
+					Conversion: nil,
+					Label:      true,
+				},
+			}
 
-				expected := MetricMapSet{
-					columnName: {
-						Name:       columnName,
-						Discard:    true,
-						Conversion: nil,
-						Label:      true,
-					},
-				}
-
-				Expect(columnMapping.ToMetricMap(columnName, namespace, variableLabels)).To(Equal(expected))
-			})
+			Expect(columnMapping.ToMetricMap(columnName, namespace, variableLabels)).To(Equal(expected))
 		})
+	})
 
-		Context("when usage is COUNTER", func() {
-			It("should return expected MetricMapSet", func() {
-				columnMapping := ColumnMapping{
-					Usage: "COUNTER",
-				}
-				columnName := "counter_column"
+	Context("when usage is COUNTER", func() {
+		It("should return expected MetricMapSet", func() {
+			columnMapping := ColumnMapping{
+				Usage: "COUNTER",
+			}
+			columnName := "counter_column"
 
-				result := columnMapping.ToMetricMap(columnName, namespace, variableLabels)
+			result := columnMapping.ToMetricMap(columnName, namespace, variableLabels)
 
-				// Validate the properties of the MetricMap
-				Expect(result[columnName].Name).To(Equal(columnName))
-				Expect(result[columnName].Vtype).To(Equal(prometheus.CounterValue))
-				Expect(result[columnName].Desc.String()).To(Equal(prometheus.NewDesc(
-					fmt.Sprintf("%s_%s", namespace, columnName),
-					columnMapping.Description, variableLabels, nil).String()))
-				Expect(result[columnName].Label).To(BeFalse())
+			// Validate the properties of the MetricMap
+			Expect(result[columnName].Name).To(Equal(columnName))
+			Expect(result[columnName].Vtype).To(Equal(prometheus.CounterValue))
+			Expect(result[columnName].Desc.String()).To(Equal(prometheus.NewDesc(
+				fmt.Sprintf("%s_%s", namespace, columnName),
+				columnMapping.Description, variableLabels, nil).String()))
+			Expect(result[columnName].Label).To(BeFalse())
 
-				// Test the behavior of the conversion function
-				dbValue := "12345"
-				expectedValue, _ := postgresutils.DBToFloat64(dbValue)
-				output, ok := result[columnName].Conversion(dbValue)
-				Expect(ok).To(BeTrue())
-				Expect(output).To(Equal(expectedValue))
-			})
+			// Test the behavior of the conversion function
+			dbValue := "12345"
+			expectedValue, _ := postgresutils.DBToFloat64(dbValue)
+			output, ok := result[columnName].Conversion(dbValue)
+			Expect(ok).To(BeTrue())
+			Expect(output).To(Equal(expectedValue))
 		})
 	})
 
