@@ -59,7 +59,7 @@ storage that the CloudNativePG operator provides, please refer to the
 ["Recovery" section](recovery.md) for guidance on each method.
 
 !!! Seealso "API reference"
-    Please refer to the ["API reference for the `bootstrap` section](api_reference.md#BootstrapConfiguration)
+    Please refer to the ["API reference for the `bootstrap` section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BootstrapConfiguration)
     for more information.
 
 ## The `externalClusters` section
@@ -100,7 +100,7 @@ continuously fed from the source, either via streaming, via WAL shipping
 through the PostgreSQL's `restore_command`, or any of the two.
 
 !!! Seealso "API reference"
-    Please refer to the ["API reference for the `externalClusters` section](api_reference.md#ExternalCluster)
+    Please refer to the ["API reference for the `externalClusters` section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ExternalCluster)
     for more information.
 
 ## Bootstrap an empty cluster (`initdb`)

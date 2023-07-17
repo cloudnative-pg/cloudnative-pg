@@ -274,7 +274,7 @@ jobs:
 
       - name: Verify apidoc changes
         run: |
-          apidoc_file_path='docs/src/api_reference.md'
+          apidoc_file_path='docs/src/cloudnative-pg.v1.md'
           if git status --porcelain $apidoc_file_path | grep '^ M'; then
             echo "The API documentation doesn't reflect the current API. Please run make apidoc."
             exit 1

@@ -90,7 +90,7 @@ both the template database and the application database, ready for use.
 
 !!! Info
     Take some time and look at the available options in `.spec.bootstrap.initdb`
-    from the [API reference](api_reference.md#BootstrapInitDB), such as
+    from the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BootstrapInitDB), such as
     `postInitApplicationSQL`.
 
 You can easily verify the available version of PostGIS that is in the
