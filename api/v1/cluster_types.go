@@ -2527,10 +2527,14 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 // SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
 // sets all the needed annotations and labels
 func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
+	cluster.SetInheritedData(obj)
+	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
+}
+
+func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta) {
 	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
 	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 	utils.LabelClusterName(obj, cluster.GetName())
-	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(obj, versions.Version)
 }
 
