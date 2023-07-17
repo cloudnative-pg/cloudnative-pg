@@ -26,3 +26,13 @@ import "fmt"
 func CreateFifo(fileName string) error {
 	panic(fmt.Sprintf("function CreateFifo() should not be used in Windows"))
 }
+
+// AdInstanceRunCommands mimics the behavior for compatibility issues
+func AddInstanceRunCommands(cmd *exec.Cmd) {
+	return
+}
+
+// Umask sets the process's unix umask to prevent/allow permissions changes
+func Umask(mask int) int {
+	return mask
+}
