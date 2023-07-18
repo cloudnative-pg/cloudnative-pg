@@ -2531,6 +2531,7 @@ func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
 	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
 }
 
+// SetInheritedData sets all the needed annotations and labels
 func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta) {
 	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
 	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
