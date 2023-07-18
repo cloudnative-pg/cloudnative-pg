@@ -75,6 +75,8 @@ spec:
                 - primary
                 - prefer-standby
                 type: string
+            required:
+            - cluster
             type: object
           status:
             description: 'Most recently observed status of the backup. This data may
@@ -320,6 +322,9 @@ spec:
                 format: date-time
                 type: string
             type: object
+        required:
+        - metadata
+        - spec
         type: object
     served: true
     storage: true
