@@ -20,7 +20,10 @@ limitations under the License.
 // Package compatibility provides a layer to cross-compile with other OS than Linux
 package compatibility
 
-import "fmt"
+import (
+	"fmt"
+	"os/exec"
+)
 
 // CreateFifo fakes function for cross-compiling compatibility
 func CreateFifo(fileName string) error {
