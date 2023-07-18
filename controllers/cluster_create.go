@@ -427,8 +427,8 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	if err != nil {
 		return fmt.Errorf("while generating service account: %w", err)
 	}
-
-	cluster.SetInheritedDataAndOwnership(&sa.ObjectMeta)
+	// we add the ownerMetadata only when creating the SA
+	cluster.SetInheritedData(&sa.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
 
 	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
