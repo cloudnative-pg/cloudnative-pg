@@ -24,6 +24,9 @@ from typing import Dict, List
 
 POSTGRES_REPO = "ghcr.io/cloudnative-pg/postgresql"
 PG_VERSIONS_FILE = ".github/pg_versions.json"
+AKS_VERSIONS_FILE = ".github/aks_versions.json"
+EKS_VERSIONS_FILE = ".github/eks_versions.json"
+GKE_VERSIONS_FILE = ".github/gke_versions.json"
 KIND_VERSIONS_FILE = ".github/kind_versions.json"
 VERSION_SCOPE_FILE = ".github/k8s_versions_scope.json"
 E2E_TEST_TIMEOUT = ".github/e2e_test_timeout.json"
@@ -93,6 +96,24 @@ with open(KIND_VERSIONS_FILE) as json_file:
     kind_versions = filter_version(version_list, SUPPORT_K8S_VERSION["KIND"])
 KIND_K8S = VersionList(kind_versions)
 
+# Kubernetes versions on EKS to use during the tests
+with open(EKS_VERSIONS_FILE) as json_file:
+    version_list = json.load(json_file)
+    eks_versions = filter_version(version_list, SUPPORT_K8S_VERSION["EKS"])
+EKS_K8S = VersionList(eks_versions)
+
+# Kubernetes versions on AKS to use during the tests
+with open(AKS_VERSIONS_FILE) as json_file:
+    version_list = json.load(json_file)
+    aks_versions = filter_version(version_list, SUPPORT_K8S_VERSION["AKS"])
+AKS_K8S = VersionList(aks_versions)
+
+# Kubernetes versions on GKE to use during the tests
+with open(GKE_VERSIONS_FILE) as json_file:
+    version_list = json.load(json_file)
+    gke_versions = filter_version(version_list, SUPPORT_K8S_VERSION["GKE"])
+GKE_K8S = VersionList(gke_versions)
+
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
 # First entry is used as default testing version
@@ -135,21 +156,6 @@ def build_push_include_local():
         E2EJob(KIND_K8S.latest, POSTGRES.latest),
         E2EJob(KIND_K8S.oldest, POSTGRES.oldest),
     }
-
-
-def build_pull_request_target_include_local():
-    result = build_push_include_local()
-    # Iterate over K8S versions
-    for k8s_version in KIND_K8S:
-        result |= {
-            E2EJob(k8s_version, POSTGRES.latest),
-        }
-
-    # Iterate over PostgreSQL versions
-    for postgres_version in POSTGRES.values():
-        result |= {E2EJob(KIND_K8S.latest, postgres_version)}
-
-    return result
 
 
 def build_pull_request_include_local():
@@ -197,7 +203,9 @@ def build_push_include_cloud(engine_version_list):
 
 
 def build_pull_request_include_cloud(engine_version_list):
-    return {}
+    return {
+        E2EJob(engine_version_list.latest, POSTGRES.latest),
+    }
 
 
 def build_main_include_cloud(engine_version_list):
@@ -226,11 +234,34 @@ ENGINE_MODES = {
     "local": {
         "push": build_push_include_local,
         "pull_request": build_pull_request_include_local,
-        "pull_request_target": build_pull_request_target_include_local,
         "issue_comment": build_pull_request_include_local,
         "workflow_dispatch": build_pull_request_include_local,
         "main": build_main_include_local,
         "schedule": build_schedule_include_local,
+    },
+    "eks": {
+        "push": lambda: build_push_include_cloud(EKS_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(EKS_K8S),
+        "issue_comment": lambda: build_pull_request_include_cloud(EKS_K8S),
+        "workflow_dispatch": lambda: build_pull_request_include_cloud(EKS_K8S),
+        "main": lambda: build_main_include_cloud(EKS_K8S),
+        "schedule": lambda: build_schedule_include_cloud(EKS_K8S),
+    },
+    "aks": {
+        "push": lambda: build_push_include_cloud(AKS_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(AKS_K8S),
+        "issue_comment": lambda: build_pull_request_include_cloud(AKS_K8S),
+        "workflow_dispatch": lambda: build_pull_request_include_cloud(AKS_K8S),
+        "main": lambda: build_main_include_cloud(AKS_K8S),
+        "schedule": lambda: build_schedule_include_cloud(AKS_K8S),
+    },
+    "gke": {
+        "push": lambda: build_push_include_cloud(GKE_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(GKE_K8S),
+        "issue_comment": lambda: build_pull_request_include_cloud(GKE_K8S),
+        "workflow_dispatch": lambda: build_pull_request_include_cloud(GKE_K8S),
+        "main": lambda: build_main_include_cloud(GKE_K8S),
+        "schedule": lambda: build_schedule_include_cloud(GKE_K8S),
     },
 }
 
@@ -242,7 +273,7 @@ if __name__ == "__main__":
         "-m",
         "--mode",
         type=str,
-        choices={"push", "pull_request", "main", "schedule", "pull_request_target", "issue_comment", "workflow_dispatch"},
+        choices={"push", "pull_request", "issue_comment",  "workflow_dispatch", "main", "schedule"},
         default="push",
         help="set of tests to run",
     )
