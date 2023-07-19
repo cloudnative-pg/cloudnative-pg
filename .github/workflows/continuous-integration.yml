@@ -392,6 +392,46 @@ jobs:
           echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV
           echo PWD=$(pwd) >> $GITHUB_ENV
 
+      - name: Run GoReleaser to build kubectl-cnpg plugin
+        uses: goreleaser/goreleaser-action@v4
+        if: |
+          github.event_name == 'schedule' ||
+          (
+            github.event_name == 'workflow_dispatch' &&
+            startsWith(github.head_ref, 'release-') ||
+            startsWith(github.ref_name, 'release-')
+          )
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build --skip-validate --rm-dist --id kubectl-cnpg
+        env:
+          DATE: ${{ env.DATE }}
+          COMMIT: ${{ env.COMMIT }}
+          VERSION: ${{ env.VERSION }}
+
+      # Send Slack notification if the kubectl-cnpg build fails.
+      # To avoid message overflow, we only report runs scheduled on main or release branches
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        if: |
+          failure() &&
+          github.organization == 'cloudnative-pg' &&
+          (
+            github.event_name == 'schedule' ||
+            (
+              github.event_name == 'workflow_dispatch' &&
+              startsWith(github.head_ref, 'release-') ||
+              startsWith(github.ref_name, 'release-')
+            )
+          )
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
+          SLACK_USERNAME: cnpg-bot
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: Building plugin `kubectl-cnpg` failed!
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
         with:
