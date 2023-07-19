@@ -34,6 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
+// clusterLogs contains the options and context to retrieve cluster logs
 type clusterLogs struct {
 	ctx         context.Context
 	clusterName string

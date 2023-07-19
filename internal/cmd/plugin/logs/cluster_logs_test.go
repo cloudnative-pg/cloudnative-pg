@@ -80,7 +80,7 @@ var _ = Describe("Get the logs", func() {
 		Expect(logsStream.Options.Follow).To(BeTrue())
 		Expect(logsStream.Options.Timestamps).To(BeTrue())
 		Expect(logsStream.Options.SinceTime).ToNot(BeNil())
-		Expect(logsStream.Options.TailLines).ToNot(BeNil())
+		Expect(logsStream.Options.TailLines).To(BeNil())
 	})
 
 	It("should get the proper tail lines", func() {
@@ -90,7 +90,8 @@ var _ = Describe("Get the logs", func() {
 		Expect(logsStream.Options.Follow).To(BeTrue())
 		Expect(logsStream.Options.Timestamps).To(BeTrue())
 		Expect(logsStream.Options.SinceTime).ToNot(BeNil())
-		Expect(logsStream.Options.TailLines).To(Equal(5))
+		Expect(logsStream.Options.TailLines).ToNot(BeNil())
+		Expect(*logsStream.Options.TailLines).To(BeEquivalentTo(5))
 	})
 
 	It("should get the proper stream for logs", func() {

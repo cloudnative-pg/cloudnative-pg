@@ -45,9 +45,9 @@ func clusterCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&cl.outputFile, "output", "o", "",
 		"Output outputFile")
 	cmd.Flags().BoolVarP(&cl.timestamp, "timestamps", "t", false,
-		"Prepend human-readable timestamp to each log line, if provided, logs since current timestamp will display")
+		"Prepend human-readable timestamp to each log line. If set, logs start from current time")
 	cmd.Flags().Int64Var(&cl.tailLines, "tail", -1,
-		" Lines of log file from each pod to retrieve, defaults to show all log lines")
+		"Number of lines from the end of the logs to show for each pod. By default there is no limit")
 	cmd.Flags().BoolVarP(&cl.follow, "follow", "f", false,
 		"Follow cluster logs (watches for new and re-created pods)")
 
