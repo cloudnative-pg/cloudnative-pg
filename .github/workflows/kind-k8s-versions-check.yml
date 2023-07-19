@@ -1,0 +1,54 @@
+# Checks the latest kind image version from `https://registry.hub.docker.com/v2/repositories/kindest/node/tags`,
+# and if there is a new one, updates the kind_versions.json
+name: kind-k8s-versions-check
+on:
+  schedule:
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+
+defaults:
+  run:
+    shell: 'bash -Eeuo pipefail -x {0}'
+
+env:
+  # The minimal k8s version supported, k8s version smaller than this one will be removed from vendor
+  MINIMAL_K8S: "1.23"
+
+jobs:
+  check-kind-k8s-versions:
+    runs-on: ubuntu-22.04
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v3
+      -
+        name: Get updated kind node version
+        run : |
+          # Get the latest valid kind node version, convert them to json
+          # and write them to a file, starting from the MINIMAL_K8S
+          for baseversion in $(seq $MINIMAL_K8S 0.01 99); do
+            URL="https://registry.hub.docker.com/v2/repositories/kindest/node/tags?name=${baseversion}&ordering=last_updated"
+            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | sort -Vr | head -n1)
+            if [[ -z "${v}" ]]; then
+               break
+            fi
+            echo "${v}"
+          done | jq -Rs 'split("\n") | map(select(length>0))' | tee .github/kind_versions.json
+      -
+        name: Create Pull Request if kind k8s versions have been updated
+        uses: peter-evans/create-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          title: "feat: Kind K8S versions update"
+          body: "Update the versions used to test the operator on kind k8s clusters"
+          branch: "k8s-kind-versions-update"
+          author: "k8s-kind-versions-check <k8s-kind-versions-check@users.noreply.github.com>"
+          add-paths: ".github/"
+          commit-message: "feat: Updated k8s kind tested versions"
+          signoff: true
