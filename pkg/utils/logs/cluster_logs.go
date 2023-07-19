@@ -240,30 +240,3 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 		return
 	}
 }
-
-// TailClusterLogs streams the cluster pod logs to a single output io.Writer,
-// starting from the current time, and watching for any new pods, and any new logs,
-// until the  context is cancelled or there are no pods left.
-//
-// If `parseTimestamps` is true, the log line will have the timestamp in
-// human-readable prepended. NOTE: this will make log-lines NON-JSON
-func TailClusterLogs(
-	ctx context.Context,
-	client kubernetes.Interface,
-	cluster *apiv1.Cluster,
-	writer io.Writer,
-	parseTimestamps bool,
-) error {
-	now := metav1.Now()
-	streamClusterLogs := ClusterStreamingRequest{
-		Cluster: cluster,
-		Options: &v1.PodLogOptions{
-			Timestamps: parseTimestamps,
-			Follow:     true,
-			SinceTime:  &now,
-		},
-		FollowWaiting: DefaultFollowWaiting,
-		Client:        client,
-	}
-	return streamClusterLogs.SingleStream(ctx, writer)
-}

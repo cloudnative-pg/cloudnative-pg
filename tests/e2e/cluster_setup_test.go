@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -29,7 +28,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -71,7 +69,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		var buf bytes.Buffer
 		GinkgoWriter.Println("Putting Tail on the cluster logs")
 		go func() {
-			err = logs.TailClusterLogs(context.TODO(), env.Interface, cluster, &buf, false)
+			err = env.TailClusterLogs(cluster, &buf, false)
 			if err != nil {
 				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
 			}

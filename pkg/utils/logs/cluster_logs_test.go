@@ -100,23 +100,4 @@ var _ = Describe("Cluster logging tests", func() {
 		// the fake pod will be seen twice
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logsfake logs"))
 	})
-
-	It("should tail without errors", func() {
-		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
-		var wait sync.WaitGroup
-		wait.Add(1)
-		go func() {
-			defer GinkgoRecover()
-			defer wait.Done()
-			err := TailClusterLogs(
-				context.TODO(),
-				client,
-				cluster,
-				&logBuffer,
-				false,
-			)
-			Expect(err).ToNot(HaveOccurred())
-		}()
-	})
 })
