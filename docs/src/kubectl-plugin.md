@@ -730,6 +730,9 @@ standard-out, then exit.
 The `-o` or `--output` flag can be provided, to specify the name
 of the file where the logs should be saved, instead of displaying over
 standard-out.
+The `--tail` can be used to specify how many logs lines will be retrieved from
+each pod in the cluster. by default, `logs cluster` sub-command will display all 
+the logs from each pod in the cluster. 
 
 NOTE: unlike other `cnpg` plugin commands, the `-f` is used to denote "follow"
 rather than specify a file. This keeps with the convention of `kubectl logs`,
@@ -745,6 +748,13 @@ Using the `-f` option to follow:
 
 ```shell
 kubectl cnpg report cluster cluster-example -f
+```
+
+Using `--tail` option to display 3 lines from each pod and then using the `-f` option 
+to follow:
+
+```shell
+kubectl cnpg report cluster cluster-example -f --tail 3
 ```
 
 ``` json

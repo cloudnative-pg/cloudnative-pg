@@ -60,6 +60,7 @@ var _ = Describe("Get the logs", func() {
 		namespace:   namespace,
 		follow:      true,
 		timestamp:   true,
+		tailLines:   -1,
 		client:      client,
 	}
 	plugin.Client = fake.NewClientBuilder().
@@ -73,12 +74,23 @@ var _ = Describe("Get the logs", func() {
 		Expect(cluster).ToNot(BeNil())
 	})
 
-	It("should ge tthe proper stream cluster log", func() {
+	It("should get the proper stream cluster log", func() {
 		logsStream := getStreamClusterLogs(cluster, cl)
 		Expect(logsStream).ToNot(BeNil())
 		Expect(logsStream.Options.Follow).To(BeTrue())
 		Expect(logsStream.Options.Timestamps).To(BeTrue())
 		Expect(logsStream.Options.SinceTime).ToNot(BeNil())
+		Expect(logsStream.Options.TailLines).ToNot(BeNil())
+	})
+
+	It("should get the proper tail lines", func() {
+		cl.tailLines = 5
+		logsStream := getStreamClusterLogs(cluster, cl)
+		Expect(logsStream).ToNot(BeNil())
+		Expect(logsStream.Options.Follow).To(BeTrue())
+		Expect(logsStream.Options.Timestamps).To(BeTrue())
+		Expect(logsStream.Options.SinceTime).ToNot(BeNil())
+		Expect(logsStream.Options.TailLines).To(Equal(5))
 	})
 
 	It("should get the proper stream for logs", func() {

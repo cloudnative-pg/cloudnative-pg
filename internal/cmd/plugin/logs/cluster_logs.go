@@ -39,6 +39,7 @@ type clusterLogs struct {
 	clusterName string
 	namespace   string
 	timestamp   bool
+	tailLines   int64
 	outputFile  string
 	follow      bool
 	client      kubernetes.Interface
@@ -55,8 +56,12 @@ func getCluster(cl clusterLogs) (*cnpgv1.Cluster, error) {
 
 func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) logs.ClusterStreamingRequest {
 	var sinceTime *metav1.Time
+	var tail *int64
 	if cl.timestamp {
 		sinceTime = &metav1.Time{Time: time.Now().UTC()}
+	}
+	if cl.tailLines >= 0 {
+		tail = &cl.tailLines
 	}
 	return logs.ClusterStreamingRequest{
 		Cluster: cluster,
@@ -64,6 +69,7 @@ func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) logs.ClusterS
 			Timestamps: cl.timestamp,
 			Follow:     cl.follow,
 			SinceTime:  sinceTime,
+			TailLines:  tail,
 		},
 		Client: cl.client,
 	}
