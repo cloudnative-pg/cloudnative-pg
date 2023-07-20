@@ -529,7 +529,7 @@ reset the password for the `postgres` user of the cluster.
 available WAL on the default target timeline (`current` for PostgreSQL up to
 11, `latest` for version 12 and above).
 You can optionally specify a `recoveryTarget` to perform a point in time
-recovery (see the ["Point in time recovery" section](#point-in-time-recovery)).
+recovery (see the ["Point in time recovery" section](#point-in-time-recovery-pitr)).
 
 !!! Important
     Consider using the `barmanObjectStore.wal.maxParallel` option to speed
@@ -662,10 +662,11 @@ You can choose only a single one among the targets above in each
 Additionally, you can specify `targetTLI` force recovery to a specific
 timeline.
 
-By default, the previous parameters are considered to be exclusive, stopping
-just before the recovery target. You can request inclusive behavior,
-stopping right after the recovery target, setting the `exclusive` parameter to
-`false` like in the following example relying on a blob container in Azure:
+By default, the previous parameters are considered to be inclusive, stopping
+just after the recovery target, matching [the behavior in PostgreSQL](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RECOVERY-TARGET-INCLUSIVE)
+You can request exclusive behavior,
+stopping right before the recovery target, setting the `exclusive` parameter to
+`true` like in the following example relying on a blob container in Azure:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -684,7 +685,7 @@ spec:
       recoveryTarget:
         backupID: 20220616T142236
         targetName: "maintenance-activity"
-        exclusive: false
+        exclusive: true
 
   externalClusters:
     - name: clusterBackup

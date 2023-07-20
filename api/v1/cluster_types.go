@@ -1234,7 +1234,7 @@ type RecoveryTarget struct {
 	// End recovery as soon as a consistent state is reached
 	TargetImmediate *bool `json:"targetImmediate,omitempty"`
 
-	// Set the target to be exclusive (defaults to true)
+	// Set the target to be exclusive (defaults to false)
 	Exclusive *bool `json:"exclusive,omitempty"`
 }
 
@@ -2613,13 +2613,10 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"
 	}
-	switch {
-	case target.Exclusive == nil:
-		result += "recovery_target_inclusive = false\n"
-	case *target.Exclusive:
-		result += "recovery_target_inclusive = false\n"
-	default:
+	if target.Exclusive == nil || !*target.Exclusive {
 		result += "recovery_target_inclusive = true\n"
+	} else {
+		result += "recovery_target_inclusive = false\n"
 	}
 
 	return result
