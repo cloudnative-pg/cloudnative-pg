@@ -1234,7 +1234,8 @@ type RecoveryTarget struct {
 	// End recovery as soon as a consistent state is reached
 	TargetImmediate *bool `json:"targetImmediate,omitempty"`
 
-	// Set the target to be exclusive (defaults to false)
+	// Set the target to be exclusive. If omitted, defaults to false, so that
+	// in Postgres, `recovery_target_inclusive` will be true
 	Exclusive *bool `json:"exclusive,omitempty"`
 }
 
