@@ -43,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/restorer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
@@ -105,6 +106,10 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
+		return err
+	}
+
 	if err := info.restoreDataDir(backup, env); err != nil {
 		return err
 	}
@@ -143,6 +148,49 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	}
 
 	return info.ConfigureInstanceAfterRestore(cluster, env)
+}
+
+func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	env []string,
+	backup *apiv1.Backup,
+) error {
+	// it's the full path of the file that will temporarily contain the LastCheckpointRedoWAL
+	const testWALPath = postgresSpec.RecoveryTemporaryDirectory + "/test.wal"
+	contextLogger := log.FromContext(ctx)
+
+	defer func() {
+		if err := fileutils.RemoveFile(testWALPath); err != nil {
+			contextLogger.Error(err, "while deleting the temporary wal file: %w")
+		}
+	}()
+
+	if err := fileutils.EnsureParentDirectoryExist(testWALPath); err != nil {
+		return err
+	}
+
+	rest, err := restorer.New(ctx, cluster, env, walarchive.SpoolDirectory)
+	if err != nil {
+		return err
+	}
+
+	opts, err := barman.CloudWalRestoreOptions(&apiv1.BarmanObjectStoreConfiguration{
+		BarmanCredentials: backup.Status.BarmanCredentials,
+		EndpointCA:        backup.Status.EndpointCA,
+		EndpointURL:       backup.Status.EndpointURL,
+		DestinationPath:   backup.Status.DestinationPath,
+		ServerName:        backup.Status.ServerName,
+	}, cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	if err := rest.Restore(backup.Status.BeginWal, testWALPath, opts); err != nil {
+		return fmt.Errorf("encountered an error while checking the presence of first needed WAL in the archive: %w", err)
+	}
+
+	return nil
 }
 
 // restoreCustomWalDir moves the current pg_wal data to the specified custom wal dir and applies the symlink
