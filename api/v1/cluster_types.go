@@ -2613,10 +2613,10 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"
 	}
-	if target.Exclusive == nil || !*target.Exclusive {
-		result += "recovery_target_inclusive = true\n"
-	} else {
+	if target.Exclusive != nil && *target.Exclusive {
 		result += "recovery_target_inclusive = false\n"
+	} else {
+		result += "recovery_target_inclusive = true\n"
 	}
 
 	return result
