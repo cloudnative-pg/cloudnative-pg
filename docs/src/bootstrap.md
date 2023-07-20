@@ -665,7 +665,7 @@ timeline.
 By default, the previous parameters are considered to be inclusive, stopping
 just after the recovery target, matching [the behavior in PostgreSQL](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RECOVERY-TARGET-INCLUSIVE)
 You can request exclusive behavior,
-stopping right before the recovery target, setting the `exclusive` parameter to
+stopping right before the recovery target, by setting the `exclusive` parameter to
 `true` like in the following example relying on a blob container in Azure:
 
 ```yaml
