@@ -24,6 +24,33 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
+// CloudWalRestoreOptions returns the options needed to execute the barman command successfully
+func CloudWalRestoreOptions(
+	configuration *v1.BarmanObjectStoreConfiguration,
+	clusterName string,
+) ([]string, error) {
+	var options []string
+	if len(configuration.EndpointURL) > 0 {
+		options = append(
+			options,
+			"--endpoint-url",
+			configuration.EndpointURL)
+	}
+
+	options, err := AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	serverName := clusterName
+	if len(configuration.ServerName) != 0 {
+		serverName = configuration.ServerName
+	}
+
+	options = append(options, configuration.DestinationPath, serverName)
+	return options, nil
+}
+
 // AppendCloudProviderOptionsFromConfiguration takes an options array and adds the cloud provider specified
 // in the Barman configuration object
 func AppendCloudProviderOptionsFromConfiguration(
