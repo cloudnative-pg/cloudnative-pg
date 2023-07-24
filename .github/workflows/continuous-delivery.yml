@@ -1172,14 +1172,14 @@ jobs:
 
           # Updating .kubeconfig to use the correct version of client.authentication.k8s.io API
           aws eks update-kubeconfig --name ${CLUSTER_NAME} --region ${AWS_REGION}
-          
+
           # Installing CRD for support volumeSnapshot
           SNAPSHOTTER_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/${{env.EXTERNAL_SNAPSHOTTER_VERSION}}
           kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
           kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
           kubectl apply -f ${SNAPSHOTTER_BASE_URL}/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
-          
-          ## Controller 
+
+          ## Controller
           kubectl apply -f ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
           kubectl apply -f ${SNAPSHOTTER_BASE_URL}/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
 

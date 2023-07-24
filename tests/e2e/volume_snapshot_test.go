@@ -27,12 +27,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// Test case for validating storage expansion
+// Test case for validating volume snapshots
 // with different storage providers in different k8s environments
 var _ = Describe("Verify volume snapshot", Label(tests.LabelBackupRestore, tests.LabelStorage), func() {
 	const (
 		sampleFile  = fixturesDir + "/volume_snapshot/cluster_volume_snapshot.yaml.template"
-		clusterName = "volume-snapshot-source"
+		clusterName = "volume-snapshot"
 		level       = tests.Medium
 	)
 	BeforeEach(func() {
@@ -41,16 +41,15 @@ var _ = Describe("Verify volume snapshot", Label(tests.LabelBackupRestore, tests
 		}
 		// This need to be removed later
 		if IsLocal() {
-			Skip("This test is only run on AKS and EKS and GKE clusters for now")
+			Skip("This test is only run on AKS, EKS and GKE clusters for now")
 		}
 	})
 	// Initializing a global namespace variable to be used in each test case
 	var namespace, namespacePrefix string
-	// Gathering default storage class requires to check whether the value
-	// of 'allowVolumeExpansion' is true or false
+	// Gathering the default volumeSnapshot class for the current environment
 	volumeSnapshotClassName := os.Getenv("E2E_DEFAULT_VOLUMESNAPSHOT_CLASS")
 
-	Context("Basic test", Ordered, func() {
+	Context("Can create a Volume Snapshot", Ordered, func() {
 		BeforeAll(func() {
 			var err error
 			// Initializing namespace variable to be used in test case
@@ -67,7 +66,7 @@ var _ = Describe("Verify volume snapshot", Label(tests.LabelBackupRestore, tests
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
 
-		It("Use kubectl cnp plugin to backup", func() {
+		It("Using the kubectl cnp plugin", func() {
 			err := utils.CreateVolumeSnapshotBackup(volumeSnapshotClassName, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
