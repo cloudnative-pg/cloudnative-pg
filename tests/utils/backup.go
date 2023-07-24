@@ -501,10 +501,10 @@ func CreateVolumeSnapshotBackup(
 ) error {
 	var err error
 	if volumeSnapshotClass == "" {
-		_, _, err = Run(fmt.Sprintf("kubectl cnp snapshot %v -n %v",
+		_, _, err = Run(fmt.Sprintf("kubectl cnpg snapshot %v -n %v",
 			clusterName, namespace))
 	} else {
-		_, _, err = Run(fmt.Sprintf("kubectl cnp snapshot %v -c %v -n %v",
+		_, _, err = Run(fmt.Sprintf("kubectl cnpg snapshot %v -c %v -n %v",
 			clusterName, volumeSnapshotClass, namespace))
 	}
 	if err != nil {

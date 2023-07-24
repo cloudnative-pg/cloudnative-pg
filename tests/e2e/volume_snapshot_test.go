@@ -66,7 +66,7 @@ var _ = Describe("Verify volume snapshot", Label(tests.LabelBackupRestore, tests
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
 
-		It("Using the kubectl cnp plugin", func() {
+		It("Using the kubectl cnpg plugin", func() {
 			err := utils.CreateVolumeSnapshotBackup(volumeSnapshotClassName, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
