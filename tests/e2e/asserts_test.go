@@ -162,7 +162,12 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 // correspond to the number of Instances in the cluster spec.
 // Important: this is not equivalent to "kubectl apply", and is not able
 // to apply a patch to an existing object.
-func AssertCreateCluster(namespace string, clusterName string, sampleFile string, env *testsUtils.TestingEnvironment) {
+func AssertCreateCluster(
+	namespace string,
+	clusterName string,
+	sampleFile string,
+	env *testsUtils.TestingEnvironment,
+) {
 	By(fmt.Sprintf("having a %v namespace", namespace), func() {
 		// Creating a namespace should be quick
 		namespacedName := types.NamespacedName{
@@ -2478,18 +2483,34 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 		if preRollingUpdateImg == "" {
 			preRollingUpdateImg = os.Getenv("POSTGRES_IMG")
 		}
-		envVars := map[string]string{
-			"E2E_DEFAULT_STORAGE_CLASS":  os.Getenv("E2E_DEFAULT_STORAGE_CLASS"),
-			"AZURE_STORAGE_ACCOUNT":      os.Getenv("AZURE_STORAGE_ACCOUNT"),
-			"POSTGRES_IMG":               os.Getenv("POSTGRES_IMG"),
+		envVars := buildTemplateEnvs(map[string]string{
 			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
-		}
+		})
+
 		yaml, err = testsUtils.Envsubst(envVars, data)
 		if err != nil {
 			return nil, wrapErr(err)
 		}
 	}
 	return yaml, nil
+}
+
+func buildTemplateEnvs(additionalEnvs map[string]string) map[string]string {
+	envs := make(map[string]string)
+	rawEnvs := os.Environ()
+	for _, s := range rawEnvs {
+		keyValue := strings.Split(s, "=")
+		if len(keyValue) < 2 {
+			continue
+		}
+		envs[keyValue[0]] = keyValue[1]
+	}
+
+	for key, value := range additionalEnvs {
+		envs[key] = value
+	}
+
+	return envs
 }
 
 // DeleteResourcesFromFile deletes the Kubernetes objects described in the file
