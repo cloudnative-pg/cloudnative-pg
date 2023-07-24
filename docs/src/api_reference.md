@@ -872,7 +872,7 @@ Name            | Description                                                   
 `targetLSN      ` | The target LSN (Log Sequence Number)                                                                                                                                                                                                                 | string
 `targetTime     ` | The target time as a timestamp in the RFC3339 standard                                                                                                                                                                                               | string
 `targetImmediate` | End recovery as soon as a consistent state is reached                                                                                                                                                                                                | *bool 
-`exclusive      ` | Set the target to be exclusive (defaults to true)                                                                                                                                                                                                    | *bool 
+`exclusive      ` | Set the target to be exclusive. If omitted, defaults to false, so that in Postgres, `recovery_target_inclusive` will be true                                                                                                                         | *bool 
 
 <a id='ReplicaClusterConfiguration'></a>
 
