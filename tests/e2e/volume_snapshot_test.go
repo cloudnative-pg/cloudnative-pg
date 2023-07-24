@@ -40,8 +40,8 @@ var _ = Describe("Verify volume snapshot", Label(tests.LabelBackupRestore, tests
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 		// This need to be removed later
-		if !IsAKS() && !IsEKS() {
-			Skip("This test is only run on AKS and EKS clusters for now")
+		if IsLocal() {
+			Skip("This test is only run on AKS and EKS and GKE clusters for now")
 		}
 	})
 	// Initializing a global namespace variable to be used in each test case

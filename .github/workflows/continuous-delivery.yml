@@ -1471,8 +1471,8 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
-      E2E_DEFAULT_STORAGE_CLASS: standard
-      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: ""
+      E2E_DEFAULT_STORAGE_CLASS: standard-rwo
+      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: pd-csi-snapclass
 
       ZONE: europe-west3-a
       TEST_CLOUD_VENDOR: "gke"
@@ -1553,6 +1553,14 @@ jobs:
           USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
         run: |
           gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} --zone ${{ env.ZONE }} --project ${{ secrets.GCP_PROJECT_ID }}
+      -
+        name: Configure Storage
+        run: |
+          # Install volume snapshot class
+          kubectl apply -f hack/e2e/volumesnapshotclass-pd-csi.yaml
+          # Change to use standard-rwo as default storage account
+          kubectl annotate storageclass ${{env.E2E_DEFAULT_STORAGE_CLASS}} storage.kubernetes.io/default-snapshot-class=${{env.E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}} --overwrite
+          kubectl get storageclass
       -
         name: Prepare patch for customization
         env:
