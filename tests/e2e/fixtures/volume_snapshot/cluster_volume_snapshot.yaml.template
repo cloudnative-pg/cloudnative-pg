@@ -1,0 +1,19 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: volume-snapshot-source
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
