@@ -1505,8 +1505,9 @@ spec:
                               available backup in chronological order.
                             type: string
                           exclusive:
-                            description: Set the target to be exclusive (defaults
-                              to true)
+                            description: Set the target to be exclusive. If omitted,
+                              defaults to false, so that in Postgres, `recovery_target_inclusive`
+                              will be true
                             type: boolean
                           targetImmediate:
                             description: End recovery as soon as a consistent state
