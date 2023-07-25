@@ -29,7 +29,7 @@ import (
 
 // Test case for validating volume snapshots
 // with different storage providers in different k8s environments
-var _ = Describe("Verify volume snapshot",
+var _ = Describe("Verify Volume Snapshot",
 	Label(tests.LabelBackupRestore, tests.LabelStorage, tests.LabelSnapshot), func() {
 		const (
 			sampleFile  = fixturesDir + "/volume_snapshot/cluster_volume_snapshot.yaml.template"
@@ -67,8 +67,13 @@ var _ = Describe("Verify volume snapshot",
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			})
 
-			It("Using the kubectl cnpg plugin", func() {
-				err := utils.CreateVolumeSnapshotBackup(volumeSnapshotClassName, namespace, clusterName, "")
+			It("using the kubectl cnpg plugin", func() {
+				err := utils.CreateVolumeSnapshotBackup(
+					volumeSnapshotClassName,
+					namespace,
+					clusterName,
+					"",
+				)
 				Expect(err).ToNot(HaveOccurred())
 
 				out, _, err := utils.Run(fmt.Sprintf("kubectl get volumesnapshot -n %v", namespace))
@@ -93,12 +98,12 @@ var _ = Describe("Verify volume snapshot",
 
 				out, _, err := utils.Run(fmt.Sprintf("kubectl get volumesnapshot -n %v", namespace))
 				Expect(err).ToNot(HaveOccurred())
-				GinkgoWriter.Println("output of current volumesnapshot")
+				GinkgoWriter.Println("output of current volumesnapshot \n")
 				GinkgoWriter.Println(out)
 
 				out, _, err = utils.Run(fmt.Sprintf("kubectl get volumesnapshotcontent -n %v", namespace))
 				Expect(err).ToNot(HaveOccurred())
-				GinkgoWriter.Println("output of current volumesnapshotcontent")
+				GinkgoWriter.Println("output of current volumesnapshotcontent \n")
 				GinkgoWriter.Println(out)
 			})
 		})
