@@ -434,6 +434,7 @@ cGFzc
 cb
 cd
 ce
+cgroup
 cheatsheet
 checksums
 chmod
@@ -597,6 +598,7 @@ html
 http
 httpGet
 https
+hugepages
 imageName
 imagePullPolicy
 imagePullSecrets
