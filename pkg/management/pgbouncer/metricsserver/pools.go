@@ -204,7 +204,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 		}
 	}()
 
-	// common fields
+	// common columns
 	var (
 		database  string
 		user      string
@@ -220,12 +220,12 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 		poolMode  string
 	)
 
-	// exclusive fields for 'version < 1.18.0'
+	// exclusive columns for 'version < 1.18.0'
 	var (
 		clCancelReq int
 	)
 
-	// PGBouncer 1.18.0 exclusive fields
+	// PGBouncer 1.18.0 exclusive columns
 	var (
 		clActiveCancelReq  int
 		clWaitingCancelReq int
@@ -241,9 +241,9 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 		return
 	}
 	for rows.Next() {
-		const pgBouncerVersion1180 = 16
+		const poolsColumnsPgBouncer1180 = 16
 		switch len(cols) {
-		case pgBouncerVersion1180:
+		case poolsColumnsPgBouncer1180:
 			if err = rows.Scan(&database, &user,
 				&clActive,
 				&clWaiting,
