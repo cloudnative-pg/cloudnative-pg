@@ -649,17 +649,25 @@ operator to connect cross-namespace to cluster pods.
 
 ### Error while bootstrapping data directory
 
-If you encounter the issue that your database cannot be initialized because it crashes during the bootstraping process, it is likely that your hugepage settings are set wrong.
+If your Cluster's initialization job crashes with a "Bus error (core dumped)
+child process exited with exit code 135", you likely need to fix the Cluster
+hugepages settings.
 
-To check whether hugepages are enabled, run `cat /proc/meminfo` and check if huge pages are configured, their size and how many are free. If they are not enabled, you can adjust your cluster configuration as follows:
-```
-  postgresql:
-    parameters:
-      huge_pages: "off"
-```
-If they are enabled, you need to define how much memory should be allocated on them.
-Example:
-```
+The reason is the incomplete support of hugepages in the cgroup v1 that should
+be fixed in v2. For more information, check the PostgreSQL [BUG #17757: Not
+honoring huge_pages setting during initdb causes DB crash in
+Kubernetes](https://www.postgresql.org/message-id/17757-dbdfc1f1c954a6db%40postgresql.org)
+
+To check whether hugepages are enabled, run `grep HugePages /proc/meminfo` on
+the Kubernetes node and check if hugepages are present, their size, and how many
+are free.
+
+If the hugepages are present, you need to configure how much hugepages memory
+every PostgreSQL pod should have available.
+
+For example:
+
+``` yaml
   postgresql:
     parameters:
       shared_buffers: "128MB"
@@ -669,6 +677,8 @@ Example:
       memory: "512Mi"
     limits:
       hugepages-2Mi: "512Mi"
-``` 
+```
 
-Please keep in mind that you have sufficient huge-page memory allocated (in the example above at least 512MiB need to be free) - check that in the meminfo.
+Please remember that you must have enough hugepages memory available to schedule
+every Pod in the Cluster (in the example above, at least 512MiB per Pod must be
+free).
