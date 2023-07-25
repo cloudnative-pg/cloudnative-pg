@@ -647,7 +647,7 @@ In the [networking page](networking.md) you can find a network policy file
 that you can customize to create a `NetworkPolicy` explicitly allowing the
 operator to connect cross-namespace to cluster pods.
 
-### Error while bootstrapping data directory
+### Error while bootstrapping the data directory
 
 If your Cluster's initialization job crashes with a "Bus error (core dumped)
 child process exited with exit code 135", you likely need to fix the Cluster
