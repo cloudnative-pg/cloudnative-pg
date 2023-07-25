@@ -505,7 +505,7 @@ func CreateVolumeSnapshotBackup(
 		command = fmt.Sprintf("%v -c %v", command, volumeSnapshotClass)
 	}
 	if snapshotSuffix != "" {
-		command = fmt.Sprintf("%v -s %v", command, snapshotSuffix)
+		command = fmt.Sprintf("%v -x %v", command, snapshotSuffix)
 	}
 
 	_, _, err := Run(command)

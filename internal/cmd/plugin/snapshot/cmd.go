@@ -86,7 +86,7 @@ The other replicas will continue working.`,
 (defaults to empty, which will make use of the default VolumeSnapshotClass)`)
 
 	cmd.Flags().StringP("volume-snapshot-suffix",
-		"s",
+		"x",
 		"",
 		"Specifies the suffix of the created volume snapshot. Optional. "+
 			"Defaults to the snapshot time expressed as unix timestamp",
