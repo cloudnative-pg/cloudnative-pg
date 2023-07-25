@@ -656,7 +656,7 @@ hugepages settings.
 The reason is the incomplete support of hugepages in the cgroup v1 that should
 be fixed in v2. For more information, check the PostgreSQL [BUG #17757: Not
 honoring huge_pages setting during initdb causes DB crash in
-Kubernetes](https://www.postgresql.org/message-id/17757-dbdfc1f1c954a6db%40postgresql.org)
+Kubernetes](https://www.postgresql.org/message-id/17757-dbdfc1f1c954a6db%40postgresql.org).
 
 To check whether hugepages are enabled, run `grep HugePages /proc/meminfo` on
 the Kubernetes node and check if hugepages are present, their size, and how many
