@@ -73,13 +73,13 @@ var _ = Describe("Verify volume snapshot",
 
 				out, _, err := utils.Run(fmt.Sprintf("kubectl get volumesnapshot -n %v", namespace))
 				Expect(err).ToNot(HaveOccurred())
-				GinkgoWriter.Print("output of current volumesnapshot")
-				GinkgoWriter.Print(out)
+				GinkgoWriter.Println("output of current volumesnapshot \n")
+				GinkgoWriter.Println(out)
 
 				out, _, err = utils.Run(fmt.Sprintf("kubectl get volumesnapshotcontent -n %v", namespace))
 				Expect(err).ToNot(HaveOccurred())
-				GinkgoWriter.Print("output of current volumesnapshotcontent")
-				GinkgoWriter.Print(out)
+				GinkgoWriter.Println("output of current volumesnapshotcontent \n")
+				GinkgoWriter.Println(out)
 			})
 
 			It("using the kubectl cnpg plugin with a custom suffix", func() {
@@ -93,13 +93,13 @@ var _ = Describe("Verify volume snapshot",
 
 				out, _, err := utils.Run(fmt.Sprintf("kubectl get volumesnapshot -n %v", namespace))
 				Expect(err).ToNot(HaveOccurred())
-				GinkgoWriter.Print("output of current volumesnapshot")
-				GinkgoWriter.Print(out)
+				GinkgoWriter.Println("output of current volumesnapshot")
+				GinkgoWriter.Println(out)
 
 				out, _, err = utils.Run(fmt.Sprintf("kubectl get volumesnapshotcontent -n %v", namespace))
 				Expect(err).ToNot(HaveOccurred())
-				GinkgoWriter.Print("output of current volumesnapshotcontent")
-				GinkgoWriter.Print(out)
+				GinkgoWriter.Println("output of current volumesnapshotcontent")
+				GinkgoWriter.Println(out)
 			})
 		})
 	})
