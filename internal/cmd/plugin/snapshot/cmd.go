@@ -67,8 +67,9 @@ The other replicas will continue working.`,
 			clusterName := args[0]
 
 			snapshotClassName, _ := cmd.Flags().GetString("volume-snapshot-class-name")
+			snapshotNameSuffix, _ := cmd.Flags().GetString("volume-snapshot-suffix")
 
-			snapshotCmd, err := newSnapshotCommand(cmd.Context(), clusterName, snapshotClassName)
+			snapshotCmd, err := newSnapshotCommand(cmd.Context(), clusterName, snapshotClassName, snapshotNameSuffix)
 			if err != nil {
 				return err
 			}
@@ -84,6 +85,13 @@ The other replicas will continue working.`,
 		`The VolumeSnapshotClass name to be used for the snapshot
 (defaults to empty, which will make use of the default VolumeSnapshotClass)`)
 
+	cmd.Flags().StringP("volume-snapshot-suffix",
+		"s",
+		"",
+		"Specifies the suffix of the created volume snapshot. Optional. "+
+			"Defaults to the snapshot time expressed as unix timestamp",
+	)
+
 	return cmd
 }
 
@@ -94,16 +102,23 @@ type snapshotCommand struct {
 	pvcs              []corev1.PersistentVolumeClaim
 	snapshotClassName string
 	snapshotTime      time.Time
+	snapshotSuffix    string
 }
 
 // newSnapshotCommand creates the snapshot command
-func newSnapshotCommand(ctx context.Context, clusterName, snapshotClassName string) (*snapshotCommand, error) {
+func newSnapshotCommand(
+	ctx context.Context,
+	clusterName string,
+	snapshotClassName string,
+	snapshotSuffix string,
+) (*snapshotCommand, error) {
 	var cluster apiv1.Cluster
 
 	cmd := &snapshotCommand{
 		ctx:               ctx,
 		cluster:           &cluster,
 		snapshotClassName: snapshotClassName,
+		snapshotSuffix:    snapshotSuffix,
 	}
 
 	// Get the Cluster object
@@ -324,5 +339,9 @@ func (cmd *snapshotCommand) waitSnapshot(name string) error {
 
 // getSnapshotName gets the snapshot name for a certain PVC
 func (cmd *snapshotCommand) getSnapshotName(pvcName string) string {
+	if cmd.snapshotSuffix != "" {
+		return fmt.Sprintf("%s-%v", pvcName, cmd.snapshotSuffix)
+	}
+
 	return fmt.Sprintf("%s-%v", pvcName, cmd.snapshotTime.Unix())
 }
