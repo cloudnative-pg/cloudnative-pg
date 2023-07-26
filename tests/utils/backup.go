@@ -497,18 +497,17 @@ func GetConditionsInClusterStatus(
 func CreateVolumeSnapshotBackup(
 	volumeSnapshotClass,
 	namespace,
-	clusterName string,
+	clusterName,
+	snapshotSuffix string,
 ) error {
-	var err error
-	if volumeSnapshotClass == "" {
-		_, _, err = Run(fmt.Sprintf("kubectl cnpg snapshot %v -n %v",
-			clusterName, namespace))
-	} else {
-		_, _, err = Run(fmt.Sprintf("kubectl cnpg snapshot %v -c %v -n %v",
-			clusterName, volumeSnapshotClass, namespace))
+	command := fmt.Sprintf("kubectl cnpg snapshot %v -n %v", clusterName, namespace)
+	if volumeSnapshotClass != "" {
+		command = fmt.Sprintf("%v -c %v", command, volumeSnapshotClass)
 	}
-	if err != nil {
-		return err
+	if snapshotSuffix != "" {
+		command = fmt.Sprintf("%v -x %v", command, snapshotSuffix)
 	}
-	return nil
+
+	_, _, err := Run(command)
+	return err
 }
