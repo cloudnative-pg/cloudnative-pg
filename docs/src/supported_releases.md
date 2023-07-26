@@ -99,8 +99,8 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version         | Release Date     | End of Life               | Supported Kubernetes Versions |
 |-----------------|------------------|---------------------------|-------------------------------|
-| 1.21.0          | June 27, 2023    | -                         | -                             |
-| 1.22.0          | Aug 29, 2023     | -                         | -                             |
+| 1.21.0          | Sept 26, 2023    | -                         | -                             |
+| 1.22.0          | Nov 28, 2023     | -                         | -                             |
 
 !!! Note
     Feature freeze happens one week before the release
