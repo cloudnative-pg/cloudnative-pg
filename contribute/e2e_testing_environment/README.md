@@ -130,6 +130,7 @@ exported, it will select all medium test cases from the feature type provided.
 | `service-connectivity`            |
 | `self-healing`                    |
 | `backup-restore`                  |
+| `snapshot`                        |
 | `operator`                        |
 | `observability`                   |
 | `replication`                     |
