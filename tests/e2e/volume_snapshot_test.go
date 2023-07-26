@@ -29,56 +29,82 @@ import (
 
 // Test case for validating volume snapshots
 // with different storage providers in different k8s environments
-var _ = Describe("Verify volume snapshot", Label(tests.LabelBackupRestore, tests.LabelStorage), func() {
-	const (
-		sampleFile  = fixturesDir + "/volume_snapshot/cluster_volume_snapshot.yaml.template"
-		clusterName = "volume-snapshot"
-		level       = tests.Medium
-	)
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-		// This need to be removed later
-		if IsLocal() {
-			Skip("This test is only run on AKS, EKS and GKE clusters for now")
-		}
-	})
-	// Initializing a global namespace variable to be used in each test case
-	var namespace, namespacePrefix string
-	// Gathering the default volumeSnapshot class for the current environment
-	volumeSnapshotClassName := os.Getenv("E2E_DEFAULT_VOLUMESNAPSHOT_CLASS")
+var _ = Describe("Verify Volume Snapshot",
+	Label(tests.LabelBackupRestore, tests.LabelStorage, tests.LabelSnapshot), func() {
+		const (
+			sampleFile  = fixturesDir + "/volume_snapshot/cluster_volume_snapshot.yaml.template"
+			clusterName = "volume-snapshot"
+			level       = tests.Medium
+		)
+		BeforeEach(func() {
+			if testLevelEnv.Depth < int(level) {
+				Skip("Test depth is lower than the amount requested for this test")
+			}
+			// This need to be removed later
+			if IsLocal() {
+				Skip("This test is only run on AKS, EKS and GKE clusters for now")
+			}
+		})
+		// Initializing a global namespace variable to be used in each test case
+		var namespace, namespacePrefix string
+		// Gathering the default volumeSnapshot class for the current environment
+		volumeSnapshotClassName := os.Getenv("E2E_DEFAULT_VOLUMESNAPSHOT_CLASS")
 
-	Context("Can create a Volume Snapshot", Ordered, func() {
-		BeforeAll(func() {
-			var err error
-			// Initializing namespace variable to be used in test case
-			namespacePrefix = "volume-snapshot"
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
+		Context("Can create a Volume Snapshot", Ordered, func() {
+			BeforeAll(func() {
+				var err error
+				// Initializing namespace variable to be used in test case
+				namespacePrefix = "volume-snapshot"
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					return env.DeleteNamespace(namespace)
+				})
+				// Creating a cluster with three nodes
+				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			})
-			// Creating a cluster with three nodes
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		})
 
-		It("Using the kubectl cnpg plugin", func() {
-			err := utils.CreateVolumeSnapshotBackup(volumeSnapshotClassName, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
+			It("using the kubectl cnpg plugin", func() {
+				err := utils.CreateVolumeSnapshotBackup(
+					volumeSnapshotClassName,
+					namespace,
+					clusterName,
+					"",
+				)
+				Expect(err).ToNot(HaveOccurred())
 
-			out, _, err := utils.Run(fmt.Sprintf("kubectl get volumesnapshot -n %v", namespace))
-			Expect(err).ToNot(HaveOccurred())
-			GinkgoWriter.Print("output of current volumesnapshot")
-			GinkgoWriter.Print(out)
+				out, _, err := utils.Run(fmt.Sprintf("kubectl get volumesnapshot -n %v", namespace))
+				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Println("output of current volumesnapshot \n")
+				GinkgoWriter.Println(out)
 
-			out, _, err = utils.Run(fmt.Sprintf("kubectl get volumesnapshotcontent -n %v", namespace))
-			Expect(err).ToNot(HaveOccurred())
-			GinkgoWriter.Print("output of current volumesnapshotcontent")
-			GinkgoWriter.Print(out)
+				out, _, err = utils.Run(fmt.Sprintf("kubectl get volumesnapshotcontent -n %v", namespace))
+				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Println("output of current volumesnapshotcontent \n")
+				GinkgoWriter.Println(out)
+			})
+
+			It("using the kubectl cnpg plugin with a custom suffix", func() {
+				err := utils.CreateVolumeSnapshotBackup(
+					volumeSnapshotClassName,
+					namespace,
+					clusterName,
+					"test",
+				)
+				Expect(err).ToNot(HaveOccurred())
+
+				out, _, err := utils.Run(fmt.Sprintf("kubectl get volumesnapshot -n %v", namespace))
+				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Println("output of current volumesnapshot \n")
+				GinkgoWriter.Println(out)
+
+				out, _, err = utils.Run(fmt.Sprintf("kubectl get volumesnapshotcontent -n %v", namespace))
+				Expect(err).ToNot(HaveOccurred())
+				GinkgoWriter.Println("output of current volumesnapshotcontent \n")
+				GinkgoWriter.Println(out)
+			})
 		})
 	})
-})
