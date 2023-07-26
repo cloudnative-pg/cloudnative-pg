@@ -376,8 +376,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 		pod.Spec.Subdomain = cluster.GetServiceAnyName()
 	}
 
-	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
-		utils.AnnotateAppArmor(&pod.ObjectMeta, cluster.Annotations)
+	if utils.IsAnnotationAppArmorPresent(&pod.Spec, cluster.Annotations) {
+		utils.AnnotateAppArmor(&pod.ObjectMeta, &pod.Spec, cluster.Annotations)
 	}
 	return pod
 }
