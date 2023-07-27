@@ -329,6 +329,10 @@ func (cmd *snapshotCommand) waitSnapshot(name string) error {
 			return fmt.Errorf("snapshot %s is not available: %w", name, err)
 		}
 
+		if snapshot.Status != nil && snapshot.Status.Error != nil {
+			return fmt.Errorf("snapshot %s is not ready to use.\nError: %v", name, snapshot.Status.Error.Message)
+		}
+
 		if snapshot.Status == nil || snapshot.Status.ReadyToUse == nil || !*snapshot.Status.ReadyToUse {
 			return fmt.Errorf("snapshot %s is not ready to use", name)
 		}
