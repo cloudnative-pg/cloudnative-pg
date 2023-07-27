@@ -173,6 +173,7 @@ LSN
 LTS
 LastBackupFailed
 LastBackupSucceeded
+LastFailedArchiveTime
 Lifecycle
 Linkerd
 Linode
@@ -752,6 +753,7 @@ operatorgroups
 operatorhub
 osdk
 ou
+ownerMetadata
 ownerReference
 packagemanifests
 parseable
@@ -807,6 +809,7 @@ preferredDuringSchedulingIgnoredDuringExecution
 preload
 prepended
 primaryUpdateStrategy
+priorityClassName
 proc
 programmatically
 proj
