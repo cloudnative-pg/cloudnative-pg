@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -112,6 +113,10 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.APIExtensionClient = apiextensionsclientset.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
+
+	if err := storagesnapshotv1.AddToScheme(env.Scheme); err != nil {
+		return nil, err
+	}
 
 	flags := log.NewFlags(zap.Options{
 		Development: true,
@@ -230,6 +235,14 @@ func (env TestingEnvironment) GetPVCList(namespace string) (*corev1.PersistentVo
 		env.Ctx, pvcList, client.InNamespace(namespace),
 	)
 	return pvcList, err
+}
+
+// GetSnapshotList gathers the current list of VolumeSnapshots in a namespace
+func (env TestingEnvironment) GetSnapshotList(namespace string) (*storagesnapshotv1.VolumeSnapshotList, error) {
+	list := &storagesnapshotv1.VolumeSnapshotList{}
+	err := env.Client.List(env.Ctx, list, client.InNamespace(namespace))
+
+	return list, err
 }
 
 // GetJobList gathers the current list of jobs in a namespace
