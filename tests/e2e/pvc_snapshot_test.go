@@ -48,7 +48,8 @@ var _ = Describe("PVC Snapshot", Label(tests.LabelSnapshot), func() {
 		)
 		// database constants
 		const (
-			tableName = "test"
+			tableName    = "test"
+			tableNameTwo = "test_two"
 		)
 
 		volumeSnapshotClassName := os.Getenv("E2E_DEFAULT_VOLUMESNAPSHOT_CLASS")
@@ -142,15 +143,16 @@ var _ = Describe("PVC Snapshot", Label(tests.LabelSnapshot), func() {
 			})
 
 			start := time.Now()
-			var timeNeededToCreateData time.Duration
+			var rawPITR time.Duration
 			By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 				AssertCreateTestData(namespace, clusterToSnapshotName, tableName, psqlClientPod)
-				timeNeededToCreateData = time.Since(start)
+				rawPITR = time.Since(start)
+				AssertCreateTestData(namespace, clusterToSnapshotName, tableNameTwo, psqlClientPod)
 				AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
 			})
 
 			// create a sensible PITR
-			PITR := start.Add(timeNeededToCreateData / 2).Format("2006-01-02T15:04:05")
+			PITR := start.Add(rawPITR).Format("2006-01-02T15:04:05")
 
 			// pass the env variable to the template engine
 			err := os.Setenv("SNAPSHOT_PITR", PITR)
