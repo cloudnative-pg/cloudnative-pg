@@ -23,7 +23,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 
@@ -94,7 +94,7 @@ var _ = Describe("RoleInheritanceManager", func() {
 					RoleID:      "role1",
 					Member:      "member1",
 					AdminOption: true,
-					Grantor:     pointer.String("grantor1"),
+					Grantor:     ptr.To("grantor1"),
 				},
 				{
 					RoleID:      "role2",

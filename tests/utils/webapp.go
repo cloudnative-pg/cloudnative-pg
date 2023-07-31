@@ -19,7 +19,7 @@ package utils
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -80,7 +80,7 @@ func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSe
 						},
 					},
 					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: pointer.Bool(false),
+						AllowPrivilegeEscalation: ptr.To(false),
 						SeccompProfile:           seccompProfile,
 					},
 				},

@@ -19,7 +19,7 @@ package utils
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -71,7 +71,7 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 					// sleep enough time to keep the pod running until we finish the E2E tests
 					Args: []string{"sleep 7200"},
 					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: pointer.Bool(false),
+						AllowPrivilegeEscalation: ptr.To(false),
 						SeccompProfile:           seccompProfile,
 					},
 				},
