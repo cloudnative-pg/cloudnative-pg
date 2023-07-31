@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
@@ -106,7 +106,7 @@ var _ = Describe("Slot synchronization", func() {
 	}
 	config := apiv1.ReplicationSlotsConfiguration{
 		HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-			Enabled:    pointer.Bool(true),
+			Enabled:    ptr.To(true),
 			SlotPrefix: "_cnpg_",
 		},
 	}

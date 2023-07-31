@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -230,12 +230,12 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 								PeriodSeconds:       10,
 							},
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
 								SeccompProfile: &corev1.SeccompProfile{
 									Type: corev1.SeccompProfileTypeRuntimeDefault,
 								},
 								RunAsGroup:   &runAs,
-								RunAsNonRoot: pointer.Bool(true),
+								RunAsNonRoot: ptr.To(true),
 								RunAsUser:    &runAs,
 
 								Capabilities: &corev1.Capabilities{
@@ -243,7 +243,7 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 										"ALL",
 									},
 								},
-								ReadOnlyRootFilesystem: pointer.Bool(true),
+								ReadOnlyRootFilesystem: ptr.To(true),
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
