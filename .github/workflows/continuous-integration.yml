@@ -122,10 +122,8 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Run Go linter only if Go code has changed
-    if: |
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      needs.change-triage.outputs.go-code-changed == 'true'
+    # We need always run linter as go linter is a required check
+    if: needs.duplicate_runs.outputs.should_skip != 'true'
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
