@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -177,7 +177,7 @@ var _ = Describe("Reconcile resource requests", func() {
 	It("Reconcile resources with resize in use and empty PVCs shouldn't fail", func() {
 		cluster.Spec = apiv1.ClusterSpec{
 			StorageConfiguration: apiv1.StorageConfiguration{
-				ResizeInUseVolumes: pointer.Bool(false),
+				ResizeInUseVolumes: ptr.To(false),
 			},
 		}
 		err := reconcileResourceRequests(
@@ -431,12 +431,12 @@ var _ = Describe("Storage source", func() {
 							Storage: corev1.TypedLocalObjectReference{
 								Name:     pgDataSnapshotVolumeName,
 								Kind:     "VolumeSnapshot",
-								APIGroup: pointer.String("snapshot.storage.k8s.io"),
+								APIGroup: ptr.To("snapshot.storage.k8s.io"),
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
 								Name:     pgWalSnapshotVolumeName,
 								Kind:     "VolumeSnapshot",
-								APIGroup: pointer.String("snapshot.storage.k8s.io"),
+								APIGroup: ptr.To("snapshot.storage.k8s.io"),
 							},
 						},
 					},

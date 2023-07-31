@@ -21,7 +21,7 @@ import (
 	"errors"
 	"time"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
@@ -85,7 +85,7 @@ func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.
 		Spec: apiv1.ClusterSpec{
 			ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 				HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-					Enabled:    pointer.Bool(true),
+					Enabled:    ptr.To(true),
 					SlotPrefix: slotPrefix,
 				},
 			},

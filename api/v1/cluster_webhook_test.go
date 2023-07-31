@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -2579,7 +2579,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: pointer.Bool(true),
+						Enabled: ptr.To(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -2597,7 +2597,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: pointer.Bool(true),
+						Enabled: ptr.To(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -2620,7 +2620,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster := oldCluster.DeepCopy()
 		newCluster.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{
 			HighAvailability: &ReplicationSlotsHAConfiguration{
-				Enabled:    pointer.Bool(true),
+				Enabled:    ptr.To(true),
 				SlotPrefix: "_test_",
 			},
 		}
@@ -2654,7 +2654,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    pointer.Bool(true),
+						Enabled:    ptr.To(true),
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2673,7 +2673,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    pointer.Bool(true),
+						Enabled:    ptr.To(true),
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2682,7 +2682,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		oldCluster.Default()
 
 		newCluster := oldCluster.DeepCopy()
-		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = pointer.Bool(false)
+		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(false)
 		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
 	})
 })
@@ -2901,7 +2901,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: pointer.Bool(true),
+						Enabled: ptr.To(true),
 					},
 				},
 				PostgresConfiguration: PostgresConfiguration{
@@ -2947,7 +2947,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: pointer.Bool(true),
+						Enabled: ptr.To(true),
 					},
 				},
 				PostgresConfiguration: PostgresConfiguration{
@@ -2995,7 +2995,7 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &BootstrapRecovery{
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgdata",
 							},
@@ -3015,12 +3015,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &BootstrapRecovery{
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgwal",
 							},
@@ -3039,12 +3039,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &BootstrapRecovery{
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgwal",
 							},
@@ -3061,12 +3061,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&BootstrapRecovery{
 			VolumeSnapshots: &DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: pointer.String(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(storagesnapshotv1.GroupName),
 					Kind:     "VolumeSnapshot",
 					Name:     "pgdata",
 				},
 				WalStorage: &corev1.TypedLocalObjectReference{
-					APIGroup: pointer.String(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(storagesnapshotv1.GroupName),
 					Kind:     "VolumeSnapshot",
 					Name:     "pgwal",
 				},
@@ -3100,12 +3100,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			cluster := clusterFromRecovery(&BootstrapRecovery{
 				VolumeSnapshots: &DataSource{
 					Storage: corev1.TypedLocalObjectReference{
-						APIGroup: pointer.String(""),
+						APIGroup: ptr.To(""),
 						Kind:     "PersistentVolumeClaim",
 						Name:     "pgdata",
 					},
 					WalStorage: &corev1.TypedLocalObjectReference{
-						APIGroup: pointer.String(""),
+						APIGroup: ptr.To(""),
 						Kind:     "PersistentVolumeClaim",
 						Name:     "pgwal",
 					},
@@ -3119,12 +3119,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&BootstrapRecovery{
 			VolumeSnapshots: &DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: pointer.String(""),
+					APIGroup: ptr.To(""),
 					Kind:     "Secret",
 					Name:     "pgdata",
 				},
 				WalStorage: &corev1.TypedLocalObjectReference{
-					APIGroup: pointer.String(""),
+					APIGroup: ptr.To(""),
 					Kind:     "ConfigMap",
 					Name:     "pgwal",
 				},
