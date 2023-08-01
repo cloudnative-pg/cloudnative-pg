@@ -40,10 +40,6 @@ var _ = Describe("Verify Volume Snapshot",
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			// This need to be removed later
-			if IsLocal() {
-				Skip("This test is only run on AKS, EKS and GKE clusters for now")
-			}
 		})
 		// Initializing a global namespace variable to be used in each test case
 		var namespace, namespacePrefix string
