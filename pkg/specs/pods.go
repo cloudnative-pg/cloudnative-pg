@@ -147,6 +147,28 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 	return config
 }
 
+func CreateClusterSpec(podName string, cluster apiv1.Cluster, envConfig EnvConfig, gracePeriod int64) corev1.PodSpec {
+	return corev1.PodSpec{
+		Hostname: podName,
+		InitContainers: []corev1.Container{
+			createBootstrapContainer(cluster),
+		},
+		SchedulerName: cluster.Spec.SchedulerName,
+		Containers:    createPostgresContainers(cluster, envConfig),
+		Volumes:       createPostgresVolumes(cluster, podName),
+		SecurityContext: CreatePodSecurityContext(
+			cluster.GetSeccompProfile(),
+			cluster.GetPostgresUID(),
+			cluster.GetPostgresGID()),
+		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
+		Tolerations:                   cluster.Spec.Affinity.Tolerations,
+		ServiceAccountName:            cluster.Name,
+		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
+		TerminationGracePeriodSeconds: &gracePeriod,
+		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
+	}
+}
+
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
 func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []corev1.Container {
@@ -332,9 +354,11 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	resources, err := cluster.Spec.Resources.Marshal()
+	podSpec := CreateClusterSpec(podName, cluster, envConfig, gracePeriod)
+
+	podSpecMarshaled, err := podSpec.Marshal()
 	if err != nil {
-		resources = []byte{}
+		podSpecMarshaled = []byte{}
 	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -345,32 +369,14 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
 			},
 			Annotations: map[string]string{
-				ClusterSerialAnnotationName:      strconv.Itoa(nodeSerial),
-				utils.PodEnvHashAnnotationName:   envConfig.Hash,
-				utils.PodResourcesAnnotationName: string(resources),
+				ClusterSerialAnnotationName:    strconv.Itoa(nodeSerial),
+				utils.PodEnvHashAnnotationName: envConfig.Hash,
+				utils.PodSpecAnnotationName:    string(podSpecMarshaled),
 			},
 			Name:      podName,
 			Namespace: cluster.Namespace,
 		},
-		Spec: corev1.PodSpec{
-			Hostname: podName,
-			InitContainers: []corev1.Container{
-				createBootstrapContainer(cluster),
-			},
-			SchedulerName: cluster.Spec.SchedulerName,
-			Containers:    createPostgresContainers(cluster, envConfig),
-			Volumes:       createPostgresVolumes(cluster, podName),
-			SecurityContext: CreatePodSecurityContext(
-				cluster.GetSeccompProfile(),
-				cluster.GetPostgresUID(),
-				cluster.GetPostgresGID()),
-			Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			Tolerations:                   cluster.Spec.Affinity.Tolerations,
-			ServiceAccountName:            cluster.Name,
-			NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
-			TerminationGracePeriodSeconds: &gracePeriod,
-			TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
-		},
+		Spec: podSpec,
 	}
 
 	if cluster.Spec.PriorityClassName != "" {

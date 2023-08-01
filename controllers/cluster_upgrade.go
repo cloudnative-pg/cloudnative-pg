@@ -248,26 +248,48 @@ func isPodNeedingRollout(
 		"instance is missing executable hash":  checkHasExecutableHash,
 		"pod has PVC requiring resizing":       checkHasResizingPVC,
 		"pod projected volume is outdated":     checkProjectedVolumeIsOutdated,
-		"pod resources are outdated":           checkResourcesAreOutdated,
+		"original PodSpec is outdated":         checkPodSpecIsOutdated,
 		"pod image is outdated":                checkPodImageIsOutdated,
 		"pod init container is outdated":       checkPodInitContainerIsOutdated,
 		"pod has missing PVCs":                 checkHasMissingPVCs,
-		"pod environment is outdated":          checkPodEnvironmentIsOutdated,
-		"pod scheduler is outdated":            checkSchedulerIsOutdated,
 		"cluster has newer restart annotation": checkClusterHasNewerRestartAnnotation,
-		"pod needs updated topology":           checkPodNeedsUpdatedTopology,
 	}
 	for message, check := range checkers {
-		rollout, err := check(status, cluster)
+		rollout1, err := check(status, cluster)
 		if err != nil {
 			contextLogger.Error(err, "while checking if pod needs rollout")
 			continue
 		}
-		if rollout.required {
-			if rollout.reason == "" {
-				rollout.reason = message
+		if rollout1.required {
+			if rollout1.reason == "" {
+				rollout1.reason = message
 			}
-			return rollout
+			return rollout1
+		}
+	}
+
+	// If the pod has a stored PodSpec annotation, we're done checking.
+	// If not, we should perform additional checks
+	_, hasStoredPodSpec := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
+	if hasStoredPodSpec {
+		return rollout{}
+	}
+	checkers = map[string]rolloutChecker{
+		"pod environment is outdated": checkPodEnvironmentIsOutdated,
+		"pod scheduler is outdated":   checkSchedulerIsOutdated,
+		"pod needs updated topology":  checkPodNeedsUpdatedTopology,
+	}
+	for message, check := range checkers {
+		rollout1, err := check(status, cluster)
+		if err != nil {
+			contextLogger.Error(err, "while checking if pod needs rollout")
+			continue
+		}
+		if rollout1.required {
+			if rollout1.reason == "" {
+				rollout1.reason = message
+			}
+			return rollout1
 		}
 	}
 	return rollout{}
@@ -480,6 +502,8 @@ func checkPodEnvironmentIsOutdated(
 	envConfig := specs.CreatePodEnvConfig(*cluster, status.Pod.Name)
 
 	// Use the hash to detect if the environment needs a refresh
+	// Deprecated: the PodEnvHashAnnotationName is marked deprecated. When it is
+	// eliminated, the fallback code below can still be useful
 	podEnvHash, hasPodEnvhash := status.Pod.Annotations[utils.PodEnvHashAnnotationName]
 	if hasPodEnvhash {
 		if podEnvHash != envConfig.Hash {
@@ -518,24 +542,46 @@ func checkPodEnvironmentIsOutdated(
 	return rollout{}, nil
 }
 
-func checkResourcesAreOutdated(
+func checkPodSpecIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
-	res, ok := status.Pod.ObjectMeta.Annotations[utils.PodResourcesAnnotationName]
+	res, ok := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
 	if !ok {
 		return rollout{}, nil
 	}
 
-	var resources corev1.ResourceRequirements
-	err := (&resources).Unmarshal([]byte(res))
+	var storedPodSpec corev1.PodSpec
+	err := (&storedPodSpec).Unmarshal([]byte(res))
 	if err != nil {
 		return rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
 	}
-	if !reflect.DeepEqual(resources, cluster.Spec.Resources) {
+	envConfig := specs.CreatePodEnvConfig(*cluster, status.Pod.Name)
+	gracePeriod := int64(cluster.GetMaxStopDelay())
+	currentPodSpec := specs.CreateClusterSpec(status.Pod.Name, *cluster, envConfig, gracePeriod)
+
+	if currentPodSpec.SchedulerName != storedPodSpec.SchedulerName {
 		return rollout{
 			required: true,
-			reason:   "the instance resources don't match the current cluster spec",
+			reason:   "scheduler name changed",
+		}, nil
+	}
+
+	if !reflect.DeepEqual(currentPodSpec.TopologySpreadConstraints, storedPodSpec.TopologySpreadConstraints) {
+		return rollout{
+			required: true,
+			reason: fmt.Sprintf(
+				"Pod '%s' does not have up-to-date TopologySpreadConstraints."+
+					" It needs to match the cluster's constraints.",
+				status.Pod.Name,
+			),
+		}, nil
+	}
+
+	if !reflect.DeepEqual(storedPodSpec, currentPodSpec) {
+		return rollout{
+			required: true,
+			reason:   "the podSpec is outdated",
 		}, nil
 	}
 

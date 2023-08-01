@@ -73,11 +73,12 @@ const (
 	HibernatePgControlDataAnnotationName = "cnpg.io/hibernatePgControlData"
 
 	// PodEnvHashAnnotationName is the name of the annotation containing the podEnvHash value
+	// Deprecated: the PodSpec annotation covers the environment drift. This annotation is
+	// kept for backward compatibility
 	PodEnvHashAnnotationName = "cnpg.io/podEnvHash"
 
-	// PodResourcesAnnotationName is the name of the annotation with the cluster resources used
-	// when creating a Pod
-	PodResourcesAnnotationName = "cnpg.io/podResources"
+	// PodSpecAnnotationName is the name of the annotation with the PodSpec derived from the cluster
+	PodSpecAnnotationName = "cnpg.io/originalPodSpec"
 
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"

@@ -24,6 +24,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -158,7 +159,31 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.canBeInPlace).To(BeTrue())
 	})
 
+	When("the PodSpec annotation is not available", func() {
+		It("should trigger a rollout when the scheduler changes", func(ctx SpecContext) {
+			pod := specs.PodWithExistingStorage(cluster, 1)
+			cluster.Spec.SchedulerName = "newScheduler"
+			delete(pod.Annotations, utils.PodSpecAnnotationName)
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.reason).To(ContainSubstring("scheduler name changed"))
+		})
+	})
+
 	It("should trigger a rollout when the scheduler changes", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.11",
+			},
+		}
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		cluster.Spec.SchedulerName = "newScheduler"
 
@@ -200,7 +225,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("the instance resources don't match"))
+			Expect(rollout.reason).To(ContainSubstring("the podSpec is outdated"))
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
 			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
@@ -215,11 +240,36 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("the instance resources don't match"))
+			Expect(rollout.reason).To(ContainSubstring("the podSpec is outdated"))
 		})
 	})
 
-	When("there's a custom environment variable set", func() {
+	When("the PodSpec annotation is not available", func() {
+		It("detects when a new custom environment variable is set", func(ctx SpecContext) {
+			pod := specs.PodWithExistingStorage(cluster, 1)
+			delete(pod.Annotations, utils.PodSpecAnnotationName)
+
+			cluster := cluster.DeepCopy()
+			cluster.Spec.Env = []corev1.EnvVar{
+				{
+					Name:  "TEST",
+					Value: "test",
+				},
+			}
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.required).To(BeTrue())
+			Expect(rollout.reason).To(Equal("environment variable configuration hash changed"))
+		})
+	})
+
+	When("the podSpec annotation is available", func() {
 		It("detects when a new custom environment variable is set", func(ctx SpecContext) {
 			pod := specs.PodWithExistingStorage(cluster, 1)
 
@@ -239,7 +289,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, cluster)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(Equal("environment variable configuration hash changed"))
+			Expect(rollout.reason).To(Equal("the podSpec is outdated"))
 		})
 	})
 })
@@ -265,73 +315,148 @@ var _ = Describe("Test pod rollout due to topology", func() {
 		pod = specs.PodWithExistingStorage(*cluster, 1)
 	})
 
-	It("should not require rollout when cluster and pod have the same TopologySpreadConstraints", func(ctx SpecContext) {
-		status := postgres.PostgresqlStatus{
-			Pod:            pod,
-			IsPodReady:     true,
-			ExecutableHash: "test_hash",
-		}
-		rollout := isPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.reason).To(BeEmpty())
-		Expect(rollout.required).To(BeFalse())
+	When("the original podSpec annotation is available", func() {
+		It("should not require rollout when cluster and pod have the same TopologySpreadConstraints", func(ctx SpecContext) {
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(BeEmpty())
+			Expect(rollout.required).To(BeFalse())
+		})
+
+		It("should require rollout when the cluster and pod do not have "+
+			"the same TopologySpreadConstraints", func(ctx SpecContext) {
+			cluster.Spec.TopologySpreadConstraints[0].MaxSkew = 2
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.required).To(BeTrue())
+		})
+
+		It("should require rollout when the LabelSelector maps are different", func(ctx SpecContext) {
+			cluster.Spec.TopologySpreadConstraints[0].LabelSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "different-app"},
+			}
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.required).To(BeTrue())
+		})
+
+		It("should require rollout when TopologySpreadConstraints is nil in one of the objects", func(ctx SpecContext) {
+			cluster.Spec.TopologySpreadConstraints = nil
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.required).To(BeTrue())
+		})
+
+		It("should not require rollout if pod and spec both lack TopologySpreadConstraints", func(ctx SpecContext) {
+			cluster.Spec.TopologySpreadConstraints = nil
+			pod = specs.PodWithExistingStorage(*cluster, 1)
+			Expect(pod.Spec.TopologySpreadConstraints).To(BeNil())
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(BeEmpty())
+			Expect(rollout.required).To(BeFalse())
+		})
 	})
 
-	It("should require rollout when the cluster and pod do not have "+
-		"the same TopologySpreadConstraints", func(ctx SpecContext) {
-		pod2 := pod.DeepCopy()
-		pod2.Spec.TopologySpreadConstraints[0].MaxSkew = 2
-		status := postgres.PostgresqlStatus{
-			Pod:            pod2,
-			IsPodReady:     true,
-			ExecutableHash: "test_hash",
-		}
-		rollout := isPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
-		Expect(rollout.required).To(BeTrue())
-	})
+	When("the original podSpec annotation is not available", func() {
+		It("should not require rollout when cluster and pod have the same TopologySpreadConstraints", func(ctx SpecContext) {
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(BeEmpty())
+			Expect(rollout.required).To(BeFalse())
+		})
 
-	It("should require rollout when the LabelSelector maps are different", func(ctx SpecContext) {
-		pod2 := pod.DeepCopy()
-		pod2.Spec.TopologySpreadConstraints[0].LabelSelector = &metav1.LabelSelector{
-			MatchLabels: map[string]string{"app": "different-app"},
-		}
+		It("should require rollout when the cluster and pod do not have "+
+			"the same TopologySpreadConstraints", func(ctx SpecContext) {
+			pod2 := pod.DeepCopy()
+			pod2.Spec.TopologySpreadConstraints[0].MaxSkew = 2
+			delete(pod2.Annotations, utils.PodSpecAnnotationName)
+			status := postgres.PostgresqlStatus{
+				Pod:            pod2,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.required).To(BeTrue())
+		})
 
-		status := postgres.PostgresqlStatus{
-			Pod:            pod2,
-			IsPodReady:     true,
-			ExecutableHash: "test_hash",
-		}
-		rollout := isPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
-		Expect(rollout.required).To(BeTrue())
-	})
+		It("should require rollout when the LabelSelector maps are different", func(ctx SpecContext) {
+			pod2 := pod.DeepCopy()
+			pod2.Spec.TopologySpreadConstraints[0].LabelSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "different-app"},
+			}
+			delete(pod2.Annotations, utils.PodSpecAnnotationName)
 
-	It("should require rollout when TopologySpreadConstraints is nil in one of the objects", func(ctx SpecContext) {
-		pod2 := pod.DeepCopy()
-		pod2.Spec.TopologySpreadConstraints = nil
+			status := postgres.PostgresqlStatus{
+				Pod:            pod2,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.required).To(BeTrue())
+		})
 
-		status := postgres.PostgresqlStatus{
-			Pod:            pod2,
-			IsPodReady:     true,
-			ExecutableHash: "test_hash",
-		}
-		rollout := isPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
-		Expect(rollout.required).To(BeTrue())
-	})
+		It("should require rollout when TopologySpreadConstraints is nil in one of the objects", func(ctx SpecContext) {
+			pod2 := pod.DeepCopy()
+			pod2.Spec.TopologySpreadConstraints = nil
+			delete(pod2.Annotations, utils.PodSpecAnnotationName)
 
-	It("should not require rollout if pod and spec both lack TopologySpreadConstraints", func(ctx SpecContext) {
-		cluster.Spec.TopologySpreadConstraints = nil
-		pod2 := pod.DeepCopy()
-		pod2.Spec.TopologySpreadConstraints = nil
+			status := postgres.PostgresqlStatus{
+				Pod:            pod2,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.required).To(BeTrue())
+		})
 
-		status := postgres.PostgresqlStatus{
-			Pod:            pod2,
-			IsPodReady:     true,
-			ExecutableHash: "test_hash",
-		}
-		rollout := isPodNeedingRollout(ctx, status, cluster)
-		Expect(rollout.reason).To(BeEmpty())
-		Expect(rollout.required).To(BeFalse())
+		It("should not require rollout if pod and spec both lack TopologySpreadConstraints", func(ctx SpecContext) {
+			cluster.Spec.TopologySpreadConstraints = nil
+			pod2 := pod.DeepCopy()
+			pod2.Spec.TopologySpreadConstraints = nil
+			delete(pod2.Annotations, utils.PodSpecAnnotationName)
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod2,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+			rollout := isPodNeedingRollout(ctx, status, cluster)
+			Expect(rollout.reason).To(BeEmpty())
+			Expect(rollout.required).To(BeFalse())
+		})
 	})
 })
