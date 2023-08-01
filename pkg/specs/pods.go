@@ -148,7 +148,12 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 }
 
 // CreateClusterPodSpec computes the PodSpec corresponding to a cluster
-func CreateClusterPodSpec(podName string, cluster apiv1.Cluster, envConfig EnvConfig, gracePeriod int64) corev1.PodSpec {
+func CreateClusterPodSpec(
+	podName string,
+	cluster apiv1.Cluster,
+	envConfig EnvConfig,
+	gracePeriod int64,
+) corev1.PodSpec {
 	return corev1.PodSpec{
 		Hostname: podName,
 		InitContainers: []corev1.Container{
