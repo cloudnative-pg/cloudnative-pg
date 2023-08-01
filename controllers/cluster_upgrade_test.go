@@ -131,7 +131,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		}
 		rollout := isPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
-		Expect(rollout.reason).To(Equal("missing executable hash"))
+		Expect(rollout.reason).To(Equal("instance is missing executable hash"))
 		Expect(rollout.canBeInPlace).To(BeFalse())
 	})
 
