@@ -558,7 +558,7 @@ func checkPodSpecIsOutdated(
 	}
 	envConfig := specs.CreatePodEnvConfig(*cluster, status.Pod.Name)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
-	currentPodSpec := specs.CreateClusterSpec(status.Pod.Name, *cluster, envConfig, gracePeriod)
+	currentPodSpec := specs.CreateClusterPodSpec(status.Pod.Name, *cluster, envConfig, gracePeriod)
 
 	if currentPodSpec.SchedulerName != storedPodSpec.SchedulerName {
 		return rollout{

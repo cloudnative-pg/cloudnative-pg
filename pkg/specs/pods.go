@@ -147,7 +147,8 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 	return config
 }
 
-func CreateClusterSpec(podName string, cluster apiv1.Cluster, envConfig EnvConfig, gracePeriod int64) corev1.PodSpec {
+// CreateClusterPodSpec computes the PodSpec corresponding to a cluster
+func CreateClusterPodSpec(podName string, cluster apiv1.Cluster, envConfig EnvConfig, gracePeriod int64) corev1.PodSpec {
 	return corev1.PodSpec{
 		Hostname: podName,
 		InitContainers: []corev1.Container{
@@ -354,7 +355,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	podSpec := CreateClusterSpec(podName, cluster, envConfig, gracePeriod)
+	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod)
 
 	podSpecMarshaled, err := podSpec.Marshal()
 	if err != nil {
