@@ -132,13 +132,27 @@ var _ = Describe("Label cluster name management", func() {
 })
 
 var _ = Describe("Annotate pods management", func() {
-	pod := corev1.Pod{}
+	const appArmorPostgres = AppArmorAnnotationPrefix + "/postgres"
 	annotations := map[string]string{
-		AppArmorAnnotationPrefix + "/apparmor_profile": "unconfined",
+		appArmorPostgres: "unconfined",
 	}
 
-	It("must annotate empty objects", func() {
-		AnnotateAppArmor(&pod.ObjectMeta, annotations)
-		Expect(pod.ObjectMeta.Annotations[AppArmorAnnotationPrefix+"/apparmor_profile"]).To(Equal("unconfined"))
+	It("must annotate empty objects with the matching container", func() {
+		pod := corev1.Pod{
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "postgres"}}},
+		}
+
+		AnnotateAppArmor(&pod.ObjectMeta, &pod.Spec, annotations)
+		Expect(pod.ObjectMeta.Annotations[appArmorPostgres]).To(Equal("unconfined"))
+	})
+
+	It("must not annotate the object if the container is not present", func() {
+		pod := corev1.Pod{
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "test"}}},
+		}
+
+		AnnotateAppArmor(&pod.ObjectMeta, &pod.Spec, annotations)
+		_, isPresent := pod.ObjectMeta.Annotations[appArmorPostgres]
+		Expect(isPresent).To(BeFalse())
 	})
 })
