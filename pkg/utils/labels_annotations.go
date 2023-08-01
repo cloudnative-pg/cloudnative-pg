@@ -197,9 +197,12 @@ func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) 
 	appArmorAnnotations := make(map[string]string)
 	for annotation, value := range annotations {
 		if strings.HasPrefix(annotation, AppArmorAnnotationPrefix) {
-			// TODO handle panics etc
-			containerName := strings.Split(annotation, "/")[1]
+			appArmorSplit := strings.SplitN(annotation, "/", 2)
+			if len(appArmorSplit) < 2 {
+				continue
+			}
 
+			containerName := appArmorSplit[1]
 			if containsContainerWithName(containerName, append(spec.Containers, spec.InitContainers...)...) {
 				appArmorAnnotations[annotation] = value
 			}
