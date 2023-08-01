@@ -150,8 +150,7 @@ func newAnnotationReconciler(cluster *apiv1.Cluster) metadataReconciler {
 			return utils.IsAnnotationSubset(pvc.Annotations,
 				cluster.Annotations,
 				cluster.GetFixedInheritedAnnotations(),
-				configuration.Current) &&
-				utils.IsAnnotationAppArmorPresentInObject(&pvc.ObjectMeta, cluster.Annotations)
+				configuration.Current)
 		},
 		update: func(pvc *corev1.PersistentVolumeClaim) {
 			utils.InheritAnnotations(&pvc.ObjectMeta, cluster.Annotations,
