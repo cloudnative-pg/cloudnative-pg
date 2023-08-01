@@ -70,6 +70,14 @@ spec:
                 description: If the first backup has to be immediately start after
                   creation or not
                 type: boolean
+              method:
+                default: barmanObjectStore
+                description: BackupMethod defines the way of executing the physical
+                  base backups of the selected PostgreSQL instance
+                enum:
+                - barmanObjectStore
+                - volumeSnapshotTemplate
+                type: string
               schedule:
                 description: The schedule does not follow the same format used in
                   Kubernetes CronJobs as it includes an additional seconds specifier,

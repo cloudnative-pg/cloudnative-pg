@@ -19,8 +19,8 @@ package utils
 import (
 	"fmt"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/fencing"
 )
 
 // FencingMethod will be one of the supported ways to trigger an instance fencing
@@ -49,7 +49,7 @@ func FencingOn(
 			return err
 		}
 	case UsingAnnotation:
-		err := fence.ApplyFenceFunc(env.Ctx, env.Client, clusterName, namespace, serverName, utils.AddFencedInstance)
+		err := fencing.ApplyFenceFunc(env.Ctx, env.Client, clusterName, namespace, serverName, utils.AddFencedInstance)
 		if err != nil {
 			return err
 		}
@@ -75,7 +75,7 @@ func FencingOff(
 			return err
 		}
 	case UsingAnnotation:
-		err := fence.ApplyFenceFunc(env.Ctx, env.Client, clusterName, namespace, serverName, utils.RemoveFencedInstance)
+		err := fencing.ApplyFenceFunc(env.Ctx, env.Client, clusterName, namespace, serverName, utils.RemoveFencedInstance)
 		if err != nil {
 			return err
 		}

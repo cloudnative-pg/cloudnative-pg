@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"time"
 
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -43,8 +43,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/snapshot"
 )
 
 // backupPhase indicates the path inside the Backup kind
@@ -76,8 +78,10 @@ func NewBackupReconciler(mgr manager.Manager) *BackupReconciler {
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
+// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list
 
 // Reconcile is the main reconciliation loop
+// nolint: gocognit
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
@@ -192,15 +196,100 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		"cluster", cluster.Name,
 		"pod", pod.Name)
 
-	// This backup has been started
-	if err := StartBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
-		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
-		tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("encountered an error while taking the backup: %w", err))
-		return ctrl.Result{}, nil
+	switch backup.Spec.Method {
+	case apiv1.BarmanObjectStoreBackupMethod:
+		if cluster.Spec.Backup.BarmanObjectStore == nil {
+			tryFlagBackupAsFailed(ctx, r.Client, &backup,
+				errors.New("no barmanObjectStore section defined on the target cluster"))
+			return ctrl.Result{}, nil
+		}
+		// This backup has been started
+		if err := StartBarmanBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
+			r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
+			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("encountered an error while taking the backup: %w", err))
+			return ctrl.Result{}, nil
+		}
+	case apiv1.VolumeSnapshotTemplateBackupMethod:
+		if cluster.Spec.Backup.VolumeSnapshotTemplate == nil {
+			tryFlagBackupAsFailed(ctx, r.Client, &backup,
+				errors.New("no volumeSnapshotTemplate section defined on the target cluster"))
+			return ctrl.Result{}, nil
+		}
+		if err := startSnapshotBackup(ctx, r.Client, pod, &cluster, &backup); err != nil {
+			r.Recorder.Eventf(&backup, "Warning", "Error", "snapshot backup failed: %v", err)
+			tryFlagBackupAsFailed(ctx, r.Client, &backup,
+				fmt.Errorf("encountered an error while taking the snapshot backup: %w", err))
+			return ctrl.Result{}, nil
+		}
+	default:
+		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
 	}
 
 	contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
 	return ctrl.Result{}, nil
+}
+
+func startSnapshotBackup(
+	ctx context.Context,
+	cli client.Client,
+	targetPod *corev1.Pod,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	backup.Status.SetAsStarted(targetPod, apiv1.VolumeSnapshotTemplateBackupMethod)
+	if err := postgres.PatchBackupStatusAndRetry(ctx, cli, backup); err != nil {
+		return err
+	}
+
+	if errCond := conditions.Patch(ctx, cli, cluster, apiv1.BackupStartingCondition); errCond != nil {
+		log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup starting)")
+	}
+
+	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, cli, targetPod.Name, cluster.Namespace)
+	if err != nil {
+		return fmt.Errorf("cannot get PVCs: %w", err)
+	}
+
+	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshotTemplate
+
+	snapshotEnrich := func(vs *storagesnapshotv1.VolumeSnapshot) {
+		switch snapshotConfig.SnapshotOwnerReference {
+		case apiv1.ClusterBackupOwnerReference:
+			cluster.SetInheritedDataAndOwnership(&vs.ObjectMeta)
+		case apiv1.BackupOwnerReference:
+			utils.SetAsOwnedBy(&vs.ObjectMeta, backup.ObjectMeta, backup.TypeMeta)
+		default:
+			break
+		}
+	}
+	executor := snapshot.
+		NewExecutorBuilder(cli, snapshotConfig).
+		FenceInstance(true).
+		WithSnapshotEnrich(snapshotEnrich).
+		Build()
+
+	snapshots, err := executor.Execute(ctx, cluster, targetPod, pvcs)
+	if err != nil {
+		contextLogger.Error(err, "while executing snapshot backup")
+		backup.Status.SetAsFailed(fmt.Errorf("can't execute snapshot backup: %w", err))
+
+		// Update backup status in cluster conditions
+		if errCond := conditions.Patch(ctx, cli, cluster, apiv1.BuildClusterBackupFailedCondition(err)); errCond != nil {
+			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup snapshot failed)")
+		}
+		return postgres.PatchBackupStatusAndRetry(ctx, cli, backup)
+	}
+
+	if err := conditions.Patch(ctx, cli, cluster, apiv1.BackupSucceededCondition); err != nil {
+		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
+	}
+
+	backup.Status.SetAsCompleted()
+	backup.Status.BackupSnapshotStatus.SetSnapshotList(snapshots)
+
+	return postgres.PatchBackupStatusAndRetry(ctx, cli, backup)
 }
 
 // getBackupTargetPod returns the correct pod that should run the backup according to the current
@@ -214,7 +303,10 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	backupTarget := cluster.Spec.Backup.Target
+	var backupTarget apiv1.BackupTarget
+	if cluster.Spec.Backup != nil {
+		backupTarget = cluster.Spec.Backup.Target
+	}
 	if backup.Spec.Target != "" {
 		backupTarget = backup.Spec.Target
 	}
@@ -252,9 +344,9 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	return &pod, err
 }
 
-// StartBackup request a backup in a Pod and marks the backup started
+// StartBarmanBackup request a backup in a Pod and marks the backup started
 // or failed if needed
-func StartBackup(
+func StartBarmanBackup(
 	ctx context.Context,
 	client client.Client,
 	backup *apiv1.Backup,
@@ -263,8 +355,8 @@ func StartBackup(
 ) error {
 	// This backup has been started
 	status := backup.GetStatus()
-	status.Phase = apiv1.BackupPhaseStarted
-	status.InstanceID = &apiv1.InstanceID{PodName: pod.Name, ContainerID: pod.Status.ContainerStatuses[0].ContainerID}
+	status.SetAsStarted(pod, apiv1.BarmanObjectStoreBackupMethod)
+
 	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
 		return err
 	}
@@ -295,13 +387,7 @@ func StartBackup(
 		status.CommandError = stdout
 
 		// Update backup status in cluster conditions
-		condition := metav1.Condition{
-			Type:    string(apiv1.ConditionBackup),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
-			Message: err.Error(),
-		}
-		if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Patch(ctx, client, cluster, apiv1.BuildClusterBackupFailedCondition(err)); errCond != nil {
 			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup failed)")
 		}
 		return postgres.PatchBackupStatusAndRetry(ctx, client, backup)

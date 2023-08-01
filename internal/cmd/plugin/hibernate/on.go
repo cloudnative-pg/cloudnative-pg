@@ -33,12 +33,13 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	pkgres "github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/fencing"
 )
 
 var hibernationBackoff = wait.Backoff{
@@ -84,7 +85,7 @@ func newOnCommand(ctx context.Context, clusterName string, force bool) (*onComma
 	}
 
 	// Get the PVCs that will be hibernated
-	pvcs, err := resources.GetInstancePVCs(ctx, clusterName, primaryInstance.Name)
+	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, primaryInstance.Name, plugin.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get PVCs: %w", err)
 	}
@@ -178,7 +179,7 @@ func (on *onCommand) fenceClusterStep() error {
 	contextLogger := log.FromContext(on.ctx)
 
 	contextLogger.Debug("applying the fencing annotation to the cluster manifest")
-	if err := fence.ApplyFenceFunc(
+	if err := fencing.ApplyFenceFunc(
 		on.ctx,
 		plugin.Client,
 		on.cluster.Name,
@@ -203,7 +204,7 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 	contextLogger := log.FromContext(on.ctx)
 
 	fmt.Println("rolling back hibernation: removing the fencing annotation")
-	err := fence.ApplyFenceFunc(
+	err := fencing.ApplyFenceFunc(
 		on.ctx,
 		plugin.Client,
 		on.cluster.Name,

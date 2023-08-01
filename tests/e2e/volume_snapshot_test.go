@@ -20,6 +20,9 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/types"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -254,6 +257,91 @@ var _ = Describe("Verify Volume Snapshot",
 					restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
 					Expect(err).ToNot(HaveOccurred())
 					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, restoredPrimary)
+				})
+			})
+		})
+
+		Context("declarative snapshot tests", Ordered, func() {
+			// test env constants
+			const (
+				namespacePrefix = "declarative-snapshot-backup"
+				level           = tests.High
+				filesDir        = fixturesDir + "/volume_snapshot"
+			)
+			// file constants
+			const (
+				clusterToBackup  = filesDir + "/declarative-backup-cluster.yaml.template"
+				clusterToRestore = filesDir + "/declarative-backup-cluster-restore.yaml.template"
+				backupFile       = filesDir + "/declarative-backup.yaml.template"
+			)
+
+			// database constants
+			const (
+				tableName = "test"
+			)
+
+			var namespace string
+			BeforeAll(func() {
+				if testLevelEnv.Depth < int(level) {
+					Skip("Test depth is lower than the amount requested for this test")
+				}
+
+				var err error
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					_ = os.Unsetenv("SNAPSHOT_NAME_PGDATA")
+					return env.DeleteNamespace(namespace)
+				})
+			})
+
+			It("it should do a declarative cold backup and restore", func() {
+				clusterToBackupName, err := env.GetResourceNameFromYAML(clusterToBackup)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("creating the cluster on which to execute the backup", func() {
+					AssertCreateCluster(namespace, clusterToBackupName, clusterToBackup, env)
+				})
+
+				By("inserting test data", func() {
+					AssertCreateTestData(namespace, clusterToBackupName, tableName, psqlClientPod)
+				})
+
+				backupName, err := env.GetResourceNameFromYAML(backupFile)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("executing the backup", func() {
+					err := CreateResourcesFromFileWithError(namespace, backupFile)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				var backup apiv1.Backup
+				By("waiting the backup to complete", func() {
+					Eventually(func(g Gomega) {
+						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+					}, 300).Should(Succeed())
+					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
+				})
+
+				By("setting the snapshot name env variable", func() {
+					snapshotList := backup.Status.BackupSnapshotStatus.Snapshots
+					Expect(snapshotList).To(HaveLen(1))
+					Expect(err).ToNot(HaveOccurred())
+					err = os.Setenv("SNAPSHOT_NAME_PGDATA", snapshotList[0])
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterToRestore)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("executing the restore", func() {
+					AssertCreateCluster(namespace, clusterToRestoreName, clusterToRestore, env)
+				})
+
+				By("checking that the data is present on the restored cluster", func() {
+					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, psqlClientPod)
 				})
 			})
 		})

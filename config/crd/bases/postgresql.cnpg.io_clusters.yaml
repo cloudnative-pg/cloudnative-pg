@@ -1241,6 +1241,41 @@ spec:
                     - primary
                     - prefer-standby
                     type: string
+                  volumeSnapshotTemplate:
+                    description: VolumeSnapshotTemplate provides the configuration
+                      for the execution of volume snapshot backups.
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations key-value pairs that will be added
+                          to .metadata.annotations snapshot resources.
+                        type: object
+                      className:
+                        description: ClassName specifies the Snapshot Class to be
+                          used for PG_DATA PersistentVolumeClaim. It is the default
+                          class for the other types if no specific class is present
+                        type: string
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: Labels are key-value pairs that will be added
+                          to .metadata.labels snapshot resources.
+                        type: object
+                      snapshotOwnerReference:
+                        default: none
+                        description: SnapshotOwnerReference indicates the type of
+                          owner reference the snapshot should have. .
+                        enum:
+                        - none
+                        - cluster
+                        - backup
+                        type: string
+                      walClassName:
+                        description: WalClassName specifies the Snapshot Class to
+                          be used for the PG_WAL PersistentVolumeClaim.
+                        type: string
+                    type: object
                 type: object
               bootstrap:
                 description: Instructions to bootstrap this cluster

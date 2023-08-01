@@ -57,6 +57,14 @@ spec:
                 required:
                 - name
                 type: object
+              method:
+                default: barmanObjectStore
+                description: BackupMethod defines the way of executing the physical
+                  base backups of the selected PostgreSQL instance
+                enum:
+                - barmanObjectStore
+                - volumeSnapshotTemplate
+                type: string
               target:
                 description: The policy to decide which instance should perform this
                   backup. If empty, it defaults to `cluster.spec.backup.target`. Available
@@ -222,6 +230,10 @@ spec:
                     description: The pod name
                     type: string
                 type: object
+              method:
+                description: BackupMethod defines the way of executing the physical
+                  base backups of the selected PostgreSQL instance
+                type: string
               phase:
                 description: The last backup status
                 type: string
@@ -290,6 +302,17 @@ spec:
                 description: The server name on S3, the cluster name is used if this
                   parameter is omitted
                 type: string
+              snapshotBackupStatus:
+                description: BackupSnapshotStatus the fields exclusive to the volumeSnapshotTemplate
+                  method backup
+                properties:
+                  snapshots:
+                    description: The snapshot lists, populated if it is a snapshot
+                      type backup
+                    items:
+                      type: string
+                    type: array
+                type: object
               startedAt:
                 description: When the backup was started
                 format: date-time
