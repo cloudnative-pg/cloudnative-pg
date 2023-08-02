@@ -2478,8 +2478,13 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 		if preRollingUpdateImg == "" {
 			preRollingUpdateImg = os.Getenv("POSTGRES_IMG")
 		}
+		csiStorageClass := os.Getenv("E2E_CSI_STORAGE_CLASS")
+		if csiStorageClass == "" {
+			csiStorageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+		}
 		envVars := map[string]string{
 			"E2E_DEFAULT_STORAGE_CLASS":  os.Getenv("E2E_DEFAULT_STORAGE_CLASS"),
+			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
 			"AZURE_STORAGE_ACCOUNT":      os.Getenv("AZURE_STORAGE_ACCOUNT"),
 			"POSTGRES_IMG":               os.Getenv("POSTGRES_IMG"),
 			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
