@@ -7,7 +7,3 @@ spec:
 
   storage:
     size: 1Gi
-    storageClass: csi-hostpath-sc
-  walStorage:
-    size: 1Gi
-    storageClass: csi-hostpath-sc
