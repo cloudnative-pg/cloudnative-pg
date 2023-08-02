@@ -36,7 +36,7 @@ const PrometheusNamespace = "cnpg"
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
 	Metrics *metrics
-	pool    *pool.ConnectionPool
+	pool    pool.Pooler
 }
 
 // metrics here are related to the exporter itself, which is instrumented to
@@ -145,7 +145,7 @@ func (e *Exporter) GetPgBouncerDB() (*sql.DB, error) {
 }
 
 // ConnectionPool gets or initializes the connection pool for this instance
-func (e *Exporter) ConnectionPool() *pool.ConnectionPool {
+func (e *Exporter) ConnectionPool() pool.Pooler {
 	if e.pool == nil {
 		dsn := fmt.Sprintf(
 			"host=%s port=%v user=%s sslmode=disable",
