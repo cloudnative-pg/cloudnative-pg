@@ -274,6 +274,7 @@ func isPodNeedingRollout(
 	if hasStoredPodSpec {
 		return rollout{}
 	}
+	// These checks are subsumed by the PodSpec checker
 	checkers = map[string]rolloutChecker{
 		"pod environment is outdated": checkPodEnvironmentIsOutdated,
 		"pod scheduler is outdated":   checkSchedulerIsOutdated,
@@ -546,13 +547,13 @@ func checkPodSpecIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
-	res, ok := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
+	podSpecAnnotation, ok := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
 	if !ok {
 		return rollout{}, nil
 	}
 
 	var storedPodSpec corev1.PodSpec
-	err := (&storedPodSpec).Unmarshal([]byte(res))
+	err := (&storedPodSpec).Unmarshal([]byte(podSpecAnnotation))
 	if err != nil {
 		return rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
 	}
