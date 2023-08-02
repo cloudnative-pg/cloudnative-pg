@@ -372,8 +372,6 @@ deploy_csi_host_path() {
   ## create storage class
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
 
-  ## scale the statefulset so each node has driver installed
-  kubectl scale statefulset csi-hostpathplugin --replicas="$NODES"
   echo "waiting for csi plugin ready"
   ITER=0
   while true; do
