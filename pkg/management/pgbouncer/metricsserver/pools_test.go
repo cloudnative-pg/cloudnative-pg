@@ -75,7 +75,7 @@ var _ = Describe("Exporter", func() {
 	})
 
 	Context("collectShowPools", func() {
-		It("should handle SQL query execution properly", func() {
+		It("should react properly if SQL shows no pools", func() {
 			mock.ExpectQuery("SHOW POOLS;").WillReturnError(sql.ErrNoRows)
 			exp.collectShowPools(ch, db)
 
