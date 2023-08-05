@@ -336,6 +336,12 @@ by `name` (our recommendation is to use the same `name` of the origin cluster).
 
 ### Bootstrap from a backup (`recovery`)
 
+<!--
+
+TODO: Move the recovery content here in the recovery.md file and refactor it
+
+-->
+
 The `recovery` bootstrap mode lets you create a new cluster from an existing
 physical base backup, and then reapply the WAL files containing the REDO log
 from the archive. Both base backups and WAL files are pulled from the
