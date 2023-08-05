@@ -307,8 +307,8 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 
 	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
-	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
-		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
+	if utils.IsAnnotationAppArmorPresent(&job.Spec.Template.Spec, cluster.Annotations) {
+		utils.AnnotateAppArmor(&job.ObjectMeta, &job.Spec.Template.Spec, cluster.Annotations)
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {

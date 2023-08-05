@@ -362,7 +362,7 @@ var _ = Describe("object metadata test", func() {
 
 			It("Should correctly add AppArmor annotations if present in the cluster's annotations", func() {
 				const (
-					key   = "container.apparmor.security.beta.kubernetes.io/pod"
+					key   = "container.apparmor.security.beta.kubernetes.io/postgres"
 					value = "runtime/default"
 				)
 
@@ -370,6 +370,7 @@ var _ = Describe("object metadata test", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod1",
 					},
+					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "postgres"}}},
 				}
 
 				cluster := &apiv1.Cluster{

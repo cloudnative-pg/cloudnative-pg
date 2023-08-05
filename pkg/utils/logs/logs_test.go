@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("StreamingRequest default options", func() {
+var _ = Describe("Pod logging tests", func() {
 	podNamespace := "pod-test"
 	podName := "pod-name-test"
 	pod := &v1.Pod{
@@ -61,7 +61,7 @@ var _ = Describe("StreamingRequest default options", func() {
 		var logBuffer bytes.Buffer
 		err := streamPodLog.Stream(ctx, &logBuffer)
 		Expect(err).NotTo(HaveOccurred())
-		// The fake client will be given a pod name of "", but it will still
+		// The fake Client will be given a pod name of "", but it will still
 		// go on along. In production, we'd have an error when pod not found
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(""))
@@ -89,7 +89,7 @@ var _ = Describe("StreamingRequest default options", func() {
 		Expect(options.Previous).To(BeTrue())
 	})
 
-	It("should read the logs with the provided k8s client", func(ctx context.Context) {
+	It("should read the logs with the provided k8s Client", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
 		streamPodLog := StreamingRequest{
 			Pod:      pod,
@@ -125,7 +125,7 @@ var _ = Describe("StreamingRequest default options", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 
-	It("TailPodLogs defaults to non-zero lines shown if set to zero", func() {
+	It("can follow pod logs", func() {
 		client := fake.NewSimpleClientset(pod)
 		var logBuffer bytes.Buffer
 		ctx := context.TODO()
@@ -137,7 +137,7 @@ var _ = Describe("StreamingRequest default options", func() {
 			err := TailPodLogs(ctx, client, *pod, &logBuffer, true)
 			Expect(err).NotTo(HaveOccurred())
 		}()
-		// calling ctx.Done is not strictly necessary because the fake client
+		// calling ctx.Done is not strictly necessary because the fake Client
 		// will terminate the pod stream anyway, ending TailPodLogs.
 		// But in "production", TailPodLogs will follow
 		// the pod logs until the context, or the logs, are over

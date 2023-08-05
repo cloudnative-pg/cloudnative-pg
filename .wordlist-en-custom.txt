@@ -173,6 +173,7 @@ LSN
 LTS
 LastBackupFailed
 LastBackupSucceeded
+LastFailedArchiveTime
 Lifecycle
 Linkerd
 Linode
@@ -450,6 +451,7 @@ cGFzc
 cb
 cd
 ce
+cgroup
 cheatsheet
 checksums
 chmod
@@ -613,6 +615,7 @@ html
 http
 httpGet
 https
+hugepages
 imageName
 imagePullPolicy
 imagePullSecrets
@@ -750,6 +753,7 @@ operatorgroups
 operatorhub
 osdk
 ou
+ownerMetadata
 ownerReference
 packagemanifests
 parseable
@@ -805,6 +809,7 @@ preferredDuringSchedulingIgnoredDuringExecution
 preload
 prepended
 primaryUpdateStrategy
+priorityClassName
 proc
 programmatically
 proj

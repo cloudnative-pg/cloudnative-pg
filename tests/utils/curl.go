@@ -21,7 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -48,7 +48,7 @@ func CurlClient(namespace string) corev1.Pod {
 					Image:   "curlimages/curl:7.82.0",
 					Command: []string{"sleep", "3600"},
 					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: pointer.Bool(false),
+						AllowPrivilegeEscalation: ptr.To(false),
 						SeccompProfile:           seccompProfile,
 					},
 				},

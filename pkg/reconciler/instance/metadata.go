@@ -92,7 +92,7 @@ func updateClusterAnnotations(
 	// we are done
 	if utils.IsAnnotationSubset(instance.Annotations, cluster.Annotations, cluster.GetFixedInheritedAnnotations(),
 		configuration.Current) &&
-		utils.IsAnnotationAppArmorPresentInObject(&instance.ObjectMeta, cluster.Annotations) {
+		utils.IsAnnotationAppArmorPresentInObject(&instance.ObjectMeta, &instance.Spec, cluster.Annotations) {
 		contextLogger.Debug(
 			"Skipping cluster annotations reconciliation, because they are already present on pod",
 			"pod", instance.Name,
@@ -106,8 +106,8 @@ func updateClusterAnnotations(
 	contextLogger.Info("Updating cluster annotations on pod", "pod", instance.Name)
 	utils.InheritAnnotations(&instance.ObjectMeta, cluster.Annotations,
 		cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
-		utils.AnnotateAppArmor(&instance.ObjectMeta, cluster.Annotations)
+	if utils.IsAnnotationAppArmorPresent(&instance.Spec, cluster.Annotations) {
+		utils.AnnotateAppArmor(&instance.ObjectMeta, &instance.Spec, cluster.Annotations)
 	}
 
 	return true

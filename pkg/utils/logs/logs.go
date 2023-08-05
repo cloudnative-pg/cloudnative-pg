@@ -116,7 +116,7 @@ func TailPodLogs(
 	pod v1.Pod,
 	writer io.Writer,
 	parseTimestamps bool,
-) (err error) {
+) error {
 	now := metav1.Now()
 	streamPodLog := StreamingRequest{
 		Pod: &pod,

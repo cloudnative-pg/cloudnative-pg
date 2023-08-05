@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -182,35 +183,57 @@ func InheritLabels(
 	}
 }
 
-func getAnnotationAppArmor(annotations map[string]string) map[string]string {
+func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) map[string]string {
+	containsContainerWithName := func(name string, containers ...corev1.Container) bool {
+		for _, container := range containers {
+			if container.Name == name {
+				return true
+			}
+		}
+
+		return false
+	}
+
 	appArmorAnnotations := make(map[string]string)
 	for annotation, value := range annotations {
 		if strings.HasPrefix(annotation, AppArmorAnnotationPrefix) {
-			appArmorAnnotations[annotation] = value
+			appArmorSplit := strings.SplitN(annotation, "/", 2)
+			if len(appArmorSplit) < 2 {
+				continue
+			}
+
+			containerName := appArmorSplit[1]
+			if containsContainerWithName(containerName, append(spec.Containers, spec.InitContainers...)...) {
+				appArmorAnnotations[annotation] = value
+			}
 		}
 	}
 	return appArmorAnnotations
 }
 
 // IsAnnotationAppArmorPresent checks if one of the annotations is an AppArmor annotation
-func IsAnnotationAppArmorPresent(annotations map[string]string) bool {
-	annotation := getAnnotationAppArmor(annotations)
+func IsAnnotationAppArmorPresent(spec *corev1.PodSpec, annotations map[string]string) bool {
+	annotation := getAnnotationAppArmor(spec, annotations)
 	return len(annotation) != 0
 }
 
 // IsAnnotationAppArmorPresentInObject checks if the AppArmor annotations are present or not in the given Object
-func IsAnnotationAppArmorPresentInObject(object *metav1.ObjectMeta, annotations map[string]string) bool {
-	objAnnotations := getAnnotationAppArmor(object.Annotations)
-	appArmorAnnotations := getAnnotationAppArmor(annotations)
+func IsAnnotationAppArmorPresentInObject(
+	object *metav1.ObjectMeta,
+	spec *corev1.PodSpec,
+	annotations map[string]string,
+) bool {
+	objAnnotations := getAnnotationAppArmor(spec, object.Annotations)
+	appArmorAnnotations := getAnnotationAppArmor(spec, annotations)
 	return reflect.DeepEqual(objAnnotations, appArmorAnnotations)
 }
 
 // AnnotateAppArmor adds an annotation to the pod
-func AnnotateAppArmor(object *metav1.ObjectMeta, annotations map[string]string) {
+func AnnotateAppArmor(object *metav1.ObjectMeta, spec *corev1.PodSpec, annotations map[string]string) {
 	if object.Annotations == nil {
 		object.Annotations = make(map[string]string)
 	}
-	appArmorAnnotations := getAnnotationAppArmor(annotations)
+	appArmorAnnotations := getAnnotationAppArmor(spec, annotations)
 	for annotation, value := range appArmorAnnotations {
 		object.Annotations[annotation] = value
 	}

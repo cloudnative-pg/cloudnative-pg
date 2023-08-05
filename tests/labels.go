@@ -50,6 +50,9 @@ const (
 	// LabelBackupRestore is a label for only selecting backup and restore tests
 	LabelBackupRestore = "backup-restore"
 
+	// LabelSnapshot is a label for selecting snapshot tests
+	LabelSnapshot = "snapshot"
+
 	// LabelOperator is a label for only selecting operator tests
 	LabelOperator = "operator"
 

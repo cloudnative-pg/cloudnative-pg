@@ -33,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/install"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
@@ -90,6 +91,7 @@ func main() {
 	rootCmd.AddCommand(backup.NewCmd())
 	rootCmd.AddCommand(psql.NewCmd())
 	rootCmd.AddCommand(snapshot.NewCmd())
+	rootCmd.AddCommand(logs.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

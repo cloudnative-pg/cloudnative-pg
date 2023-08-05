@@ -25,6 +25,7 @@ import (
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,6 +45,9 @@ var (
 
 	// Client is the controller-runtime client
 	Client client.Client
+
+	// ClientInterface contains the interface used i the plugin
+	ClientInterface kubernetes.Interface
 )
 
 // SetupKubernetesClient creates a k8s client to be used inside the kubectl-cnpg
@@ -67,6 +71,8 @@ func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 	if err != nil {
 		return err
 	}
+
+	ClientInterface = kubernetes.NewForConfigOrDie(Config)
 
 	return nil
 }
