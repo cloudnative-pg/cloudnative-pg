@@ -19,6 +19,7 @@ package persistentvolumeclaim
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -116,5 +117,36 @@ var _ = Describe("PVC Creation", func() {
 			},
 		)
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("builds pvc with correct size and the tablespace name for tablespaces", func() {
+		tbsName := "fragglerock"
+		pvc, err := Build(
+			&apiv1.Cluster{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "thecluster",
+				},
+				Spec: apiv1.ClusterSpec{},
+			},
+			&CreateConfiguration{
+				Status:     StatusInitializing,
+				NodeSerial: 1,
+				Role:       utils.PVCRolePgTablespace,
+				Storage: apiv1.StorageConfiguration{
+					Size:         "2Gi",
+					StorageClass: &storageClass,
+					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+						},
+					},
+				},
+				TablespaceName: tbsName,
+			},
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.Name).To(Equal("thecluster-1-tbs-fragglerock"))
+		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))
+		Expect(pvc.Labels[utils.TablespaceNameLabelName]).To(Equal(tbsName))
 	})
 })

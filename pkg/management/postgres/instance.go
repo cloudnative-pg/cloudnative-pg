@@ -190,6 +190,9 @@ type Instance struct {
 
 	// roleSynchronizerChan is used to send managed role configuration to the role synchronizer
 	roleSynchronizerChan chan *apiv1.ManagedConfiguration
+
+	// tablespaceSynchronizerChan is used to send tablespace configuration to the tablespace synchronizer
+	tablespaceSynchronizerChan chan map[string]*apiv1.TablespaceConfiguration
 }
 
 // IsFenced checks whether the instance is marked as fenced
@@ -249,6 +252,18 @@ func (instance *Instance) RoleSynchronizerChan() <-chan *apiv1.ManagedConfigurat
 	return instance.roleSynchronizerChan
 }
 
+// TriggerTablespaceSynchronizer sends the configuration to the tablespace synchronizer
+func (instance *Instance) TriggerTablespaceSynchronizer(config map[string]*apiv1.TablespaceConfiguration) {
+	go func() {
+		instance.tablespaceSynchronizerChan <- config
+	}()
+}
+
+// TablespaceSynchronizerChan returns the communication channel to the tablespace synchronizer
+func (instance *Instance) TablespaceSynchronizerChan() <-chan map[string]*apiv1.TablespaceConfiguration {
+	return instance.tablespaceSynchronizerChan
+}
+
 // VerifyPgDataCoherence checks the PGDATA is correctly configured in terms
 // of file rights and users
 func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
@@ -287,10 +302,11 @@ const (
 // NewInstance creates a new Instance object setting the defaults
 func NewInstance() *Instance {
 	return &Instance{
-		SocketDirectory:      postgres.SocketDirectory,
-		instanceCommandChan:  make(chan InstanceCommand),
-		slotsReplicatorChan:  make(chan *apiv1.ReplicationSlotsConfiguration),
-		roleSynchronizerChan: make(chan *apiv1.ManagedConfiguration),
+		SocketDirectory:            postgres.SocketDirectory,
+		instanceCommandChan:        make(chan InstanceCommand),
+		slotsReplicatorChan:        make(chan *apiv1.ReplicationSlotsConfiguration),
+		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
+		tablespaceSynchronizerChan: make(chan map[string]*apiv1.TablespaceConfiguration),
 	}
 }
 

@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
@@ -218,6 +219,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	roleSynchronizer := roles.NewRoleSynchronizer(instance, reconciler.GetClient())
 	if err = mgr.Add(roleSynchronizer); err != nil {
 		setupLog.Error(err, "unable to create role synchronizer")
+		return err
+	}
+
+	tablespaceSynchronizer := tablespaces.NewTablespaceSynchronizer(instance, reconciler.GetClient())
+	if err = mgr.Add(tablespaceSynchronizer); err != nil {
+		setupLog.Error(err, "unable to create tablespace synchronizer")
 		return err
 	}
 

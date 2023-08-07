@@ -61,6 +61,7 @@ nav:
   - samples.md
   - networking.md
   - benchmarking.md
+  - tablespaces.md
   - commercial_support.md
   - faq.md
   - cloudnative-pg.v1.md
