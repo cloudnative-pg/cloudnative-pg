@@ -12,7 +12,7 @@ You can also use any compatible implementation of the supported services.
 The required setup depends on the chosen storage provider and is
 discussed in the following sections.
 
-## S3
+## AWS S3
 
 You can define the permissions to store backups in S3 buckets in two ways:
 
