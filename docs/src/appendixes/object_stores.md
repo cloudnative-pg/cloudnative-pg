@@ -1,6 +1,6 @@
 # Appendix A - Common object stores for backups
 
-You can archive the backup files in any service that is supported
+You can store the [backup](backup.md) files in any service that is supported
 by the Barman Cloud infrastructure. That is:
 
 - [AWS S3](https://aws.amazon.com/s3/)
