@@ -355,6 +355,7 @@ TCP
 TLS
 TOC
 TODO
+TablespaceConfiguration
 TimelineId
 TopologyKey
 TopologySpreadConstraint

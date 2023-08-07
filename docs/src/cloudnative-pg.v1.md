@@ -1608,6 +1608,13 @@ sources to the pods to be used by Env</p>
 Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
+<tr><td><code>tablespaces</code><br/>
+<a href="#postgresql-cnpg-io-v1-*github-com-cloudnative-pg-cloudnative-pg-api-v1-TablespaceConfiguration"><i>map[string]*github.com/cloudnative-pg/cloudnative-pg/api/v1.TablespaceConfiguration</i></a>
+</td>
+<td>
+   <p>The tablespaces configuration</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -4068,7 +4075,9 @@ This specifies which owner the processed resources should relate to.</p>
 - [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
 
 
-<p>StorageConfiguration is the configuration of the storage of the PostgreSQL instances</p>
+
+<p>StorageConfiguration is the configuration of the storage of the PostgreSQL instances
+TODO: update the comment</p>
 
 
 <table class="table">
@@ -4081,7 +4090,8 @@ This specifies which owner the processed resources should relate to.</p>
    <p>StorageClass to use for database data (<code>PGDATA</code>). Applied after
 evaluating the PVC template, if available.
 If not specified, generated PVCs will be satisfied by the
-default storage class</p>
+default storage class
+TODO: update the comment</p>
 </td>
 </tr>
 <tr><td><code>size</code><br/>

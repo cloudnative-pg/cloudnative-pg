@@ -376,6 +376,10 @@ type ClusterSpec struct {
 	// Defaults to: `RuntimeDefault`
 	// +optional
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
+
+	// The tablespaces configuration
+	// +optional
+	Tablespaces map[string]*TablespaceConfiguration `json:"tablespaces,omitempty"`
 }
 
 const (
@@ -1442,11 +1446,13 @@ type RecoveryTarget struct {
 }
 
 // StorageConfiguration is the configuration of the storage of the PostgreSQL instances
+// TODO: update the comment
 type StorageConfiguration struct {
 	// StorageClass to use for database data (`PGDATA`). Applied after
 	// evaluating the PVC template, if available.
 	// If not specified, generated PVCs will be satisfied by the
 	// default storage class
+	// TODO: update the comment
 	// +optional
 	StorageClass *string `json:"storageClass,omitempty"`
 
@@ -1486,6 +1492,20 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 	}
 
 	return nil
+}
+
+// TablespaceConfiguration is the configuration of a tablespace, and includes
+// the storage specification, and whether it is temporary (defaults to false
+// if not specified)
+type TablespaceConfiguration struct {
+	// TODO: update the comment
+	// +optional
+	Storage StorageConfiguration `json:"storage,omitempty"`
+
+	// This flag indicates if the tablespace is a temporary tablespace or not (default false)
+	// +optional
+	// +kubebuilder:default:=false
+	Temporary bool `json:"temporary,omitempty"`
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.
