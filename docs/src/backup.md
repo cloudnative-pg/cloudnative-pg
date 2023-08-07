@@ -43,7 +43,7 @@ on a [standby](#backup-from-a-standby).
 ## Common object stores
 
 If you are looking for a specific object store such as
-[AWS S3](appendixes/object_stores.md#s3),
+[AWS S3](appendixes/object_stores.md#aws-s3),
 [Microsoft Azure Blob Storage](appendixes/object_stores.md#azure-blob-storage),
 [Google Cloud Storage](appendixes/object_stores.md#google-cloud-storage), or
 [MinIO Gateway](appendixes/object_stores.md#minio-gateway), or a compatible

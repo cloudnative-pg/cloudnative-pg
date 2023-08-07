@@ -3,9 +3,9 @@
 You can store the [backup](../backup.md) files in any service that is supported
 by the Barman Cloud infrastructure. That is:
 
-- [AWS S3](https://aws.amazon.com/s3/)
-- [Microsoft Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/)
-- [Google Cloud Storage](https://cloud.google.com/storage/)
+- [Amazon S3](#aws-s3)
+- [Microsoft Azure Blob Storage](#azure-blob-storage)
+- [Google Cloud Storage](#google-cloud-storage)
 
 You can also use any compatible implementation of the supported services.
 
@@ -14,7 +14,11 @@ discussed in the following sections.
 
 ## AWS S3
 
-You can define the permissions to store backups in S3 buckets in two ways:
+[AWS Simple Storage Service (S3)](https://aws.amazon.com/s3/) is
+a very popular object storage service offered by Amazon.
+
+As far as CloudNativePG backup is concerned, you can define the permissions to
+store backups in S3 buckets in two ways:
 
 - If CloudNativePG is running in EKS. you may want to use the
   [IRSA authentication method](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
@@ -139,13 +143,17 @@ spec:
 
 ## Azure Blob Storage
 
-In order to access your storage account, you will need one of the following combinations
-of credentials:
+[Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) is the
+obect storage service provided by Microsoft.
 
-- [**Connection String**](https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string#configure-a-connection-string-for-an-azure-storage-account)
-- **Storage account name** and [**Storage account access key**](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
-- **Storage account name** and [**Storage account SAS Token**](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create)
-- **Storage account name** and [**Azure AD Workload Identity**](https://azure.github.io/azure-workload-identity/docs/introduction.html)
+In order to access your storage account for backup and recovery of
+CloudNativePG managed databases, you will need one of the following
+combinations of credentials:
+
+- [Connection String](https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string#configure-a-connection-string-for-an-azure-storage-account)
+- Storage account name and [Storage account access key](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
+- Storage account name and [Storage account SAS Token](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create)
+- Storage account name and [Azure AD Workload Identity](https://azure.github.io/azure-workload-identity/docs/introduction.html)
 properly configured.
 
 Using **Azure AD Workload Identity**, you can avoid saving the credentials into a Kubernetes Secret,
@@ -230,7 +238,8 @@ Emulator or [Azurite](https://github.com/Azure/Azurite).
 
 ## Google Cloud Storage
 
-Currently, the operator supports two authentication methods for Google Cloud Storage:
+Currently, the CloudNativePG operator supports two authentication methods for
+[Google Cloud Storage](https://cloud.google.com/storage/):
 
 - the first one assumes that the pod is running inside a Google Kubernetes Engine cluster
 - the second one leverages the environment variable `GOOGLE_APPLICATION_CREDENTIALS`
