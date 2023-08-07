@@ -18,6 +18,8 @@ package specs
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -30,6 +32,28 @@ const PgWalVolumePath = "/var/lib/postgresql/wal"
 
 // PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
+
+// PgTableSpaceVolumePath its the base path used by tablespace when present
+const PgTableSpaceVolumePath = "/var/lib/postgresql/tablespaces"
+
+// MountForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func MountForTablespace(tablespaceName string) string {
+	return fmt.Sprintf("%s/%s", PgTableSpaceVolumePath, tablespaceName)
+}
+
+// LocationForTablespace returns the data location for tablespace on a cluster pod
+func LocationForTablespace(tablespaceName string) string {
+	return fmt.Sprintf("%s/%s/data", PgTableSpaceVolumePath, tablespaceName)
+}
+
+// PvcNameForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func PvcNameForTablespace(podName, tablespaceName string) string {
+	// TODO: have a function to convert tablespace names to a lowercase RFC 1123 label
+	name := strings.ReplaceAll(tablespaceName, "_", "-")
+	return podName + "-tbs-" + name
+}
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
@@ -96,6 +120,31 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 					},
 				},
 			})
+	}
+
+	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
+	// later it will be  retrieved to do deepEquals
+	if cluster.ShouldCreateTablespaces() {
+		// Try to get a fix order of name
+		tbsNames := make([]string, len(cluster.Spec.Tablespaces))
+		i := 0
+		for name := range cluster.Spec.Tablespaces {
+			tbsNames[i] = name
+			i++
+		}
+		sort.Strings(tbsNames)
+		for i = range tbsNames {
+			result = append(result,
+				corev1.Volume{
+					Name: tbsNames[i],
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: PvcNameForTablespace(podName, tbsNames[i]),
+						},
+					},
+				},
+			)
+		}
 	}
 
 	if cluster.ShouldCreateProjectedVolume() {
@@ -221,6 +270,26 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		)
 	}
 
+	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
+	// later it will be  retrieved to do deepEquals
+	if cluster.ShouldCreateTablespaces() {
+		// Try to get a fix order of name
+		tbsNames := make([]string, len(cluster.Spec.Tablespaces))
+		i := 0
+		for name := range cluster.Spec.Tablespaces {
+			tbsNames[i] = name
+			i++
+		}
+		sort.Strings(tbsNames)
+		for i = range tbsNames {
+			volumeMounts = append(volumeMounts,
+				corev1.VolumeMount{
+					Name:      tbsNames[i],
+					MountPath: MountForTablespace(tbsNames[i]),
+				},
+			)
+		}
+	}
 	return volumeMounts
 }
 

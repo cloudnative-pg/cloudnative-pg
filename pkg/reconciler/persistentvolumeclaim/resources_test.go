@@ -108,3 +108,53 @@ var _ = Describe("PVCs used by instance", func() {
 		Expect(res).To(BeFalse())
 	})
 })
+
+var _ = Describe("instance with tablespace test", func() {
+	clusterName := "cluster-tbs-pvc-instance"
+	instanceName := clusterName + "-1"
+
+	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterName,
+		},
+		Spec: apiv1.ClusterSpec{
+			StorageConfiguration: apiv1.StorageConfiguration{},
+			WalStorage:           &apiv1.StorageConfiguration{},
+			Tablespaces: map[string]*apiv1.TablespaceConfiguration{
+				"tbs1": {
+					Storage: apiv1.StorageConfiguration{
+						Size: "1Gi",
+					},
+				},
+				"tbs2": {
+					Storage: apiv1.StorageConfiguration{
+						Size: "1Gi",
+					},
+				},
+				"tbs3": {
+					Storage: apiv1.StorageConfiguration{
+						Size: "1Gi",
+					},
+				},
+			},
+		},
+	}
+
+	It("Get all the expected pvc out", func() {
+		expectedPVCs := getExpectedPVCsFromCluster(cluster, instanceName)
+		Expect(expectedPVCs).Should(HaveLen(5))
+		for _, pvc := range expectedPVCs {
+			if pvc.role == utils.PVCRolePgData {
+				Expect(pvc.name).Should(Equal(GetName(instanceName, utils.PVCRolePgData)))
+			}
+
+			if pvc.role == utils.PVCRolePgWal {
+				Expect(pvc.name).Should(Equal(GetName(instanceName, utils.PVCRolePgWal)))
+			}
+
+			if pvc.role == utils.PVCRolePgTablespace {
+				Expect(pvc.name).Should(Equal(specs.PvcNameForTablespace(instanceName, pvc.tablespaceName)))
+			}
+		}
+	})
+})

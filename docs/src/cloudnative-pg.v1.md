@@ -1695,6 +1695,13 @@ sources to the pods to be used by Env</p>
 Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
+<tr><td><code>tablespaces</code><br/>
+<a href="#postgresql-cnpg-io-v1-*github-com-cloudnative-pg-cloudnative-pg-api-v1-TablespaceConfiguration"><i>map[string]*github.com/cloudnative-pg/cloudnative-pg/api/v1.TablespaceConfiguration</i></a>
+</td>
+<td>
+   <p>The tablespaces configuration</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -1745,6 +1752,13 @@ Defaults to: <code>RuntimeDefault</code></p>
 </td>
 <td>
    <p>ManagedRolesStatus reports the state of the managed roles in the cluster</p>
+</td>
+</tr>
+<tr><td><code>tablespacesStatus</code><br/>
+<a href="#postgresql-cnpg-io-v1-TablespacesState"><i>TablespacesState</i></a>
+</td>
+<td>
+   <p>TablespaceStatus reports the state of the declarative tablespaces in the cluster</p>
 </td>
 </tr>
 <tr><td><code>timelineID</code><br/>
@@ -2142,6 +2156,13 @@ PostgreSQL cluster from an existing storage</p>
 </td>
 <td>
    <p>Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)</p>
+</td>
+</tr>
+<tr><td><code>tablespaceStorage</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#typedlocalobjectreference-v1-core"><i>map[string]k8s.io/api/core/v1.TypedLocalObjectReference</i></a>
+</td>
+<td>
+   <p>Configuration of the storage for PostgreSQL tablespaces</p>
 </td>
 </tr>
 </tbody>
@@ -4250,7 +4271,9 @@ This specifies which owner the processed resources should relate to.</p>
 - [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
 
 
-<p>StorageConfiguration is the configuration of the storage of the PostgreSQL instances</p>
+
+<p>StorageConfiguration is the configuration of the storage of the PostgreSQL instances
+TODO: update the comment</p>
 
 
 <table class="table">
@@ -4263,7 +4286,8 @@ This specifies which owner the processed resources should relate to.</p>
    <p>StorageClass to use for database data (<code>PGDATA</code>). Applied after
 evaluating the PVC template, if available.
 If not specified, generated PVCs will be satisfied by the
-default storage class</p>
+default storage class
+TODO: update the comment</p>
 </td>
 </tr>
 <tr><td><code>size</code><br/>
@@ -4321,6 +4345,30 @@ if all the labels values match.</p>
 </td>
 <td>
    <p>This flag enables the constraints for sync replicas</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## TablespacesState     {#postgresql-cnpg-io-v1-TablespacesState}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>TablespacesState tracks the status of a cluster's declarative tablespaces</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>byStatus</code><br/>
+<i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.TablespaceStatus][]string</i>
+</td>
+<td>
+   <p>ByStatus gives the list of tablespaces in each state</p>
 </td>
 </tr>
 </tbody>

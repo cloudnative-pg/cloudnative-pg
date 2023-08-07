@@ -372,7 +372,11 @@ TCP
 TLS
 TOC
 TODO
+TablespaceConfiguration
 TablespaceMapFile
+TablespaceStatus
+Tablespaces
+TablespacesState
 TemporaryData
 TimelineId
 TopologyKey
@@ -1080,7 +1084,9 @@ sysv
 tAc
 tablespace
 tablespaceMapFile
+tablespaceStorage
 tablespaces
+tablespacesStatus
 targetImmediate
 targetLSN
 targetName
