@@ -1,4 +1,4 @@
-# Appendix A - Common object stores
+# Appendix A - Common object stores for backups
 
 You can archive the backup files in any service that is supported
 by the Barman Cloud infrastructure. That is:
