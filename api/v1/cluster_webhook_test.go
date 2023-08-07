@@ -3133,3 +3133,243 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(2))
 	})
 })
+
+var _ = Describe("Tablespaces validation", func() {
+	It("should succeed if there is no tablespaces section", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+			},
+		}
+		Expect(cluster.Validate()).To(BeEmpty())
+	})
+
+	It("should succeed if the tablespaces are ok", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					"my-tablespace": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.Validate()).To(BeEmpty())
+	})
+
+	It("should produce an error if the tablespace name is too long", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
+					"my-tablespace1my-tablespace2my-tablespace3my-tablespace4my-tablespace5": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.Validate()).To(HaveLen(1))
+	})
+
+	It("should produce an error if the storage configured for the tablespace is invalid", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "10Gibberish",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.Validate()).To(HaveLen(1))
+	})
+
+	It("should produce two errors if two tablespaces have errors", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "10Gibberish",
+						},
+						Temporary: true,
+					},
+					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
+					"my-tablespace1my-tablespace2my-tablespace3my-tablespace4my-tablespace5": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.Validate()).To(HaveLen(2))
+	})
+
+	It("should produce an error if the tablespaces section is deleted", func() {
+		oldCluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+			},
+		}
+		Expect(cluster.ValidateChanges(oldCluster)).To(HaveLen(1))
+	})
+
+	It("should produce an error if a tablespace is deleted", func() {
+		oldCluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+					"my-tablespace2": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.ValidateChanges(oldCluster)).To(HaveLen(1))
+	})
+
+	It("should produce an error if a tablespace is reduced in size", func() {
+		oldCluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "9Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.ValidateChanges(oldCluster)).To(HaveLen(1))
+	})
+})
