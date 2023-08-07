@@ -315,6 +315,9 @@ type ClusterSpec struct {
 	// The SeccompProfile applied to every Pod and Container.
 	// Defaults to: `RuntimeDefault`
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
+
+	// The tablespaces configuration
+	Tablespaces map[string]*TablespaceConfiguration `json:"tablespaces,omitempty"`
 }
 
 const (
@@ -1283,6 +1286,14 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 	}
 
 	return nil
+}
+
+// TablespaceConfiguration is the configuration of a tablespace, and includes
+// the storage specification, and whether it is temporary (defaults to false
+// if not specified)
+type TablespaceConfiguration struct {
+	Storage   StorageConfiguration `json:"storage,omitempty"`
+	Temporary bool                 `json:"temporary,omitempty"`
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.

@@ -89,6 +89,7 @@ Below you will find a description of the defined resources:
 - [ServiceAccountTemplate](#ServiceAccountTemplate)
 - [StorageConfiguration](#StorageConfiguration)
 - [SyncReplicaElectionConstraints](#SyncReplicaElectionConstraints)
+- [TablespaceConfiguration](#TablespaceConfiguration)
 - [Topology](#Topology)
 - [WalBackupConfiguration](#WalBackupConfiguration)
 
@@ -400,6 +401,7 @@ Name                      | Description                                         
 `envFrom                  ` | EnvFrom follows the EnvFrom format to pass environment variables sources to the pods to be used by Env                                                                                                                                                                                                                                                                                                                  | []corev1.EnvFromSource                                                                                                          
 `managed                  ` | The configuration that is used by the portions of PostgreSQL that are managed by the instance manager                                                                                                                                                                                                                                                                                                                   | [*ManagedConfiguration](#ManagedConfiguration)                                                                                  
 `seccompProfile           ` | The SeccompProfile applied to every Pod and Container. Defaults to: `RuntimeDefault`                                                                                                                                                                                                                                                                                                                                    | *corev1.SeccompProfile                                                                                                          
+`tablespaces              ` | The tablespaces configuration                                                                                                                                                                                                                                                                                                                                                                                           | map[string]*TablespaceConfiguration                                                                                             
 
 <a id='ClusterStatus'></a>
 
@@ -1089,6 +1091,17 @@ Name                   | Description                                            
 ---------------------- | -------------------------------------------------------------------------------------------------------------- | --------
 `enabled               ` | This flag enables the constraints for sync replicas                                                            - *mandatory*  | bool    
 `nodeLabelsAntiAffinity` | A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not | []string
+
+<a id='TablespaceConfiguration'></a>
+
+## TablespaceConfiguration
+
+TablespaceConfiguration is the configuration of a tablespace, and includes the storage specification, and whether it is temporary (defaults to false if not specified)
+
+Name      | Description            | Type                                         
+--------- | --- | ---------------------------------------------
+`storage  ` |  | [StorageConfiguration](#StorageConfiguration)
+`temporary` |  | bool                                         
 
 <a id='Topology'></a>
 

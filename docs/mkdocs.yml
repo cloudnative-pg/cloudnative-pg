@@ -57,6 +57,7 @@ nav:
   - samples.md
   - networking.md
   - benchmarking.md
+  - tablespaces.md
   - commercial_support.md
   - faq.md
   - api_reference.md
