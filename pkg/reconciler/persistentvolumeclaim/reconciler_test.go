@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -402,17 +403,17 @@ var _ = Describe("Storage configuration", func() {
 	}
 
 	It("Should not fail when the roles it's correct", func() {
-		configuration, err := getStorageConfiguration(cluster, utils.PVCRolePgData)
+		configuration, err := getStorageConfiguration(cluster, utils.PVCRolePgData, "")
 		Expect(configuration).ToNot(BeNil())
 		Expect(err).ToNot(HaveOccurred())
 
-		configuration, err = getStorageConfiguration(cluster, utils.PVCRolePgWal)
+		configuration, err = getStorageConfiguration(cluster, utils.PVCRolePgWal, "")
 		Expect(configuration).ToNot(BeNil())
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("fail if we look for the wrong role", func() {
-		configuration, err := getStorageConfiguration(cluster, "NoRol")
+		configuration, err := getStorageConfiguration(cluster, "NoRol", "")
 		Expect(err).To(HaveOccurred())
 		Expect(configuration.StorageClass).To(BeNil())
 	})
@@ -423,6 +424,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 		clusterName = "cluster-pvc-quantity"
 		cluster     *apiv1.Cluster
 		pvc         corev1.PersistentVolumeClaim
+		pvc2        corev1.PersistentVolumeClaim
 		cli         client.Client
 	)
 
@@ -432,11 +434,17 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 				Name: clusterName,
 			},
 		}
-		pvc = makePVC(clusterName, "1", "", false)
+		pvc = makePVC(clusterName, "1", utils.PVCRolePgData, false)
+
+		pvc2 = makePVC(clusterName, "2", utils.PVCRolePgTablespace, false)
+		pvc2.Labels[utils.TablespaceNameLabelName] = "fragglerock"
+		pvc2.Spec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{
+			"storage": resource.MustParse("3Gi"),
+		}
 
 		cli = fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
-			WithObjects(cluster, &pvc).
+			WithObjects(cluster, &pvc, &pvc2).
 			Build()
 	})
 
@@ -474,7 +482,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("It should not fail it's everything it's ok", func() {
+	It("It should not fail it's everything is ok", func() {
 		pvc.Labels = map[string]string{
 			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 		}
@@ -485,6 +493,42 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			cli,
 			cluster,
 			&pvc)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("It should succeed increasing size of tablespaces", func() {
+		// Now we set the proper storage configuration
+		cluster.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
+			"fragglerock": {
+				Storage: apiv1.StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+
+		err := reconcilePVCQuantity(
+			context.Background(),
+			cli,
+			cluster,
+			&pvc2)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("It should succeed decreasing size of tablespaces", func() {
+		// Now we set the proper storage configuration
+		cluster.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
+			"fragglerock": {
+				Storage: apiv1.StorageConfiguration{
+					Size: "2Gi",
+				},
+			},
+		}
+
+		err := reconcilePVCQuantity(
+			context.Background(),
+			cli,
+			cluster,
+			&pvc2)
 		Expect(err).ToNot(HaveOccurred())
 	})
 })

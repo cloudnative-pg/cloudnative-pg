@@ -453,6 +453,10 @@ type ClusterSpec struct {
 	// Defaults to: `RuntimeDefault`
 	// +optional
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
+
+	// The tablespaces configuration
+	// +optional
+	Tablespaces map[string]*TablespaceConfiguration `json:"tablespaces,omitempty"`
 }
 
 const (
@@ -626,6 +630,26 @@ type ManagedRoles struct {
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
+// TablespaceStatus represents the status of a tablespace in the cluster
+type TablespaceStatus string
+
+const (
+	// TablespaceStatusReconciled indicates the tablespace in DB matches the Spec
+	TablespaceStatusReconciled TablespaceStatus = "reconciled"
+	// TablespaceStatusPendingReconciliation indicates the tablespace in Spec requires creation in the DB
+	TablespaceStatusPendingReconciliation TablespaceStatus = "pending"
+	// TablespaceStatusReserved indicates this tablespace is reserved by the operator. E.g. `pg_global`
+	// TODO: remove this status
+	TablespaceStatusReserved TablespaceStatus = "reserved"
+)
+
+// TablespacesState tracks the status of a cluster's declarative tablespaces
+type TablespacesState struct {
+	// ByStatus gives the list of tablespaces in each state
+	// +optional
+	ByStatus map[TablespaceStatus][]string `json:"byStatus,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -647,6 +671,10 @@ type ClusterStatus struct {
 	// ManagedRolesStatus reports the state of the managed roles in the cluster
 	// +optional
 	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus,omitempty"`
+
+	// TablespaceStatus reports the state of the declarative tablespaces in the cluster
+	// +optional
+	TablespaceStatus TablespacesState `json:"tablespacesStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	// +optional
@@ -1476,6 +1504,10 @@ type DataSource struct {
 	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
 	// +optional
 	WalStorage *corev1.TypedLocalObjectReference `json:"walStorage,omitempty"`
+
+	// Configuration of the storage for PostgreSQL tablespaces
+	// +optional
+	TablespaceStorage map[string]corev1.TypedLocalObjectReference `json:"tablespaceStorage,omitempty"`
 }
 
 // BackupSource contains the backup we need to restore from, plus some
@@ -1554,11 +1586,13 @@ type RecoveryTarget struct {
 }
 
 // StorageConfiguration is the configuration of the storage of the PostgreSQL instances
+// TODO: update the comment
 type StorageConfiguration struct {
 	// StorageClass to use for database data (`PGDATA`). Applied after
 	// evaluating the PVC template, if available.
 	// If not specified, generated PVCs will be satisfied by the
 	// default storage class
+	// TODO: update the comment
 	// +optional
 	StorageClass *string `json:"storageClass,omitempty"`
 
@@ -1598,6 +1632,20 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 	}
 
 	return nil
+}
+
+// TablespaceConfiguration is the configuration of a tablespace, and includes
+// the storage specification, and whether it is temporary (defaults to false
+// if not specified)
+type TablespaceConfiguration struct {
+	// TODO: update the comment
+	// +optional
+	Storage StorageConfiguration `json:"storage,omitempty"`
+
+	// This flag indicates if the tablespace is a temporary tablespace or not (default false)
+	// +optional
+	// +kubebuilder:default:=false
+	Temporary bool `json:"temporary,omitempty"`
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.
@@ -2708,6 +2756,11 @@ func (cluster *Cluster) ShouldCreateProjectedVolume() bool {
 // ShouldCreateWalArchiveVolume returns whether we should create the wal archive volume
 func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
+}
+
+// ShouldCreateTablespaces returns true if for this cluster, we need to create tablespaces
+func (cluster *Cluster) ShouldCreateTablespaces() bool {
+	return len(cluster.Spec.Tablespaces) != 0
 }
 
 // GetPostgresUID returns the UID that is being used for the "postgres"

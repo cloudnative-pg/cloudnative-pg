@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-with-tablespaces
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  tablespaces:
+    atablespace:
+      storage:
+        size: 1Gi
+        storageClass: standard
+      temporary: false
+    anothertablespace:
+      storage:
+        size: 2Gi
+        storageClass: standard
+      temporary: true
+    tablespacea1:
+      temporary: true
+      storage:
+        size: 2Gi
+        storageClass: standard
