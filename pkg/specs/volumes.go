@@ -47,12 +47,45 @@ func LocationForTablespace(tablespaceName string) string {
 	return fmt.Sprintf("%s/%s/data", PgTableSpaceVolumePath, tablespaceName)
 }
 
+// convertPostgresIDToK8sName returns a postgres identifier without the characters
+// that are illegal in K8s names and domains. (Lowercase RFC 1123)
+func convertPostgresIDToK8sName(tablespaceName string) string {
+	name := convertPostgresIDToK8s(tablespaceName)
+	name = strings.ReplaceAll(name, "_", "-") // reversible
+	name = strings.ToLower(name)              // irreversible
+	return name
+}
+
+// convertPostgresIDToK8s transforms a postgres identifier to be a valid K8s
+// label.
+//
+// NOTE: this is a reversible transformation, as we swap invalid K8s chars into invalid PG chars
+func convertPostgresIDToK8s(tablespaceName string) string {
+	// Postgres identifiers can begin with _ or a letter, K8's must begin
+	// with an alphanumeric. We convert _ to 1 in this edge case
+	if strings.HasPrefix(tablespaceName, "_") {
+		tablespaceName = strings.Replace(tablespaceName, "_", "1", 1)
+	}
+	name := strings.ReplaceAll(tablespaceName, "$", "-")
+	return name
+}
+
+// LabelForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func LabelForTablespace(tablespaceName string) string {
+	return convertPostgresIDToK8s(tablespaceName)
+}
+
 // PvcNameForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func PvcNameForTablespace(podName, tablespaceName string) string {
-	// TODO: have a function to convert tablespace names to a lowercase RFC 1123 label
-	name := strings.ReplaceAll(tablespaceName, "_", "-")
-	return podName + "-tbs-" + name
+	return podName + "-tbs-" + convertPostgresIDToK8sName(tablespaceName)
+}
+
+// VolumeMountNameForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func VolumeMountNameForTablespace(tablespaceName string) string {
+	return convertPostgresIDToK8sName(tablespaceName)
 }
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
@@ -136,7 +169,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 		for i = range tbsNames {
 			result = append(result,
 				corev1.Volume{
-					Name: tbsNames[i],
+					Name: VolumeMountNameForTablespace(tbsNames[i]),
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 							ClaimName: PvcNameForTablespace(podName, tbsNames[i]),
@@ -284,7 +317,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		for i = range tbsNames {
 			volumeMounts = append(volumeMounts,
 				corev1.VolumeMount{
-					Name:      tbsNames[i],
+					Name:      VolumeMountNameForTablespace(tbsNames[i]),
 					MountPath: MountForTablespace(tbsNames[i]),
 				},
 			)

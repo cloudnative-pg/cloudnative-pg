@@ -14,7 +14,7 @@ spec:
         size: 1Gi
         storageClass: standard
       temporary: false
-    anothertablespace:
+    another_tablespace:
       storage:
         size: 2Gi
         storageClass: standard

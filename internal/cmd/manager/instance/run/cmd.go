@@ -164,7 +164,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
-
 	// postgres CSV logs handler (PGAudit too)
 	postgresLogPipe := logpipe.NewLogPipe()
 	if err := mgr.Add(postgresLogPipe); err != nil {
@@ -222,12 +221,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	tablespaceSynchronizer := tablespaces.NewTablespaceSynchronizer(instance, reconciler.GetClient())
-	if err = mgr.Add(tablespaceSynchronizer); err != nil {
-		setupLog.Error(err, "unable to create tablespace synchronizer")
-		return err
-	}
-
 	// onlineUpgradeCtx is a child context of the postgres context.
 	// onlineUpgradeCtx will be the context passed to all the manager handled Runnables via Start(ctx),
 	// its deletion will imply all Runnables to stop, but will be handled
@@ -251,6 +244,13 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	}
 	if err = mgr.Add(localSrv); err != nil {
 		setupLog.Error(err, "unable to add local webserver runnable")
+		return err
+	}
+
+	setupLog.Info("starting tablespace manager")
+	if err := tablespaces.NewTablespaceReconciler(instance, mgr.GetClient()).
+		SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create tablespace reconciler")
 		return err
 	}
 
