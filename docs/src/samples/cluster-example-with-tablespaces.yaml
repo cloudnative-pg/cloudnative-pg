@@ -9,7 +9,7 @@ spec:
     size: 1Gi
 
   tablespaces:
-    a_tablespace:
+    a_tablespacea:
       storage:
         size: 1Gi
         storageClass: standard
@@ -18,4 +18,6 @@ spec:
       storage:
         size: 2Gi
         storageClass: standard
+      temporary: true
+    a_tablespacea1:
       temporary: true

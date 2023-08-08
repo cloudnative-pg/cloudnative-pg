@@ -1540,8 +1540,8 @@ func (r *Cluster) validateTablespacesNames() field.ErrorList {
 	for name := range r.Spec.Tablespaces {
 		if len(name) > PostgresIdentifierMaxLen {
 			result = append(result, field.Invalid(
-				field.NewPath("metadata", "name"),
-				r.Name,
+				field.NewPath("spec", "tablespaces"),
+				name,
 				"the maximum length of an identifier is 63 characters"))
 		}
 	}

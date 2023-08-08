@@ -3480,6 +3480,9 @@ spec:
                           type: string
                       type: object
                     temporary:
+                      default: false
+                      description: This flag indicates if the tablespace is a temporary
+                        tablespace or not (default false)
                       type: boolean
                   type: object
                 description: The tablespaces configuration

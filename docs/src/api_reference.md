@@ -1098,10 +1098,10 @@ Name                   | Description                                            
 
 TablespaceConfiguration is the configuration of a tablespace, and includes the storage specification, and whether it is temporary (defaults to false if not specified)
 
-Name      | Description            | Type                                         
---------- | --- | ---------------------------------------------
-`storage  ` |  | [StorageConfiguration](#StorageConfiguration)
-`temporary` |  | bool                                         
+Name      | Description                                                                            | Type                                         
+--------- | -------------------------------------------------------------------------------------- | ---------------------------------------------
+`storage  ` |                                                                                        | [StorageConfiguration](#StorageConfiguration)
+`temporary` | This flag indicates if the tablespace is a temporary tablespace or not (default false) | bool                                         
 
 <a id='Topology'></a>
 
