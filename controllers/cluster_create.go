@@ -1203,7 +1203,7 @@ func findInstancePodToCreate(
 ) (*corev1.Pod, error) {
 	instanceThatHavePods := instancesStatus.GetNames()
 
-	var instanceToRecreate *corev1.PersistentVolumeClaim
+	var missingInstancePVC *corev1.PersistentVolumeClaim
 
 	iterablePVCs := cluster.Status.DanglingPVC
 	// appending unusablePVC ensures that some corner cases are covered. (EX: an instance is deleted manually while
@@ -1229,17 +1229,17 @@ func findInstancePodToCreate(
 
 		// We give the priority to reattaching the primary instance
 		if isPrimary := specs.IsPrimary(pvcs[idx].ObjectMeta); isPrimary {
-			instanceToRecreate = &pvcs[idx]
+			missingInstancePVC = &pvcs[idx]
 			break
 		}
 
-		if instanceToRecreate == nil {
-			instanceToRecreate = &pvcs[idx]
+		if missingInstancePVC == nil {
+			missingInstancePVC = &pvcs[idx]
 		}
 	}
 
-	if instanceToRecreate != nil {
-		serial, err := specs.GetNodeSerial(instanceToRecreate.ObjectMeta)
+	if missingInstancePVC != nil {
+		serial, err := specs.GetNodeSerial(missingInstancePVC.ObjectMeta)
 		if err != nil {
 			return nil, err
 		}
