@@ -42,7 +42,6 @@ E2E_DIR="${HACK_DIR}/e2e"
 TEMP_DIR="$(mktemp -d)"
 echo $TEMP_DIR
 LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
-#trap 'rm -fr ${TEMP_DIR}' EXIT
 
 # Operating System and Architecture
 OS=$(uname | tr '[:upper:]' '[:lower:]')
@@ -338,7 +337,7 @@ deploy_fluentd() {
 }
 
 deploy_csi_host_path() {
-  echo "${bright} Deploying csi driver plugin ${reset}"
+  echo "${bright}Starting deployment of CSI driver plugin... ${reset}"
   CSI_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi
   EXTERNAL_SNAPSHOTTER_VERSION="v6.2.2"
   EXTERNAL_PROVISIONER_VERSION="v3.3.0"
@@ -372,23 +371,23 @@ deploy_csi_host_path() {
   ## create storage class
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
 
-  echo "waiting for csi plugin ready"
+
+  echo "${bright} CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready... ${reset}"
   ITER=0
   while true; do
     if [[ $ITER -ge 300 ]]; then
-      echo "Time out waiting for csi plugin ready"
+      echo "${bright}Timeout: The CSI plugin did not become ready within the expected time.${reset}"
       exit 1
     fi
     NUM_SPEC=$(kubectl get statefulset csi-hostpathplugin  -o jsonpath='{.spec.replicas}')
     NUM_STATUS=$(kubectl get statefulset csi-hostpathplugin -o jsonpath='{.status.availableReplicas}')
     if [[ "$NUM_SPEC" == "$NUM_STATUS" ]]; then
-      echo "csi plugin is ready"
+      echo "${bright}Success: The CSI plugin is deployed and ready.${reset}"
       break
     fi
     sleep 1
     ((++ITER))
   done
-  echo "${bright} Deploying csi driver plugin ${reset}"
 }
 
 
@@ -490,7 +489,6 @@ Options:
     -r|--registry         Enable local registry. Env: ENABLE_REGISTRY
 
     -p|--pyroscope        Enable Pyroscope in the operator namespace
-
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
