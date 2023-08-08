@@ -336,12 +336,6 @@ by `name` (our recommendation is to use the same `name` of the origin cluster).
 
 ### Bootstrap from a backup (`recovery`)
 
-<!--
-
-TODO: Move the recovery content here in the recovery.md file and refactor it
-
--->
-
 The `recovery` bootstrap mode lets you create a new cluster from an existing
 physical base backup, and then reapply the WAL files containing the REDO log
 from the archive. Both base backups and WAL files are pulled from the
@@ -363,8 +357,8 @@ in replica mode. Also, make sure that the PostgreSQL configuration
 compatible, from a physical replication standpoint, with the original one.
 
 !!! Note
-    You can find more information about recovery of a running cluster
-    from a backup in the ["Recovery" page](recovery.md).
+    You can find more information about backup and recovery of a running cluster
+    in the ["Backup and recovery" page](backup_recovery.md).
 
 CloudNativePG is also introducing support for Kubernetes' volume snapshots.
 With the current version of CloudNativePG, you can:

@@ -27,8 +27,7 @@ nav:
   - failure_modes.md
   - rolling_update.md
   - replication.md
-  - backup.md
-  - recovery.md
+  - backup_recovery.md
   - postgresql_conf.md
   - operator_conf.md
   - cluster_conf.md
@@ -61,5 +60,3 @@ nav:
   - api_reference.md
   - supported_releases.md
   - release_notes.md
-  - Appendixes:
-    - appendixes/object_stores.md
