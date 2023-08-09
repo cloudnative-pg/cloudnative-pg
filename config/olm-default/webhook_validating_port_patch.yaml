@@ -1,0 +1,24 @@
+# This patch is needed to instruct OLM to add containerPort to webhooks definition
+# otherwise it will use a default that could be `0` or `443` that are both wrong
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+webhooks:
+  - clientConfig:
+      service:
+        containerPort: 9443
+    name: vcluster.kb.io
+  - clientConfig:
+      service:
+        containerPort: 9443
+    name: vbackup.kb.io
+  - clientConfig:
+      service:
+        containerPort: 9443
+    name: vscheduledbackup.kb.io
+  - clientConfig:
+      service:
+        containerPort: 9443
+    name: vpooler.kb.io

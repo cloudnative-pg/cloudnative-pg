@@ -22,12 +22,13 @@ ifeq (,$(CONTROLLER_IMG))
 IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
 CONTROLLER_IMG = ghcr.io/cloudnative-pg/cloudnative-pg-testing:${IMAGE_TAG}
+BUNDLE_IMG = ghcr.io/cloudnative-pg/cloudnative-pg-testing:bundle-${IMAGE_TAG}
 endif
 endif
 
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
-VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/+dev\1/')
+VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/-dev\1/')
 LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=${VERSION} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
@@ -44,6 +45,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.13.0
 GORELEASER_VERSION ?= v1.21.2
 SPELLCHECK_VERSION ?= 0.34.0
 WOKE_VERSION ?= 0.19.0
+OPERATOR_SDK_VERSION ?= 1.31.0
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -124,6 +126,46 @@ docker-build: go-releaser ## Build the docker image.
 docker-push: ## Push the docker image.
 	docker push ${CONTROLLER_IMG}
 
+olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM installation
+	set -xeEuo pipefail ;\
+	CONFIG_TMP_DIR=$$(mktemp -d) ;\
+	cp -r config "$${CONFIG_TMP_DIR}" ;\
+	( \
+		cd "$${CONFIG_TMP_DIR}/config/default" ;\
+		$(KUSTOMIZE) edit set image controller="$${CONTROLLER_IMG}" ;\
+		cd "$${CONFIG_TMP_DIR}" ;\
+	) ;\
+	rm -fr bundle bundle.Dockerfile ;\
+	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
+	#sed -e 's/name: cnpg-controller-manager$$/name: cnpg-controller-manager-${VERSION}/g' | \
+	sed -e "s@\$${CREATED_AT}@$$(LANG=C date -Iseconds -u)@g" | \
+	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
+	docker buildx build --no-cache -f bundle.Dockerfile --push -t ${BUNDLE_IMG} . ;\
+	export BUNDLE_IMG="${BUNDLE_IMG}"
+
+olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
+	set -xeEuo pipefail ;\
+	rm -fr catalog* cloudnative-pg-operator-template.yaml ;\
+	mkdir -p catalog/cloudnative-pg ;\
+	$(OPM) generate dockerfile catalog
+	echo -e "Schema: olm.semver\n\
+	GenerateMajorChannels: true\n\
+	GenerateMinorChannels: false\n\
+	Stable:\n\
+	    Bundles:\n\
+	    - Image: ${BUNDLE_IMG}" | envsubst > cloudnative-pg-operator-template.yaml
+	$(OPM) alpha render-template semver -o yaml < cloudnative-pg-operator-template.yaml > catalog/catalog.yaml ;\
+	$(OPM) validate catalog/ ;\
+	DOCKER_BUILDKIT=1 docker buildx build --push -f catalog.Dockerfile -t ghcr.io/cloudnative-pg/cloudnative-pg-testing:catalog-${VERSION} --push . ;\
+	echo -e "apiVersion: operators.coreos.com/v1alpha1\n\
+	kind: CatalogSource\n\
+	metadata:\n\
+	   name: cloudnative-pg-catalog\n\
+	   namespace: operators\n\
+	spec:\n\
+	   sourceType: grpc\n\
+	   image: ghcr.io/cloudnative-pg/cloudnative-pg-testing:catalog-${VERSION}" | envsubst > cloudnative-pg-catalog.yaml ;\
+
 ##@ Deployment
 install: manifests kustomize ## Install CRDs into a cluster.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
@@ -160,6 +202,9 @@ generate: controller-gen ## Generate code.
 deploy-locally: kind-cluster ## Build and deploy operator in local cluster
 	set -e ;\
 	hack/setup-cluster.sh -n1 -r load deploy
+
+olm-scorecard: operator-sdk ## Run the Scorecard test from operator-sdk
+	$(OPERATOR_SDK) scorecard ${BUNDLE_IMG} --wait-time 60s --verbose
 
 ##@ Formatters and Linters
 
@@ -272,3 +317,35 @@ kind-cluster: ## Create KinD cluster to run operator locally
 kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
 	set -e ;\
 	hack/setup-cluster.sh -n1 -r destroy
+
+.PHONY: operator-sdk
+operator-sdk: ## Install the operator-sdk app
+ifneq ($(shell PATH="$(GOBIN):$${PATH}" operator-sdk version | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
+	@{ \
+	set -e ;\
+	mkdir -p $(GOBIN) ;\
+	GO_ARCH=$(shell go env GOARCH) ;\
+	SDK_OS="linux" ;\
+	if [ $$(uname) = "Darwin" ]; then SDK_OS="darwin"; fi ;\
+	curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${SDK_OS}_$${GO_ARCH}" -o "$(GOBIN)/operator-sdk" ;\
+	chmod +x "$(GOBIN)/operator-sdk" ;\
+	}
+OPERATOR_SDK=$(GOBIN)/operator-sdk
+else
+OPERATOR_SDK=$(shell which operator-sdk)
+endif
+
+.PHONY: opm
+opm: ## Download opm locally if necessary.
+ifeq (,$(shell which opm 2>/dev/null))
+	@{ \
+	set -e ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	OPM_VERSION=$$(curl -s -LH "Accept:application/json" https://github.com/operator-framework/operator-registry/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/') ;\
+	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/$${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(GOBIN)/opm";\
+	chmod +x $(GOBIN)/opm ;\
+	}
+OPM=$(GOBIN)/opm
+else
+OPM=$(shell which opm)
+endif

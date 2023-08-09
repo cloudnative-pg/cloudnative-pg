@@ -365,8 +365,8 @@ jobs:
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
 
-          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
-          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
+          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')j
 
           # shortened commit sha
           commit_short=$(git rev-parse --short "${commit_sha}")

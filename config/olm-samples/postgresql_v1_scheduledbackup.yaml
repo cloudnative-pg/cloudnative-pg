@@ -1,0 +1,8 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: scheduledbackup-sample
+spec:
+  schedule: "0 0 0 * * *"
+  cluster:
+    name: cluster-sample

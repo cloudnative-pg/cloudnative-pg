@@ -28,3 +28,10 @@ tests/e2e/out/
 
 # Spellcheck dictionary
 dictionary.dic
+
+# OLM ignores
+bundle/
+bundle.Dockerfile
+catalog
+catalog.Dockerfile
+cloudnative-pg-catalog.yaml

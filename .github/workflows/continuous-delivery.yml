@@ -39,7 +39,7 @@ env:
   ROOK_VERSION: "v1.12.0"
   EXTERNAL_SNAPSHOTTER_VERSION: "v6.2.2"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
-
+  OPP_SCRIPT_URL: "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/ci/latest/ci/scripts/opp.sh"
 
 defaults:
   run:
@@ -242,6 +242,7 @@ jobs:
       upload_artifacts: ${{ steps.build-meta.outputs.upload_artifacts }}
       commit_msg: ${{ steps.build-meta.outputs.commit_msg }}
       commit_sha: ${{ steps.build-meta.outputs.commit_sha }}
+      commit_version: ${{ steps.build-meta.outputs.commit_version }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
     steps:
@@ -268,8 +269,8 @@ jobs:
           labels=''
           commit_sha=${{ needs.evaluate_options.outputs.git_ref }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
-          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
-          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
+          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
 
           # shortened commit sha
           commit_short=$(git rev-parse --short "${commit_sha}")
@@ -310,6 +311,7 @@ jobs:
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "commit_sha=${commit_sha}" >> $GITHUB_OUTPUT
           echo "commit_msg=${commit_message}" >> $GITHUB_OUTPUT
+          echo "commit_version=${commit_version}" >> $GITHUB_OUTPUT
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
           echo "author_email=${author_email}" >> $GITHUB_OUTPUT
           echo "branch_name=${branch_name}" >> $GITHUB_OUTPUT
@@ -459,6 +461,148 @@ jobs:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           repository: cloudnative-pg/artifacts
           branch: ${{ needs.buildx.outputs.branch_name }}
+
+  olm-bundle:
+    name: Create OLM Bundle and Catalog
+    runs-on: ubuntu-22.04
+    needs:
+      - buildx
+      - evaluate_options
+    if: |
+      (always() && !cancelled()) &&
+      needs.buildx.result == 'success'
+    outputs:
+      bundle_img: ${{ env.BUNDLE_IMG }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+          # To identify the commit we need the history and all the tags.
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          image: tonistiigi/binfmt:qemu-v6.2.0
+          platforms: ${{ env.PLATFORMS }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create bundle
+        run: |
+          make olm-catalog
+          echo 'BUNDLE_IMG=${BUNDLE_IMG}' >> $GITHUB_ENV
+
+      - name: Archive the bundle manifests
+        uses: actions/upload-artifact@v3
+        with:
+          name: bundle
+          path: |
+            bundle.Dockerfile
+            bundle/
+            cloudnative-pg-catalog.yaml
+          retention-days: 7
+
+  olm-scorecard:
+    name: Scorecard test
+    runs-on: ubuntu-22.04
+    needs:
+      - buildx
+      - olm-bundle
+    if: |
+      (always() && !cancelled()) &&
+      needs.buildx.result == 'success' &&
+      needs.olm-bundle.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: "Setting up KinD cluster"
+        uses: helm/kind-action@v1.8.0
+        with:
+          wait: "600s"
+          version: "v0.20.0"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          image: tonistiigi/binfmt:qemu-v6.2.0
+          platforms: ${{ env.PLATFORMS }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: "Running Scorecard tests"
+        env:
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.image_tag }}
+          BUNDLE_IMG: ${{ needs.olm-bundle.outputs.bundle_img }}
+        run: |
+          make olm-scorecard
+
+  olm-tests:
+    strategy:
+      matrix:
+        test: [ kiwi, lemon, orange ]
+    name: Running ${{ matrix.test }} test
+#    name: Running all OperatorHub.io tests
+    runs-on: ubuntu-22.04
+    needs:
+      - buildx
+      - olm-bundle
+      - olm-scorecard
+    if: |
+      always() &&
+      needs.buildx.result == 'success' &&
+      needs.olm-bundle.result == 'success' &&
+      needs.olm-scorecard.result == 'success'
+    env:
+        VERSION: ${{ needs.buildx.outputs.commit_version }}
+        OPP_DEBUG: 1
+        OPP_PRODUCTION_TYPE: "k8s"
+        OPP_CONTAINER_OPT: "-t"
+        OPP_RELEASE_INDEX_NAME: "catalog_tmp"
+    steps:
+      - name: Checkout community-operators
+        uses: actions/checkout@v4
+        with:
+          repository: k8s-operatorhub/community-operators
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download the bundle
+        uses: actions/download-artifact@v3
+        with:
+          name: bundle
+      - name: Copy bundle in the community-operators
+        run: |
+          mkdir -p "operators/cloudnative-pg/${{ env.VERSION}}"
+          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+          rm -fr bundle.Dockerfile *.zip bundle/
+      - name: Test bundle
+        run: |
+          bash <(curl -sL ${{ env.OPP_SCRIPT_URL }}) ${{ matrix.test }} operators/cloudnative-pg/${{ env.VERSION }}/
 
   generate-jobs:
     name: Generate jobs for E2E tests

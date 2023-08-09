@@ -1,0 +1,5 @@
+resources:
+- postgresql_v1_cluster.yaml
+- postgresql_v1_pooler.yaml
+- postgresql_v1_backup.yaml
+- postgresql_v1_scheduledbackup.yaml
