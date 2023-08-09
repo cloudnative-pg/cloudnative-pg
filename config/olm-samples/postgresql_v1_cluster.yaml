@@ -1,0 +1,21 @@
+# Example of PostgreSQL cluster using a storage class
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-sample
+spec:
+  instances: 3
+
+  # Example of rolling update strategy:
+  # - unsupervised: automated update of the primary once all
+  #                 replicas have been upgraded (default)
+  # - supervised: requires manual supervision to perform
+  #               the switchover of the primary
+  primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
+  storage:
+    size: 1Gi
+  walStorage:
+    size: 1Gi
+  logLevel: info

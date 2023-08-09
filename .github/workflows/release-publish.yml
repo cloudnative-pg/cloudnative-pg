@@ -82,8 +82,8 @@ jobs:
           if [[ "$latest_release_branch" != "$current_release_branch" ]]; then
             skip_krew="true"
           fi
-          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
-          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
+          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
           echo "IMAGES=${images}" >> $GITHUB_ENV
           echo "DATE=${commit_date}" >> $GITHUB_ENV

@@ -1,0 +1,7 @@
+resources:
+- bases/cloudnative-pg.clusterserviceversion.yaml
+- ../olm-default
+- ../olm-samples
+- ../scorecard
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
