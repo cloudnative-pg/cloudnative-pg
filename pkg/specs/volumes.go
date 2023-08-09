@@ -32,9 +32,15 @@ const PgWalVolumePath = "/var/lib/postgresql/wal"
 // PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
-// TablespaceName returns the normalized tablespace volume name for a given
+// MountForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
-func TablespaceName(podName, tablespaceName string) string {
+func MountForTablespace(tablespaceName string) string {
+	return fmt.Sprintf("/var/lib/postgresql/tablespaces/%s", tablespaceName)
+}
+
+// PvcNameForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func PvcNameForTablespace(podName, tablespaceName string) string {
 	// TODO: have a function to convert tablespace names to a lowercase RFC 1123 label
 	name := strings.ReplaceAll(tablespaceName, "_", "-")
 	return podName + "-tbs-" + name
@@ -105,13 +111,13 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 	}
 
 	if cluster.ShouldCreateTablespaces() {
-		for k := range cluster.Spec.Tablespaces {
+		for tbsName := range cluster.Spec.Tablespaces {
 			result = append(result,
 				corev1.Volume{
-					Name: k,
+					Name: tbsName,
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: TablespaceName(podName, k),
+							ClaimName: PvcNameForTablespace(podName, tbsName),
 						},
 					},
 				},
@@ -240,6 +246,17 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 				MountPath: postgres.ProjectedVolumeDirectory,
 			},
 		)
+	}
+
+	if cluster.ShouldCreateTablespaces() {
+		for name := range cluster.Spec.Tablespaces {
+			volumeMounts = append(volumeMounts,
+				corev1.VolumeMount{
+					Name:      name,
+					MountPath: MountForTablespace(name),
+				},
+			)
+		}
 	}
 
 	return volumeMounts

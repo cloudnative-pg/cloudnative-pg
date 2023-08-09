@@ -290,3 +290,181 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 		}))
 	})
 })
+
+var _ = DescribeTable("test creation of volume mounts",
+	func(cluster apiv1.Cluster, mounts []corev1.VolumeMount) {
+		mts := createPostgresVolumeMounts(cluster)
+		Expect(mts).NotTo(BeEmpty())
+		for _, mt := range mounts {
+			Expect(mts).To(ContainElement(mt))
+		}
+	},
+	Entry("creates pgdata mount for a plain cluster",
+		apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 1,
+			},
+		},
+		[]corev1.VolumeMount{
+			{
+				Name:             "pgdata",
+				ReadOnly:         false,
+				MountPath:        "/var/lib/postgresql/data",
+				SubPath:          "",
+				MountPropagation: nil,
+				SubPathExpr:      "",
+			},
+		}),
+	Entry("creates pgdata and pg-wal mounts for a cluster with walStorage configured",
+		apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 1,
+				WalStorage: &apiv1.StorageConfiguration{
+					Size: "3Gi",
+				},
+			},
+		},
+		[]corev1.VolumeMount{
+			{
+				Name:             "pgdata",
+				ReadOnly:         false,
+				MountPath:        "/var/lib/postgresql/data",
+				SubPath:          "",
+				MountPropagation: nil,
+				SubPathExpr:      "",
+			},
+			{
+				Name:             "pg-wal",
+				ReadOnly:         false,
+				MountPath:        "/var/lib/postgresql/wal",
+				SubPath:          "",
+				MountPropagation: nil,
+				SubPathExpr:      "",
+			},
+		}),
+	Entry("creates a volume mount for each tablespace, with the expected mount point",
+		apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 1,
+				Tablespaces: map[string]*apiv1.TablespaceConfiguration{
+					"fragglerock": {
+						Storage: apiv1.StorageConfiguration{
+							Size: "3Gi",
+						},
+					},
+					"futurama": {
+						Storage: apiv1.StorageConfiguration{
+							Size: "2Gi",
+						},
+					},
+				},
+			},
+		},
+		[]corev1.VolumeMount{
+			{
+				Name:             "fragglerock",
+				ReadOnly:         false,
+				MountPath:        "/var/lib/postgresql/tablespaces/fragglerock",
+				SubPath:          "",
+				MountPropagation: nil,
+				SubPathExpr:      "",
+			},
+			{
+				Name:             "futurama",
+				ReadOnly:         false,
+				MountPath:        "/var/lib/postgresql/tablespaces/futurama",
+				SubPath:          "",
+				MountPropagation: nil,
+				SubPathExpr:      "",
+			},
+		}),
+)
+
+var _ = DescribeTable("test creation of volumes",
+	func(cluster apiv1.Cluster, volumes []corev1.Volume) {
+		vols := createPostgresVolumes(cluster, "pod-1")
+		Expect(vols).NotTo(BeEmpty())
+		for _, v := range volumes {
+			Expect(vols).To(ContainElement(v))
+		}
+	},
+	Entry("should create a pgdata volume for a plain cluster",
+		apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 1,
+			},
+		},
+		[]corev1.Volume{
+			{
+				Name: "pgdata",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pod-1",
+					},
+				},
+			},
+		}),
+	Entry("should create a pgdata and pgwal volumes for a cluster with walStorage",
+		apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 1,
+				WalStorage: &apiv1.StorageConfiguration{
+					Size: "3Gi",
+				},
+			},
+		},
+		[]corev1.Volume{
+			{
+				Name: "pgdata",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pod-1",
+					},
+				},
+			},
+			{
+				Name: "pg-wal",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pod-1" + apiv1.WalArchiveVolumeSuffix,
+					},
+				},
+			},
+		}),
+	Entry("should create a volume for each tablespace",
+		apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 1,
+				Tablespaces: map[string]*apiv1.TablespaceConfiguration{
+					"fragglerock": {
+						Storage: apiv1.StorageConfiguration{
+							Size: "3Gi",
+						},
+					},
+					"futurama": {
+						Storage: apiv1.StorageConfiguration{
+							Size: "2Gi",
+						},
+					},
+				},
+			},
+		},
+		[]corev1.Volume{
+			{
+				Name: "fragglerock",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pod-1-tbs-fragglerock",
+					},
+				},
+			},
+			{
+				Name: "futurama",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pod-1-tbs-futurama",
+					},
+				},
+			},
+		}),
+)

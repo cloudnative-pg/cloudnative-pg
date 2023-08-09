@@ -225,7 +225,7 @@ func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []util
 func buildTablespacesPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
 	expectedMounts := make([]expectedPVC, 0, len(cluster.Spec.Tablespaces))
 	for name, config := range cluster.Spec.Tablespaces {
-		pvcName := specs.TablespaceName(instanceName, name)
+		pvcName := specs.PvcNameForTablespace(instanceName, name)
 		expectedMounts = append(expectedMounts,
 			expectedPVC{
 				name: pvcName,

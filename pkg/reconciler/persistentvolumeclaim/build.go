@@ -47,7 +47,7 @@ func Build(
 	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
 	pvcName := GetName(instanceName, configuration.Role)
 	if configuration.Role == utils.PVCRolePgTablespace {
-		pvcName = specs.TablespaceName(instanceName, configuration.TablespaceName)
+		pvcName = specs.PvcNameForTablespace(instanceName, configuration.TablespaceName)
 	}
 
 	labels := map[string]string{
