@@ -401,17 +401,17 @@ var _ = Describe("Storage configuration", func() {
 	}
 
 	It("Should not fail when the roles it's correct", func() {
-		configuration, err := getStorageConfiguration(cluster, utils.PVCRolePgData)
+		configuration, err := getStorageConfiguration(cluster, utils.PVCRolePgData, "")
 		Expect(configuration).ToNot(BeNil())
 		Expect(err).ToNot(HaveOccurred())
 
-		configuration, err = getStorageConfiguration(cluster, utils.PVCRolePgWal)
+		configuration, err = getStorageConfiguration(cluster, utils.PVCRolePgWal, "")
 		Expect(configuration).ToNot(BeNil())
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("fail if we look for the wrong role", func() {
-		configuration, err := getStorageConfiguration(cluster, "NoRol")
+		configuration, err := getStorageConfiguration(cluster, "NoRol", "")
 		Expect(err).To(HaveOccurred())
 		Expect(configuration.StorageClass).To(BeNil())
 	})

@@ -23,6 +23,7 @@ import (
 	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -33,12 +34,6 @@ func GetName(instanceName string, role utils.PVCRole) string {
 		pvcName += apiv1.WalArchiveVolumeSuffix
 	}
 	return pvcName
-}
-
-// GetTablespacePVCName builds the name for a PVC corresponding to a tablespace,
-// on a given instance
-func GetTablespacePVCName(instanceName, tablespaceName string) string {
-	return instanceName + "-tbs-" + tablespaceName
 }
 
 // FilterByPodSpec returns all the corev1.PersistentVolumeClaim that are used inside the podSpec
@@ -230,7 +225,7 @@ func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []util
 func buildTablespacesPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
 	expectedMounts := make([]expectedPVC, 0, len(cluster.Spec.Tablespaces))
 	for name, config := range cluster.Spec.Tablespaces {
-		pvcName := GetTablespacePVCName(instanceName, name)
+		pvcName := specs.TablespaceName(instanceName, name)
 		expectedMounts = append(expectedMounts,
 			expectedPVC{
 				name: pvcName,
@@ -249,6 +244,7 @@ func buildTablespacesPVCs(cluster *apiv1.Cluster, instanceName string) []expecte
 func getStorageConfiguration(
 	cluster *apiv1.Cluster,
 	role utils.PVCRole,
+	tablespaceLabel string,
 ) (apiv1.StorageConfiguration, error) {
 	var storageConfiguration *apiv1.StorageConfiguration
 	switch role {
@@ -257,6 +253,11 @@ func getStorageConfiguration(
 	case utils.PVCRolePgWal:
 		storageConfiguration = cluster.Spec.WalStorage
 	case utils.PVCRolePgTablespace:
+		for name, config := range cluster.Spec.Tablespaces {
+			if name == tablespaceLabel {
+				storageConfiguration = &config.Storage
+			}
+		}
 	default:
 		return apiv1.StorageConfiguration{}, fmt.Errorf("unknown pvcRole: %s", string(role))
 	}

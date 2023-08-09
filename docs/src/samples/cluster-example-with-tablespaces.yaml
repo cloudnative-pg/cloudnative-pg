@@ -9,12 +9,12 @@ spec:
     size: 1Gi
 
   tablespaces:
-    a_tablespacea:
+    atablespace:
       storage:
         size: 1Gi
         storageClass: standard
       temporary: false
-    another_tablespace:
+    anothertablespace:
       storage:
         size: 2Gi
         storageClass: standard
