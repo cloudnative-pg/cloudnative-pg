@@ -40,8 +40,8 @@ ROOT_DIR=$(cd "$(dirname "$0")/../"; pwd)
 HACK_DIR="${ROOT_DIR}/hack"
 E2E_DIR="${HACK_DIR}/e2e"
 TEMP_DIR="$(mktemp -d)"
-echo $TEMP_DIR
 LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
+trap 'rm -fr ${TEMP_DIR}' EXIT
 
 # Operating System and Architecture
 OS=$(uname | tr '[:upper:]' '[:lower:]')
