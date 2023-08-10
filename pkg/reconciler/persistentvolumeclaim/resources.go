@@ -301,6 +301,7 @@ func getStorageSource(
 		source = &volumeSnapshots.Storage
 	case utils.PVCRolePgWal:
 		source = volumeSnapshots.WalStorage
+	// TODO ad the moment, getting the Source for a tablespace will error out. Do something better
 	case utils.PVCRolePgTablespace:
 		return nil, fmt.Errorf("volume source unsupported for Tablespaces atm: %s", string(role))
 	default:
