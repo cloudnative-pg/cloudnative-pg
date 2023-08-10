@@ -25,11 +25,14 @@ fi
 
 # Defaults
 K8S_DEFAULT_VERSION=v1.27.3
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.11.0
 K8S_VERSION=${K8S_VERSION:-$K8S_DEFAULT_VERSION}
 KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
+CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
 ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
+ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
 NODES=${NODES:-3}
 
 # Define the directories used by the script
@@ -333,6 +336,61 @@ deploy_fluentd() {
   done
 }
 
+deploy_csi_host_path() {
+  echo "${bright}Starting deployment of CSI driver plugin... ${reset}"
+  CSI_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi
+  EXTERNAL_SNAPSHOTTER_VERSION="v6.2.2"
+  EXTERNAL_PROVISIONER_VERSION="v3.3.0"
+  EXTERNAL_RESIZER_VERSION="v1.6.0"
+  EXTERNAL_ATTACHER_VERSION="v4.0.0"
+
+  ## Install external snapshotter CRD
+  kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
+
+  ## Install external provisioner
+  kubectl apply -f "${CSI_BASE_URL}"/external-provisioner/"${EXTERNAL_PROVISIONER_VERSION}"/deploy/kubernetes/rbac.yaml
+
+  ## Install external attacher
+  kubectl apply -f "${CSI_BASE_URL}"/external-attacher/"${EXTERNAL_ATTACHER_VERSION}"/deploy/kubernetes/rbac.yaml
+
+  ## Install external resizer
+  kubectl apply -f "${CSI_BASE_URL}"/external-resizer/"${EXTERNAL_RESIZER_VERSION}"/deploy/kubernetes/rbac.yaml
+
+  ## Install driver and plugin
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-driverinfo.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-plugin.yaml
+
+  ## create volumesnapshotclass
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-snapshotclass.yaml
+
+  ## create storage class
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
+
+
+  echo "${bright} CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready... ${reset}"
+  ITER=0
+  while true; do
+    if [[ $ITER -ge 300 ]]; then
+      echo "${bright}Timeout: The CSI plugin did not become ready within the expected time.${reset}"
+      exit 1
+    fi
+    NUM_SPEC=$(kubectl get statefulset csi-hostpathplugin  -o jsonpath='{.spec.replicas}')
+    NUM_STATUS=$(kubectl get statefulset csi-hostpathplugin -o jsonpath='{.status.availableReplicas}')
+    if [[ "$NUM_SPEC" == "$NUM_STATUS" ]]; then
+      echo "${bright}Success: The CSI plugin is deployed and ready.${reset}"
+      break
+    fi
+    sleep 1
+    ((++ITER))
+  done
+}
+
+
 deploy_pyroscope() {
   helm repo add pyroscope-io https://pyroscope-io.github.io/helm-chart
 
@@ -461,6 +519,7 @@ create() {
   fi
 
   deploy_fluentd
+  deploy_csi_host_path
 
   echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }

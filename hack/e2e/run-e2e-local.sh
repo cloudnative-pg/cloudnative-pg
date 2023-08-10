@@ -36,6 +36,7 @@ function get_postgres_image() {
 }
 
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_storage_class)}
+export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
 
 # Unset DEBUG to prevent k8s from spamming messages
