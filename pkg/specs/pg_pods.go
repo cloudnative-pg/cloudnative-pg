@@ -42,7 +42,12 @@ func GetNodeSerial(object metav1.ObjectMeta) (int, error) {
 
 // IsPodPrimary check if a certain pod belongs to a primary
 func IsPodPrimary(pod corev1.Pod) bool {
-	role, hasRole := pod.ObjectMeta.Labels[ClusterRoleLabelName]
+	return IsPrimary(pod.ObjectMeta)
+}
+
+// IsPrimary check if a certain resource belongs to a primary
+func IsPrimary(meta metav1.ObjectMeta) bool {
+	role, hasRole := meta.Labels[ClusterRoleLabelName]
 	if !hasRole {
 		return false
 	}
