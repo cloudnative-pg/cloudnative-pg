@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -491,19 +492,29 @@ var _ = Describe("Storage source", func() {
 })
 
 var _ = Describe("Reconcile PVC Quantity", func() {
-	cl := clientMock{}
 	clusterName := "cluster-pvc-quantity"
 	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName,
 		},
 	}
-	pvc := makePVC(clusterName, "1", "", false)
+	pvc := makePVC(clusterName, "1", utils.PVCRolePgData, false)
+	pvc2 := makePVC(clusterName, "2", utils.PVCRolePgTablespace, false)
+	pvc2.Labels[utils.PvcTablespaceLabelName] = "fragglerock"
+	q, err := resource.ParseQuantity("3Gi")
+	Expect(err).ShouldNot(HaveOccurred())
+	pvc2.Spec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{
+		"storage": q,
+	}
+
+	cl := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+		WithObjects(&pvc, &pvc2).
+		Build()
 
 	It("fail if we dont' have the proper role", func() {
 		err := reconcilePVCQuantity(
 			context.Background(),
-			&cl,
+			cl,
 			cluster,
 			&pvc)
 		Expect(err).To(HaveOccurred())
@@ -516,7 +527,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 		err := reconcilePVCQuantity(
 			context.Background(),
-			&cl,
+			cl,
 			cluster,
 			&pvc)
 		Expect(err).To(HaveOccurred())
@@ -528,21 +539,57 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 		// If we don't have a proper storage configuration we should also fail
 		err := reconcilePVCQuantity(
 			context.Background(),
-			&cl,
+			cl,
 			cluster,
 			&pvc)
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("It should not fail it's everything it's ok", func() {
+	It("It should not fail it's everything is ok", func() {
 		// Now we set the proper storage configuration
 		cluster.Spec.StorageConfiguration.Size = "1Gi"
 
 		err := reconcilePVCQuantity(
 			context.Background(),
-			&cl,
+			cl,
 			cluster,
 			&pvc)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("It should succeed increasing size of tablespaces", func() {
+		// Now we set the proper storage configuration
+		cluster.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
+			"fragglerock": {
+				Storage: apiv1.StorageConfiguration{
+					Size: "4Gi",
+				},
+			},
+		}
+
+		err := reconcilePVCQuantity(
+			context.Background(),
+			cl,
+			cluster,
+			&pvc2)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("It should succeed decreasing size of tablespaces", func() {
+		// Now we set the proper storage configuration
+		cluster.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
+			"fragglerock": {
+				Storage: apiv1.StorageConfiguration{
+					Size: "2Gi",
+				},
+			},
+		}
+
+		err := reconcilePVCQuantity(
+			context.Background(),
+			cl,
+			cluster,
+			&pvc2)
 		Expect(err).ToNot(HaveOccurred())
 	})
 })
