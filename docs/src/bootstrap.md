@@ -54,9 +54,9 @@ create a new cluster based on another one (either offline or online) and can be
 used to spin up replica clusters. They both rely on the definition of external
 clusters.
 
-Given that there are several possible backup methods and combinations of backup storage that the
-CloudNativePG operator provides, please refer
-to the ["Recovery" section](recovery.md) for guidance for each method.
+Given that there are several possible backup methods and combinations of backup
+storage that the CloudNativePG operator provides, please refer to the
+["Recovery" section](recovery.md) for guidance on each method.
 
 !!! Seealso "API reference"
     Please refer to the ["API reference for the `bootstrap` section](api_reference.md#BootstrapConfiguration)
@@ -94,7 +94,7 @@ When only the streaming connection is defined, the source can be used for the
 source can be used for the `recovery` method. When both are defined, any of the
 two bootstrap methods can be chosen.
 
-Furthermore, in case of `pg_basebackup` or full `recovery` point in time), the
+Furthermore, in case of `pg_basebackup` or full `recovery` point in time, the
 cluster is eligible for replica cluster mode. This means that the cluster is
 continuously fed from the source, either via streaming, via WAL shipping
 through the PostgreSQL's `restore_command`, or any of the two.
