@@ -54,9 +54,9 @@ create a new cluster based on another one (either offline or online) and can be
 used to spin up replica clusters. They both rely on the definition of external
 clusters.
 
-Given the several possibilities, methods, and combinations that the
-CloudNativePG operator provides in terms of backup and recovery, please refer
-to the ["Recovery" section](recovery.md).
+Given that there are several possible backup methods and combinations of backup storage that the
+CloudNativePG operator provides, please refer
+to the ["Recovery" section](recovery.md) for guidance for each method.
 
 !!! Seealso "API reference"
     Please refer to the ["API reference for the `bootstrap` section](api_reference.md#BootstrapConfiguration)

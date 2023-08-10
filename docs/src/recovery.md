@@ -14,8 +14,8 @@
 
 -->
 
-In PostgreSQL terminology, recovery is the process to start a PostgreSQL
-instance from a previously taken backup. PostgreSQL recovery mechanism
+In PostgreSQL terminology, recovery is the process of starting a PostgreSQL
+instance using a previously taken backup. PostgreSQL recovery mechanism
 is very solid and rich. It also supports Point In Time Recovery, which allows
 you to restore a given cluster up to any point in time from the first available
 backup in your catalog to the last archived WAL (as you can see, the WAL
