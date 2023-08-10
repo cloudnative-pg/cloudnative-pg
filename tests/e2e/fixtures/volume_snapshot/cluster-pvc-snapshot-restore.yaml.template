@@ -1,19 +1,30 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-pvc-snapshot
+  name: cluster-pvc-snapshot-recovery
 spec:
-  instances: 2
+  instances: 1
   primaryUpdateStrategy: unsupervised
 
   # Persistent storage configuration
   storage:
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
 
-  backup:
-    target: primary
-    barmanObjectStore:
+  bootstrap:
+    recovery:
+      source: cluster-pvc-snapshot
+      volumeSnapshots:
+        storage:
+          name: cluster-pvc-snapshot-2-test-pitr
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+      recoveryTarget:
+        targetTime:  ${SNAPSHOT_PITR}
+
+  externalClusters:
+    - name: cluster-pvc-snapshot
+      barmanObjectStore:
         destinationPath: s3://cluster-backups/
         endpointURL: https://minio-service:9000
         endpointCA:
@@ -26,12 +37,3 @@ spec:
           secretAccessKey:
             name: backup-storage-creds
             key: KEY
-        wal:
-          compression: gzip
-        data:
-          immediateCheckpoint: true
-        tags:
-          retention: "30days"
-        historyTags:
-          retention: "30days"
-    retentionPolicy: "30d"
