@@ -21,3 +21,6 @@ spec:
       temporary: true
     a_tablespacea1:
       temporary: true
+      storage:
+        size: 2Gi
+        storageClass: standard

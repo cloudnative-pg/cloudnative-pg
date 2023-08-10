@@ -18,8 +18,10 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/retry"
@@ -297,4 +299,50 @@ func (r *InstanceReconciler) ReconcileWalStorage(ctx context.Context) error {
 	// We moved all the files now we should create the proper symlink
 	contextLogger.Debug("Creating symlink", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
 	return os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath)
+}
+
+// ReconcileTablespaces ensures the mounted directories corresponding to tablespaces
+// have the correct ownership
+func (r *InstanceReconciler) ReconcileTablespaces(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	if !cluster.ShouldCreateTablespaces() {
+		return nil
+	}
+
+	for tbsName := range cluster.Spec.Tablespaces {
+		mountPoint := specs.MountForTablespace(tbsName)
+		if tbsMount, err := fileutils.FileExists(mountPoint); err != nil {
+			contextLogger.Error(err, "XXX reconcile tablespaces", "instance",
+				r.instance.PodName, "tablespace", tbsName)
+			return err
+		} else if !tbsMount {
+			contextLogger.Error(fmt.Errorf("mount not found"),
+				"XXX reconcile tablespaces", "instance", r.instance.PodName, "tablespace", tbsName)
+			return nil
+		}
+
+		info, err := os.Lstat(mountPoint)
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			contextLogger.Error(fmt.Errorf("the tablespace %s mount: %s is not a directory", tbsName, mountPoint),
+				"XXX reconcile tablespaces", "instance", r.instance.PodName, "tablespace", tbsName)
+			return fmt.Errorf("the tablespace %s mount: %s is not a directory", tbsName, mountPoint)
+		}
+		// uid := cluster.GetPostgresUID()
+		// gid := cluster.GetPostgresGID()
+		err = os.Mkdir(filepath.Join(mountPoint, "extra"), 0o700)
+		//err = os.Chown(mountPoint, int(uid), int(gid))
+		if err != nil {
+			contextLogger.Error(err,
+				"XXX reconcile tablespaces", "instance", r.instance.PodName, "tablespace", tbsName)
+			return err
+		}
+	}
+	return nil
 }
