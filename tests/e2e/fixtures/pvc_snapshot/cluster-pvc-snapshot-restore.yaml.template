@@ -5,9 +5,12 @@ metadata:
 spec:
   instances: 1
   primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
+
   bootstrap:
     recovery:
       source: cluster-pvc-snapshot
@@ -18,7 +21,6 @@ spec:
           apiGroup: snapshot.storage.k8s.io
       recoveryTarget:
         targetTime:  ${SNAPSHOT_PITR}
-
 
   externalClusters:
     - name: cluster-pvc-snapshot
@@ -35,10 +37,3 @@ spec:
           secretAccessKey:
             name: backup-storage-creds
             key: KEY
-      connectionParameters:
-        host: cluster-pvc-snapshot-rw.main.svc
-        user: postgres
-        dbname: postgres
-      password:
-        name: cluster-pvc-snapshot-superuser
-        key: password

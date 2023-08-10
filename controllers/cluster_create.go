@@ -949,7 +949,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		}
 
 		if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots != nil {
-			r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumesnapshot)")
+			r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
 			job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, backup)
 			break
 		}

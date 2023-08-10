@@ -72,8 +72,8 @@ func NewCmd() *cobra.Command {
 		"current cluster in k8s, used to coordinate switchover and failover")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and the Pod in k8s")
-	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
-	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "the PGWAL to be created")
+	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be restored")
+	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "The PGWAL to be restored")
 
 	return cmd
 }

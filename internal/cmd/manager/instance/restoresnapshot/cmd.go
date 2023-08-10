@@ -1,3 +1,20 @@
+/*
+Copyright The CloudNativePG Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package restoresnapshot implements the "instance restoresnapshot" subcommand of the operator
 package restoresnapshot
 
 import (
@@ -13,7 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// NewCmd creates the "restore" subcommand
+// NewCmd creates the "restoresnapshot" subcommand
 func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
@@ -55,7 +72,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be restored")
-	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "the PGWAL to be restored")
+	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "The PGWAL to be restored")
 
 	return cmd
 }

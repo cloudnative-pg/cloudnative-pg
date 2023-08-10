@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"os"
-	"time"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -142,27 +141,36 @@ var _ = Describe("PVC Snapshot", Label(tests.LabelSnapshot), func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			start := time.Now()
-			var rawPITR time.Duration
 			By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+				// Create a "test" table with values 1,2
 				AssertCreateTestData(namespace, clusterToSnapshotName, tableName, psqlClientPod)
-				rawPITR = time.Since(start)
-				AssertCreateTestData(namespace, clusterToSnapshotName, tableNameTwo, psqlClientPod)
+
+				// Get the recovery_target_time and pass it to the template engine
+				recoveryTargetTime, err := testUtils.GetCurrentTimestamp(namespace, clusterToSnapshotName, env, psqlClientPod)
+				Expect(err).ToNot(HaveOccurred())
+				err = os.Setenv("SNAPSHOT_PITR", recoveryTargetTime)
+				Expect(err).ToNot(HaveOccurred())
+
+				// Insert 2 more rows which we expect not to be present at the end of the recovery
+				insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 3, psqlClientPod)
+				insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 4, psqlClientPod)
+
+				// Close and archive the current WAL file
 				AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
 			})
 
-			// create a sensible PITR
-			PITR := start.Add(rawPITR).Format("2006-01-02T15:04:05")
-
-			// pass the env variable to the template engine
-			err := os.Setenv("SNAPSHOT_PITR", PITR)
+			clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterSnapshotRestoreFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the cluster to be restored through snapshot and PITR", func() {
-				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterSnapshotRestoreFile)
-				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterToRestoreName, clusterSnapshotRestoreFile, env)
 				AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[testUtils.ClusterIsReadySlow], env)
+			})
+
+			By("verifying the correct data exists in the restored cluster", func() {
+				restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
+				Expect(err).ToNot(HaveOccurred())
+				AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, restoredPrimary)
 			})
 		})
 	})

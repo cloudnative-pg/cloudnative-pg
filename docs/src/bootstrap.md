@@ -561,13 +561,6 @@ spec:
           secretAccessKey:
             name: minio
             key: ACCESS_SECRET_KEY
-      connectionParameters:
-        host: cluster-example-with-backup-rw.main.svc
-        user: postgres
-        dbname: postgres
-      password:
-        name: cluster-example-with-backup-superuser
-        key: password
 ```
 
 #### Additional considerations

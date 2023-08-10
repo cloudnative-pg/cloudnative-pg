@@ -76,7 +76,7 @@ var (
 	}
 )
 
-// RestoreSnapshot restores a PostgreSQL cluster from a volumesnapshot
+// RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client) error {
 	cluster, err := info.loadCluster(ctx, cli)
 	if err != nil {

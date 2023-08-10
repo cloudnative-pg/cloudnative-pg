@@ -135,7 +135,7 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 	return initCommand
 }
 
-// CreatePrimaryJobViaRestoreSnapshot todo
+// CreatePrimaryJobViaRestoreSnapshot creates a new primary instance in a Pod, restoring from a volumeSnapshot
 func CreatePrimaryJobViaRestoreSnapshot(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
@@ -152,7 +152,7 @@ func CreatePrimaryJobViaRestoreSnapshot(cluster apiv1.Cluster, nodeSerial int, b
 	return job
 }
 
-// CreatePrimaryJobViaRecovery creates a new primary instance in a Pod
+// CreatePrimaryJobViaRecovery creates a new primary instance in a Pod, restoring from a Backup
 func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
