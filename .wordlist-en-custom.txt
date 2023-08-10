@@ -2,6 +2,7 @@ AES
 API's
 APIs
 ARMv
+ATTACHER
 AcolumnName
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
@@ -348,6 +349,7 @@ VOLNAME
 Valerio
 VirtualBox
 VolumeSnapshot
+VolumeSnapshotClass
 WAL
 WAL's
 WALBackupConfiguration
@@ -967,6 +969,7 @@ virtualxid
 volumeMode
 volumeMounts
 volumesnapshot
+volumesnapshotclass
 wal
 walSegmentSize
 walStorage

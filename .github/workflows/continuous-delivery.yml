@@ -542,7 +542,8 @@ jobs:
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
       E2E_DEFAULT_STORAGE_CLASS: standard
-      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: ""
+      E2E_CSI_STORAGE_CLASS: csi-hostpath-sc
+      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-hostpath-snapclass
       LOG_DIR: ${{ github.workspace }}/kind-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "local"
@@ -774,6 +775,7 @@ jobs:
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
       E2E_DEFAULT_STORAGE_CLASS: rook-ceph-block
+      E2E_CSI_STORAGE_CLASS: rook-ceph-block
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-rbdplugin-snapclass
       TEST_CLOUD_VENDOR: "aks"
     steps:
@@ -1096,6 +1098,7 @@ jobs:
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
       E2E_DEFAULT_STORAGE_CLASS: gp3
+      E2E_CSI_STORAGE_CLASS: gp3
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: ebs-csi-snapclass
 
       AWS_REGION: eu-central-1
@@ -1472,6 +1475,7 @@ jobs:
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
       E2E_DEFAULT_STORAGE_CLASS: standard-rwo
+      E2E_CSI_STORAGE_CLASS: standard-rwo
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: pd-csi-snapclass
 
       ZONE: europe-west3-a
