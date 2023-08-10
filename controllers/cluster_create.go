@@ -1203,6 +1203,8 @@ func findInstancePodToCreate(
 ) (*corev1.Pod, error) {
 	instanceThatHavePods := instancesStatus.GetNames()
 
+	var missingInstancePVC *corev1.PersistentVolumeClaim
+
 	iterablePVCs := cluster.Status.DanglingPVC
 	// appending unusablePVC ensures that some corner cases are covered. (EX: an instance is deleted manually while
 	// new type of PVCs were enabled)
@@ -1225,6 +1227,22 @@ func findInstancePodToCreate(
 			continue
 		}
 
+		// We give the priority to reattaching the primary instance
+		if isPrimary := specs.IsPrimary(pvcs[idx].ObjectMeta); isPrimary {
+			missingInstancePVC = &pvcs[idx]
+			break
+		}
+
+		if missingInstancePVC == nil {
+			missingInstancePVC = &pvcs[idx]
+		}
+	}
+
+	if missingInstancePVC != nil {
+		serial, err := specs.GetNodeSerial(missingInstancePVC.ObjectMeta)
+		if err != nil {
+			return nil, err
+		}
 		return specs.PodWithExistingStorage(*cluster, serial), nil
 	}
 
