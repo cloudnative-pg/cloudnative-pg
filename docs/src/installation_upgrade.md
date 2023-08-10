@@ -243,7 +243,7 @@ convention over configuration.
 
 #### Backup from a standby
 
-[Backup from a standby](backup_recovery.md#backup-from-a-standby)
+[Backup from a standby](backup.md#backup-from-a-standby)
 was introduced in CloudNativePG 1.19, but disabled by default - meaning that
 the base backup is taken from the primary unless the target is explicitly
 set to prefer standby.
