@@ -47,12 +47,12 @@ func collectPGWALStat(e *Exporter) error {
 	}
 	walMetrics := e.Metrics.PgStatWalMetrics
 	walMetrics.WalSync.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSync))
-	walMetrics.WalSyncTime.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSyncTime))
+	walMetrics.WalSyncTime.WithLabelValues(walStat.StatsReset).Set(walStat.WalSyncTime)
 	walMetrics.WALBuffersFull.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WALBuffersFull))
 	walMetrics.WalFpi.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalFpi))
 	walMetrics.WalWrite.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWrite))
 	walMetrics.WalBytes.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalBytes))
-	walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWriteTime))
+	walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(walStat.WalWriteTime)
 	walMetrics.WalRecords.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalRecords))
 
 	return nil
