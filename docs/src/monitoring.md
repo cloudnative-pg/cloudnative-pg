@@ -686,7 +686,7 @@ metadata:
 spec:
   containers:
   - name: curl
-    image: curlimages/curl:7.84.0
+    image: curlimages/curl:8.2.1
     command: ['sleep', '3600']
 ```
 
