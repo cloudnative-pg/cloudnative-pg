@@ -301,12 +301,15 @@ func (r *InstanceReconciler) ReconcileWalStorage(ctx context.Context) error {
 	return os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath)
 }
 
-// ReconcileTablespaces ensures the mounted directories corresponding to tablespaces
-// have the correct ownership
+// ReconcileTablespaces ensures the mountpoints created for the tablespaces
+// are there, and creates a subdirectory in each of them, which will therefore
+// be owned by the `postgres` user (rathen than `root` as the mountpoint),
+// as required to hold PostgreSQL Tablespaces
 func (r *InstanceReconciler) ReconcileTablespaces(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) error {
+	const dataDir = "data"
 	contextLogger := log.FromContext(ctx)
 
 	if !cluster.ShouldCreateTablespaces() {
@@ -316,32 +319,29 @@ func (r *InstanceReconciler) ReconcileTablespaces(
 	for tbsName := range cluster.Spec.Tablespaces {
 		mountPoint := specs.MountForTablespace(tbsName)
 		if tbsMount, err := fileutils.FileExists(mountPoint); err != nil {
-			contextLogger.Error(err, "XXX reconcile tablespaces", "instance",
+			contextLogger.Error(err, "while checking for mountpoint", "instance",
 				r.instance.PodName, "tablespace", tbsName)
 			return err
 		} else if !tbsMount {
-			contextLogger.Error(fmt.Errorf("mount not found"),
-				"XXX reconcile tablespaces", "instance", r.instance.PodName, "tablespace", tbsName)
-			return nil
+			contextLogger.Error(fmt.Errorf("mountpoint not found"),
+				"mountpoint for tablespaces is missing",
+				"instance", r.instance.PodName, "tablespace", tbsName)
+			continue
 		}
 
 		info, err := os.Lstat(mountPoint)
 		if err != nil {
-			return err
+			return fmt.Errorf("while checking for tablespace mount point: %w", err)
 		}
 		if !info.IsDir() {
-			contextLogger.Error(fmt.Errorf("the tablespace %s mount: %s is not a directory", tbsName, mountPoint),
-				"XXX reconcile tablespaces", "instance", r.instance.PodName, "tablespace", tbsName)
 			return fmt.Errorf("the tablespace %s mount: %s is not a directory", tbsName, mountPoint)
 		}
-		// uid := cluster.GetPostgresUID()
-		// gid := cluster.GetPostgresGID()
-		err = os.Mkdir(filepath.Join(mountPoint, "extra"), 0o700)
-		//err = os.Chown(mountPoint, int(uid), int(gid))
+		err = os.Mkdir(filepath.Join(mountPoint, dataDir), 0o700)
 		if err != nil {
 			contextLogger.Error(err,
-				"XXX reconcile tablespaces", "instance", r.instance.PodName, "tablespace", tbsName)
-			return err
+				"could not create data dir in tablespace mount",
+				"instance", r.instance.PodName, "tablespace", tbsName)
+			return fmt.Errorf("while creating data dir in tablespace %s: %w", mountPoint, err)
 		}
 	}
 	return nil
