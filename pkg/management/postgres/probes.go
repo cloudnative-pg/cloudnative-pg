@@ -524,8 +524,8 @@ type PgStatWal struct {
 	WALBuffersFull int64
 	WalWrite       int64
 	WalSync        int64
-	WalWriteTime   int64
-	WalSyncTime    int64
+	WalWriteTime   float64
+	WalSyncTime    float64
 	StatsReset     string
 }
 
