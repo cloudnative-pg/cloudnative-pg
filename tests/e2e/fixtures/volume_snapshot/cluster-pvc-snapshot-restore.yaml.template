@@ -10,6 +10,9 @@ spec:
   storage:
     storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
 
   bootstrap:
     recovery:
@@ -17,6 +20,10 @@ spec:
       volumeSnapshots:
         storage:
           name: cluster-pvc-snapshot-2-test-pitr
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+        walStorage:
+          name: cluster-pvc-snapshot-2-wal-test-pitr
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
       recoveryTarget:

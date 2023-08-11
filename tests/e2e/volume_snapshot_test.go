@@ -110,7 +110,7 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 		})
 
-		FContext("Can restore from a Volume Snapshot", Ordered, func() {
+		Context("Can restore from a Volume Snapshot", Ordered, func() {
 			// test env constants
 			const (
 				namespacePrefix = "volume-snapshot-recovery"

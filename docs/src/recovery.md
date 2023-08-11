@@ -305,7 +305,6 @@ base backup for the recovery as follows:
 
 ### PITR from `VolumeSnapshot` Objects
 
-
 - a Kubernetes volume snapshot for the `PGDATA` containing the base backup from
   which to start the recovery process, identified in the
   `recovery.volumeSnapshots` section and called `test-snapshot-1`
@@ -344,6 +343,12 @@ spec:
             name: minio
             key: ACCESS_SECRET_KEY
 ```
+
+!!! Note
+    In case the backed up Cluster had `walStorage` enabled, you also must
+    specify the volume snapshot containing the `PGWAL` directory, as mentioned
+    in the [Recovery from VolumeSnapshot objects](#recovery-from-volumeSnapshot-objects)
+    section.
 
 !!! Warning
     It is your responsibility to ensure that the end time of the base backup in

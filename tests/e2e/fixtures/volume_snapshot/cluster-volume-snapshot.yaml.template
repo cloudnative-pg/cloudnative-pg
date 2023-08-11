@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-volume-snapshot
 spec:
-  instances: 3
+  instances: 2
 
   bootstrap:
     initdb:

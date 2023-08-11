@@ -55,7 +55,7 @@ hack/setup-cluster.sh destroy
 All flags have corresponding environment variables labeled `(Env:...` in the table below.
 
 | Flags | Usage                                                                                                                         |
-|-/-----|-------------------------------------------------------------------------------------------------------------------------------|
+|-------|-------------------------------------------------------------------------------------------------------------------------------|
 | -r    |--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
 | -e    |--engine <CLUSTER_ENGINE>        | Use the provided ENGINE to run the cluster. Available options are 'kind' and 'k3d'. Default 'kind'. (Env: `CLUSTER_ENGINE`)   |
 | -k    |--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.26.0`). (Env: `K8S_VERSION`)                                   |
@@ -82,7 +82,7 @@ The script can be configured through the following environment variables:
   latest minor
 * `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
 * `AZURE_STORAGE_ACCOUNT`: Azure storage account to test backup and restore, using Barman Cloud on Azure
-   blob storage
+  blob storage
 * `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using Barman Cloud on Azure
   blob storage
 * `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex: smoke, basic, security... details
@@ -262,9 +262,8 @@ Example:
      /test type=smoke,upgrade
   ```
 
-## Storage class for volume snapshots
+## Storage class for volume snapshots on Kind
 
-In order to enable testing of Kubernetes volume snapshots, we are installing
-the `csi-hostpath-sc` storage class and the `csi-hostpath-snapclass` volume
-snapshot class.
-
+In order to enable testing of Kubernetes volume snapshots on a local Kind
+Cluster, we are installing the `csi-hostpath-sc` storage class and the
+`csi-hostpath-snapclass` volume snapshot class.
