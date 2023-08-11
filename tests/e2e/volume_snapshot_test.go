@@ -286,6 +286,10 @@ var _ = Describe("Verify Volume Snapshot",
 					Skip("Test depth is lower than the amount requested for this test")
 				}
 
+				if !(IsLocal() || IsGKE()) {
+					Skip("This test is only executed on gke, openshift and local")
+				}
+
 				var err error
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())

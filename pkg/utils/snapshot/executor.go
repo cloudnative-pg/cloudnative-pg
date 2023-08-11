@@ -50,9 +50,7 @@ type Executor struct {
 	snapshotSuffix       string
 	printAdvancementFunc func(msg string)
 	snapshotEnrichFunc   func(vs *storagesnapshotv1.VolumeSnapshot)
-
-	snapshotTime   time.Time
-	snapshotConfig apiv1.BackupSnapshotConfig
+	snapshotConfig       apiv1.BackupSnapshotConfig
 }
 
 // ExecutorBuilder is a struct capable of creating an Executor
@@ -104,13 +102,13 @@ func (e *ExecutorBuilder) Build() *Executor {
 }
 
 func (se *Executor) ensureLoggerIsPresent(ctx context.Context) {
+	if se.printAdvancementFunc != nil {
+		return
+	}
+	// if no logger was specified we default to the contextLogger. This is needed because the plugin uses a println // logging system
 	contextLogger := log.FromContext(ctx)
-	// if no logger was specified we default to the contextLogger. This is needed because the plugin uses a println
-	// logging system
-	if se.printAdvancementFunc == nil {
-		se.printAdvancementFunc = func(msg string) {
-			contextLogger.Info(msg)
-		}
+	se.printAdvancementFunc = func(msg string) {
+		contextLogger.Info(msg)
 	}
 }
 
@@ -136,6 +134,11 @@ func (se *Executor) Execute(
 		if err := se.waitPodToBeFencedStep(ctx, targetPod); err != nil {
 			return nil, err
 		}
+	}
+
+	// if we have no suffix specified from the user we use unix timestamp
+	if se.snapshotSuffix == "" {
+		se.snapshotSuffix = fmt.Sprintf("%d", time.Now().Unix())
 	}
 
 	snapshots, err := se.snapshotPVCGroupStep(ctx, pvcs)
@@ -191,17 +194,16 @@ func (se *Executor) rollbackFencePod(
 	contextLogger := log.FromContext(ctx)
 
 	se.printAdvancementFunc(fmt.Sprintf("unfencing pod %s", targetPod.Name))
-	err := fencing.ApplyFenceFunc(
+	if err := fencing.ApplyFenceFunc(
 		ctx,
 		se.cli,
 		cluster.Name,
 		cluster.Namespace,
 		utils.FenceAllServers,
 		utils.RemoveFencedInstance,
-	)
-	if err != nil {
+	); err != nil {
 		contextLogger.Error(
-			err, "Rolling back from pod fencing failed",
+			err, "while rolling back the pod from the fencing state",
 			"targetPod", targetPod.Name,
 		)
 	}
@@ -234,7 +236,6 @@ func (se *Executor) snapshotPVCGroupStep(
 	ctx context.Context,
 	pvcs []corev1.PersistentVolumeClaim,
 ) ([]*storagesnapshotv1.VolumeSnapshot, error) {
-	se.snapshotTime = time.Now()
 	createdSnapshots := make([]*storagesnapshotv1.VolumeSnapshot, len(pvcs))
 	for i := range pvcs {
 		snapshot, err := se.createSnapshot(ctx, &pvcs[i])
@@ -343,9 +344,5 @@ func (se *Executor) waitSnapshot(ctx context.Context, name, namespace string) er
 
 // getSnapshotName gets the snapshot name for a certain PVC
 func (se *Executor) getSnapshotName(pvcName string) string {
-	if se.snapshotSuffix != "" {
-		return fmt.Sprintf("%s-%v", pvcName, se.snapshotSuffix)
-	}
-
-	return fmt.Sprintf("%s-%v", pvcName, se.snapshotTime.Unix())
+	return fmt.Sprintf("%s-%s", pvcName, se.snapshotSuffix)
 }
