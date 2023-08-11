@@ -18,6 +18,7 @@ package snapshot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -105,7 +106,7 @@ func (se *Executor) ensureLoggerIsPresent(ctx context.Context) {
 	if se.printAdvancementFunc != nil {
 		return
 	}
-	// if no logger was specified we default to the contextLogger. This is needed because the plugin uses a println // logging system
+
 	contextLogger := log.FromContext(ctx)
 	se.printAdvancementFunc = func(msg string) {
 		contextLogger.Info(msg)
@@ -162,7 +163,7 @@ func (se *Executor) checkPreconditionsStep(
 	}
 
 	if fencedInstances.Len() > 0 {
-		return fmt.Errorf("cannot hibernate a cluster that has fenced instances")
+		return errors.New("cannot hibernate a cluster that has fenced instances")
 	}
 
 	return nil

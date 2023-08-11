@@ -42,8 +42,8 @@ func CollectDifferencesFromMaps(p1 map[string]string, p2 map[string]string) map[
 	return nil
 }
 
-// isMapSubset returns true if mapSubset is a subset of mapSet otherwise false
-func isMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
+// IsMapSubset returns true if mapSubset is a subset of mapSet otherwise false
+func IsMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
 	if len(mapSet) < len(mapSubset) {
 		return false
 	}
@@ -86,7 +86,7 @@ func IsLabelSubset(
 		}
 	}
 
-	return isMapSubset(mapSet, mapToEvaluate)
+	return IsMapSubset(mapSet, mapToEvaluate)
 }
 
 // IsAnnotationSubset checks if a collection of annotations is a subset of another
@@ -110,5 +110,5 @@ func IsAnnotationSubset(
 		}
 	}
 
-	return isMapSubset(mapSet, mapToEvaluate)
+	return IsMapSubset(mapSet, mapToEvaluate)
 }

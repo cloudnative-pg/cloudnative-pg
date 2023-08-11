@@ -11,6 +11,9 @@ spec:
   storage:
     storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
   bootstrap:
     recovery:
       volumeSnapshots:
@@ -18,3 +21,7 @@ spec:
           name: ${SNAPSHOT_NAME_PGDATA}
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
+        walStorage:
+         name: ${SNAPSHOT_NAME_PGWAL}
+         kind: VolumeSnapshot
+         apiGroup: snapshot.storage.k8s.io
