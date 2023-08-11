@@ -32,9 +32,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	pkgres "github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/fencing"
 )
 
 var snapshotBackoff = wait.Backoff{
@@ -176,7 +175,7 @@ func (se *Executor) fencePodStep(
 	targetPod *corev1.Pod,
 ) error {
 	se.printAdvancementFunc(fmt.Sprintf("fencing pod: %s", targetPod.Namespace))
-	return fencing.ApplyFenceFunc(
+	return resources.ApplyFenceFunc(
 		ctx,
 		se.cli,
 		cluster.Name,
@@ -195,7 +194,7 @@ func (se *Executor) rollbackFencePod(
 	contextLogger := log.FromContext(ctx)
 
 	se.printAdvancementFunc(fmt.Sprintf("unfencing pod %s", targetPod.Name))
-	if err := fencing.ApplyFenceFunc(
+	if err := resources.ApplyFenceFunc(
 		ctx,
 		se.cli,
 		cluster.Name,
@@ -217,7 +216,7 @@ func (se *Executor) waitPodToBeFencedStep(
 ) error {
 	se.printAdvancementFunc(fmt.Sprintf("waiting for %s to be fenced", targetPod.Name))
 
-	return retry.OnError(snapshotBackoff, pkgres.RetryAlways, func() error {
+	return retry.OnError(snapshotBackoff, resources.RetryAlways, func() error {
 		var pod corev1.Pod
 		err := se.cli.Get(ctx, types.NamespacedName{Name: targetPod.Name, Namespace: targetPod.Namespace}, &pod)
 		if err != nil {
@@ -316,7 +315,7 @@ func (se *Executor) createSnapshot(
 func (se *Executor) waitSnapshot(ctx context.Context, name, namespace string) error {
 	se.printAdvancementFunc(fmt.Sprintf("waiting for VolumeSnapshot %s to be ready to use", name))
 
-	return retry.OnError(snapshotBackoff, pkgres.RetryAlways, func() error {
+	return retry.OnError(snapshotBackoff, resources.RetryAlways, func() error {
 		var snapshot storagesnapshotv1.VolumeSnapshot
 
 		err := se.cli.Get(
