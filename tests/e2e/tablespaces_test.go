@@ -20,8 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -95,117 +93,115 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic),
 
 			DeferCleanup(func(ctx SpecContext) {
 				if CurrentSpecReport().Failed() {
-					filename := fmt.Sprintf("out/%s_%s.log", "declarativeTablespaces", cluster.Name)
-					f, err := os.Create(filepath.Clean(filename))
-					if err != nil {
-						GinkgoWriter.Println(err)
-						return
-					}
-					defer func() {
-						syncErr := f.Sync()
-						if syncErr != nil {
-							GinkgoWriter.Println("ERROR while flushing file:", syncErr)
-						}
-						closeErr := f.Close()
-						if closeErr != nil {
-							GinkgoWriter.Println("ERROR while closing file:", err)
-						}
-					}()
-					_, _ = f.Write(buffer.Bytes())
+					saveLogs(&buffer, "cluster_logs_", "tablespace_tests", GinkgoWriter, 10)
 				}
 			})
 		})
 
 		It("creates the PVCs and mount points required for tablespaces", func() {
-			By("checking the mount points and volumes in the pods", func() {
-				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
-				Expect(cluster.Spec.Tablespaces).To(HaveLen(2))
-				podList, err := env.GetClusterPodList(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				for _, pod := range podList.Items {
-					Expect(pod.Spec.Containers).ToNot(BeEmpty())
-					var hasPostgresContainer bool
-					var mountPaths []string
-
-					for _, ctr := range pod.Spec.Containers {
-						if ctr.Name == "postgres" {
-							hasPostgresContainer = true
-							for _, mt := range ctr.VolumeMounts {
-								mountPaths = append(mountPaths, mt.MountPath)
-							}
-						}
-					}
-					Expect(hasPostgresContainer).To(BeTrue())
-					Expect(mountPaths).To(ContainElements(
-						"/var/lib/postgresql/tablespaces/"+firstTablespace,
-						"/var/lib/postgresql/tablespaces/"+secondTablespace,
-					))
-
-					var volumeNames []string
-					var claimNames []string
-					for _, vol := range pod.Spec.Volumes {
-						volumeNames = append(volumeNames, vol.Name)
-						if vol.PersistentVolumeClaim != nil {
-							claimNames = append(claimNames, vol.PersistentVolumeClaim.ClaimName)
-						}
-					}
-					Expect(volumeNames).To(ContainElements(
-						firstTablespace,
-						secondTablespace,
-					))
-					Expect(claimNames).To(ContainElements(
-						pod.Name+"-tbs-"+firstTablespace,
-						pod.Name+"-tbs-"+secondTablespace,
-					))
-				}
-			})
-			By("checking all the required PVCs were created", func() {
-				pvcList, err := env.GetPVCList(namespace)
-				Expect(err).ShouldNot(HaveOccurred())
-				var tablespacePvcNames []string
-				for _, pvc := range pvcList.Items {
-					roleLabel, found := pvc.Labels[utils.PvcRoleLabelName]
-					Expect(found).To(BeTrue())
-					if roleLabel != utils.PVCRolePgTablespace {
-						continue
-					}
-					tablespacePvcNames = append(tablespacePvcNames, pvc.Name)
-					tbsName := pvc.Labels[utils.PvcTablespaceLabelName]
-					Expect(tbsName).ToNot(BeEmpty())
-					Expect([]string{firstTablespace, secondTablespace}).To(ContainElement(tbsName))
-					for tbs, config := range cluster.Spec.Tablespaces {
-						if tbsName == tbs {
-							Expect(pvc.Spec.Resources.Requests.Storage()).
-								To(BeEquivalentTo(config.Storage.GetSizeOrNil()))
-						}
-					}
-				}
-				podList, err := env.GetClusterPodList(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				for _, pod := range podList.Items {
-					Expect(tablespacePvcNames).To(ContainElement(pod.Name + "-tbs-" + firstTablespace))
-					Expect(tablespacePvcNames).To(ContainElement(pod.Name + "-tbs-" + secondTablespace))
-				}
-			})
-			By("checking the data directory for the tablespaces is owned by postgres", func() {
-				pvcList, err := env.GetPodList(namespace)
-				Expect(err).ShouldNot(HaveOccurred())
-				for _, pod := range pvcList.Items {
-					for tbsName := range cluster.Spec.Tablespaces {
-						dataDir := fmt.Sprintf("/var/lib/postgresql/tablespaces/%s/data", tbsName)
-						owner, stdErr, err := env.ExecCommandInInstancePod(
-							testUtils.PodLocator{
-								Namespace: namespace,
-								PodName:   pod.Name,
-							}, nil,
-							"stat", "-c", `'%U'`, dataDir,
-						)
-						Expect(stdErr).To(BeEmpty())
-						Expect(err).ShouldNot(HaveOccurred())
-						Expect(owner).To(ContainSubstring("postgres"))
-					}
-				}
-			})
+			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, []string{firstTablespace, secondTablespace})
+			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, []string{firstTablespace, secondTablespace})
 		})
 	})
 })
+
+func AssertClusterHasMountPointsAndVolumesForTablespaces(cluster *apiv1.Cluster, tbsNames []string) {
+	namespace := cluster.ObjectMeta.Namespace
+	clusterName := cluster.ObjectMeta.Name
+	By("checking the mount points and volumes in the pods", func() {
+		Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+		Expect(cluster.Spec.Tablespaces).To(HaveLen(2))
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		for _, pod := range podList.Items {
+			Expect(pod.Spec.Containers).ToNot(BeEmpty())
+			var hasPostgresContainer bool
+			var mountPaths []string
+
+			for _, ctr := range pod.Spec.Containers {
+				if ctr.Name == "postgres" {
+					hasPostgresContainer = true
+					for _, mt := range ctr.VolumeMounts {
+						mountPaths = append(mountPaths, mt.MountPath)
+					}
+				}
+			}
+			Expect(hasPostgresContainer).To(BeTrue())
+			for _, tbsName := range tbsNames {
+				Expect(mountPaths).To(ContainElements(
+					"/var/lib/postgresql/tablespaces/" + tbsName,
+				))
+			}
+
+			var volumeNames []string
+			var claimNames []string
+			for _, vol := range pod.Spec.Volumes {
+				volumeNames = append(volumeNames, vol.Name)
+				if vol.PersistentVolumeClaim != nil {
+					claimNames = append(claimNames, vol.PersistentVolumeClaim.ClaimName)
+				}
+			}
+			for _, tbsName := range tbsNames {
+				Expect(volumeNames).To(ContainElement(
+					tbsName,
+				))
+				Expect(claimNames).To(ContainElement(
+					pod.Name + "-tbs-" + tbsName,
+				))
+			}
+		}
+	})
+}
+
+func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, tbsNames []string) {
+	namespace := cluster.ObjectMeta.Namespace
+	clusterName := cluster.ObjectMeta.Name
+	By("checking all the required PVCs were created", func() {
+		pvcList, err := env.GetPVCList(namespace)
+		Expect(err).ShouldNot(HaveOccurred())
+		var tablespacePvcNames []string
+		for _, pvc := range pvcList.Items {
+			roleLabel, found := pvc.Labels[utils.PvcRoleLabelName]
+			Expect(found).To(BeTrue())
+			if roleLabel != utils.PVCRolePgTablespace {
+				continue
+			}
+			tablespacePvcNames = append(tablespacePvcNames, pvc.Name)
+			tbsName := pvc.Labels[utils.PvcTablespaceLabelName]
+			Expect(tbsName).ToNot(BeEmpty())
+			Expect(tbsNames).To(ContainElement(tbsName))
+			for tbs, config := range cluster.Spec.Tablespaces {
+				if tbsName == tbs {
+					Expect(pvc.Spec.Resources.Requests.Storage()).
+						To(BeEquivalentTo(config.Storage.GetSizeOrNil()))
+				}
+			}
+		}
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		for _, pod := range podList.Items {
+			for _, tbsName := range tbsNames {
+				Expect(tablespacePvcNames).To(ContainElement(pod.Name + "-tbs-" + tbsName))
+			}
+		}
+	})
+	By("checking the data directory for the tablespaces is owned by postgres", func() {
+		pvcList, err := env.GetPodList(namespace)
+		Expect(err).ShouldNot(HaveOccurred())
+		for _, pod := range pvcList.Items {
+			for tbsName := range cluster.Spec.Tablespaces {
+				dataDir := fmt.Sprintf("/var/lib/postgresql/tablespaces/%s/data", tbsName)
+				owner, stdErr, err := env.ExecCommandInInstancePod(
+					testUtils.PodLocator{
+						Namespace: namespace,
+						PodName:   pod.Name,
+					}, nil,
+					"stat", "-c", `'%U'`, dataDir,
+				)
+				Expect(stdErr).To(BeEmpty())
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(owner).To(ContainSubstring("postgres"))
+			}
+		}
+	})
+}
