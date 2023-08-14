@@ -4242,6 +4242,18 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
+              tablespacesStatus:
+                description: DeclarativeTablespaceStatus reports the state of the
+                  managed roles in the cluster
+                properties:
+                  byStatus:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: ByStatus gives the list of tablespace in each state
+                    type: object
+                type: object
               targetPrimary:
                 description: Target primary instance, this is different from the previous
                   one during a switchover or a failover
