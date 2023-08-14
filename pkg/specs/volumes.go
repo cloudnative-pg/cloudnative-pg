@@ -32,10 +32,13 @@ const PgWalVolumePath = "/var/lib/postgresql/wal"
 // PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
+// PgTableSpaceVolumePath its the base path used by tablespace when present
+const PgTableSpaceVolumePath = "/var/lib/postgresql/tablespaces"
+
 // MountForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func MountForTablespace(tablespaceName string) string {
-	return fmt.Sprintf("/var/lib/postgresql/tablespaces/%s", tablespaceName)
+	return fmt.Sprintf("%s/%s", PgTableSpaceVolumePath, tablespaceName)
 }
 
 // PvcNameForTablespace returns the normalized tablespace volume name for a given
@@ -110,19 +113,17 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 			})
 	}
 
-	if cluster.ShouldCreateTablespaces() {
-		for tbsName := range cluster.Spec.Tablespaces {
-			result = append(result,
-				corev1.Volume{
-					Name: tbsName,
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: PvcNameForTablespace(podName, tbsName),
-						},
+	for tbsName := range cluster.Spec.Tablespaces {
+		result = append(result,
+			corev1.Volume{
+				Name: tbsName,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: PvcNameForTablespace(podName, tbsName),
 					},
 				},
-			)
-		}
+			},
+		)
 	}
 
 	if cluster.ShouldCreateProjectedVolume() {
@@ -248,15 +249,13 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		)
 	}
 
-	if cluster.ShouldCreateTablespaces() {
-		for name := range cluster.Spec.Tablespaces {
-			volumeMounts = append(volumeMounts,
-				corev1.VolumeMount{
-					Name:      name,
-					MountPath: MountForTablespace(name),
-				},
-			)
-		}
+	for name := range cluster.Spec.Tablespaces {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      name,
+				MountPath: MountForTablespace(name),
+			},
+		)
 	}
 
 	return volumeMounts

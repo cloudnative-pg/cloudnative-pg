@@ -500,7 +500,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 	}
 	pvc := makePVC(clusterName, "1", utils.PVCRolePgData, false)
 	pvc2 := makePVC(clusterName, "2", utils.PVCRolePgTablespace, false)
-	pvc2.Labels[utils.PvcTablespaceLabelName] = "fragglerock"
+	pvc2.Labels[utils.TablespaceNameLabelName] = "fragglerock"
 	q, err := resource.ParseQuantity("3Gi")
 	Expect(err).ShouldNot(HaveOccurred())
 	pvc2.Spec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{

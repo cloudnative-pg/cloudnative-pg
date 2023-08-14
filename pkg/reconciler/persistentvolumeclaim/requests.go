@@ -56,7 +56,7 @@ func reconcilePVCQuantity(
 ) error {
 	contextLogger := log.FromContext(ctx)
 	pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
-	tablespace := pvc.Labels[utils.PvcTablespaceLabelName]
+	tablespace := pvc.Labels[utils.TablespaceNameLabelName]
 
 	storageConfiguration, err := getStorageConfiguration(cluster, pvcRole, tablespace)
 	if err != nil {

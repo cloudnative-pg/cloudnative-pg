@@ -48,8 +48,8 @@ const (
 	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
 	PvcRoleLabelName = "cnpg.io/pvcRole"
 
-	// PvcTablespaceLabelName is the name of the label containing tablespace that a pvc holds
-	PvcTablespaceLabelName = "cnpg.io/pvcTablespace"
+	// TablespaceNameLabelName is the name of the label containing tablespace name that a pvc holds
+	TablespaceNameLabelName = "cnpg.io/tablespaceName"
 
 	// PodRoleLabelName is the name of the label containing the podRole value
 	PodRoleLabelName = "cnpg.io/podRole"

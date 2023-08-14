@@ -161,17 +161,15 @@ func GetInstancePVCs(
 	}
 
 	contextLogger := log.FromContext(ctx)
-	if cluster.ShouldCreateTablespaces() {
-		for name := range cluster.Spec.Tablespaces {
-			pvcName := specs.PvcNameForTablespace(instanceName, name)
-			tbsPVC, err := getPVC(ctx, pvcName)
-			if err != nil {
-				contextLogger.Error(err, "Tablespace", name, "instance", instanceName)
-				continue
-			}
-			if tbsPVC != nil {
-				pvcs = append(pvcs, *tbsPVC)
-			}
+	for tbsName := range cluster.Spec.Tablespaces {
+		pvcName := specs.PvcNameForTablespace(instanceName, tbsName)
+		tbsPVC, err := getPVC(ctx, pvcName)
+		if err != nil {
+			contextLogger.Error(err, "Tablespace", tbsName, "instance", instanceName)
+			continue
+		}
+		if tbsPVC != nil {
+			pvcs = append(pvcs, *tbsPVC)
 		}
 	}
 

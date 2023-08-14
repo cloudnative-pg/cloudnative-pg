@@ -167,7 +167,7 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, tbsNa
 				continue
 			}
 			tablespacePvcNames = append(tablespacePvcNames, pvc.Name)
-			tbsName := pvc.Labels[utils.PvcTablespaceLabelName]
+			tbsName := pvc.Labels[utils.TablespaceNameLabelName]
 			Expect(tbsName).ToNot(BeEmpty())
 			Expect(tbsNames).To(ContainElement(tbsName))
 			for tbs, config := range cluster.Spec.Tablespaces {

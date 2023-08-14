@@ -147,6 +147,6 @@ var _ = Describe("PVC Creation", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Name).To(Equal("thecluster-1-tbs-fragglerock"))
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))
-		Expect(pvc.Labels[utils.PvcTablespaceLabelName]).To(Equal(tbsName))
+		Expect(pvc.Labels[utils.TablespaceNameLabelName]).To(Equal(tbsName))
 	})
 })

@@ -199,7 +199,7 @@ func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []util
 			expectedPVC{
 				name: dataPVCName,
 				role: utils.PVCRolePgData,
-				// This requires a init, ideally we should move to a design where each pvc can be init separately
+				// This requires an init, ideally we should move to a design where each pvc can be init separately
 				// and then  attached
 				initialStatus: StatusInitializing,
 				storage:       cluster.Spec.StorageConfiguration,
@@ -224,17 +224,17 @@ func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []util
 
 func buildTablespacesPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
 	expectedMounts := make([]expectedPVC, 0, len(cluster.Spec.Tablespaces))
-	for name, config := range cluster.Spec.Tablespaces {
-		pvcName := specs.PvcNameForTablespace(instanceName, name)
+	for tbsName, config := range cluster.Spec.Tablespaces {
+		pvcName := specs.PvcNameForTablespace(instanceName, tbsName)
 		expectedMounts = append(expectedMounts,
 			expectedPVC{
 				name: pvcName,
 				role: utils.PVCRolePgTablespace,
-				// This requires a init, ideally we should move to a design where each pvc can be init separately
+				// This requires an init, ideally we should move to a design where each pvc can be init separately
 				// and then  attached
 				initialStatus:  StatusInitializing,
 				storage:        config.Storage,
-				tablespaceName: name,
+				tablespaceName: tbsName,
 			},
 		)
 	}
@@ -253,8 +253,8 @@ func getStorageConfiguration(
 	case utils.PVCRolePgWal:
 		storageConfiguration = cluster.Spec.WalStorage
 	case utils.PVCRolePgTablespace:
-		for name, config := range cluster.Spec.Tablespaces {
-			if name == tablespaceLabel {
+		for tbsName, config := range cluster.Spec.Tablespaces {
+			if tbsName == tablespaceLabel {
 				storageConfiguration = &config.Storage
 			}
 		}
