@@ -356,6 +356,7 @@ TLS
 TOC
 TODO
 TablespaceConfiguration
+Tablespaces
 TimelineId
 TopologyKey
 TopologySpreadConstraint
