@@ -3,24 +3,18 @@ kind: Cluster
 metadata:
   name: cluster-example-with-tablespaces
 spec:
-  instances: 3
+  instances: 2
 
   storage:
     size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
   tablespaces:
     atablespace:
       storage:
         size: 1Gi
-        storageClass: standard
-      temporary: false
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     anothertablespace:
       storage:
         size: 2Gi
-        storageClass: standard
-      temporary: true
-    tablespacea1:
-      temporary: true
-      storage:
-        size: 2Gi
-        storageClass: standard
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

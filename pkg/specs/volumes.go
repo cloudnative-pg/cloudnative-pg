@@ -18,6 +18,7 @@ package specs
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -30,6 +31,23 @@ const PgWalVolumePath = "/var/lib/postgresql/wal"
 
 // PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
+
+// PgTableSpaceVolumePath its the base path used by tablespace when present
+const PgTableSpaceVolumePath = "/var/lib/postgresql/tablespaces"
+
+// MountForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func MountForTablespace(tablespaceName string) string {
+	return fmt.Sprintf("%s/%s", PgTableSpaceVolumePath, tablespaceName)
+}
+
+// PvcNameForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func PvcNameForTablespace(podName, tablespaceName string) string {
+	// TODO: have a function to convert tablespace names to a lowercase RFC 1123 label
+	name := strings.ReplaceAll(tablespaceName, "_", "-")
+	return podName + "-tbs-" + name
+}
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
@@ -93,6 +111,19 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 					},
 				},
 			})
+	}
+
+	for tbsName := range cluster.Spec.Tablespaces {
+		result = append(result,
+			corev1.Volume{
+				Name: tbsName,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: PvcNameForTablespace(podName, tbsName),
+					},
+				},
+			},
+		)
 	}
 
 	if cluster.ShouldCreateProjectedVolume() {
@@ -214,6 +245,15 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 			corev1.VolumeMount{
 				Name:      "projected",
 				MountPath: postgres.ProjectedVolumeDirectory,
+			},
+		)
+	}
+
+	for name := range cluster.Spec.Tablespaces {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      name,
+				MountPath: MountForTablespace(name),
 			},
 		)
 	}

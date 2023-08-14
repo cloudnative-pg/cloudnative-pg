@@ -2330,6 +2330,11 @@ func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
 }
 
+// ShouldCreateTablespaces returns true if for this cluster, we need to create tablespaces
+func (cluster *Cluster) ShouldCreateTablespaces() bool {
+	return len(cluster.Spec.Tablespaces) != 0
+}
+
 // GetPostgresUID returns the UID that is being used for the "postgres"
 // user
 func (cluster Cluster) GetPostgresUID() int64 {
