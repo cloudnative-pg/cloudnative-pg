@@ -23,6 +23,7 @@ import (
 	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -124,21 +125,23 @@ func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool
 }
 
 type expectedPVC struct {
-	role          utils.PVCRole
-	name          string
-	initialStatus PVCStatus
+	role           utils.PVCRole
+	tablespaceName string
+	name           string
+	initialStatus  PVCStatus
+	storage        apiv1.StorageConfiguration
 }
 
 func (e *expectedPVC) toCreateConfiguration(
 	serial int,
-	storage apiv1.StorageConfiguration,
 	source *corev1.TypedLocalObjectReference,
 ) *CreateConfiguration {
 	cc := &CreateConfiguration{
-		Status:     e.initialStatus,
-		NodeSerial: serial,
-		Role:       e.role,
-		Storage:    storage,
+		Status:         e.initialStatus,
+		NodeSerial:     serial,
+		Role:           e.role,
+		Storage:        e.storage,
+		TablespaceName: e.tablespaceName,
 	}
 
 	if source != nil {
@@ -156,7 +159,13 @@ func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []e
 		roles = append(roles, utils.PVCRolePgWal)
 	}
 
-	return buildExpectedPVCs(instanceName, roles)
+	expectedTablespacesMounts := buildExpectedPVCs(cluster, instanceName, roles)
+	if cluster.ShouldCreateTablespaces() {
+		expectedTablespacesMounts = append(expectedTablespacesMounts,
+			buildTablespacesPVCs(cluster, instanceName)...)
+	}
+
+	return expectedTablespacesMounts
 }
 
 // getExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
@@ -179,7 +188,7 @@ func containsRole(roles []utils.PVCRole, role utils.PVCRole) bool {
 }
 
 // here we should register any new PVC for the instance
-func buildExpectedPVCs(instanceName string, roles []utils.PVCRole) []expectedPVC {
+func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []utils.PVCRole) []expectedPVC {
 	var expectedMounts []expectedPVC
 
 	if containsRole(roles, utils.PVCRolePgData) {
@@ -190,9 +199,10 @@ func buildExpectedPVCs(instanceName string, roles []utils.PVCRole) []expectedPVC
 			expectedPVC{
 				name: dataPVCName,
 				role: utils.PVCRolePgData,
-				// This requires a init, ideally we should move to a design where each pvc can be init separately
+				// This requires an init, ideally we should move to a design where each pvc can be init separately
 				// and then  attached
 				initialStatus: StatusInitializing,
+				storage:       cluster.Spec.StorageConfiguration,
 			},
 		)
 	}
@@ -204,6 +214,7 @@ func buildExpectedPVCs(instanceName string, roles []utils.PVCRole) []expectedPVC
 				name:          walPVCName,
 				role:          utils.PVCRolePgWal,
 				initialStatus: StatusReady,
+				storage:       *cluster.Spec.WalStorage,
 			},
 		)
 	}
@@ -211,9 +222,29 @@ func buildExpectedPVCs(instanceName string, roles []utils.PVCRole) []expectedPVC
 	return expectedMounts
 }
 
+func buildTablespacesPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
+	expectedMounts := make([]expectedPVC, 0, len(cluster.Spec.Tablespaces))
+	for tbsName, config := range cluster.Spec.Tablespaces {
+		pvcName := specs.PvcNameForTablespace(instanceName, tbsName)
+		expectedMounts = append(expectedMounts,
+			expectedPVC{
+				name: pvcName,
+				role: utils.PVCRolePgTablespace,
+				// This requires an init, ideally we should move to a design where each pvc can be init separately
+				// and then  attached
+				initialStatus:  StatusInitializing,
+				storage:        config.Storage,
+				tablespaceName: tbsName,
+			},
+		)
+	}
+	return expectedMounts
+}
+
 func getStorageConfiguration(
 	cluster *apiv1.Cluster,
 	role utils.PVCRole,
+	tablespaceLabel string,
 ) (apiv1.StorageConfiguration, error) {
 	var storageConfiguration *apiv1.StorageConfiguration
 	switch role {
@@ -221,6 +252,12 @@ func getStorageConfiguration(
 		storageConfiguration = &cluster.Spec.StorageConfiguration
 	case utils.PVCRolePgWal:
 		storageConfiguration = cluster.Spec.WalStorage
+	case utils.PVCRolePgTablespace:
+		for tbsName, config := range cluster.Spec.Tablespaces {
+			if tbsName == tablespaceLabel {
+				storageConfiguration = &config.Storage
+			}
+		}
 	default:
 		return apiv1.StorageConfiguration{}, fmt.Errorf("unknown pvcRole: %s", string(role))
 	}
@@ -264,6 +301,9 @@ func getStorageSource(
 		source = &volumeSnapshots.Storage
 	case utils.PVCRolePgWal:
 		source = volumeSnapshots.WalStorage
+	// TODO ad the moment, getting the Source for a tablespace will error out. Do something better
+	case utils.PVCRolePgTablespace:
+		return nil, fmt.Errorf("volume source unsupported for Tablespaces atm: %s", string(role))
 	default:
 		return nil, fmt.Errorf("unknown pvcRole: %s", string(role))
 	}

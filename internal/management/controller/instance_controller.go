@@ -334,6 +334,10 @@ func (r *InstanceReconciler) initialize(ctx context.Context, cluster *apiv1.Clus
 		return err
 	}
 
+	if err := r.ReconcileTablespaces(ctx, cluster); err != nil {
+		return err
+	}
+
 	r.instance.SetFencing(cluster.IsInstanceFenced(r.instance.PodName))
 
 	return nil
