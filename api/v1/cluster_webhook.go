@@ -822,6 +822,15 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 		}
 	}
 
+	if recoverySection.RecoveryTarget != nil && recoverySection.RecoveryTarget.BackupID != "" {
+		return field.ErrorList{
+			field.Invalid(
+				recoveryPath.Child("recoveryTarget", "backupID"),
+				r.Spec.Bootstrap.Recovery.RecoveryTarget.BackupID,
+				"Cannot specify a backupID when recovering using a DataSource"),
+		}
+	}
+
 	result := validateVolumeSnapshotSource(recoverySection.VolumeSnapshots.Storage, recoveryPath.Child("storage"))
 
 	if recoverySection.VolumeSnapshots.WalStorage != nil && r.Spec.WalStorage == nil {
