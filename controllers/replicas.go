@@ -228,7 +228,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 			continue
 		}
 
-		if !utils.IsPodReady(candidate.Pod) {
+		if !utils.IsPodReady(*candidate.Pod) {
 			continue
 		}
 

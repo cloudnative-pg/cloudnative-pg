@@ -42,7 +42,7 @@ var _ = Describe("Pod upgrade", func() {
 	It("will not require a restart for just created Pods", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 
-		needRestart, reason := isPodNeedingRestart(&cluster, postgres.PostgresqlStatus{Pod: *pod})
+		needRestart, reason := isPodNeedingRestart(&cluster, postgres.PostgresqlStatus{Pod: pod})
 		Expect(needRestart).To(BeFalse())
 		Expect(reason).To(BeEmpty())
 	})
@@ -62,11 +62,11 @@ var _ = Describe("Pod upgrade", func() {
 		clusterRestart.Annotations = make(map[string]string)
 		clusterRestart.Annotations[specs.ClusterRestartAnnotationName] = "now"
 
-		needRestart, reason := isPodNeedingRestart(&clusterRestart, postgres.PostgresqlStatus{Pod: *pod})
+		needRestart, reason := isPodNeedingRestart(&clusterRestart, postgres.PostgresqlStatus{Pod: pod})
 		Expect(needRestart).To(BeTrue())
 		Expect(reason).ToNot(BeEmpty())
 
-		needRestart, reason = isPodNeedingRestart(&cluster, postgres.PostgresqlStatus{Pod: *pod})
+		needRestart, reason = isPodNeedingRestart(&cluster, postgres.PostgresqlStatus{Pod: pod})
 		Expect(needRestart).To(BeFalse())
 		Expect(reason).To(BeEmpty())
 	})
@@ -74,13 +74,13 @@ var _ = Describe("Pod upgrade", func() {
 	It("checks when a restart is being needed by PostgreSQL", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 
-		needRestart, reason := isPodNeedingRestart(&cluster, postgres.PostgresqlStatus{Pod: *pod})
+		needRestart, reason := isPodNeedingRestart(&cluster, postgres.PostgresqlStatus{Pod: pod})
 		Expect(needRestart).To(BeFalse())
 		Expect(reason).To(BeEmpty())
 
 		needRestart, reason = isPodNeedingRestart(&cluster,
 			postgres.PostgresqlStatus{
-				Pod:            *pod,
+				Pod:            pod,
 				PendingRestart: true,
 			})
 		Expect(needRestart).To(BeTrue())
@@ -89,7 +89,7 @@ var _ = Describe("Pod upgrade", func() {
 
 	It("checks when a rollout is being needed for any reason", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
-		status := postgres.PostgresqlStatus{Pod: *pod, PendingRestart: true}
+		status := postgres.PostgresqlStatus{Pod: pod, PendingRestart: true}
 		needRollout, inplacePossible, reason := IsPodNeedingRollout(status, &cluster)
 		Expect(needRollout).To(BeFalse())
 		Expect(inplacePossible).To(BeFalse())

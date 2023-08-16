@@ -49,11 +49,11 @@ type Role struct {
 	Rolcanlogin    bool    `json:"rolcanlogin,omitempty"`
 	Rolreplication bool    `json:"rolreplication,omitempty"`
 	Rolbypassrls   bool    `json:"rolbypassrls,omitempty"`
+	IsCurrentUser  bool    `json:"is_current_user,omitempty"`
 	Rolconnlimit   int     `json:"rolconnlimit,omitempty"`
 	Rolpassword    *string `json:"rolpassword,omitempty"`
 	Rolvaliduntil  *string `json:"rolvaliduntil,omitempty"`
 	RolComment     *string `json:"rolcomment,omitempty"`
-	IsCurrentUser  bool    `json:"is_current_user,omitempty"`
 }
 
 func cloneRoles(
