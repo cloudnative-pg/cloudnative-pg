@@ -436,10 +436,10 @@ Name                                | Description                               
 `targetPrimaryTimestamp             ` | The timestamp when the last request for a new primary has occurred                                                                                                                 | string                                                     
 `poolerIntegrations                 ` | The integration needed by poolers referencing the cluster                                                                                                                          | [*PoolerIntegrations](#PoolerIntegrations)                 
 `cloudNativePGOperatorHash          ` | The hash of the binary of the operator                                                                                                                                             | string                                                     
-`onlineUpdateEnabled                ` | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster                                                                                                      | bool                                                       
-`azurePVCUpdateEnabled              ` | AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster                                                                                                  | bool                                                       
 `conditions                         ` | Conditions for cluster object                                                                                                                                                      | []metav1.Condition                                         
 `instanceNames                      ` | List of instance names in the cluster                                                                                                                                              | []string                                                   
+`onlineUpdateEnabled                ` | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster                                                                                                      | bool                                                       
+`azurePVCUpdateEnabled              ` | AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster                                                                                                  | bool                                                       
 
 <a id='ConfigMapKeySelector'></a>
 
@@ -471,8 +471,8 @@ Name                | Description                                               
 ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------
 `compression        ` | Compress a backup file (a tar file per tablespace) while streaming it to the object store. Available options are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.                                                                                                                                | CompressionType
 `encryption         ` | Whenever to force the encryption of files (if the bucket is not already configured for that). Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms`                                                                                                                              | EncryptionType 
-`immediateCheckpoint` | Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default. | bool           
 `jobs               ` | The number of parallel jobs to be used to upload the backup, defaults to 2                                                                                                                                                                                                                                           | *int32         
+`immediateCheckpoint` | Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default. | bool           
 
 <a id='DataSource'></a>
 
@@ -520,8 +520,8 @@ GoogleCredentials is the type for the Google Cloud Storage credentials. This nee
 
 Name                   | Description                                                                                | Type                                    
 ---------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------
-`gkeEnvironment        ` | If set to true, will presume that it's running inside a GKE environment, default to false. - *mandatory*  | bool                                    
 `applicationCredentials` | The secret containing the Google Cloud Storage JSON file with the credentials              | [*SecretKeySelector](#SecretKeySelector)
+`gkeEnvironment        ` | If set to true, will presume that it's running inside a GKE environment, default to false. - *mandatory*  | bool                                    
 
 <a id='Import'></a>
 
@@ -606,9 +606,9 @@ Name           | Description                                                    
 `server        ` | LDAP hostname or IP address                                     | string                                    
 `port          ` | LDAP server port                                                | int                                       
 `scheme        ` | LDAP schema to be used, possible options are `ldap` and `ldaps` | LDAPScheme                                
-`tls           ` | Set to 'true' to enable LDAP over TLS. 'false' is default       | bool                                      
 `bindAsAuth    ` | Bind as authentication configuration                            | [*LDAPBindAsAuth](#LDAPBindAsAuth)        
 `bindSearchAuth` | Bind+Search authentication configuration                        | [*LDAPBindSearchAuth](#LDAPBindSearchAuth)
+`tls           ` | Set to 'true' to enable LDAP over TLS. 'false' is default       | bool                                      
 
 <a id='LocalObjectReference'></a>
 
@@ -654,8 +654,8 @@ This option is only useful when the chosen storage prevents the Pods from being 
 
 Name       | Description                                                                                                      | Type 
 ---------- | ---------------------------------------------------------------------------------------------------------------- | -----
-`inProgress` | Is there a node maintenance activity in progress?                                                                - *mandatory*  | bool 
 `reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere - when `instances` >1) - *mandatory*  | *bool
+`inProgress` | Is there a node maintenance activity in progress?                                                                - *mandatory*  | bool 
 
 <a id='PgBouncerIntegrationStatus'></a>
 
@@ -814,9 +814,9 @@ Name                          | Description                                     
 `parameters                   ` | PostgreSQL configuration options (postgresql.conf)                                                                                                                                             | map[string]string                                                
 `pg_hba                       ` | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file)                                                                                                      | []string                                                         
 `syncReplicaElectionConstraint` | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be set up.                                                                        | [SyncReplicaElectionConstraints](#SyncReplicaElectionConstraints)
-`promotionTimeout             ` | Specifies the maximum number of seconds to wait when promoting an instance to primary. Default value is 40000000, greater than one year in seconds, big enough to simulate an infinite timeout | int32                                                            
 `shared_preload_libraries     ` | Lists of shared preload libraries to add to the default ones                                                                                                                                   | []string                                                         
 `ldap                         ` | Options to specify LDAP configuration                                                                                                                                                          | [*LDAPConfig](#LDAPConfig)                                       
+`promotionTimeout             ` | Specifies the maximum number of seconds to wait when promoting an instance to primary. Default value is 40000000, greater than one year in seconds, big enough to simulate an infinite timeout | int32                                                            
 
 <a id='RecoveryTarget'></a>
 
@@ -843,8 +843,8 @@ ReplicaClusterConfiguration encapsulates the configuration of a replica cluster
 
 Name    | Description                                                                                                                                                                                                                                                     | Type  
 ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
-`enabled` | If replica mode is enabled, this cluster will be a replica of an existing cluster. Replica cluster can be created from a recovery object store or via streaming through pg_basebackup. Refer to the Replication page of the documentation for more information. - *mandatory*  | bool  
 `source ` | The name of the external cluster which is the replication origin                                                                                                                                                                                                - *mandatory*  | string
+`enabled` | If replica mode is enabled, this cluster will be a replica of an existing cluster. Replica cluster can be created from a recovery object store or via streaming through pg_basebackup. Refer to the Replication page of the documentation for more information. - *mandatory*  | bool  
 
 <a id='ReplicationSlotsConfiguration'></a>
 
@@ -1021,8 +1021,8 @@ In future synchronous replica election restriction by name will be supported.
 
 Name                   | Description                                                                                                    | Type    
 ---------------------- | -------------------------------------------------------------------------------------------------------------- | --------
-`enabled               ` | This flag enables the constraints for sync replicas                                                            - *mandatory*  | bool    
 `nodeLabelsAntiAffinity` | A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not | []string
+`enabled               ` | This flag enables the constraints for sync replicas                                                            - *mandatory*  | bool    
 
 <a id='Topology'></a>
 
@@ -1032,9 +1032,9 @@ Topology contains the cluster topology
 
 Name                  | Description                                                                                                                                                                                                                                                                                                                                                   | Type                         
 --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------
-`successfullyExtracted` | SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors in synchronous replica election in case of failures                                                                                                                                                                                                | bool                         
 `instances            ` | Instances contains the pod topology of the instances                                                                                                                                                                                                                                                                                                          | map[PodName]PodTopologyLabels
 `nodesUsed            ` | NodesUsed represents the count of distinct nodes accommodating the instances. A value of '1' suggests that all instances are hosted on a single node, implying the absence of High Availability (HA). Ideally, this value should be the same as the number of instances in the Postgres HA cluster, implying shared nothing architecture on the compute side. | int32                        
+`successfullyExtracted` | SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors in synchronous replica election in case of failures                                                                                                                                                                                                | bool                         
 
 <a id='WalBackupConfiguration'></a>
 

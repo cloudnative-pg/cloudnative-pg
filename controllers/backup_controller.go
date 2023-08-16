@@ -230,13 +230,13 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 			if item.IsPrimary {
 				contextLogger.Debug("Primary Instance is elected as backup target",
 					"instance", item.Pod.Name)
-				return &item.Pod, nil
+				return item.Pod, nil
 			}
 		case apiv1.BackupTargetStandby:
 			if !item.IsPrimary {
 				contextLogger.Debug("Standby Instance is elected as backup target",
 					"instance", item.Pod.Name)
-				return &item.Pod, nil
+				return item.Pod, nil
 			}
 		}
 	}

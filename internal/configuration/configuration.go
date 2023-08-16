@@ -44,9 +44,6 @@ type Data struct {
 	// Multiple namespaces can be specified separated by comma
 	WatchNamespace string `json:"watchNamespace" env:"WATCH_NAMESPACE"`
 
-	// EnablePodDebugging enable debugging mode in new generated pods
-	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
-
 	// OperatorNamespace is the namespace where the operator is installed
 	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
 
@@ -70,13 +67,6 @@ type Data struct {
 	// the owning Cluster
 	InheritedLabels []string `json:"inheritedLabels" env:"INHERITED_LABELS"`
 
-	// EnableInstanceManagerInplaceUpdates enables the instance manager to apply in-place updates,
-	// replacing the executable in a pod without restarting
-	EnableInstanceManagerInplaceUpdates bool `json:"enableInstanceManagerInplaceUpdates" env:"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES"` //nolint
-
-	// EnableAzurePVCUpdates enables the live update of PVC in Azure environment
-	EnableAzurePVCUpdates bool `json:"enableAzurePVCUpdates" env:"ENABLE_AZURE_PVC_UPDATES"`
-
 	// MonitoringQueriesConfigmap is the name of the configmap in the operator namespace which contain
 	// the monitoring queries. The queries will be read from the data key: "queries".
 	MonitoringQueriesConfigmap string `json:"monitoringQueriesConfigmap" env:"MONITORING_QUERIES_CONFIGMAP"`
@@ -84,6 +74,16 @@ type Data struct {
 	// MonitoringQueriesSecret is the name of the secret in the operator namespace which contain
 	// the monitoring queries. The queries will be read from the data key: "queries".
 	MonitoringQueriesSecret string `json:"monitoringQueriesSecret" env:"MONITORING_QUERIES_SECRET"`
+
+	// EnableInstanceManagerInplaceUpdates enables the instance manager to apply in-place updates,
+	// replacing the executable in a pod without restarting
+	EnableInstanceManagerInplaceUpdates bool `json:"enableInstanceManagerInplaceUpdates" env:"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES"` //nolint
+
+	// EnableAzurePVCUpdates enables the live update of PVC in Azure environment
+	EnableAzurePVCUpdates bool `json:"enableAzurePVCUpdates" env:"ENABLE_AZURE_PVC_UPDATES"`
+
+	// EnablePodDebugging enable debugging mode in new generated pods
+	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
 
 	// CreateAnyService is true when the user wants the operator to create
 	// the <cluster-name>-any service. Defaults to false.

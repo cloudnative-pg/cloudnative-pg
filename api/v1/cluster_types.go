@@ -396,9 +396,6 @@ type PodName string
 
 // Topology contains the cluster topology
 type Topology struct {
-	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
-	// in synchronous replica election in case of failures
-	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
 	// Instances contains the pod topology of the instances
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
 
@@ -408,6 +405,10 @@ type Topology struct {
 	// be the same as the number of instances in the Postgres HA cluster, implying
 	// shared nothing architecture on the compute side.
 	NodesUsed int32 `json:"nodesUsed,omitempty"`
+
+	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
+	// in synchronous replica election in case of failures
+	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -517,17 +518,17 @@ type ClusterStatus struct {
 	// The hash of the binary of the operator
 	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
 
-	// OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster
-	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
-
-	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
-	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
-
 	// Conditions for cluster object
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// List of instance names in the cluster
 	InstanceNames []string `json:"instanceNames,omitempty"`
+
+	// OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster
+	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
+
+	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
+	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -619,16 +620,16 @@ type PgBouncerIntegrationStatus struct {
 // ReplicaClusterConfiguration encapsulates the configuration of a replica
 // cluster
 type ReplicaClusterConfiguration struct {
+	// The name of the external cluster which is the replication origin
+	// +kubebuilder:validation:MinLength=1
+	Source string `json:"source"`
+
 	// If replica mode is enabled, this cluster will be a replica of an
 	// existing cluster. Replica cluster can be created from a recovery
 	// object store or via streaming through pg_basebackup.
 	// Refer to the Replication page of the documentation for more information.
 	// +optional
 	Enabled bool `json:"enabled"`
-
-	// The name of the external cluster which is the replication origin
-	// +kubebuilder:validation:MinLength=1
-	Source string `json:"source"`
 }
 
 // DefaultReplicationSlotsUpdateInterval is the default in seconds for the replication slots update interval
@@ -743,15 +744,15 @@ const (
 // This option is only useful when the chosen storage prevents the Pods
 // from being freely moved across nodes.
 type NodeMaintenanceWindow struct {
-	// Is there a node maintenance activity in progress?
-	// +kubebuilder:default:=false
-	InProgress bool `json:"inProgress"`
-
 	// Reuse the existing PVC (wait for the node to come
 	// up again) or not (recreate it elsewhere - when `instances` >1)
 	// +optional
 	// +kubebuilder:default:=true
 	ReusePVC *bool `json:"reusePVC"`
+
+	// Is there a node maintenance activity in progress?
+	// +kubebuilder:default:=false
+	InProgress bool `json:"inProgress"`
 }
 
 // PrimaryUpdateStrategy contains the strategy to follow when upgrading
@@ -805,12 +806,6 @@ type PostgresConfiguration struct {
 	// set up.
 	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
-	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
-	// Default value is 40000000, greater than one year in seconds,
-	// big enough to simulate an infinite timeout
-	// +optional
-	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
-
 	// Lists of shared preload libraries to add to the default ones
 	// +optional
 	AdditionalLibraries []string `json:"shared_preload_libraries,omitempty"`
@@ -818,6 +813,12 @@ type PostgresConfiguration struct {
 	// Options to specify LDAP configuration
 	// +optional
 	LDAP *LDAPConfig `json:"ldap,omitempty"`
+
+	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
+	// Default value is 40000000, greater than one year in seconds,
+	// big enough to simulate an infinite timeout
+	// +optional
+	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
@@ -857,14 +858,14 @@ type LDAPConfig struct {
 	// +kubebuilder:validation:Enum=ldap;ldaps
 	Scheme LDAPScheme `json:"scheme,omitempty"`
 
-	// Set to 'true' to enable LDAP over TLS. 'false' is default
-	TLS bool `json:"tls,omitempty"`
-
 	// Bind as authentication configuration
 	BindAsAuth *LDAPBindAsAuth `json:"bindAsAuth,omitempty"`
 
 	// Bind+Search authentication configuration
 	BindSearchAuth *LDAPBindSearchAuth `json:"bindSearchAuth,omitempty"`
+
+	// Set to 'true' to enable LDAP over TLS. 'false' is default
+	TLS bool `json:"tls,omitempty"`
 }
 
 // LDAPBindAsAuth provides the required fields to use the
@@ -1251,11 +1252,11 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 //
 // In future synchronous replica election restriction by name will be supported.
 type SyncReplicaElectionConstraints struct {
-	// This flag enables the constraints for sync replicas
-	Enabled bool `json:"enabled"`
-
 	// A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not
 	NodeLabelsAntiAffinity []string `json:"nodeLabelsAntiAffinity,omitempty"`
+
+	// This flag enables the constraints for sync replicas
+	Enabled bool `json:"enabled"`
 }
 
 // AffinityConfiguration contains the info we need to create the
@@ -1491,17 +1492,17 @@ type DataBackupConfiguration struct {
 	// +kubebuilder:validation:Enum=AES256;"aws:kms"
 	Encryption EncryptionType `json:"encryption,omitempty"`
 
+	// The number of parallel jobs to be used to upload the backup, defaults
+	// to 2
+	// +kubebuilder:validation:Minimum=1
+	Jobs *int32 `json:"jobs,omitempty"`
+
 	// Control whether the I/O workload for the backup initial checkpoint will
 	// be limited, according to the `checkpoint_completion_target` setting on
 	// the PostgreSQL server. If set to true, an immediate checkpoint will be
 	// used, meaning PostgreSQL will complete the checkpoint as soon as
 	// possible. `false` by default.
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
-
-	// The number of parallel jobs to be used to upload the backup, defaults
-	// to 2
-	// +kubebuilder:validation:Minimum=1
-	Jobs *int32 `json:"jobs,omitempty"`
 }
 
 // S3Credentials is the type for the credentials to be used to upload
@@ -1560,13 +1561,13 @@ type AzureCredentials struct {
 // GoogleCredentials is the type for the Google Cloud Storage credentials.
 // This needs to be specified even if we run inside a GKE environment.
 type GoogleCredentials struct {
+	// The secret containing the Google Cloud Storage JSON file with the credentials
+	ApplicationCredentials *SecretKeySelector `json:"applicationCredentials,omitempty"`
+
 	// If set to true, will presume that it's running inside a GKE environment,
 	// default to false.
 	// +optional
 	GKEEnvironment bool `json:"gkeEnvironment"`
-
-	// The secret containing the Google Cloud Storage JSON file with the credentials
-	ApplicationCredentials *SecretKeySelector `json:"applicationCredentials,omitempty"`
 }
 
 // MonitoringConfiguration is the type containing all the monitoring

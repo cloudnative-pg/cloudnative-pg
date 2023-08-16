@@ -667,7 +667,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	}
 
 	if !instance.IsWalReceiverActive {
-		if utils.IsPodReady(instance.Pod) {
+		if utils.IsPodReady(*instance.Pod) {
 			return "Standby (file based)"
 		}
 		if instance.IsPgRewindRunning {
