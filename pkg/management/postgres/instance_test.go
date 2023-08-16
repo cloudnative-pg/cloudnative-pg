@@ -214,7 +214,7 @@ var _ = Describe("check atomic bool", func() {
 		Expect(canBeChecked).To(BeTrue())
 	})
 
-	It("should recognize whether the instance might be unavailanle based on the setting", func() {
+	It("should recognize whether the instance might be unavailable based on the setting", func() {
 		instance.SetMightBeUnavailable(false)
 		unAvailable := instance.MightBeUnavailable()
 		Expect(unAvailable).To(BeFalse())
