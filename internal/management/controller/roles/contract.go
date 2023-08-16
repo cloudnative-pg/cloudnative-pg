@@ -39,12 +39,12 @@ type DatabaseRole struct {
 	Inherit         bool             `json:"inherit,omitempty"` // defaults to true
 	Login           bool             `json:"login,omitempty"`
 	Replication     bool             `json:"replication,omitempty"`
-	BypassRLS       bool             `json:"bypassrls,omitempty"`       // Row-Level Security
+	BypassRLS       bool             `json:"bypassrls,omitempty"` // Row-Level Security
+	ignorePassword  bool             `json:"-"`
 	ConnectionLimit int64            `json:"connectionLimit,omitempty"` // default is -1
 	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
 	InRoles         []string         `json:"inRoles,omitempty"`
 	password        sql.NullString   `json:"-"`
-	ignorePassword  bool             `json:"-"`
 	transactionID   int64            `json:"-"`
 }
 

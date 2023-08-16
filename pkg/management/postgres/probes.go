@@ -65,7 +65,7 @@ func (instance *Instance) IsServerReady() error {
 // GetStatus Extract the status of this PostgreSQL database
 func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
-		Pod:                    corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
+		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
 		InstanceManagerVersion: versions.Version,
 		MightBeUnavailable:     instance.MightBeUnavailable(),
 	}
