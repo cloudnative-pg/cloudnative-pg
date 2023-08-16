@@ -144,7 +144,7 @@ To enable the operator you need to edit the operator deployment add the flag `--
 
 You can do this by executing these commands:
 
-``` console
+```shell
 kubectl edit deployment -n cnpg-system cnpg-controller-manager
 ```
 
@@ -167,12 +167,12 @@ Save the changes, the deployment now will execute a rollout and the new pod will
 
 Once the pod is running you can exec inside the container by doing:
 
-``` console
+```shell
 kubectl exec -ti -n cnpg-system <pod name> -- bash
 ```
 
 Once inside execute:
 
-``` console
+```shell
 curl localhost:6060/debug/pprof/
 ```

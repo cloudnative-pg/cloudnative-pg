@@ -78,7 +78,7 @@ hack/setup-cluster.sh pyroscope
 ```
 
 will create a deployment, and add two services on ports 6060 and 4040
-respectivelly, in the same namespace as the operator:
+respectively, in the same namespace as the operator:
 
 ``` console
 kubectl get svc -n cnpg-system        
