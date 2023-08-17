@@ -202,6 +202,14 @@ type ConfigurationInfo struct {
 	// The list of user-level settings
 	UserSettings map[string]string
 
+	// The list of replicas
+	SyncReplicasElectable []string
+
+	// The number of desired number of synchronous replicas
+	SyncReplicas int
+	// List of additional sharedPreloadLibraries to be loaded
+	AdditionalSharedPreloadLibraries []string
+
 	// Whether we need to include mandatory settings that are
 	// not meant to be seen by users. Should be set to
 	// true only when writing the configuration to disk
@@ -213,17 +221,8 @@ type ConfigurationInfo struct {
 	// to allow the validating webhook to return an error
 	PreserveFixedSettingsFromUser bool
 
-	// The list of replicas
-	SyncReplicasElectable []string
-
-	// The number of desired number of synchronous replicas
-	SyncReplicas int
-
 	// If the generated configuration should contain shared_preload_libraries too or no
 	IncludingSharedPreloadLibraries bool
-
-	// List of additional sharedPreloadLibraries to be loaded
-	AdditionalSharedPreloadLibraries []string
 
 	// Is this a replica cluster?
 	IsReplicaCluster bool
@@ -233,12 +232,15 @@ type ConfigurationInfo struct {
 type ManagedExtension struct {
 	// Name of the extension
 	Name string
-	// SkipCreateExtension is true when the extension is made only from a shared preload library
-	SkipCreateExtension bool
+
 	// Namespaces contains the configuration namespaces handled by the extension
 	Namespaces []string
+
 	// SharedPreloadLibraries is the list of needed shared preload libraries
 	SharedPreloadLibraries []string
+
+	// SkipCreateExtension is true when the extension is made only from a shared preload library
+	SkipCreateExtension bool
 }
 
 // IsUsed checks whether a configuration namespace in the namespaces list

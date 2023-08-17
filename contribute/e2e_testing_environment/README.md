@@ -66,6 +66,48 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 > sure that they are consistent through all invocations either via command line
 > options or by defining the respective environment variables
 
+## Profiling tools
+
+In addition to deploying and destroying the operator, `hack/setup-cluster.sh`
+can also load two powerful profiling / debugging tools: *pprof* and *pyroscope*.
+
+Issuing the following command once the operator is deployed:
+
+``` console
+hack/setup-cluster.sh pyroscope
+```
+
+will create a deployment, and add two services on ports 6060 and 4040
+respectively, in the same namespace as the operator:
+
+``` console
+kubectl get svc -n cnpg-system        
+
+NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+cnpg-pprof             ClusterIP   10.96.17.58    <none>        6060/TCP   9m41s
+cnpg-webhook-service   ClusterIP   10.96.64.74    <none>        443/TCP    10m
+pyroscope              ClusterIP   10.96.187.86   <none>        4040/TCP   9m41s
+```
+
+You can find more information on the various endpoints that come included with
+the `pprof` server in the
+[operator conf document](../../docs/src/operator_conf.md#pprof-http-server).
+
+[Pyroscope](https://pyroscope.io/) offers a very functional web app out of the
+box.
+To use it, you will need first to do port-forwarding for the `pyroscope`
+service:
+
+```console
+kubectl port-forward -n cnpg-system svc/pyroscope 4040
+```
+
+Then you can open the local pyroscope page at [localhost:4040](http://localhost:4040), and you should see a display like so:
+
+![pyroscope](pyroscope.png)
+
+It is a great tool to interactively monitor memory and CPU usage.
+
 ## E2E tests suite
 
 E2E testing is performed by running the

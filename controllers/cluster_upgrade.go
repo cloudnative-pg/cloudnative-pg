@@ -76,7 +76,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 		}
 
-		return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod, restartMessage)
+		return true, r.upgradePod(ctx, cluster, postgresqlStatus.Pod, restartMessage)
 	}
 
 	// report an error if there is no primary. This condition should never happen because
@@ -103,7 +103,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		return false, nil
 	}
 
-	return r.updatePrimaryPod(ctx, cluster, podList, primaryPostgresqlStatus.Pod, inPlacePossible, reason)
+	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod, inPlacePossible, reason)
 }
 
 func (r *ClusterReconciler) updatePrimaryPod(
@@ -250,12 +250,12 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	}
 
 	// Check if there is a change in the projected volume configuration
-	if needsUpdate, reason := isPodNeedingUpdateOfProjectedVolume(cluster, status.Pod); needsUpdate {
+	if needsUpdate, reason := isPodNeedingUpdateOfProjectedVolume(cluster, *status.Pod); needsUpdate {
 		return true, false, reason
 	}
 
 	// check if the pod requires an image upgrade
-	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, status.Pod)
+	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, *status.Pod)
 	if err != nil {
 		log.Error(err, "while checking if image could be upgraded")
 		return false, false, ""
@@ -266,7 +266,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	}
 
 	if !configuration.Current.EnableInstanceManagerInplaceUpdates {
-		oldImage, newImage, err = isPodNeedingUpgradedInitContainerImage(status.Pod)
+		oldImage, newImage, err = isPodNeedingUpgradedInitContainerImage(*status.Pod)
 		if err != nil {
 			log.Error(err, "while checking if init container image could be upgraded")
 			return false, false, ""
@@ -278,20 +278,20 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		}
 	}
 
-	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, &status.Pod) {
+	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
 		return true, false, string(apiv1.DetachedVolume)
 	}
 
 	// Check if there is a change in the environment section
-	if restartRequired, reason := isPodNeedingUpdatedEnvironment(*cluster, status.Pod); restartRequired {
+	if restartRequired, reason := isPodNeedingUpdatedEnvironment(*cluster, *status.Pod); restartRequired {
 		return true, false, reason
 	}
 
-	if restartRequired, reason := isPodNeedingUpdatedScheduler(cluster, status.Pod); restartRequired {
+	if restartRequired, reason := isPodNeedingUpdatedScheduler(cluster, *status.Pod); restartRequired {
 		return restartRequired, false, reason
 	}
 
-	if restartRequired, reason := isPodNeedingUpdatedTopology(cluster, status.Pod); restartRequired {
+	if restartRequired, reason := isPodNeedingUpdatedTopology(cluster, *status.Pod); restartRequired {
 		return restartRequired, false, reason
 	}
 
@@ -557,7 +557,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				}
 			}
 
-			err = upgradeInstanceManagerOnPod(ctx, postgresqlStatus.Pod)
+			err = upgradeInstanceManagerOnPod(ctx, *postgresqlStatus.Pod)
 			if err != nil {
 				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
 					postgresqlStatus.Pod.Name,
