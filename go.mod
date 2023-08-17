@@ -5,14 +5,14 @@ go 1.19
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Masterminds/semver/v3 v3.2.1
-	github.com/avast/retry-go/v4 v4.3.4
+	github.com/avast/retry-go/v4 v4.5.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-logr/logr v1.2.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
-	github.com/jackc/pgx/v5 v5.4.2
+	github.com/jackc/pgx/v5 v5.4.3
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0
 	github.com/lib/pq v1.10.9
@@ -28,9 +28,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/thoas/go-funk v0.9.3
 	go.uber.org/atomic v1.11.0
-	go.uber.org/zap v1.24.0
-	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090
-	golang.org/x/sys v0.10.0
+	go.uber.org/zap v1.25.0
+	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb
+	golang.org/x/sys v0.11.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.27.4
 	k8s.io/apiextensions-apiserver v0.27.4
@@ -86,7 +86,7 @@ require (
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.11.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
