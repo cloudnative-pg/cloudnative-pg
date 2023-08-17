@@ -97,8 +97,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	if len(backup.Status.Phase) != 0 && backup.Status.Phase != apiv1.BackupPhasePending {
-		// Nothing to do here
+	switch backup.Status.Phase {
+	case apiv1.BackupPhaseFailed, apiv1.BackupPhaseCompleted:
 		return ctrl.Result{}, nil
 	}
 
@@ -160,6 +160,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
 	}
 
+	// here we analyze the running backups
 	if backup.Status.Phase != "" && backup.Status.InstanceID != nil {
 		// Detect the pod where a backup will be executed
 		var pod corev1.Pod
