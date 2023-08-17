@@ -89,8 +89,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
-		// This also happens when you delete a Backup resource in k8s.
-		// If that's the case, we have nothing to do
 		if apierrs.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
@@ -134,7 +132,16 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	origBackup := backup.DeepCopy()
 
-	// Detect the pod where a backup will be executed
+	// we check if there is any running backup
+	if res, err := r.analyzeRunningBackups(ctx, backup, cluster); res != nil || err != nil {
+		if res != nil {
+			return *res, nil
+		}
+
+		return ctrl.Result{}, err
+	}
+
+	// If no good running backups are found we elect a pod for the backup
 	pod, err := r.getBackupTargetPod(ctx, cluster, &backup)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
@@ -158,40 +165,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
 			cluster.Status.TargetPrimary)
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
-	}
-
-	// here we analyze the running backups
-	if backup.Status.Phase != "" && backup.Status.InstanceID != nil {
-		// Detect the pod where a backup will be executed
-		var pod corev1.Pod
-		err = r.Get(ctx, client.ObjectKey{
-			Namespace: backup.Namespace,
-			Name:      backup.Status.InstanceID.PodName,
-		}, &pod)
-		// we found the pod
-		if err == nil &&
-			// the pod is actually the target primary,
-			// we don't care whether it's the current one as running the backup on the new primary would
-			// still be the correct thing to do
-			backup.Status.InstanceID.PodName == cluster.Status.TargetPrimary &&
-			// the pod was not restarted since when we started the backup
-			backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID &&
-			// the pod is active
-			utils.IsPodActive(pod) {
-			contextLogger.Info("Backup is already running on",
-				"cluster", cluster.Name,
-				"pod", pod.Name,
-				"started at", backup.Status.StartedAt)
-
-			// Nothing to do here
-			return ctrl.Result{}, nil
-		}
-		// We need to restart the backup as the previously selected instance doesn't look healthy
-		r.Recorder.Eventf(&backup, "Normal", "ReStarting",
-			"Restarted backup for cluster %v on instance %v", clusterName, pod.Name)
-	} else {
-		// We need to start a backup
-		r.Recorder.Eventf(&backup, "Normal", "Starting", "Starting backup for cluster %v", clusterName)
 	}
 
 	contextLogger.Info("Starting backup",
@@ -229,6 +202,63 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
 	return ctrl.Result{}, nil
+}
+
+func (r *BackupReconciler) analyzeRunningBackups(
+	ctx context.Context,
+	backup apiv1.Backup,
+	cluster apiv1.Cluster,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+	if backup.Status.Phase == "" || backup.Status.InstanceID == nil {
+		// We need to start a backup
+		r.Recorder.Eventf(&backup, "Normal", "Starting",
+			"Starting backup for cluster %v", cluster.Name)
+		return nil, nil
+	}
+
+	// Detect the pod where a backup is being executed or will be executed
+	var pod corev1.Pod
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      backup.Status.InstanceID.PodName,
+	}, &pod)
+
+	if apierrs.IsNotFound(err) {
+		// We need to restart the backup as the previously selected instance doesn't look healthy
+		r.Recorder.Eventf(
+			&backup,
+			"Normal",
+			"ReStarting",
+			"Could not find the elected backup pod. Restarting backup for cluster %v on instance %v",
+			cluster.Name,
+			pod.Name,
+		)
+		return nil, nil
+	}
+
+	// we can't make decisions to start another backup if we received a different error type
+	if err != nil {
+		return nil, err
+	}
+
+	isPrimary := backup.Status.InstanceID.PodName == cluster.Status.TargetPrimary
+	containerIsNotRestarted := backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
+	if isPrimary && containerIsNotRestarted && utils.IsPodActive(pod) {
+		contextLogger.Info("Backup is already running on",
+			"cluster", cluster.Name,
+			"pod", pod.Name,
+			"started at", backup.Status.StartedAt)
+
+		// Nothing to do here
+		return &ctrl.Result{}, nil
+	}
+
+	// We need to restart the backup as the previously selected instance doesn't look healthy
+	r.Recorder.Eventf(&backup, "Normal", "ReStarting",
+		"Restarted backup for cluster %v on instance %v", cluster.Name, pod.Name)
+
+	return nil, nil
 }
 
 func startSnapshotBackup(
