@@ -12,18 +12,42 @@ resources:
 patches:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
-#- patches/webhook_in_clusters.yaml
-#- patches/webhook_in_backups.yaml
-#- patches/webhook_in_scheduledbackups.yaml
-#- patches/webhook_in_poolers.yaml
+#- path: patches/webhook_in_clusters.yaml
+#  target:
+#    kind: CustomResourceDefinition
+#    name: clusters.postgresql.cnpg.io
+#- path: patches/webhook_in_backups.yaml
+#  target:
+#    kind: CustomResourceDefinition
+#    name: backups.postgresql.cnpg.io
+#- path: patches/webhook_in_scheduledbackups.yaml
+#  target:
+#    kind: CustomResourceDefinition
+#    name: scheduledbackups.postgresql.cnpg.io
+#- path: patches/webhook_in_poolers.yaml
+#  target:
+#    kind: CustomResourceDefinition
+#    name: poolers.postgresql.cnpg.io
 # +kubebuilder:scaffold:crdkustomizewebhookpatch
 
-# [CERTMANAGER] To enable webhook, uncomment all the sections with [CERTMANAGER] prefix.
+# [CERTMANAGER] To enable certmanager, uncomment all the sections with [CERTMANAGER] prefix.
 # patches here are for enabling the CA injection for each CRD
-#- patches/cainjection_in_clusters.yaml
-#- patches/cainjection_in_backups.yaml
-#- patches/cainjection_in_scheduledbackups.yaml
-#- patches/cainjection_in_poolers.yaml
+#- path: patches/cainjection_in_clusters.yaml
+#  target:
+#    kind: CustomResourceDefinition
+#    name: clusters.postgresql.cnpg.io
+#- path: patches/cainjection_in_backups.yaml
+#  target:
+#    kind: CustomResourceDefinition
+#    name: backups.postgresql.cnpg.io
+#- path: patches/cainjection_in_scheduledbackups.yaml
+#  target:
+#    kind: CustomResourceDefinition
+#    name: scheduledbackups.postgresql.cnpg.io
+#- path: patches/cainjection_in_poolers.yaml
+#  target:
+#    kind: CustomResourceDefinition
+#    name: poolers.postgresql.cnpg.io
 # +kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.
