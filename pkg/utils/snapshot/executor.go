@@ -162,7 +162,7 @@ func (se *Executor) checkPreconditionsStep(
 	}
 
 	if fencedInstances.Len() > 0 {
-		return errors.New("cannot hibernate a cluster that has fenced instances")
+		return errors.New("cannot execute volume snapshot on a cluster that has fenced instances")
 	}
 
 	return nil

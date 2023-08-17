@@ -72,8 +72,8 @@ spec:
                 type: boolean
               method:
                 default: barmanObjectStore
-                description: BackupMethod defines the way of executing the physical
-                  base backups of the selected PostgreSQL instance
+                description: 'The backup method to be used, possible options are `barmanObjectStore`
+                  and `volumeSnapshotTemplate`. Defaults to: `barmanObjectStore`.'
                 enum:
                 - barmanObjectStore
                 - volumeSnapshotTemplate

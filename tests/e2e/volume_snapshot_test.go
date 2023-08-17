@@ -265,7 +265,7 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 		})
 
-		Context("declarative snapshot tests", Ordered, func() {
+		Context("Declarative Volume Snapshot", Ordered, func() {
 			// test env constants
 			const (
 				namespacePrefix = "declarative-snapshot-backup"
@@ -297,13 +297,16 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
 					_ = os.Unsetenv("SNAPSHOT_NAME_PGDATA")
 					_ = os.Unsetenv("SNAPSHOT_NAME_PGWAL")
 					return env.DeleteNamespace(namespace)
 				})
 			})
 
-			It("it should do a declarative cold backup and restore", func() {
+			It("creating a declarative cold backup and restoring it", func() {
 				clusterToBackupName, err := env.GetResourceNameFromYAML(clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
 

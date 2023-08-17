@@ -3,17 +3,17 @@ kind: Cluster
 metadata:
   name: cluster-declarative-backup-restore
 spec:
-  instances: 3
-  bootstrap:
-    initdb:
-      database: app
-      owner: app
+  instances: 1
+  primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
   storage:
     storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
   walStorage:
     storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
+
   bootstrap:
     recovery:
       volumeSnapshots:

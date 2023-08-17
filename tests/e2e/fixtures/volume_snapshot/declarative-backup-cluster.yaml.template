@@ -5,12 +5,15 @@ metadata:
 spec:
   instances: 2
   primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
   storage:
     storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
   walStorage:
     storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
+
   backup:
     volumeSnapshotTemplate:
        className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}

@@ -1526,7 +1526,7 @@ type BarmanObjectStoreConfiguration struct {
 }
 
 // BackupConfiguration defines how the backup of the cluster are taken.
-// Currently the only supported backup method is barmanObjectStore.
+// The supported backup methods are BarmanObjectStore and VolumeSnapshotTemplate.
 // For details and examples refer to the Backup and Recovery section of the
 // documentation
 type BackupConfiguration struct {
@@ -1540,6 +1540,7 @@ type BackupConfiguration struct {
 	// and WALs (i.e. '60d'). The retention policy is expressed in the form
 	// of `XXu` where `XX` is a positive integer and `u` is in `[dwm]` -
 	// days, weeks, months.
+	// It's currently only applicable when using the BarmanObjectStore method.
 	// +kubebuilder:validation:Pattern=^[1-9][0-9]*[dwm]$
 	// +optional
 	RetentionPolicy string `json:"retentionPolicy,omitempty"`
