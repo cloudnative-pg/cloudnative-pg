@@ -32,7 +32,7 @@ For more detailed information about this feature, please refer to the
     [Kubernetes' native `VolumeSnapshot` API](https://github.com/cloudnative-pg/cloudnative-pg/issues/2081)
     for both incremental and differential copy in backup and recovery
     operations - if supported by the underlying storage classes.
-    Please see ["Recovery from Volume Snapshot objects"](#recovery-from-volumesnapshot-objects)
+    Please see ["Recovery from Volume Snapshot objects"](recovery.md#recovery-from-volumesnapshot-objects)
     for details.
 
 ## The `bootstrap` section
