@@ -41,15 +41,15 @@ func CreateSecret(
 		Host:   fmt.Sprintf("%s:%d", hostname, postgres.ServerPort),
 		Path:   dbname,
 	}
-	jdbc_uri := &url.URL{
+	jdbcURI := &url.URL{
 		Scheme: "jdbc:postgresql",
 		Host:   fmt.Sprintf("%s:%d", hostname, postgres.ServerPort),
 		Path:   dbname,
 	}
-	q := jdbc_uri.Query()
+	q := jdbcURI.Query()
 	q.Set("user", username)
 	q.Set("password", password)
-	jdbc_uri.RawQuery = q.Encode()
+	jdbcURI.RawQuery = q.Encode()
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -74,7 +74,7 @@ func CreateSecret(
 				username,
 				password),
 			"uri":      uri.String(),
-			"jdbc-uri": jdbc_uri.String(),
+			"jdbc-uri": jdbcURI.String(),
 		},
 	}
 }
