@@ -132,6 +132,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	isRunning, err := r.isValidBackupRunning(ctx, backup, cluster)
 	if err != nil {
+		contextLogger.Error(err, "while running isValidBackupRunning")
 		return ctrl.Result{}, err
 	}
 	if isRunning {
