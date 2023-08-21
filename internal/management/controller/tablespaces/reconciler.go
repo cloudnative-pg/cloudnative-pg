@@ -55,7 +55,7 @@ func Reconcile(
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	tbsNameByStatus := EvaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces).
+	tbsNameByStatus := evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces).
 		convertToTablespaceNameByStatus()
 	if len(tbsNameByStatus[apiv1.TablespaceStatusPendingReconciliation]) != 0 {
 		// forces runnable to run

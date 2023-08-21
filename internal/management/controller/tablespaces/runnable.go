@@ -24,8 +24,10 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // A TablespaceSynchronizer is a Kubernetes manager.Runnable
@@ -112,32 +114,48 @@ func (tbsSync *TablespaceSynchronizer) reconcile(
 
 	superUserDB, err := tbsSync.instance.GetSuperUserDB()
 	if err != nil {
-		return fmt.Errorf("while reconciling managed roles: %w", err)
+		return fmt.Errorf("while synchronizing tablespaces: %w", err)
 	}
 	tbsManager := infrastructure.NewPostgresTablespaceManager(superUserDB)
+	tbsStorageManager := instaceTablespaceStorageManager{}
 
-	err = tbsSync.synchronizeTablespaces(ctx, tbsManager, config)
+	err = tbsSync.synchronizeTablespaces(ctx, tbsManager, tbsStorageManager, config)
 	if err != nil {
-		return fmt.Errorf("while syncrhonizing tablespaces: %w", err)
+		return fmt.Errorf("while synchronizing tablespaces: %w", err)
 	}
 	return nil
+}
+
+// tablespaceStorageManager parametrizes checking (eventually creating) storage
+// for tablespaces
+type tablespaceStorageManager interface {
+	storageExists(tbsName string) (bool, error)
+}
+
+type instaceTablespaceStorageManager struct{}
+
+func (ism instaceTablespaceStorageManager) storageExists(tbsName string) (bool, error) {
+	location := specs.LocationForTablespace(tbsName)
+	return fileutils.FileExists(location)
 }
 
 // synchronizeTablespaces sync the tablespace in spec to database
 func (tbsSync *TablespaceSynchronizer) synchronizeTablespaces(
 	ctx context.Context,
 	tbsManager infrastructure.TablespaceManager,
+	tbsStorageManager tablespaceStorageManager,
 	config map[string]*apiv1.TablespaceConfiguration,
 ) error {
 	tablespaceInDB, err := tbsManager.List(ctx)
 	if err != nil {
 		return err
 	}
-	tableSpaceByAction := EvaluateNextActions(ctx, tablespaceInDB, config)
+	tableSpaceByAction := evaluateNextActions(ctx, tablespaceInDB, config)
 
 	return tbsSync.applyTablespaceActions(
 		ctx,
 		tbsManager,
+		tbsStorageManager,
 		tableSpaceByAction,
 	)
 }
@@ -145,7 +163,8 @@ func (tbsSync *TablespaceSynchronizer) synchronizeTablespaces(
 // applyTablespaceActions applies the actions to reconcile tablespace in the DB with the Spec
 func (tbsSync *TablespaceSynchronizer) applyTablespaceActions(
 	ctx context.Context,
-	roleManager infrastructure.TablespaceManager,
+	tbsManager infrastructure.TablespaceManager,
+	tbsStorageManager tablespaceStorageManager,
 	tablespacesByAction TablespaceByAction,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
@@ -161,8 +180,20 @@ func (tbsSync *TablespaceSynchronizer) applyTablespaceActions(
 		contextLog.Info("tablespace in DB out of sync with Spec, evaluating action",
 			"tablespaces", getTablespaceNames(tbsAdapters), "action", action)
 
+		if action != TbsToCreate {
+			contextLog.Error(fmt.Errorf("only tablespace creation is supported"), "action", action)
+			continue
+		}
+
 		for _, tbs := range tbsAdapters {
-			err := tbsSync.applyTablespaceCreateUpdate(ctx, roleManager, tbs, action)
+			tablespace := infrastructure.Tablespace{
+				Name:      tbs.Name,
+				Temporary: tbs.Temporary,
+			}
+			if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
+				return fmt.Errorf("cannot create tablespace before data directory is created")
+			}
+			err := tbsManager.Create(ctx, tablespace)
 			if err != nil {
 				contextLog.Error(err, "while performing "+string(action), "tablespace", tbs.Name)
 			}
@@ -170,26 +201,4 @@ func (tbsSync *TablespaceSynchronizer) applyTablespaceActions(
 	}
 
 	return nil
-}
-
-// applyTablespaceCreate create or update tablespace
-func (tbsSync *TablespaceSynchronizer) applyTablespaceCreateUpdate(
-	ctx context.Context,
-	tbsManager infrastructure.TablespaceManager,
-	tbsAdapter TablespaceConfigurationAdapter,
-	action TablespaceAction,
-) error {
-	tablespace := infrastructure.Tablespace{
-		Name:      tbsAdapter.Name,
-		Temporary: tbsAdapter.Temporary,
-	}
-	var err error
-	switch action {
-	case TbsToCreate:
-		err = tbsManager.Create(ctx, tablespace)
-	case TbsToUpdate:
-		err = tbsManager.Update(ctx, tablespace)
-	}
-
-	return err
 }

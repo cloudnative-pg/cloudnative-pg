@@ -21,9 +21,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 type (
@@ -35,7 +33,7 @@ type (
 	TablespaceNameByStatus map[apiv1.TablespaceStatus][]string
 )
 
-// possible role actions
+// possible tablespace actions
 const (
 	// TbsIsReconciled tablespaces action represent tablespace already reconciled
 	TbsIsReconciled TablespaceAction = "RECONCILED"
@@ -63,8 +61,8 @@ type TablespaceConfigurationAdapter struct {
 	apiv1.TablespaceConfiguration
 }
 
-// EvaluateNextActions evaluates the next action going to take for tablespace
-func EvaluateNextActions(
+// evaluateNextActions evaluates the next action going to take for tablespace
+func evaluateNextActions(
 	ctx context.Context,
 	tablespaceInDBSlice []infrastructure.Tablespace,
 	tablespaceInSpecMap map[string]*apiv1.TablespaceConfiguration,
@@ -79,23 +77,16 @@ func EvaluateNextActions(
 		tbsInDBNamed[tbs.Name] = tablespaceInDBSlice[idx]
 	}
 
-	// we go through all the tablespace in spec and compare each with the one in db
-	// as for now we only support tablespace create, attribute update
-	// we do not handle the tablespace remove / rename
+	// we go through all the tablespaces in spec and create them if missing in DB
+	// NOTE: we do not at the moment support update/Delete
 	for tbsInSpecName, tbsInSpec := range tablespaceInSpecMap {
-		tbsInDB, isTbsInDB := tbsInDBNamed[tbsInSpecName]
+		_, isTbsInDB := tbsInDBNamed[tbsInSpecName]
 		switch {
 		case isTablespaceNameReserved(tbsInSpecName):
 			tablespaceByAction[TbsReserved] = append(tablespaceByAction[TbsReserved],
 				tablespaceAdapterFromName(tbsInSpecName, *tbsInSpec))
-		case isTbsInDB && tbsInSpec.Temporary != tbsInDB.Temporary:
-			tablespaceByAction[TbsToUpdate] = append(tablespaceByAction[TbsToUpdate],
-				tablespaceAdapterFromName(tbsInSpecName, *tbsInSpec))
-		case !isTbsInDB && isLocationExists(tbsInSpecName):
+		case !isTbsInDB:
 			tablespaceByAction[TbsToCreate] = append(tablespaceByAction[TbsToCreate],
-				tablespaceAdapterFromName(tbsInSpecName, *tbsInSpec))
-		case !isTbsInDB && !isLocationExists(tbsInSpecName):
-			tablespaceByAction[TbsPending] = append(tablespaceByAction[TbsPending],
 				tablespaceAdapterFromName(tbsInSpecName, *tbsInSpec))
 		default:
 			tablespaceByAction[TbsIsReconciled] = append(tablespaceByAction[TbsIsReconciled],
@@ -125,13 +116,6 @@ func (r TablespaceByAction) convertToTablespaceNameByStatus() TablespaceNameBySt
 	}
 
 	return tablespaceByStatus
-}
-
-// isLocationExists check if the location for tablespace exists, if not, tablespace will hold on to create
-func isLocationExists(tbsName string) bool {
-	location := specs.LocationForTablespace(tbsName)
-	exists, _ := fileutils.FileExists(location)
-	return exists
 }
 
 // tablespaceAdapterFromName create a TablespaceConfigurationAdapter from the given information
