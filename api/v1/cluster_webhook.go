@@ -1226,11 +1226,11 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 	// and a backupID is not needed.
 
 	// validate BackupID is defined when TargetName or TargetXID or TargetImmediate are set
-	timeBasedPITR := recoveryTarget.TargetName != "" ||
+	labelBasedPITR := recoveryTarget.TargetName != "" ||
 		recoveryTarget.TargetXID != "" ||
 		recoveryTarget.TargetImmediate != nil
 	recoveryFromSnapshot := r.Spec.Bootstrap.Recovery.VolumeSnapshots != nil
-	if timeBasedPITR && !recoveryFromSnapshot && recoveryTarget.BackupID == "" {
+	if labelBasedPITR && !recoveryFromSnapshot && recoveryTarget.BackupID == "" {
 		result = append(result, field.Required(
 			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 			"BackupID is missing"))
