@@ -242,9 +242,18 @@ func (r *BackupReconciler) analyzeRunningBackups(
 		return nil, err
 	}
 
-	isPrimary := backup.Status.InstanceID.PodName == cluster.Status.TargetPrimary
+	var isCorrectPodElected bool
+	switch backup.Spec.Target {
+	case apiv1.BackupTargetPrimary:
+		isCorrectPodElected = backup.Status.InstanceID.PodName == cluster.Status.TargetPrimary
+	case apiv1.BackupTargetStandby, "":
+		// we don't really care for this type
+		isCorrectPodElected = true
+	}
+
 	containerIsNotRestarted := backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
-	if isPrimary && containerIsNotRestarted && utils.IsPodActive(pod) {
+	isPodActive := utils.IsPodActive(pod)
+	if isCorrectPodElected && containerIsNotRestarted && isPodActive {
 		contextLogger.Info("Backup is already running on",
 			"cluster", cluster.Name,
 			"pod", pod.Name,
@@ -253,7 +262,12 @@ func (r *BackupReconciler) analyzeRunningBackups(
 		// Nothing to do here
 		return &ctrl.Result{}, nil
 	}
-
+	contextLogger.Info("restarting backup",
+		"isCorrectPodElected", isCorrectPodElected,
+		"containerNotRestarted", containerIsNotRestarted,
+		"isPodActive", isPodActive,
+		"target", backup.Spec.Target,
+	)
 	// We need to restart the backup as the previously selected instance doesn't look healthy
 	r.Recorder.Eventf(&backup, "Normal", "ReStarting",
 		"Restarted backup for cluster %v on instance %v", cluster.Name, pod.Name)
@@ -350,13 +364,13 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 			continue
 		}
 		switch backupTarget {
-		case apiv1.BackupTargetPrimary, "":
+		case apiv1.BackupTargetPrimary:
 			if item.IsPrimary {
 				contextLogger.Debug("Primary Instance is elected as backup target",
 					"instance", item.Pod.Name)
 				return item.Pod, nil
 			}
-		case apiv1.BackupTargetStandby:
+		case apiv1.BackupTargetStandby, "":
 			if !item.IsPrimary {
 				contextLogger.Debug("Standby Instance is elected as backup target",
 					"instance", item.Pod.Name)

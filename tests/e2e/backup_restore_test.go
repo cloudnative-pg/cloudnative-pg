@@ -271,7 +271,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		// We backup and restore a cluster from a standby, and verify some expected data to
 		// be there
-		FIt("backs up and restore a cluster from standby", func() {
+		It("backs up and restore a cluster from standby", func() {
 			const (
 				targetDBOne                       = "test"
 				targetDBTwo                       = "test1"
