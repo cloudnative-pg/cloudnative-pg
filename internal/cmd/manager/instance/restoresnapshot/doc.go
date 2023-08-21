@@ -1,2 +1,2 @@
-// Package restoresnapshot implements the logic to bootstrap the restored snapshot volumes
+// Package restoresnapshot implements the job command that bootstraps the snapshot volumes
 package restoresnapshot

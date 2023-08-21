@@ -1219,10 +1219,18 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 		}
 	}
 
+	// When using a backup catalog, we can identify the backup to be restored
+	// only if the PITR is time-based. If the PITR is not time-based, the user
+	// need to specify a backup ID.
+	// If we use a dataSource, the operator will directly access the backup
+	// and a backupID is not needed.
+
 	// validate BackupID is defined when TargetName or TargetXID or TargetImmediate are set
-	if (recoveryTarget.TargetName != "" ||
+	timeBasedPITR := recoveryTarget.TargetName != "" ||
 		recoveryTarget.TargetXID != "" ||
-		recoveryTarget.TargetImmediate != nil) && recoveryTarget.BackupID == "" {
+		recoveryTarget.TargetImmediate != nil
+	recoveryFromSnapshot := r.Spec.Bootstrap.Recovery.VolumeSnapshots != nil
+	if timeBasedPITR && !recoveryFromSnapshot && recoveryTarget.BackupID == "" {
 		result = append(result, field.Required(
 			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 			"BackupID is missing"))
