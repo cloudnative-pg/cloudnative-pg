@@ -6281,7 +6281,7 @@
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "/\\bcluster\\b=\"(?<text>[^\"]+)/g",
+        "regex": "/\\bcnpg_cluster\\b=\"(?<text>[^\"]+)/g",
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
