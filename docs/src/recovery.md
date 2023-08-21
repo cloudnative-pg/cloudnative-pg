@@ -305,6 +305,8 @@ base backup for the recovery as follows:
 
 ### PITR from `VolumeSnapshot` Objects
 
+The example below uses:
+
 - a Kubernetes volume snapshot for the `PGDATA` containing the base backup from
   which to start the recovery process, identified in the
   `recovery.volumeSnapshots` section and called `test-snapshot-1`
