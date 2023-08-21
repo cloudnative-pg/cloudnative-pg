@@ -130,17 +130,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
-	origBackup := backup.DeepCopy()
-
-	// we check if there is any running backup
-	if res, err := r.analyzeRunningBackups(ctx, backup, cluster); res != nil || err != nil {
-		if res != nil {
-			return *res, nil
-		}
-
+	isRunning, err := r.isValidBackupRunning(ctx, backup, cluster)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
+	if isRunning {
+		return ctrl.Result{}, nil
+	}
 
+	origBackup := backup.DeepCopy()
 	// If no good running backups are found we elect a pod for the backup
 	pod, err := r.getBackupTargetPod(ctx, cluster, &backup)
 	if err != nil {
@@ -204,17 +202,17 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-func (r *BackupReconciler) analyzeRunningBackups(
+func (r *BackupReconciler) isValidBackupRunning(
 	ctx context.Context,
 	backup apiv1.Backup,
 	cluster apiv1.Cluster,
-) (*ctrl.Result, error) {
+) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 	if backup.Status.Phase == "" || backup.Status.InstanceID == nil {
 		// We need to start a backup
 		r.Recorder.Eventf(&backup, "Normal", "Starting",
 			"Starting backup for cluster %v", cluster.Name)
-		return nil, nil
+		return false, nil
 	}
 
 	// Detect the pod where a backup is being executed or will be executed
@@ -234,12 +232,12 @@ func (r *BackupReconciler) analyzeRunningBackups(
 			cluster.Name,
 			pod.Name,
 		)
-		return nil, nil
+		return false, nil
 	}
 
 	// we can't make decisions to start another backup if we received a different error type
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	var isCorrectPodElected bool
@@ -249,6 +247,8 @@ func (r *BackupReconciler) analyzeRunningBackups(
 	case apiv1.BackupTargetStandby, "":
 		// we don't really care for this type
 		isCorrectPodElected = true
+	default:
+		return false, fmt.Errorf("unknown.spec.target received: %s", backup.Spec.Target)
 	}
 
 	containerIsNotRestarted := backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
@@ -260,7 +260,7 @@ func (r *BackupReconciler) analyzeRunningBackups(
 			"started at", backup.Status.StartedAt)
 
 		// Nothing to do here
-		return &ctrl.Result{}, nil
+		return true, nil
 	}
 	contextLogger.Info("restarting backup",
 		"isCorrectPodElected", isCorrectPodElected,
@@ -272,7 +272,7 @@ func (r *BackupReconciler) analyzeRunningBackups(
 	r.Recorder.Eventf(&backup, "Normal", "ReStarting",
 		"Restarted backup for cluster %v on instance %v", cluster.Name, pod.Name)
 
-	return nil, nil
+	return false, nil
 }
 
 func startSnapshotBackup(
