@@ -241,7 +241,7 @@ $(ENVTEST): $(LOCALBIN)
 
 GENREF = $(LOCALBIN)/genref
 genref: ## Download kubernetes-sigs/reference-docs/genref locally if necessary.
-	$(call go-install-tool,$(GENREF),github.com/kubernetes-sigs/reference-docs/genref@master)
+	$(call go-install-tool,$(GENREF),github.com/kubernetes-sigs/reference-docs/genref@master) # wokeignore:rule=master
 
 GO_LICENSES = $(LOCALBIN)/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
