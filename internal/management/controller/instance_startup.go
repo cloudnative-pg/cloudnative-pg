@@ -336,7 +336,7 @@ func (r *InstanceReconciler) ReconcileTablespaces(
 		if !info.IsDir() {
 			return fmt.Errorf("the tablespace %s mount: %s is not a directory", tbsName, mountPoint)
 		}
-		err = os.Mkdir(filepath.Join(mountPoint, dataDir), 0o700)
+		err = fileutils.EnsureDirectoryExists(filepath.Join(mountPoint, dataDir))
 		if err != nil {
 			contextLogger.Error(err,
 				"could not create data dir in tablespace mount",

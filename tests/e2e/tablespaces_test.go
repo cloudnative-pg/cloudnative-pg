@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -93,14 +95,22 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic),
 
 			DeferCleanup(func(ctx SpecContext) {
 				if CurrentSpecReport().Failed() {
-					saveLogs(&buffer, "cluster_logs_", "tablespace_tests", GinkgoWriter, 10)
+					specName := CurrentSpecReport().FullText()
+					capLines := 10
+					GinkgoWriter.Printf("DUMPING tailed CLUSTER Logs with error/warning (at most %v lines ). Failed Spec: %v\n",
+						capLines, specName)
+					GinkgoWriter.Println("================================================================================")
+					saveLogs(&buffer, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
+					GinkgoWriter.Println("================================================================================")
 				}
 			})
 		})
 
 		It("creates the PVCs and mount points required for tablespaces", func() {
-			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, []string{firstTablespace, secondTablespace})
-			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, []string{firstTablespace, secondTablespace})
+			tableSpaces := []string{firstTablespace, secondTablespace}
+			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, tableSpaces)
+			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, tableSpaces)
+			AssertDatabaseContainsTablespaces(cluster, tableSpaces)
 		})
 	})
 })
@@ -202,6 +212,27 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, tbsNa
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(owner).To(ContainSubstring("postgres"))
 			}
+		}
+	})
+}
+
+func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, tbsNames []string) {
+	namespace := cluster.ObjectMeta.Namespace
+	clusterName := cluster.ObjectMeta.Name
+	By("checking the expected tablespaces are in the database", func() {
+		primary, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ShouldNot(HaveOccurred())
+		tbsListing, stdErr, err := env.ExecQueryInInstancePod(
+			testUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   primary.Name,
+			}, testsUtils.DatabaseName("app"),
+			"SELECT spcname FROM pg_tablespace;",
+		)
+		Expect(stdErr).To(BeEmpty())
+		Expect(err).ShouldNot(HaveOccurred())
+		for tbsName := range cluster.Spec.Tablespaces {
+			Expect(tbsListing).To(ContainSubstring(tbsName))
 		}
 	})
 }
