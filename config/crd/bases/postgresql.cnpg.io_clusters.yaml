@@ -4243,15 +4243,15 @@ spec:
                     type: string
                 type: object
               tablespacesStatus:
-                description: DeclarativeTablespaceStatus reports the state of the
-                  managed roles in the cluster
+                description: TablespaceStatus reports the state of the declarative
+                  tablespaces in the cluster
                 properties:
                   byStatus:
                     additionalProperties:
                       items:
                         type: string
                       type: array
-                    description: ByStatus gives the list of tablespace in each state
+                    description: ByStatus gives the list of tablespaces in each state
                     type: object
                 type: object
               targetPrimary:

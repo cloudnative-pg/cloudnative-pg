@@ -304,7 +304,7 @@ func (r *InstanceReconciler) ReconcileWalStorage(ctx context.Context) error {
 // ReconcileTablespaces ensures the mount points created for the tablespaces
 // are there, and creates a subdirectory in each of them, which will therefore
 // be owned by the `postgres` user (rather than `root` as the mount point),
-// as required to hold PostgreSQL Tablespaces
+// as required in order to hold PostgreSQL Tablespaces
 func (r *InstanceReconciler) ReconcileTablespaces(
 	ctx context.Context,
 	cluster *apiv1.Cluster,

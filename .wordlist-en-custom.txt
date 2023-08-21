@@ -351,7 +351,9 @@ TLS
 TOC
 TODO
 TablespaceConfiguration
+TablespaceStatus
 Tablespaces
+TablespacesState
 TimelineId
 TopologyKey
 TopologySpreadConstraint
