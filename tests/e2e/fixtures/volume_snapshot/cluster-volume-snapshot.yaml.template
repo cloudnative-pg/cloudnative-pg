@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: volume-snapshot
+  name: cluster-volume-snapshot
 spec:
-  instances: 3
+  instances: 2
 
   bootstrap:
     initdb:

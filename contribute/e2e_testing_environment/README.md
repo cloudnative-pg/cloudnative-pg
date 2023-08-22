@@ -56,10 +56,10 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 
 | Flags | Usage                                                                                                                         |
 |-------|-------------------------------------------------------------------------------------------------------------------------------|
-| -r\   |--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
-| -e\   |--engine <CLUSTER_ENGINE>        | Use the provided ENGINE to run the cluster. Available options are 'kind' and 'k3d'. Default 'kind'. (Env: `CLUSTER_ENGINE`)   |
-| -k\   |--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.26.0`). (Env: `K8S_VERSION`)                                   |
-| -n\   |--nodes <NODES>                  | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
+| -r    |--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
+| -e    |--engine <CLUSTER_ENGINE>        | Use the provided ENGINE to run the cluster. Available options are 'kind' and 'k3d'. Default 'kind'. (Env: `CLUSTER_ENGINE`)   |
+| -k    |--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.26.0`). (Env: `K8S_VERSION`)                                   |
+| -n    |--nodes <NODES>                  | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
 
 
 > **NOTE:** if you want to use custom engine and registry settings, please make
@@ -123,8 +123,8 @@ The script can be configured through the following environment variables:
 * `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
   latest minor
 * `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
-* `AZURE_STORAGE_ACCOUNT`: Azure storage account to test backup and restore, using Barman Cloud on Azure 
-   blob storage
+* `AZURE_STORAGE_ACCOUNT`: Azure storage account to test backup and restore, using Barman Cloud on Azure
+  blob storage
 * `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using Barman Cloud on Azure
   blob storage
 * `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex: smoke, basic, security... details
@@ -293,8 +293,8 @@ Options supported are:
   is false.
 
 Example:
-1. Trigger an e2e test to run all test cases with `highest` test level, we want to cover most kubernetes and postgres 
-metrics
+1. Trigger an e2e test to run all test cases with `highest` test level, we want
+   to cover most Kubernetes and Postgres metrics
 
   ```
      /test -tl=0 d=schedule
@@ -303,3 +303,9 @@ metrics
   ```
      /test type=smoke,upgrade
   ```
+
+## Storage class for volume snapshots on Kind
+
+In order to enable testing of Kubernetes volume snapshots on a local Kind
+Cluster, we are installing the `csi-hostpath-sc` storage class and the
+`csi-hostpath-snapclass` volume snapshot class.

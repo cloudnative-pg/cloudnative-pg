@@ -2988,11 +2988,14 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(1))
 	})
 
-	It("should produce an error when requested a recovery target time", func() {
+	It("should produce an error when defining a backupID while recovering using a DataSource", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
 					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							BackupID: "20220616T031500",
+						},
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
 								APIGroup: ptr.To(""),
@@ -3000,7 +3003,6 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 								Name:     "pgdata",
 							},
 						},
-						RecoveryTarget: &RecoveryTarget{},
 					},
 				},
 			},
@@ -3071,6 +3073,21 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Name:     "pgwal",
 				},
 			},
+		})
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
+	})
+
+	It("accepts recovery from a VolumeSnapshot, while restoring WALs from an object store", func() {
+		cluster := clusterFromRecovery(&BootstrapRecovery{
+			VolumeSnapshots: &DataSource{
+				Storage: corev1.TypedLocalObjectReference{
+					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					Kind:     "VolumeSnapshot",
+					Name:     "pgdata",
+				},
+			},
+
+			Source: "pg-cluster",
 		})
 		Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
 	})

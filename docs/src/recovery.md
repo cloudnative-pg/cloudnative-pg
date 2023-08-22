@@ -117,35 +117,6 @@ spec:
     value of this parameter for your environment. It will certainly make a
     difference **when** (not if) you'll need it.
 
-## Recovery from a `Backup` object
-
-In case a Backup resource is already available in the namespace in which the
-cluster should be created, you can specify its name through
-`.spec.bootstrap.recovery.backup.name`, as in the following example:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example-initdb
-spec:
-  instances: 3
-
-  superuserSecret:
-    name: superuser-secret
-
-  bootstrap:
-    recovery:
-      backup:
-        name: backup-example
-
-  storage:
-    size: 1Gi
-```
-
-This bootstrap method allows you to specify just a reference to the
-backup that needs to be restored.
-
 ## Recovery from `VolumeSnapshot` objects
 
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
@@ -204,10 +175,39 @@ replica through a technique known as *cold backup*, by fencing the standby
 before taking a physical copy of the volumes. For details, please refer to
 ["Snapshotting a Postgres cluster"](#snapshotting-a-postgres-cluster).
 
+## Recovery from a `Backup` object
+
+In case a Backup resource is already available in the namespace in which the
+cluster should be created, you can specify its name through
+`.spec.bootstrap.recovery.backup.name`, as in the following example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-initdb
+spec:
+  instances: 3
+
+  superuserSecret:
+    name: superuser-secret
+
+  bootstrap:
+    recovery:
+      backup:
+        name: backup-example
+
+  storage:
+    size: 1Gi
+```
+
+This bootstrap method allows you to specify just a reference to the
+backup that needs to be restored.
+
 ## Additional considerations
 
-Whether you recover from a recovery object store or an existing `Backup`
-resource, the following considerations apply:
+Whether you recover from a recovery object store, a volume snapshot, or an
+existing `Backup` resource, the following considerations apply:
 
 - The application database name and the application database user are preserved
 from the backup that is being restored. The operator does not currently attempt
@@ -232,15 +232,20 @@ recovery (see the ["Point in time recovery" section](#point-in-time-recovery-pit
 Instead of replaying all the WALs up to the latest one, we can ask PostgreSQL
 to stop replaying WALs at any given point in time, after having extracted a
 base backup. PostgreSQL uses this technique to achieve *point-in-time* recovery
-(PITR).
+(PITR). The presence of a WAL archive is mandatory.
 
-!!! Note
-    PITR is available from recovery object stores as well as `Backup` objects.
+!!! Important
+    PITR requires you to specify a **recovery target**, by using the options
+    described in the ["Recovery targets" section](#recovery-targets) below.
 
 The operator will generate the configuration parameters required for this
-feature to work in case a recovery target is specified, like in the following
-example that uses a recovery object stored in Azure and a timestamp based
-goal:
+feature to work in case a recovery target is specified.
+
+#### PITR from an object store
+
+The example below uses a recovery object store in Azure that contains both
+the base backups and the WAL archive. The recovery target is based on a
+requested timestamp:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -255,9 +260,11 @@ spec:
 
   bootstrap:
     recovery:
+      # Recovery object store containing WAL archive and base backups
       source: clusterBackup
       recoveryTarget:
-        targetTime: "2020-11-26 15:22:00.00000+00"
+        # Time base target for the recovery
+        targetTime: "2023-08-11 11:14:21.00000+02"
 
   externalClusters:
     - name: clusterBackup
@@ -295,6 +302,61 @@ base backup for the recovery as follows:
   backup that was completed before that target
 - otherwise the operator selects the last available backup in chronological
   order.
+
+### PITR from `VolumeSnapshot` Objects
+
+The example below uses:
+
+- a Kubernetes volume snapshot for the `PGDATA` containing the base backup from
+  which to start the recovery process, identified in the
+  `recovery.volumeSnapshots` section and called `test-snapshot-1`
+- a recovery object store in MinIO containing the WAL archive, identified by
+  the `recovery.source` option in the form of an external cluster definition
+
+The recovery target is based on a requested timestamp.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-snapshot
+spec:
+  # ...
+  bootstrap:
+    recovery:
+      source: cluster-example-with-backup
+      volumeSnapshots:
+        storage:
+          name: test-snapshot-1
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+      recoveryTarget:
+        targetTime: "2023-07-06T08:00:39"
+  externalClusters:
+    - name: cluster-example-with-backup
+      barmanObjectStore:
+        destinationPath: s3://backups/
+        endpointURL: http://minio:9000
+        s3Credentials:
+          accessKeyId:
+            name: minio
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: minio
+            key: ACCESS_SECRET_KEY
+```
+
+!!! Note
+    In case the backed up Cluster had `walStorage` enabled, you also must
+    specify the volume snapshot containing the `PGWAL` directory, as mentioned
+    in the [Recovery from VolumeSnapshot objects](#recovery-from-volumeSnapshot-objects)
+    section.
+
+!!! Warning
+    It is your responsibility to ensure that the end time of the base backup in
+    the volume snapshot is prior to the recovery target timestamp.
+
+### Recovery targets
 
 Here are the recovery target criteria you can use:
 
@@ -357,7 +419,8 @@ By default, the previous parameters are considered to be inclusive, stopping
 just after the recovery target, matching [the behavior in PostgreSQL](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RECOVERY-TARGET-INCLUSIVE)
 You can request exclusive behavior,
 stopping right before the recovery target, by setting the `exclusive` parameter to
-`true` like in the following example relying on a blob container in Azure:
+`true` like in the following example relying on a blob container in Azure
+for both base backups and the WAL archive:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1

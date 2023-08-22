@@ -7,12 +7,13 @@ spec:
 
   storage:
     size: 1Gi
+    storageClass: csi-hostpath-sc
 
   bootstrap:
     recovery:
       volumeSnapshots:
         storage:
-          name: my-backup
+          name: cluster-example-with-backup-3-1692618163
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 

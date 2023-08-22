@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package restore implements the "instance restore" subcommand of the operator
-package restore
+// Package restoresnapshot implements the "instance restoresnapshot" subcommand of the operator
+package restoresnapshot
 
 import (
 	"context"
@@ -27,11 +27,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// NewCmd creates the "restore" subcommand
+// NewCmd creates the "restoresnapshot" subcommand
 func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
@@ -39,7 +38,7 @@ func NewCmd() *cobra.Command {
 	var pgWal string
 
 	cmd := &cobra.Command{
-		Use:           "restore [flags]",
+		Use:           "restoresnapshot [flags]",
 		SilenceErrors: true,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
@@ -57,7 +56,7 @@ func NewCmd() *cobra.Command {
 				PgWal:       pgWal,
 			}
 
-			return restoreSubCommand(ctx, info)
+			return execute(ctx, info)
 		},
 		PostRunE: func(cmd *cobra.Command, args []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
@@ -69,26 +68,20 @@ func NewCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
-		"current cluster in k8s, used to coordinate switchover and failover")
+		"cluster containing the PVC snapshot to be restored")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
-		"the cluster and the Pod in k8s")
+		"the cluster")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be restored")
 	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "The PGWAL to be restored")
 
 	return cmd
 }
 
-func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
-	err := info.VerifyPGData()
+func execute(ctx context.Context, info postgres.InitInfo) error {
+	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
 	}
 
-	err = info.Restore(ctx)
-	if err != nil {
-		log.Error(err, "Error while restoring a backup")
-		return err
-	}
-
-	return nil
+	return info.RestoreSnapshot(ctx, typedClient)
 }
