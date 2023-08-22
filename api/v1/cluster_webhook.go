@@ -1588,6 +1588,7 @@ func (r *Cluster) validateTolerations() field.ErrorList {
 	path := field.NewPath("spec", "affinity", "toleration")
 	allErrors := field.ErrorList{}
 	for i, toleration := range r.Spec.Affinity.Tolerations {
+		toleration := toleration
 		idxPath := path.Index(i)
 		// validate the toleration key
 		if len(toleration.Key) > 0 {

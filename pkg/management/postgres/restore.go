@@ -515,10 +515,9 @@ func (info InitInfo) loadBackupFromReference(
 // to complete the WAL recovery from the object storage and then start
 // as a new primary
 func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.Cluster) error {
-	const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
 	var err error
 
-	cmd := []string{barmanCloudWalRestoreName}
+	cmd := []string{barmanCapabilities.BarmanCloudWalRestore}
 	if backup.Status.EndpointURL != "" {
 		cmd = append(cmd, "--endpoint-url", backup.Status.EndpointURL)
 	}
