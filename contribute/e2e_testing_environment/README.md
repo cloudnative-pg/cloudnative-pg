@@ -294,7 +294,7 @@ Options supported are:
 
 Example:
 1. Trigger an e2e test to run all test cases with `highest` test level, we want
-   to cover most kubernetes and postgres metrics
+   to cover most Kubernetes and Postgres metrics
 
   ```
      /test -tl=0 d=schedule
