@@ -413,9 +413,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 		return fmt.Errorf("cannot detect major version: %w", err)
 	}
 
-	const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
-
-	cmd := []string{barmanCloudWalRestoreName}
+	cmd := []string{barmanCapabilities.BarmanCloudWalRestore}
 	if backup.Status.EndpointURL != "" {
 		cmd = append(cmd, "--endpoint-url", backup.Status.EndpointURL)
 	}
