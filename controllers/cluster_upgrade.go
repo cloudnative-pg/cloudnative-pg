@@ -65,13 +65,13 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 			continue
 		}
 
-		rollout := isPodNeedingRollout(ctx, postgresqlStatus, cluster)
-		if !rollout.required {
+		podRollout := isPodNeedingRollout(ctx, postgresqlStatus, cluster)
+		if !podRollout.required {
 			continue
 		}
 
 		restartMessage := fmt.Sprintf("Restarting instance %s, because: %s",
-			postgresqlStatus.Pod.Name, rollout.reason)
+			postgresqlStatus.Pod.Name, podRollout.reason)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade, restartMessage); err != nil {
 			return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 		}
@@ -92,8 +92,8 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	// we first check whether a restart is needed given the provided condition
-	rollout := isPodNeedingRollout(ctx, *primaryPostgresqlStatus, cluster)
-	if !rollout.required {
+	podRollout := isPodNeedingRollout(ctx, *primaryPostgresqlStatus, cluster)
+	if !podRollout.required {
 		return false, nil
 	}
 
@@ -104,7 +104,7 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
-		rollout.canBeInPlace, rollout.reason)
+		podRollout.canBeInPlace, podRollout.reason)
 }
 
 func (r *ClusterReconciler) updatePrimaryPod(
@@ -255,16 +255,16 @@ func isPodNeedingRollout(
 		"cluster has newer restart annotation": checkClusterHasNewerRestartAnnotation,
 	}
 	for message, check := range checkers {
-		rollout1, err := check(status, cluster)
+		podRollout, err := check(status, cluster)
 		if err != nil {
 			contextLogger.Error(err, "while checking if pod needs rollout")
 			continue
 		}
-		if rollout1.required {
-			if rollout1.reason == "" {
-				rollout1.reason = message
+		if podRollout.required {
+			if podRollout.reason == "" {
+				podRollout.reason = message
 			}
-			return rollout1
+			return podRollout
 		}
 	}
 
@@ -274,6 +274,7 @@ func isPodNeedingRollout(
 	if hasStoredPodSpec {
 		return rollout{}
 	}
+
 	// These checks are subsumed by the PodSpec checker
 	checkers = map[string]rolloutChecker{
 		"pod environment is outdated": checkPodEnvironmentIsOutdated,
@@ -281,18 +282,19 @@ func isPodNeedingRollout(
 		"pod needs updated topology":  checkPodNeedsUpdatedTopology,
 	}
 	for message, check := range checkers {
-		rollout1, err := check(status, cluster)
+		podRollout, err := check(status, cluster)
 		if err != nil {
 			contextLogger.Error(err, "while checking if pod needs rollout")
 			continue
 		}
-		if rollout1.required {
-			if rollout1.reason == "" {
-				rollout1.reason = message
+		if podRollout.required {
+			if podRollout.reason == "" {
+				podRollout.reason = message
 			}
-			return rollout1
+			return podRollout
 		}
 	}
+
 	return rollout{}
 }
 

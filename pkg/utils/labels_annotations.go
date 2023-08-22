@@ -78,7 +78,7 @@ const (
 	PodEnvHashAnnotationName = "cnpg.io/podEnvHash"
 
 	// PodSpecAnnotationName is the name of the annotation with the PodSpec derived from the cluster
-	PodSpecAnnotationName = "cnpg.io/originalPodSpec"
+	PodSpecAnnotationName = "cnpg.io/podSpec"
 
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"
