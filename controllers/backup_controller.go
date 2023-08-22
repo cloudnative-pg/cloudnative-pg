@@ -357,8 +357,8 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	if backup.Spec.Target != "" {
 		backupTarget = backup.Spec.Target
 	}
-	posgresqlStatusList := r.instanceStatusClient.getStatusFromInstances(ctx, pods)
-	for _, item := range posgresqlStatusList.Items {
+	postgresqlStatusList := r.instanceStatusClient.getStatusFromInstances(ctx, pods)
+	for _, item := range postgresqlStatusList.Items {
 		if !item.IsPodReady {
 			contextLogger.Debug("Instance not ready, discarded as target for backup",
 				"pod", item.Pod.Name)
