@@ -265,6 +265,19 @@ func configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName string) (ch
 	return changed, nil
 }
 
+// removeSignalFiles removes the PostgreSQL signal files to get
+// a cleanup up pgdata. This is useful after having restored
+// a PVC snapshot
+func removeSignalFiles(pgData string) error {
+	standbySignalFile := filepath.Join(pgData, "standby.signal")
+	if err := fileutils.RemoveFile(standbySignalFile); err != nil {
+		return err
+	}
+
+	recoverySignalFile := filepath.Join(pgData, "recovery.signal")
+	return fileutils.RemoveFile(recoverySignalFile)
+}
+
 // createStandbySignal creates a standby.signal file for PostgreSQL 12 and beyond
 func createStandbySignal(pgData string) error {
 	emptyFile, err := os.Create(filepath.Clean(filepath.Join(pgData, "standby.signal")))

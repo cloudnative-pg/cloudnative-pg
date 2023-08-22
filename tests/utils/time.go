@@ -34,7 +34,7 @@ func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment,
 	if err != nil {
 		return "", err
 	}
-	query := "select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS');"
+	query := "select CURRENT_TIMESTAMP;"
 	stdOut, _, err := RunQueryFromPod(
 		podName,
 		host,
