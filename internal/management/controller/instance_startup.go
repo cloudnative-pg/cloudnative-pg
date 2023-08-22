@@ -304,7 +304,7 @@ func (r *InstanceReconciler) ReconcileWalStorage(ctx context.Context) error {
 // ReconcileTablespaces ensures the mount points created for the tablespaces
 // are there, and creates a subdirectory in each of them, which will therefore
 // be owned by the `postgres` user (rather than `root` as the mount point),
-// as required to hold PostgreSQL Tablespaces
+// as required in order to hold PostgreSQL Tablespaces
 func (r *InstanceReconciler) ReconcileTablespaces(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -336,7 +336,7 @@ func (r *InstanceReconciler) ReconcileTablespaces(
 		if !info.IsDir() {
 			return fmt.Errorf("the tablespace %s mount: %s is not a directory", tbsName, mountPoint)
 		}
-		err = os.Mkdir(filepath.Join(mountPoint, dataDir), 0o700)
+		err = fileutils.EnsureDirectoryExists(filepath.Join(mountPoint, dataDir))
 		if err != nil {
 			contextLogger.Error(err,
 				"could not create data dir in tablespace mount",

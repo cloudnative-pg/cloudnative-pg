@@ -90,6 +90,7 @@ Below you will find a description of the defined resources:
 - [StorageConfiguration](#StorageConfiguration)
 - [SyncReplicaElectionConstraints](#SyncReplicaElectionConstraints)
 - [TablespaceConfiguration](#TablespaceConfiguration)
+- [TablespacesState](#TablespacesState)
 - [Topology](#Topology)
 - [WalBackupConfiguration](#WalBackupConfiguration)
 
@@ -416,6 +417,7 @@ Name                                | Description                               
 `instancesStatus                    ` | InstancesStatus indicates in which status the instances are                                                                                                                        | map[utils.PodStatus][]string                               
 `instancesReportedState             ` | The reported state of the instances during the last reconciliation loop                                                                                                            | [map[PodName]InstanceReportedState](#InstanceReportedState)
 `managedRolesStatus                 ` | ManagedRolesStatus reports the state of the managed roles in the cluster                                                                                                           | [ManagedRoles](#ManagedRoles)                              
+`tablespacesStatus                  ` | TablespaceStatus reports the state of the declarative tablespaces in the cluster                                                                                                   | [TablespacesState](#TablespacesState)                      
 `timelineID                         ` | The timeline of the Postgres cluster                                                                                                                                               | int                                                        
 `topology                           ` | Instances topology.                                                                                                                                                                | [Topology](#Topology)                                      
 `latestGeneratedNode                ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                        
@@ -1102,6 +1104,16 @@ Name      | Description                                                         
 --------- | -------------------------------------------------------------------------------------- | ---------------------------------------------
 `storage  ` |                                                                                        | [StorageConfiguration](#StorageConfiguration)
 `temporary` | This flag indicates if the tablespace is a temporary tablespace or not (default false) | bool                                         
+
+<a id='TablespacesState'></a>
+
+## TablespacesState
+
+TablespacesState tracks the status of a cluster's declarative tablespaces
+
+Name     | Description                                          | Type                         
+-------- | ---------------------------------------------------- | -----------------------------
+`byStatus` | ByStatus gives the list of tablespaces in each state | map[TablespaceStatus][]string
 
 <a id='Topology'></a>
 
