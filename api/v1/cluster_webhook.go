@@ -813,15 +813,6 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 
 	recoveryPath := field.NewPath("spec", "bootstrap", "recovery")
 	recoverySection := r.Spec.Bootstrap.Recovery
-	if recoverySection.Source != "" {
-		return field.ErrorList{
-			field.Invalid(
-				recoveryPath.Child("dataSource"),
-				r.Spec.Bootstrap.Recovery.VolumeSnapshots,
-				"Recovery from dataSource is not compatible with other types of recovery"),
-		}
-	}
-
 	if recoverySection.Backup != nil {
 		return field.ErrorList{
 			field.Invalid(
@@ -831,15 +822,16 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 		}
 	}
 
-	result := validateVolumeSnapshotSource(recoverySection.VolumeSnapshots.Storage, recoveryPath.Child("storage"))
-	if recoverySection.RecoveryTarget != nil {
-		result = append(
-			result,
+	if recoverySection.RecoveryTarget != nil && recoverySection.RecoveryTarget.BackupID != "" {
+		return field.ErrorList{
 			field.Invalid(
-				recoveryPath.Child("recoveryTarget"),
-				r.Spec.Bootstrap.Recovery.RecoveryTarget,
-				"A recovery target cannot be set while recovering from a DataSource"))
+				recoveryPath.Child("recoveryTarget", "backupID"),
+				r.Spec.Bootstrap.Recovery.RecoveryTarget.BackupID,
+				"Cannot specify a backupID when recovering using a DataSource"),
+		}
 	}
+
+	result := validateVolumeSnapshotSource(recoverySection.VolumeSnapshots.Storage, recoveryPath.Child("storage"))
 
 	if recoverySection.VolumeSnapshots.WalStorage != nil && r.Spec.WalStorage == nil {
 		walStoragePath := recoveryPath.Child("dataSource", "walStorage")
@@ -1227,10 +1219,18 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 		}
 	}
 
+	// When using a backup catalog, we can identify the backup to be restored
+	// only if the PITR is time-based. If the PITR is not time-based, the user
+	// need to specify a backup ID.
+	// If we use a dataSource, the operator will directly access the backup
+	// and a backupID is not needed.
+
 	// validate BackupID is defined when TargetName or TargetXID or TargetImmediate are set
-	if (recoveryTarget.TargetName != "" ||
+	labelBasedPITR := recoveryTarget.TargetName != "" ||
 		recoveryTarget.TargetXID != "" ||
-		recoveryTarget.TargetImmediate != nil) && recoveryTarget.BackupID == "" {
+		recoveryTarget.TargetImmediate != nil
+	recoveryFromSnapshot := r.Spec.Bootstrap.Recovery.VolumeSnapshots != nil
+	if labelBasedPITR && !recoveryFromSnapshot && recoveryTarget.BackupID == "" {
 		result = append(result, field.Required(
 			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 			"BackupID is missing"))

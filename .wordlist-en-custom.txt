@@ -984,6 +984,7 @@ virtualized
 virtualxid
 volumeMode
 volumeMounts
+volumeSnapshot
 volumesnapshot
 volumesnapshotclass
 wal

@@ -141,12 +141,12 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		return err
 	}
 
-	return env.configureInstanceAsNewPrimary(&cluster)
+	return env.configureInstanceAsNewPrimary(ctx, &cluster)
 }
 
 // configureInstanceAsNewPrimary sets up this instance as a new primary server, using
 // the configuration created by the user and setting up the global objects as needed
-func (env *CloneInfo) configureInstanceAsNewPrimary(cluster *apiv1.Cluster) error {
+func (env *CloneInfo) configureInstanceAsNewPrimary(ctx context.Context, cluster *apiv1.Cluster) error {
 	if err := env.info.WriteInitialPostgresqlConf(cluster); err != nil {
 		return err
 	}
@@ -163,5 +163,5 @@ func (env *CloneInfo) configureInstanceAsNewPrimary(cluster *apiv1.Cluster) erro
 	// In the future, when we will support recovering WALs in the
 	// designated primary from an object store, we'll need to use
 	// the environment variables of the recovery object store.
-	return env.info.ConfigureInstanceAfterRestore(cluster, nil)
+	return env.info.ConfigureInstanceAfterRestore(ctx, cluster, nil)
 }

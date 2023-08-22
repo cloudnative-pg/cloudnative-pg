@@ -341,12 +341,6 @@ by `name` (our recommendation is to use the same `name` of the origin cluster).
 
 ### Bootstrap from a backup (`recovery`)
 
-<!--
-
-TODO: Move the recovery content here in the recovery.md file and refactor it
-
--->
-
 Given the several possibilities, methods, and combinations that the
 CloudNativePG operator provides in terms of backup and recovery, please refer
 to the ["Recovery" section](recovery.md).

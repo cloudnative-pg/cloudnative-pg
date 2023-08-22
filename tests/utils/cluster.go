@@ -383,12 +383,27 @@ func PrintClusterResources(namespace, clusterName string, env *TestingEnvironmen
 	pvcList, _ := env.GetPVCList(cluster.GetNamespace())
 	clusterInfo.AddLine()
 	clusterInfo.AddLine("Cluster PVC information: (dumping all pvc under the namespace)")
-	clusterInfo.AddLine("Available PVCCount", cluster.Status.PVCCount)
+	clusterInfo.AddLine("Available Cluster PVCCount", cluster.Status.PVCCount)
 	clusterInfo.AddLine()
 	clusterInfo.AddHeader("Items", "Values")
 	for _, pvc := range pvcList.Items {
 		clusterInfo.AddLine("PVC name", pvc.Name)
 		clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
+		clusterInfo.AddLine("---", "---")
+	}
+
+	snapshotList, _ := env.GetSnapshotList(cluster.Namespace)
+	clusterInfo.AddLine()
+	clusterInfo.AddLine("Cluster Snapshot information: (dumping all snapshot under the namespace)")
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Items", "Values")
+	for _, snapshot := range snapshotList.Items {
+		clusterInfo.AddLine("Snapshot name", snapshot.Name)
+		if snapshot.Status.ReadyToUse != nil {
+			clusterInfo.AddLine("Snapshot ready to use", *snapshot.Status.ReadyToUse)
+		} else {
+			clusterInfo.AddLine("Snapshot ready to use", "false")
+		}
 		clusterInfo.AddLine("---", "---")
 	}
 
