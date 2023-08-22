@@ -356,7 +356,9 @@ TLS
 TOC
 TODO
 TablespaceConfiguration
+TablespaceStatus
 Tablespaces
+TablespacesState
 TimelineId
 TopologyKey
 TopologySpreadConstraint
@@ -1048,6 +1050,7 @@ sysv
 tAc
 tablespace
 tablespaces
+tablespacesStatus
 targetImmediate
 targetLSN
 targetName

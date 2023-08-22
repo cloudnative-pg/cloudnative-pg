@@ -3243,10 +3243,10 @@ spec:
                       reapplied to the created PVCs. Size cannot be decreased.
                     type: string
                   storageClass:
-                    description: StorageClass to use for database data (`PGDATA`).
+                    description: 'StorageClass to use for database data (`PGDATA`).
                       Applied after evaluating the PVC template, if available. If
                       not specified, generated PVCs will be satisfied by the default
-                      storage class
+                      storage class TODO: update the comment'
                     type: string
                 type: object
               superuserSecret:
@@ -3274,8 +3274,7 @@ spec:
                     (defaults to false if not specified)
                   properties:
                     storage:
-                      description: StorageConfiguration is the configuration of the
-                        storage of the PostgreSQL instances
+                      description: 'TODO: update the comment'
                       properties:
                         pvcTemplate:
                           description: Template to be used to generate the Persistent
@@ -3508,10 +3507,10 @@ spec:
                             be decreased.
                           type: string
                         storageClass:
-                          description: StorageClass to use for database data (`PGDATA`).
+                          description: 'StorageClass to use for database data (`PGDATA`).
                             Applied after evaluating the PVC template, if available.
                             If not specified, generated PVCs will be satisfied by
-                            the default storage class
+                            the default storage class TODO: update the comment'
                           type: string
                       type: object
                     temporary:
@@ -3918,10 +3917,10 @@ spec:
                       reapplied to the created PVCs. Size cannot be decreased.
                     type: string
                   storageClass:
-                    description: StorageClass to use for database data (`PGDATA`).
+                    description: 'StorageClass to use for database data (`PGDATA`).
                       Applied after evaluating the PVC template, if available. If
                       not specified, generated PVCs will be satisfied by the default
-                      storage class
+                      storage class TODO: update the comment'
                     type: string
                 type: object
             required:
@@ -4276,6 +4275,18 @@ spec:
                   superuserSecretVersion:
                     description: The resource version of the "postgres" user secret
                     type: string
+                type: object
+              tablespacesStatus:
+                description: TablespaceStatus reports the state of the declarative
+                  tablespaces in the cluster
+                properties:
+                  byStatus:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: ByStatus gives the list of tablespaces in each state
+                    type: object
                 type: object
               targetPrimary:
                 description: Target primary instance, this is different from the previous

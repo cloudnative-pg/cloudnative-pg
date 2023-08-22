@@ -1667,6 +1667,13 @@ Defaults to: <code>RuntimeDefault</code></p>
    <p>ManagedRolesStatus reports the state of the managed roles in the cluster</p>
 </td>
 </tr>
+<tr><td><code>tablespacesStatus</code><br/>
+<a href="#postgresql-cnpg-io-v1-TablespacesState"><i>TablespacesState</i></a>
+</td>
+<td>
+   <p>TablespaceStatus reports the state of the declarative tablespaces in the cluster</p>
+</td>
+</tr>
 <tr><td><code>timelineID</code><br/>
 <i>int</i>
 </td>
@@ -4149,6 +4156,30 @@ if all the labels values match.</p>
 </td>
 <td>
    <p>This flag enables the constraints for sync replicas</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## TablespacesState     {#postgresql-cnpg-io-v1-TablespacesState}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>TablespacesState tracks the status of a cluster's declarative tablespaces</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>byStatus</code><br/>
+<i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.TablespaceStatus][]string</i>
+</td>
+<td>
+   <p>ByStatus gives the list of tablespaces in each state</p>
 </td>
 </tr>
 </tbody>

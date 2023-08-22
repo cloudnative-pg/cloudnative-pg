@@ -522,6 +522,25 @@ type ManagedRoles struct {
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
+// TablespaceStatus represents the status of a tablespace in the cluster
+type TablespaceStatus string
+
+const (
+	// TablespaceStatusReconciled indicates the tablespace in DB matches the Spec
+	TablespaceStatusReconciled TablespaceStatus = "reconciled"
+	// TablespaceStatusPendingReconciliation indicates the tablespace in Spec requires creation in the DB
+	TablespaceStatusPendingReconciliation TablespaceStatus = "pending"
+	// TablespaceStatusReserved indicates this tablespace is reserved by the operator. E.g. `pg_global`
+	TablespaceStatusReserved TablespaceStatus = "reserved"
+)
+
+// TablespacesState tracks the status of a cluster's declarative tablespaces
+type TablespacesState struct {
+	// ByStatus gives the list of tablespaces in each state
+	// +optional
+	ByStatus map[TablespaceStatus][]string `json:"byStatus,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -543,6 +562,10 @@ type ClusterStatus struct {
 	// ManagedRolesStatus reports the state of the managed roles in the cluster
 	// +optional
 	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus,omitempty"`
+
+	// TablespaceStatus reports the state of the declarative tablespaces in the cluster
+	// +optional
+	TablespaceStatus TablespacesState `json:"tablespacesStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	// +optional
