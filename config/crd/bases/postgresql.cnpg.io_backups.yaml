@@ -302,8 +302,8 @@ spec:
                   parameter is omitted
                 type: string
               snapshotBackupStatus:
-                description: BackupSnapshotStatus the fields exclusive to the volumeSnapshotTemplate
-                  method backup
+                description: BackupSnapshotStatus the status of to the volumeSnapshot
+                  backup
                 properties:
                   snapshots:
                     description: The snapshot lists, populated if it is a snapshot

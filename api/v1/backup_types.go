@@ -49,10 +49,14 @@ const (
 // the selected PostgreSQL instance
 type BackupMethod string
 
-// List of the supported BackupMethod
 const (
-	VolumeSnapshotTemplateBackupMethod BackupMethod = "volumeSnapshotTemplate"
-	BarmanObjectStoreBackupMethod      BackupMethod = "barmanObjectStore"
+	// BackupMethodVolumeSnapshotTemplate means using the volume snapshot
+	// Kubernetes feature
+	BackupMethodVolumeSnapshotTemplate BackupMethod = "volumeSnapshotTemplate"
+
+	// BackupMethodBarmanObjectStore means using barman to backup the
+	// PostgreSQL cluster
+	BackupMethodBarmanObjectStore BackupMethod = "barmanObjectStore"
 )
 
 // BackupSpec defines the desired state of Backup
@@ -147,7 +151,7 @@ type BackupStatus struct {
 	// Information to identify the instance where the backup has been taken from
 	InstanceID *InstanceID `json:"instanceID,omitempty"`
 
-	// BackupSnapshotStatus the fields exclusive to the volumeSnapshotTemplate method backup
+	// BackupSnapshotStatus the status of to the volumeSnapshot backup
 	BackupSnapshotStatus BackupSnapshotStatus `json:"snapshotBackupStatus,omitempty"`
 
 	// The backup method being used

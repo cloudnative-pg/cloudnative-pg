@@ -120,12 +120,12 @@ type SnapshotOwnerReference string
 
 // Constants to represent the allowed types for SnapshotOwnerReference.
 const (
-	// NoneBackupOwnerReference indicates that the snapshot does not have any owner reference.
-	NoneBackupOwnerReference SnapshotOwnerReference = "none"
-	// BackupOwnerReference indicates that the snapshot is owned by the backup resource.
-	BackupOwnerReference SnapshotOwnerReference = "backup"
-	// ClusterBackupOwnerReference indicates that the snapshot is owned by the cluster resource.
-	ClusterBackupOwnerReference SnapshotOwnerReference = "cluster"
+	// ShapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.
+	ShapshotOwnerReferenceNone SnapshotOwnerReference = "none"
+	// SnapshotOwnerReferenceBackup indicates that the snapshot is owned by the backup resource.
+	SnapshotOwnerReferenceBackup SnapshotOwnerReference = "backup"
+	// SnapshotOwnerReferenceCluster indicates that the snapshot is owned by the cluster resource.
+	SnapshotOwnerReferenceCluster SnapshotOwnerReference = "cluster"
 )
 
 // BackupSnapshotConfig represents the configuration for the execution of snapshot backups.
@@ -627,6 +627,8 @@ const (
 
 // A Condition that can be used to communicate the Backup progress
 var (
+	// BackupSucceededCondition is added to a backup
+	// when it was completed correctly
 	BackupSucceededCondition = &metav1.Condition{
 		Type:    string(ConditionBackup),
 		Status:  metav1.ConditionTrue,
@@ -634,6 +636,8 @@ var (
 		Message: "Backup was successful",
 	}
 
+	// BackupStartingCondition is added to a backup
+	// when it started
 	BackupStartingCondition = &metav1.Condition{
 		Type:    string(ConditionBackup),
 		Status:  metav1.ConditionFalse,
@@ -641,7 +645,8 @@ var (
 		Message: "New Backup starting up",
 	}
 
-	// BuildClusterBackupFailedCondition builds ConditionReasonLastBackupFailed condition
+	// BuildClusterBackupFailedCondition builds
+	// ConditionReasonLastBackupFailed condition
 	BuildClusterBackupFailedCondition = func(err error) *metav1.Condition {
 		return &metav1.Condition{
 			Type:    string(ConditionBackup),
