@@ -3077,6 +3077,21 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
 	})
 
+	It("accepts recovery from a VolumeSnapshot, while restoring WALs from an object store", func() {
+		cluster := clusterFromRecovery(&BootstrapRecovery{
+			VolumeSnapshots: &DataSource{
+				Storage: corev1.TypedLocalObjectReference{
+					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					Kind:     "VolumeSnapshot",
+					Name:     "pgdata",
+				},
+			},
+
+			Source: "pg-cluster",
+		})
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
+	})
+
 	When("using an nil apiGroup", func() {
 		It("accepts recovery from a PersistentVolumeClaim", func() {
 			cluster := clusterFromRecovery(&BootstrapRecovery{
