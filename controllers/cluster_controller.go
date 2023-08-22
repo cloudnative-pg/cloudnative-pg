@@ -481,8 +481,9 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	if !resources.allInstancesAreActive() {
-		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		contextLogger.Debug("found an instance pod not active, retrying in one second")
+		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitNotActiveInstances, "")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, err
 	}
 
 	if res, err := persistentvolumeclaim.Reconcile(
