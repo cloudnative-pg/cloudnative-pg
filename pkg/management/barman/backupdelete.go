@@ -134,6 +134,7 @@ func DeleteBackupsNotInCatalog(
 
 	var errors []error
 	for id, backup := range backups.Items {
+		backup := backup
 		if backup.Spec.Cluster.Name != cluster.GetName() ||
 			backup.Status.Phase != v1.BackupPhaseCompleted ||
 			!useSameBackupLocation(&backup.Status, cluster) {
