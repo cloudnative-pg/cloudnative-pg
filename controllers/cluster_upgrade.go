@@ -246,12 +246,13 @@ func isPodNeedingRollout(
 
 	checkers := map[string]rolloutChecker{
 		"instance is missing executable hash":  checkHasExecutableHash,
+		"pod has missing PVCs":                 checkHasMissingPVCs,
 		"pod has PVC requiring resizing":       checkHasResizingPVC,
 		"pod projected volume is outdated":     checkProjectedVolumeIsOutdated,
-		"original PodSpec is outdated":         checkPodSpecIsOutdated,
+		"PodSpec is outdated":                  checkPodSpecIsOutdated,
 		"pod image is outdated":                checkPodImageIsOutdated,
 		"pod init container is outdated":       checkPodInitContainerIsOutdated,
-		"pod has missing PVCs":                 checkHasMissingPVCs,
+		"postgres restart required":            checkPostgresPendingRestart,
 		"cluster has newer restart annotation": checkClusterHasNewerRestartAnnotation,
 	}
 	for message, check := range checkers {
@@ -305,7 +306,11 @@ func checkHasExecutableHash(
 	if status.ExecutableHash == "" {
 		// This is an old instance manager.
 		// We need to replace it with one supporting the online operator upgrade feature
-		return rollout{required: true}, nil
+		return rollout{
+			required: true,
+			reason: fmt.Sprintf("pod '%s' is not reporting the executable hash",
+				status.Pod.Name),
+		}, nil
 	}
 	return rollout{}, nil
 }
@@ -335,14 +340,13 @@ func checkPodNeedsUpdatedTopology(
 	if reflect.DeepEqual(cluster.Spec.TopologySpreadConstraints, status.Pod.Spec.TopologySpreadConstraints) {
 		return rollout{}, nil
 	}
-	reason := fmt.Sprintf(
-		"Pod '%s' does not have up-to-date TopologySpreadConstraints. It needs to match the cluster's constraints.",
-		status.Pod.Name,
-	)
 
 	return rollout{
 		required: true,
-		reason:   reason,
+		reason: fmt.Sprintf(
+			"pod '%s' does not have up-to-date TopologySpreadConstraints. It needs to match the cluster's constraints.",
+			status.Pod.Name,
+		),
 	}, nil
 }
 
@@ -354,14 +358,13 @@ func checkSchedulerIsOutdated(
 		return rollout{}, nil
 	}
 
-	message := fmt.Sprintf(
-		"scheduler name changed from: '%s', to '%s'",
-		status.Pod.Spec.SchedulerName,
-		cluster.Spec.SchedulerName,
-	)
 	return rollout{
 		required: true,
-		reason:   message,
+		reason: fmt.Sprintf(
+			"scheduler name changed from: '%s', to '%s'",
+			status.Pod.Spec.SchedulerName,
+			cluster.Spec.SchedulerName,
+		),
 	}, nil
 }
 
@@ -413,47 +416,51 @@ func checkPodImageIsOutdated(
 		return rollout{}, err
 	}
 
-	if pgCurrentImageName != targetImageName {
-		canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
-		if err != nil {
-			return rollout{}, err
-		}
-
-		if !canUpgradeImage {
-			return rollout{}, nil
-		}
-		// We need to apply a different PostgreSQL version
-		return rollout{
-			required: true,
-			reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
-				pgCurrentImageName, targetImageName),
-		}, nil
+	if pgCurrentImageName == targetImageName {
+		return rollout{}, nil
 	}
 
-	return rollout{}, nil
+	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
+	if err != nil {
+		return rollout{}, err
+	}
+
+	// We do not report anything here. The webhook should prevent the user to
+	// set an invalid target image
+	if !canUpgradeImage {
+		return rollout{}, nil
+	}
+
+	return rollout{
+		required: true,
+		reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
+			pgCurrentImageName, targetImageName),
+	}, nil
 }
 
 func checkPodInitContainerIsOutdated(
 	status postgres.PostgresqlStatus,
 	_ *apiv1.Cluster,
 ) (rollout, error) {
-	if !configuration.Current.EnableInstanceManagerInplaceUpdates {
-		opCurrentImageName, err := specs.GetBootstrapControllerImageName(*status.Pod)
-		if err != nil {
-			return rollout{}, err
-		}
-
-		if opCurrentImageName != configuration.Current.OperatorImageName {
-			// We need to apply a different version of the instance manager
-			return rollout{
-				required: true,
-				reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
-					opCurrentImageName, configuration.Current.OperatorImageName),
-			}, nil
-		}
+	if configuration.Current.EnableInstanceManagerInplaceUpdates {
+		return rollout{}, nil
 	}
 
-	return rollout{}, nil
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(*status.Pod)
+	if err != nil {
+		return rollout{}, err
+	}
+
+	if opCurrentImageName == configuration.Current.OperatorImageName {
+		return rollout{}, nil
+	}
+
+	// We need to apply a different version of the instance manager
+	return rollout{
+		required: true,
+		reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
+			opCurrentImageName, configuration.Current.OperatorImageName),
+	}, nil
 }
 
 func checkHasMissingPVCs(
@@ -461,7 +468,7 @@ func checkHasMissingPVCs(
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
-		return rollout{required: true, reason: string(apiv1.DetachedVolume)}, nil
+		return rollout{required: true, reason: "attaching a new PVC to the instance Pod"}, nil
 	}
 	return rollout{}, nil
 }
@@ -486,10 +493,17 @@ func checkClusterHasNewerRestartAnnotation(
 		}
 	}
 
+	return rollout{}, nil
+}
+
+func checkPostgresPendingRestart(
+	status postgres.PostgresqlStatus,
+	_ *apiv1.Cluster,
+) (rollout, error) {
 	if status.PendingRestart {
 		return rollout{
 			required:     true,
-			reason:       "configuration needs a restart to apply some configuration changes",
+			reason:       "Postgres needs a restart to apply some configuration changes",
 			canBeInPlace: true,
 		}, nil
 	}

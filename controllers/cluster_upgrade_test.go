@@ -32,6 +32,9 @@ import (
 
 var _ = Describe("Pod upgrade", Ordered, func() {
 	cluster := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
 		Spec: apiv1.ClusterSpec{
 			ImageName: "postgres:13.11",
 		},
@@ -120,7 +123,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		}
 		rollout = isPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
-		Expect(rollout.reason).To(Equal("configuration needs a restart to apply some configuration changes"))
+		Expect(rollout.reason).To(Equal("Postgres needs a restart to apply some configuration changes"))
 	})
 
 	It("requires pod rollout if executable does not have a hash", func(ctx SpecContext) {
@@ -132,7 +135,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		}
 		rollout := isPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
-		Expect(rollout.reason).To(Equal("instance is missing executable hash"))
+		Expect(rollout.reason).To(Equal("pod 'test-1' is not reporting the executable hash"))
 		Expect(rollout.canBeInPlace).To(BeFalse())
 	})
 
@@ -155,7 +158,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		}
 		rollout = isPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
-		Expect(rollout.reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
+		Expect(rollout.reason).To(BeEquivalentTo("Postgres needs a restart to apply some configuration changes"))
 		Expect(rollout.canBeInPlace).To(BeTrue())
 	})
 
