@@ -8,6 +8,9 @@ linters-settings:
       - prefix(github.com/cloudnative-pg/cloudnative-pg)
       - blank
       - dot
+  gosec:
+    excludes:
+      - G101 # remove this exclude when https://github.com/securego/gosec/issues/1001 is fixed
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
