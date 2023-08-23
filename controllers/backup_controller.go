@@ -130,7 +130,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
-	isRunning, err := r.isValidBackupRunning(ctx, backup, cluster)
+	isRunning, err := r.isValidBackupRunning(ctx, &backup, &cluster)
 	if err != nil {
 		contextLogger.Error(err, "while running isValidBackupRunning")
 		return ctrl.Result{}, err
@@ -141,7 +141,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	origBackup := backup.DeepCopy()
 	// If no good running backups are found we elect a pod for the backup
-	pod, err := r.getBackupTargetPod(ctx, cluster, &backup)
+	pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
@@ -205,13 +205,13 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 func (r *BackupReconciler) isValidBackupRunning(
 	ctx context.Context,
-	backup apiv1.Backup,
-	cluster apiv1.Cluster,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 	if backup.Status.Phase == "" || backup.Status.InstanceID == nil {
 		// We need to start a backup
-		r.Recorder.Eventf(&backup, "Normal", "Starting",
+		r.Recorder.Eventf(backup, "Normal", "Starting",
 			"Starting backup for cluster %v", cluster.Name)
 		return false, nil
 	}
@@ -226,7 +226,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 	if apierrs.IsNotFound(err) {
 		// We need to restart the backup as the previously selected instance doesn't look healthy
 		r.Recorder.Eventf(
-			&backup,
+			backup,
 			"Normal",
 			"ReStarting",
 			"Could not find the elected backup pod. Restarting backup for cluster %v on instance %v",
@@ -270,7 +270,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 		"target", backup.Spec.Target,
 	)
 	// We need to restart the backup as the previously selected instance doesn't look healthy
-	r.Recorder.Eventf(&backup, "Normal", "ReStarting",
+	r.Recorder.Eventf(backup, "Normal", "ReStarting",
 		"Restarted backup for cluster %v on instance %v", cluster.Name, pod.Name)
 
 	return false, nil
@@ -342,11 +342,11 @@ func startSnapshotBackup(
 // getBackupTargetPod returns the correct pod that should run the backup according to the current
 // cluster's target policy
 func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
-	cluster apiv1.Cluster,
+	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 ) (*corev1.Pod, error) {
 	contextLogger := log.FromContext(ctx)
-	pods, err := GetManagedInstances(ctx, &cluster, r.Client)
+	pods, err := GetManagedInstances(ctx, cluster, r.Client)
 	if err != nil {
 		return nil, err
 	}
