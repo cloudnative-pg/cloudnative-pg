@@ -1,15 +1,24 @@
 # Backup
 
+!!! Warning
+    With version 1.21, backup and recovery features have sensibly changed
+    due to the introduction of native support for
+    [Kubernetes Volume Snapshots](backup_volumesnapshot.md).
+    If you have been using CloudNativePG before that version, please
+    acknowledge that object store backup and recovery are not anymore the only
+    available options, as covered in this section and the [recovery](recovery.md) one.
+
 PostgreSQL natively provides first class backup and recovery capabilities based
 on file system level (physical) copy. These have been successfully used for
 more than 15 years in mission critical production databases, helping
 organizations all over the world implement their disaster recovery solutions.
 
 !!! Note
-    PostgreSQL provides another way of backing up databases, based on logical
-    backups, through the `pg_dump` utility. However, logical backups are not
-    suitable for business continuity use cases and are not covered in this section.
-    You can use the `pg_dump` utility if needed, as explained in the
+    There's another way to backup databases in PostgreSQL, through the
+    `pg_dump` utility - which relies on logical backups instead of physical ones.
+    However, logical backups are not suitable for business continuity use cases
+    and as such are not (yet?) covered by CloudNativePG. You can use the `pg_dump`
+    utility, if needed, by taking inspiration from the
     ["Troubleshooting / Emergency backup" section](troubleshooting.md#emergency-backup).
 
 In CloudNativePG, the backup infrastructure for each PostgreSQL cluster is made
@@ -24,7 +33,7 @@ The WAL archive can only be stored on object stores at the moment.
 
 On the other hand, CloudNativePG supports two ways to store physical base backups:
 
-- on [object stores](backup_barmanobjectstore.md), as tarballs optionally
+- on [object stores](backup_barmanobjectstore.md), as tarballs - optionally
   compressed
 - on [Kubernetes Volume Snapshots](backup_volumesnapshot.md), if supported by
   the underlying storage class
@@ -94,6 +103,90 @@ VolumeSnapshots instead:
 - support differential copy, depending on the underlying storage classes
 - open up for consistent database snapshots (cold backup based disaster
   recovery scenarios with no point in time recovery and higher RPOs) 
+
+Which one to use depends on your specific requirements and environment,
+including available storage infrastructure and size of the database (volume
+snapshots, thanks to copy on write, normally provide incremental and
+differential backup/recovery capabilities that well fit in the Very Large
+Database sector).
+
+The summary table below highlights some of the main differences between the two
+available methods for storing physical base backups.
+
+|                                   | Object store |   Volume Snapshots   |
+|-----------------------------------|:------------:|:--------------------:|
+| **WAL archiving**                 |   Required   |      Recommended     |
+| **Cold backup**                   |      N/A     |           ✓          |
+| **Hot backup**                    |       ✓      |        𐄂  (1)        |
+| **Incremental copy**              |      𐄂       |         ✓  (2)       |
+| **Differential copy**             |      𐄂       |         ✓  (3)       |
+| **Backup from a standby**         |       ✓      |         ✓  (4)       |
+| **Snapshot recovery**             |    𐄂 (5)     |           ✓          |
+| **Point In Time Recovery (PITR)** |       ✓      | Requires WAL archive |
+
+
+> See the explanation below for the notes in the above table:
+> 
+> 1. Hot backup is not available yet for volume snapshots, and it is planned
+> for version 1.22; however, considering that cold backup is taken by fencing
+> temporarily a standby, the operation does not induce any downtime for your
+> write applications
+> 2. If supported by the underlying storage classes of the PostgreSQL volumes
+> 3. The current implementation of volume snapshot backups supports cold backup on a standby instance
+> 4. Snapshot recovery can be emulated using the `bootstrap.recovery.recoveryTarget.targetImmediate` option
+
+## Scheduled backups
+
+<!-- TODO: Adapt for Volume Snapshots -->
+You can also schedule your backups periodically by creating a
+resource named `ScheduledBackup`. The latter is similar to a
+`Backup` but with an added field, called `schedule`.
+
+This field is a *cron schedule* specification, which follows the same
+[format used in Kubernetes CronJobs](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
+
+This is an example of a scheduled backup:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: backup-example
+spec:
+  schedule: "0 0 0 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: pg-backup
+```
+
+The above example will schedule a backup every day at midnight.
+
+!!! Hint
+    Backup frequency might impact your recovery time object (RTO) after a
+    disaster which requires a full or Point-In-Time recovery operation. Our
+    advice is that you regularly test your backups by recovering them, and then
+    measuring the time it takes to recover from scratch so that you can refine
+    your RTO predictability. Recovery time is influenced by the size of the
+    base backup and the amount of WAL files that need to be fetched from the archive
+    and replayed during recovery (remember that WAL archiving is what enables
+    continuous backup in PostgreSQL!).
+    Based on our experience, a weekly base backup is more than enough for most
+    cases - while it is extremely rare to schedule backups more frequently than once
+    a day.
+
+ScheduledBackups can be suspended if needed by setting `.spec.suspend: true`,
+this will stop any new backup to be scheduled as long as the option is set to false.
+
+In case you want to issue a backup as soon as the ScheduledBackup resource is created
+you can set `.spec.immediate: true`.
+
+!!! Note
+    `.spec.backupOwnerReference` indicates which ownerReference should be put inside
+    the created backup resources.
+
+    - *none:* no owner reference for created backup objects (same behavior as before the field was introduced)
+    - *self:* sets the Scheduled backup object as owner of the backup
+    - *cluster:* set the cluster as owner of the backup
 
 ## On-demand backups
 
@@ -173,59 +266,6 @@ Events:         <none>
     This feature will not backup the secrets for the superuser and the
     application user. The secrets are supposed to be backed up as part of
     the standard backup procedures for the Kubernetes cluster.
-
-## Scheduled backups
-
-<!-- TODO: Adapt for Volume Snapshots -->
-You can also schedule your backups periodically by creating a
-resource named `ScheduledBackup`. The latter is similar to a
-`Backup` but with an added field, called `schedule`.
-
-This field is a *cron schedule* specification, which follows the same
-[format used in Kubernetes CronJobs](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
-
-This is an example of a scheduled backup:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: ScheduledBackup
-metadata:
-  name: backup-example
-spec:
-  schedule: "0 0 0 * * *"
-  backupOwnerReference: self
-  cluster:
-    name: pg-backup
-```
-
-The above example will schedule a backup every day at midnight.
-
-!!! Hint
-    Backup frequency might impact your recovery time object (RTO) after a
-    disaster which requires a full or Point-In-Time recovery operation. Our
-    advice is that you regularly test your backups by recovering them, and then
-    measuring the time it takes to recover from scratch so that you can refine
-    your RTO predictability. Recovery time is influenced by the size of the
-    base backup and the amount of WAL files that need to be fetched from the archive
-    and replayed during recovery (remember that WAL archiving is what enables
-    continuous backup in PostgreSQL!).
-    Based on our experience, a weekly base backup is more than enough for most
-    cases - while it is extremely rare to schedule backups more frequently than once
-    a day.
-
-ScheduledBackups can be suspended if needed by setting `.spec.suspend: true`,
-this will stop any new backup to be scheduled as long as the option is set to false.
-
-In case you want to issue a backup as soon as the ScheduledBackup resource is created
-you can set `.spec.immediate: true`.
-
-!!! Note
-    `.spec.backupOwnerReference` indicates which ownerReference should be put inside
-    the created backup resources.
-
-    - *none:* no owner reference for created backup objects (same behavior as before the field was introduced)
-    - *self:* sets the Scheduled backup object as owner of the backup
-    - *cluster:* set the cluster as owner of the backup
 
 ## Backup from a standby
 
