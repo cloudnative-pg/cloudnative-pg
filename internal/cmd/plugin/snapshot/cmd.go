@@ -121,7 +121,7 @@ func execute(
 		return fmt.Errorf("cannot get PVCs: %w", err)
 	}
 
-	executor := snapshot.NewExecutorBuilder(plugin.Client, apiv1.BackupSnapshotConfig{
+	executor := snapshot.NewExecutorBuilder(plugin.Client, apiv1.VolumeSnapshotConfiguration{
 		ClassName:              snapshotClassName,
 		SnapshotOwnerReference: "none",
 	}).

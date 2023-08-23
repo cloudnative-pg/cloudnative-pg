@@ -60,10 +60,10 @@ spec:
               method:
                 default: barmanObjectStore
                 description: 'The backup method to be used, possible options are `barmanObjectStore`
-                  and `volumeSnapshotTemplate`. Defaults to: `barmanObjectStore`.'
+                  and `volumeSnapshot`. Defaults to: `barmanObjectStore`.'
                 enum:
                 - barmanObjectStore
-                - volumeSnapshotTemplate
+                - volumeSnapshot
                 type: string
               target:
                 description: The policy to decide which instance should perform this

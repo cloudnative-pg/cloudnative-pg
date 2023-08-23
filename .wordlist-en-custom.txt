@@ -21,7 +21,6 @@ BackupConfiguration
 BackupList
 BackupMethod
 BackupPhase
-BackupSnapshotConfig
 BackupSnapshotStatus
 BackupSource
 BackupSpec
@@ -370,6 +369,7 @@ Valerio
 VirtualBox
 VolumeSnapshot
 VolumeSnapshotClass
+VolumeSnapshotConfiguration
 WAL
 WAL's
 WALBackupConfiguration
@@ -990,7 +990,6 @@ virtualxid
 volumeMode
 volumeMounts
 volumeSnapshot
-volumeSnapshotTemplate
 volumesnapshot
 wal
 walSegmentSize

@@ -50,7 +50,7 @@ type Executor struct {
 	snapshotSuffix       string
 	printAdvancementFunc func(msg string)
 	snapshotEnrichFunc   func(vs *storagesnapshotv1.VolumeSnapshot)
-	snapshotConfig       apiv1.BackupSnapshotConfig
+	snapshotConfig       apiv1.VolumeSnapshotConfiguration
 }
 
 // ExecutorBuilder is a struct capable of creating an Executor
@@ -59,7 +59,7 @@ type ExecutorBuilder struct {
 }
 
 // NewExecutorBuilder instantiates a new ExecutorBuilder with the minimum required data
-func NewExecutorBuilder(cli client.Client, config apiv1.BackupSnapshotConfig) *ExecutorBuilder {
+func NewExecutorBuilder(cli client.Client, config apiv1.VolumeSnapshotConfiguration) *ExecutorBuilder {
 	return &ExecutorBuilder{
 		executor: Executor{
 			cli:                cli,

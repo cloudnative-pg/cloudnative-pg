@@ -354,7 +354,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("ensuring that the additional labels and annotations are present", func() {
 					for _, item := range snapshotList.Items {
-						snapshotConfig := clusterToBackup.Spec.Backup.VolumeSnapshotTemplate
+						snapshotConfig := clusterToBackup.Spec.Backup.VolumeSnapshot
 						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
 						Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
 					}

@@ -15,7 +15,7 @@ spec:
     size: 1Gi
 
   backup:
-    volumeSnapshotTemplate:
+    volumeSnapshot:
        className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}
        snapshotOwnerReference: cluster
        annotations:

@@ -210,10 +210,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("encountered an error while taking the backup: %w", err))
 			return ctrl.Result{}, nil
 		}
-	case apiv1.BackupMethodVolumeSnapshotTemplate:
-		if cluster.Spec.Backup.VolumeSnapshotTemplate == nil {
+	case apiv1.BackupMethodVolumeSnapshot:
+		if cluster.Spec.Backup.VolumeSnapshot == nil {
 			tryFlagBackupAsFailed(ctx, r.Client, &backup,
-				errors.New("no volumeSnapshotTemplate section defined on the target cluster"))
+				errors.New("no volumeSnapshot section defined on the target cluster"))
 			return ctrl.Result{}, nil
 		}
 		if err := startSnapshotBackup(ctx, r.Client, pod, &cluster, &backup); err != nil {
@@ -239,7 +239,7 @@ func startSnapshotBackup(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshotTemplate)
+	backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
 	if err := postgres.PatchBackupStatusAndRetry(ctx, cli, backup); err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func startSnapshotBackup(
 		return fmt.Errorf("cannot get PVCs: %w", err)
 	}
 
-	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshotTemplate
+	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
 
 	snapshotEnrich := func(vs *storagesnapshotv1.VolumeSnapshot) {
 		switch snapshotConfig.SnapshotOwnerReference {

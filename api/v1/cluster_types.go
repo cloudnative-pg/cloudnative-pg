@@ -128,8 +128,8 @@ const (
 	SnapshotOwnerReferenceCluster SnapshotOwnerReference = "cluster"
 )
 
-// BackupSnapshotConfig represents the configuration for the execution of snapshot backups.
-type BackupSnapshotConfig struct {
+// VolumeSnapshotConfiguration represents the configuration for the execution of snapshot backups.
+type VolumeSnapshotConfiguration struct {
 	// Labels are key-value pairs that will be added to .metadata.labels snapshot resources.
 	Labels map[string]string `json:"labels,omitempty"`
 	// Annotations key-value pairs that will be added to .metadata.annotations snapshot resources.
@@ -1531,12 +1531,12 @@ type BarmanObjectStoreConfiguration struct {
 }
 
 // BackupConfiguration defines how the backup of the cluster are taken.
-// The supported backup methods are BarmanObjectStore and VolumeSnapshotTemplate.
+// The supported backup methods are BarmanObjectStore and VolumeSnapshot.
 // For details and examples refer to the Backup and Recovery section of the
 // documentation
 type BackupConfiguration struct {
-	// VolumeSnapshotTemplate provides the configuration for the execution of volume snapshot backups.
-	VolumeSnapshotTemplate *BackupSnapshotConfig `json:"volumeSnapshotTemplate,omitempty"`
+	// VolumeSnapshot provides the configuration for the execution of volume snapshot backups.
+	VolumeSnapshot *VolumeSnapshotConfiguration `json:"volumeSnapshot,omitempty"`
 
 	// The configuration for the barman-cloud tool suite
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`

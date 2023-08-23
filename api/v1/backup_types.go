@@ -50,9 +50,9 @@ const (
 type BackupMethod string
 
 const (
-	// BackupMethodVolumeSnapshotTemplate means using the volume snapshot
+	// BackupMethodVolumeSnapshot means using the volume snapshot
 	// Kubernetes feature
-	BackupMethodVolumeSnapshotTemplate BackupMethod = "volumeSnapshotTemplate"
+	BackupMethodVolumeSnapshot BackupMethod = "volumeSnapshot"
 
 	// BackupMethodBarmanObjectStore means using barman to backup the
 	// PostgreSQL cluster
@@ -74,13 +74,13 @@ type BackupSpec struct {
 	Target BackupTarget `json:"target,omitempty"`
 
 	// The backup method to be used, possible options are `barmanObjectStore`
-	// and `volumeSnapshotTemplate`. Defaults to: `barmanObjectStore`.
-	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshotTemplate
+	// and `volumeSnapshot`. Defaults to: `barmanObjectStore`.
+	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
 }
 
-// BackupSnapshotStatus the fields exclusive to the volumeSnapshotTemplate method backup
+// BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
 type BackupSnapshotStatus struct {
 	// The snapshot lists, populated if it is a snapshot type backup
 	Snapshots []string `json:"snapshots,omitempty"`

@@ -3,6 +3,6 @@ kind: Backup
 metadata:
   name: cluster-declarative-backup
 spec:
-  method: volumeSnapshotTemplate
+  method: volumeSnapshot
   cluster:
     name: cluster-declarative-backup

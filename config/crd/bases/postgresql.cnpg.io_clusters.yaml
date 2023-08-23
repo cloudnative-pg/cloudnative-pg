@@ -1242,9 +1242,9 @@ spec:
                     - primary
                     - prefer-standby
                     type: string
-                  volumeSnapshotTemplate:
-                    description: VolumeSnapshotTemplate provides the configuration
-                      for the execution of volume snapshot backups.
+                  volumeSnapshot:
+                    description: VolumeSnapshot provides the configuration for the
+                      execution of volume snapshot backups.
                     properties:
                       annotations:
                         additionalProperties:
