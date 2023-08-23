@@ -33,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -412,6 +413,7 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 			handler.EnqueueRequestsFromMapFunc(r.mapClustersToBackup()),
 			builder.WithPredicates(clustersWithBackupPredicate),
 		).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 5}).
 		Complete(r)
 }
 
