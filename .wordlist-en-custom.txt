@@ -1,5 +1,3 @@
-VolumeSnapshots
-barmanobjectstore
 AES
 API's
 APIs
@@ -372,6 +370,7 @@ VirtualBox
 VolumeSnapshot
 VolumeSnapshotClass
 VolumeSnapshotConfiguration
+VolumeSnapshots
 WAL
 WAL's
 WALBackupConfiguration
@@ -438,6 +437,7 @@ backupspec
 backupstatus
 balancer
 barmanObjectStore
+barmanobjectstore
 barmanobjectstoreconfiguration
 baseDN
 basebackup
@@ -744,6 +744,7 @@ ntt
 num
 oauth
 objectmeta
+objectstore
 objid
 objref
 objsubid

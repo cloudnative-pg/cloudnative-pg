@@ -1,19 +1,5 @@
 # Recovery
 
-<!-- TODO:
-
-- Explain the two sources of recovery: object store and volume snapshots
-- Provide an overview of both solutions (see example table below)
-- Describe both solutions, with examples, and cover PITR as well as snapshot recovery
-
-|                                      | WAL archiving | Cold backup | Hot backup | Backup from a standby | Snapshot recovery | Point In Time Recovery (PITR) |
-|--------------------------------------|:-------------:|:-----------:|:----------:|:---------------------:|:-----------------:|:-----------------------------:|
-| Object store                         |      Yes      |      No     |     Yes    |          Yes          |        No*        |              Yes              |
-| Volume Snapshots without WAL archive |       No      |     Yes     |     No     |          Yes          |        Yes        |               No              |
-| Volume Snapshots with WAL archive    |      Yes      |     Yes     |     Yes    |          Yes          |        Yes        |              Yes              |
-
--->
-
 In PostgreSQL terminology, recovery is the process of starting a PostgreSQL
 instance using a previously taken backup. PostgreSQL recovery mechanism
 is very solid and rich. It also supports Point In Time Recovery, which allows
@@ -31,8 +17,12 @@ starting from an available physical backup.
 
 The `recovery` bootstrap mode lets you create a new cluster from an existing
 physical base backup, and then reapply the WAL files containing the REDO log
-from the archive. Both base backups and WAL files are pulled from the
-*recovery object store*.
+from the archive.
+
+WAL files are pulled from the defined *recovery object store*.
+
+Base backups depend on the actual method used to take them, either object
+stores or volume snapshots.
 
 <!-- TODO: this needs to cover volume snapshots -->
 
@@ -120,7 +110,8 @@ spec:
 ## Recovery from `VolumeSnapshot` objects
 
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
-existing `Cluster` that's been taken with `kubectl cnpg snapshot`.
+existing `Cluster` that's been taken using the declarative API for
+[volume snapshot backups](backup_volumesnapshot.md).
 You need to specify the name of the snapshot as in the following example:
 
 ```yaml
@@ -169,11 +160,6 @@ bootstrap:
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 ```
-
-The `kubectl cnpg snapshot` command is able to take consistent snapshots of a
-replica through a technique known as *cold backup*, by fencing the standby
-before taking a physical copy of the volumes. For details, please refer to
-["Snapshotting a Postgres cluster"](#snapshotting-a-postgres-cluster).
 
 ## Recovery from a `Backup` object
 

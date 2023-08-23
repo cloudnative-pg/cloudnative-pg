@@ -1,7 +1,20 @@
 # WAL archiving
 
-WAL archiving is enabled as soon as you choose a destination path
-and you configure your cloud credentials.
+WAL archiving is the process that feeds a [WAL archive](backup.md#wal-archive)
+in CloudNativePG.
+
+!!! Important
+    CloudNativePG currently only supports WAL archives on object stores. Such
+    WAL archives serve for both object store backups and volume snapshot backups.
+
+The WAL archive is defined in the `.spec.backup.barmanObjectStore` stanza of
+a `Cluster` resource. Please proceed with the same instructions you find in
+the ["Backup on object stores" section](backup_objectstore.md) to set up
+the WAL archive.
+
+!!! Info
+    Please refer to [`BarmanObjectStoreConfiguration`](api_reference.md#barmanobjectstoreconfiguration)
+    in the API reference for a full list of options.
 
 If required, you can choose to compress WAL files as soon as they
 are uploaded and/or encrypt them:

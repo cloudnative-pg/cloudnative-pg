@@ -48,7 +48,7 @@ On the other hand, CloudNativePG supports two ways to store physical base backup
 
 The WAL archive in PostgreSQL is fundamental for the following reasons:
 
-- **hot backups**: the possibility to take physical base backups from any
+- **Hot backups**: the possibility to take physical base backups from any
   instance in the Postgres cluster (either primary or standby) without shutting
   down the server; they are also known as online backups 
 - **Point in Time recovery** (PITR): to possibility to recover at any point in

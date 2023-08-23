@@ -6,7 +6,7 @@ store. This means that the database is always up (no downtime required)
 and that Point In Time Recovery is available.
 
 The operator can orchestrate a continuous backup infrastructure
-that is based on the [Barman](https://pgbarman.org) tool. Instead
+that is based on the [Barman Cloud](https://pgbarman.org) tool. Instead
 of using the classical architecture with a Barman server, which
 backs up many PostgreSQL instances, the operator relies on the
 `barman-cloud-wal-archive`, `barman-cloud-check-wal-archive`,
