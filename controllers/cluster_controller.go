@@ -724,8 +724,7 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	contextLogger := log.FromContext(ctx)
 
 	// If we need to roll out a restart of any instance, this is the right moment
-	// Do I have to roll out a new image?
-	done, err := r.rolloutDueToCondition(ctx, cluster, &instancesStatus, IsPodNeedingRollout)
+	done, err := r.rolloutRequiredInstances(ctx, cluster, &instancesStatus)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
