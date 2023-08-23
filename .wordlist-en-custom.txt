@@ -1,3 +1,5 @@
+VolumeSnapshots
+barmanobjectstore
 AES
 API's
 APIs
