@@ -1056,37 +1056,55 @@ var _ = Describe("configuration change validation", func() {
 
 var _ = Describe("validate image name change", func() {
 	It("doesn't complain with no changes", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{},
+		}
 		clusterNew := Cluster{
 			Spec: ClusterSpec{},
 		}
-		Expect(clusterNew.validateImageChange("")).To(BeEmpty())
+		Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
 	})
 
 	It("complains if versions are wrong", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "12:1",
+			},
+		}
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
 				ImageName: "postgres:12.0",
 			},
 		}
-		Expect(clusterNew.validateImageChange("12:1")).To(HaveLen(1))
+		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 	})
 
 	It("complains if can't upgrade between mayor versions", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:12.0",
+			},
+		}
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
 				ImageName: "postgres:11.0",
 			},
 		}
-		Expect(clusterNew.validateImageChange("postgres:12.0")).To(HaveLen(1))
+		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 	})
 
 	It("doesn't complain if image change it's valid", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:12.1",
+			},
+		}
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
 				ImageName: "postgres:12.0",
 			},
 		}
-		Expect(clusterNew.validateImageChange("postgres:12.1")).To(BeEmpty())
+		Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
 	})
 })
 

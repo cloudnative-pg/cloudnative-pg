@@ -347,6 +347,7 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 	}
 	type validationFunc func(old *Cluster) field.ErrorList
 	validations := []validationFunc{
+		r.validateImageChange,
 		r.validateConfigurationChange,
 		r.validateStorageChange,
 		r.validateWalStorageChange,
@@ -355,7 +356,6 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 		r.validateUnixPermissionIdentifierChange,
 		r.validateReplicationSlotsChange,
 	}
-	allErrs = append(allErrs, r.validateImageChange(old.Spec.ImageName)...)
 	for _, validate := range validations {
 		allErrs = append(allErrs, validate(old)...)
 	}
@@ -1162,7 +1162,7 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 
 // validateImageChange validate the change from a certain image name
 // to a new one.
-func (r *Cluster) validateImageChange(old string) field.ErrorList {
+func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	newVersion := r.Spec.ImageName
@@ -1171,11 +1171,12 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 		newVersion = configuration.Current.PostgresImageName
 	}
 
-	if old == "" {
-		old = configuration.Current.PostgresImageName
+	oldVersion := old.Spec.ImageName
+	if oldVersion == "" {
+		oldVersion = configuration.Current.PostgresImageName
 	}
 
-	status, err := postgres.CanUpgrade(old, newVersion)
+	status, err := postgres.CanUpgrade(oldVersion, newVersion)
 	if err != nil {
 		result = append(
 			result,
@@ -1190,7 +1191,7 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 				field.NewPath("spec", "imageName"),
 				r.Spec.ImageName,
 				fmt.Sprintf("can't upgrade between %v and %v",
-					old, newVersion)))
+					oldVersion, newVersion)))
 	}
 
 	return result
