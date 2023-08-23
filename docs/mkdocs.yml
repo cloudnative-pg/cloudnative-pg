@@ -28,6 +28,9 @@ nav:
   - rolling_update.md
   - replication.md
   - backup.md
+  - backup_barmanobjectstore.md
+  - wal_archiving.md
+  - backup_volumesnapshot.md
   - recovery.md
   - postgresql_conf.md
   - declarative_role_management.md
