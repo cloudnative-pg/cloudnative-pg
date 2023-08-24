@@ -151,7 +151,7 @@ type BackupStatus struct {
 	// Information to identify the instance where the backup has been taken from
 	InstanceID *InstanceID `json:"instanceID,omitempty"`
 
-	// BackupSnapshotStatus the status of to the volumeSnapshot backup
+	// Status of the volumeSnapshot backup
 	BackupSnapshotStatus BackupSnapshotStatus `json:"snapshotBackupStatus,omitempty"`
 
 	// The backup method being used

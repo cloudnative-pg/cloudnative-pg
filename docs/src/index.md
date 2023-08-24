@@ -80,7 +80,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * In-place or rolling updates for operator upgrades
 * TLS connections and client certificate authentication
 * Support for custom TLS certificates (including integration with cert-manager)
-* Continous WAL archiving to an object store (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
+* Continuous WAL archiving to an object store (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
 * Backups on volume snapshots (where supported by the underlying storage classes)
 * Backups on object stores (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
 * Full recovery and Point-In-Time recovery from an existing backup on volume snapshots or object stores
