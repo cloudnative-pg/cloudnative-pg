@@ -197,6 +197,13 @@ The above example will schedule a backup every day at midnight.
     cases - while it is extremely rare to schedule backups more frequently than once
     a day.
 
+You can choose whether to schedule a backup from a defined object store or a
+volume snapshot via the `.spec.method` attribute, by default set to
+`barmanObjectStore`. If you have properly defined
+[volume snapshots](backup_volumesnapshot.md#how-to-configure-volume-snapshot-backups)
+in the `backup` stanza of the cluster, you can set `method: volumeSnapshot`
+to start scheduling base backups on volume snapshots.
+
 ScheduledBackups can be suspended if needed by setting `.spec.suspend: true`,
 this will stop any new backup to be scheduled as long as the option is set to false.
 

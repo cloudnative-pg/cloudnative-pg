@@ -106,18 +106,6 @@ As you can see, the `backup` section contains both the `volumeSnapshot` stanza
 Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
 
-<!-- TODO
-
-## Scheduled backups
-
-TO BE DONE.
-
-## On demand backups
-
-TO BE DONE.
-
--->
-
 ## Example
 
 The following example shows how to configure volume snapshot base backups on an
