@@ -17,6 +17,7 @@ limitations under the License.
 package scheme
 
 import (
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,6 +64,13 @@ func (b *Builder) WithAPIExtensionV1() *Builder {
 	return b
 }
 
+// WithStorageSnapshotV1 adds storagesnapshotv1
+func (b *Builder) WithStorageSnapshotV1() *Builder {
+	_ = storagesnapshotv1.AddToScheme(b.scheme)
+
+	return b
+}
+
 // Build returns the built scheme
 func (b *Builder) Build() *runtime.Scheme {
 	return b.scheme
@@ -75,6 +83,7 @@ func BuildWithAllKnownScheme() *runtime.Scheme {
 		WithClientGoScheme().
 		WithMonitoringV1().
 		WithAPIExtensionV1().
+		WithStorageSnapshotV1().
 		Build()
 
 	// +kubebuilder:scaffold:scheme

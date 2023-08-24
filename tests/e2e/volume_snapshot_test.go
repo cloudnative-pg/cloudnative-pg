@@ -17,10 +17,17 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"k8s.io/apimachinery/pkg/types"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -254,6 +261,130 @@ var _ = Describe("Verify Volume Snapshot",
 					restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
 					Expect(err).ToNot(HaveOccurred())
 					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, restoredPrimary)
+				})
+			})
+		})
+
+		Context("Declarative Volume Snapshot", Ordered, func() {
+			// test env constants
+			const (
+				namespacePrefix = "declarative-snapshot-backup"
+				level           = tests.High
+				filesDir        = fixturesDir + "/volume_snapshot"
+			)
+			// file constants
+			const (
+				clusterToBackupFilePath  = filesDir + "/declarative-backup-cluster.yaml.template"
+				clusterToRestoreFilePath = filesDir + "/declarative-backup-cluster-restore.yaml.template"
+				backupFileFilePath       = filesDir + "/declarative-backup.yaml.template"
+			)
+
+			// database constants
+			const (
+				tableName = "test"
+			)
+
+			BeforeAll(func() {
+				if testLevelEnv.Depth < int(level) {
+					Skip("Test depth is lower than the amount requested for this test")
+				}
+
+				if !(IsLocal() || IsGKE()) {
+					Skip("This test is only executed on gke, openshift and local")
+				}
+
+				var err error
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					_ = os.Unsetenv("SNAPSHOT_NAME_PGDATA")
+					_ = os.Unsetenv("SNAPSHOT_NAME_PGWAL")
+					return env.DeleteNamespace(namespace)
+				})
+			})
+
+			It("creating a declarative cold backup and restoring it", func() {
+				clusterToBackupName, err := env.GetResourceNameFromYAML(clusterToBackupFilePath)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("creating the cluster on which to execute the backup", func() {
+					AssertCreateCluster(namespace, clusterToBackupName, clusterToBackupFilePath, env)
+				})
+
+				By("inserting test data", func() {
+					AssertCreateTestData(namespace, clusterToBackupName, tableName, psqlClientPod)
+				})
+
+				backupName, err := env.GetResourceNameFromYAML(backupFileFilePath)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("executing the backup", func() {
+					err := CreateResourcesFromFileWithError(namespace, backupFileFilePath)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				var backup apiv1.Backup
+				By("waiting the backup to complete", func() {
+					Eventually(func(g Gomega) {
+						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+					}, 300).Should(Succeed())
+					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
+				})
+
+				var clusterToBackup *apiv1.Cluster
+
+				By("fetching the created cluster", func() {
+					clusterToBackup, err = env.GetCluster(namespace, clusterToBackupName)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				snapshotList := volumesnapshot.VolumeSnapshotList{}
+				By("fetching the volume snapshots", func() {
+					err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
+						utils.ClusterLabelName: clusterToBackupName,
+					})
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Snapshots)))
+				})
+
+				By("ensuring that the additional labels and annotations are present", func() {
+					for _, item := range snapshotList.Items {
+						snapshotConfig := clusterToBackup.Spec.Backup.VolumeSnapshot
+						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
+						Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
+					}
+				})
+
+				By("setting the snapshot name env variable", func() {
+					for _, item := range snapshotList.Items {
+						switch utils.PVCRole(item.Labels[utils.PvcRoleLabelName]) {
+						case utils.PVCRolePgData:
+							err = os.Setenv("SNAPSHOT_NAME_PGDATA", item.Name)
+						case utils.PVCRolePgWal:
+							err = os.Setenv("SNAPSHOT_NAME_PGWAL", item.Name)
+						default:
+							Fail(fmt.Sprintf("Unrecognized PVC snapshot role: %s, name: %s",
+								item.Labels[utils.PvcRoleLabelName],
+								item.Name,
+							))
+						}
+					}
+				})
+
+				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterToRestoreFilePath)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("executing the restore", func() {
+					AssertCreateCluster(namespace, clusterToRestoreName, clusterToRestoreFilePath, env)
+				})
+
+				By("checking that the data is present on the restored cluster", func() {
+					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, psqlClientPod)
 				})
 			})
 		})

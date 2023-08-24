@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -43,6 +45,20 @@ const (
 	BackupPhaseWalArchivingFailing = "walArchivingFailing"
 )
 
+// BackupMethod defines the way of executing the physical base backups of
+// the selected PostgreSQL instance
+type BackupMethod string
+
+const (
+	// BackupMethodVolumeSnapshot means using the volume snapshot
+	// Kubernetes feature
+	BackupMethodVolumeSnapshot BackupMethod = "volumeSnapshot"
+
+	// BackupMethodBarmanObjectStore means using barman to backup the
+	// PostgreSQL cluster
+	BackupMethodBarmanObjectStore BackupMethod = "barmanObjectStore"
+)
+
 // BackupSpec defines the desired state of Backup
 type BackupSpec struct {
 	// The cluster to backup
@@ -56,6 +72,18 @@ type BackupSpec struct {
 	// standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
 	Target BackupTarget `json:"target,omitempty"`
+
+	// The backup method to be used, possible options are `barmanObjectStore`
+	// and `volumeSnapshot`. Defaults to: `barmanObjectStore`.
+	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
+	// +kubebuilder:default:=barmanObjectStore
+	Method BackupMethod `json:"method,omitempty"`
+}
+
+// BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
+type BackupSnapshotStatus struct {
+	// The snapshot lists, populated if it is a snapshot type backup
+	Snapshots []string `json:"snapshots,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
@@ -122,6 +150,12 @@ type BackupStatus struct {
 
 	// Information to identify the instance where the backup has been taken from
 	InstanceID *InstanceID `json:"instanceID,omitempty"`
+
+	// Status of the volumeSnapshot backup
+	BackupSnapshotStatus BackupSnapshotStatus `json:"snapshotBackupStatus,omitempty"`
+
+	// The backup method being used
+	Method BackupMethod `json:"method,omitempty"`
 }
 
 // InstanceID contains the information to identify an instance
@@ -183,6 +217,25 @@ func (backupStatus *BackupStatus) SetAsFailed(
 func (backupStatus *BackupStatus) SetAsCompleted() {
 	backupStatus.Phase = BackupPhaseCompleted
 	backupStatus.Error = ""
+}
+
+// SetAsStarted marks a certain backup as started
+func (backupStatus *BackupStatus) SetAsStarted(targetPod *corev1.Pod, method BackupMethod) {
+	backupStatus.Phase = BackupPhaseStarted
+	backupStatus.InstanceID = &InstanceID{
+		PodName:     targetPod.Name,
+		ContainerID: targetPod.Status.ContainerStatuses[0].ContainerID,
+	}
+	backupStatus.Method = method
+}
+
+// SetSnapshotList sets the Snapshots field from a list of VolumeSnapshot
+func (snapshotStatus *BackupSnapshotStatus) SetSnapshotList(snapshots []*volumesnapshot.VolumeSnapshot) {
+	snapshotNames := make([]string, len(snapshots))
+	for idx, volumeSnapshot := range snapshots {
+		snapshotNames[idx] = volumeSnapshot.Name
+	}
+	snapshotStatus.Snapshots = snapshotNames
 }
 
 // IsDone check if a backup is completed or still in progress

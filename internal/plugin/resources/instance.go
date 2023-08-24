@@ -24,8 +24,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
@@ -35,7 +33,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -120,60 +117,6 @@ func getReplicaStatusFromPodViaExec(
 	result.AddPod(pod)
 
 	return result
-}
-
-// GetInstancePVCs gets all the PVC associated with a given instance
-func GetInstancePVCs(
-	ctx context.Context,
-	clusterName string,
-	instanceName string,
-) ([]v1.PersistentVolumeClaim, error) {
-	cluster := &corev1.Cluster{}
-	if err := plugin.Client.Get(
-		ctx,
-		types.NamespacedName{
-			Name:      clusterName,
-			Namespace: plugin.Namespace,
-		},
-		cluster,
-	); err != nil {
-		return nil, err
-	}
-
-	var pvcs []v1.PersistentVolumeClaim
-
-	pgDataName := persistentvolumeclaim.GetName(instanceName, utils.PVCRolePgData)
-	pgData, err := getPVC(ctx, pgDataName)
-	if err != nil {
-		return nil, err
-	}
-	if pgData != nil {
-		pvcs = append(pvcs, *pgData)
-	}
-
-	pgWalName := persistentvolumeclaim.GetName(instanceName, utils.PVCRolePgWal)
-	pgWal, err := getPVC(ctx, pgWalName)
-	if err != nil {
-		return nil, err
-	}
-	if pgWal != nil {
-		pvcs = append(pvcs, *pgWal)
-	}
-
-	return pvcs, nil
-}
-
-// getPVC returns the pvc if found or any error that isn't apierrs.IsNotFound
-func getPVC(ctx context.Context, name string) (*v1.PersistentVolumeClaim, error) {
-	var pvc v1.PersistentVolumeClaim
-	err := plugin.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: plugin.Namespace}, &pvc)
-	if apierrs.IsNotFound(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &pvc, nil
 }
 
 // IsInstanceRunning returns a boolean indicating if the given instance is running and any error encountered

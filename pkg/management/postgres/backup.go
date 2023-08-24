@@ -283,13 +283,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		if failErr := b.retryWithRefreshedCluster(ctx, func() error {
 			origCluster := b.Cluster.DeepCopy()
 
-			meta.SetStatusCondition(&b.Cluster.
-				Status.Conditions, metav1.Condition{
-				Type:    string(apiv1.ConditionBackup),
-				Status:  metav1.ConditionFalse,
-				Reason:  string(apiv1.ConditionReasonLastBackupFailed),
-				Message: err.Error(),
-			})
+			meta.SetStatusCondition(&b.Cluster.Status.Conditions, *apiv1.BuildClusterBackupFailedCondition(err))
 
 			b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
 			return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
@@ -319,12 +313,8 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 
 	// Update backup status in cluster conditions on startup
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Patch(ctx, b.Client, b.Cluster, &metav1.Condition{
-			Type:    string(apiv1.ConditionBackup),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(apiv1.ConditionBackupStarted),
-			Message: "New Backup starting up",
-		})
+		// TODO: this condition is set only here, never removed or handled?
+		return conditions.Patch(ctx, b.Client, b.Cluster, apiv1.BackupStartingCondition)
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup started)")
 		// We do not terminate here because we could still have a good backup
@@ -363,12 +353,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 
 	// Update backup status in cluster conditions on backup completion
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Patch(ctx, b.Client, b.Cluster, &metav1.Condition{
-			Type:    string(apiv1.ConditionBackup),
-			Status:  metav1.ConditionTrue,
-			Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
-			Message: "Backup was successful",
-		})
+		return conditions.Patch(ctx, b.Client, b.Cluster, apiv1.BackupSucceededCondition)
 	}); err != nil {
 		b.Log.Error(err, "Can't update the cluster with the completed backup data")
 	}

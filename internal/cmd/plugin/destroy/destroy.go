@@ -28,7 +28,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -41,7 +40,7 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		return fmt.Errorf("error deleting instance %s: %v", instanceName, err)
 	}
 
-	pvcs, err := resources.GetInstancePVCs(ctx, clusterName, instanceName)
+	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instanceName, plugin.Namespace)
 	if err != nil {
 		return err
 	}

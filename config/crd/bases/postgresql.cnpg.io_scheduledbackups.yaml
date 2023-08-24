@@ -70,6 +70,14 @@ spec:
                 description: If the first backup has to be immediately start after
                   creation or not
                 type: boolean
+              method:
+                default: barmanObjectStore
+                description: 'The backup method to be used, possible options are `barmanObjectStore`
+                  and `volumeSnapshot`. Defaults to: `barmanObjectStore`.'
+                enum:
+                - barmanObjectStore
+                - volumeSnapshot
+                type: string
               schedule:
                 description: The schedule does not follow the same format used in
                   Kubernetes CronJobs as it includes an additional seconds specifier,

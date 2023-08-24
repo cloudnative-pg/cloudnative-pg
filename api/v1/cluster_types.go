@@ -114,6 +114,37 @@ const (
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 )
 
+// SnapshotOwnerReference defines the reference type for the owner of the snapshot.
+// This specifies which owner the processed resources should relate to.
+type SnapshotOwnerReference string
+
+// Constants to represent the allowed types for SnapshotOwnerReference.
+const (
+	// ShapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.
+	ShapshotOwnerReferenceNone SnapshotOwnerReference = "none"
+	// SnapshotOwnerReferenceBackup indicates that the snapshot is owned by the backup resource.
+	SnapshotOwnerReferenceBackup SnapshotOwnerReference = "backup"
+	// SnapshotOwnerReferenceCluster indicates that the snapshot is owned by the cluster resource.
+	SnapshotOwnerReferenceCluster SnapshotOwnerReference = "cluster"
+)
+
+// VolumeSnapshotConfiguration represents the configuration for the execution of snapshot backups.
+type VolumeSnapshotConfiguration struct {
+	// Labels are key-value pairs that will be added to .metadata.labels snapshot resources.
+	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations key-value pairs that will be added to .metadata.annotations snapshot resources.
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// ClassName specifies the Snapshot Class to be used for PG_DATA PersistentVolumeClaim.
+	// It is the default class for the other types if no specific class is present
+	ClassName string `json:"className,omitempty"`
+	// WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.
+	WalClassName string `json:"walClassName,omitempty"`
+	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have. .
+	// +kubebuilder:validation:Enum=none;cluster;backup
+	// +kubebuilder:default:=none
+	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
+}
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
@@ -592,6 +623,38 @@ const (
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
+)
+
+// A Condition that can be used to communicate the Backup progress
+var (
+	// BackupSucceededCondition is added to a backup
+	// when it was completed correctly
+	BackupSucceededCondition = &metav1.Condition{
+		Type:    string(ConditionBackup),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(ConditionReasonLastBackupSucceeded),
+		Message: "Backup was successful",
+	}
+
+	// BackupStartingCondition is added to a backup
+	// when it started
+	BackupStartingCondition = &metav1.Condition{
+		Type:    string(ConditionBackup),
+		Status:  metav1.ConditionFalse,
+		Reason:  string(ConditionBackupStarted),
+		Message: "New Backup starting up",
+	}
+
+	// BuildClusterBackupFailedCondition builds
+	// ConditionReasonLastBackupFailed condition
+	BuildClusterBackupFailedCondition = func(err error) *metav1.Condition {
+		return &metav1.Condition{
+			Type:    string(ConditionBackup),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(ConditionReasonLastBackupFailed),
+			Message: err.Error(),
+		}
+	}
 )
 
 // ConditionStatus defines conditions of resources
@@ -1468,10 +1531,13 @@ type BarmanObjectStoreConfiguration struct {
 }
 
 // BackupConfiguration defines how the backup of the cluster are taken.
-// Currently the only supported backup method is barmanObjectStore.
+// The supported backup methods are BarmanObjectStore and VolumeSnapshot.
 // For details and examples refer to the Backup and Recovery section of the
 // documentation
 type BackupConfiguration struct {
+	// VolumeSnapshot provides the configuration for the execution of volume snapshot backups.
+	VolumeSnapshot *VolumeSnapshotConfiguration `json:"volumeSnapshot,omitempty"`
+
 	// The configuration for the barman-cloud tool suite
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 
@@ -1479,6 +1545,7 @@ type BackupConfiguration struct {
 	// and WALs (i.e. '60d'). The retention policy is expressed in the form
 	// of `XXu` where `XX` is a positive integer and `u` is in `[dwm]` -
 	// days, weeks, months.
+	// It's currently only applicable when using the BarmanObjectStore method.
 	// +kubebuilder:validation:Pattern=^[1-9][0-9]*[dwm]$
 	// +optional
 	RetentionPolicy string `json:"retentionPolicy,omitempty"`

@@ -2,7 +2,6 @@ AES
 API's
 APIs
 ARMv
-ATTACHER
 AcolumnName
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
@@ -20,7 +19,9 @@ Azurite
 BDR
 BackupConfiguration
 BackupList
+BackupMethod
 BackupPhase
+BackupSnapshotStatus
 BackupSource
 BackupSpec
 BackupStatus
@@ -55,6 +56,7 @@ Cecchi
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
+ClassName
 ClientCASecret
 ClientCertsCASecret
 ClientReplicationSecret
@@ -337,6 +339,7 @@ ServiceAccountTemplate
 ServiceMonitor
 Silvela
 Slonik
+SnapshotOwnerReference
 SnapshotType
 Snapshotting
 StatefulSets
@@ -366,12 +369,15 @@ Valerio
 VirtualBox
 VolumeSnapshot
 VolumeSnapshotClass
+VolumeSnapshotConfiguration
+VolumeSnapshots
 WAL
 WAL's
 WALBackupConfiguration
 WALs
 Wadle
 WalBackupConfiguration
+WalClassName
 YXBw
 YY
 YYYY
@@ -431,6 +437,7 @@ backupspec
 backupstatus
 balancer
 barmanObjectStore
+barmanobjectstore
 barmanobjectstoreconfiguration
 baseDN
 basebackup
@@ -737,6 +744,7 @@ ntt
 num
 oauth
 objectmeta
+objectstore
 objid
 objref
 objsubid
@@ -986,7 +994,6 @@ volumeMode
 volumeMounts
 volumeSnapshot
 volumesnapshot
-volumesnapshotclass
 wal
 walSegmentSize
 walStorage

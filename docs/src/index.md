@@ -80,15 +80,17 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * In-place or rolling updates for operator upgrades
 * TLS connections and client certificate authentication
 * Support for custom TLS certificates (including integration with cert-manager)
-* Continuous backup to an object store (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
-* Full recovery and Point-In-Time recovery from an existing backup in an object store
+* Continuous WAL archiving to an object store (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
+* Backups on volume snapshots (where supported by the underlying storage classes)
+* Backups on object stores (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
+* Full recovery and Point-In-Time recovery from an existing backup on volume snapshots or object stores
 * Offline import of existing PostgreSQL databases, including major upgrades of PostgreSQL
 * Fencing of an entire PostgreSQL cluster, or a subset of the instances in a declarative way
 * Hibernation of a PostgreSQL cluster in a declarative way
 * Support for Synchronous Replicas
 * Support for HA physical replication slots at cluster level
 * Backup from a standby
-* Backup retention policies (based on recovery window)
+* Backup retention policies (based on recovery window, only on object stores)
 * Parallel WAL archiving and restore to allow the database to keep up with WAL
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
