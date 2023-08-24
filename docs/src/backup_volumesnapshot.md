@@ -1,5 +1,15 @@
 # Backup on volume snapshots
 
+!!! Important
+    The current implementation of volume snapshots in CloudNativePG
+    supports [cold backup](backup.md#cold-and-hot-backups) only.
+    Hot backup with direct support of
+    [PostgreSQL's low level API for base backups](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-LOWLEVEL-BASE-BACKUP)
+    will be added in version 1.22. Having said this, the current implementation
+    is suitable for production HA environments as, by honoring the backup
+    target settings, will work on the most aligned standby without impacting the
+    primary.
+
 CloudNativePG is one of the first known cases of database operators that
 directly leverages the Kubernetes native Volume Snapshot API for both
 backup and recovery operations, in an entirely declarative way.
@@ -30,9 +40,8 @@ cross-cluster availability of the snapshots.
 ## Requirements
 
 For Volume Snapshots to work with a CloudNativePG cluster, you need to ensure
-that each storage class used to dynamically provision the `PGDATA` volume
-(`storage`) and, where present, the WAL volume(`walStorage`) support volume
-snapshots.
+that each storage class used to dynamically provision the PostgreSQL volumes
+(namely, `storage` and `walStorage` sections) support volume snapshots.
 
 Given that instructions vary from storage class to storage class, please
 refer to the documentation of the specific storage class and related CSI
@@ -42,6 +51,12 @@ Normally, it is the [`VolumeSnapshotClass`](https://kubernetes.io/docs/concepts/
 that is responsible to ensure that snapshots can be taken from persistent
 volumes of a given storage class, and managed as `VolumeSnapshot` and
 `VolumeSnapshotContent` resources.
+
+!!! Important
+    It is your responsibility to verify with the third party vendor
+    that volume snapshots are supported. CloudNativePG only interacts
+    with the Kubernetes API on this matter and we cannot support issues
+    at the storage level for each specific CSI driver.
 
 ## How to configure Volume Snapshot backups
 

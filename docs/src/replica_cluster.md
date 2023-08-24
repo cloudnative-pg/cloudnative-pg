@@ -22,29 +22,39 @@ and kept synchronized through the
 [replica cluster](architecture.md#deployments-across-kubernetes-clusters) feature. The source
 can be a primary cluster or another replica cluster (cascading replica cluster).
 
-The available options in terms of replication, both at bootstrap and continuous
-recovery level, are:
+The first step is to bootstrap the replica cluster, choosing among one of the
+available methods:
+
+- streaming replication, via `pg_basebackup`
+- recovery from a volume snapshot
+- recovery from a Barman Cloud backup in an object store
+
+Please refer to the ["Bootstrap" section](bootstrap.md#bootstrap-from-another-cluster)
+for information on how to clone a PostgreSQL server using either
+`pg_basebackup` (streaming) or `recovery` (volume snapshot or object store).
+
+Once the replica cluster's base backup is available, you need to define how
+changes are replicated from the origin, through PostgreSQL continuous recovery.
+There are two options:
 
 - use streaming replication between the replica cluster and the source
   (this will certainly require some administrative and security related
   work to be done to make sure that the network connection between the
   two clusters are correctly setup)
-- use a Barman Cloud object store for recovery of the base backups and
-  the WAL files that are regularly shipped from the source to the object
-  store and pulled by `barman-cloud-wal-restore` in the replica cluster
+- use the WAL archive (on an object store) to fetch the WAL files that are
+  regularly shipped from the source to the object store and pulled by
+  `barman-cloud-wal-restore` in the replica cluster
 - any of the two
 
 All you have to do is actually define an external cluster.
-Please refer to the ["Bootstrap" section](bootstrap.md#bootstrap-from-another-cluster)
-for information on how to clone a PostgreSQL server using either
-`pg_basebackup` (streaming) or `recovery` (object store).
 
 If the external cluster contains a `barmanObjectStore` section:
 
+- you'll be able to use the WAL archive, and CloudNativePG will automatically
+  set the `restore_command` in the designated primary instance
 - you'll be able to bootstrap the replica cluster from an object store
-  using the `recovery` section
-- CloudNativePG will automatically set the `restore_command`
-  in the designated primary instance
+  using the `recovery` section, in case you cannot take advantage of
+  volume snapshots
 
 If the external cluster contains a `connectionParameters` section:
 
@@ -76,8 +86,8 @@ file and define the following parts accordingly:
 
 - define the `externalClusters` section in the replica cluster
 - define the bootstrap part for the replica cluster. We can either bootstrap via
-  streaming using the `pg_basebackup` section, or bootstrap from an object store
-  using the `recovery` section
+  streaming using the `pg_basebackup` section, or bootstrap from a volume snapshot
+  or an object store using the `recovery` section
 - define the continuous recovery part (`spec.replica`) in the replica cluster. All
   we need to do is to enable the replica mode through option `spec.replica.enabled`
   and set the `externalClusters` name in option `spec.replica.source`

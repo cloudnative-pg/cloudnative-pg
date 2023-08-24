@@ -46,7 +46,8 @@ On the other hand, CloudNativePG supports two ways to store physical base backup
 
 ## WAL archive
 
-The WAL archive in PostgreSQL is fundamental for the following reasons:
+The WAL archive in PostgreSQL is at the heart of **continuous backup**, and it
+is fundamental for the following reasons:
 
 - **Hot backups**: the possibility to take physical base backups from any
   instance in the Postgres cluster (either primary or standby) without shutting
@@ -84,9 +85,10 @@ taken when the PostgreSQL instance (standby or primary) is shut down. They are
 consistent per definition and they represent a snapshot of the database at the
 time it was shut down.
 
-As a result, they do not require the WAL archive to be restarted, but they can
-certainly take advantage of it when available (with all the benefits for the
-recovery explained in the previous section).
+As a result, PostgreSQL instances can be restarted from a cold backup without
+the need of a WAL archive, even though they can take advantage of it, if
+available (with all the benefits on the recovery side highlighted in the
+previous section).
 
 In those situations with a higher RPO (for example, 1 hour or 24 hours), and
 shorter retention periods, cold backups represent a viable option to be considered
@@ -311,7 +313,7 @@ no replicas are available, backups will run on the primary instance.
     represents the starting point from which to begin a recovery operation,
     including PITR. Similarly to what happens with
     [`pg_basebackup`](https://www.postgresql.org/docs/current/app-pgbasebackup.html),
-    when backing up from a standby we do not force a switch of the WAL on the
+    when backing up from an online standby we do not force a switch of the WAL on the
     primary. This might produce unexpected results in the short term (before
     `archive_timeout` kicks in) in deployments with low write activity.
 
@@ -327,6 +329,11 @@ spec:
   backup:
     target: "primary"
 ```
+
+!!! Warning
+    Beware of setting the target to primary when performing a cold backup
+    strategy on volume snapshots, as this will shut down the primary for
+    time needed to take the snapshot, impacting write operations.
 
 When the backup target is set to `prefer-standby`, such policy will ensure
 backups are run on the most up-to-date available secondary instance, or if no
