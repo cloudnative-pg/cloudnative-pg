@@ -19,6 +19,7 @@ limitations under the License.
 package specs
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -400,7 +401,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 		Spec: podSpec,
 	}
 
-	if podSpecMarshaled, err := podSpec.Marshal(); err == nil {
+	if podSpecMarshaled, err := json.Marshal(podSpec); err == nil {
 		pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecMarshaled)
 	}
 
