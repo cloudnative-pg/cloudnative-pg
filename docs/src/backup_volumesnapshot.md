@@ -101,7 +101,7 @@ As you can see, the `backup` section contains both the `volumeSnapshot` stanza
 !!! Info
     Once you have defined the `barmanObjectStore`, you can decide to use
     both volume snapshot and object store backup strategies simultaneously
-    to take physical backups. We will cover this later in the documentation.
+    to take physical backups.
 
 Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.

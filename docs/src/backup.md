@@ -55,6 +55,10 @@ is fundamental for the following reasons:
 - **Point in Time recovery** (PITR): to possibility to recover at any point in
   time from the first available base backup in your system
 
+!!! Warning
+    WAL archive alone is useless. Without a physical base backup, you cannot
+    restore a PostgreSQL cluster.
+
 In general, the presence of a WAL archive enhances the resilience of a
 PostgreSQL cluster, allowing each instance to fetch any required WAL file from
 the archive if needed (normally the WAL archive has higher retention periods
@@ -135,8 +139,8 @@ available methods for storing physical base backups.
 | **Hot backup**                    |       ✓      |        𐄂  (2)        |
 | **Incremental copy**              |      𐄂       |         ✓  (3)       |
 | **Differential copy**             |      𐄂       |         ✓  (3)       |
-| **Backup from a standby**         |       ✓      |         ✓  (4)       |
-| **Snapshot recovery**             |    𐄂 (5)     |           ✓          |
+| **Backup from a standby**         |       ✓      |           ✓          |
+| **Snapshot recovery**             |    𐄂 (4)     |           ✓          |
 | **Point In Time Recovery (PITR)** |       ✓      | Requires WAL archive |
 | **Underlying technology**         | Barman Cloud |   Kubernetes API     |
 
@@ -149,8 +153,7 @@ available methods for storing physical base backups.
 > temporarily a standby, the operation does not induce any downtime for your
 > write applications
 > 3. If supported by the underlying storage classes of the PostgreSQL volumes
-> 4. The current implementation of volume snapshot backups supports cold backup on a standby instance
-> 5. Snapshot recovery can be emulated using the `bootstrap.recovery.recoveryTarget.targetImmediate` option
+> 4. Snapshot recovery can be emulated using the `bootstrap.recovery.recoveryTarget.targetImmediate` option
 
 ## Scheduled backups
 
@@ -197,7 +200,7 @@ The above example will schedule a backup every day at midnight.
     cases - while it is extremely rare to schedule backups more frequently than once
     a day.
 
-You can choose whether to schedule a backup from a defined object store or a
+You can choose whether to schedule a backup on a defined object store or a
 volume snapshot via the `.spec.method` attribute, by default set to
 `barmanObjectStore`. If you have properly defined
 [volume snapshots](backup_volumesnapshot.md#how-to-configure-volume-snapshot-backups)
@@ -340,7 +343,7 @@ spec:
 !!! Warning
     Beware of setting the target to primary when performing a cold backup
     strategy on volume snapshots, as this will shut down the primary for
-    time needed to take the snapshot, impacting write operations.
+    the time needed to take the snapshot, impacting write operations.
 
 When the backup target is set to `prefer-standby`, such policy will ensure
 backups are run on the most up-to-date available secondary instance, or if no

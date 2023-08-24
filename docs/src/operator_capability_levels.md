@@ -347,7 +347,7 @@ through the `backup` parameter in the cluster definition.
 
 You can define base backups in two ways: on-demand (through the `Backup`
 custom resource definition) or scheduled (through the `ScheduledBackup`
-customer resource definition, using a cron-like syntax).
+custom resource definition, using a cron-like syntax).
 
 Volume Snapshots rely directly on the Kubernetes API, which delegates this
 capability to the underlying storage classes and CSI drivers. Volume snapshot
