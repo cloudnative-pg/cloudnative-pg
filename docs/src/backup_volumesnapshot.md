@@ -114,7 +114,7 @@ volume snapshot class.
 
 !!! Important
     If you are interested in testing the example, please read
-    ["Volume Snapshots" for the Amazon Elastic Block Store (EBS) CSI driver](https://github.com/kubernetes-sigs/aws-ebs-csi-driver/tree/master/examples/kubernetes/snapshot)
+    ["Volume Snapshots" for the Amazon Elastic Block Store (EBS) CSI driver](https://github.com/kubernetes-sigs/aws-ebs-csi-driver/tree/master/examples/kubernetes/snapshot) <!-- wokeignore:rule=master -->
     for detailed instructions on the installation process for the storage class and the snapshot class.
 
 
