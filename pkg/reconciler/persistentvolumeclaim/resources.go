@@ -133,24 +133,20 @@ type expectedPVC struct {
 	tablespaceName string
 	name           string
 	initialStatus  PVCStatus
-	storage        apiv1.StorageConfiguration
 }
 
 func (e *expectedPVC) toCreateConfiguration(
 	serial int,
+	storage apiv1.StorageConfiguration,
 	source *corev1.TypedLocalObjectReference,
 ) *CreateConfiguration {
 	cc := &CreateConfiguration{
 		Status:         e.initialStatus,
 		NodeSerial:     serial,
 		Role:           e.role,
-		Storage:        e.storage,
+		Storage:        storage,
 		TablespaceName: e.tablespaceName,
-	}
-
-	if source != nil {
-		cc.Source = source
-		cc.Status = StatusReady
+		Source:         source,
 	}
 
 	return cc
@@ -163,13 +159,7 @@ func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []e
 		roles = append(roles, utils.PVCRolePgWal)
 	}
 
-	expectedTablespacesMounts := buildExpectedPVCs(cluster, instanceName, roles)
-	if cluster.ShouldCreateTablespaces() {
-		expectedTablespacesMounts = append(expectedTablespacesMounts,
-			buildTablespacesPVCs(cluster, instanceName)...)
-	}
-
-	return expectedTablespacesMounts
+	return buildExpectedPVCs(cluster, instanceName, roles)
 }
 
 // getExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
@@ -193,7 +183,7 @@ func containsRole(roles []utils.PVCRole, role utils.PVCRole) bool {
 
 // here we should register any new PVC for the instance
 func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []utils.PVCRole) []expectedPVC {
-	var expectedMounts []expectedPVC
+	expectedMounts := make([]expectedPVC, 0, len(cluster.Spec.Tablespaces)+2)
 
 	if containsRole(roles, utils.PVCRolePgData) {
 		// At the moment detecting a pod is missing the data pvc has no real use.
@@ -206,7 +196,6 @@ func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []util
 				// This requires an init, ideally we should move to a design where each pvc can be init separately
 				// and then  attached
 				initialStatus: StatusInitializing,
-				storage:       cluster.Spec.StorageConfiguration,
 			},
 		)
 	}
@@ -218,17 +207,11 @@ func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []util
 				name:          walPVCName,
 				role:          utils.PVCRolePgWal,
 				initialStatus: StatusReady,
-				storage:       *cluster.Spec.WalStorage,
 			},
 		)
 	}
 
-	return expectedMounts
-}
-
-func buildTablespacesPVCs(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
-	expectedMounts := make([]expectedPVC, 0, len(cluster.Spec.Tablespaces))
-	for tbsName, config := range cluster.Spec.Tablespaces {
+	for tbsName := range cluster.Spec.Tablespaces {
 		pvcName := specs.PvcNameForTablespace(instanceName, tbsName)
 		expectedMounts = append(expectedMounts,
 			expectedPVC{
@@ -237,7 +220,6 @@ func buildTablespacesPVCs(cluster *apiv1.Cluster, instanceName string) []expecte
 				// This requires an init, ideally we should move to a design where each pvc can be init separately
 				// and then  attached
 				initialStatus:  StatusReady,
-				storage:        config.Storage,
 				tablespaceName: tbsName,
 			},
 		)

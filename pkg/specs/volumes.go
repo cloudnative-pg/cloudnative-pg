@@ -44,7 +44,7 @@ func MountForTablespace(tablespaceName string) string {
 
 // LocationForTablespace returns the data location for tablespace on a cluster pod
 func LocationForTablespace(tablespaceName string) string {
-	return fmt.Sprintf("%s/%s/%s", PgTableSpaceVolumePath, tablespaceName, "data")
+	return fmt.Sprintf("%s/%s/data", PgTableSpaceVolumePath, tablespaceName)
 }
 
 // PvcNameForTablespace returns the normalized tablespace volume name for a given
