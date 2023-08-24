@@ -836,6 +836,9 @@ func createOrPatchPodMonitor(
 	default:
 		origPodMonitor := podMonitor.DeepCopy()
 		podMonitor.Spec = expectedPodMonitor.Spec
+		// We don't override the current labels/annotations given that there could be data that isn't managed by us
+		utils.MergeMap(podMonitor.Labels, expectedPodMonitor.Labels)
+		utils.MergeMap(podMonitor.Annotations, expectedPodMonitor.Annotations)
 
 		// If there's no changes we are done
 		if reflect.DeepEqual(origPodMonitor, podMonitor) {

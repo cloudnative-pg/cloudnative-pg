@@ -409,4 +409,37 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 	})
+
+	It("should patch the PodMonitor with updated labels and annotations", func() {
+		initialLabels := map[string]string{"label1": "value1"}
+		initialAnnotations := map[string]string{"annotation1": "value1"}
+
+		manager.podMonitor.Labels = initialLabels
+		manager.podMonitor.Annotations = initialAnnotations
+		err := fakeCli.Create(ctx, manager.podMonitor)
+		Expect(err).ToNot(HaveOccurred())
+
+		updatedLabels := map[string]string{"label1": "changedValue1", "label2": "value2"}
+		updatedAnnotations := map[string]string{"annotation1": "changedValue1", "annotation2": "value2"}
+
+		manager.podMonitor.Labels = updatedLabels
+		manager.podMonitor.Annotations = updatedAnnotations
+
+		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
+		Expect(err).ToNot(HaveOccurred())
+
+		podMonitor := &v1.PodMonitor{}
+		err = fakeCli.Get(
+			ctx,
+			types.NamespacedName{
+				Name:      manager.podMonitor.Name,
+				Namespace: manager.podMonitor.Namespace,
+			},
+			podMonitor,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(podMonitor.Labels).To(Equal(updatedLabels))
+		Expect(podMonitor.Annotations).To(Equal(updatedAnnotations))
+	})
 })
