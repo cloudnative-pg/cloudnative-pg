@@ -30,7 +30,6 @@ import (
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
@@ -83,7 +82,7 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("failed to get cluster: %w", err)
 			}
 
-			err = run(ctx, podName, pgData, cluster, args, typedClient)
+			err = run(ctx, podName, pgData, cluster, args)
 			if err != nil {
 				contextLog.Error(err, logErrorMessage)
 				condition := metav1.Condition{
@@ -96,6 +95,17 @@ func NewCmd() *cobra.Command {
 					log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 				}
 				return err
+			}
+
+			// Update the condition if needed.
+			condition := metav1.Condition{
+				Type:    string(apiv1.ConditionContinuousArchiving),
+				Status:  metav1.ConditionTrue,
+				Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
+				Message: "Continuous archiving is working",
+			}
+			if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
+				log.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
 			}
 
 			return nil
@@ -113,7 +123,6 @@ func run(
 	podName, pgData string,
 	cluster *apiv1.Cluster,
 	args []string,
-	client client.WithWatch,
 ) error {
 	startTime := time.Now()
 	contextLog := log.FromContext(ctx)
@@ -200,21 +209,10 @@ func run(
 			"totalTime", time.Since(startTime))
 	}
 
-	// Update the condition if needed.
-	condition := metav1.Condition{
-		Type:    string(apiv1.ConditionContinuousArchiving),
-		Status:  metav1.ConditionTrue,
-		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
-		Message: "Continuous archiving is working",
-	}
-	if errCond := conditions.Patch(ctx, client, cluster, &condition); errCond != nil {
-		log.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
-	}
 	// We return only the first error to PostgreSQL, because the first error
 	// is the one raised by the file that PostgreSQL has requested to archive.
 	// The other errors are related to WAL files that were pre-archived as
 	// a performance optimization and are just logged
-
 	return walStatus[0].Err
 }
 
