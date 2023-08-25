@@ -28,20 +28,6 @@ const (
 	// ClusterLabelName is the name of cluster which the backup CR belongs to
 	ClusterLabelName = "cnpg.io/cluster"
 
-	// OldClusterLabelName label is applied to objects to link them to the owning
-	// cluster.
-	//
-	// Deprecated: please use ClusterLabelName instead
-	//
-	// TODO: delete as soon as possible. releases 1.16, 1.17 still
-	// have embedded logic relying on "postgresql" as the cluster label
-	// in controllers/cluster_controller.go mapNodeToClusters() at minimum.
-	// Release 1.18 does not have that logic
-	//
-	// IMPORTANT: Removing this is a breaking change and should be announced in Release Notes
-	// utils.ClusterLabelName should be used instead where possible.
-	OldClusterLabelName = "postgresql" // Deprecated: use ClusterLabelName going forward
-
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
 	JobRoleLabelName = "cnpg.io/jobRole"
 
