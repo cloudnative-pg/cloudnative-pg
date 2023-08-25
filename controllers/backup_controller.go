@@ -285,6 +285,9 @@ func startSnapshotBackup(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
+	// given that we use only kubernetes resources we can use the backup name as ID
+	backup.Status.BackupID = backup.Name
+
 	backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
 	if err := postgres.PatchBackupStatusAndRetry(ctx, cli, backup); err != nil {
 		return err
@@ -302,6 +305,12 @@ func startSnapshotBackup(
 	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
 
 	snapshotEnrich := func(vs *storagesnapshotv1.VolumeSnapshot) {
+		if backup.Labels == nil {
+			backup.Labels = map[string]string{}
+		}
+
+		vs.Labels[utils.BackupNameLabelName] = backup.Name
+
 		switch snapshotConfig.SnapshotOwnerReference {
 		case apiv1.SnapshotOwnerReferenceCluster:
 			cluster.SetInheritedDataAndOwnership(&vs.ObjectMeta)
