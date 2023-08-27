@@ -441,3 +441,11 @@ You can use a pre-provisioned volume in CloudNativePG by following these steps:
     by Kubernetes where a pre-provisioned volume exists. Make sure you check
     for any pods stuck in `Pending` after you have deployed the cluster, and
     if the condition persists investigate why this is happening.
+
+## Block storage considerations (Ceph, Longhorn)
+Most block storage solutions in Kubernetes suggest to have multiple 'replicas' of a volume
+to improve resiliency. This works well for workloads that do not have resiliency built into the 
+application. However Cloud Native Postgres has this resiliency built ino the storage of 
+the Postgres Cluster through the number of instances.
+
+Therefore 
