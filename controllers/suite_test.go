@@ -57,6 +57,7 @@ var (
 	testEnv           *envtest.Environment
 	poolerReconciler  *PoolerReconciler
 	clusterReconciler *ClusterReconciler
+	backupReconciler  *BackupReconciler
 	scheme            *runtime.Scheme
 	discoveryClient   discovery.DiscoveryInterface
 )
@@ -102,6 +103,12 @@ var _ = BeforeSuite(func() {
 		Scheme:          scheme,
 		Recorder:        record.NewFakeRecorder(120),
 		DiscoveryClient: discoveryClient,
+	}
+
+	backupReconciler = &BackupReconciler{
+		Client:   k8sClient,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(120),
 	}
 })
 
