@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -258,7 +259,7 @@ func isPodNeedingRollout(
 	for message, check := range checkers {
 		podRollout, err := check(status, cluster)
 		if err != nil {
-			contextLogger.Error(err, "while checking if pod needs rollout")
+			contextLogger.Error(err, "while checking if pod needs rollout", "check", check)
 			continue
 		}
 		if podRollout.required {
@@ -569,7 +570,7 @@ func checkPodSpecIsOutdated(
 	}
 
 	var storedPodSpec corev1.PodSpec
-	err := (&storedPodSpec).Unmarshal([]byte(podSpecAnnotation))
+	err := json.Unmarshal([]byte(podSpecAnnotation), &storedPodSpec)
 	if err != nil {
 		return rollout{}, fmt.Errorf("while unmarshaling the pod resources annotation: %w", err)
 	}
