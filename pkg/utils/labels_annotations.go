@@ -54,6 +54,9 @@ const (
 	// InstanceNameLabelName is the name of the label containing the instance name
 	InstanceNameLabelName = "cnpg.io/instanceName"
 
+	// BackupNameLabelName is the name of the label containing the backup id
+	BackupNameLabelName = "cnpg.io/backupName"
+
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "cnpg.io/operatorVersion"

@@ -357,6 +357,7 @@ var _ = Describe("Verify Volume Snapshot",
 						snapshotConfig := clusterToBackup.Spec.Backup.VolumeSnapshot
 						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
 						Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
+						Expect(item.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
 					}
 				})
 
