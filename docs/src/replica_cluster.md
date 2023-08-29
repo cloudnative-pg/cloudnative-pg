@@ -92,6 +92,8 @@ file and define the following parts accordingly:
   we need to do is to enable the replica mode through option `spec.replica.enabled`
   and set the `externalClusters` name in option `spec.replica.source`
 
+#### Example using pg_basebackup
+
 This **first example** defines a replica cluster using streaming replication in
 both bootstrap and continuous recovery. The replica cluster connects to the
 source cluster using TLS authentication.
@@ -134,6 +136,8 @@ in case the replica cluster is in a separate namespace.
       name: <MAIN-CLUSTER>-ca
       key: ca.crt
 ```
+
+#### Example using a Backup from an object store
 
 The **second example** defines a replica cluster that bootstraps from an object
 store using the `recovery` section and continuous recovery using both streaming
@@ -182,6 +186,18 @@ a backup of the source cluster has been created already.
     cluster, we need to make sure there is network connectivity between the two
     clusters, and that all the necessary secrets which hold passwords or
     certificates are properly created in advance.
+
+#### Example using a Volume Snapshot
+
+In case you are using volume snapshots, and your storage class provides
+cross-clusters availability of the snapshots, you can leaverage that to
+bootstrap a replica cluster through a volume snapshot of the source cluster.
+This **third example** defines a replica cluster that bootstraps from a volume
+snapshot using the `recovery` section. It uses both streaming replication
+(via basic authentication) and the object store to fetch the WAL files.
+
+You can check the [sample YAML](samples/cluster-example-replica-from-volume-snapshot.yaml)
+for it in the `samples/` subdirectory.
 
 ## Promoting the designated primary in the replica cluster
 
