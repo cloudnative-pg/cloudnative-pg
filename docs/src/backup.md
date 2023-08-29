@@ -1,57 +1,233 @@
 # Backup
 
-<!-- TODO:
+!!! Important
+    With version 1.21, backup and recovery capabilities in CloudNativePG
+    have sensibly changed due to the introduction of native support for
+    [Kubernetes Volume Snapshots](backup_volumesnapshot.md).
+    Up to that point, backup and recovery were available only for object
+    stores. Please carefully read this section and the [recovery](recovery.md)
+    one if you have been a user of CloudNativePG 1.15 through 1.20.
 
-- Explain the two methods: object store and volume snapshots
-- Explain the role of WAL archiving for both cold/hot backups and PITR
+PostgreSQL natively provides first class backup and recovery capabilities based
+on file system level (physical) copy. These have been successfully used for
+more than 15 years in mission critical production databases, helping
+organizations all over the world achieve their disaster recovery goals with
+Postgres.
 
--->
+!!! Note
+    There's another way to backup databases in PostgreSQL, through the
+    `pg_dump` utility - which relies on logical backups instead of physical ones.
+    However, logical backups are not suitable for business continuity use cases
+    and as such are not covered by CloudNativePG (yet, at least).
+    If you want to use the `pg_dump` utility, let yourself be inspired by the
+    ["Troubleshooting / Emergency backup" section](troubleshooting.md#emergency-backup).
 
-CloudNativePG natively supports **online/hot backup** of PostgreSQL
-clusters through continuous physical backup and WAL archiving.
-This means that the database is always up (no downtime required)
-and that you can recover at any point in time from the first
-available base backup in your system. The latter is normally
-referred to as "Point In Time Recovery" (PITR).
+In CloudNativePG, the backup infrastructure for each PostgreSQL cluster is made
+up of the following resources:
 
-The operator can orchestrate a continuous backup infrastructure
-that is based on the [Barman](https://pgbarman.org) tool. Instead
-of using the classical architecture with a Barman server, which
-backs up many PostgreSQL instances, the operator relies on the
-`barman-cloud-wal-archive`, `barman-cloud-check-wal-archive`,
-`barman-cloud-backup`, `barman-cloud-backup-list`, and
-`barman-cloud-backup-delete` tools. As a result, base backups will
-be *tarballs*. Both base backups and WAL files can be compressed
-and encrypted.
+- **WAL archive**: a location containing the WAL files (transactional logs)
+  that are continuously written by Postgres and archived for data durability
+- **Physical base backups**: a copy of all the files that PostgreSQL uses to
+  store the data in the database (primarily the `PGDATA` and any tablespace)
 
-For this, it is required to use an image with `barman-cli-cloud` included.
-You can use the image `ghcr.io/cloudnative-pg/postgresql` for this scope,
-as it is composed of a community PostgreSQL image and the latest
-`barman-cli-cloud` package.
+The WAL archive can only be stored on object stores at the moment.
+
+On the other hand, CloudNativePG supports two ways to store physical base backups:
+
+- on [object stores](backup_barmanobjectstore.md), as tarballs - optionally
+  compressed
+- on [Kubernetes Volume Snapshots](backup_volumesnapshot.md), if supported by
+  the underlying storage class
 
 !!! Important
-    Always ensure that you are running the latest version of the operands
-    in your system to take advantage of the improvements introduced in
-    Barman cloud (as well as improve the security aspects of your cluster).
+    Before choosing your backup strategy with CloudNativePG, it is important that
+    you take some time to familiarize with some basic concepts, like WAL archive,
+    hot and cold backups.
 
-A backup is performed from a primary or a designated primary instance in a
-`Cluster` (please refer to
-[replica clusters](replica_cluster.md)
-for more information about designated primary instances), or alternatively
-on a [standby](#backup-from-a-standby).
+## WAL archive
 
-## Common object stores
+The WAL archive in PostgreSQL is at the heart of **continuous backup**, and it
+is fundamental for the following reasons:
 
-If you are looking for a specific object store such as
-[AWS S3](appendixes/object_stores.md#aws-s3),
-[Microsoft Azure Blob Storage](appendixes/object_stores.md#azure-blob-storage),
-[Google Cloud Storage](appendixes/object_stores.md#google-cloud-storage), or
-[MinIO Gateway](appendixes/object_stores.md#minio-gateway), or a compatible
-provider, please refer to [Appendix A - Common object stores](appendixes/object_stores.md).
+- **Hot backups**: the possibility to take physical base backups from any
+  instance in the Postgres cluster (either primary or standby) without shutting
+  down the server; they are also known as online backups 
+- **Point in Time recovery** (PITR): to possibility to recover at any point in
+  time from the first available base backup in your system
+
+!!! Warning
+    WAL archive alone is useless. Without a physical base backup, you cannot
+    restore a PostgreSQL cluster.
+
+In general, the presence of a WAL archive enhances the resilience of a
+PostgreSQL cluster, allowing each instance to fetch any required WAL file from
+the archive if needed (normally the WAL archive has higher retention periods
+than any Postgres instance that normally recycles those files).
+
+This use case can also be extended to [replica clusters](replica_cluster.md),
+as they can simply rely on the WAL archive to synchronize across long
+distances, extending disaster recovery goals across different regions.
+
+When you [configure a WAL archive](wal_archiving.md), CloudNativePG provides
+out-of-the-box an RPO <= 5 minutes for disaster recovery, even across regions.
+
+!!! Important
+    Our recommendation is to always setup the WAL archive in production.
+    There are known use cases - normally involving staging and development
+    environments - where none of the above benefits are needed and the WAL
+    archive is not necessary. RPO in this case can be any value, such as
+    24 hours (daily backups) or infinite (no backup at all).
+
+## Cold and Hot backups
+
+Hot backups have already been defined in the previous section. They require the
+presence of a WAL archive and they are the norm in any modern database management
+system.
+
+**Cold backups**, also known as offline backups, are instead physical base backups
+taken when the PostgreSQL instance (standby or primary) is shut down. They are
+consistent per definition and they represent a snapshot of the database at the
+time it was shut down.
+
+As a result, PostgreSQL instances can be restarted from a cold backup without
+the need of a WAL archive, even though they can take advantage of it, if
+available (with all the benefits on the recovery side highlighted in the
+previous section).
+
+In those situations with a higher RPO (for example, 1 hour or 24 hours), and
+shorter retention periods, cold backups represent a viable option to be considered
+for your disaster recovery plans.
+
+## Object stores or volume snapshots: which one to use?
+
+In CloudNativePG, object store based backups:
+
+- always require the WAL archive
+- support hot backup only
+- don't support incremental copy
+- don't support differential copy
+
+VolumeSnapshots instead:
+
+- don't require the WAL archive, although in production it is always recommended
+- support cold backup only (currently)
+- support incremental copy, depending on the underlying storage classes
+- support differential copy, depending on the underlying storage classes
+
+Which one to use depends on your specific requirements and environment,
+including:
+
+- availability of a viable object store solution in your Kubernetes cluster
+- availability of a trusted storage class that supports volume snapshots
+- size of the database: with object stores, the larger your database, the
+  longer backup and, most importantly, recovery procedures take (the latter
+  impacts RTO); in presence of Very Large Databases (VLDB), the general
+  advice is to rely on Volume Snapshots as, thanks to copy-on-write, they
+  provide faster recovery
+- data mobility and possibility to store or relay backup files on a
+  secondary location in a different region, or any subsequent one
+- other factors, mostly based on the confidence and familiarity with the
+  underlying storage solutions
+
+The summary table below highlights some of the main differences between the two
+available methods for storing physical base backups.
+
+|                                   | Object store |   Volume Snapshots   |
+|-----------------------------------|:------------:|:--------------------:|
+| **WAL archiving**                 |   Required   |    Recommended (1)   |
+| **Cold backup**                   |      𐄂       |           ✓          |
+| **Hot backup**                    |       ✓      |        𐄂  (2)        |
+| **Incremental copy**              |      𐄂       |         ✓  (3)       |
+| **Differential copy**             |      𐄂       |         ✓  (3)       |
+| **Backup from a standby**         |       ✓      |           ✓          |
+| **Snapshot recovery**             |    𐄂 (4)     |           ✓          |
+| **Point In Time Recovery (PITR)** |       ✓      | Requires WAL archive |
+| **Underlying technology**         | Barman Cloud |   Kubernetes API     |
+
+
+> See the explanation below for the notes in the above table:
+>
+> 1. WAL archive must be on an object store
+> 2. Hot backup is not available yet for volume snapshots, and it is planned
+> for version 1.22; however, considering that cold backup is taken by fencing
+> temporarily a standby, the operation does not induce any downtime for your
+> write applications
+> 3. If supported by the underlying storage classes of the PostgreSQL volumes
+> 4. Snapshot recovery can be emulated using the `bootstrap.recovery.recoveryTarget.targetImmediate` option
+
+## Scheduled backups
+
+Scheduled backups are the recommended way to configure your backup strategy in
+CloudNativePG. They are managed by the `ScheduledBackup` resource.
+
+!!! Info
+    Please refer to [`ScheduledBackupSpec`](api_reference.md#ScheduledBackupSpec)
+    in the API reference for a full list of options.
+
+The `schedule` field allows you to define a *cron schedule* specification,
+expressed in the [Go `cron` package format](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
+
+!!! Warning
+    Beware that this format accepts also the `seconds` field, and it is
+    different from the `crontab` format in Unix/Linux systems.
+
+This is an example of a scheduled backup:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: backup-example
+spec:
+  schedule: "0 0 0 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: pg-backup
+```
+
+The above example will schedule a backup every day at midnight.
+
+!!! Hint
+    Backup frequency might impact your recovery time object (RTO) after a
+    disaster which requires a full or Point-In-Time recovery operation. Our
+    advice is that you regularly test your backups by recovering them, and then
+    measuring the time it takes to recover from scratch so that you can refine
+    your RTO predictability. Recovery time is influenced by the size of the
+    base backup and the amount of WAL files that need to be fetched from the archive
+    and replayed during recovery (remember that WAL archiving is what enables
+    continuous backup in PostgreSQL!).
+    Based on our experience, a weekly base backup is more than enough for most
+    cases - while it is extremely rare to schedule backups more frequently than once
+    a day.
+
+You can choose whether to schedule a backup on a defined object store or a
+volume snapshot via the `.spec.method` attribute, by default set to
+`barmanObjectStore`. If you have properly defined
+[volume snapshots](backup_volumesnapshot.md#how-to-configure-volume-snapshot-backups)
+in the `backup` stanza of the cluster, you can set `method: volumeSnapshot`
+to start scheduling base backups on volume snapshots.
+
+ScheduledBackups can be suspended if needed by setting `.spec.suspend: true`,
+this will stop any new backup to be scheduled as long as the option is set to false.
+
+In case you want to issue a backup as soon as the ScheduledBackup resource is created
+you can set `.spec.immediate: true`.
+
+!!! Note
+    `.spec.backupOwnerReference` indicates which ownerReference should be put inside
+    the created backup resources.
+
+    - *none:* no owner reference for created backup objects (same behavior as before the field was introduced)
+    - *self:* sets the Scheduled backup object as owner of the backup
+    - *cluster:* set the cluster as owner of the backup
 
 ## On-demand backups
 
-To request a new backup, you need to create a new Backup resource
+!!! Info
+    Please refer to [`BackupSpec`](api_reference.md#BackupSpec)
+    in the API reference for a full list of options.
+
+To request a new backup, you need to create a new `Backup` resource
 like the following one:
 
 ```yaml
@@ -60,14 +236,14 @@ kind: Backup
 metadata:
   name: backup-example
 spec:
+  method: barmanObjectStore
   cluster:
     name: pg-backup
 ```
 
-The operator will start to orchestrate the cluster to take the
-required backup using `barman-cloud-backup`. You can check
-the backup status using the plain `kubectl describe backup <name>`
-command:
+In this case, the operator will start to orchestrate the cluster to take the
+required backup on an object store, using `barman-cloud-backup`. You can check
+the backup status using the plain `kubectl describe backup <name>` command:
 
 ```text
 Name:         backup-example
@@ -127,124 +303,9 @@ Events:         <none>
     application user. The secrets are supposed to be backed up as part of
     the standard backup procedures for the Kubernetes cluster.
 
-## Scheduled backups
-
-You can also schedule your backups periodically by creating a
-resource named `ScheduledBackup`. The latter is similar to a
-`Backup` but with an added field, called `schedule`.
-
-This field is a *cron schedule* specification, which follows the same
-[format used in Kubernetes CronJobs](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
-
-This is an example of a scheduled backup:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: ScheduledBackup
-metadata:
-  name: backup-example
-spec:
-  schedule: "0 0 0 * * *"
-  backupOwnerReference: self
-  cluster:
-    name: pg-backup
-```
-
-The above example will schedule a backup every day at midnight.
-
-!!! Hint
-    Backup frequency might impact your recovery time object (RTO) after a
-    disaster which requires a full or Point-In-Time recovery operation. Our
-    advice is that you regularly test your backups by recovering them, and then
-    measuring the time it takes to recover from scratch so that you can refine
-    your RTO predictability. Recovery time is influenced by the size of the
-    base backup and the amount of WAL files that need to be fetched from the archive
-    and replayed during recovery (remember that WAL archiving is what enables
-    continuous backup in PostgreSQL!).
-    Based on our experience, a weekly base backup is more than enough for most
-    cases - while it is extremely rare to schedule backups more frequently than once
-    a day.
-
-ScheduledBackups can be suspended if needed by setting `.spec.suspend: true`,
-this will stop any new backup to be scheduled as long as the option is set to false.
-
-In case you want to issue a backup as soon as the ScheduledBackup resource is created
-you can set `.spec.immediate: true`.
-
-!!! Note
-    `.spec.backupOwnerReference` indicates which ownerReference should be put inside
-    the created backup resources.
-
-    - *none:* no owner reference for created backup objects (same behavior as before the field was introduced)
-    - *self:* sets the Scheduled backup object as owner of the backup
-    - *cluster:* set the cluster as owner of the backup
-
-## WAL archiving
-
-WAL archiving is enabled as soon as you choose a destination path
-and you configure your cloud credentials.
-
-If required, you can choose to compress WAL files as soon as they
-are uploaded and/or encrypt them:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  backup:
-    barmanObjectStore:
-      [...]
-      wal:
-        compression: gzip
-        encryption: AES256
-```
-
-You can configure the encryption directly in your bucket, and the operator
-will use it unless you override it in the cluster configuration.
-
-PostgreSQL implements a sequential archiving scheme, where the
-`archive_command` will be executed sequentially for every WAL
-segment to be archived.
-
-!!! Important
-    By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
-    that WAL files, even in case of low workloads, are closed and archived
-    at least every 5 minutes, providing a deterministic time-based value for
-    your Recovery Point Objective (RPO). Even though you change the value
-    of the [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
-    our experience suggests that the default value set by the operator is
-    suitable for most use cases.
-
-When the bandwidth between the PostgreSQL instance and the object
-store allows archiving more than one WAL file in parallel, you
-can use the parallel WAL archiving feature of the instance manager
-like in the following example:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  backup:
-    barmanObjectStore:
-      [...]
-      wal:
-        compression: gzip
-        maxParallel: 8
-        encryption: AES256
-```
-
-In the previous example, the instance manager optimizes the WAL
-archiving process by archiving in parallel at most eight ready
-WALs, including the one requested by PostgreSQL.
-
-When PostgreSQL will request the archiving of a WAL that has
-already been archived by the instance manager as an optimization,
-that archival request will be just dismissed with a positive status.
-
 ## Backup from a standby
 
+<!-- TODO: Adapt for Volume Snapshots -->
 Taking a base backup requires to scrape the whole data content of the
 PostgreSQL instance on disk, possibly resulting in I/O contention with the
 actual workload of the database.
@@ -262,7 +323,7 @@ no replicas are available, backups will run on the primary instance.
     represents the starting point from which to begin a recovery operation,
     including PITR. Similarly to what happens with
     [`pg_basebackup`](https://www.postgresql.org/docs/current/app-pgbasebackup.html),
-    when backing up from a standby we do not force a switch of the WAL on the
+    when backing up from an online standby we do not force a switch of the WAL on the
     primary. This might produce unexpected results in the short term (before
     `archive_timeout` kicks in) in deployments with low write activity.
 
@@ -278,6 +339,11 @@ spec:
   backup:
     target: "primary"
 ```
+
+!!! Warning
+    Beware of setting the target to primary when performing a cold backup
+    strategy on volume snapshots, as this will shut down the primary for
+    the time needed to take the snapshot, impacting write operations.
 
 When the backup target is set to `prefer-standby`, such policy will ensure
 backups are run on the most up-to-date available secondary instance, or if no
@@ -303,107 +369,3 @@ spec:
 In the previous example, CloudNativePG will invariably choose the primary
 instance even if the `Cluster` is set to prefer replicas.
 
-## Retention policies
-
-CloudNativePG can manage the automated deletion of backup files from
-the backup object store, using **retention policies** based on the recovery
-window.
-
-Internally, the retention policy feature uses `barman-cloud-backup-delete`
-with `--retention-policy “RECOVERY WINDOW OF {{ retention policy value }} {{ retention policy unit }}”`.
-
-For example, you can define your backups with a retention policy of 30 days as
-follows:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  backup:
-    barmanObjectStore:
-      destinationPath: "<destination path here>"
-      s3Credentials:
-        accessKeyId:
-          name: aws-creds
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: aws-creds
-          key: ACCESS_SECRET_KEY
-    retentionPolicy: "30d"
-```
-
-!!! Note "There's more ..."
-    The **recovery window retention policy** is focused on the concept of
-    *Point of Recoverability* (`PoR`), a moving point in time determined by
-    `current time - recovery window`. The *first valid backup* is the first
-    available backup before `PoR` (in reverse chronological order).
-    CloudNativePG must ensure that we can recover the cluster at
-    any point in time between `PoR` and the latest successfully archived WAL
-    file, starting from the first valid backup. Base backups that are older
-    than the first valid backup will be marked as *obsolete* and permanently
-    removed after the next backup is completed.
-
-## Compression algorithms
-
-CloudNativePG by default archives backups and WAL files in an
-uncompressed fashion. However, it also supports the following compression
-algorithms via `barman-cloud-backup` (for backups) and
-`barman-cloud-wal-archive` (for WAL files):
-
-* bzip2
-* gzip
-* snappy
-
-The compression settings for backups and WALs are independent. See the
-[DataBackupConfiguration](api_reference.md#DataBackupConfiguration) and
-[WALBackupConfiguration](api_reference.md#WalBackupConfiguration) sections in
-the API reference.
-
-It is important to note that archival time, restore time, and size change
-between the algorithms, so the compression algorithm should be chosen according
-to your use case.
-
-The Barman team has performed an evaluation of the performance of the supported
-algorithms for Barman Cloud. The following table summarizes a scenario where a
-backup is taken on a local MinIO deployment. The Barman GitHub project includes
-a [deeper analysis](https://github.com/EnterpriseDB/barman/issues/344#issuecomment-992547396).
-
-| Compression | Backup Time (ms) | Restore Time (ms) | Uncompressed size (MB) | Compressed size (MB)  | Approx ratio |
-|-------------|------------------|-------------------|------------------------|-----------------------|--------------|
-| None        | 10927            | 7553              | 395                    | 395                   | 1:1          |
-| bzip2       | 25404            | 13886             | 395                    | 67                    | 5.9:1        |
-| gzip        | 116281           | 3077              | 395                    | 91                    | 4.3:1        |
-| snappy      | 8134             | 8341              | 395                    | 166                   | 2.4:1        |
-
-## Tagging of backup objects
-
-Barman 2.18 introduces support for tagging backup resources when saving them in
-object stores via `barman-cloud-backup` and `barman-cloud-wal-archive`. As a
-result, if your PostgreSQL container image includes Barman with version 2.18 or
-higher, CloudNativePG enables you to specify tags as key-value pairs
-for backup objects, namely base backups, WAL files and history files.
-
-You can use two properties in the `.spec.backup.barmanObjectStore` definition:
-
-- `tags`: key-value pair tags to be added to backup objects and archived WAL
-  file in the backup object store
-- `historyTags`: key-value pair tags to be added to archived history files in
-  the backup object store
-
-The excerpt of a YAML manifest below provides an example of usage of this
-feature:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  backup:
-    barmanObjectStore:
-      [...]
-      tags:
-        backupRetentionPolicy: "expire"
-      historyTags:
-        backupRetentionPolicy: "keep"
-```

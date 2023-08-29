@@ -42,6 +42,29 @@ var _ = Describe("Difference of values of maps", func() {
 	})
 })
 
+var _ = Describe("Set relationship between maps", func() {
+	It("An empty map is subset of every possible map", func() {
+		Expect(IsMapSubset(nil, nil)).To(BeTrue())
+		Expect(IsMapSubset(map[string]string{"one": "1"}, nil)).To(BeTrue())
+
+		Expect(IsMapSubset(nil, map[string]string{"one": "1"})).To(BeFalse())
+	})
+
+	It("Two maps containing different elements are not subsets", func() {
+		Expect(IsMapSubset(map[string]string{"one": "1"}, map[string]string{"two": "2"})).To(BeFalse())
+		Expect(IsMapSubset(map[string]string{"two": "2"}, map[string]string{"one": "1"})).To(BeFalse())
+	})
+
+	It("The subset relationship is not invertible", func() {
+		Expect(IsMapSubset(map[string]string{"one": "1", "two": "2"}, map[string]string{"two": "2"})).To(BeTrue())
+		Expect(IsMapSubset(map[string]string{"two": "2"}, map[string]string{"one": "1", "two": "2"})).To(BeFalse())
+	})
+
+	It("Two equal maps are subsets", func() {
+		Expect(IsMapSubset(map[string]string{"one": "1"}, map[string]string{"one": "1"})).To(BeTrue())
+	})
+})
+
 var _ = Describe("Testing Annotations and labels subset", func() {
 	const environment = "environment"
 	const department = "finance"

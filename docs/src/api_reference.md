@@ -23,6 +23,7 @@ Below you will find a description of the defined resources:
 - [Backup](#Backup)
 - [BackupConfiguration](#BackupConfiguration)
 - [BackupList](#BackupList)
+- [BackupSnapshotStatus](#BackupSnapshotStatus)
 - [BackupSource](#BackupSource)
 - [BackupSpec](#BackupSpec)
 - [BackupStatus](#BackupStatus)
@@ -92,6 +93,7 @@ Below you will find a description of the defined resources:
 - [TablespaceConfiguration](#TablespaceConfiguration)
 - [TablespacesState](#TablespacesState)
 - [Topology](#Topology)
+- [VolumeSnapshotConfiguration](#VolumeSnapshotConfiguration)
 - [WalBackupConfiguration](#WalBackupConfiguration)
 
 
@@ -146,12 +148,13 @@ Name     | Description                                                          
 
 ## BackupConfiguration
 
-BackupConfiguration defines how the backup of the cluster are taken. Currently the only supported backup method is barmanObjectStore. For details and examples refer to the Backup and Recovery section of the documentation
+BackupConfiguration defines how the backup of the cluster are taken. The supported backup methods are BarmanObjectStore and VolumeSnapshot. For details and examples refer to the Backup and Recovery section of the documentation
 
 Name              | Description                                                                                                                                                                                                                                                                                          | Type                                                              
 ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------
+`volumeSnapshot   ` | VolumeSnapshot provides the configuration for the execution of volume snapshot backups.                                                                                                                                                                                                              | [*VolumeSnapshotConfiguration](#VolumeSnapshotConfiguration)      
 `barmanObjectStore` | The configuration for the barman-cloud tool suite                                                                                                                                                                                                                                                    | [*BarmanObjectStoreConfiguration](#BarmanObjectStoreConfiguration)
-`retentionPolicy  ` | RetentionPolicy is the retention policy to be used for backups and WALs (i.e. '60d'). The retention policy is expressed in the form of `XXu` where `XX` is a positive integer and `u` is in `[dwm]` - days, weeks, months.                                                                           | string                                                            
+`retentionPolicy  ` | RetentionPolicy is the retention policy to be used for backups and WALs (i.e. '60d'). The retention policy is expressed in the form of `XXu` where `XX` is a positive integer and `u` is in `[dwm]` - days, weeks, months. It's currently only applicable when using the BarmanObjectStore method.   | string                                                            
 `target           ` | The policy to decide which instance should perform backups. Available options are empty string, which will default to `prefer-standby` policy, `primary` to have backups run always on primary instances, `prefer-standby` to have backups run preferably on the most updated standby, if available. | BackupTarget                                                      
 
 <a id='BackupList'></a>
@@ -164,6 +167,16 @@ Name     | Description                                                          
 -------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------
 `metadata` | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#listmeta-v1-meta)
 `items   ` | List of backups                                                                                                                    - *mandatory*  | [[]Backup](#Backup)                                                                                     
+
+<a id='BackupSnapshotStatus'></a>
+
+## BackupSnapshotStatus
+
+BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
+
+Name      | Description                                                   | Type    
+--------- | ------------------------------------------------------------- | --------
+`snapshots` | The snapshot lists, populated if it is a snapshot type backup | []string
 
 <a id='BackupSource'></a>
 
@@ -185,6 +198,7 @@ Name    | Description                                                           
 ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------
 `cluster` | The cluster to backup                                                                                                                                                                                                                                                                                                                            | [LocalObjectReference](#LocalObjectReference)
 `target ` | The policy to decide which instance should perform this backup. If empty, it defaults to `cluster.spec.backup.target`. Available options are empty string, `primary` and `prefer-standby`. `primary` to have backups run always on primary instances, `prefer-standby` to have backups run preferably on the most updated standby, if available. | BackupTarget                                 
+`method ` | The backup method to be used, possible options are `barmanObjectStore` and `volumeSnapshot`. Defaults to: `barmanObjectStore`.                                                                                                                                                                                                                   | BackupMethod                                 
 
 <a id='BackupStatus'></a>
 
@@ -192,26 +206,28 @@ Name    | Description                                                           
 
 BackupStatus defines the observed state of Backup
 
-Name            | Description                                                                                                                                                                                          | Type                                                                                             
---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------
-`endpointCA     ` | EndpointCA store the CA bundle of the barman endpoint. Useful when using self-signed certificates to avoid errors with certificate issuer and barman-cloud-wal-archive.                              | [*SecretKeySelector](#SecretKeySelector)                                                         
-`endpointURL    ` | Endpoint to be used to upload data to the cloud, overriding the automatic endpoint discovery                                                                                                         | string                                                                                           
-`destinationPath` | The path where to store the backup (i.e. s3://bucket/path/to/folder) this path, with different destination folders, will be used for WALs and for data. This may not be populated in case of errors. | string                                                                                           
-`serverName     ` | The server name on S3, the cluster name is used if this parameter is omitted                                                                                                                         | string                                                                                           
-`encryption     ` | Encryption method required to S3 API                                                                                                                                                                 | string                                                                                           
-`backupId       ` | The ID of the Barman backup                                                                                                                                                                          | string                                                                                           
-`backupName     ` | The Name of the Barman backup                                                                                                                                                                        | string                                                                                           
-`phase          ` | The last backup status                                                                                                                                                                               | BackupPhase                                                                                      
-`startedAt      ` | When the backup was started                                                                                                                                                                          | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta)
-`stoppedAt      ` | When the backup was terminated                                                                                                                                                                       | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta)
-`beginWal       ` | The starting WAL                                                                                                                                                                                     | string                                                                                           
-`endWal         ` | The ending WAL                                                                                                                                                                                       | string                                                                                           
-`beginLSN       ` | The starting xlog                                                                                                                                                                                    | string                                                                                           
-`endLSN         ` | The ending xlog                                                                                                                                                                                      | string                                                                                           
-`error          ` | The detected error                                                                                                                                                                                   | string                                                                                           
-`commandOutput  ` | Unused. Retained for compatibility with old versions.                                                                                                                                                | string                                                                                           
-`commandError   ` | The backup command output in case of error                                                                                                                                                           | string                                                                                           
-`instanceID     ` | Information to identify the instance where the backup has been taken from                                                                                                                            | [*InstanceID](#InstanceID)                                                                       
+Name                 | Description                                                                                                                                                                                          | Type                                                                                             
+-------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------
+`endpointCA          ` | EndpointCA store the CA bundle of the barman endpoint. Useful when using self-signed certificates to avoid errors with certificate issuer and barman-cloud-wal-archive.                              | [*SecretKeySelector](#SecretKeySelector)                                                         
+`endpointURL         ` | Endpoint to be used to upload data to the cloud, overriding the automatic endpoint discovery                                                                                                         | string                                                                                           
+`destinationPath     ` | The path where to store the backup (i.e. s3://bucket/path/to/folder) this path, with different destination folders, will be used for WALs and for data. This may not be populated in case of errors. | string                                                                                           
+`serverName          ` | The server name on S3, the cluster name is used if this parameter is omitted                                                                                                                         | string                                                                                           
+`encryption          ` | Encryption method required to S3 API                                                                                                                                                                 | string                                                                                           
+`backupId            ` | The ID of the Barman backup                                                                                                                                                                          | string                                                                                           
+`backupName          ` | The Name of the Barman backup                                                                                                                                                                        | string                                                                                           
+`phase               ` | The last backup status                                                                                                                                                                               | BackupPhase                                                                                      
+`startedAt           ` | When the backup was started                                                                                                                                                                          | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta)
+`stoppedAt           ` | When the backup was terminated                                                                                                                                                                       | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta)
+`beginWal            ` | The starting WAL                                                                                                                                                                                     | string                                                                                           
+`endWal              ` | The ending WAL                                                                                                                                                                                       | string                                                                                           
+`beginLSN            ` | The starting xlog                                                                                                                                                                                    | string                                                                                           
+`endLSN              ` | The ending xlog                                                                                                                                                                                      | string                                                                                           
+`error               ` | The detected error                                                                                                                                                                                   | string                                                                                           
+`commandOutput       ` | Unused. Retained for compatibility with old versions.                                                                                                                                                | string                                                                                           
+`commandError        ` | The backup command output in case of error                                                                                                                                                           | string                                                                                           
+`instanceID          ` | Information to identify the instance where the backup has been taken from                                                                                                                            | [*InstanceID](#InstanceID)                                                                       
+`snapshotBackupStatus` | Status of the volumeSnapshot backup                                                                                                                                                                  | [BackupSnapshotStatus](#BackupSnapshotStatus)                                                    
+`method              ` | The backup method being used                                                                                                                                                                         | BackupMethod                                                                                     
 
 <a id='BarmanCredentials'></a>
 
@@ -1003,6 +1019,7 @@ Name                 | Description                                              
 `cluster             ` | The cluster to backup                                                                                                                                                                                                                                                                                                                            | [LocalObjectReference](#LocalObjectReference)
 `backupOwnerReference` | Indicates which ownerReference should be put inside the created backup resources.<br /> - none: no owner reference for created backup objects (same behavior as before the field was introduced)<br /> - self: sets the Scheduled backup object as owner of the backup<br /> - cluster: set the cluster as owner of the backup<br />             | string                                       
 `target              ` | The policy to decide which instance should perform this backup. If empty, it defaults to `cluster.spec.backup.target`. Available options are empty string, `primary` and `prefer-standby`. `primary` to have backups run always on primary instances, `prefer-standby` to have backups run preferably on the most updated standby, if available. | BackupTarget                                 
+`method              ` | The backup method to be used, possible options are `barmanObjectStore` and `volumeSnapshot`. Defaults to: `barmanObjectStore`.                                                                                                                                                                                                                   | BackupMethod                                 
 
 <a id='ScheduledBackupStatus'></a>
 
@@ -1126,6 +1143,20 @@ Name                  | Description                                             
 `instances            ` | Instances contains the pod topology of the instances                                                                                                                                                                                                                                                                                                          | map[PodName]PodTopologyLabels
 `nodesUsed            ` | NodesUsed represents the count of distinct nodes accommodating the instances. A value of '1' suggests that all instances are hosted on a single node, implying the absence of High Availability (HA). Ideally, this value should be the same as the number of instances in the Postgres HA cluster, implying shared nothing architecture on the compute side. | int32                        
 `successfullyExtracted` | SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors in synchronous replica election in case of failures                                                                                                                                                                                                | bool                         
+
+<a id='VolumeSnapshotConfiguration'></a>
+
+## VolumeSnapshotConfiguration
+
+VolumeSnapshotConfiguration represents the configuration for the execution of snapshot backups.
+
+Name                   | Description                                                                                                                                                      | Type                  
+---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------
+`labels                ` | Labels are key-value pairs that will be added to .metadata.labels snapshot resources.                                                                            | map[string]string     
+`annotations           ` | Annotations key-value pairs that will be added to .metadata.annotations snapshot resources.                                                                      | map[string]string     
+`className             ` | ClassName specifies the Snapshot Class to be used for PG_DATA PersistentVolumeClaim. It is the default class for the other types if no specific class is present | string                
+`walClassName          ` | WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.                                                                       | string                
+`snapshotOwnerReference` | SnapshotOwnerReference indicates the type of owner reference the snapshot should have. .                                                                         | SnapshotOwnerReference
 
 <a id='WalBackupConfiguration'></a>
 

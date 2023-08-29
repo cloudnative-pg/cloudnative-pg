@@ -19,7 +19,7 @@ package utils
 import (
 	"fmt"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -49,7 +49,7 @@ func FencingOn(
 			return err
 		}
 	case UsingAnnotation:
-		err := fence.ApplyFenceFunc(env.Ctx, env.Client, clusterName, namespace, serverName, utils.AddFencedInstance)
+		err := resources.ApplyFenceFunc(env.Ctx, env.Client, clusterName, namespace, serverName, utils.AddFencedInstance)
 		if err != nil {
 			return err
 		}
@@ -75,7 +75,7 @@ func FencingOff(
 			return err
 		}
 	case UsingAnnotation:
-		err := fence.ApplyFenceFunc(env.Ctx, env.Client, clusterName, namespace, serverName, utils.RemoveFencedInstance)
+		err := resources.ApplyFenceFunc(env.Ctx, env.Client, clusterName, namespace, serverName, utils.RemoveFencedInstance)
 		if err != nil {
 			return err
 		}

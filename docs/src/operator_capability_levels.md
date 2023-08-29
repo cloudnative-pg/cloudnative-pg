@@ -311,20 +311,18 @@ failover and switchover operations. This area includes enhancements in:
 - connection pooling, to improve performance and control through a
   connection pooling layer with pgBouncer.
 
-### PostgreSQL Hot Backups
+### PostgreSQL WAL archive
 
-The operator has been designed to provide application-level backups using
-PostgreSQL’s native continuous hot backup technology based on
-physical base backups and continuous WAL archiving. Specifically,
-the operator currently supports only backups on object stores (AWS S3 and
-S3-compatible, Azure Blob Storage, Google Cloud Storage, and gateways like
-MinIO).
+The operator supports PostgreSQL continuous archiving of WAL files
+to an object store (AWS S3 and S3-compatible, Azure Blob Storage, Google Cloud
+Storage, and gateways like MinIO).
 
-WAL archiving and base backups are defined at the cluster level, declaratively,
-through the `backup` parameter in the cluster definition, by specifying
-an S3 protocol destination URL (for example, to point to a specific folder in
-an AWS S3 bucket) and, optionally, a generic endpoint URL. WAL archiving,
-a prerequisite for continuous backup, does not require any further
+WAL archiving is defined at the cluster level, declaratively, through the
+`backup` parameter in the cluster definition, by specifying an S3 protocol
+destination URL (for example, to point to a specific folder in an AWS S3
+bucket) and, optionally, a generic endpoint URL.
+
+WAL archiving, a prerequisite for continuous backup, does not require any further
 action from the user: the operator will automatically and transparently set
 the `archive_command` to rely on `barman-cloud-wal-archive` to ship WAL
 files to the defined endpoint. Users can decide the compression algorithm,
@@ -333,11 +331,31 @@ in the archive. In addition to that `Instance Manager` automatically checks
 the correctness of the archive destination, by performing `barman-cloud-check-wal-archive` 
 command before beginning to ship the very first set of WAL files.
 
+### PostgreSQL Hot Backups
+
+The operator has been designed to provide application-level backups using
+PostgreSQL’s native continuous hot backup technology based on
+physical base backups and continuous WAL archiving.
+Base backups can be saved on:
+
+- Kubernetes Volume Snapshots
+- object stores (AWS S3 and S3-compatible, Azure Blob Storage, Google Cloud
+  Storage, and gateways like MinIO)
+
+Base backups are defined at the cluster level, declaratively,
+through the `backup` parameter in the cluster definition.
+
 You can define base backups in two ways: on-demand (through the `Backup`
 custom resource definition) or scheduled (through the `ScheduledBackup`
-customer resource definition, using a cron-like syntax). They both rely on
-`barman-cloud-backup` for the job (distributed as part of the application
-container image) to relay backups in the same endpoint, alongside WAL files.
+custom resource definition, using a cron-like syntax).
+
+Volume Snapshots rely directly on the Kubernetes API, which delegates this
+capability to the underlying storage classes and CSI drivers. Volume snapshot
+backups are suitable for Very Large Database (VLDB) contexts.
+
+Object store backups rely on `barman-cloud-backup` for the job (distributed as
+part of the application container image) to relay backups in the same endpoint,
+alongside WAL files.
 
 Both `barman-cloud-wal-restore` and `barman-cloud-backup` are distributed in
 the application container image under GNU GPL 3 terms.
@@ -351,10 +369,12 @@ particular I/O, for standard database operations.
 ### Full restore from a backup
 
 The operator enables you to bootstrap a new cluster (with its settings)
-starting from an existing and accessible backup taken using
-`barman-cloud-backup`. Once the bootstrap process is completed, the operator
-initiates the instance in recovery mode and replays all available WAL files
-from the specified archive, exiting recovery and starting as a primary.
+starting from an existing and accessible backup, either on a volume snapshot
+or in an object store.
+
+Once the bootstrap process is completed, the operator initiates the instance in
+recovery mode and replays all available WAL files from the specified archive,
+exiting recovery and starting as a primary.
 Subsequently, the operator will clone the requested number of standby instances
 from the primary.
 CloudNativePG supports parallel WAL fetching from the archive.
@@ -365,7 +385,7 @@ The operator enables you to create a new PostgreSQL cluster by recovering
 an existing backup to a specific point-in-time, defined with a timestamp, a
 label or a transaction ID. This capability is built on top of the full restore
 one and supports all the options available in
-[PostgreSQL for PITR](https://www.postgresql.org/docs/13/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET).
+[PostgreSQL for PITR](https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET).
 
 ### Zero Data Loss clusters through synchronous replication
 
@@ -390,9 +410,9 @@ version: such a source can be anywhere, as long as a direct streaming
 connection via TLS is allowed from the two endpoints.
 Moreover, the source can be even outside Kubernetes, running in a physical or
 virtual environment.
-Replica clusters can be created from a recovery object store (backup in Barman
-Cloud format) or via streaming through `pg_basebackup`. Both WAL file shipping
-and WAL streaming are allowed.
+Replica clusters can be created from a volume snapshot, a recovery object store
+(backup in Barman Cloud format) or via streaming through `pg_basebackup`.
+Both WAL file shipping and WAL streaming are allowed.
 Replica clusters dramatically improve the business continuity posture of your
 PostgreSQL databases in Kubernetes, spanning over multiple datacenters and
 opening up for hybrid and multi-cloud setups (currently, manual switchover

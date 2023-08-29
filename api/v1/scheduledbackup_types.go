@@ -55,6 +55,12 @@ type ScheduledBackupSpec struct {
 	// standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
 	Target BackupTarget `json:"target,omitempty"`
+
+	// The backup method to be used, possible options are `barmanObjectStore`
+	// and `volumeSnapshot`. Defaults to: `barmanObjectStore`.
+	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
+	// +kubebuilder:default:=barmanObjectStore
+	Method BackupMethod `json:"method,omitempty"`
 }
 
 // ScheduledBackupStatus defines the observed state of ScheduledBackup
@@ -152,6 +158,7 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 		Spec: BackupSpec{
 			Cluster: scheduledBackup.Spec.Cluster,
 			Target:  scheduledBackup.Spec.Target,
+			Method:  scheduledBackup.Spec.Method,
 		},
 	}
 	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, configuration.Current)

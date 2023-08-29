@@ -33,10 +33,10 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
+	pluginresources "github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	pkgres "github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -75,7 +75,7 @@ func newOnCommand(ctx context.Context, clusterName string, force bool) (*onComma
 	}
 
 	// Get the instances to be hibernated
-	managedInstances, primaryInstance, err := resources.GetInstancePods(ctx, clusterName)
+	managedInstances, primaryInstance, err := pluginresources.GetInstancePods(ctx, clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("could not get cluster pods: %w", err)
 	}
@@ -84,7 +84,7 @@ func newOnCommand(ctx context.Context, clusterName string, force bool) (*onComma
 	}
 
 	// Get the PVCs that will be hibernated
-	pvcs, err := resources.GetInstancePVCs(ctx, clusterName, primaryInstance.Name)
+	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, primaryInstance.Name, plugin.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get PVCs: %w", err)
 	}
@@ -178,7 +178,7 @@ func (on *onCommand) fenceClusterStep() error {
 	contextLogger := log.FromContext(on.ctx)
 
 	contextLogger.Debug("applying the fencing annotation to the cluster manifest")
-	if err := fence.ApplyFenceFunc(
+	if err := resources.ApplyFenceFunc(
 		on.ctx,
 		plugin.Client,
 		on.cluster.Name,
@@ -203,7 +203,7 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 	contextLogger := log.FromContext(on.ctx)
 
 	fmt.Println("rolling back hibernation: removing the fencing annotation")
-	err := fence.ApplyFenceFunc(
+	err := resources.ApplyFenceFunc(
 		on.ctx,
 		plugin.Client,
 		on.cluster.Name,
@@ -219,8 +219,8 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 // waitInstancesToBeFenced waits for all instances to be shut down
 func (on *onCommand) waitInstancesToBeFencedStep() error {
 	for _, instance := range on.managedInstances {
-		if err := retry.OnError(hibernationBackoff, pkgres.RetryAlways, func() error {
-			running, err := resources.IsInstanceRunning(on.ctx, instance)
+		if err := retry.OnError(hibernationBackoff, resources.RetryAlways, func() error {
+			running, err := pluginresources.IsInstanceRunning(on.ctx, instance)
 			if err != nil {
 				return fmt.Errorf("error checking instance status (%v): %w", instance.Name, err)
 			}
@@ -298,7 +298,7 @@ func annotatePVCs(
 	pgControlData string,
 ) error {
 	for _, pvc := range pvcs {
-		if err := retry.OnError(retry.DefaultBackoff, pkgres.RetryAlways, func() error {
+		if err := retry.OnError(retry.DefaultBackoff, resources.RetryAlways, func() error {
 			var currentPVC corev1.PersistentVolumeClaim
 			if err := plugin.Client.Get(
 				ctx,
@@ -341,7 +341,7 @@ func removePVCannotations(
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	for _, pvc := range pvcs {
-		if err := retry.OnError(retry.DefaultBackoff, pkgres.RetryAlways, func() error {
+		if err := retry.OnError(retry.DefaultBackoff, resources.RetryAlways, func() error {
 			var currentPVC corev1.PersistentVolumeClaim
 			if err := plugin.Client.Get(
 				ctx,

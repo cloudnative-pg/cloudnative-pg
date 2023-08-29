@@ -17,10 +17,14 @@ limitations under the License.
 package persistentvolumeclaim
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -314,4 +318,46 @@ func getStorageSource(
 	}
 
 	return source, nil
+}
+
+// GetInstancePVCs gets all the PVC associated with a given instance
+func GetInstancePVCs(
+	ctx context.Context,
+	cli client.Client,
+	instanceName string,
+	namespace string,
+) ([]corev1.PersistentVolumeClaim, error) {
+	getPVC := func(name string) (*corev1.PersistentVolumeClaim, error) {
+		var pvc corev1.PersistentVolumeClaim
+		err := cli.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &pvc)
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &pvc, nil
+	}
+
+	var pvcs []corev1.PersistentVolumeClaim
+
+	pgDataName := GetName(instanceName, utils.PVCRolePgData)
+	pgData, err := getPVC(pgDataName)
+	if err != nil {
+		return nil, err
+	}
+	if pgData != nil {
+		pvcs = append(pvcs, *pgData)
+	}
+
+	pgWalName := GetName(instanceName, utils.PVCRolePgWal)
+	pgWal, err := getPVC(pgWalName)
+	if err != nil {
+		return nil, err
+	}
+	if pgWal != nil {
+		pvcs = append(pvcs, *pgWal)
+	}
+
+	return pvcs, nil
 }
