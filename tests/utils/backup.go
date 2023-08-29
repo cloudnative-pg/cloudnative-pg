@@ -493,29 +493,6 @@ func GetConditionsInClusterStatus(
 	return nil, fmt.Errorf("no condition matching requested type found: %v", conditionType)
 }
 
-// CreateVolumeSnapshotBackup use kubectl plugin to create volumesnapshot backup
-func CreateVolumeSnapshotBackup(
-	volumeSnapshotClass,
-	namespace,
-	clusterName,
-	snapshotSuffix,
-	backupName string,
-) error {
-	command := fmt.Sprintf("kubectl cnpg snapshot %v -n %v", clusterName, namespace)
-	if volumeSnapshotClass != "" {
-		command = fmt.Sprintf("%v -c %v", command, volumeSnapshotClass)
-	}
-	if snapshotSuffix != "" {
-		command = fmt.Sprintf("%v -x %v", command, snapshotSuffix)
-	}
-	if backupName != "" {
-		command = fmt.Sprintf("%v -l %v", command, backupName)
-	}
-
-	_, _, err := Run(command)
-	return err
-}
-
 // CreateOnDemandBackup creates a Backup resource for a given cluster name
 func CreateOnDemandBackup(
 	namespace,

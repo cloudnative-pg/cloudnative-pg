@@ -100,7 +100,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// the list of backups we have already taken to see if anything
 	// is running now
 	for _, backup := range childBackups {
-		if backup.Status.IsInProgress() {
+		if !backup.Status.IsDone() {
 			contextLogger.Info(
 				"The system is already taking a scheduledBackup, retrying in 60 seconds",
 				"backupName", backup.GetName(),

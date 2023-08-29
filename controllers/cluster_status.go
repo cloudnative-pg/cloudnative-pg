@@ -18,20 +18,15 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"reflect"
 	"sort"
-	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,22 +34,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
-
-// StatusRequestRetry is the default backoff used to query the instance manager
-// for the status of each PostgreSQL instance.
-var StatusRequestRetry = wait.Backoff{
-	Steps:    5,
-	Duration: 10 * time.Millisecond,
-	Factor:   5.0,
-	Jitter:   0.1,
-}
 
 // managedResources contains the resources that are created a cluster
 // and need to be managed by the controller
@@ -102,16 +87,6 @@ func (resources *managedResources) getPVC(name string) *corev1.PersistentVolumeC
 	}
 
 	return nil
-}
-
-// An InstanceStatusError reports an unsuccessful attempt to retrieve an instance status
-type InstanceStatusError struct {
-	StatusCode int
-	Body       string
-}
-
-func (i InstanceStatusError) Error() string {
-	return fmt.Sprintf("error status code: %v, body: %v", i.StatusCode, i.Body)
 }
 
 // getManagedResources get the managed resources of various types
@@ -793,52 +768,6 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 		return r.Status().Update(ctx, cluster)
 	}
 	return nil
-}
-
-// rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
-func rawInstanceStatusRequest(
-	ctx context.Context,
-	client *http.Client,
-	pod corev1.Pod,
-) (result postgres.PostgresqlStatus) {
-	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
-	if err != nil {
-		result.Error = err
-		return result
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		result.Error = err
-		return result
-	}
-
-	defer func() {
-		err = resp.Body.Close()
-		if err != nil && result.Error == nil {
-			result.Error = err
-		}
-	}()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		result.Error = err
-		return result
-	}
-
-	if resp.StatusCode != 200 {
-		result.Error = &InstanceStatusError{StatusCode: resp.StatusCode, Body: string(body)}
-		return result
-	}
-
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		result.Error = err
-		return result
-	}
-
-	return result
 }
 
 // getPodsTopology returns a map with all the information about the pods topology

@@ -48,6 +48,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -70,14 +71,13 @@ type ClusterReconciler struct {
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 
-	*instanceStatusClient
+	*instance.StatusClient
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
 func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
 	return &ClusterReconciler{
-		instanceStatusClient: newInstanceStatusClient(),
-
+		StatusClient:    instance.NewStatusClient(),
 		DiscoveryClient: discoveryClient,
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
@@ -219,7 +219,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Get the replication status
-	instancesStatus := r.instanceStatusClient.getStatusFromInstances(ctx, resources.instances)
+	instancesStatus := r.StatusClient.GetStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {

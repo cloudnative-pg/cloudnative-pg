@@ -57,7 +57,7 @@ func NewCmd() *cobra.Command {
 				backupName = fmt.Sprintf(
 					"%s-%s",
 					clusterName,
-					time.Now().Format("20060102150400"))
+					time.Now().Format("20060102150405"))
 			}
 
 			// Check if the backup target is correct
