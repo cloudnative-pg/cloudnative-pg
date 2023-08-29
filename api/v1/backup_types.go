@@ -76,6 +76,7 @@ type BackupSpec struct {
 
 	// The backup method to be used, possible options are `barmanObjectStore`
 	// and `volumeSnapshot`. Defaults to: `barmanObjectStore`.
+	// +optional
 	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
@@ -84,6 +85,7 @@ type BackupSpec struct {
 // BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
 type BackupSnapshotStatus struct {
 	// The snapshot lists, populated if it is a snapshot type backup
+	// +optional
 	Snapshots []string `json:"snapshots,omitempty"`
 }
 
@@ -171,9 +173,11 @@ type BackupStatus struct {
 	InstanceID *InstanceID `json:"instanceID,omitempty"`
 
 	// Status of the volumeSnapshot backup
+	// +optional
 	BackupSnapshotStatus BackupSnapshotStatus `json:"snapshotBackupStatus,omitempty"`
 
 	// The backup method being used
+	// +optional
 	Method BackupMethod `json:"method,omitempty"`
 }
 

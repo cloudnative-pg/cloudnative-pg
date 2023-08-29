@@ -131,15 +131,20 @@ const (
 // VolumeSnapshotConfiguration represents the configuration for the execution of snapshot backups.
 type VolumeSnapshotConfiguration struct {
 	// Labels are key-value pairs that will be added to .metadata.labels snapshot resources.
+	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 	// Annotations key-value pairs that will be added to .metadata.annotations snapshot resources.
+	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 	// ClassName specifies the Snapshot Class to be used for PG_DATA PersistentVolumeClaim.
 	// It is the default class for the other types if no specific class is present
+	// +optional
 	ClassName string `json:"className,omitempty"`
 	// WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.
+	// +optional
 	WalClassName string `json:"walClassName,omitempty"`
 	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have. .
+	// +optional
 	// +kubebuilder:validation:Enum=none;cluster;backup
 	// +kubebuilder:default:=none
 	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
@@ -1682,6 +1687,7 @@ type BarmanObjectStoreConfiguration struct {
 // documentation
 type BackupConfiguration struct {
 	// VolumeSnapshot provides the configuration for the execution of volume snapshot backups.
+	// +optional
 	VolumeSnapshot *VolumeSnapshotConfiguration `json:"volumeSnapshot,omitempty"`
 
 	// The configuration for the barman-cloud tool suite

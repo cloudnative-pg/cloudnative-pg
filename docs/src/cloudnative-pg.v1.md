@@ -335,7 +335,7 @@ documentation</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>volumeSnapshot</code> <B>[Required]</B><br/>
+<tr><td><code>volumeSnapshot</code><br/>
 <a href="#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration"><i>VolumeSnapshotConfiguration</i></a>
 </td>
 <td>
@@ -420,7 +420,7 @@ the selected PostgreSQL instance</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>snapshots</code> <B>[Required]</B><br/>
+<tr><td><code>snapshots</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -496,7 +496,7 @@ Available options are empty string, <code>primary</code> and <code>prefer-standb
 standby, if available.</p>
 </td>
 </tr>
-<tr><td><code>method</code> <B>[Required]</B><br/>
+<tr><td><code>method</code><br/>
 <a href="#postgresql-cnpg-io-v1-BackupMethod"><i>BackupMethod</i></a>
 </td>
 <td>
@@ -660,14 +660,14 @@ parameter is omitted</p>
    <p>Information to identify the instance where the backup has been taken from</p>
 </td>
 </tr>
-<tr><td><code>snapshotBackupStatus</code> <B>[Required]</B><br/>
+<tr><td><code>snapshotBackupStatus</code><br/>
 <a href="#postgresql-cnpg-io-v1-BackupSnapshotStatus"><i>BackupSnapshotStatus</i></a>
 </td>
 <td>
    <p>Status of the volumeSnapshot backup</p>
 </td>
 </tr>
-<tr><td><code>method</code> <B>[Required]</B><br/>
+<tr><td><code>method</code><br/>
 <a href="#postgresql-cnpg-io-v1-BackupMethod"><i>BackupMethod</i></a>
 </td>
 <td>
@@ -3789,7 +3789,7 @@ Available options are empty string, <code>primary</code> and <code>prefer-standb
 standby, if available.</p>
 </td>
 </tr>
-<tr><td><code>method</code> <B>[Required]</B><br/>
+<tr><td><code>method</code><br/>
 <a href="#postgresql-cnpg-io-v1-BackupMethod"><i>BackupMethod</i></a>
 </td>
 <td>
@@ -4201,21 +4201,21 @@ in synchronous replica election in case of failures</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>labels</code> <B>[Required]</B><br/>
+<tr><td><code>labels</code><br/>
 <i>map[string]string</i>
 </td>
 <td>
    <p>Labels are key-value pairs that will be added to .metadata.labels snapshot resources.</p>
 </td>
 </tr>
-<tr><td><code>annotations</code> <B>[Required]</B><br/>
+<tr><td><code>annotations</code><br/>
 <i>map[string]string</i>
 </td>
 <td>
    <p>Annotations key-value pairs that will be added to .metadata.annotations snapshot resources.</p>
 </td>
 </tr>
-<tr><td><code>className</code> <B>[Required]</B><br/>
+<tr><td><code>className</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -4223,14 +4223,14 @@ in synchronous replica election in case of failures</p>
 It is the default class for the other types if no specific class is present</p>
 </td>
 </tr>
-<tr><td><code>walClassName</code> <B>[Required]</B><br/>
+<tr><td><code>walClassName</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.</p>
 </td>
 </tr>
-<tr><td><code>snapshotOwnerReference</code> <B>[Required]</B><br/>
+<tr><td><code>snapshotOwnerReference</code><br/>
 <a href="#postgresql-cnpg-io-v1-SnapshotOwnerReference"><i>SnapshotOwnerReference</i></a>
 </td>
 <td>
