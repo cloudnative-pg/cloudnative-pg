@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -271,6 +270,8 @@ var _ = Describe("Verify Volume Snapshot",
 				namespacePrefix = "declarative-snapshot-backup"
 				level           = tests.High
 				filesDir        = fixturesDir + "/volume_snapshot"
+				snapshotDataEnv = "SNAPSHOT_NAME_PGDATA"
+				snapshotWalEnv  = "SNAPSHOT_NAME_PGWAL"
 			)
 			// file constants
 			const (
@@ -300,8 +301,14 @@ var _ = Describe("Verify Volume Snapshot",
 					if CurrentSpecReport().Failed() {
 						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 					}
-					_ = os.Unsetenv("SNAPSHOT_NAME_PGDATA")
-					_ = os.Unsetenv("SNAPSHOT_NAME_PGWAL")
+					err = os.Unsetenv(snapshotDataEnv)
+					if err != nil {
+						return err
+					}
+					err = os.Unsetenv(snapshotWalEnv)
+					if err != nil {
+						return err
+					}
 					return env.DeleteNamespace(namespace)
 				})
 			})
@@ -361,21 +368,8 @@ var _ = Describe("Verify Volume Snapshot",
 					}
 				})
 
-				By("setting the snapshot name env variable", func() {
-					for _, item := range snapshotList.Items {
-						switch utils.PVCRole(item.Labels[utils.PvcRoleLabelName]) {
-						case utils.PVCRolePgData:
-							err = os.Setenv("SNAPSHOT_NAME_PGDATA", item.Name)
-						case utils.PVCRolePgWal:
-							err = os.Setenv("SNAPSHOT_NAME_PGWAL", item.Name)
-						default:
-							Fail(fmt.Sprintf("Unrecognized PVC snapshot role: %s, name: %s",
-								item.Labels[utils.PvcRoleLabelName],
-								item.Name,
-							))
-						}
-					}
-				})
+				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
+				Expect(err).ToNot(HaveOccurred())
 
 				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterToRestoreFilePath)
 				Expect(err).ToNot(HaveOccurred())

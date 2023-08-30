@@ -190,7 +190,7 @@ a backup of the source cluster has been created already.
 #### Example using a Volume Snapshot
 
 In case you are using volume snapshots, and your storage class provides
-cross-clusters availability of the snapshots, you can leaverage that to
+cross-clusters availability of the snapshots, you can leverage that to
 bootstrap a replica cluster through a volume snapshot of the source cluster.
 This **third example** defines a replica cluster that bootstraps from a volume
 snapshot using the `recovery` section. It uses both streaming replication

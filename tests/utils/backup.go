@@ -511,3 +511,44 @@ func CreateVolumeSnapshotBackup(
 	_, _, err := Run(command)
 	return err
 }
+
+// CreateOnDemandBackup creates a Backup resource for a given cluster name
+func CreateOnDemandBackup(
+	namespace,
+	clusterName,
+	backupName string,
+	target apiv1.BackupTarget,
+	method apiv1.BackupMethod,
+	env *TestingEnvironment,
+) (*apiv1.Backup, error) {
+	targetBackup := &apiv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: namespace,
+		},
+		Spec: apiv1.BackupSpec{
+			Cluster: apiv1.LocalObjectReference{
+				Name: clusterName,
+			},
+			Target: "",
+			Method: "",
+		},
+	}
+
+	if target != "" {
+		targetBackup.Spec.Target = target
+	}
+	if method != "" {
+		targetBackup.Spec.Method = method
+	}
+
+	obj, err := CreateObject(env, targetBackup)
+	if err != nil {
+		return nil, err
+	}
+	backup, ok := obj.(*apiv1.Backup)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of Backup type: %T %v", obj, obj)
+	}
+	return backup, nil
+}
