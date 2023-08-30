@@ -38,9 +38,16 @@ import (
 
 var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic), func() {
 	const (
-		clusterManifest = fixturesDir + "/tablespaces/cluster-with-tablespaces.yaml.template"
-		level           = tests.Medium
-		ERROR           = "error"
+		level            = tests.Medium
+		ERROR            = "error"
+		firstTablespace  = "atablespace"
+		secondTablespace = "anothertablespace"
+		namespacePrefix  = "tablespaces"
+	)
+	var (
+		clusterName string
+		namespace   string
+		cluster     *apiv1.Cluster
 	)
 
 	BeforeEach(func() {
@@ -49,135 +56,79 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic),
 		}
 	})
 
+	clusterSetup := func(clusterManifest string) {
+		var err error
+		// Create a cluster in a namespace we'll delete after the test
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
+
+		clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("creating a cluster and having it be ready", func() {
+			AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+		})
+		cluster, err = env.GetCluster(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		clusterLogs := logs.ClusterStreamingRequest{
+			Cluster: cluster,
+			Options: &corev1.PodLogOptions{
+				Follow: true,
+			},
+		}
+		var buffer bytes.Buffer
+		go func() {
+			defer GinkgoRecover()
+			err = clusterLogs.SingleStream(context.TODO(), &buffer)
+			Expect(err).ToNot(HaveOccurred())
+		}()
+
+		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().Failed() {
+				specName := CurrentSpecReport().FullText()
+				capLines := 10
+				GinkgoWriter.Printf("DUMPING tailed CLUSTER Logs with error/warning (at most %v lines ). Failed Spec: %v\n",
+					capLines, specName)
+				GinkgoWriter.Println("================================================================================")
+				saveLogs(&buffer, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
+				GinkgoWriter.Println("================================================================================")
+			}
+		})
+	}
+
 	Context("new cluster with tablespaces", Ordered, func() {
-		const (
-			clusterManifest  = fixturesDir + "/tablespaces/cluster-with-tablespaces.yaml.template"
-			firstTablespace  = "atablespace"
-			secondTablespace = "anothertablespace"
-			namespacePrefix  = "tablespaces"
-		)
-		var clusterName, namespace string
-		var cluster *apiv1.Cluster
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 
+		clusterManifest := fixturesDir + "/tablespaces/cluster-with-tablespaces.yaml.template"
 		BeforeAll(func() {
-			var err error
-			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
-
-			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("creating a cluster and having it be ready", func() {
-				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
-			})
-			cluster, err = env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-
-			clusterLogs := logs.ClusterStreamingRequest{
-				Cluster: cluster,
-				Options: &corev1.PodLogOptions{
-					Follow: true,
-				},
-			}
-			var buffer bytes.Buffer
-			go func() {
-				defer GinkgoRecover()
-				err = clusterLogs.SingleStream(context.TODO(), &buffer)
-				Expect(err).ToNot(HaveOccurred())
-			}()
-
-			DeferCleanup(func(ctx SpecContext) {
-				if CurrentSpecReport().Failed() {
-					specName := CurrentSpecReport().FullText()
-					capLines := 10
-					GinkgoWriter.Printf("DUMPING tailed CLUSTER Logs with error/warning (at most %v lines ). Failed Spec: %v\n",
-						capLines, specName)
-					GinkgoWriter.Println("================================================================================")
-					saveLogs(&buffer, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
-					GinkgoWriter.Println("================================================================================")
-				}
-			})
+			clusterSetup(clusterManifest)
 		})
 
 		It("can verify tablespaces and PVC were created", func() {
-			Eventually(func(g Gomega) {
-				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster)
-			}, 5).Should(Succeed())
-			Eventually(func(g Gomega) {
-				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster)
-			}, 5).Should(Succeed())
-			Eventually(func(g Gomega) {
-				AssertDatabaseContainsTablespaces(cluster)
-			}, 5).Should(Succeed())
+			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, testTimeouts[testUtils.Short])
+			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.Short])
+			AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.Short])
 		})
 	})
 
 	Context("plain cluster", Ordered, func() {
-		const (
-			clusterManifest  = fixturesDir + "/base/cluster-basic.yaml"
-			firstTablespace  = "atablespace"
-			secondTablespace = "anothertablespace"
-			namespacePrefix  = "tablespaces"
-		)
-		var clusterName, namespace string
-		var cluster *apiv1.Cluster
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 
+		clusterManifest := fixturesDir + "/base/cluster-basic.yaml"
 		BeforeAll(func() {
-			var err error
-			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
-
-			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("creating a cluster and having it be ready", func() {
-				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
-			})
-			cluster, err = env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-
-			clusterLogs := logs.ClusterStreamingRequest{
-				Cluster: cluster,
-				Options: &corev1.PodLogOptions{
-					Follow: true,
-				},
-			}
-			var buffer bytes.Buffer
-			go func() {
-				defer GinkgoRecover()
-				err = clusterLogs.SingleStream(context.TODO(), &buffer)
-				Expect(err).ToNot(HaveOccurred())
-			}()
-
-			DeferCleanup(func(ctx SpecContext) {
-				if CurrentSpecReport().Failed() {
-					specName := CurrentSpecReport().FullText()
-					capLines := 10
-					GinkgoWriter.Printf("DUMPING tailed CLUSTER Logs with error/warning (at most %v lines ). Failed Spec: %v\n",
-						capLines, specName)
-					GinkgoWriter.Println("================================================================================")
-					saveLogs(&buffer, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
-					GinkgoWriter.Println("================================================================================")
-				}
-			})
+			clusterSetup(clusterManifest)
 		})
 
 		It("can update cluster adding tablespaces", func() {
@@ -207,7 +158,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic),
 				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
 			})
 			By("waiting for the cluster to be ready", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testUtils.ClusterIsReady], env)
 			})
 		})
 
@@ -216,22 +167,30 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic),
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
 
-			Eventually(func(g Gomega) {
-				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster)
-			}, 120).Should(Succeed())
-			Eventually(func(g Gomega) {
-				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster)
-			}, 30).Should(Succeed())
-			Eventually(func(g Gomega) {
-				AssertDatabaseContainsTablespaces(cluster)
-			}, 30).Should(Succeed())
+			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
+			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
+			AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.PodRollout])
 		})
 	})
 })
 
-func AssertClusterHasMountPointsAndVolumesForTablespaces(cluster *apiv1.Cluster) {
+func AssertClusterHasMountPointsAndVolumesForTablespaces(cluster *apiv1.Cluster, timeout int) {
 	namespace := cluster.ObjectMeta.Namespace
 	clusterName := cluster.ObjectMeta.Name
+	podMountPaths := func(pod corev1.Pod) (bool, []string) {
+		var hasPostgresContainer bool
+		var mountPaths []string
+		for _, ctr := range pod.Spec.Containers {
+			if ctr.Name == "postgres" {
+				hasPostgresContainer = true
+				for _, mt := range ctr.VolumeMounts {
+					mountPaths = append(mountPaths, mt.MountPath)
+				}
+			}
+		}
+		return hasPostgresContainer, mountPaths
+	}
+
 	By("checking the mount points and volumes in the pods", func() {
 		Eventually(func(g Gomega) {
 			g.Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
@@ -240,17 +199,7 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(cluster *apiv1.Cluster)
 			g.Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
 				g.Expect(pod.Spec.Containers).ToNot(BeEmpty())
-				var hasPostgresContainer bool
-				var mountPaths []string
-
-				for _, ctr := range pod.Spec.Containers {
-					if ctr.Name == "postgres" {
-						hasPostgresContainer = true
-						for _, mt := range ctr.VolumeMounts {
-							mountPaths = append(mountPaths, mt.MountPath)
-						}
-					}
-				}
+				hasPostgresContainer, mountPaths := podMountPaths(pod)
 				g.Expect(hasPostgresContainer).To(BeTrue())
 				for tbsName := range cluster.Spec.Tablespaces {
 					g.Expect(mountPaths).To(ContainElements(
@@ -275,11 +224,11 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(cluster *apiv1.Cluster)
 					))
 				}
 			}
-		}, 60).Should(Succeed())
+		}, timeout).Should(Succeed())
 	})
 }
 
-func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster) {
+func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeout int) {
 	namespace := cluster.ObjectMeta.Namespace
 	clusterName := cluster.ObjectMeta.Name
 	By("checking all the required PVCs were created", func() {
@@ -312,7 +261,7 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster) {
 					g.Expect(tablespacePvcNames).To(ContainElement(pod.Name + "-tbs-" + tbsName))
 				}
 			}
-		}, 60).Should(Succeed())
+		}, timeout).Should(Succeed())
 	})
 	By("checking the data directory for the tablespaces is owned by postgres", func() {
 		Eventually(func(g Gomega) {
@@ -333,12 +282,11 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster) {
 					g.Expect(owner).To(ContainSubstring("postgres"))
 				}
 			}
-
-		}, 60).Should(Succeed())
+		}, timeout).Should(Succeed())
 	})
 }
 
-func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster) {
+func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 	namespace := cluster.ObjectMeta.Namespace
 	clusterName := cluster.ObjectMeta.Name
 	By("checking the expected tablespaces are in the database", func() {
@@ -357,6 +305,6 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster) {
 			for tbsName := range cluster.Spec.Tablespaces {
 				g.Expect(tbsListing).To(ContainSubstring(tbsName))
 			}
-		}, 60).Should(Succeed())
+		}, timeout).Should(Succeed())
 	})
 }
