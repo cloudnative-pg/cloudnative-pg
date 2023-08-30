@@ -52,6 +52,9 @@ const (
 	// PathCache is the URL path for cached resources
 	PathCache string = "/cache/"
 
+	// PathPGControlData is the URL path for PostgreSQL pg_controldata output
+	PathPGControlData string = "/pg/controldata"
+
 	// StatusPort is the port for status HTTP requests
 	StatusPort int = 8000
 )

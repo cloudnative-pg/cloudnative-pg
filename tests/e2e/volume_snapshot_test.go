@@ -358,6 +358,10 @@ var _ = Describe("Verify Volume Snapshot",
 						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
 						Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
 						Expect(item.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
+						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).ToNot(BeEmpty())
+						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).To(ContainSubstring(clusterToBackupName))
+						Expect(item.Annotations[utils.PgControldataAnnotationName]).ToNot(BeEmpty())
+						Expect(item.Annotations[utils.PgControldataAnnotationName]).To(ContainSubstring("pg_control version number:"))
 					}
 				})
 

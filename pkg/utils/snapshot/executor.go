@@ -300,6 +300,12 @@ func (se *Executor) createSnapshot(
 			VolumeSnapshotClassName: snapshotClassName,
 		},
 	}
+	if snapshot.Labels == nil {
+		snapshot.Labels = map[string]string{}
+	}
+	if snapshot.Annotations == nil {
+		snapshot.Annotations = map[string]string{}
+	}
 
 	se.snapshotEnrichFunc(&snapshot)
 
