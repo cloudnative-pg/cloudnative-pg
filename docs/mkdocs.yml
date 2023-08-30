@@ -10,6 +10,7 @@ extra_css:
 markdown_extensions:
   - admonition
   - def_list
+  - attr_list
 
 nav:
   - index.md
@@ -59,7 +60,7 @@ nav:
   - benchmarking.md
   - commercial_support.md
   - faq.md
-  - api_reference.md
+  - cloudnative-pg.v1.md
   - supported_releases.md
   - release_notes.md
   - Appendixes:

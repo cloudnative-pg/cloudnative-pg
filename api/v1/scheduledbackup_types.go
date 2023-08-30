@@ -26,9 +26,11 @@ import (
 // ScheduledBackupSpec defines the desired state of ScheduledBackup
 type ScheduledBackupSpec struct {
 	// If this backup is suspended or not
+	// +optional
 	Suspend *bool `json:"suspend,omitempty"`
 
 	// If the first backup has to be immediately start after creation or not
+	// +optional
 	Immediate *bool `json:"immediate,omitempty"`
 
 	// The schedule does not follow the same format used in Kubernetes CronJobs
@@ -37,7 +39,7 @@ type ScheduledBackupSpec struct {
 	Schedule string `json:"schedule"`
 
 	// The cluster to backup
-	Cluster LocalObjectReference `json:"cluster,omitempty"`
+	Cluster LocalObjectReference `json:"cluster"`
 
 	// Indicates which ownerReference should be put inside the created backup resources.<br />
 	// - none: no owner reference for created backup objects (same behavior as before the field was introduced)<br />
@@ -45,6 +47,7 @@ type ScheduledBackupSpec struct {
 	// - cluster: set the cluster as owner of the backup<br />
 	// +kubebuilder:validation:Enum=none;self;cluster
 	// +kubebuilder:default:=none
+	// +optional
 	BackupOwnerReference string `json:"backupOwnerReference,omitempty"`
 
 	// The policy to decide which instance should perform this backup. If empty,
@@ -54,12 +57,14 @@ type ScheduledBackupSpec struct {
 	// `prefer-standby` to have backups run preferably on the most updated
 	// standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
+	// +optional
 	Target BackupTarget `json:"target,omitempty"`
 }
 
 // ScheduledBackupStatus defines the observed state of ScheduledBackup
 type ScheduledBackupStatus struct {
 	// The latest time the schedule
+	// +optional
 	LastCheckTime *metav1.Time `json:"lastCheckTime,omitempty"`
 
 	// Information when was the last time that backup was successfully scheduled.
@@ -71,6 +76,7 @@ type ScheduledBackupStatus struct {
 	NextScheduleTime *metav1.Time `json:"nextScheduleTime,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
@@ -81,14 +87,15 @@ type ScheduledBackupStatus struct {
 // ScheduledBackup is the Schema for the scheduledbackups API
 type ScheduledBackup struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
 	// Specification of the desired behavior of the ScheduledBackup.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	Spec ScheduledBackupSpec `json:"spec,omitempty"`
+	Spec ScheduledBackupSpec `json:"spec"`
 	// Most recently observed status of the ScheduledBackup. This data may not be up
 	// to date. Populated by the system. Read-only.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
 	Status ScheduledBackupStatus `json:"status,omitempty"`
 }
 

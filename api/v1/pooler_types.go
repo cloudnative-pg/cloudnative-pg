@@ -23,7 +23,7 @@ import (
 )
 
 // PoolerType is the type of the connection pool, meaning the service
-// we are targeting
+// we are targeting. Allowed values are `rw` and `ro`.
 // +kubebuilder:validation:Enum=rw;ro
 type PoolerType string
 
@@ -56,24 +56,29 @@ type PoolerSpec struct {
 	// Pooler name should never match with any cluster name within the same namespace.
 	Cluster LocalObjectReference `json:"cluster"`
 
-	// Which instances we must forward traffic to?
+	// Type of service to forward traffic to. Default: `rw`.
 	// +kubebuilder:default:=rw
-	Type PoolerType `json:"type"`
+	// +optional
+	Type PoolerType `json:"type,omitempty"`
 
-	// The number of replicas we want
+	// The number of replicas we want. Default: 1.
 	// +kubebuilder:default:=1
-	Instances int32 `json:"instances"`
+	// +optional
+	Instances int32 `json:"instances,omitempty"`
 
 	// The template of the Pod to be created
+	// +optional
 	Template *PodTemplateSpec `json:"template,omitempty"`
 
 	// The PgBouncer configuration
 	PgBouncer *PgBouncerSpec `json:"pgbouncer"`
 
 	// The deployment strategy to use for pgbouncer to replace existing pods with new ones
+	// +optional
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
 
 	// The configuration of the monitoring infrastructure of this pooler.
+	// +optional
 	Monitoring *PoolerMonitoringConfiguration `json:"monitoring,omitempty"`
 }
 
@@ -85,6 +90,7 @@ type PoolerSpec struct {
 type PoolerMonitoringConfiguration struct {
 	// Enable or disable the `PodMonitor`
 	// +kubebuilder:default:=false
+	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 }
 
@@ -113,24 +119,28 @@ type PodTemplateSpec struct {
 
 // PgBouncerSpec defines how to configure PgBouncer
 type PgBouncerSpec struct {
-	// The pool mode
+	// The pool mode. Default: `session`.
 	// +kubebuilder:default:=session
-	PoolMode PgBouncerPoolMode `json:"poolMode"`
+	// +optional
+	PoolMode PgBouncerPoolMode `json:"poolMode,omitempty"`
 
 	// The credentials of the user that need to be used for the authentication
 	// query. In case it is specified, also an AuthQuery
 	// (e.g. "SELECT usename, passwd FROM pg_shadow WHERE usename=$1")
 	// has to be specified and no automatic CNPG Cluster integration will be triggered.
+	// +optional
 	AuthQuerySecret *LocalObjectReference `json:"authQuerySecret,omitempty"`
 
 	// The query that will be used to download the hash of the password
 	// of a certain user. Default: "SELECT usename, passwd FROM user_search($1)".
 	// In case it is specified, also an AuthQuerySecret has to be specified and
 	// no automatic CNPG Cluster integration will be triggered.
+	// +optional
 	AuthQuery string `json:"authQuery,omitempty"`
 
 	// Additional parameters to be passed to PgBouncer - please check
 	// the CNPG documentation for a list of options you can configure
+	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
 	// PostgreSQL Host Based Authentication rules (lines to be appended
@@ -143,6 +153,7 @@ type PgBouncerSpec struct {
 	// client connections until this value is set to `false` (default). Internally,
 	// the operator calls PgBouncer's `PAUSE` and `RESUME` commands.
 	// +kubebuilder:default:=false
+	// +optional
 	Paused *bool `json:"paused,omitempty"`
 }
 
@@ -154,23 +165,29 @@ func (in PgBouncerSpec) IsPaused() bool {
 // PoolerStatus defines the observed state of Pooler
 type PoolerStatus struct {
 	// The resource version of the config object
+	// +optional
 	Secrets *PoolerSecrets `json:"secrets,omitempty"`
 	// The number of pods trying to be scheduled
+	// +optional
 	Instances int32 `json:"instances,omitempty"`
 }
 
 // PoolerSecrets contains the versions of all the secrets used
 type PoolerSecrets struct {
 	// The server TLS secret version
+	// +optional
 	ServerTLS SecretVersion `json:"serverTLS,omitempty"`
 
 	// The server CA secret version
+	// +optional
 	ServerCA SecretVersion `json:"serverCA,omitempty"`
 
 	// The client CA secret version
+	// +optional
 	ClientCA SecretVersion `json:"clientCA,omitempty"`
 
 	// The version of the secrets used by PgBouncer
+	// +optional
 	PgBouncerSecrets *PgBouncerSecrets `json:"pgBouncerSecrets,omitempty"`
 }
 
@@ -178,18 +195,22 @@ type PoolerSecrets struct {
 // by pgbouncer
 type PgBouncerSecrets struct {
 	// The auth query secret version
+	// +optional
 	AuthQuery SecretVersion `json:"authQuery,omitempty"`
 }
 
 // SecretVersion contains a secret name and its ResourceVersion
 type SecretVersion struct {
 	// The name of the secret
+	// +optional
 	Name string `json:"name,omitempty"`
 
 	// The ResourceVersion of the secret
+	// +optional
 	Version string `json:"version,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -200,9 +221,15 @@ type SecretVersion struct {
 // Pooler is the Schema for the poolers API
 type Pooler struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
-	Spec   PoolerSpec   `json:"spec,omitempty"`
+	// Specification of the desired behavior of the Pooler.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec PoolerSpec `json:"spec"`
+	// Most recently observed status of the Pooler. This data may not be up to
+	// date. Populated by the system. Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
 	Status PoolerStatus `json:"status,omitempty"`
 }
 
