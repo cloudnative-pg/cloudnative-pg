@@ -228,7 +228,7 @@ In CloudNativePG, we use the terms:
 
 This feature, introduced in CloudNativePG 1.18, can be enabled via configuration.
 For details, please refer to the
-["replicationSlots" section in the API reference](api_reference.md#ReplicationSlotsConfiguration).
+["replicationSlots" section in the API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ReplicationSlotsConfiguration).
 Here follows a brief description of the main options:
 
 `.spec.replicationSlots.highAvailability.enabled`

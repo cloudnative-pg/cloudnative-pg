@@ -32,7 +32,7 @@ For more detailed information about this feature, please refer to the
     [Kubernetes' native `VolumeSnapshot` API](https://github.com/cloudnative-pg/cloudnative-pg/issues/2081)
     for both incremental and differential copy in backup and recovery
     operations - if supported by the underlying storage classes.
-    Please see ["Recovery from Volume Snapshot objects"](#recovery-from-volumesnapshot-objects)
+    Please see ["Recovery from Volume Snapshot objects"](recovery.md#recovery-from-volumesnapshot-objects)
     for details.
 
 ## The `bootstrap` section
@@ -55,7 +55,7 @@ used to spin up replica clusters. They both rely on the definition of external
 clusters.
 
 !!! Seealso "API reference"
-    Please refer to the ["API reference for the `bootstrap` section](api_reference.md#BootstrapConfiguration)
+    Please refer to the ["API reference for the `bootstrap` section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BootstrapConfiguration)
     for more information.
 
 ## The `externalClusters` section
@@ -95,7 +95,7 @@ continuously fed from the source, either via streaming, via WAL shipping
 through the PostgreSQL's `restore_command`, or any of the two.
 
 !!! Seealso "API reference"
-    Please refer to the ["API reference for the `externalClusters` section](api_reference.md#ExternalCluster)
+    Please refer to the ["API reference for the `externalClusters` section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ExternalCluster)
     for more information.
 
 ## Bootstrap an empty cluster (`initdb`)
