@@ -82,4 +82,4 @@ Cluster with declarative role management
   declares a role with the `managed` stanza, includes password management with
   kubernetes secrets
 
-For a list of available options, please refer to the ["API Reference" page](api_reference.md).
+For a list of available options, please refer to the ["API Reference" page](cloudnative-pg.v1.md).

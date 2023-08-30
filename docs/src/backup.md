@@ -161,7 +161,7 @@ Scheduled backups are the recommended way to configure your backup strategy in
 CloudNativePG. They are managed by the `ScheduledBackup` resource.
 
 !!! Info
-    Please refer to [`ScheduledBackupSpec`](api_reference.md#ScheduledBackupSpec)
+    Please refer to [`ScheduledBackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ScheduledBackupSpec)
     in the API reference for a full list of options.
 
 The `schedule` field allows you to define a *cron schedule* specification,
@@ -224,7 +224,7 @@ you can set `.spec.immediate: true`.
 ## On-demand backups
 
 !!! Info
-    Please refer to [`BackupSpec`](api_reference.md#BackupSpec)
+    Please refer to [`BackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BackupSpec)
     in the API reference for a full list of options.
 
 To request a new backup, you need to create a new `Backup` resource

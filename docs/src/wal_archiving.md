@@ -13,7 +13,7 @@ the ["Backup on object stores" section](backup_objectstore.md) to set up
 the WAL archive.
 
 !!! Info
-    Please refer to [`BarmanObjectStoreConfiguration`](api_reference.md#barmanobjectstoreconfiguration)
+    Please refer to [`BarmanObjectStoreConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-barmanobjectstoreconfiguration)
     in the API reference for a full list of options.
 
 If required, you can choose to compress WAL files as soon as they
