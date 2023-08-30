@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -130,11 +131,22 @@ func (r *InstanceReconciler) Reconcile(
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadNeeded := r.RefreshSecrets(ctx, cluster)
 
-	reloadConfigNeeded, err := r.refreshConfigurationFiles(ctx, cluster)
-	if err != nil {
-		return reconcile.Result{}, err
+	// The pg configuration defined in the cluster might be tight to the image
+	// declared in the spec, so applying it to a different image could make
+	// postgres to start failing
+	currentPodImage := os.Getenv("IMAGE")
+	if currentPodImage == cluster.Spec.ImageName {
+		reloadConfigNeeded, err := r.refreshConfigurationFiles(ctx, cluster)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		reloadNeeded = reloadNeeded || reloadConfigNeeded
+	} else {
+		contextLogger.Info("The cluster image differs from the current pod image,"+
+			" will not proceed with reconciling the config",
+			"Cluster Image", cluster.Spec.ImageName,
+			"Pod Image", currentPodImage)
 	}
-	reloadNeeded = reloadNeeded || reloadConfigNeeded
 
 	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
 	if !r.firstReconcileDone.Load() {

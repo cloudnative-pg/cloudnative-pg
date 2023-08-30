@@ -326,6 +326,7 @@ var _ = Describe("EnvConfig", func() {
 							Value: "EXPECTED",
 						},
 					},
+					ImageName: "postgres:latest",
 				},
 			}
 			envConfig := CreatePodEnvConfig(cluster, "test-1")
@@ -355,6 +356,10 @@ var _ = Describe("EnvConfig", func() {
 					{
 						Name:  "PGHOST",
 						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "IMAGE",
+						Value: cluster.GetImageName(),
 					},
 					{
 						Name:  "TEST_ENV",
