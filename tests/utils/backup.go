@@ -530,8 +530,6 @@ func CreateOnDemandBackup(
 			Cluster: apiv1.LocalObjectReference{
 				Name: clusterName,
 			},
-			Target: "",
-			Method: "",
 		},
 	}
 
