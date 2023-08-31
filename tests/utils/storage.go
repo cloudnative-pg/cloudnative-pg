@@ -99,6 +99,7 @@ func SetSnapshotNameAsEnv(
 	if len(snapshotList.Items) > 2 {
 		return fmt.Errorf("cannot handle a snapshotList with more than 2 snapshots")
 	}
+
 	for _, item := range snapshotList.Items {
 		switch utils.PVCRole(item.Labels[utils.PvcRoleLabelName]) {
 		case utils.PVCRolePgData:
