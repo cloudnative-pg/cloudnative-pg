@@ -45,7 +45,7 @@ PostGIS example
 : [`postgis-example.yaml`](samples/postgis-example.yaml):
    an example of "PostGIS cluster" (see the [PostGIS section](postgis.md) for details.)
 
-Replica cluster via streaming
+Replica cluster via streaming (pg_basebackup)
 :   **Prerequisites**: [`cluster-example.yaml`](samples/cluster-example.yaml)
     applied and Healthy
 :   [`cluster-example-replica-streaming.yaml`](samples/cluster-example-replica-streaming.yaml): a replica cluster following `cluster-example` with streaming replication.
@@ -56,7 +56,7 @@ Simple cluster with backup configured
 :  [`cluster-example-with-backup.yaml`](samples/cluster-example-with-backup.yaml)
    a basic cluster with backups configured.
 
-Replica cluster via backup
+Replica cluster via Backup from an object store
 :   **Prerequisites**:
     [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml) applied and Healthy.
     And a backup
@@ -64,6 +64,15 @@ Replica cluster via backup
     applied and Completed.
 : [`cluster-example-replica-from-backup-simple.yaml`](samples/cluster-example-replica-from-backup-simple.yaml):
    a replica cluster following a cluster with backup configured.
+
+Replica cluster via Volume Snapshot
+:   **Prerequisites**:
+    [`cluster-example-with-volume-snapshot.yaml`](samples/cluster-example-with-volume-snapshot.yaml) applied and Healthy.
+    And a volume snapshot
+    [`backup-with-volume-snapshot.yaml`](samples/backup-with-volume-snapshot.yaml)
+    applied and Completed.
+: [`cluster-example-replica-from-volume-snapshot.yaml`](samples/cluster-example-replica-from-volume-snapshot.yaml):
+   a replica cluster following a cluster with volume snapshot configured.
 
 Bootstrap cluster with SQL files
 : [`cluster-example-initdb-sql-refs.yaml`](samples/cluster-example-initdb-sql-refs.yaml):
