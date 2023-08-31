@@ -236,7 +236,7 @@ func buildTablespacesPVCs(cluster *apiv1.Cluster, instanceName string) []expecte
 				role: utils.PVCRolePgTablespace,
 				// This requires an init, ideally we should move to a design where each pvc can be init separately
 				// and then  attached
-				initialStatus:  StatusInitializing,
+				initialStatus:  StatusReady,
 				storage:        config.Storage,
 				tablespaceName: tbsName,
 			},
@@ -258,8 +258,10 @@ func getStorageConfiguration(
 		storageConfiguration = cluster.Spec.WalStorage
 	case utils.PVCRolePgTablespace:
 		for tbsName, config := range cluster.Spec.Tablespaces {
+			config := config
 			if tbsName == tablespaceLabel {
 				storageConfiguration = &config.Storage
+				break
 			}
 		}
 	default:
