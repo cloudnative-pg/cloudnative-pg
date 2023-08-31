@@ -18,6 +18,7 @@ package specs
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -118,17 +119,29 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 			})
 	}
 
-	for tbsName := range cluster.Spec.Tablespaces {
-		result = append(result,
-			corev1.Volume{
-				Name: tbsName,
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: PvcNameForTablespace(podName, tbsName),
+	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
+	// later it will be  retrieved to do deepEquals
+	if cluster.ShouldCreateTablespaces() {
+		// Try to get a fix order of name
+		tbsNames := make([]string, len(cluster.Spec.Tablespaces))
+		i := 0
+		for name := range cluster.Spec.Tablespaces {
+			tbsNames[i] = name
+			i++
+		}
+		sort.Strings(tbsNames)
+		for i = range tbsNames {
+			result = append(result,
+				corev1.Volume{
+					Name: tbsNames[i],
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: PvcNameForTablespace(podName, tbsNames[i]),
+						},
 					},
 				},
-			},
-		)
+			)
+		}
 	}
 
 	if cluster.ShouldCreateProjectedVolume() {
@@ -254,15 +267,26 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		)
 	}
 
-	for name := range cluster.Spec.Tablespaces {
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      name,
-				MountPath: MountForTablespace(name),
-			},
-		)
+	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
+	// later it will be  retrieved to do deepEquals
+	if cluster.ShouldCreateTablespaces() {
+		// Try to get a fix order of name
+		tbsNames := make([]string, len(cluster.Spec.Tablespaces))
+		i := 0
+		for name := range cluster.Spec.Tablespaces {
+			tbsNames[i] = name
+			i++
+		}
+		sort.Strings(tbsNames)
+		for i = range tbsNames {
+			volumeMounts = append(volumeMounts,
+				corev1.VolumeMount{
+					Name:      tbsNames[i],
+					MountPath: MountForTablespace(tbsNames[i]),
+				},
+			)
+		}
 	}
-
 	return volumeMounts
 }
 
