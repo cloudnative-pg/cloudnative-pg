@@ -57,8 +57,9 @@ The other replicas will continue working.`,
 
 			snapshotClassName, _ := cmd.Flags().GetString("volume-snapshot-class-name")
 			snapshotNameSuffix, _ := cmd.Flags().GetString("volume-snapshot-suffix")
+			backupNameLabel, _ := cmd.Flags().GetString("label-backup-name")
 
-			return execute(cmd.Context(), clusterName, snapshotClassName, snapshotNameSuffix)
+			return execute(cmd.Context(), clusterName, snapshotClassName, snapshotNameSuffix, backupNameLabel)
 		},
 	}
 
@@ -66,8 +67,8 @@ The other replicas will continue working.`,
 		"volume-snapshot-class-name",
 		"c",
 		"",
-		`The VolumeSnapshotClass name to be used for the snapshot
-(defaults to empty, which will make use of the default VolumeSnapshotClass)`)
+		`The VolumeSnapshotClass name to be used for the snapshot. 
+Defaults to empty, which will make use of the default VolumeSnapshotClass`)
 
 	cmd.Flags().StringP("volume-snapshot-suffix",
 		"x",
@@ -75,6 +76,12 @@ The other replicas will continue working.`,
 		"Specifies the suffix of the created volume snapshot. Optional. "+
 			"Defaults to the snapshot time expressed as unix timestamp",
 	)
+
+	cmd.Flags().StringP("label-backup-name",
+		"l",
+		"",
+		"Specifies the value for the label 'cnpg.io/backupName'. "+
+			"Defaults to empty, which will cause the label to not be present on the created VolumeSnapshot resources")
 
 	return cmd
 }
@@ -85,6 +92,7 @@ func execute(
 	clusterName string,
 	snapshotClassName string,
 	snapshotSuffix string,
+	backupNameLabel string,
 ) error {
 	// Get the Cluster object
 	var cluster apiv1.Cluster
@@ -130,6 +138,10 @@ func execute(
 	}
 
 	enrichFunc := func(vs *volumesnapshot.VolumeSnapshot) {
+		if backupNameLabel != "" {
+			vs.Labels[utils.BackupNameLabelName] = backupNameLabel
+		}
+
 		vs.Annotations[utils.ClusterManifestAnnotationName] = string(rawCluster)
 
 		pgControlData, err := plugin.GetPGControlData(ctx, *targetPod)
