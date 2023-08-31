@@ -880,12 +880,11 @@ func AssertDetachReplicaModeCluster(
 	srcTableName string,
 ) {
 	var primaryReplicaCluster *corev1.Pod
-	var err error
 	replicaCommandTimeout := time.Second * 10
 
 	By("disabling the replica mode", func() {
 		Eventually(func(g Gomega) {
-			_, _, err = testsUtils.RunUnchecked(fmt.Sprintf(
+			_, _, err := testsUtils.RunUnchecked(fmt.Sprintf(
 				"kubectl patch cluster %v -n %v  -p '{\"spec\":{\"replica\":{\"enabled\":false}}}'"+
 					" --type='merge'",
 				replicaClusterName, namespace))
@@ -897,6 +896,8 @@ func AssertDetachReplicaModeCluster(
 		query := "CREATE TABLE IF NOT EXISTS replica_cluster_primary AS VALUES (1),(2);"
 		// Expect write operation to succeed
 		Eventually(func(g Gomega) {
+			var err error
+
 			// Get primary from replica cluster
 			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
 			g.Expect(err).ToNot(HaveOccurred())
@@ -906,7 +907,7 @@ func AssertDetachReplicaModeCluster(
 		}, 300, 15).Should(Succeed())
 	})
 
-	By("verifying the appTgt database doesn't exist in the replica cluster", func() {
+	By("verifying the replica database doesn't exist in the replica cluster", func() {
 		AssertDatabaseExists(namespace, primaryReplicaCluster.Name, replicaDatabaseName, false)
 	})
 

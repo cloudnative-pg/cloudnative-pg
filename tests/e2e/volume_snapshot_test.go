@@ -301,12 +301,10 @@ var _ = Describe("Verify Volume Snapshot",
 					if CurrentSpecReport().Failed() {
 						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 					}
-					err = os.Unsetenv(snapshotDataEnv)
-					if err != nil {
+					if err := os.Unsetenv(snapshotDataEnv); err != nil {
 						return err
 					}
-					err = os.Unsetenv(snapshotWalEnv)
-					if err != nil {
+					if err := os.Unsetenv(snapshotWalEnv); err != nil {
 						return err
 					}
 					return env.DeleteNamespace(namespace)

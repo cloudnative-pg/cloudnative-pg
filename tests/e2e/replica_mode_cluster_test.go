@@ -45,6 +45,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		level                 = tests.Medium
 	)
 
+	// those values are present in the cluster manifests
+	const (
+		sourceDBName  = "appSrc"
+		replicaDBName = "appTgt"
+	)
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -75,10 +81,13 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 	Context("can bootstrap a replica cluster using basic auth", func() {
 		It("can be detached from the source cluster", func() {
-			const replicaClusterSampleBasicAuth = fixturesDir + replicaModeClusterDir + "cluster-replica-basicauth.yaml.template"
+			const (
+				replicaClusterSampleBasicAuth = fixturesDir + replicaModeClusterDir + "cluster-replica-basicauth.yaml.template"
+				replicaNamespacePrefix        = "replica-mode-basic-auth"
+			)
+
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleBasicAuth)
 			Expect(err).ToNot(HaveOccurred())
-			replicaNamespacePrefix := "replica-mode-basic-auth"
 			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
@@ -99,19 +108,21 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				replicaNamespace,
 				srcClusterName,
 				replicaClusterName,
-				"appSrc",
-				"appTgt",
+				sourceDBName,
+				replicaDBName,
 				"test_replica")
 		})
 	})
 
 	Context("archive mode set to 'always' on designated primary", func() {
 		It("verifies replica cluster can archive WALs from the designated primary", func() {
-			const replicaClusterSample = fixturesDir +
-				replicaModeClusterDir + "cluster-replica-archive-mode-always.yaml.template"
+			const (
+				replicaClusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-archive-mode-always.yaml.template"
+				replicaNamespacePrefix = "replica-mode-archive"
+			)
+
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
 			Expect(err).ToNot(HaveOccurred())
-			replicaNamespacePrefix := "replica-mode-archive"
 			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
@@ -155,7 +166,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				query := "show archive_mode;"
 				Eventually(func() (string, error) {
 					stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-						&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
+						&commandTimeout, "psql", "-U", "postgres", sourceDBName, "-tAc", query)
 					return strings.Trim(stdOut, "\n"), err
 				}, 30).Should(BeEquivalentTo("always"))
 			})
@@ -173,12 +184,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			namespacePrefix = "replica-cluster-from-backup"
 		)
 		var namespace, clusterName string
-		var err error
 
 		BeforeEach(func() {
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			clusterName, err = env.GetResourceNameFromYAML(clusterSample)
+			clusterName, err := env.GetResourceNameFromYAML(clusterSample)
 			Expect(err).ToNot(HaveOccurred())
 
 			DeferCleanup(func() error {
@@ -265,6 +275,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			var backup *apiv1.Backup
 			By("creating a snapshot and waiting until it's completed", func() {
+				var err error
 				snapshotName := fmt.Sprintf("%v-snapshot", clusterName)
 				backup, err = testUtils.CreateOnDemandBackup(
 					namespace,
