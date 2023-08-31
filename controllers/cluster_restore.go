@@ -189,6 +189,8 @@ func restoreOrphanPVCs(
 		// we clean hibernation metadata if it exists
 		delete(pvc.Annotations, utils.HibernateClusterManifestAnnotationName)
 		delete(pvc.Annotations, utils.HibernatePgControlDataAnnotationName)
+		delete(pvc.Annotations, utils.ClusterManifestAnnotationName)
+		delete(pvc.Annotations, utils.PgControldataAnnotationName)
 
 		if err := c.Patch(ctx, pvc, client.MergeFrom(pvcOrig)); err != nil {
 			return err

@@ -312,6 +312,8 @@ func annotatePVCs(
 			}
 			origPVC := currentPVC.DeepCopy()
 
+			// IMPORTANT: do not use utils.ClusterManifestAnnotationName, utils.PgControlDataAnnotationName here for backwards
+			// compatibility
 			_, hasHibernateAnnotation := currentPVC.Annotations[utils.HibernateClusterManifestAnnotationName]
 			_, hasPgControlDataAnnotation := currentPVC.Annotations[utils.HibernatePgControlDataAnnotationName]
 			if hasHibernateAnnotation || hasPgControlDataAnnotation {
@@ -325,6 +327,8 @@ func annotatePVCs(
 
 			currentPVC.Annotations[utils.HibernateClusterManifestAnnotationName] = string(bytes)
 			currentPVC.Annotations[utils.HibernatePgControlDataAnnotationName] = pgControlData
+			currentPVC.Annotations[utils.ClusterManifestAnnotationName] = string(bytes)
+			currentPVC.Annotations[utils.PgControldataAnnotationName] = pgControlData
 
 			return plugin.Client.Patch(ctx, &currentPVC, client.MergeFrom(origPVC))
 		}); err != nil {
@@ -357,6 +361,8 @@ func removePVCannotations(
 
 			delete(currentPVC.Annotations, utils.HibernateClusterManifestAnnotationName)
 			delete(currentPVC.Annotations, utils.HibernatePgControlDataAnnotationName)
+			delete(currentPVC.Annotations, utils.ClusterManifestAnnotationName)
+			delete(currentPVC.Annotations, utils.PgControldataAnnotationName)
 
 			return plugin.Client.Patch(ctx, &currentPVC, client.MergeFrom(origPVC))
 		}); err != nil {
