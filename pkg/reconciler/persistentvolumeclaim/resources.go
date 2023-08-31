@@ -258,8 +258,10 @@ func getStorageConfiguration(
 		storageConfiguration = cluster.Spec.WalStorage
 	case utils.PVCRolePgTablespace:
 		for tbsName, config := range cluster.Spec.Tablespaces {
+			config := config
 			if tbsName == tablespaceLabel {
 				storageConfiguration = &config.Storage
+				break
 			}
 		}
 	default:
