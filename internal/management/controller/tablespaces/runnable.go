@@ -117,7 +117,7 @@ func (tbsSync *TablespaceSynchronizer) reconcile(
 		return fmt.Errorf("while synchronizing tablespaces: %w", err)
 	}
 	tbsManager := infrastructure.NewPostgresTablespaceManager(superUserDB)
-	tbsStorageManager := instaceTablespaceStorageManager{}
+	tbsStorageManager := instanceTablespaceStorageManager{}
 
 	err = tbsSync.synchronizeTablespaces(ctx, tbsManager, tbsStorageManager, config)
 	if err != nil {
@@ -132,9 +132,9 @@ type tablespaceStorageManager interface {
 	storageExists(tbsName string) (bool, error)
 }
 
-type instaceTablespaceStorageManager struct{}
+type instanceTablespaceStorageManager struct{}
 
-func (ism instaceTablespaceStorageManager) storageExists(tbsName string) (bool, error) {
+func (ism instanceTablespaceStorageManager) storageExists(tbsName string) (bool, error) {
 	location := specs.LocationForTablespace(tbsName)
 	return fileutils.FileExists(location)
 }
@@ -186,6 +186,8 @@ func (tbsSync *TablespaceSynchronizer) applyTablespaceActions(
 		}
 
 		for _, tbs := range tbsAdapters {
+			contextLog.Trace("creating tablespace ", "tablespace", tbs.Name)
+			tbs := tbs
 			tablespace := infrastructure.Tablespace{
 				Name:      tbs.Name,
 				Temporary: tbs.Temporary,
@@ -196,6 +198,7 @@ func (tbsSync *TablespaceSynchronizer) applyTablespaceActions(
 			err := tbsManager.Create(ctx, tablespace)
 			if err != nil {
 				contextLog.Error(err, "while performing "+string(action), "tablespace", tbs.Name)
+				return err
 			}
 		}
 	}
