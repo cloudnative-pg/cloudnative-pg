@@ -944,24 +944,28 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 func (r *Cluster) validateResources() field.ErrorList {
 	var result field.ErrorList
 
-	cpuPopulated := r.Spec.Resources.Requests.Cpu() != nil && r.Spec.Resources.Limits.Cpu() != nil
-	cpuRequestGtThanLimit := r.Spec.Resources.Requests.Cpu().Cmp(*r.Spec.Resources.Limits.Cpu()) > 0
-	if cpuPopulated && cpuRequestGtThanLimit {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "resources", "requests", "cpu"),
-			r.Spec.Resources.Requests.Cpu().String(),
-			"CPU request is greater than the limit",
-		))
+	cpuPopulated := !r.Spec.Resources.Requests.Cpu().IsZero() && !r.Spec.Resources.Limits.Cpu().IsZero()
+	if cpuPopulated {
+		cpuRequestGtThanLimit := r.Spec.Resources.Requests.Cpu().Cmp(*r.Spec.Resources.Limits.Cpu()) > 0
+		if cpuRequestGtThanLimit {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "resources", "requests", "cpu"),
+				r.Spec.Resources.Requests.Cpu().String(),
+				"CPU request is greater than the limit",
+			))
+		}
 	}
 
-	memoryPopulated := r.Spec.Resources.Requests.Memory() != nil && r.Spec.Resources.Limits.Memory() != nil
-	memoryRequestGtThanLimit := r.Spec.Resources.Requests.Memory().Cmp(*r.Spec.Resources.Limits.Memory()) > 0
-	if memoryPopulated && memoryRequestGtThanLimit {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "resources", "requests", "memory"),
-			r.Spec.Resources.Requests.Memory().String(),
-			"Memory request is greater than the limit",
-		))
+	memoryPopulated := !r.Spec.Resources.Requests.Memory().IsZero() && !r.Spec.Resources.Limits.Memory().IsZero()
+	if memoryPopulated {
+		memoryRequestGtThanLimit := r.Spec.Resources.Requests.Memory().Cmp(*r.Spec.Resources.Limits.Memory()) > 0
+		if memoryRequestGtThanLimit {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "resources", "requests", "memory"),
+				r.Spec.Resources.Requests.Memory().String(),
+				"Memory request is greater than the limit",
+			))
+		}
 	}
 
 	return result

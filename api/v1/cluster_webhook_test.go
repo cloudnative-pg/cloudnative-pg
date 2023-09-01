@@ -3204,4 +3204,28 @@ var _ = Describe("validateResources", func() {
 		errors := cluster.validateResources()
 		Expect(errors).To(BeEmpty())
 	})
+
+	It("returns no errors when CPU request is set but limit is nil", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("1")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when CPU limit is set but request is nil", func() {
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("1")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when Memory request is set but limit is nil", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1Gi")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when Memory limit is set but request is nil", func() {
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
 })
