@@ -68,7 +68,7 @@ The other replicas will continue working.`,
 		"c",
 		"",
 		`The VolumeSnapshotClass name to be used for the snapshot. 
-Defaults to empty, which will make use of the default VolumeSnapshotClass`)
+Defaults to empty string, which will make use of the default VolumeSnapshotClass`)
 
 	cmd.Flags().StringP("volume-snapshot-suffix",
 		"x",
