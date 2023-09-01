@@ -18,7 +18,9 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"sort"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -134,4 +137,54 @@ func (r *instanceStatusClient) getStatusFromInstances(
 		}
 	}
 	return status
+}
+
+type pgControldataResponse struct {
+	Data  string `json:"data,omitempty"`
+	Error error  `json:"error,omitempty"`
+}
+
+func (r *instanceStatusClient) getPgControlDataFromInstance(
+	ctx context.Context,
+	pod *corev1.Pod,
+) pgControldataResponse {
+	var result pgControldataResponse
+	url := url.Build(pod.Status.PodIP, url.PathPGControlData, url.StatusPort)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	resp, err := r.Client.Do(req)
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil && result.Error == nil {
+			result.Error = err
+		}
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	if resp.StatusCode != 200 {
+		result.Error = &InstanceStatusError{StatusCode: resp.StatusCode, Body: string(body)}
+		return result
+	}
+
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	return result
 }

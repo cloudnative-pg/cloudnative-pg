@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -239,7 +238,7 @@ func (on *onCommand) waitInstancesToBeFencedStep() error {
 // annotatePVCStep stores the pg_controldata output
 // into an annotation of the primary PVC
 func (on *onCommand) annotatePVCStep() error {
-	controlData, err := getPGControlData(on.ctx, on.primaryInstance)
+	controlData, err := plugin.GetPGControlData(on.ctx, on.primaryInstance)
 	if err != nil {
 		return fmt.Errorf("could not get primary control data: %w", err)
 	}
@@ -366,24 +365,4 @@ func removePVCannotations(
 	}
 
 	return nil
-}
-
-func getPGControlData(ctx context.Context,
-	pod corev1.Pod,
-) (string, error) {
-	timeout := time.Second * 10
-	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
-	stdout, _, err := utils.ExecCommand(
-		ctx,
-		clientInterface,
-		plugin.Config,
-		pod,
-		specs.PostgresContainerName,
-		&timeout,
-		"pg_controldata")
-	if err != nil {
-		return "", err
-	}
-
-	return stdout, nil
 }
