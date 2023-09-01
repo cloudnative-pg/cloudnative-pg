@@ -97,6 +97,7 @@ spec:
                 - prefer-standby
                 type: string
             required:
+            - cluster
             - schedule
             type: object
           status:
@@ -118,6 +119,9 @@ spec:
                 format: date-time
                 type: string
             type: object
+        required:
+        - metadata
+        - spec
         type: object
     served: true
     storage: true
