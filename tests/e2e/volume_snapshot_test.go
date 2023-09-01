@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 
@@ -358,6 +359,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("ensuring that the additional labels and annotations are present", func() {
+					clusterObj := &apiv1.Cluster{}
 					for _, item := range snapshotList.Items {
 						snapshotConfig := clusterToBackup.Spec.Backup.VolumeSnapshot
 						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
@@ -367,6 +369,9 @@ var _ = Describe("Verify Volume Snapshot",
 						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).To(ContainSubstring(clusterToBackupName))
 						Expect(item.Annotations[utils.PgControldataAnnotationName]).ToNot(BeEmpty())
 						Expect(item.Annotations[utils.PgControldataAnnotationName]).To(ContainSubstring("pg_control version number:"))
+						// Ensure the ClusterManifestAnnotationName is a valid Cluster Object
+						err = json.Unmarshal([]byte(item.Annotations[utils.ClusterManifestAnnotationName]), clusterObj)
+						Expect(err).ToNot(HaveOccurred())
 					}
 				})
 
