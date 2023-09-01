@@ -302,6 +302,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateEnv,
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
+		r.validateResources,
 	}
 
 	for _, validate := range validations {
@@ -938,6 +939,32 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 				fmt.Sprintf("invalid imagePullPolicy, if defined must be one of '%s', '%s' or '%s'",
 					v1.PullAlways, v1.PullNever, v1.PullIfNotPresent)))
 	}
+}
+
+func (r *Cluster) validateResources() field.ErrorList {
+	var result field.ErrorList
+
+	cpuPopulated := r.Spec.Resources.Requests.Cpu() != nil && r.Spec.Resources.Limits.Cpu() != nil
+	cpuRequestGtThanLimit := r.Spec.Resources.Requests.Cpu().Cmp(*r.Spec.Resources.Limits.Cpu()) > 0
+	if cpuPopulated && cpuRequestGtThanLimit {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "resources", "requests", "cpu"),
+			r.Spec.Resources.Requests.Cpu().String(),
+			"CPU request is greater than the limit",
+		))
+	}
+
+	memoryPopulated := r.Spec.Resources.Requests.Memory() != nil && r.Spec.Resources.Limits.Memory() != nil
+	memoryRequestGtThanLimit := r.Spec.Resources.Requests.Memory().Cmp(*r.Spec.Resources.Limits.Memory()) > 0
+	if memoryPopulated && memoryRequestGtThanLimit {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "resources", "requests", "memory"),
+			r.Spec.Resources.Requests.Memory().String(),
+			"Memory request is greater than the limit",
+		))
+	}
+
+	return result
 }
 
 // validateConfiguration determines whether a PostgreSQL configuration is valid

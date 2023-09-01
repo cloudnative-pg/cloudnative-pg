@@ -3150,3 +3150,58 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(2))
 	})
 })
+
+var _ = Describe("validateResources", func() {
+	var cluster *Cluster
+
+	BeforeEach(func() {
+		cluster = &Cluster{
+			Spec: ClusterSpec{
+				Resources: corev1.ResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{},
+					Limits:   map[corev1.ResourceName]resource.Quantity{},
+				},
+			},
+		}
+	})
+
+	It("returns an error when the CPU request is greater than CPU limit", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("2")
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("1")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("CPU request is greater than the limit"))
+	})
+
+	It("returns an error when the Memory request is greater than Memory limit", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Memory request is greater than the limit"))
+	})
+
+	It("returns two errors when both CPU and Memory requests are greater than their limits", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("2")
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("1")
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(2))
+		Expect(errors[0].Detail).To(Equal("CPU request is greater than the limit"))
+		Expect(errors[1].Detail).To(Equal("Memory request is greater than the limit"))
+	})
+
+	It("returns no errors when both CPU and Memory requests are less than or equal to their limits", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("1")
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("2Gi")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+})
