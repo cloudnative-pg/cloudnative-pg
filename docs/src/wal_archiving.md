@@ -9,7 +9,7 @@ in CloudNativePG.
 
 The WAL archive is defined in the `.spec.backup.barmanObjectStore` stanza of
 a `Cluster` resource. Please proceed with the same instructions you find in
-the ["Backup on object stores" section](backup_objectstore.md) to set up
+the ["Backup on object stores" section](backup_barmanobjectstore.md) to set up
 the WAL archive.
 
 !!! Info
