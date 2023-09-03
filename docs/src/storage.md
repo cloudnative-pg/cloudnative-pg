@@ -445,7 +445,10 @@ You can use a pre-provisioned volume in CloudNativePG by following these steps:
 ## Block storage considerations (Ceph, Longhorn)
 Most block storage solutions in Kubernetes suggest to have multiple 'replicas' of a volume
 to improve resiliency. This works well for workloads that do not have resiliency built into the 
-application. However Cloud Native Postgres has this resiliency built ino the storage of 
-the Postgres Cluster through the number of instances.
+application. However Cloud Native Postgres has this resiliency built into 
+the Postgres Cluster through the number of instances and the persistent volume that is
+attached to them. 
 
-Therefore 
+In these cases it makes sense to define the  storage class in the cnpg kubernetes cluster
+to be defined aas 1 replica. By having additional replicas defined in the storage solution like 
+Longhorn and  Ceph adds on more disk i/o and space being used unnecessarily.
