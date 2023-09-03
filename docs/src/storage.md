@@ -450,5 +450,5 @@ the Postgres Cluster through the number of instances and the persistent volume t
 attached to them. 
 
 In these cases it makes sense to define the  storage class in the cnpg kubernetes cluster
-to be defined aas 1 replica. By having additional replicas defined in the storage solution like 
+to be defined as  1 replica. By having additional replicas defined in the storage solution like 
 Longhorn and  Ceph adds on more disk i/o and space being used unnecessarily.
