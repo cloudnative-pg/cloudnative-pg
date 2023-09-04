@@ -482,8 +482,8 @@ func (r *ClusterReconciler) reconcileResources(
 
 	if !resources.allInstancesAreActive() {
 		contextLogger.Debug("found an instance pod not active, retrying in one second")
-		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitNotActiveInstances, "")
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, err
+		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitNotActiveInstances, "Some instances are not yet active")
+		return ctrl.Result{RequeueAfter: time.Second}, err
 	}
 
 	if res, err := persistentvolumeclaim.Reconcile(
