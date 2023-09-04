@@ -850,7 +850,7 @@ jobs:
               --resource ${AKS_CLUSTER_RESOURCE_ID} \
               --name diagnostic-kube-apiserver-logs \
               --workspace ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
-              --logs '[ { "category": "kube-apiserver", "enabled": true, "retentionPolicy": { "enabled": true, "days": 30 } } ]'
+              --logs '[ { "category": "kube-apiserver", "enabled": true } ]'
       -
         # Azure is slow in provisioning disks, and we can't wait two minutes
         # every time we create a pod, otherwise all the tests will time out.
