@@ -305,3 +305,27 @@ the lag from the primary.
 !!! Seealso "Monitoring"
     Please refer to the ["Monitoring" section](monitoring.md) for details on
     how to monitor a CloudNativePG deployment.
+
+### Capping the WAL size retained for replication slots
+
+When replication slots is enabled, you might end up running out of disk
+space due to PostgreSQL trying to retain WAL files requested by a replication
+slot. This might happen due to a standby that is (temporarily?) down, or
+lagging, or simply an orphan replication slot.
+
+Starting with PostgreSQL 13, you can take advantage of the
+[`max_slot_wal_keep_size`](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-MAX-SLOT-WAL-KEEP-SIZE)
+configuration option controlling the maximum size of WAL files that replication
+slots are allowed to retain in the `pg_wal` directory at checkpoint time.
+By default, in PostgreSQL `max_slot_wal_keep_size` is set to `-1`, meaning that
+replication slots may retain an unlimited amount of WAL files.
+As a result, our recommendation is to explicitly set `max_slot_wal_keep_size`
+when replication slots support is enabled. For example:
+
+```ini
+  # ...
+  postgresql:
+    parameters:
+      max_slot_wal_keep_size: "10GB"
+  # ...
+```
