@@ -56,8 +56,8 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
-	serveMux.HandleFunc(url.PathUpdate,
-		endpoints.updateInstanceManager(cancelFunc, exitedConditions))
+	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
+	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
@@ -127,6 +127,33 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(js)
+}
+
+func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http.Request) {
+	type Response struct {
+		Data string `json:"data,omitempty"`
+	}
+
+	out, err := ws.instance.GetPgControldata()
+	if err != nil {
+		log.Info(
+			"Instance pg_controldata endpoint failing",
+			"err", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	res, err := json.Marshal(Response{Data: out})
+	if err != nil {
+		log.Info(
+			"Internal error marshalling pg_controldata response",
+			"err", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(res)
 }
 
 // updateInstanceManager replace the instance with one in the

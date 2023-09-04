@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -189,7 +190,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				errors.New("no volumeSnapshot section defined on the target cluster"))
 			return ctrl.Result{}, nil
 		}
-		if err := startSnapshotBackup(ctx, r.Client, pod, &cluster, &backup); err != nil {
+		if err := r.startSnapshotBackup(ctx, pod, &cluster, &backup); err != nil {
 			r.Recorder.Eventf(&backup, "Warning", "Error", "snapshot backup failed: %v", err)
 			tryFlagBackupAsFailed(ctx, r.Client, &backup,
 				fmt.Errorf("encountered an error while taking the snapshot backup: %w", err))
@@ -276,9 +277,8 @@ func (r *BackupReconciler) isValidBackupRunning(
 	return false, nil
 }
 
-func startSnapshotBackup(
+func (r *BackupReconciler) startSnapshotBackup(
 	ctx context.Context,
-	cli client.Client,
 	targetPod *corev1.Pod,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
@@ -289,26 +289,27 @@ func startSnapshotBackup(
 	backup.Status.BackupID = backup.Name
 
 	backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
-	if err := postgres.PatchBackupStatusAndRetry(ctx, cli, backup); err != nil {
+	if err := postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup); err != nil {
 		return err
 	}
 
-	if errCond := conditions.Patch(ctx, cli, cluster, apiv1.BackupStartingCondition); errCond != nil {
+	if errCond := conditions.Patch(ctx, r.Client, cluster, apiv1.BackupStartingCondition); errCond != nil {
 		log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup starting)")
 	}
 
-	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, cli, targetPod.Name, cluster.Namespace)
+	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, r.Client, targetPod.Name, cluster.Namespace)
 	if err != nil {
 		return fmt.Errorf("cannot get PVCs: %w", err)
 	}
 
 	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
 
-	snapshotEnrich := func(vs *storagesnapshotv1.VolumeSnapshot) {
-		if backup.Labels == nil {
-			backup.Labels = map[string]string{}
-		}
+	rawCluster, err := json.Marshal(cluster)
+	if err != nil {
+		return err
+	}
 
+	snapshotEnrich := func(vs *storagesnapshotv1.VolumeSnapshot) {
 		vs.Labels[utils.BackupNameLabelName] = backup.Name
 
 		switch snapshotConfig.SnapshotOwnerReference {
@@ -319,9 +320,19 @@ func startSnapshotBackup(
 		default:
 			break
 		}
+
+		// we grab the pg_controldata just before creating the snapshot
+		if result := r.instanceStatusClient.getPgControlDataFromInstance(ctx, targetPod); result.Error == nil {
+			vs.Annotations[utils.PgControldataAnnotationName] = result.Data
+		} else {
+			contextLogger.Error(result.Error, "while querying for pg_controldata")
+		}
+
+		vs.Annotations[utils.ClusterManifestAnnotationName] = string(rawCluster)
 	}
+
 	executor := snapshot.
-		NewExecutorBuilder(cli, snapshotConfig).
+		NewExecutorBuilder(r.Client, snapshotConfig).
 		FenceInstance(true).
 		WithSnapshotEnrich(snapshotEnrich).
 		Build()
@@ -332,20 +343,20 @@ func startSnapshotBackup(
 		backup.Status.SetAsFailed(fmt.Errorf("can't execute snapshot backup: %w", err))
 
 		// Update backup status in cluster conditions
-		if errCond := conditions.Patch(ctx, cli, cluster, apiv1.BuildClusterBackupFailedCondition(err)); errCond != nil {
+		if errCond := conditions.Patch(ctx, r.Client, cluster, apiv1.BuildClusterBackupFailedCondition(err)); errCond != nil {
 			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup snapshot failed)")
 		}
-		return postgres.PatchBackupStatusAndRetry(ctx, cli, backup)
+		return postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 	}
 
-	if err := conditions.Patch(ctx, cli, cluster, apiv1.BackupSucceededCondition); err != nil {
+	if err := conditions.Patch(ctx, r.Client, cluster, apiv1.BackupSucceededCondition); err != nil {
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
 	}
 
 	backup.Status.SetAsCompleted()
 	backup.Status.BackupSnapshotStatus.SetSnapshotList(snapshots)
 
-	return postgres.PatchBackupStatusAndRetry(ctx, cli, backup)
+	return postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }
 
 // getBackupTargetPod returns the correct pod that should run the backup according to the current

@@ -18,8 +18,10 @@ package snapshot
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/snapshot"
 )
 
@@ -121,12 +124,32 @@ func execute(
 		return fmt.Errorf("cannot get PVCs: %w", err)
 	}
 
+	rawCluster, err := json.Marshal(cluster)
+	if err != nil {
+		return err
+	}
+
+	enrichFunc := func(vs *volumesnapshot.VolumeSnapshot) {
+		vs.Annotations[utils.ClusterManifestAnnotationName] = string(rawCluster)
+
+		pgControlData, err := plugin.GetPGControlData(ctx, *targetPod)
+		if err != nil {
+			msg := fmt.Errorf("encountered an error while adding pg_controldata metadata to the snapshot: %w", err)
+			fmt.Println(msg)
+			return
+		}
+
+		vs.Annotations[utils.PgControldataAnnotationName] = pgControlData
+	}
+
 	executor := snapshot.NewExecutorBuilder(plugin.Client, apiv1.VolumeSnapshotConfiguration{
 		ClassName:              snapshotClassName,
 		SnapshotOwnerReference: "none",
 	}).
 		FenceInstance(true).
 		WithSnapshotSuffix(snapshotSuffix).
+		WithSnapshotEnrich(enrichFunc).
+		WithPrintLogger().
 		Build()
 
 	_, err = executor.Execute(ctx, &cluster, targetPod, pvcs)

@@ -186,9 +186,10 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		var namespace, clusterName string
 
 		BeforeEach(func() {
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			clusterName, err := env.GetResourceNameFromYAML(clusterSample)
+			clusterName, err = env.GetResourceNameFromYAML(clusterSample)
 			Expect(err).ToNot(HaveOccurred())
 
 			DeferCleanup(func() error {

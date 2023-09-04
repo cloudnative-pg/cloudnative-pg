@@ -120,7 +120,7 @@ volume snapshot class.
 
 The following manifest creates a `Cluster` that is ready to be used for volume
 snapshots and that stores the WAL archive in a S3 bucket via IAM role for the
-Service Account (IRSA, see [AWS S3](object_stores.md#aws-s3)):
+Service Account (IRSA, see [AWS S3](appendixes/object_stores.md#aws-s3)):
 
 ``` yaml
 apiVersion: postgresql.cnpg.io/v1
