@@ -2844,6 +2844,12 @@ func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
 	}
 }
 
+// IsInplacePhase returns true if the cluster is in a phase that handles the Inplace restart
+func (cluster *Cluster) IsInplacePhase() bool {
+	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
+		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
+}
+
 // IsBarmanBackupConfigured returns true if one of the possible backup destination
 // is configured, false otherwise
 func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {
