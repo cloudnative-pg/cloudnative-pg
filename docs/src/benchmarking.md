@@ -52,7 +52,7 @@ kubectl cnpg pgbench \
 
 You can see the progress of the job with:
 
-```shell 
+```shell
 kubectl logs jobs/pgbench-run
 ```
 
