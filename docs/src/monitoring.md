@@ -741,9 +741,10 @@ section for context:
 
 - `kube-stack-config.yaml`: a configuration file for the kube-stack helm chart
   installation. It ensures that Prometheus listens for all PodMonitor resources.
-- `cnpg-prometheusrule.yaml`: a `PrometheusRule` with alerts for CloudNativePG.
+- `prometheusrule.yaml`: a `PrometheusRule` with alerts for CloudNativePG.
   NOTE: this does not include inter-operation with notification services. Please refer
   to the [Prometheus documentation](https://prometheus.io/docs/alerting/latest/alertmanager/).
+- `podmonitor.yaml`: a `PodMonitor` for the CloudNativePG Operator deployment.
 - `grafana-configmap.yaml`: a ConfigMap containing the definition of the sample
   CloudNativePG Dashboard. Note the labels in the definition, which ensure that
   the Grafana deployment will find the ConfigMap.
