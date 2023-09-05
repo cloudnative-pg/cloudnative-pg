@@ -193,10 +193,13 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			expectedAnnotationKeyPresent := []string{
 				utils.HibernatePgControlDataAnnotationName,
 				utils.HibernateClusterManifestAnnotationName,
+				utils.PgControldataAnnotationName,
+				utils.ClusterManifestAnnotationName,
 			}
 			testsUtils.ObjectHasAnnotations(&pvcInfo, expectedAnnotationKeyPresent)
 			expectedAnnotation := map[string]string{
 				utils.HibernateClusterManifestAnnotationName: string(clusterManifest),
+				utils.ClusterManifestAnnotationName:          string(clusterManifest),
 			}
 			testsUtils.ObjectMatchesAnnotations(&pvcInfo, expectedAnnotation)
 		}
