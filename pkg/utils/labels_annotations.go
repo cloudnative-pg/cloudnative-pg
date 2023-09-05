@@ -54,6 +54,9 @@ const (
 	// InstanceNameLabelName is the name of the label containing the instance name
 	InstanceNameLabelName = "cnpg.io/instanceName"
 
+	// BackupNameLabelName is the name of the label containing the backup id
+	BackupNameLabelName = "cnpg.io/backupName"
+
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "cnpg.io/operatorVersion"
@@ -67,9 +70,13 @@ const (
 	ReconciliationLoopAnnotationName = "cnpg.io/reconciliationLoop"
 
 	// HibernateClusterManifestAnnotationName contains the hibernated cluster manifest
+	// Deprecated. Replaced by: ClusterManifestAnnotationName. This annotation is
+	// kept for backward compatibility
 	HibernateClusterManifestAnnotationName = "cnpg.io/hibernateClusterManifest"
 
 	// HibernatePgControlDataAnnotationName contains the pg_controldata output of the hibernated cluster
+	// Deprecated. Replaced by: PgControldataAnnotationName. This annotation is
+	// kept for backward compatibility
 	HibernatePgControlDataAnnotationName = "cnpg.io/hibernatePgControlData"
 
 	// PodEnvHashAnnotationName is the name of the annotation containing the podEnvHash value
@@ -79,6 +86,12 @@ const (
 
 	// PodSpecAnnotationName is the name of the annotation with the PodSpec derived from the cluster
 	PodSpecAnnotationName = "cnpg.io/podSpec"
+
+	// ClusterManifestAnnotationName contains the cluster manifest
+	ClusterManifestAnnotationName = "cnpg.io/clusterManifest"
+
+	// PgControldataAnnotationName contains the pg_controldata output of the cluster
+	PgControldataAnnotationName = "cnpg.io/pgControldata"
 
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"

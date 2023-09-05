@@ -10,6 +10,7 @@ extra_css:
 markdown_extensions:
   - admonition
   - def_list
+  - attr_list
 
 nav:
   - index.md
@@ -28,6 +29,9 @@ nav:
   - rolling_update.md
   - replication.md
   - backup.md
+  - backup_barmanobjectstore.md
+  - wal_archiving.md
+  - backup_volumesnapshot.md
   - recovery.md
   - postgresql_conf.md
   - declarative_role_management.md
@@ -59,7 +63,7 @@ nav:
   - benchmarking.md
   - commercial_support.md
   - faq.md
-  - api_reference.md
+  - cloudnative-pg.v1.md
   - supported_releases.md
   - release_notes.md
   - Appendixes:

@@ -910,17 +910,34 @@ func PgIsReady() error {
 	return fmt.Errorf("failure executing %s: %w", pgIsReady, err)
 }
 
+func (instance *Instance) buildPgControldataCommand() *exec.Cmd {
+	pgControlDataCmd := exec.Command(pgControlDataName)
+	pgControlDataCmd.Env = os.Environ()
+	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
+
+	return pgControlDataCmd
+}
+
 // LogPgControldata logs the content of PostgreSQL control data, for debugging and tracing
 func (instance *Instance) LogPgControldata(reason string) {
 	log.Info("Extracting pg_controldata information", "reason", reason)
 
-	pgControlDataCmd := exec.Command(pgControlDataName)
-	pgControlDataCmd.Env = os.Environ()
-	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
+	pgControlDataCmd := instance.buildPgControldataCommand()
 	err := execlog.RunBuffering(pgControlDataCmd, pgControlDataName)
 	if err != nil {
 		log.Error(err, "Error printing the control information of this PostgreSQL instance")
 	}
+}
+
+// GetPgControldata returns the output of pg_controldata and any errors encountered
+func (instance *Instance) GetPgControldata() (string, error) {
+	pgControlDataCmd := instance.buildPgControldataCommand()
+	out, err := pgControlDataCmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("while executing pg_controldata: %w", err)
+	}
+
+	return string(out), nil
 }
 
 // GetInstanceCommandChan is the channel where the lifecycle manager will

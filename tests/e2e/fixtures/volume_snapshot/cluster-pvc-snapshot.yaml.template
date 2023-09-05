@@ -15,7 +15,6 @@ spec:
     size: 1Gi
 
   backup:
-    target: primary
     barmanObjectStore:
         destinationPath: s3://cluster-backups/
         endpointURL: https://minio-service:9000

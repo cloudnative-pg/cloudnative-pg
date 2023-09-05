@@ -21,8 +21,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -31,6 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var (
@@ -110,4 +114,27 @@ func CreateAndGenerateObjects(ctx context.Context, k8sObject []client.Object, op
 	}
 
 	return nil
+}
+
+// GetPGControlData obtains the PgControldata from the passed pod by doing an exec.
+// This approach should be used only in the plugin commands.
+func GetPGControlData(
+	ctx context.Context,
+	pod corev1.Pod,
+) (string, error) {
+	timeout := time.Second * 10
+	clientInterface := kubernetes.NewForConfigOrDie(Config)
+	stdout, _, err := utils.ExecCommand(
+		ctx,
+		clientInterface,
+		Config,
+		pod,
+		specs.PostgresContainerName,
+		&timeout,
+		"pg_controldata")
+	if err != nil {
+		return "", err
+	}
+
+	return stdout, nil
 }

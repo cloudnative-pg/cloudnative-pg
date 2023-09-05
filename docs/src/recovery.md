@@ -1,19 +1,5 @@
 # Recovery
 
-<!-- TODO:
-
-- Explain the two sources of recovery: object store and volume snapshots
-- Provide an overview of both solutions (see example table below)
-- Describe both solutions, with examples, and cover PITR as well as snapshot recovery
-
-|                                      | WAL archiving | Cold backup | Hot backup | Backup from a standby | Snapshot recovery | Point In Time Recovery (PITR) |
-|--------------------------------------|:-------------:|:-----------:|:----------:|:---------------------:|:-----------------:|:-----------------------------:|
-| Object store                         |      Yes      |      No     |     Yes    |          Yes          |        No*        |              Yes              |
-| Volume Snapshots without WAL archive |       No      |     Yes     |     No     |          Yes          |        Yes        |               No              |
-| Volume Snapshots with WAL archive    |      Yes      |     Yes     |     Yes    |          Yes          |        Yes        |              Yes              |
-
--->
-
 In PostgreSQL terminology, recovery is the process of starting a PostgreSQL
 instance using a previously taken backup. PostgreSQL recovery mechanism
 is very solid and rich. It also supports Point In Time Recovery, which allows
@@ -31,8 +17,12 @@ starting from an available physical backup.
 
 The `recovery` bootstrap mode lets you create a new cluster from an existing
 physical base backup, and then reapply the WAL files containing the REDO log
-from the archive. Both base backups and WAL files are pulled from the
-*recovery object store*.
+from the archive.
+
+WAL files are pulled from the defined *recovery object store*.
+
+Base backups depend on the actual method used to take them, either object
+stores or volume snapshots.
 
 <!-- TODO: this needs to cover volume snapshots -->
 
@@ -45,7 +35,7 @@ Recovery from a *recovery object store* can be achieved in two ways:
   only option available before version 1.8.0).
 
 Both recovery methods enable either full recovery (up to the last
-available WAL) or up to a [point in time](#point-in-time-recovery).
+available WAL) or up to a [point in time](#point-in-time-recovery-pitr).
 When performing a full recovery, the cluster can also be started
 in replica mode. Also, make sure that the PostgreSQL configuration
 (`.spec.postgresql.parameters`) of the recovered cluster is
@@ -120,7 +110,8 @@ spec:
 ## Recovery from `VolumeSnapshot` objects
 
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
-existing `Cluster` that's been taken with `kubectl cnpg snapshot`.
+existing `Cluster` that's been taken using the declarative API for
+[volume snapshot backups](backup_volumesnapshot.md).
 You need to specify the name of the snapshot as in the following example:
 
 ```yaml
@@ -169,11 +160,6 @@ bootstrap:
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 ```
-
-The `kubectl cnpg snapshot` command is able to take consistent snapshots of a
-replica through a technique known as *cold backup*, by fencing the standby
-before taking a physical copy of the volumes. For details, please refer to
-["Snapshotting a Postgres cluster"](#snapshotting-a-postgres-cluster).
 
 ## Recovery from a `Backup` object
 
@@ -463,7 +449,7 @@ credentials with additional configuration. To update application database
 credentials, we can generate our own passwords, store them as secrets, and
 update the database use the secrets. Or we can also let the operator generate a
 secret with randomly secure password for use. Please reference the
-["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb)
+["Bootstrap an empty cluster"](bootstrap.md#bootstrap-an-empty-cluster-initdb)
 section for more information about secrets.
 
 The following example configure the application database `app` with owner
@@ -509,7 +495,7 @@ The operator will orchestrate the recovery process using the
 requested).
 
 For details and instructions on the `recovery` bootstrap method, please refer
-to the ["Bootstrap from a backup" section](#bootstrap-from-a-backup-recovery).
+to the ["Bootstrap from a backup" section](bootstrap.md#bootstrap-from-a-backup-recovery).
 
 !!! Important
     If you are not familiar with how [PostgreSQL PITR](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-PITR-RECOVERY)

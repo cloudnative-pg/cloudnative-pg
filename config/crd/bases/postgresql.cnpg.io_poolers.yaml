@@ -42,7 +42,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: PoolerSpec defines the desired state of Pooler
+            description: 'Specification of the desired behavior of the Pooler. More
+              info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
             properties:
               cluster:
                 description: This is the cluster reference on which the Pooler will
@@ -105,7 +106,7 @@ spec:
                 type: object
               instances:
                 default: 1
-                description: The number of replicas we want
+                description: 'The number of replicas we want. Default: 1.'
                 format: int32
                 type: integer
               monitoring:
@@ -163,13 +164,11 @@ spec:
                     type: array
                   poolMode:
                     default: session
-                    description: The pool mode
+                    description: 'The pool mode. Default: `session`.'
                     enum:
                     - session
                     - transaction
                     type: string
-                required:
-                - poolMode
                 type: object
               template:
                 description: The template of the Pod to be created
@@ -7684,19 +7683,18 @@ spec:
                 type: object
               type:
                 default: rw
-                description: Which instances we must forward traffic to?
+                description: 'Type of service to forward traffic to. Default: `rw`.'
                 enum:
                 - rw
                 - ro
                 type: string
             required:
             - cluster
-            - instances
             - pgbouncer
-            - type
             type: object
           status:
-            description: PoolerStatus defines the observed state of Pooler
+            description: 'Most recently observed status of the Pooler. This data may
+              not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
             properties:
               instances:
                 description: The number of pods trying to be scheduled
@@ -7751,6 +7749,9 @@ spec:
                     type: object
                 type: object
             type: object
+        required:
+        - metadata
+        - spec
         type: object
     served: true
     storage: true

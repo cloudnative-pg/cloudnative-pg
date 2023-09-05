@@ -1,0 +1,47 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-replica-from-backup
+spec:
+  instances: 1
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  replica:
+    enabled: true
+    source: cluster-replica-src
+
+  bootstrap:
+    recovery:
+      source: cluster-replica-src
+
+  externalClusters:
+    - name: cluster-replica-src
+
+      connectionParameters:
+        host: cluster-replica-src-rw
+        user: postgres
+        dbname: postgres
+        port: "5432"
+      password:
+        name: cluster-replica-src-superuser
+        key: password
+
+      barmanObjectStore:
+        destinationPath: s3://cluster-backups/
+        endpointURL: http://minio-service:9000
+        s3Credentials:
+          accessKeyId:
+            name: backup-storage-creds
+            key: ID
+          secretAccessKey:
+            name: backup-storage-creds
+            key: KEY
+        wal:
+          compression: gzip

@@ -1,0 +1,54 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-replica-from-snapshot
+spec:
+  instances: 1
+
+  storage:
+    storageClass: csi-hostpath-sc
+    size: 1Gi
+  walStorage:
+    storageClass: csi-hostpath-sc
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      source: cluster-example-with-volume-snapshot
+      volumeSnapshots:
+        storage:
+          name: cluster-example-with-volume-snapshot-2-1692618163
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+        walStorage:
+          name: cluster-example-with-volume-snapshot-2-wal-1692618163
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+
+  replica:
+    enabled: true
+    source: cluster-example-with-volume-snapshot
+
+  externalClusters:
+    - name: cluster-example-with-volume-snapshot
+
+      connectionParameters:
+        host: cluster-example-with-volume-snapshot-rw.default.svc
+        user: postgres
+        dbname: postgres
+      password:
+        name: cluster-example-with-volume-snapshot-superuser
+        key: password
+
+      barmanObjectStore:
+        destinationPath: s3://backups/
+        endpointURL: http://minio:9000
+        s3Credentials:
+          accessKeyId:
+            name: minio
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: minio
+            key: ACCESS_SECRET_KEY
+        wal:
+          maxParallel: 8

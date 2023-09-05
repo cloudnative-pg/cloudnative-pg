@@ -248,11 +248,13 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			curlPodName = curlClient.GetName()
 		})
 
+		// Create the source Cluster
+		AssertCreateCluster(namespace, srcClusterName, srcClusterSampleFile, env)
+
+		// Create the replica Cluster
 		AssertReplicaModeCluster(
 			namespace,
 			srcClusterName,
-			srcClusterSampleFile,
-			replicaClusterName,
 			replicaClusterSampleFile,
 			checkQuery,
 			psqlClientPod)

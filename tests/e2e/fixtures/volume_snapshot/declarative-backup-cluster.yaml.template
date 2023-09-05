@@ -1,0 +1,24 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-declarative-backup
+spec:
+  instances: 2
+  primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  backup:
+    volumeSnapshot:
+       className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}
+       snapshotOwnerReference: cluster
+       annotations:
+          test-annotation: test
+       labels:
+          test-labels: test

@@ -17,9 +17,15 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
+	"os"
+
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // GetStorageAllowExpansion returns the boolean value of the 'AllowVolumeExpansion' value of the storage class
@@ -81,4 +87,37 @@ func ObjectMatchesAnnotations(
 		}
 	}
 	return true
+}
+
+// SetSnapshotNameAsEnv sets the names of a PG_DATA and a PG_WAL snapshots from a given snapshotList
+// as env variables
+func SetSnapshotNameAsEnv(
+	snapshotList *volumesnapshot.VolumeSnapshotList,
+	dataSnapshotName,
+	walSnapshotName string,
+) error {
+	if len(snapshotList.Items) > 2 {
+		return fmt.Errorf("cannot handle a snapshotList with more than 2 snapshots")
+	}
+
+	for _, item := range snapshotList.Items {
+		switch utils.PVCRole(item.Labels[utils.PvcRoleLabelName]) {
+		case utils.PVCRolePgData:
+			err := os.Setenv(dataSnapshotName, item.Name)
+			if err != nil {
+				return err
+			}
+		case utils.PVCRolePgWal:
+			err := os.Setenv(walSnapshotName, item.Name)
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unrecognized PVC snapshot role: %s, name: %s",
+				item.Labels[utils.PvcRoleLabelName],
+				item.Name,
+			)
+		}
+	}
+	return nil
 }
