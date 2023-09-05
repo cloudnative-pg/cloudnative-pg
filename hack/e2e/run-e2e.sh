@@ -41,10 +41,10 @@ notinpath () {
 
 ensure_image_pull_secret() {
   if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
-    if ! kubectl get secret postgresql-operator-pull-secret -n postgresql-operator-system >/dev/null 2>&1; then
+    if ! kubectl get secret cnpg-pull-secret -n cnpg-system >/dev/null 2>&1; then
       kubectl create secret docker-registry \
-        -n postgresql-operator-system \
-        postgresql-operator-pull-secret \
+        -n cnpg-system \
+        cnpg-pull-secret \
         --docker-server="${DOCKER_SERVER}" \
         --docker-username="${DOCKER_USERNAME}" \
         --docker-password="${DOCKER_PASSWORD}"
@@ -76,8 +76,8 @@ RC=0
 RC_GINKGO1=0
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   # Getting the operator images need a pull secret
-  kubectl delete namespace postgresql-operator-system || :
-  kubectl create namespace postgresql-operator-system
+  kubectl delete namespace cnpg-system || :
+  kubectl create namespace cnpg-system
   ensure_image_pull_secret
   # Generate a manifest for the operator after the api upgrade
   # TODO: this is almost a "make deploy". Refactor.
@@ -109,8 +109,8 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
 fi
 
 # Getting the operator images need a pull secret
-kubectl delete namespace postgresql-operator-system || :
-kubectl create namespace postgresql-operator-system
+kubectl delete namespace cnpg-system || :
+kubectl create namespace cnpg-system
 ensure_image_pull_secret
 
 CONTROLLER_IMG="${CONTROLLER_IMG}" \
