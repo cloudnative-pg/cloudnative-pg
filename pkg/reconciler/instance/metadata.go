@@ -93,10 +93,17 @@ func updateClusterAnnotations(
 	if utils.IsAnnotationSubset(instance.Annotations, cluster.Annotations, cluster.GetFixedInheritedAnnotations(),
 		configuration.Current) &&
 		utils.IsAnnotationAppArmorPresentInObject(&instance.ObjectMeta, &instance.Spec, cluster.Annotations) {
+		// let's create a copy of the pod Annotations without the PodSpec, otherwise
+		// the debug log will get clogged
+		podAnnotations := make(map[string]string)
+		for k, v := range instance.Annotations {
+			podAnnotations[k] = v
+		}
+		delete(podAnnotations, utils.PodSpecAnnotationName)
 		contextLogger.Debug(
 			"Skipping cluster annotations reconciliation, because they are already present on pod",
 			"pod", instance.Name,
-			"podAnnotations", instance.Annotations,
+			"podAnnotations", podAnnotations,
 			"clusterAnnotations", cluster.Annotations,
 		)
 		return false

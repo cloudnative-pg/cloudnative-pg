@@ -294,7 +294,9 @@ func isPodNeedingRollout(
 	}
 	podRollout = applyCheckers(checkers)
 	if podRollout.required {
-		return podRollout
+		contextLogger.Info("XXXXXX pod rollout", "pod", status.Pod.Name, "reason", podRollout.reason)
+			return podRollout
+
 	}
 
 	return rollout{}
@@ -605,7 +607,7 @@ func checkPodSpecIsOutdated(
 	if !reflect.DeepEqual(storedPodSpec, currentPodSpec) {
 		return rollout{
 			required: true,
-			reason:   "the podSpec is outdated",
+			reason:   "PodSpec used to create pod differs from desired PodSpec: " + diff,
 		}, nil
 	}
 
