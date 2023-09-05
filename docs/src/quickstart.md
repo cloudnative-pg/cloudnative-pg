@@ -284,7 +284,7 @@ You can now define some alerts by creating a `prometheusRule`:
 
 ``` sh
 kubectl apply -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring/cnpg-prometheusrule.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring/prometheusrule.yaml
 ```
 
 You should see the default alerts now:
