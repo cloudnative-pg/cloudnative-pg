@@ -255,6 +255,7 @@ func isPodNeedingRollout(
 				if podRollout.reason == "" {
 					podRollout.reason = message
 				}
+				contextLogger.Warning("Pod rollout required", "pod", status.Pod.Name, "reason", podRollout.reason)
 				return podRollout
 			}
 		}
@@ -294,7 +295,7 @@ func isPodNeedingRollout(
 	}
 	podRollout = applyCheckers(checkers)
 	if podRollout.required {
-		contextLogger.Info("XXXXXX pod rollout", "pod", status.Pod.Name, "reason", podRollout.reason)
+		contextLogger.Warning("Pod rollout required", "pod", status.Pod.Name, "reason", podRollout.reason)
 			return podRollout
 
 	}
@@ -607,7 +608,7 @@ func checkPodSpecIsOutdated(
 	if !reflect.DeepEqual(storedPodSpec, currentPodSpec) {
 		return rollout{
 			required: true,
-			reason:   "PodSpec used to create pod differs from desired PodSpec: " + diff,
+			reason:   "original PodSpec does not match target PodSpec: " + diff,
 		}, nil
 	}
 
