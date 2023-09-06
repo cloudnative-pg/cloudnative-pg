@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -136,14 +137,15 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 	}
 	ldapConfig := cluster.Spec.PostgresConfiguration.LDAP
 
-	ldapConfigString += fmt.Sprintf("host all all 0.0.0.0/0 ldap ldapserver=%s", ldapConfig.Server)
+	ldapConfigString += fmt.Sprintf("host all all 0.0.0.0/0 ldap ldapserver=\"%s\"",
+		ldapConfig.Server)
 
 	if ldapConfig.Port != 0 {
-		ldapConfigString += fmt.Sprintf(" ldapport=%d", ldapConfig.Port)
+		ldapConfigString += fmt.Sprintf(" ldapport=\"%d\"", ldapConfig.Port)
 	}
 
 	if ldapConfig.Scheme != "" {
-		ldapConfigString += fmt.Sprintf(" ldapscheme=%s", ldapConfig.Scheme)
+		ldapConfigString += fmt.Sprintf(" ldapscheme=\"%s\"", ldapConfig.Scheme)
 	}
 
 	if ldapConfig.TLS {
@@ -155,8 +157,8 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 			"server", ldapConfig.Server,
 			"prefix", ldapConfig.BindAsAuth.Prefix,
 			"suffix", ldapConfig.BindAsAuth.Suffix)
-		ldapConfigString += fmt.Sprintf(" ldapprefix=\"%s\" ldapsuffix=\"%s\"", ldapConfig.BindAsAuth.Prefix,
-			ldapConfig.BindAsAuth.Suffix)
+		ldapConfigString += fmt.Sprintf(" ldapprefix=\"%s\" ldapsuffix=\"%s\"",
+			ldapConfig.BindAsAuth.Prefix, ldapConfig.BindAsAuth.Suffix)
 	}
 
 	if ldapConfig.BindSearchAuth != nil {
@@ -167,13 +169,16 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 			"search attribute", ldapConfig.BindSearchAuth.SearchAttribute,
 			"search filter", ldapConfig.BindSearchAuth.SearchFilter)
 
-		ldapConfigString += fmt.Sprintf(" ldapbasedn=\"%s\" ldapbinddn=\"%s\" "+
-			"ldapbindpasswd=%s", ldapConfig.BindSearchAuth.BaseDN, ldapConfig.BindSearchAuth.BindDN, ldapBindPassword)
+		ldapConfigString += fmt.Sprintf(" ldapbasedn=\"%s\" ldapbinddn=\"%s\" ldapbindpasswd=\"%s\"",
+			ldapConfig.BindSearchAuth.BaseDN, ldapConfig.BindSearchAuth.BindDN,
+			strings.ReplaceAll(ldapBindPassword, "\n", "\\\n"))
 		if ldapConfig.BindSearchAuth.SearchFilter != "" {
-			ldapConfigString += fmt.Sprintf(" ldapsearchfilter=%s", ldapConfig.BindSearchAuth.SearchFilter)
+			ldapConfigString += fmt.Sprintf(" ldapsearchfilter=\"%s\"",
+				ldapConfig.BindSearchAuth.SearchFilter)
 		}
 		if ldapConfig.BindSearchAuth.SearchAttribute != "" {
-			ldapConfigString += fmt.Sprintf(" ldapsearchattribute=%s", ldapConfig.BindSearchAuth.SearchAttribute)
+			ldapConfigString += fmt.Sprintf(" ldapsearchattribute=\"%s\"",
+				ldapConfig.BindSearchAuth.SearchAttribute)
 		}
 	}
 
