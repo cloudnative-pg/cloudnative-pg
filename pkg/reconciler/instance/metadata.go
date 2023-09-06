@@ -100,7 +100,7 @@ func updateClusterAnnotations(
 			podAnnotations[k] = v
 		}
 		delete(podAnnotations, utils.PodSpecAnnotationName)
-		contextLogger.Debug(
+		contextLogger.Trace(
 			"Skipping cluster annotations reconciliation, because they are already present on pod",
 			"pod", instance.Name,
 			"podAnnotations", podAnnotations,
@@ -140,7 +140,7 @@ func updateClusterLabels(
 	// there's nothing more to do
 	if utils.IsLabelSubset(instance.Labels, cluster.Labels, cluster.GetFixedInheritedLabels(),
 		configuration.Current) {
-		contextLogger.Debug(
+		contextLogger.Trace(
 			"Skipping cluster label reconciliation, because they are already present on pod",
 			"pod", instance.Name,
 			"podLabels", instance.Labels,
@@ -171,7 +171,7 @@ func updateRoleLabels(
 	}
 
 	if !utils.IsPodActive(*instance) {
-		contextLogger.Info("Ignoring not active Pod during label update",
+		contextLogger.Trace("Ignoring not active Pod during label update",
 			"pod", instance.Name, "status", instance.Status)
 		return false
 	}

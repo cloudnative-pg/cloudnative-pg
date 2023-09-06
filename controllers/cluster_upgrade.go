@@ -255,7 +255,7 @@ func isPodNeedingRollout(
 				if podRollout.reason == "" {
 					podRollout.reason = message
 				}
-				contextLogger.Warning("Pod rollout required", "pod", status.Pod.Name, "reason", podRollout.reason)
+				contextLogger.Info("Pod rollout required", "pod", status.Pod.Name, "reason", podRollout.reason)
 				return podRollout
 			}
 		}
@@ -295,9 +295,7 @@ func isPodNeedingRollout(
 	}
 	podRollout = applyCheckers(checkers)
 	if podRollout.required {
-		contextLogger.Warning("Pod rollout required", "pod", status.Pod.Name, "reason", podRollout.reason)
-			return podRollout
-
+		return podRollout
 	}
 
 	return rollout{}
@@ -623,7 +621,7 @@ func (r *ClusterReconciler) upgradePod(
 	pod *corev1.Pod,
 	reason rolloutReason,
 ) error {
-	log.FromContext(ctx).Info("Deleting old Pod",
+	log.FromContext(ctx).Info("Recreating instance pod",
 		"pod", pod.Name,
 		"to", cluster.Spec.ImageName,
 		"reason", reason,
