@@ -244,30 +244,47 @@ func isPodNeedingRollout(
 	if !status.IsPodReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
 		return rollout{}
 	}
+	applyCheckers := func(checkers map[string]rolloutChecker) rollout {
+		for message, check := range checkers {
+			podRollout, err := check(status, cluster)
+			if err != nil {
+				contextLogger.Error(err, "while checking if pod needs rollout")
+				continue
+			}
+			if podRollout.required {
+				if podRollout.reason == "" {
+					podRollout.reason = message
+				}
+				return podRollout
+			}
+		}
+		return rollout{}
+	}
 
 	checkers := map[string]rolloutChecker{
 		"instance is missing executable hash":  checkHasExecutableHash,
 		"pod has missing PVCs":                 checkHasMissingPVCs,
 		"pod has PVC requiring resizing":       checkHasResizingPVC,
 		"pod projected volume is outdated":     checkProjectedVolumeIsOutdated,
-		"PodSpec is outdated":                  checkPodSpecIsOutdated,
 		"pod image is outdated":                checkPodImageIsOutdated,
 		"pod init container is outdated":       checkPodInitContainerIsOutdated,
 		"postgres restart required":            checkPostgresPendingRestart,
 		"cluster has newer restart annotation": checkClusterHasNewerRestartAnnotation,
 	}
-	for message, check := range checkers {
-		podRollout, err := check(status, cluster)
-		if err != nil {
-			contextLogger.Error(err, "while checking if pod needs rollout")
-			continue
-		}
-		if podRollout.required {
-			if podRollout.reason == "" {
-				podRollout.reason = message
-			}
-			return podRollout
-		}
+
+	podRollout := applyCheckers(checkers)
+	if podRollout.required {
+		return podRollout
+	}
+
+	// the PodSpec checker is very wide, and should be applied later than the others
+	checkers = map[string]rolloutChecker{
+		"PodSpec is outdated": checkPodSpecIsOutdated,
+	}
+
+	podRollout = applyCheckers(checkers)
+	if podRollout.required {
+		return podRollout
 	}
 
 	// If the pod has a stored PodSpec annotation, we're done checking.
@@ -283,18 +300,9 @@ func isPodNeedingRollout(
 		"pod scheduler is outdated":   checkSchedulerIsOutdated,
 		"pod needs updated topology":  checkPodNeedsUpdatedTopology,
 	}
-	for message, check := range checkers {
-		podRollout, err := check(status, cluster)
-		if err != nil {
-			contextLogger.Error(err, "while checking if pod needs rollout")
-			continue
-		}
-		if podRollout.required {
-			if podRollout.reason == "" {
-				podRollout.reason = message
-			}
-			return podRollout
-		}
+	podRollout = applyCheckers(checkers)
+	if podRollout.required {
+		return podRollout
 	}
 
 	return rollout{}
@@ -595,6 +603,12 @@ func checkPodSpecIsOutdated(
 			),
 		}, nil
 	}
+
+	// the bootstrap init container could change on a different operator version,
+	// but there is a separate checker handling that, so we can ignore
+	// the init containers in the PodSpec comparison
+	storedPodSpec.InitContainers = nil
+	currentPodSpec.InitContainers = nil
 
 	if !reflect.DeepEqual(storedPodSpec, currentPodSpec) {
 		return rollout{
