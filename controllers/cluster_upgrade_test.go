@@ -229,7 +229,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("PodSpec drift:"))
+			Expect(rollout.reason).To(ContainSubstring("original PodSpec does not match target PodSpec:"))
 			Expect(rollout.reason).To(ContainSubstring("resources mismatch"))
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
@@ -245,7 +245,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("PodSpec drift:"))
+			Expect(rollout.reason).To(ContainSubstring("original PodSpec does not match target PodSpec:"))
 			Expect(rollout.reason).To(ContainSubstring("resources mismatch"))
 		})
 	})
@@ -295,7 +295,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, cluster)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("PodSpec drift:"))
+			Expect(rollout.reason).To(ContainSubstring("original PodSpec does not match target PodSpec:"))
 			Expect(rollout.reason).To(ContainSubstring("environment mismatch"))
 		})
 	})
