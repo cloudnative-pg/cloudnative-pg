@@ -485,8 +485,8 @@ var _ = Describe("EnvConfig", func() {
 	})
 })
 
-var _ = Describe("podSpec drift detection tests", func() {
-	It("diff ignores order of volumes", func() {
+var _ = Describe("PodSpec drift detection", func() {
+	It("ignores order of volumes", func() {
 		podSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
@@ -537,7 +537,7 @@ var _ = Describe("podSpec drift detection tests", func() {
 		Expect(specsMatch).To(BeTrue())
 	})
 
-	It("diff detects drift in content of the same element", func() {
+	It("detects drift in content of the same element", func() {
 		podSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
@@ -570,7 +570,7 @@ var _ = Describe("podSpec drift detection tests", func() {
 		Expect(specsMatch).To(BeFalse())
 	})
 
-	It("diff detects drift on missing volumes", func() {
+	It("detects drift on missing volumes", func() {
 		podSpec1 := corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
@@ -612,7 +612,7 @@ var _ = Describe("podSpec drift detection tests", func() {
 		Expect(specsMatch).To(BeFalse())
 	})
 
-	It("diff ignores order of volume mounts in postgres container", func() {
+	It("ignores order of volume mounts in postgres container", func() {
 		podSpec1 := corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -671,7 +671,7 @@ var _ = Describe("podSpec drift detection tests", func() {
 		Expect(specsMatch).To(BeTrue())
 	})
 
-	It("diff detects missing container", func() {
+	It("detects missing container", func() {
 		podSpec1 := corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -702,7 +702,7 @@ var _ = Describe("podSpec drift detection tests", func() {
 		Expect(specsMatch).To(BeFalse())
 	})
 
-	It("diff detects difference in generic field", func() {
+	It("detects difference in generic field", func() {
 		podSpec1 := corev1.PodSpec{
 			ServiceAccountName: "foo",
 			Containers:         []corev1.Container{},
@@ -717,7 +717,7 @@ var _ = Describe("podSpec drift detection tests", func() {
 		Expect(specsMatch).To(BeFalse())
 	})
 
-	It("diff detects missing volume mounts in postgres container", func() {
+	It("detects missing volume mounts in postgres container", func() {
 		podSpec1 := corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -770,7 +770,7 @@ var _ = Describe("podSpec drift detection tests", func() {
 		Expect(specsMatch).To(BeFalse())
 	})
 
-	It("diff detects image mismatch on the postgres container", func() {
+	It("detects image mismatch on the postgres container", func() {
 		podSpec1 := corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -794,7 +794,7 @@ var _ = Describe("podSpec drift detection tests", func() {
 		Expect(specsMatch).To(BeFalse())
 	})
 
-	It("diff detects resource mismatch on the postgres container", func() {
+	It("detects resource mismatch on the postgres container", func() {
 		podSpec1 := corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
