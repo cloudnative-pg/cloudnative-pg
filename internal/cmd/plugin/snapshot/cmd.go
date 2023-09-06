@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/cobra"
@@ -33,6 +34,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/snapshot"
 )
+
+// label value regular expression
+var labelValueRegex = regexp.MustCompile("^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]")
 
 // NewCmd implements the `snapshot` subcommand
 func NewCmd() *cobra.Command {
@@ -57,8 +61,9 @@ The other replicas will continue working.`,
 
 			snapshotClassName, _ := cmd.Flags().GetString("volume-snapshot-class-name")
 			snapshotNameSuffix, _ := cmd.Flags().GetString("volume-snapshot-suffix")
+			backupNameLabel, _ := cmd.Flags().GetString("label-backup-name")
 
-			return execute(cmd.Context(), clusterName, snapshotClassName, snapshotNameSuffix)
+			return execute(cmd.Context(), clusterName, snapshotClassName, snapshotNameSuffix, backupNameLabel)
 		},
 	}
 
@@ -66,8 +71,8 @@ The other replicas will continue working.`,
 		"volume-snapshot-class-name",
 		"c",
 		"",
-		`The VolumeSnapshotClass name to be used for the snapshot
-(defaults to empty, which will make use of the default VolumeSnapshotClass)`)
+		`The VolumeSnapshotClass name to be used for the snapshot. 
+Defaults to empty string, which will make use of the default VolumeSnapshotClass`)
 
 	cmd.Flags().StringP("volume-snapshot-suffix",
 		"x",
@@ -75,6 +80,12 @@ The other replicas will continue working.`,
 		"Specifies the suffix of the created volume snapshot. Optional. "+
 			"Defaults to the snapshot time expressed as unix timestamp",
 	)
+
+	cmd.Flags().StringP("label-backup-name",
+		"l",
+		"",
+		`Specifies the value for the label 'cnpg.io/backupName'.
+Defaults to empty, which will cause the label to not be present on the created VolumeSnapshot resources`)
 
 	return cmd
 }
@@ -85,7 +96,13 @@ func execute(
 	clusterName string,
 	snapshotClassName string,
 	snapshotSuffix string,
+	backupNameLabel string,
 ) error {
+	if backupNameLabel != "" && !labelValueRegex.MatchString(backupNameLabel) {
+		return fmt.Errorf("invalid label value. A valid label must be an empty string or consist of " +
+			"alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character")
+	}
+
 	// Get the Cluster object
 	var cluster apiv1.Cluster
 	err := plugin.Client.Get(
@@ -130,6 +147,10 @@ func execute(
 	}
 
 	enrichFunc := func(vs *volumesnapshot.VolumeSnapshot) {
+		if backupNameLabel != "" {
+			vs.Labels[utils.BackupNameLabelName] = backupNameLabel
+		}
+
 		vs.Annotations[utils.ClusterManifestAnnotationName] = string(rawCluster)
 
 		pgControlData, err := plugin.GetPGControlData(ctx, *targetPod)

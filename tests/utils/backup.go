@@ -498,7 +498,8 @@ func CreateVolumeSnapshotBackup(
 	volumeSnapshotClass,
 	namespace,
 	clusterName,
-	snapshotSuffix string,
+	snapshotSuffix,
+	backupName string,
 ) error {
 	command := fmt.Sprintf("kubectl cnpg snapshot %v -n %v", clusterName, namespace)
 	if volumeSnapshotClass != "" {
@@ -506,6 +507,9 @@ func CreateVolumeSnapshotBackup(
 	}
 	if snapshotSuffix != "" {
 		command = fmt.Sprintf("%v -x %v", command, snapshotSuffix)
+	}
+	if backupName != "" {
+		command = fmt.Sprintf("%v -l %v", command, backupName)
 	}
 
 	_, _, err := Run(command)
