@@ -1,0 +1,119 @@
+# Retrieves a list of supported image versions for the cloud providers and
+# creates a PR to update each relative JSON file:
+# - Kind (Kubernetes in Docker): kind_versions.json
+# - GKE (Google Kubernetes Engine): gke_versions.json
+# - AKS (Azure Kubernetes Service): aks_versions.json
+# - EKS (Amazon Elastic Kubernetes Service): eks_versions.json
+
+name: public-cloud-k8s-versions-check
+on:
+  schedule:
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Limit to the specified engines list (eks, aks, gke, kind)'
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+
+defaults:
+  run:
+    shell: 'bash -Eeuo pipefail -x {0}'
+
+env:
+  # The minimal k8s version supported, k8s version smaller than this one will be removed from vendor
+  MINIMAL_K8S: "1.23"
+
+jobs:
+
+  check-public-clouds-k8s-versions:
+    runs-on: ubuntu-22.04
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v3
+      -
+        # There is no command to get EKS k8s versions, we have to parse the documentation
+        name: Get updated EKS versions
+        run: |
+          DOC_URL="https://raw.githubusercontent.com/awsdocs/amazon-eks-user-guide/master/doc_source/kubernetes-versions.md" #wokeignore:rule=master
+          curl --silent "${DOC_URL}" | grep -E '^\+ `[0-9]\.[0-9]{2}`$' | sed -e 's/[\ +`]//g' | \
+            awk -vv=$MINIMAL_K8S '$0>=v {print $0}' | \
+            jq -Rn '[inputs]' | tee .github/eks_versions.json
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'eks'
+      -
+        name: Azure Login
+        uses: azure/login@v1.4.7
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
+      -
+        name: Get updated AKS versions
+        run: |
+          az aks get-versions --location westeurope  \
+            --query 'reverse(sort(values[? isPreview != `true`].patchVersions.keys(@)[]))' -o tsv | \
+            sort -urk 1,1.5 | \
+            awk -vv=$MINIMAL_K8S '$0>=v {print $0}' | \
+            jq -Rn '[inputs]' | tee .github/aks_versions.json
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
+      -
+        name: 'Auth GKE'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
+      -
+        name: Set up Cloud SDK for GKE
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          export_default_credentials: true
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
+      -
+        name: Install YQ
+        uses: frenck/action-setup-yq@v1
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
+      -
+        name: Get updated GKE versions
+        run: |
+          # Get the valid major versions from all the channels, convert them
+          # to json and write them to file.
+          YQEXPR=".validMasterVersions" #wokeignore:rule=master
+          gcloud container get-server-config --zone europe-west3-a --quiet | \
+            yq e ${YQEXPR} - | \
+            cut -d'.' -f '1-2' | \
+            uniq | \
+            sed 's/\([[:digit:]]\+\.[[:digit:]]\+\)/"\1"/' | \
+            yq '.[] | select( . >= strenv(MINIMAL_K8S) )' | \
+            jq -Rn '[inputs]' | tee .github/gke_versions.json
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
+      -
+        name: Get updated kind node version
+        run : |
+          # Get the latest valid kind node version, convert them to json
+          # and write them to a file, starting from the MINIMAL_K8S
+          for baseversion in $(seq $MINIMAL_K8S 0.01 99); do
+            URL="https://registry.hub.docker.com/v2/repositories/kindest/node/tags?name=${baseversion}&ordering=last_updated"
+            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | sort -Vr | head -n1)
+            if [[ -z "${v}" ]]; then
+               break
+            fi
+            echo "${v}"
+          done | jq -Rs 'split("\n") | map(select(length>0))' | tee .github/kind_versions.json
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'kind'
+      -
+        name: Create Pull Request if versions have been updated
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "feat: Public Cloud K8S versions update"
+          body: "Update the versions used to test the operator on public cloud providers"
+          branch: "k8s-cloud-versions-update"
+          author: "public-cloud-k8s-versions-check <public-cloud-k8s-versions-check@users.noreply.github.com>"
+          add-paths: ".github/"
+          commit-message: "feat: Updated public cloud k8s tested versions"
+          signoff: true
