@@ -101,13 +101,14 @@ var _ = Describe("testing the building of the ldap config string", func() {
 			`ldapport="%d" ldapscheme="%s" ldaptls=1 ldapprefix="%s" ldapsuffix="%s"`,
 			ldapServer, ldapPort, ldapScheme, ldapPrefix, ldapSuffix)))
 	})
-	It("does not generate a newline if ldapBindPasswd contains one", func() {
+	It("if password contains a newline, ends the line with a backslash and carries on", func() {
 		str := buildLDAPConfigString(&cluster, "nasty\npass")
-		Expect(strings.Split(str, "\n")).To(HaveLen(1))
+		Expect(strings.Split(str, "\n")).To(HaveLen(2))
 		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" `+
 			`ldapport="%d" ldapscheme="%s" ldaptls=1 ldapbasedn="%s" `+
-			`ldapbinddn="%s" ldapbindpasswd="nasty\npass" `+
-			`ldapsearchfilter="%s" ldapsearchattribute="%s"`,
+			`ldapbinddn="%s" ldapbindpasswd="nasty\`+
+			"\n"+
+			`pass" ldapsearchfilter="%s" ldapsearchattribute="%s"`,
 			ldapServer, ldapPort, ldapScheme, ldapBaseDN, ldapBindDN,
 			ldapSearchFilter, ldapSearchAttribute)))
 	})

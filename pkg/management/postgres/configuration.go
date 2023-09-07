@@ -171,7 +171,9 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 
 		ldapConfigString += fmt.Sprintf(` ldapbasedn="%s" ldapbinddn="%s" ldapbindpasswd="%s"`,
 			ldapConfig.BindSearchAuth.BaseDN, ldapConfig.BindSearchAuth.BindDN,
-			strings.ReplaceAll(ldapBindPassword, "\n", "\\n"))
+			// if there is a newline, finsh the line with a backslash, and carry on
+			// in the next line. (see https://www.postgresql.org/docs/current/auth-pg-hba-conf.html)
+			strings.ReplaceAll(ldapBindPassword, "\n", "\\\n"))
 		if ldapConfig.BindSearchAuth.SearchFilter != "" {
 			ldapConfigString += fmt.Sprintf(` ldapsearchfilter="%s"`,
 				ldapConfig.BindSearchAuth.SearchFilter)
