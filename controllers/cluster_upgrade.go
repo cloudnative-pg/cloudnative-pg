@@ -277,21 +277,13 @@ func isPodNeedingRollout(
 		return podRollout
 	}
 
-	// the PodSpec checker is very wide, and should be applied later than the others
-	checkers = map[string]rolloutChecker{
-		"PodSpec is outdated": checkPodSpecIsOutdated,
-	}
-
-	podRollout = applyCheckers(checkers)
-	if podRollout.required {
-		return podRollout
-	}
-
-	// If the pod has a stored PodSpec annotation, we're done checking.
+	// If the pod has a stored PodSpec annotation, that's the final check.
 	// If not, we should perform additional checks
 	_, hasStoredPodSpec := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
 	if hasStoredPodSpec {
-		return rollout{}
+		return applyCheckers(map[string]rolloutChecker{
+			"PodSpec is outdated": checkPodSpecIsOutdated,
+		})
 	}
 
 	// These checks are subsumed by the PodSpec checker
