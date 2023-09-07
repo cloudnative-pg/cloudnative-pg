@@ -26,7 +26,7 @@ import (
 // ComparePodSpecs compares two pod specs, returns true iff they are equivalent, and
 // if they are not, points out the first discrepancy.
 // This function matches CreateClusterPodSpec, specifically it looks in more detail
-// and ignores reorderings of: volume mounts and containers
+// and ignores reordering of volume mounts and containers
 func ComparePodSpecs(
 	podSpec1, podSpec2 corev1.PodSpec,
 ) (bool, string) {
