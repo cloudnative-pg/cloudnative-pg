@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,9 +83,9 @@ var _ = Describe("testing the building of the ldap config string", func() {
 	It("correctly builds a bindSearchAuth string", func() {
 		str := buildLDAPConfigString(&cluster, ldapPassword)
 		fmt.Printf("here %s\n", str)
-		Expect(str).To(Equal(fmt.Sprintf("host all all 0.0.0.0/0 ldap ldapserver=\"%s\" ldapport=\"%d\" "+
-			"ldapscheme=\"%s\" ldaptls=1 ldapbasedn=\"%s\" ldapbinddn=\"%s\" "+
-			"ldapbindpasswd=\"%s\" ldapsearchfilter=\"%s\" ldapsearchattribute=\"%s\"",
+		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" ldapport="%d" `+
+			`ldapscheme="%s" ldaptls=1 ldapbasedn="%s" ldapbinddn="%s" `+
+			`ldapbindpasswd="%s" ldapsearchfilter="%s" ldapsearchattribute="%s"`,
 			ldapServer, ldapPort, ldapScheme, ldapBaseDN,
 			ldapBindDN, ldapPassword, ldapSearchFilter, ldapSearchAttribute)))
 	})
@@ -96,8 +97,18 @@ var _ = Describe("testing the building of the ldap config string", func() {
 			Suffix: ldapSuffix,
 		}
 		str := buildLDAPConfigString(baaCluster, ldapPassword)
-		Expect(str).To(Equal(fmt.Sprintf("host all all 0.0.0.0/0 ldap ldapserver=\"%s\" "+
-			"ldapport=\"%d\" ldapscheme=\"%s\" ldaptls=1 ldapprefix=\"%s\" ldapsuffix=\"%s\"",
+		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" `+
+			`ldapport="%d" ldapscheme="%s" ldaptls=1 ldapprefix="%s" ldapsuffix="%s"`,
 			ldapServer, ldapPort, ldapScheme, ldapPrefix, ldapSuffix)))
+	})
+	It("does not generate a newline if ldapBindPasswd contains one", func() {
+		str := buildLDAPConfigString(&cluster, "nasty\npass")
+		Expect(strings.Split(str, "\n")).To(HaveLen(1))
+		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" `+
+			`ldapport="%d" ldapscheme="%s" ldaptls=1 ldapbasedn="%s" `+
+			`ldapbinddn="%s" ldapbindpasswd="nasty\npass" `+
+			`ldapsearchfilter="%s" ldapsearchattribute="%s"`,
+			ldapServer, ldapPort, ldapScheme, ldapBaseDN, ldapBindDN,
+			ldapSearchFilter, ldapSearchAttribute)))
 	})
 })
