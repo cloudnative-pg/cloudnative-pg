@@ -117,7 +117,7 @@ func newMetrics() *metrics {
 			Subsystem: subsystem,
 			Name:      "up",
 			Help:      "1 if PostgreSQL is up, 0 otherwise.",
-		}, []string{"cnpg_cluster"}),
+		}, []string{"cluster", "cnpg_cluster"}),
 		CollectionDuration: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,

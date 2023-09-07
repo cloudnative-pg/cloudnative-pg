@@ -83,6 +83,7 @@ var _ = Describe("Verify Volume Snapshot",
 					namespace,
 					clusterName,
 					"",
+					"",
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -97,12 +98,14 @@ var _ = Describe("Verify Volume Snapshot",
 				}).Should(Succeed())
 			})
 
-			It("using the kubectl cnpg plugin with a custom suffix", func() {
+			It("using the kubectl cnpg plugin with a custom suffix and label name", func() {
+				const backupName = "backup-name"
 				err := testUtils.CreateVolumeSnapshotBackup(
 					volumeSnapshotClassName,
 					namespace,
 					clusterName,
 					snapshotSuffix,
+					backupName,
 				)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -111,6 +114,7 @@ var _ = Describe("Verify Volume Snapshot",
 					for _, snapshot := range snapshotList.Items {
 						if strings.Contains(snapshot.Name, snapshotSuffix) {
 							g.Expect(snapshot.Name).To(ContainSubstring(clusterName))
+							g.Expect(snapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupName))
 						}
 					}
 				}).Should(Succeed())
@@ -227,6 +231,7 @@ var _ = Describe("Verify Volume Snapshot",
 						namespace,
 						clusterToSnapshotName,
 						suffix,
+						"",
 					)
 					Expect(err).ToNot(HaveOccurred())
 				})
