@@ -171,7 +171,7 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 
 		ldapConfigString += fmt.Sprintf(` ldapbasedn="%s" ldapbinddn="%s" ldapbindpasswd="%s"`,
 			ldapConfig.BindSearchAuth.BaseDN, ldapConfig.BindSearchAuth.BindDN,
-			strings.ReplaceAll(ldapBindPassword, "\n", "\\\n"))
+			strings.ReplaceAll(ldapBindPassword, "\n", "\\n"))
 		if ldapConfig.BindSearchAuth.SearchFilter != "" {
 			ldapConfigString += fmt.Sprintf(` ldapsearchfilter="%s"`,
 				ldapConfig.BindSearchAuth.SearchFilter)
