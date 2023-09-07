@@ -83,6 +83,9 @@ const (
 
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"
+
+	// CoredumpFilter stores the value defined by the user to set in /proc/self/coredump_filter
+	CoredumpFilter = "cnpg.io/coredumpFilter"
 )
 
 type annotationStatus string

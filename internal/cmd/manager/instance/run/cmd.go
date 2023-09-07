@@ -48,6 +48,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -145,6 +146,27 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	metricsServer, err := metricserver.New(instance)
 	if err != nil {
+		return err
+	}
+
+	typedClient, err := management.NewControllerRuntimeClient()
+	if err != nil {
+		return err
+	}
+	var cluster apiv1.Cluster
+	if err := typedClient.Get(ctx,
+		client.ObjectKey{
+			Name:      instance.ClusterName,
+			Namespace: instance.Namespace,
+		},
+		&cluster); err != nil {
+		setupLog.Error(err, "unable to get cluster object")
+		return err
+	}
+
+	coredumpFilter := cluster.GetCoredumpFilter()
+	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
+		setupLog.Error(err, "unable to set coredump filter value")
 		return err
 	}
 
