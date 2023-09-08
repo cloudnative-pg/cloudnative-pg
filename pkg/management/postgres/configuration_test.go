@@ -83,7 +83,7 @@ var _ = Describe("testing the building of the ldap config string", func() {
 	It("correctly builds a bindSearchAuth string", func() {
 		str := buildLDAPConfigString(&cluster, ldapPassword)
 		fmt.Printf("here %s\n", str)
-		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" ldapport="%d" `+
+		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" ldapport=%d `+
 			`ldapscheme="%s" ldaptls=1 ldapbasedn="%s" ldapbinddn="%s" `+
 			`ldapbindpasswd="%s" ldapsearchfilter="%s" ldapsearchattribute="%s"`,
 			ldapServer, ldapPort, ldapScheme, ldapBaseDN,
@@ -98,15 +98,15 @@ var _ = Describe("testing the building of the ldap config string", func() {
 		}
 		str := buildLDAPConfigString(baaCluster, ldapPassword)
 		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" `+
-			`ldapport="%d" ldapscheme="%s" ldaptls=1 ldapprefix="%s" ldapsuffix="%s"`,
+			`ldapport=%d ldapscheme="%s" ldaptls=1 ldapprefix="%s" ldapsuffix="%s"`,
 			ldapServer, ldapPort, ldapScheme, ldapPrefix, ldapSuffix)))
 	})
 	It("if password contains a newline, ends the line with a backslash and carries on", func() {
-		str := buildLDAPConfigString(&cluster, "nasty\npass")
+		str := buildLDAPConfigString(&cluster, "really\"nasty\npass")
 		Expect(strings.Split(str, "\n")).To(HaveLen(2))
 		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" `+
-			`ldapport="%d" ldapscheme="%s" ldaptls=1 ldapbasedn="%s" `+
-			`ldapbinddn="%s" ldapbindpasswd="nasty\`+
+			`ldapport=%d ldapscheme="%s" ldaptls=1 ldapbasedn="%s" `+
+			`ldapbinddn="%s" ldapbindpasswd="really""nasty\`+
 			"\n"+
 			`pass" ldapsearchfilter="%s" ldapsearchattribute="%s"`,
 			ldapServer, ldapPort, ldapScheme, ldapBaseDN, ldapBindDN,
