@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -132,18 +133,20 @@ func (instance *Instance) RefreshPGHBA(cluster *apiv1.Cluster, ldapBindPassword 
 func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) string {
 	var ldapConfigString string
 	if !cluster.GetEnableLDAPAuth() {
-		return ldapConfigString
+		return ""
 	}
 	ldapConfig := cluster.Spec.PostgresConfiguration.LDAP
 
-	ldapConfigString += fmt.Sprintf("host all all 0.0.0.0/0 ldap ldapserver=%s", ldapConfig.Server)
+	ldapConfigString += fmt.Sprintf("host all all 0.0.0.0/0 ldap ldapserver=%s",
+		quoteHbaLiteral(ldapConfig.Server))
 
 	if ldapConfig.Port != 0 {
 		ldapConfigString += fmt.Sprintf(" ldapport=%d", ldapConfig.Port)
 	}
 
 	if ldapConfig.Scheme != "" {
-		ldapConfigString += fmt.Sprintf(" ldapscheme=%s", ldapConfig.Scheme)
+		ldapConfigString += fmt.Sprintf(" ldapscheme=%s",
+			quoteHbaLiteral(string(ldapConfig.Scheme)))
 	}
 
 	if ldapConfig.TLS {
@@ -155,8 +158,9 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 			"server", ldapConfig.Server,
 			"prefix", ldapConfig.BindAsAuth.Prefix,
 			"suffix", ldapConfig.BindAsAuth.Suffix)
-		ldapConfigString += fmt.Sprintf(" ldapprefix=\"%s\" ldapsuffix=\"%s\"", ldapConfig.BindAsAuth.Prefix,
-			ldapConfig.BindAsAuth.Suffix)
+		ldapConfigString += fmt.Sprintf(" ldapprefix=%s ldapsuffix=%s",
+			quoteHbaLiteral(ldapConfig.BindAsAuth.Prefix),
+			quoteHbaLiteral(ldapConfig.BindAsAuth.Suffix))
 	}
 
 	if ldapConfig.BindSearchAuth != nil {
@@ -167,17 +171,29 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 			"search attribute", ldapConfig.BindSearchAuth.SearchAttribute,
 			"search filter", ldapConfig.BindSearchAuth.SearchFilter)
 
-		ldapConfigString += fmt.Sprintf(" ldapbasedn=\"%s\" ldapbinddn=\"%s\" "+
-			"ldapbindpasswd=%s", ldapConfig.BindSearchAuth.BaseDN, ldapConfig.BindSearchAuth.BindDN, ldapBindPassword)
+		ldapConfigString += fmt.Sprintf(" ldapbasedn=%s ldapbinddn=%s ldapbindpasswd=%s",
+			quoteHbaLiteral(ldapConfig.BindSearchAuth.BaseDN),
+			quoteHbaLiteral(ldapConfig.BindSearchAuth.BindDN),
+			quoteHbaLiteral(ldapBindPassword))
 		if ldapConfig.BindSearchAuth.SearchFilter != "" {
-			ldapConfigString += fmt.Sprintf(" ldapsearchfilter=%s", ldapConfig.BindSearchAuth.SearchFilter)
+			ldapConfigString += fmt.Sprintf(" ldapsearchfilter=%s",
+				quoteHbaLiteral(ldapConfig.BindSearchAuth.SearchFilter))
 		}
 		if ldapConfig.BindSearchAuth.SearchAttribute != "" {
-			ldapConfigString += fmt.Sprintf(" ldapsearchattribute=%s", ldapConfig.BindSearchAuth.SearchAttribute)
+			ldapConfigString += fmt.Sprintf(" ldapsearchattribute=%s",
+				quoteHbaLiteral(ldapConfig.BindSearchAuth.SearchAttribute))
 		}
 	}
 
 	return ldapConfigString
+}
+
+// quoteHbaLiteral quotes a string according to pg_hba.conf rules
+// (see https://www.postgresql.org/docs/current/auth-pg-hba-conf.html)
+func quoteHbaLiteral(literal string) string {
+	literal = strings.ReplaceAll(literal, `"`, `""`)
+	literal = strings.ReplaceAll(literal, "\n", "\\\n")
+	return fmt.Sprintf(`"%s"`, literal)
 }
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
