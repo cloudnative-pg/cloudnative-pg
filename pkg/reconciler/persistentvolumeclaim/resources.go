@@ -22,7 +22,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -313,36 +312,50 @@ func GetInstancePVCs(
 	instanceName string,
 	namespace string,
 ) ([]corev1.PersistentVolumeClaim, error) {
-	getPVC := func(name string) (*corev1.PersistentVolumeClaim, error) {
-		var pvc corev1.PersistentVolumeClaim
-		err := cli.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &pvc)
+	getPVC := func(role utils.PVCRole, instance string) (*corev1.PersistentVolumeClaimList, error) {
+		var pvcList corev1.PersistentVolumeClaimList
+		matchClusterName := client.MatchingLabels{
+			utils.InstanceNameLabelName: instance,
+			utils.PvcRoleLabelName:      string(role),
+		}
+		err := cli.List(ctx,
+			&pvcList,
+			client.InNamespace(namespace),
+			matchClusterName,
+		)
 		if errors.IsNotFound(err) {
 			return nil, nil
 		}
 		if err != nil {
 			return nil, err
 		}
-		return &pvc, nil
+		return &pvcList, nil
 	}
 
 	var pvcs []corev1.PersistentVolumeClaim
 
-	pgDataName := GetName(instanceName, utils.PVCRolePgData)
-	pgData, err := getPVC(pgDataName)
+	pgData, err := getPVC(utils.PVCRolePgData, instanceName)
 	if err != nil {
 		return nil, err
 	}
-	if pgData != nil {
-		pvcs = append(pvcs, *pgData)
+	if pgData != nil && len(pgData.Items) > 0 {
+		pvcs = append(pvcs, pgData.Items...)
 	}
 
-	pgWalName := GetName(instanceName, utils.PVCRolePgWal)
-	pgWal, err := getPVC(pgWalName)
+	pgWal, err := getPVC(utils.PVCRolePgWal, instanceName)
 	if err != nil {
 		return nil, err
 	}
-	if pgWal != nil {
-		pvcs = append(pvcs, *pgWal)
+	if pgWal != nil && len(pgWal.Items) > 0 {
+		pvcs = append(pvcs, pgWal.Items...)
+	}
+
+	pgTbs, err := getPVC(utils.PVCRolePgTablespace, instanceName)
+	if err != nil {
+		return nil, err
+	}
+	if pgTbs != nil && len(pgTbs.Items) > 0 {
+		pvcs = append(pvcs, pgTbs.Items...)
 	}
 
 	return pvcs, nil
