@@ -22,7 +22,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -267,36 +266,51 @@ func GetInstancePVCs(
 	instanceName string,
 	namespace string,
 ) ([]corev1.PersistentVolumeClaim, error) {
-	getPVC := func(name string) (*corev1.PersistentVolumeClaim, error) {
-		var pvc corev1.PersistentVolumeClaim
-		err := cli.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &pvc)
+	// getPvcList returns the PVCs matching the instance name as well as the role
+	getPvcList := func(role utils.PVCRole, instance string) (*corev1.PersistentVolumeClaimList, error) {
+		var pvcList corev1.PersistentVolumeClaimList
+		matchClusterName := client.MatchingLabels{
+			utils.InstanceNameLabelName: instance,
+			utils.PvcRoleLabelName:      string(role),
+		}
+		err := cli.List(ctx,
+			&pvcList,
+			client.InNamespace(namespace),
+			matchClusterName,
+		)
 		if errors.IsNotFound(err) {
 			return nil, nil
 		}
 		if err != nil {
 			return nil, err
 		}
-		return &pvc, nil
+		return &pvcList, nil
 	}
 
 	var pvcs []corev1.PersistentVolumeClaim
 
-	pgDataName := GetName(instanceName, utils.PVCRolePgData)
-	pgData, err := getPVC(pgDataName)
+	pgData, err := getPvcList(utils.PVCRolePgData, instanceName)
 	if err != nil {
 		return nil, err
 	}
-	if pgData != nil {
-		pvcs = append(pvcs, *pgData)
+	if pgData != nil && len(pgData.Items) > 0 {
+		pvcs = append(pvcs, pgData.Items...)
 	}
 
-	pgWalName := GetName(instanceName, utils.PVCRolePgWal)
-	pgWal, err := getPVC(pgWalName)
+	pgWal, err := getPvcList(utils.PVCRolePgWal, instanceName)
 	if err != nil {
 		return nil, err
 	}
-	if pgWal != nil {
-		pvcs = append(pvcs, *pgWal)
+	if pgWal != nil && len(pgWal.Items) > 0 {
+		pvcs = append(pvcs, pgWal.Items...)
+	}
+
+	tablespacesPVClist, err := getPvcList(utils.PVCRolePgTablespace, instanceName)
+	if err != nil {
+		return nil, err
+	}
+	if tablespacesPVClist != nil && len(tablespacesPVClist.Items) > 0 {
+		pvcs = append(pvcs, tablespacesPVClist.Items...)
 	}
 
 	return pvcs, nil
