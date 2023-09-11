@@ -196,7 +196,7 @@ func quoteHbaLiteral(literal string) string {
 	return fmt.Sprintf(`"%s"`, literal)
 }
 
-// UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
+// UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	major, err := postgresutils.GetMajorVersion(pgData)
@@ -212,7 +212,7 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 		return false, err
 	}
 
-	return configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName)
+	return configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
 }
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
@@ -252,10 +252,10 @@ func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (change
 	return changed, nil
 }
 
-// configurePostgresAutoConfFile configures replication in the postgresql.auto.conf file
+// configurePostgresOverrideConfFile configures replication in the override.conf file
 // for PostgreSQL 12 and newer
-func configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
-	targetFile := path.Join(pgData, "postgresql.auto.conf")
+func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
 	options := map[string]string{
 		"restore_command": fmt.Sprintf(
@@ -275,7 +275,7 @@ func configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName string) (ch
 	}
 
 	if changed {
-		log.Info("Updated replication settings in postgresql.auto.conf file")
+		log.Info("Updated replication settings in %v file", constants.PostgresqlOverrideConfigurationFile)
 	}
 
 	return changed, nil
@@ -304,15 +304,23 @@ func createStandbySignal(pgData string) error {
 	return err
 }
 
-// removeArchiveModeFromPostgresAutoConf removes the "archive_mode" option from "postgresql.auto.conf"
-func removeArchiveModeFromPostgresAutoConf(pgData string) (changed bool, err error) {
+// cleanPostgresAutoConfFile remove all the options historically managed by the operator from
+// `postgresql.auto.conf` file, now moved in the `override.conf` file
+func cleanPostgresAutoConfFile(pgData string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
 	currentContent, err := fileutils.ReadFile(targetFile)
 	if err != nil {
 		return false, fmt.Errorf("error while reading content of %v: %w", targetFile, err)
 	}
 
-	updatedContent := configfile.RemoveOptionFromConfigurationContents(string(currentContent), "archive_mode")
+	updatedContent := configfile.RemoveOptionsFromConfigurationContents(string(currentContent),
+		[]string{
+			"archive_mode",
+			"primary_slot_name",
+			"primary_conninfo",
+			"recovery_target_timeline",
+			"restore_command",
+		})
 	return fileutils.WriteStringToFile(targetFile, updatedContent)
 }
 
