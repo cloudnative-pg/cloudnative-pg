@@ -41,6 +41,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		},
 	}
 
+	const newOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
+
 	It("will not require a restart for just created Pods", func(ctx SpecContext) {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 
@@ -273,6 +275,66 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(Equal("environment variable configuration hash changed"))
 		})
+
+		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.11",
+				},
+			}
+			pod := specs.PodWithExistingStorage(cluster, 1)
+			delete(pod.Annotations, utils.PodSpecAnnotationName)
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			// let's simulate an operator upgrade, with online upgrades allowed
+			oldOperatorImage := configuration.Current.OperatorImageName
+			configuration.Current.OperatorImageName = newOperatorImage
+			oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
+			configuration.Current.EnableInstanceManagerInplaceUpdates = true
+			defer func() {
+				configuration.Current.OperatorImageName = oldOperatorImage
+				configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
+			}()
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.reason).To(BeEmpty())
+			Expect(rollout.required).To(BeFalse())
+		})
+
+		It("should trigger an explicit rollout if operator changes without inplace upgrades", func(ctx SpecContext) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.11",
+				},
+			}
+			pod := specs.PodWithExistingStorage(cluster, 1)
+			delete(pod.Annotations, utils.PodSpecAnnotationName)
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			// let's simulate an operator upgrade, with online upgrades allowed
+			oldOperatorImage := configuration.Current.OperatorImageName
+			configuration.Current.OperatorImageName = newOperatorImage
+			oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
+			configuration.Current.EnableInstanceManagerInplaceUpdates = false
+			defer func() {
+				configuration.Current.OperatorImageName = oldOperatorImage
+				configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
+			}()
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
+			Expect(rollout.required).To(BeTrue())
+		})
 	})
 
 	When("the podSpec annotation is available", func() {
@@ -298,64 +360,64 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.reason).To(ContainSubstring("original PodSpec does not match target PodSpec:"))
 			Expect(rollout.reason).To(ContainSubstring("environment mismatch"))
 		})
-	})
 
-	It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:13.11",
-			},
-		}
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.11",
+				},
+			}
+			pod := specs.PodWithExistingStorage(cluster, 1)
 
-		status := postgres.PostgresqlStatus{
-			Pod:            pod,
-			PendingRestart: false,
-			IsPodReady:     true,
-			ExecutableHash: "test_hash",
-		}
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
 
-		// let's simulate an operator upgrade, with online upgrades allowed
-		oldOperatorImage := configuration.Current.OperatorImageName
-		configuration.Current.OperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
-		oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
-		configuration.Current.EnableInstanceManagerInplaceUpdates = true
-		defer func() {
-			configuration.Current.OperatorImageName = oldOperatorImage
-			configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
-		}()
-		rollout := isPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.reason).To(BeEmpty())
-		Expect(rollout.required).To(BeFalse())
-	})
+			// let's simulate an operator upgrade, with online upgrades allowed
+			oldOperatorImage := configuration.Current.OperatorImageName
+			configuration.Current.OperatorImageName = newOperatorImage
+			oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
+			configuration.Current.EnableInstanceManagerInplaceUpdates = true
+			defer func() {
+				configuration.Current.OperatorImageName = oldOperatorImage
+				configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
+			}()
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.reason).To(BeEmpty())
+			Expect(rollout.required).To(BeFalse())
+		})
 
-	It("should trigger an explicit rollout if operator changes without inplace upgrades", func(ctx SpecContext) {
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:13.11",
-			},
-		}
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		It("should trigger an explicit rollout if operator changes without inplace upgrades", func(ctx SpecContext) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.11",
+				},
+			}
+			pod := specs.PodWithExistingStorage(cluster, 1)
 
-		status := postgres.PostgresqlStatus{
-			Pod:            pod,
-			PendingRestart: false,
-			IsPodReady:     true,
-			ExecutableHash: "test_hash",
-		}
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
 
-		// let's simulate an operator upgrade, with online upgrades allowed
-		oldOperatorImage := configuration.Current.OperatorImageName
-		configuration.Current.OperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
-		oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
-		configuration.Current.EnableInstanceManagerInplaceUpdates = false
-		defer func() {
-			configuration.Current.OperatorImageName = oldOperatorImage
-			configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
-		}()
-		rollout := isPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
-		Expect(rollout.required).To(BeTrue())
+			// let's simulate an operator upgrade, with online upgrades allowed
+			oldOperatorImage := configuration.Current.OperatorImageName
+			configuration.Current.OperatorImageName = newOperatorImage
+			oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
+			configuration.Current.EnableInstanceManagerInplaceUpdates = false
+			defer func() {
+				configuration.Current.OperatorImageName = oldOperatorImage
+				configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
+			}()
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
+			Expect(rollout.required).To(BeTrue())
+		})
 	})
 })
 
