@@ -359,7 +359,7 @@ go_threads 18
 ### User defined metrics
 
 This feature is currently in *beta* state and the format is inspired by the
-[queries.yaml file](https://github.com/prometheus-community/postgres_exporter/blob/v0.12.1/queries.yaml)
+[queries.yaml file (release 0.12)](https://github.com/prometheus-community/postgres_exporter/blob/v0.12.1/queries.yaml)
 of the PostgreSQL Prometheus Exporter.
 
 Custom metrics can be defined by users by referring to the created `Configmap`/`Secret` in a `Cluster` definition
