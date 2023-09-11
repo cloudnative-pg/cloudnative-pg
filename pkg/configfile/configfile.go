@@ -106,6 +106,16 @@ func UpdateConfigurationContents(content string, options map[string]string) (str
 	return strings.Join(resultContent, "\n") + "\n", nil
 }
 
+// RemoveOptionsFromConfigurationContents deletes the lines containing the
+// given options from the content of a configuration file
+func RemoveOptionsFromConfigurationContents(content string, options []string) string {
+	resultContent := content
+	for _, option := range options {
+		resultContent = RemoveOptionFromConfigurationContents(resultContent, option)
+	}
+	return resultContent
+}
+
 // RemoveOptionFromConfigurationContents deletes the lines containing the given option a configuration file whose
 // content is passed
 func RemoveOptionFromConfigurationContents(content string, option string) string {

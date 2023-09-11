@@ -147,16 +147,18 @@ func (info InitInfo) CreateDataDirectory() error {
 		return fmt.Errorf("error while creating the PostgreSQL instance: %w", err)
 	}
 
-	// Always read the custom configuration file created by the operator
-	postgresConfTrailer := fmt.Sprintf("# load CloudNativePG custom configuration\n"+
+	// Always read the custom and override configuration files created by the operator
+	postgresConfTrailer := fmt.Sprintf("# load CloudNativePG custom and override configuration\n"+
+		"include '%v'\n"+
 		"include '%v'\n",
-		constants.PostgresqlCustomConfigurationFile)
+		constants.PostgresqlCustomConfigurationFile,
+		constants.PostgresqlOverrideConfigurationFile)
 	err = fileutils.AppendStringToFile(
 		path.Join(info.PgData, "postgresql.conf"),
 		postgresConfTrailer,
 	)
 	if err != nil {
-		return fmt.Errorf("appending to postgresql.conf file resulted in an error: %w", err)
+		return fmt.Errorf("appending inclusion directives to postgresql.conf file resulted in an error: %w", err)
 	}
 
 	// Create a stub for the configuration file
@@ -164,7 +166,17 @@ func (info InitInfo) CreateDataDirectory() error {
 	err = fileutils.CreateEmptyFile(
 		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile))
 	if err != nil {
-		return fmt.Errorf("appending to the operator managed settings file resulted in an error: %w", err)
+		return fmt.Errorf("creating the operator managed configuration file '%v' resulted in an error: %w",
+			constants.PostgresqlCustomConfigurationFile, err)
+	}
+
+	// Create a stub for the configuration file
+	// to be filled during the real startup of this instance
+	err = fileutils.CreateEmptyFile(
+		path.Join(info.PgData, constants.PostgresqlOverrideConfigurationFile))
+	if err != nil {
+		return fmt.Errorf("creating the operator managed configuration file '%v' resulted in an error: %w",
+			constants.PostgresqlOverrideConfigurationFile, err)
 	}
 
 	return nil
@@ -354,7 +366,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 	if postgresVersion >= 120000 {
 		primaryConnInfo := info.GetPrimaryConnInfo()
 		slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-		_, err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo, slotName)
+		_, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName)
 		if err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}

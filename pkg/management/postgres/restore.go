@@ -600,7 +600,7 @@ func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) err
 		}
 
 		err = os.WriteFile(
-			path.Join(info.PgData, "postgresql.auto.conf"),
+			path.Join(info.PgData, constants.PostgresqlOverrideConfigurationFile),
 			[]byte(""),
 			0o600)
 		if err != nil {
@@ -708,10 +708,10 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	}
 
 	err = fileutils.CopyFile(
-		path.Join(temporaryInitInfo.PgData, "postgresql.auto.conf"),
-		path.Join(info.PgData, "postgresql.auto.conf"))
+		path.Join(temporaryInitInfo.PgData, constants.PostgresqlOverrideConfigurationFile),
+		path.Join(info.PgData, constants.PostgresqlOverrideConfigurationFile))
 	if err != nil {
-		return fmt.Errorf("while creating postgresql.auto.conf: %w", err)
+		return fmt.Errorf("while creating %v: %w", constants.PostgresqlOverrideConfigurationFile, err)
 	}
 
 	// Disable SSL as we still don't have the required certificates
@@ -783,7 +783,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 	if majorVersion >= 12 {
 		primaryConnInfo := info.GetPrimaryConnInfo()
 		slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-		_, err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo, slotName)
+		_, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName)
 		if err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}
