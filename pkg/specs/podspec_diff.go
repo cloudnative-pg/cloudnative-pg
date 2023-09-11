@@ -69,6 +69,12 @@ func ComparePodSpecs(
 		"service-account-name": func() bool {
 			return podSpec1.ServiceAccountName == podSpec2.ServiceAccountName
 		},
+		"scheduler-name": func() bool {
+			return podSpec1.SchedulerName == podSpec2.SchedulerName
+		},
+		"hostname": func() bool {
+			return podSpec1.Hostname == podSpec2.Hostname
+		},
 		"termination-grace-period": func() bool {
 			return podSpec1.TerminationGracePeriodSeconds == nil && podSpec2.TerminationGracePeriodSeconds == nil ||
 				*podSpec1.TerminationGracePeriodSeconds == *podSpec2.TerminationGracePeriodSeconds
