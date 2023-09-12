@@ -51,6 +51,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var (
@@ -714,7 +715,11 @@ func (info *InitInfo) checkBackupDestination(
 	}
 
 	// Check if we're ok to archive in the desired destination
-	return walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions)
+	if utils.IsEmptyWalArchiveCheckEnabled(&cluster.ObjectMeta) {
+		return walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions)
+	}
+
+	return nil
 }
 
 // waitUntilRecoveryFinishes periodically checks the underlying
