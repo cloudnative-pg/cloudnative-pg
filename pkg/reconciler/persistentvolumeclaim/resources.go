@@ -159,10 +159,8 @@ func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []e
 		roles = append(roles, utils.PVCRolePgWal)
 	}
 
-	if cluster.ShouldCreateTablespaces() {
-		roles = append(roles, utils.PVCRolePgTablespace)
-	}
-
+	// TODO: The PVC's for tablespaces need more info than the role, so they
+	// are built in the following function call. This structure should be improved
 	return buildExpectedPVCs(cluster, instanceName, roles)
 }
 
