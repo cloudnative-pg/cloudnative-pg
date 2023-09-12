@@ -409,8 +409,8 @@ const (
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
 
-	// PhaseWaitNotActiveInstances is a waiting phase that is triggered when an instance pod is not active
-	PhaseWaitNotActiveInstances = "Waiting for the instances to become active"
+	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
+	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
 
 	// PhaseOnlineUpgrading for when the instance manager is being upgraded in place
 	PhaseOnlineUpgrading = "Online upgrade in progress"

@@ -497,7 +497,7 @@ func (r *ClusterReconciler) reconcileResources(
 			if err := r.RegisterPhase(
 				ctx,
 				cluster,
-				apiv1.PhaseWaitNotActiveInstances,
+				apiv1.PhaseWaitingForInstancesToBeActive,
 				"Some instances are not yet active. Please wait.",
 			); err != nil {
 				return ctrl.Result{}, err
