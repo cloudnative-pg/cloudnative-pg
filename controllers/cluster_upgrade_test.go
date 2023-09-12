@@ -202,7 +202,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 		rollout := isPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
-		Expect(rollout.reason).To(ContainSubstring("scheduler name changed"))
+		Expect(rollout.reason).To(ContainSubstring("scheduler-name"))
 	})
 
 	When("cluster has resources specified", func() {
@@ -231,8 +231,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("original PodSpec does not match target PodSpec:"))
-			Expect(rollout.reason).To(ContainSubstring("resources mismatch"))
+			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
+			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
 			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
@@ -247,8 +247,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("original PodSpec does not match target PodSpec:"))
-			Expect(rollout.reason).To(ContainSubstring("resources mismatch"))
+			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
+			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
 		})
 	})
 
@@ -357,8 +357,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, cluster)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("original PodSpec does not match target PodSpec:"))
-			Expect(rollout.reason).To(ContainSubstring("environment mismatch"))
+			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
+			Expect(rollout.reason).To(ContainSubstring("container postgres differs in environment"))
 		})
 
 		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
@@ -463,7 +463,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 				ExecutableHash: "test_hash",
 			}
 			rollout := isPodNeedingRollout(ctx, status, cluster)
-			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
 		})
 
@@ -478,7 +478,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 				ExecutableHash: "test_hash",
 			}
 			rollout := isPodNeedingRollout(ctx, status, cluster)
-			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
 		})
 
@@ -491,7 +491,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 				ExecutableHash: "test_hash",
 			}
 			rollout := isPodNeedingRollout(ctx, status, cluster)
-			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
 		})
 

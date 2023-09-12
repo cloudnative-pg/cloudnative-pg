@@ -566,7 +566,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		}
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, reorderedPodSpec1)
-		Expect(diff).To(Equal("podSpecs differ on volumes: element pgdata has differing value"))
+		Expect(diff).To(Equal("volumes: element pgdata has differing value"))
 		Expect(specsMatch).To(BeFalse())
 	})
 
@@ -608,7 +608,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		}
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
-		Expect(diff).To(Equal("podSpecs differ on volumes: element pgdata missing from argument 2"))
+		Expect(diff).To(Equal("volumes: element pgdata has been added"))
 		Expect(specsMatch).To(BeFalse())
 	})
 
@@ -697,8 +697,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		}
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
-		Expect(diff).To(ContainSubstring("podSpecs differ on containers"))
-		Expect(diff).To(ContainSubstring("container foo is missing"))
+		Expect(diff).To(ContainSubstring("containers: container foo has been removed"))
 		Expect(specsMatch).To(BeFalse())
 	})
 
@@ -713,7 +712,7 @@ var _ = Describe("PodSpec drift detection", func() {
 		}
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
-		Expect(diff).To(ContainSubstring("podSpecs differ on service-account-name"))
+		Expect(diff).To(ContainSubstring("service-account-name"))
 		Expect(specsMatch).To(BeFalse())
 	})
 
@@ -764,9 +763,9 @@ var _ = Describe("PodSpec drift detection", func() {
 		}
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
-		Expect(diff).To(ContainSubstring("podSpecs differ on containers"))
-		Expect(diff).To(ContainSubstring("differing VolumeMounts"))
-		Expect(diff).To(ContainSubstring("pgdata missing"))
+		Expect(diff).To(ContainSubstring("containers:"))
+		Expect(diff).To(ContainSubstring("container postgres differs in volume-mounts:"))
+		Expect(diff).To(ContainSubstring("element pgdata has been removed"))
 		Expect(specsMatch).To(BeFalse())
 	})
 
@@ -790,7 +789,7 @@ var _ = Describe("PodSpec drift detection", func() {
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
 		Expect(diff).To(ContainSubstring(
-			"podSpecs differ on containers: container postgres: image mismatch"))
+			"containers: container postgres differs in image"))
 		Expect(specsMatch).To(BeFalse())
 	})
 
@@ -826,7 +825,7 @@ var _ = Describe("PodSpec drift detection", func() {
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
 		Expect(diff).To(ContainSubstring(
-			"podSpecs differ on containers: container postgres: resources mismatch"))
+			"containers: container postgres differs in resources"))
 		Expect(specsMatch).To(BeFalse())
 	})
 })

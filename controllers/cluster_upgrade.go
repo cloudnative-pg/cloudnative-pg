@@ -579,24 +579,6 @@ func checkPodSpecIsOutdated(
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 	targetPodSpec := specs.CreateClusterPodSpec(status.Pod.Name, *cluster, envConfig, gracePeriod)
 
-	if targetPodSpec.SchedulerName != storedPodSpec.SchedulerName {
-		return rollout{
-			required: true,
-			reason:   "scheduler name changed",
-		}, nil
-	}
-
-	if !reflect.DeepEqual(targetPodSpec.TopologySpreadConstraints, storedPodSpec.TopologySpreadConstraints) {
-		return rollout{
-			required: true,
-			reason: fmt.Sprintf(
-				"Pod '%s' does not have up-to-date TopologySpreadConstraints."+
-					" It needs to match the cluster's constraints.",
-				status.Pod.Name,
-			),
-		}, nil
-	}
-
 	// the bootstrap init-container could change image after an operator upgrade.
 	// If in-place upgrades of the instance manager are enabled, we don't need rollout.
 	opCurrentImageName, err := specs.GetBootstrapControllerImageName(*status.Pod)
@@ -620,7 +602,7 @@ func checkPodSpecIsOutdated(
 	if !match {
 		return rollout{
 			required: true,
-			reason:   "original PodSpec does not match target PodSpec: " + diff,
+			reason:   "original and target PodSpec differ in " + diff,
 		}, nil
 	}
 
