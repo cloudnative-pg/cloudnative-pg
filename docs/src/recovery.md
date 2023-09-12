@@ -595,3 +595,10 @@ in the storage buckets could be overwritten by the new cluster.
     The pod logs will show:
     `ERROR: WAL archive check failed for server recoveredCluster: Expected empty archive`
 
+!!! Important
+    If you set the `cnpg.io/skipEmptyWalArchiveCheck` annotation to `enabled` in
+    the recovered cluster, you can skip the above check. This is not recommended
+    as for the general use case the above check works fine. Please don't do
+    this unless you are familiar with PostgreSQL recovery system, as this can lead
+    you to severe data loss.
+
