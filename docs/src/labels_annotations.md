@@ -77,8 +77,8 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
 :   Snapshot of the `spec` of the Pod taken by the operator
 
 `cnpg.io/reconciliationLoop`
-:   When set to `disabled` on a `Cluster` prevents the reconciliation loop from
-    running
+:   When set to `disabled` on a `Cluster`, the operator prevents the
+    reconciliation loop from running
 
 `cnpg.io/skipEmptyWalArchiveCheck`
 :   When set to `true` on a `Cluster` resource, the operator disables the check
