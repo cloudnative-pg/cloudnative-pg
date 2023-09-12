@@ -26,6 +26,65 @@ they are automatically inherited by all resources created by it (including pods)
     Label and annotation inheritance is the technique adopted by CloudNativePG
     in lieu of alternative approaches such as pod templates.
 
+## Predefined labels
+
+Below is a list of predefined labels that are managed by CloudNativePG.
+
+`cnpg.io/backupName`
+:   Backup identifier, only available on `Backup` and `VolumeSnapshot`
+    resources
+
+`cnpg.io/cluster`
+:   Name of the cluster
+
+`cnpg.io/instanceName`
+:   Name of the PostgreSQL instance - this label replaces the old and
+    deprecated `postgresql` label
+
+`cnpg.io/jobRole`
+:   Role of the job (i.e. `import`, `initdb`, `join`, ...)
+
+`cnpg.io/podRole`
+:   Currently fixed to `instance` to identify a pod running PostgreSQL
+
+`cnpg.io/pvcRole`
+:   Purpose of the PVC, such as `PG_DATA` or `PG_WAL`
+
+## Predefined annotations
+
+Below is a list of predefined annotations that are managed by CloudNativePG.
+
+`container.apparmor.security.beta.kubernetes.io`
+:   Name of the AppArmor profile to apply - this is required for Azure but can
+    also be set in other environments
+
+`cnpg.io/clusterManifest`
+:   Manifest of the `Cluster` owning this resource (such as a PVC) - this label
+    replaces the old and deprecated `cnpg.io/hibernateClusterManifest` label
+
+`cnpg.io/operatorVersion`
+:   Version of the operator
+
+`cnpg.io/pgControldata`
+:   Output of the `pg_controldata` command - this label replaces the old and
+    deprecated `cnpg.io/hibernatePgControlData` label
+
+`cnpg.io/podEnvHash`
+:   *Deprecated* as the `cnpg.io/podSpec` annotation now also contains the hash
+    of the pod environment
+
+`cnpg.io/podSpec`
+:   Snapshot of the `spec` of the Pod taken by the operator
+
+`cnpg.io/reconciliationLoop`
+:   When set to `disabled` on a `Cluster` prevents the reconciliation loop from
+    running
+
+`cnpg.io/skipEmptyWalArchiveCheck`
+:   When set to `true` on a `Cluster` resource, the operator disables the check
+    that ensures that the WAL archive is empty before writing data. Use at your own
+    risk.
+
 ## Pre-requisites
 
 By default, no label or annotation defined in the cluster's metadata is
