@@ -39,21 +39,22 @@ notinpath () {
     esac
 }
 
+ensure_image_pull_secret() {
+  if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
+    if ! kubectl get secret cnpg-pull-secret -n cnpg-system >/dev/null 2>&1; then
+      kubectl create secret docker-registry \
+        -n cnpg-system \
+        cnpg-pull-secret \
+        --docker-server="${DOCKER_SERVER}" \
+        --docker-username="${DOCKER_USERNAME}" \
+        --docker-password="${DOCKER_PASSWORD}"
+    fi
+  fi
+}
+
 # Process the e2e templates
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 export AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT:-''}
-
-# Getting the operator images need a pull secret
-kubectl delete namespace cnpg-system || :
-kubectl create namespace cnpg-system
-if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
-  kubectl create secret docker-registry \
-    -n cnpg-system \
-    cnpg-pull-secret \
-    --docker-server="${DOCKER_SERVER}" \
-    --docker-username="${DOCKER_USERNAME}" \
-    --docker-password="${DOCKER_PASSWORD}"
-fi
 
 go_bin="$(go env GOPATH)/bin"
 if notinpath "${go_bin}"; then
@@ -74,6 +75,10 @@ echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 RC=0
 RC_GINKGO1=0
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
+  # Getting the operator images need a pull secret
+  kubectl delete namespace cnpg-system || :
+  kubectl create namespace cnpg-system
+  ensure_image_pull_secret
   # Generate a manifest for the operator after the api upgrade
   # TODO: this is almost a "make deploy". Refactor.
   make manifests kustomize
@@ -102,6 +107,11 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   # Report if there are any tests that failed and did NOT have an "ignore-fails" label
   jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/upgrade_report.json" || RC=$?
 fi
+
+# Getting the operator images need a pull secret
+kubectl delete namespace cnpg-system || :
+kubectl create namespace cnpg-system
+ensure_image_pull_secret
 
 CONTROLLER_IMG="${CONTROLLER_IMG}" \
   POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
