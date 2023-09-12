@@ -9,6 +9,7 @@ name: public-cloud-k8s-versions-check
 on:
   schedule:
     - cron: "30 0 * * *"
+  push:
   workflow_dispatch:
     inputs:
       limit:
@@ -71,7 +72,6 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          export_default_credentials: true
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
       -
         name: Install YQ
