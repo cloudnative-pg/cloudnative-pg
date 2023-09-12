@@ -32,8 +32,8 @@ All monitoring queries that are performed on PostgreSQL are:
 - executed with `application_name` set to `cnpg_metrics_exporter`
 - executed as user `postgres`
 
-Please refer to the "Default roles" section in PostgreSQL
-[documentation](https://www.postgresql.org/docs/current/default-roles.html)
+Please refer to the "Predefined Roles" section in PostgreSQL
+[documentation](https://www.postgresql.org/docs/current/predefined-roles.html)
 for details on the `pg_monitor` role.
 
 Queries, by default, are run against the *main database*, as defined by
@@ -359,7 +359,7 @@ go_threads 18
 ### User defined metrics
 
 This feature is currently in *beta* state and the format is inspired by the
-[queries.yaml file](https://github.com/prometheus-community/postgres_exporter/blob/master/queries.yaml) <!-- wokeignore:rule=master -->
+[queries.yaml file (release 0.12)](https://github.com/prometheus-community/postgres_exporter/blob/v0.12.1/queries.yaml)
 of the PostgreSQL Prometheus Exporter.
 
 Custom metrics can be defined by users by referring to the created `Configmap`/`Secret` in a `Cluster` definition
@@ -438,7 +438,7 @@ data:
 ```
 
 A list of basic monitoring queries can be found in the
-[`default-monitoring.yaml` file](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/config/manager/default-monitoring.yaml)
+[`default-monitoring.yaml` file](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/config/manager/default-monitoring.yaml)
 that is already installed in your CloudNativePG deployment (see ["Default set of metrics"](#default-set-of-metrics)).
 
 #### Example of a user defined metric running on multiple databases
@@ -539,7 +539,7 @@ Here is a short description of all the available fields:
 
 - `<MetricName>`: the name of the Prometheus metric
     - `query`: the SQL query to run on the target database to generate the metrics
-    - `primary`: whether to run the query only on the primary instance <!-- wokeignore:rule=master -->
+    - `primary`: whether to run the query only on the primary instance
     - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
     - `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on
        (e.g. `">=11.0.0"` or `">=12.0.0 <=15.0.0"`)
