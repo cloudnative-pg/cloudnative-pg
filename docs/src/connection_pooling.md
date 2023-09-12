@@ -346,12 +346,13 @@ metrics having the `cnpg_pgbouncer_` prefix, by running:
 
 Similarly to the CloudNativePG instance, the exporter runs on port
 `9127` of each pod running PgBouncer, and also provides metrics related to the
-Go runtime (with prefix `go_*`). You can debug the exporter on a pod running
-PgBouncer through the following command:
+Go runtime (with prefix `go_*`).
 
-```console
-kubectl exec -ti <PGBOUNCER_POD> -- curl 127.0.0.1:9127/metrics
-```
+!!! Info
+    You can inspect the exported metrics on a pod running PgBouncer, by following
+    the instructions provided in the
+    ["How to inspect the exported metrics" section from the "Monitoring" page](monitoring.md/#how-to-inspect-the-exported-metrics),
+    making sure that you use the correct IP and the `9127` port.
 
 An example of the output for `cnpg_pgbouncer` metrics:
 
