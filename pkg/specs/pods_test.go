@@ -20,6 +20,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -481,5 +482,350 @@ var _ = Describe("EnvConfig", func() {
 
 			Expect(envConfig.IsEnvEqual(container)).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("PodSpec drift detection", func() {
+	It("ignores order of volumes", func() {
+		podSpec1 := corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "pgdata",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-1",
+							ReadOnly:  false,
+						},
+					},
+				},
+				{
+					Name: "scratch-data",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-1",
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+		}
+		reorderedPodSpec1 := corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "scratch-data",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-1",
+							ReadOnly:  false,
+						},
+					},
+				},
+				{
+					Name: "pgdata",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-1",
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, reorderedPodSpec1)
+		Expect(diff).To(BeEmpty())
+		Expect(specsMatch).To(BeTrue())
+	})
+
+	It("detects drift in content of the same element", func() {
+		podSpec1 := corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "pgdata",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-1",
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+		}
+		reorderedPodSpec1 := corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "pgdata",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-foo",
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, reorderedPodSpec1)
+		Expect(diff).To(Equal("volumes: element pgdata has differing value"))
+		Expect(specsMatch).To(BeFalse())
+	})
+
+	It("detects drift on missing volumes", func() {
+		podSpec1 := corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "scratch-data",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-1",
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+		}
+		podSpec2 := corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "scratch-data",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-1",
+							ReadOnly:  false,
+						},
+					},
+				},
+				{
+					Name: "pgdata",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-1",
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
+		Expect(diff).To(Equal("volumes: element pgdata has been added"))
+		Expect(specsMatch).To(BeFalse())
+	})
+
+	It("ignores order of volume mounts in postgres container", func() {
+		podSpec1 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "postgres",
+					Image: "postgres:13.11",
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:             "pgdata",
+							ReadOnly:         false,
+							MountPath:        "/var/lib/postgresql/data",
+							SubPath:          "",
+							MountPropagation: nil,
+							SubPathExpr:      "",
+						},
+						{
+							Name:             "bar",
+							ReadOnly:         false,
+							MountPath:        "/var/lib/postgresql/tablespaces/bar",
+							SubPath:          "",
+							MountPropagation: nil,
+							SubPathExpr:      "",
+						},
+					},
+				},
+			},
+		}
+		reorderedPodSpec1 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "postgres",
+					Image: "postgres:13.11",
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:             "bar",
+							ReadOnly:         false,
+							MountPath:        "/var/lib/postgresql/tablespaces/bar",
+							SubPath:          "",
+							MountPropagation: nil,
+							SubPathExpr:      "",
+						},
+						{
+							Name:             "pgdata",
+							ReadOnly:         false,
+							MountPath:        "/var/lib/postgresql/data",
+							SubPath:          "",
+							MountPropagation: nil,
+							SubPathExpr:      "",
+						},
+					},
+				},
+			},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, reorderedPodSpec1)
+		Expect(diff).To(BeEmpty())
+		Expect(specsMatch).To(BeTrue())
+	})
+
+	It("detects missing container", func() {
+		podSpec1 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:         "postgres",
+					Image:        "postgres:13.11",
+					VolumeMounts: []corev1.VolumeMount{},
+				},
+				{
+					Name:         "foo",
+					Image:        "foobar",
+					VolumeMounts: []corev1.VolumeMount{},
+				},
+			},
+		}
+		podSpec2 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:         "postgres",
+					Image:        "postgres:13.11",
+					VolumeMounts: []corev1.VolumeMount{},
+				},
+			},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
+		Expect(diff).To(ContainSubstring("containers: container foo has been removed"))
+		Expect(specsMatch).To(BeFalse())
+	})
+
+	It("detects difference in generic field", func() {
+		podSpec1 := corev1.PodSpec{
+			ServiceAccountName: "foo",
+			Containers:         []corev1.Container{},
+		}
+		podSpec2 := corev1.PodSpec{
+			ServiceAccountName: "bar",
+			Containers:         []corev1.Container{},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
+		Expect(diff).To(ContainSubstring("service-account-name"))
+		Expect(specsMatch).To(BeFalse())
+	})
+
+	It("detects missing volume mounts in postgres container", func() {
+		podSpec1 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "postgres",
+					Image: "postgres:13.11",
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:             "pgdata",
+							ReadOnly:         false,
+							MountPath:        "/var/lib/postgresql/data",
+							SubPath:          "",
+							MountPropagation: nil,
+							SubPathExpr:      "",
+						},
+						{
+							Name:             "bar",
+							ReadOnly:         false,
+							MountPath:        "/var/lib/postgresql/tablespaces/bar",
+							SubPath:          "",
+							MountPropagation: nil,
+							SubPathExpr:      "",
+						},
+					},
+				},
+			},
+		}
+		podSpec2 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "postgres",
+					Image: "postgres:13.11",
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:             "bar",
+							ReadOnly:         false,
+							MountPath:        "/var/lib/postgresql/tablespaces/bar",
+							SubPath:          "",
+							MountPropagation: nil,
+							SubPathExpr:      "",
+						},
+					},
+				},
+			},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
+		Expect(diff).To(ContainSubstring("containers:"))
+		Expect(diff).To(ContainSubstring("container postgres differs in volume-mounts:"))
+		Expect(diff).To(ContainSubstring("element pgdata has been removed"))
+		Expect(specsMatch).To(BeFalse())
+	})
+
+	It("detects image mismatch on the postgres container", func() {
+		podSpec1 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "postgres",
+					Image: "postgres:13.11",
+				},
+			},
+		}
+		podSpec2 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "postgres",
+					Image: "postgres:13.13",
+				},
+			},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
+		Expect(diff).To(ContainSubstring(
+			"containers: container postgres differs in image"))
+		Expect(specsMatch).To(BeFalse())
+	})
+
+	It("detects resource mismatch on the postgres container", func() {
+		podSpec1 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "postgres",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("2"),
+							"memory": resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+		}
+		podSpec2 := corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "postgres",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("2"),
+							"memory": resource.MustParse("3Gi"),
+						},
+					},
+				},
+			},
+		}
+
+		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
+		Expect(diff).To(ContainSubstring(
+			"containers: container postgres differs in resources"))
+		Expect(specsMatch).To(BeFalse())
 	})
 })
