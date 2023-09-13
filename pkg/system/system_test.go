@@ -17,6 +17,7 @@ package system
 
 import (
 	"encoding/asn1"
+	"runtime"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 
@@ -26,6 +27,13 @@ import (
 
 var _ = Describe("Testing set coredump_filter", func() {
 	It("properly set the default value for a cluster", func() {
+		// Did not split the darwin out from windows as that is not necessary
+		// we just check in the test case. for most situation, we build in darwin and
+		// test in linux based docker
+		if runtime.GOOS != "linux" {
+			return
+		}
+
 		coredumpFilter := "0x31"
 		err := SetCoredumpFilter(coredumpFilter)
 		Expect(err).ToNot(HaveOccurred())

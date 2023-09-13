@@ -21,6 +21,6 @@ limitations under the License.
 package compatibility
 
 // SetCoredumpFilter for Windows compatibility
-func SetCoredumpFilter(coredumpFilter string) error {
+func SetCoredumpFilter(_ string) error {
 	return nil
 }
