@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// When you add a new label or annotation, please make sure that you also update the
+// publicly visible documentation, namely the `docs/src/labels_annotations.md` file
 const (
 	// ClusterLabelName is the name of cluster which the backup CR belongs to
 	ClusterLabelName = "cnpg.io/cluster"
