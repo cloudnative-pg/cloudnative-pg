@@ -93,10 +93,19 @@ func updateClusterAnnotations(
 	if utils.IsAnnotationSubset(instance.Annotations, cluster.Annotations, cluster.GetFixedInheritedAnnotations(),
 		configuration.Current) &&
 		utils.IsAnnotationAppArmorPresentInObject(&instance.ObjectMeta, &instance.Spec, cluster.Annotations) {
-		contextLogger.Debug(
+		// let's create a copy of the pod Annotations without the PodSpec, otherwise
+		// the debug log will get clogged
+		podAnnotations := make(map[string]string, len(instance.Annotations))
+		for k, v := range instance.Annotations {
+			if k == utils.PodSpecAnnotationName {
+				continue
+			}
+			podAnnotations[k] = v
+		}
+		contextLogger.Trace(
 			"Skipping cluster annotations reconciliation, because they are already present on pod",
 			"pod", instance.Name,
-			"podAnnotations", instance.Annotations,
+			"podAnnotations", podAnnotations,
 			"clusterAnnotations", cluster.Annotations,
 		)
 		return false
@@ -133,7 +142,7 @@ func updateClusterLabels(
 	// there's nothing more to do
 	if utils.IsLabelSubset(instance.Labels, cluster.Labels, cluster.GetFixedInheritedLabels(),
 		configuration.Current) {
-		contextLogger.Debug(
+		contextLogger.Trace(
 			"Skipping cluster label reconciliation, because they are already present on pod",
 			"pod", instance.Name,
 			"podLabels", instance.Labels,
@@ -164,7 +173,7 @@ func updateRoleLabels(
 	}
 
 	if !utils.IsPodActive(*instance) {
-		contextLogger.Info("Ignoring not active Pod during label update",
+		contextLogger.Trace("Ignoring not active Pod during label update",
 			"pod", instance.Name, "status", instance.Status)
 		return false
 	}
