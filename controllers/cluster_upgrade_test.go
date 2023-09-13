@@ -32,16 +32,27 @@ import (
 )
 
 var _ = Describe("Pod upgrade", Ordered, func() {
-	cluster := apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
-		},
-		Spec: apiv1.ClusterSpec{
-			ImageName: "postgres:13.11",
-		},
-	}
+	const (
+		newOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
+	)
 
-	const newOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.11",
+			},
+		}
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	AfterAll(func() {
+		configuration.Current = configuration.NewConfiguration()
+	})
 
 	It("will not require a restart for just created Pods", func(ctx SpecContext) {
 		pod := specs.PodWithExistingStorage(cluster, 1)
@@ -293,14 +304,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			}
 
 			// let's simulate an operator upgrade, with online upgrades allowed
-			oldOperatorImage := configuration.Current.OperatorImageName
 			configuration.Current.OperatorImageName = newOperatorImage
-			oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
 			configuration.Current.EnableInstanceManagerInplaceUpdates = true
-			defer func() {
-				configuration.Current.OperatorImageName = oldOperatorImage
-				configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
-			}()
 			rollout := isPodNeedingRollout(ctx, status, &cluster)
 			Expect(rollout.reason).To(BeEmpty())
 			Expect(rollout.required).To(BeFalse())
@@ -323,14 +328,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			}
 
 			// let's simulate an operator upgrade, with online upgrades allowed
-			oldOperatorImage := configuration.Current.OperatorImageName
 			configuration.Current.OperatorImageName = newOperatorImage
-			oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
 			configuration.Current.EnableInstanceManagerInplaceUpdates = false
-			defer func() {
-				configuration.Current.OperatorImageName = oldOperatorImage
-				configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
-			}()
 			rollout := isPodNeedingRollout(ctx, status, &cluster)
 			Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
 			Expect(rollout.required).To(BeTrue())
@@ -377,14 +376,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			}
 
 			// let's simulate an operator upgrade, with online upgrades allowed
-			oldOperatorImage := configuration.Current.OperatorImageName
 			configuration.Current.OperatorImageName = newOperatorImage
-			oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
 			configuration.Current.EnableInstanceManagerInplaceUpdates = true
-			defer func() {
-				configuration.Current.OperatorImageName = oldOperatorImage
-				configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
-			}()
 			rollout := isPodNeedingRollout(ctx, status, &cluster)
 			Expect(rollout.reason).To(BeEmpty())
 			Expect(rollout.required).To(BeFalse())
@@ -406,14 +399,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			}
 
 			// let's simulate an operator upgrade, with online upgrades allowed
-			oldOperatorImage := configuration.Current.OperatorImageName
 			configuration.Current.OperatorImageName = newOperatorImage
-			oldInplceUpdates := configuration.Current.EnableInstanceManagerInplaceUpdates
 			configuration.Current.EnableInstanceManagerInplaceUpdates = false
-			defer func() {
-				configuration.Current.OperatorImageName = oldOperatorImage
-				configuration.Current.EnableInstanceManagerInplaceUpdates = oldInplceUpdates
-			}()
 			rollout := isPodNeedingRollout(ctx, status, &cluster)
 			Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
 			Expect(rollout.required).To(BeTrue())
