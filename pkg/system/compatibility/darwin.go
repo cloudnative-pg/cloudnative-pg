@@ -1,5 +1,5 @@
-//go:build linux
-// +build linux
+//go:build darwin
+// +build darwin
 
 /*
 Copyright The CloudNativePG Contributors
@@ -20,12 +20,7 @@ limitations under the License.
 // Package compatibility provides a layer to cross-compile with other OS than Linux
 package compatibility
 
-import (
-	"os"
-)
-
-// SetCoredumpFilter set the value of /proc/self/coredump_filter
-func SetCoredumpFilter(coredumpFilter string) error {
-	coredumpFilterFile := "/proc/self/coredump_filter"
-	return os.WriteFile(coredumpFilterFile, []byte(coredumpFilter), 0o600)
+// SetCoredumpFilter for Windows compatibility
+func SetCoredumpFilter(_ string) error {
+	return nil
 }
