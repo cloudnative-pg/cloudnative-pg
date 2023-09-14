@@ -85,6 +85,11 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
     that ensures that the WAL archive is empty before writing data. Use at your own
     risk.
 
+`cnpg.io/coredumpFilter`
+:   Customize the coredump filter bitmask of Postgres processes.
+    Set by default to `0x31` that excludes shared memory.
+    See https://docs.kernel.org/filesystems/proc.html#proc-pid-coredump-filter-core-dump-filtering-settings
+
 ## Pre-requisites
 
 By default, no label or annotation defined in the cluster's metadata is
