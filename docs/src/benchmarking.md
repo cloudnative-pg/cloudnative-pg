@@ -52,8 +52,8 @@ kubectl cnpg pgbench \
 
 You can see the progress of the job with:
 
-```shell 
-kubectl logs jobs/pgbench-run
+```shell
+kubectl logs jobs/pgbench-init
 ```
 
 The following example creates a job called `pgbench-run` executing `pgbench`
