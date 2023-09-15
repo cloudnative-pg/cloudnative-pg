@@ -37,9 +37,9 @@ import (
 )
 
 var snapshotBackoff = wait.Backoff{
-	Steps:    7,
+	Steps:    200,
 	Duration: 10 * time.Second,
-	Factor:   5.0,
+	Factor:   1.0,
 	Jitter:   0.1,
 }
 
