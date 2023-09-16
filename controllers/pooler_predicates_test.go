@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -48,7 +47,7 @@ var _ = Describe("pooler_predicates unit tests", func() {
 					Name:      rand.String(10),
 					Namespace: namespace,
 					Labels: map[string]string{
-						specs.WatchedLabelName: "true",
+						utils.WatchedLabelName: "true",
 					},
 				},
 			}

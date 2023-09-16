@@ -113,10 +113,10 @@ var _ = Describe("Reconcile Resources", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: clusterName + "-3",
 					Labels: map[string]string{
-						specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+						utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
 					},
 					Annotations: map[string]string{
-						specs.ClusterSerialAnnotationName: "3",
+						utils.ClusterSerialAnnotationName: "3",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -136,7 +136,7 @@ var _ = Describe("Reconcile Resources", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: clusterName + "-2",
 					Annotations: map[string]string{
-						specs.ClusterSerialAnnotationName: "2",
+						utils.ClusterSerialAnnotationName: "2",
 					},
 				},
 			},

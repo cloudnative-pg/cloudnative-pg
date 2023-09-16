@@ -25,12 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
-	// HibernationAnnotationName is the name of the hibernation annotation
-	HibernationAnnotationName = "cnpg.io/hibernation"
-
 	// HibernationOff is the value of hibernation annotation when the hibernation
 	// has been deactivated for the cluster
 	HibernationOff = "off"
@@ -135,7 +133,7 @@ func EnrichStatus(
 }
 
 func getHibernationAnnotationValue(cluster *apiv1.Cluster) (bool, error) {
-	value, ok := cluster.Annotations[HibernationAnnotationName]
+	value, ok := cluster.Annotations[utils.HibernationAnnotationName]
 	if !ok {
 		return false, nil
 	}

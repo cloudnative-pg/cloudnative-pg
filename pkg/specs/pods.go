@@ -38,32 +38,11 @@ import (
 )
 
 const (
-	// MetadataNamespace is the annotation and label namespace used by the operator
-	MetadataNamespace = "cnpg.io"
-
-	// ClusterSerialAnnotationName is the name of the annotation containing the
-	// serial number of the node
-	ClusterSerialAnnotationName = MetadataNamespace + "/nodeSerial"
-
-	// ClusterRestartAnnotationName is the name of the annotation containing the
-	// latest required restart time
-	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
-
-	// ClusterReloadAnnotationName is the name of the annotation containing the
-	// latest required restart time
-	ClusterReloadAnnotationName = MetadataNamespace + "/reloadedAt"
-
-	// ClusterRoleLabelName label is applied to Pods to mark primary ones
-	ClusterRoleLabelName = "role"
-
 	// ClusterRoleLabelPrimary is written in labels to represent primary servers
 	ClusterRoleLabelPrimary = "primary"
 
 	// ClusterRoleLabelReplica is written in labels to represent replica servers
 	ClusterRoleLabelReplica = "replica"
-
-	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
-	WatchedLabelName = MetadataNamespace + "/reload"
 
 	// PostgresContainerName is the name of the container executing PostgreSQL
 	// inside one Pod
@@ -371,8 +350,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
 			},
 			Annotations: map[string]string{
-				ClusterSerialAnnotationName:    strconv.Itoa(nodeSerial),
-				utils.PodEnvHashAnnotationName: envConfig.Hash,
+				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
+				utils.PodEnvHashAnnotationName:    envConfig.Hash,
 			},
 			Name:      podName,
 			Namespace: cluster.Namespace,

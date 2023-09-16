@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,8 +36,8 @@ func TestSpecs(t *testing.T) {
 
 func makePVC(clusterName string, suffix string, role utils.PVCRole, isResizing bool) corev1.PersistentVolumeClaim {
 	annotations := map[string]string{
-		specs.ClusterSerialAnnotationName: suffix,
-		StatusAnnotationName:              StatusReady,
+		utils.ClusterSerialAnnotationName: suffix,
+		utils.PVCStatusAnnotationName:     StatusReady,
 	}
 
 	var conditions []corev1.PersistentVolumeClaimCondition
@@ -76,10 +75,10 @@ func makePod(clusterName, serial, role string) corev1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName + "-" + serial,
 			Annotations: map[string]string{
-				specs.ClusterSerialAnnotationName: serial,
+				utils.ClusterSerialAnnotationName: serial,
 			},
 			Labels: map[string]string{
-				specs.ClusterRoleLabelName: role,
+				utils.ClusterRoleLabelName: role,
 			},
 		},
 		Spec: corev1.PodSpec{

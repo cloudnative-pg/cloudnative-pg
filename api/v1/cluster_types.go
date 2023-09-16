@@ -2829,9 +2829,7 @@ func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta) {
 // ShouldForceLegacyBackup if present takes a backup without passing the name argument even on barman version 3.3.0+.
 // This is needed to test both backup system in the E2E suite
 func (cluster *Cluster) ShouldForceLegacyBackup() bool {
-	const legacyBackupAnnotationName = "cnpg.io/forceLegacyBackup"
-
-	return cluster.Annotations[legacyBackupAnnotationName] == "true"
+	return cluster.Annotations[utils.LegacyBackupAnnotationName] == "true"
 }
 
 // GetSeccompProfile return the proper SeccompProfile set in the cluster for Pods and Containers

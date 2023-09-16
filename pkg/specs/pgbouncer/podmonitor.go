@@ -45,7 +45,7 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Namespace: c.pooler.Namespace,
 		Name:      c.pooler.Name,
 		Labels: map[string]string{
-			PgbouncerNameLabel: c.pooler.Name,
+			utils.PgbouncerNameLabel: c.pooler.Name,
 		},
 	}
 

@@ -195,14 +195,14 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 	primaryPod corev1.Pod,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok &&
-		(primaryPod.Annotations == nil || primaryPod.Annotations[specs.ClusterRestartAnnotationName] != clusterRestart) {
-		contextLogger.Info("Setting restart annotation on primary pod as needed", "label", specs.ClusterReloadAnnotationName)
+	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok &&
+		(primaryPod.Annotations == nil || primaryPod.Annotations[utils.ClusterRestartAnnotationName] != clusterRestart) {
+		contextLogger.Info("Setting restart annotation on primary pod as needed", "label", utils.ClusterReloadAnnotationName)
 		original := primaryPod.DeepCopy()
 		if primaryPod.Annotations == nil {
 			primaryPod.Annotations = make(map[string]string)
 		}
-		primaryPod.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
+		primaryPod.Annotations[utils.ClusterRestartAnnotationName] = clusterRestart
 		if err := r.Client.Patch(ctx, &primaryPod, client.MergeFrom(original)); err != nil {
 			return err
 		}
@@ -484,8 +484,8 @@ func checkClusterHasNewerRestartAnnotation(
 	// If the cluster has been restarted and we are working with a Pod
 	// which has not been restarted yet, or restarted at a different
 	// time, let's restart it.
-	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
-		podRestart := status.Pod.Annotations[specs.ClusterRestartAnnotationName]
+	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok {
+		podRestart := status.Pod.Annotations[utils.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
 			return rollout{
 				required:     true,

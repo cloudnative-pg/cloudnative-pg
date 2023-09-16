@@ -77,7 +77,7 @@ func reconcileMetadataComingFromInstance(
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	for _, pod := range runningInstances {
-		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+		podRole, podHasRole := pod.ObjectMeta.Labels[utils.ClusterRoleLabelName]
 		podSerial, podSerialErr := specs.GetNodeSerial(pod.ObjectMeta)
 		if podSerialErr != nil {
 			return podSerialErr
@@ -86,7 +86,7 @@ func reconcileMetadataComingFromInstance(
 		instanceReconciler := metadataReconciler{
 			name: "instance-inheritance",
 			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-				if podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole {
+				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] != podRole {
 					return false
 				}
 
@@ -101,13 +101,13 @@ func reconcileMetadataComingFromInstance(
 				if pvc.Labels == nil {
 					pvc.Labels = map[string]string{}
 				}
-				pvc.Labels[specs.ClusterRoleLabelName] = podRole
+				pvc.Labels[utils.ClusterRoleLabelName] = podRole
 
 				if pvc.Annotations == nil {
 					pvc.Annotations = map[string]string{}
 				}
 
-				pvc.Annotations[specs.ClusterSerialAnnotationName] = strconv.Itoa(podSerial)
+				pvc.Annotations[utils.ClusterSerialAnnotationName] = strconv.Itoa(podSerial)
 			},
 		}
 

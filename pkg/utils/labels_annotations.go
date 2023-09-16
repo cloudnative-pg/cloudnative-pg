@@ -45,6 +45,25 @@ const (
 	// BackupNameLabelName is the name of the label containing the backup id
 	BackupNameLabelName = "cnpg.io/backupName"
 
+	// PgbouncerNameLabel is the label of the pgbouncer pod used by default
+	PgbouncerNameLabel = "cnpg.io/poolerName"
+
+	// ClusterRoleLabelName label is applied to Pods to mark primary ones
+	ClusterRoleLabelName = "role"
+
+	// ImmediateBackupLabelName label is applied to backups to tell if a backup
+	// is immediate or not
+	ImmediateBackupLabelName = "cnpg.io/immediateBackup"
+
+	// ParentScheduledBackupLabelName label is applied to backups to easily tell the scheduled backup
+	// it was created from.
+	ParentScheduledBackupLabelName = "cnpg.io/scheduled-backup"
+
+	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
+	WatchedLabelName = "cnpg.io/reload"
+)
+
+const (
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "cnpg.io/operatorVersion"
@@ -78,14 +97,49 @@ const (
 	// ClusterManifestAnnotationName contains the cluster manifest
 	ClusterManifestAnnotationName = "cnpg.io/clusterManifest"
 
+	// CoredumpFilter stores the value defined by the user to set in /proc/self/coredump_filter
+	CoredumpFilter = "cnpg.io/coredumpFilter"
+
 	// PgControldataAnnotationName contains the pg_controldata output of the cluster
 	PgControldataAnnotationName = "cnpg.io/pgControldata"
 
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"
 
-	// CoredumpFilter stores the value defined by the user to set in /proc/self/coredump_filter
-	CoredumpFilter = "cnpg.io/coredumpFilter"
+	// ClusterSerialAnnotationName is the name of the annotation containing the
+	// serial number of the node
+	ClusterSerialAnnotationName = "cnpg.io/nodeSerial"
+
+	// ClusterRestartAnnotationName is the name of the annotation containing the
+	// latest required restart time
+	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
+
+	// ClusterReloadAnnotationName is the name of the annotation containing the
+	// latest required restart time
+	ClusterReloadAnnotationName = "cnpg.io/reloadedAt"
+
+	// PVCStatusAnnotationName is an annotation that shows the current status of the PVC.
+	// The status can be "initializing", "ready" or "detached"
+	PVCStatusAnnotationName = "cnpg.io/pvcStatus"
+
+	// LegacyBackupAnnotationName represents whether taking a backup without passing
+	//	the name argument even on barman version 3.3.0+. The value can be "true" or "false"
+	LegacyBackupAnnotationName = "cnpg.io/forceLegacyBackup"
+
+	// HibernationAnnotationName is the name of the hibernation annotation
+	HibernationAnnotationName = "cnpg.io/hibernation"
+
+	// PoolerSpecHashAnnotationName is the annotation added to the deployment to tell
+	// the hash of the Pooler Specification
+	PoolerSpecHashAnnotationName = "cnpg.io/poolerSpecHash"
+
+	// OperatorManagedSecretsAnnotationName is the name of the annotation containing
+	// the secrets managed by the operator inside the generated service account
+	OperatorManagedSecretsAnnotationName = "cnpg.io/managedSecrets" // #nosec
+
+	// CNPGHashAnnotationName contains the hash of the used by
+	// CNPG expect the pooler that uses PoolerSpecHashAnnotationName
+	CNPGHashAnnotationName = "cnpg.io/hash"
 )
 
 type annotationStatus string

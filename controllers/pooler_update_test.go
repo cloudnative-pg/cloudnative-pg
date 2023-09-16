@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -76,8 +77,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 			afterDep := getPoolerDeployment(ctx, pooler)
 			Expect(beforeDep.ResourceVersion).To(Equal(afterDep.ResourceVersion))
-			Expect(beforeDep.Annotations[pgbouncer.PgbouncerPoolerSpecHash]).
-				To(Equal(afterDep.Annotations[pgbouncer.PgbouncerPoolerSpecHash]))
+			Expect(beforeDep.Annotations[utils.PoolerSpecHashAnnotationName]).
+				To(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
 		})
 
 		By("making sure that the deployments gets updated if the pooler.spec changes", func() {
@@ -93,8 +94,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			afterDep := getPoolerDeployment(ctx, poolerUpdate)
 
 			Expect(beforeDep.ResourceVersion).ToNot(Equal(afterDep.ResourceVersion))
-			Expect(beforeDep.Annotations[pgbouncer.PgbouncerPoolerSpecHash]).
-				ToNot(Equal(afterDep.Annotations[pgbouncer.PgbouncerPoolerSpecHash]))
+			Expect(beforeDep.Annotations[utils.PoolerSpecHashAnnotationName]).
+				ToNot(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
 			Expect(*afterDep.Spec.Replicas).To(Equal(instancesNumber))
 		})
 	})
