@@ -2844,8 +2844,8 @@ func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
 	}
 }
 
-// IsInplacePhase returns true if the cluster is in a phase that handles the Inplace restart
-func (cluster *Cluster) IsInplacePhase() bool {
+// IsInplaceRestartPhase returns true if the cluster is in a phase that handles the Inplace restart
+func (cluster *Cluster) IsInplaceRestartPhase() bool {
 	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
 		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
 }

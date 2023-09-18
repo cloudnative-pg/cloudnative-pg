@@ -486,7 +486,7 @@ func (r *ClusterReconciler) reconcileResources(
 		// Preserve phases that handle the Inplace behaviour for the following reasons:
 		// 1. Technically: The Inplace phases help determine if a switchover is required.
 		// 2. Descriptive: They precisely describe the cluster's current state externally.
-		if cluster.IsInplacePhase() {
+		if cluster.IsInplaceRestartPhase() {
 			contextLogger.Debug("Cluster is in an Inplace phase. Waiting...", "phase", cluster.Status.Phase)
 		} else {
 			// If not in an Inplace phase, notify that the reconciliation is halted due
