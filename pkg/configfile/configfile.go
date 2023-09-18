@@ -143,3 +143,17 @@ func RemoveOptionFromConfigurationContents(content string, option string) string
 
 	return strings.Join(resultContent, "\n") + "\n"
 }
+
+func ReadOptionsFromConfigurationContents(content string) (options map[string]string) {
+	options = map[string]string{}
+	for _, line := range splitLines(content) {
+		trimLine := strings.TrimSpace(line)
+		if len(trimLine) == 0 || trimLine[0] == '#' {
+			continue
+		}
+
+		kv := strings.SplitN(trimLine, "=", 2)
+		options[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+	}
+	return
+}

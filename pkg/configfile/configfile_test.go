@@ -199,3 +199,28 @@ var _ = Describe("Remove configuration files option", func() {
 		Expect(updatedContent).To(Equal(wantedContent))
 	})
 })
+
+var _ = Describe("Read configuration files option", func() {
+	It("read options without comments", func() {
+		initialContent := `
+# Add settings for extensions here
+shared_preload_libraries = 'bdr'
+wal_level = 'logical'
+track_commit_timestamp = on
+`
+		options := ReadOptionsFromConfigurationContents(initialContent)
+		Expect(options).To(HaveLen(3))
+		Expect(options).To(Equal(map[string]string{
+			"shared_preload_libraries": "'bdr'",
+			"wal_level":                "'logical'",
+			"track_commit_timestamp":   "on",
+		}))
+	})
+
+	It("read options from empty content", func() {
+		initialContent := ``
+		options := ReadOptionsFromConfigurationContents(initialContent)
+		Expect(options).To(HaveLen(0))
+		Expect(options).To(Equal(map[string]string{}))
+	})
+})
