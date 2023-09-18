@@ -483,11 +483,11 @@ func (r *ClusterReconciler) reconcileResources(
 	if !resources.allInstancesAreActive() {
 		contextLogger.Debug("Instance pod not active. Retrying in one second.")
 
-		// Preserve phases that handle the Inplace behaviour for the following reasons:
+		// Preserve phases that handle the in-place restart behaviour for the following reasons:
 		// 1. Technically: The Inplace phases help determine if a switchover is required.
 		// 2. Descriptive: They precisely describe the cluster's current state externally.
 		if cluster.IsInplaceRestartPhase() {
-			contextLogger.Debug("Cluster is in an Inplace phase. Waiting...", "phase", cluster.Status.Phase)
+			contextLogger.Debug("Cluster is in an in-place restart phase. Waiting...", "phase", cluster.Status.Phase)
 		} else {
 			// If not in an Inplace phase, notify that the reconciliation is halted due
 			// to an unready instance.
