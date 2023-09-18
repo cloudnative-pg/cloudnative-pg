@@ -481,8 +481,31 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	if !resources.allInstancesAreActive() {
-		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		contextLogger.Debug("Instance pod not active. Retrying in one second.")
+
+		// Preserve phases that handle the in-place restart behaviour for the following reasons:
+		// 1. Technically: The Inplace phases help determine if a switchover is required.
+		// 2. Descriptive: They precisely describe the cluster's current state externally.
+		if cluster.IsInplaceRestartPhase() {
+			contextLogger.Debug("Cluster is in an in-place restart phase. Waiting...", "phase", cluster.Status.Phase)
+		} else {
+			// If not in an Inplace phase, notify that the reconciliation is halted due
+			// to an unready instance.
+			contextLogger.Debug("An instance is not ready. Pausing reconciliation...")
+
+			// Register a phase indicating some instances aren't active yet
+			if err := r.RegisterPhase(
+				ctx,
+				cluster,
+				apiv1.PhaseWaitingForInstancesToBeActive,
+				"Some instances are not yet active. Please wait.",
+			); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		// Requeue reconciliation after a short delay
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	if res, err := persistentvolumeclaim.Reconcile(

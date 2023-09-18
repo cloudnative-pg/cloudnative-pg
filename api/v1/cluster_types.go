@@ -373,6 +373,9 @@ const (
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
 
+	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
+	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
+
 	// PhaseOnlineUpgrading for when the instance manager is being upgraded in place
 	PhaseOnlineUpgrading = "Online upgrade in progress"
 
@@ -2766,6 +2769,12 @@ func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
 	return &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
+}
+
+// IsInplaceRestartPhase returns true if the cluster is in a phase that handles the Inplace restart
+func (cluster *Cluster) IsInplaceRestartPhase() bool {
+	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
+		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination
