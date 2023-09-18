@@ -43,7 +43,7 @@ func CreateSecret(
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				utils.WatchedLabelName: "true",
+				utils.ReloadLabelName: "true",
 			},
 		},
 		Type: corev1.SecretTypeBasicAuth,

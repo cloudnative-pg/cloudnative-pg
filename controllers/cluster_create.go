@@ -264,7 +264,7 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 				&clientCaSecret,
 				certs.CertTypeClient,
 				nil,
-				map[string]string{utils.WatchedLabelName: "true"})
+				map[string]string{utils.ReloadLabelName: "true"})
 			if err != nil {
 				return err
 			}
@@ -628,7 +628,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 				Name:      apiv1.DefaultMonitoringConfigMapName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					utils.WatchedLabelName: "true",
+					utils.ReloadLabelName: "true",
 				},
 			},
 			Data: map[string]string{
@@ -715,7 +715,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 				Name:      apiv1.DefaultMonitoringSecretName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					utils.WatchedLabelName: "true",
+					utils.ReloadLabelName: "true",
 				},
 			},
 			Data: map[string][]byte{
