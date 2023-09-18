@@ -89,6 +89,9 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
 :   Customize the coredump filter bitmask of Postgres processes.
     Set by default to `0x31` that excludes shared memory.
     See https://docs.kernel.org/filesystems/proc.html#proc-pid-coredump-filter-core-dump-filtering-settings
+    This setting only takes effect during Pod startup,
+    and changing it doesn't trigger any automatic rollout of the instances.
+
 
 ## Pre-requisites
 
