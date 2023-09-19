@@ -2684,9 +2684,9 @@ func AssertPvcHasLabels(
 					ExpectedPvcRole = "PG_WAL"
 				}
 				expectedLabels := map[string]string{
-					"cnpg.io/cluster": clusterName,
-					"cnpg.io/pvcRole": ExpectedPvcRole,
-					"role":            ExpectedRole,
+					utils.ClusterLabelName: clusterName,
+					utils.PvcRoleLabelName: ExpectedPvcRole,
+					"role":                 ExpectedRole,
 				}
 				g.Expect(testsUtils.PvcHasLabels(pvc, expectedLabels)).To(BeTrue(),
 					fmt.Sprintf("expectedLabels: %v and found actualLabels on pvc: %v",

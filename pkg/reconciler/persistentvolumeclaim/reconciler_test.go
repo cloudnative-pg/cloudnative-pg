@@ -236,9 +236,9 @@ var _ = Describe("PVC reconciliation", func() {
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvcs[2].Labels).To(BeEquivalentTo(map[string]string{
-			"cnpg.io/pvcRole": "PG_DATA",
-			"label1":          "value",
-			"label2":          "value",
+			utils.PvcRoleLabelName: "PG_DATA",
+			"label1":               "value",
+			"label2":               "value",
 		}))
 
 		configuration.Current.InheritedAnnotations = []string{"annotation1"}
@@ -253,10 +253,10 @@ var _ = Describe("PVC reconciliation", func() {
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvcs[2].Annotations).To(BeEquivalentTo(map[string]string{
-			"cnpg.io/pvcStatus":  "ready",
-			"cnpg.io/nodeSerial": "3-wal",
-			"annotation1":        "value",
-			"annotation2":        "value",
+			utils.PVCStatusAnnotationName:     "ready",
+			utils.ClusterSerialAnnotationName: "3-wal",
+			"annotation1":                     "value",
+			"annotation2":                     "value",
 		}))
 	})
 
@@ -308,26 +308,26 @@ var _ = Describe("PVC reconciliation", func() {
 		patchedPvc2 := fetchPVC(cl, pvc2)
 
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
-			"cnpg.io/instanceName": "cluster-pvc-reconciliation-2",
-			"cnpg.io/pvcRole":      "PG_DATA",
-			"label1":               "value",
-			"label2":               "value",
+			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-2",
+			utils.PvcRoleLabelName:      "PG_DATA",
+			"label1":                    "value",
+			"label2":                    "value",
 		}))
 
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
-			"cnpg.io/instanceName": "cluster-pvc-reconciliation-3",
-			"cnpg.io/pvcRole":      "PG_WAL",
-			"label1":               "value",
-			"label2":               "value",
+			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
+			utils.PvcRoleLabelName:      "PG_WAL",
+			"label1":                    "value",
+			"label2":                    "value",
 		}))
 
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
-			"cnpg.io/instanceName": "cluster-pvc-reconciliation-3",
-			"cnpg.io/pvcRole":      "PG_DATA",
-			"label1":               "value",
-			"label2":               "value",
+			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
+			utils.PvcRoleLabelName:      "PG_DATA",
+			"label1":                    "value",
+			"label2":                    "value",
 		}))
 	})
 
@@ -368,26 +368,26 @@ var _ = Describe("PVC reconciliation", func() {
 
 		patchedPvc := fetchPVC(cl, pvc)
 		Expect(patchedPvc.Labels).To(Equal(map[string]string{
-			"cnpg.io/pvcRole": "PG_DATA",
-			"role":            "primary",
+			utils.PvcRoleLabelName: "PG_DATA",
+			"role":                 "primary",
 		}))
 
 		patchedPvc2 := fetchPVC(cl, pvc2)
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
-			"cnpg.io/pvcRole": "PG_DATA",
-			"role":            "replica",
+			utils.PvcRoleLabelName: "PG_DATA",
+			"role":                 "replica",
 		}))
 
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
-			"cnpg.io/pvcRole": "PG_WAL",
-			"role":            "replica",
+			utils.PvcRoleLabelName: "PG_WAL",
+			"role":                 "replica",
 		}))
 
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
-			"cnpg.io/pvcRole": "PG_DATA",
-			"role":            "replica",
+			utils.PvcRoleLabelName: "PG_DATA",
+			"role":                 "replica",
 		}))
 	})
 })

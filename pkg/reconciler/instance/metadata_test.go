@@ -362,7 +362,7 @@ var _ = Describe("object metadata test", func() {
 
 			It("Should correctly add AppArmor annotations if present in the cluster's annotations", func() {
 				const (
-					key   = "container.apparmor.security.beta.kubernetes.io/postgres"
+					key   = utils.AppArmorAnnotationPrefix + "/postgres"
 					value = "runtime/default"
 				)
 
