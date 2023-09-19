@@ -78,6 +78,12 @@ func (sr *Replicator) Start(ctx context.Context) error {
 				updateInterval = newUpdateInterval
 			}
 
+			// If the instance is fenced, skip reconciliation
+			if sr.instance.IsFenced() {
+				contextLog.Info("skip replication slots reconciliation due to fencing")
+				continue
+			}
+
 			err := sr.reconcile(ctx, config)
 			if err != nil {
 				contextLog.Warning("synchronizing replication slots", "err", err)
