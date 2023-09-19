@@ -35,21 +35,8 @@ func CreateSecret(
 	username string,
 	password string,
 ) *corev1.Secret {
-	uri := &url.URL{
-		Scheme: "postgresql",
-		User:   url.UserPassword(username, password),
-		Host:   fmt.Sprintf("%s:%d", hostname, postgres.ServerPort),
-		Path:   dbname,
-	}
-	jdbcURI := &url.URL{
-		Scheme: "jdbc:postgresql",
-		Host:   fmt.Sprintf("%s:%d", hostname, postgres.ServerPort),
-		Path:   dbname,
-	}
-	q := jdbcURI.Query()
-	q.Set("user", username)
-	q.Set("password", password)
-	jdbcURI.RawQuery = q.Encode()
+	uriBuilder := newConnectionStringBuilder(hostname, dbname, username, password)
+
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -73,8 +60,48 @@ func CreateSecret(
 				dbname,
 				username,
 				password),
-			"uri":      uri.String(),
-			"jdbc-uri": jdbcURI.String(),
+			"uri":      uriBuilder.buildPostgres(),
+			"jdbc-uri": uriBuilder.buildJdbc(),
 		},
 	}
+}
+
+type connectionStringBuilder struct {
+	host     string
+	dbname   string
+	username string
+	password string
+}
+
+func newConnectionStringBuilder(hostname, dbname, username, password string) *connectionStringBuilder {
+	return &connectionStringBuilder{
+		host:     fmt.Sprintf("%s:%d", hostname, postgres.ServerPort),
+		dbname:   dbname,
+		username: username,
+		password: password,
+	}
+}
+
+func (c connectionStringBuilder) buildPostgres() string {
+	postgresURI := url.URL{
+		Scheme: "postgresql",
+		User:   url.UserPassword(c.username, c.password),
+		Host:   c.host,
+		Path:   c.dbname,
+	}
+
+	return postgresURI.String()
+}
+
+func (c connectionStringBuilder) buildJdbc() string {
+	jdbcURI := &url.URL{
+		Scheme: "jdbc:postgresql",
+		Host:   c.host,
+		Path:   c.dbname,
+	}
+	q := jdbcURI.Query()
+	q.Set("user", c.username)
+	q.Set("password", c.password)
+	jdbcURI.RawQuery = q.Encode()
+	return jdbcURI.String()
 }
