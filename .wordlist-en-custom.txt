@@ -689,6 +689,7 @@ ips
 isPrimary
 issuecomment
 italy
+jdbc
 jobCount
 jq
 json
@@ -1076,6 +1077,7 @@ unix
 unusablePVC
 updateInterval
 upgradable
+uri
 usename
 usernamepassword
 usr
