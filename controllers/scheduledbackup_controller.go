@@ -38,6 +38,14 @@ import (
 
 const (
 	backupOwnerKey = ".metadata.controller"
+
+	// ImmediateBackupLabelName label is applied to backups to tell if a backup
+	// is immediate or not
+	ImmediateBackupLabelName = utils.ImmediateBackupLabelName
+
+	// ParentScheduledBackupLabelName label is applied to backups to easily tell the scheduled backup
+	// it was created from.
+	ParentScheduledBackupLabelName = utils.ParentScheduledBackupLabelName
 )
 
 // ScheduledBackupReconciler reconciles a ScheduledBackup object

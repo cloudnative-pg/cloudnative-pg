@@ -47,7 +47,7 @@ var _ = Describe("pooler_predicates unit tests", func() {
 					Name:      rand.String(10),
 					Namespace: namespace,
 					Labels: map[string]string{
-						utils.ReloadLabelName: "true",
+						utils.WatchedLabelName: "true",
 					},
 				},
 			}

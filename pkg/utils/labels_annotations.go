@@ -63,9 +63,9 @@ const (
 	// scheduled backup if a backup is created by a scheduled backup
 	ParentScheduledBackupLabelName = MetadataNamespace + "/scheduled-backup"
 
-	// ReloadLabelName the name of the label which tell if a resource change will be automatically reloaded by instance
+	// WatchedLabelName the name of the label which tell if a resource change will be automatically reloaded by instance
 	// or not, use for Secrets or ConfigMaps
-	ReloadLabelName = MetadataNamespace + "/reload"
+	WatchedLabelName = MetadataNamespace + "/reload"
 )
 
 const (
