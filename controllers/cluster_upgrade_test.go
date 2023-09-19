@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -31,14 +32,27 @@ import (
 )
 
 var _ = Describe("Pod upgrade", Ordered, func() {
-	cluster := apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
-		},
-		Spec: apiv1.ClusterSpec{
-			ImageName: "postgres:13.11",
-		},
-	}
+	const (
+		newOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
+	)
+
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.11",
+			},
+		}
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	AfterAll(func() {
+		configuration.Current = configuration.NewConfiguration()
+	})
 
 	It("will not require a restart for just created Pods", func(ctx SpecContext) {
 		pod := specs.PodWithExistingStorage(cluster, 1)
@@ -199,7 +213,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 		rollout := isPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
-		Expect(rollout.reason).To(ContainSubstring("scheduler name changed"))
+		Expect(rollout.reason).To(ContainSubstring("scheduler-name"))
 	})
 
 	When("cluster has resources specified", func() {
@@ -228,7 +242,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("the podSpec is outdated"))
+			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
+			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
 			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
@@ -243,7 +258,8 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(ContainSubstring("the podSpec is outdated"))
+			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
+			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
 		})
 	})
 
@@ -270,6 +286,54 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(Equal("environment variable configuration hash changed"))
 		})
+
+		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.11",
+				},
+			}
+			pod := specs.PodWithExistingStorage(cluster, 1)
+			delete(pod.Annotations, utils.PodSpecAnnotationName)
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			// let's simulate an operator upgrade, with online upgrades allowed
+			configuration.Current.OperatorImageName = newOperatorImage
+			configuration.Current.EnableInstanceManagerInplaceUpdates = true
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.reason).To(BeEmpty())
+			Expect(rollout.required).To(BeFalse())
+		})
+
+		It("should trigger an explicit rollout if operator changes without inplace upgrades", func(ctx SpecContext) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.11",
+				},
+			}
+			pod := specs.PodWithExistingStorage(cluster, 1)
+			delete(pod.Annotations, utils.PodSpecAnnotationName)
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			// let's simulate an operator upgrade, with online upgrades allowed
+			configuration.Current.OperatorImageName = newOperatorImage
+			configuration.Current.EnableInstanceManagerInplaceUpdates = false
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
+			Expect(rollout.required).To(BeTrue())
+		})
 	})
 
 	When("the podSpec annotation is available", func() {
@@ -292,7 +356,54 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 			rollout := isPodNeedingRollout(ctx, status, cluster)
 			Expect(rollout.required).To(BeTrue())
-			Expect(rollout.reason).To(Equal("the podSpec is outdated"))
+			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
+			Expect(rollout.reason).To(ContainSubstring("container postgres differs in environment"))
+		})
+
+		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.11",
+				},
+			}
+			pod := specs.PodWithExistingStorage(cluster, 1)
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			// let's simulate an operator upgrade, with online upgrades allowed
+			configuration.Current.OperatorImageName = newOperatorImage
+			configuration.Current.EnableInstanceManagerInplaceUpdates = true
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.reason).To(BeEmpty())
+			Expect(rollout.required).To(BeFalse())
+		})
+
+		It("should trigger an explicit rollout if operator changes without inplace upgrades", func(ctx SpecContext) {
+			cluster := apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ImageName: "postgres:13.11",
+				},
+			}
+			pod := specs.PodWithExistingStorage(cluster, 1)
+
+			status := postgres.PostgresqlStatus{
+				Pod:            pod,
+				PendingRestart: false,
+				IsPodReady:     true,
+				ExecutableHash: "test_hash",
+			}
+
+			// let's simulate an operator upgrade, with online upgrades allowed
+			configuration.Current.OperatorImageName = newOperatorImage
+			configuration.Current.EnableInstanceManagerInplaceUpdates = false
+			rollout := isPodNeedingRollout(ctx, status, &cluster)
+			Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
+			Expect(rollout.required).To(BeTrue())
 		})
 	})
 })
@@ -339,7 +450,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 				ExecutableHash: "test_hash",
 			}
 			rollout := isPodNeedingRollout(ctx, status, cluster)
-			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
 		})
 
@@ -354,7 +465,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 				ExecutableHash: "test_hash",
 			}
 			rollout := isPodNeedingRollout(ctx, status, cluster)
-			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
 		})
 
@@ -367,7 +478,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 				ExecutableHash: "test_hash",
 			}
 			rollout := isPodNeedingRollout(ctx, status, cluster)
-			Expect(rollout.reason).To(ContainSubstring("does not have up-to-date TopologySpreadConstraints"))
+			Expect(rollout.reason).To(ContainSubstring("topology-spread-constraints"))
 			Expect(rollout.required).To(BeTrue())
 		})
 

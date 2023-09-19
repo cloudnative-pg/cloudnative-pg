@@ -244,57 +244,58 @@ func isPodNeedingRollout(
 	if !status.IsPodReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
 		return rollout{}
 	}
+	applyCheckers := func(checkers map[string]rolloutChecker) rollout {
+		for message, check := range checkers {
+			podRollout, err := check(status, cluster)
+			if err != nil {
+				contextLogger.Error(err, "while checking if pod needs rollout")
+				continue
+			}
+			if podRollout.required {
+				if podRollout.reason == "" {
+					podRollout.reason = message
+				}
+				contextLogger.Info("Pod rollout required", "pod", status.Pod.Name, "reason", podRollout.reason)
+				return podRollout
+			}
+		}
+		return rollout{}
+	}
 
 	checkers := map[string]rolloutChecker{
 		"instance is missing executable hash":  checkHasExecutableHash,
 		"pod has missing PVCs":                 checkHasMissingPVCs,
 		"pod has PVC requiring resizing":       checkHasResizingPVC,
 		"pod projected volume is outdated":     checkProjectedVolumeIsOutdated,
-		"PodSpec is outdated":                  checkPodSpecIsOutdated,
 		"pod image is outdated":                checkPodImageIsOutdated,
-		"pod init container is outdated":       checkPodInitContainerIsOutdated,
 		"postgres restart required":            checkPostgresPendingRestart,
 		"cluster has newer restart annotation": checkClusterHasNewerRestartAnnotation,
 	}
-	for message, check := range checkers {
-		podRollout, err := check(status, cluster)
-		if err != nil {
-			contextLogger.Error(err, "while checking if pod needs rollout")
-			continue
-		}
-		if podRollout.required {
-			if podRollout.reason == "" {
-				podRollout.reason = message
-			}
-			return podRollout
-		}
+
+	podRollout := applyCheckers(checkers)
+	if podRollout.required {
+		return podRollout
 	}
 
-	// If the pod has a stored PodSpec annotation, we're done checking.
+	// If the pod has a stored PodSpec annotation, that's the final check.
 	// If not, we should perform additional checks
 	_, hasStoredPodSpec := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
 	if hasStoredPodSpec {
-		return rollout{}
+		return applyCheckers(map[string]rolloutChecker{
+			"PodSpec is outdated": checkPodSpecIsOutdated,
+		})
 	}
 
 	// These checks are subsumed by the PodSpec checker
 	checkers = map[string]rolloutChecker{
-		"pod environment is outdated": checkPodEnvironmentIsOutdated,
-		"pod scheduler is outdated":   checkSchedulerIsOutdated,
-		"pod needs updated topology":  checkPodNeedsUpdatedTopology,
+		"pod environment is outdated":    checkPodEnvironmentIsOutdated,
+		"pod scheduler is outdated":      checkSchedulerIsOutdated,
+		"pod needs updated topology":     checkPodNeedsUpdatedTopology,
+		"pod init container is outdated": checkPodInitContainerIsOutdated,
 	}
-	for message, check := range checkers {
-		podRollout, err := check(status, cluster)
-		if err != nil {
-			contextLogger.Error(err, "while checking if pod needs rollout")
-			continue
-		}
-		if podRollout.required {
-			if podRollout.reason == "" {
-				podRollout.reason = message
-			}
-			return podRollout
-		}
+	podRollout = applyCheckers(checkers)
+	if podRollout.required {
+		return podRollout
 	}
 
 	return rollout{}
@@ -576,30 +577,32 @@ func checkPodSpecIsOutdated(
 	}
 	envConfig := specs.CreatePodEnvConfig(*cluster, status.Pod.Name)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
-	currentPodSpec := specs.CreateClusterPodSpec(status.Pod.Name, *cluster, envConfig, gracePeriod)
+	targetPodSpec := specs.CreateClusterPodSpec(status.Pod.Name, *cluster, envConfig, gracePeriod)
 
-	if currentPodSpec.SchedulerName != storedPodSpec.SchedulerName {
+	// the bootstrap init-container could change image after an operator upgrade.
+	// If in-place upgrades of the instance manager are enabled, we don't need rollout.
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(*status.Pod)
+	if err != nil {
+		return rollout{}, err
+	}
+	if opCurrentImageName != configuration.Current.OperatorImageName &&
+		!configuration.Current.EnableInstanceManagerInplaceUpdates {
 		return rollout{
 			required: true,
-			reason:   "scheduler name changed",
+			reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
+				opCurrentImageName, configuration.Current.OperatorImageName),
 		}, nil
 	}
 
-	if !reflect.DeepEqual(currentPodSpec.TopologySpreadConstraints, storedPodSpec.TopologySpreadConstraints) {
-		return rollout{
-			required: true,
-			reason: fmt.Sprintf(
-				"Pod '%s' does not have up-to-date TopologySpreadConstraints."+
-					" It needs to match the cluster's constraints.",
-				status.Pod.Name,
-			),
-		}, nil
-	}
+	// from here we don't care about drift in the init containers: avoid checking them
+	storedPodSpec.InitContainers = nil
+	targetPodSpec.InitContainers = nil
 
-	if !reflect.DeepEqual(storedPodSpec, currentPodSpec) {
+	match, diff := specs.ComparePodSpecs(storedPodSpec, targetPodSpec)
+	if !match {
 		return rollout{
 			required: true,
-			reason:   "the podSpec is outdated",
+			reason:   "original and target PodSpec differ in " + diff,
 		}, nil
 	}
 
@@ -614,7 +617,7 @@ func (r *ClusterReconciler) upgradePod(
 	pod *corev1.Pod,
 	reason rolloutReason,
 ) error {
-	log.FromContext(ctx).Info("Deleting old Pod",
+	log.FromContext(ctx).Info("Recreating instance pod",
 		"pod", pod.Name,
 		"to", cluster.Spec.ImageName,
 		"reason", reason,

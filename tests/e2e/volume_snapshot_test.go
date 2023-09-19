@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
+	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -240,6 +241,10 @@ var _ = Describe("Verify Volume Snapshot",
 					// Create a "test" table with values 1,2
 					AssertCreateTestData(namespace, clusterToSnapshotName, tableName, psqlClientPod)
 
+					// Because GetCurrentTimestamp() rounds down to the second and is executed
+					// right after the creation of the test data, we wait for 1s to avoid not
+					// including the newly created data within the recovery_target_time
+					time.Sleep(1 * time.Second)
 					// Get the recovery_target_time and pass it to the template engine
 					recoveryTargetTime, err := testUtils.GetCurrentTimestamp(namespace, clusterToSnapshotName, env, psqlClientPod)
 					Expect(err).ToNot(HaveOccurred())
