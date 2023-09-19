@@ -341,8 +341,12 @@ func ensureConfOptionsMigration(ctx context.Context, pgData string) (changed boo
 	// add include `override.conf` at the end of the `postgresql.conf` file
 	err = fileutils.AppendStringToFile(
 		path.Join(pgData, "postgresql.conf"),
-		fmt.Sprintf("# load CloudNativePG override configuration\ninclude '%v'\n", constants.PostgresqlOverrideConfigurationFile),
+		fmt.Sprintf("# load CloudNativePG override configuration\ninclude '%v'\n",
+			constants.PostgresqlOverrideConfigurationFile),
 	)
+	if err != nil {
+		return false, err
+	}
 
 	// remove options  managed by the operator from `postgresql.auto.conf`
 	autoConfFileChanged, err := fileutils.WriteStringToFile(

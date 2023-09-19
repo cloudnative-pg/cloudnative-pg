@@ -220,7 +220,7 @@ track_commit_timestamp = on
 	It("read options from empty content", func() {
 		initialContent := ``
 		options := ReadOptionsFromConfigurationContents(initialContent)
-		Expect(options).To(HaveLen(0))
+		Expect(options).To(BeEmpty())
 		Expect(options).To(Equal(map[string]string{}))
 	})
 })

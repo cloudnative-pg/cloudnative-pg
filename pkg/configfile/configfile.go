@@ -144,6 +144,7 @@ func RemoveOptionFromConfigurationContents(content string, option string) string
 	return strings.Join(resultContent, "\n") + "\n"
 }
 
+// ReadOptionsFromConfigurationContents read the lines containing options into a map
 func ReadOptionsFromConfigurationContents(content string) (options map[string]string) {
 	options = map[string]string{}
 	for _, line := range splitLines(content) {
