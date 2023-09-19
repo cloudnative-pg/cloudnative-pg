@@ -197,7 +197,7 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 	contextLogger := log.FromContext(ctx)
 	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok &&
 		(primaryPod.Annotations == nil || primaryPod.Annotations[utils.ClusterRestartAnnotationName] != clusterRestart) {
-		contextLogger.Info("Setting restart annotation on primary pod as needed", "label", utils.ClusterReloadAnnotationName)
+		contextLogger.Info("Setting restart annotation on primary pod as needed", "label", utils.ClusterRestartAnnotationName)
 		original := primaryPod.DeepCopy()
 		if primaryPod.Annotations == nil {
 			primaryPod.Annotations = make(map[string]string)

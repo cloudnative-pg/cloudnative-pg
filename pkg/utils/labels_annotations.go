@@ -34,6 +34,7 @@ const (
 	ClusterLabelName = MetadataNamespace + "/cluster"
 
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
+	// the value could be import, initdb, join
 	JobRoleLabelName = MetadataNamespace + "/jobRole"
 
 	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
@@ -48,18 +49,18 @@ const (
 	// BackupNameLabelName is the name of the label containing the backup id, available on backup resources
 	BackupNameLabelName = MetadataNamespace + "/backupName"
 
-	// PgbouncerNameLabel is the name of the label of the pgbouncer pod used
+	// PgbouncerNameLabel is the name of the label of containing the pooler name
 	PgbouncerNameLabel = MetadataNamespace + "/poolerName"
 
-	// ClusterRoleLabelName is the name of label applied to instances to mark primary/standby
+	// ClusterRoleLabelName is the name of label applied to instances to mark primary/replica
 	ClusterRoleLabelName = "role"
 
-	// ImmediateBackupLabelName is the name of the label applied to backups to tell if a backup should be taken
-	// immediately or not
+	// ImmediateBackupLabelName is the name of the label applied to backups to tell if the first scheduled backup is
+	// taken immediately or not
 	ImmediateBackupLabelName = MetadataNamespace + "/immediateBackup"
 
-	// ParentScheduledBackupLabelName is the name of the label applied to backups to easily tell where the scheduled
-	// backup created from
+	// ParentScheduledBackupLabelName is the name of the label applied to backups to easily tell the name of parent
+	// scheduled backup if a backup is created by a scheduled backup
 	ParentScheduledBackupLabelName = MetadataNamespace + "/scheduled-backup"
 
 	// ReloadLabelName the name of the label which tell if a resource change will be automatically reloaded by instance
@@ -116,7 +117,7 @@ const (
 	ClusterSerialAnnotationName = MetadataNamespace + "/nodeSerial"
 
 	// ClusterReloadAnnotationName is the name of the annotation containing the
-	// latest required restart time
+	// latest reload time trigger by external
 	ClusterReloadAnnotationName = MetadataNamespace + "/reloadedAt"
 
 	// PVCStatusAnnotationName is the name of the annotation that shows the current status of the PVC.
