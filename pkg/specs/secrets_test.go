@@ -24,10 +24,20 @@ import (
 var _ = Describe("Secret creation", func() {
 	It("create a secret with the right user and password", func() {
 		secret := CreateSecret("name", "namespace",
-			"*", "thisdb", "thisuser", "thispassword")
+			"thishost", "thisdb", "thisuser", "thispassword")
 		Expect(secret.Name).To(Equal("name"))
 		Expect(secret.Namespace).To(Equal("namespace"))
 		Expect(secret.StringData["username"]).To(Equal("thisuser"))
+		Expect(secret.StringData["user"]).To(Equal("thisuser"))
 		Expect(secret.StringData["password"]).To(Equal("thispassword"))
+		Expect(secret.StringData["dbname"]).To(Equal("thisdb"))
+		Expect(secret.StringData["host"]).To(Equal("thishost"))
+		Expect(secret.StringData["port"]).To(Equal("5432"))
+		Expect(secret.StringData["uri"]).To(
+			Equal("postgresql://thisuser:thispassword@thishost:5432/thisdb"),
+		)
+		Expect(secret.StringData["jdbc-uri"]).To(
+			Equal("jdbc:postgresql://thishost:5432/thisdb?password=thispassword&user=thisuser"),
+		)
 	})
 })
