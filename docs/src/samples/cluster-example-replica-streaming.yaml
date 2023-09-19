@@ -10,7 +10,7 @@ spec:
       source: cluster-example
 
   replica:
-    enabled: false
+    enabled: true
     source: cluster-example
 
   storage:

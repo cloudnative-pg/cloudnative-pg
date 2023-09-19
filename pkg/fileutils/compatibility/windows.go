@@ -20,9 +20,22 @@ limitations under the License.
 // Package compatibility provides a layer to cross-compile with other OS than Linux
 package compatibility
 
-import "fmt"
+import (
+	"fmt"
+	"os/exec"
+)
 
 // CreateFifo fakes function for cross-compiling compatibility
 func CreateFifo(fileName string) error {
 	panic(fmt.Sprintf("function CreateFifo() should not be used in Windows"))
+}
+
+// AdInstanceRunCommands mimics the behavior for compatibility issues
+func AddInstanceRunCommands(cmd *exec.Cmd) {
+	return
+}
+
+// Umask sets the process's unix umask to prevent/allow permissions changes
+func Umask(mask int) int {
+	return mask
 }

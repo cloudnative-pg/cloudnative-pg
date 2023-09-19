@@ -302,6 +302,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateEnv,
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
+		r.validateResources,
 	}
 
 	for _, validate := range validations {
@@ -813,15 +814,6 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 
 	recoveryPath := field.NewPath("spec", "bootstrap", "recovery")
 	recoverySection := r.Spec.Bootstrap.Recovery
-	if recoverySection.Source != "" {
-		return field.ErrorList{
-			field.Invalid(
-				recoveryPath.Child("dataSource"),
-				r.Spec.Bootstrap.Recovery.VolumeSnapshots,
-				"Recovery from dataSource is not compatible with other types of recovery"),
-		}
-	}
-
 	if recoverySection.Backup != nil {
 		return field.ErrorList{
 			field.Invalid(
@@ -831,15 +823,16 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 		}
 	}
 
-	result := validateVolumeSnapshotSource(recoverySection.VolumeSnapshots.Storage, recoveryPath.Child("storage"))
-	if recoverySection.RecoveryTarget != nil {
-		result = append(
-			result,
+	if recoverySection.RecoveryTarget != nil && recoverySection.RecoveryTarget.BackupID != "" {
+		return field.ErrorList{
 			field.Invalid(
-				recoveryPath.Child("recoveryTarget"),
-				r.Spec.Bootstrap.Recovery.RecoveryTarget,
-				"A recovery target cannot be set while recovering from a DataSource"))
+				recoveryPath.Child("recoveryTarget", "backupID"),
+				r.Spec.Bootstrap.Recovery.RecoveryTarget.BackupID,
+				"Cannot specify a backupID when recovering using a DataSource"),
+		}
 	}
+
+	result := validateVolumeSnapshotSource(recoverySection.VolumeSnapshots.Storage, recoveryPath.Child("storage"))
 
 	if recoverySection.VolumeSnapshots.WalStorage != nil && r.Spec.WalStorage == nil {
 		walStoragePath := recoveryPath.Child("dataSource", "walStorage")
@@ -946,6 +939,36 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 				fmt.Sprintf("invalid imagePullPolicy, if defined must be one of '%s', '%s' or '%s'",
 					v1.PullAlways, v1.PullNever, v1.PullIfNotPresent)))
 	}
+}
+
+func (r *Cluster) validateResources() field.ErrorList {
+	var result field.ErrorList
+
+	cpuPopulated := !r.Spec.Resources.Requests.Cpu().IsZero() && !r.Spec.Resources.Limits.Cpu().IsZero()
+	if cpuPopulated {
+		cpuRequestGtThanLimit := r.Spec.Resources.Requests.Cpu().Cmp(*r.Spec.Resources.Limits.Cpu()) > 0
+		if cpuRequestGtThanLimit {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "resources", "requests", "cpu"),
+				r.Spec.Resources.Requests.Cpu().String(),
+				"CPU request is greater than the limit",
+			))
+		}
+	}
+
+	memoryPopulated := !r.Spec.Resources.Requests.Memory().IsZero() && !r.Spec.Resources.Limits.Memory().IsZero()
+	if memoryPopulated {
+		memoryRequestGtThanLimit := r.Spec.Resources.Requests.Memory().Cmp(*r.Spec.Resources.Limits.Memory()) > 0
+		if memoryRequestGtThanLimit {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "resources", "requests", "memory"),
+				r.Spec.Resources.Requests.Memory().String(),
+				"Memory request is greater than the limit",
+			))
+		}
+	}
+
+	return result
 }
 
 // validateConfiguration determines whether a PostgreSQL configuration is valid
@@ -1227,10 +1250,18 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 		}
 	}
 
+	// When using a backup catalog, we can identify the backup to be restored
+	// only if the PITR is time-based. If the PITR is not time-based, the user
+	// need to specify a backup ID.
+	// If we use a dataSource, the operator will directly access the backup
+	// and a backupID is not needed.
+
 	// validate BackupID is defined when TargetName or TargetXID or TargetImmediate are set
-	if (recoveryTarget.TargetName != "" ||
+	labelBasedPITR := recoveryTarget.TargetName != "" ||
 		recoveryTarget.TargetXID != "" ||
-		recoveryTarget.TargetImmediate != nil) && recoveryTarget.BackupID == "" {
+		recoveryTarget.TargetImmediate != nil
+	recoveryFromSnapshot := r.Spec.Bootstrap.Recovery.VolumeSnapshots != nil
+	if labelBasedPITR && !recoveryFromSnapshot && recoveryTarget.BackupID == "" {
 		result = append(result, field.Required(
 			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 			"BackupID is missing"))
@@ -1588,6 +1619,7 @@ func (r *Cluster) validateTolerations() field.ErrorList {
 	path := field.NewPath("spec", "affinity", "toleration")
 	allErrors := field.ErrorList{}
 	for i, toleration := range r.Spec.Affinity.Tolerations {
+		toleration := toleration
 		idxPath := path.Index(i)
 		// validate the toleration key
 		if len(toleration.Key) > 0 {

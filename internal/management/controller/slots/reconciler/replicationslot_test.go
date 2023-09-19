@@ -18,8 +18,10 @@ package reconciler
 
 import (
 	"context"
+	"errors"
+	"time"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
@@ -34,7 +36,9 @@ type fakeSlot struct {
 }
 
 type fakeReplicationSlotManager struct {
-	replicationSlots map[fakeSlot]bool
+	replicationSlots   map[fakeSlot]bool
+	triggerListError   bool
+	triggerDeleteError bool
 }
 
 const slotPrefix = "_cnpg_"
@@ -45,6 +49,9 @@ func (fk fakeReplicationSlotManager) Create(_ context.Context, slot infrastructu
 }
 
 func (fk fakeReplicationSlotManager) Delete(_ context.Context, slot infrastructure.ReplicationSlot) error {
+	if fk.triggerDeleteError {
+		return errors.New("triggered delete error")
+	}
 	delete(fk.replicationSlots, fakeSlot{name: slot.SlotName})
 	return nil
 }
@@ -58,6 +65,10 @@ func (fk fakeReplicationSlotManager) List(
 	_ *apiv1.ReplicationSlotsConfiguration,
 ) (infrastructure.ReplicationSlotList, error) {
 	var slotList infrastructure.ReplicationSlotList
+	if fk.triggerListError {
+		return slotList, errors.New("triggered list error")
+	}
+
 	for slot := range fk.replicationSlots {
 		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
 			SlotName:   slot.name,
@@ -74,7 +85,7 @@ func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.
 		Spec: apiv1.ClusterSpec{
 			ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
 				HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-					Enabled:    pointer.Bool(true),
+					Enabled:    ptr.To(true),
 					SlotPrefix: slotPrefix,
 				},
 			},
@@ -146,5 +157,60 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: slotPrefix + "instance3", active: true}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
+	})
+})
+
+var _ = Describe("dropReplicationSlots", func() {
+	It("returns error when listing slots fails", func() {
+		fakeManager := &fakeReplicationSlotManager{
+			replicationSlots: make(map[fakeSlot]bool),
+			triggerListError: true,
+		}
+		cluster := makeClusterWithInstanceNames([]string{}, "")
+
+		_, err := dropReplicationSlots(context.Background(), fakeManager, &cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("triggered list error"))
+	})
+
+	It("skips deletion of active slots and reschedules", func() {
+		fakeManager := &fakeReplicationSlotManager{
+			replicationSlots: map[fakeSlot]bool{
+				{name: "slot1", active: true}: true,
+			},
+		}
+		cluster := makeClusterWithInstanceNames([]string{}, "")
+
+		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Second))
+	})
+
+	It("returns error when deleting a slot fails", func() {
+		fakeManager := &fakeReplicationSlotManager{
+			replicationSlots: map[fakeSlot]bool{
+				{name: "slot1", active: false}: true,
+			},
+			triggerDeleteError: true,
+		}
+		cluster := makeClusterWithInstanceNames([]string{}, "")
+
+		_, err := dropReplicationSlots(context.Background(), fakeManager, &cluster)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("triggered delete error"))
+	})
+
+	It("deletes inactive slots and does not reschedule", func() {
+		fakeManager := &fakeReplicationSlotManager{
+			replicationSlots: map[fakeSlot]bool{
+				{name: "slot1", active: false}: true,
+			},
+		}
+		cluster := makeClusterWithInstanceNames([]string{}, "")
+
+		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Duration(0)))
+		Expect(fakeManager.replicationSlots).NotTo(HaveKey(fakeSlot{name: "slot1", active: false}))
 	})
 })

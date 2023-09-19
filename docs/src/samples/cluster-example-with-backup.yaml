@@ -8,7 +8,7 @@ spec:
 
   # Persistent storage configuration
   storage:
-    storageClass: standard
+    storageClass: csi-hostpath-sc
     size: 1Gi
 
   # Backup properties

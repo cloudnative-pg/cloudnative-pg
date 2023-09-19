@@ -33,8 +33,8 @@ import (
 )
 
 type roleManager struct {
-	origin      *pool.ConnectionPool
-	destination *pool.ConnectionPool
+	origin      pool.Pooler
+	destination pool.Pooler
 	cluster     *apiv1.Cluster
 }
 
@@ -49,18 +49,18 @@ type Role struct {
 	Rolcanlogin    bool    `json:"rolcanlogin,omitempty"`
 	Rolreplication bool    `json:"rolreplication,omitempty"`
 	Rolbypassrls   bool    `json:"rolbypassrls,omitempty"`
+	IsCurrentUser  bool    `json:"is_current_user,omitempty"`
 	Rolconnlimit   int     `json:"rolconnlimit,omitempty"`
 	Rolpassword    *string `json:"rolpassword,omitempty"`
 	Rolvaliduntil  *string `json:"rolvaliduntil,omitempty"`
 	RolComment     *string `json:"rolcomment,omitempty"`
-	IsCurrentUser  bool    `json:"is_current_user,omitempty"`
 }
 
 func cloneRoles(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	destination *pool.ConnectionPool,
-	origin *pool.ConnectionPool,
+	destination pool.Pooler,
+	origin pool.Pooler,
 ) error {
 	rs := roleManager{origin: origin, destination: destination, cluster: cluster}
 	roles, err := rs.getRoles(ctx)

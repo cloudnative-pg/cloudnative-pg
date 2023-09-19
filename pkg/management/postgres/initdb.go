@@ -34,6 +34,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
@@ -133,6 +134,11 @@ func (info InitInfo) CreateDataDirectory() error {
 	log.Info("Creating new data directory",
 		"pgdata", info.PgData,
 		"initDbOptions", options)
+
+	// Certain CSI drivers may add setgid permissions on newly created folders.
+	// A default umask is set to attempt to avoid this, by revoking group/other
+	// permission bits on the PGDATA
+	_ = compatibility.Umask(0o077)
 
 	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
 	err := execlog.RunBuffering(initdbCmd, constants.InitdbName)

@@ -25,38 +25,6 @@ metadata:
     cnpg.io/reload: ""
 data:
   custom-queries: |
-    pg_replication:
-      query: "SELECT CASE WHEN NOT pg_is_in_recovery()
-              THEN 0
-              ELSE GREATEST (0, 
-                EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) 
-              END AS lag, 
-              pg_is_in_recovery() AS in_recovery,
-              EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up,
-              (SELECT count(*) FROM pg_stat_replication) AS streaming_replicas"
-
-      metrics:
-        - lag:
-            usage: "GAUGE"
-            description: "Replication lag behind primary in seconds"
-        - in_recovery:
-            usage: "GAUGE"
-            description: "Whether the instance is in recovery"
-        - is_wal_receiver_up:
-            usage: "GAUGE"
-            description: "Whether the instance wal_receiver is up"
-        - streaming_replicas:
-            usage: "GAUGE"
-            description: "Number of streaming replicas connected to the instance"
-
-    pg_postmaster:
-      query: "SELECT pg_postmaster_start_time as start_time from pg_postmaster_start_time()"
-      primary: true
-      metrics:
-        - start_time:
-            usage: "GAUGE"
-            description: "Time at which postgres started"
-
     pg_stat_user_tables:
       target_databases:
       - "*"

@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -35,6 +37,7 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,6 +54,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
@@ -109,6 +113,10 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.APIExtensionClient = apiextensionsclientset.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
+
+	if err := storagesnapshotv1.AddToScheme(env.Scheme); err != nil {
+		return nil, err
+	}
 
 	flags := log.NewFlags(zap.Options{
 		Development: true,
@@ -227,6 +235,14 @@ func (env TestingEnvironment) GetPVCList(namespace string) (*corev1.PersistentVo
 		env.Ctx, pvcList, client.InNamespace(namespace),
 	)
 	return pvcList, err
+}
+
+// GetSnapshotList gathers the current list of VolumeSnapshots in a namespace
+func (env TestingEnvironment) GetSnapshotList(namespace string) (*storagesnapshotv1.VolumeSnapshotList, error) {
+	list := &storagesnapshotv1.VolumeSnapshotList{}
+	err := env.Client.List(env.Ctx, list, client.InNamespace(namespace))
+
+	return list, err
 }
 
 // GetJobList gathers the current list of jobs in a namespace
@@ -391,4 +407,29 @@ func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName
 	} else {
 		return
 	}
+}
+
+// TailClusterLogs streams the cluster pod logs to a single output io.Writer,
+// starting from the current time, and watching for any new pods, and any new logs,
+// until the  context is cancelled or there are no pods left.
+//
+// If `parseTimestamps` is true, the log line will have the timestamp in
+// human-readable prepended. NOTE: this will make log-lines NON-JSON
+func (env TestingEnvironment) TailClusterLogs(
+	cluster *apiv1.Cluster,
+	writer io.Writer,
+	parseTimestamps bool,
+) error {
+	now := metav1.Now()
+	streamClusterLogs := logs.ClusterStreamingRequest{
+		Cluster: cluster,
+		Options: &corev1.PodLogOptions{
+			Timestamps: parseTimestamps,
+			Follow:     true,
+			SinceTime:  &now,
+		},
+		FollowWaiting: logs.DefaultFollowWaiting,
+		Client:        env.Interface,
+	}
+	return streamClusterLogs.SingleStream(env.Ctx, writer)
 }

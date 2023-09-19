@@ -43,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/restorer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
@@ -50,6 +51,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var (
@@ -74,6 +76,115 @@ var (
 		"max_locks_per_xact":   "max_locks_per_transaction",
 	}
 )
+
+// RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
+func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client) error {
+	cluster, err := info.loadCluster(ctx, cli)
+	if err != nil {
+		return err
+	}
+
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil ||
+		cluster.Spec.Bootstrap.Recovery.Source == "" {
+		// We are recovering from an existing PVC snapshot, we
+		// don't need to invoke the recovery job
+		return nil
+	}
+
+	log.Info("Recovering from volume snapshot",
+		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
+	if err := removeSignalFiles(info.PgData); err != nil {
+		return fmt.Errorf("error while cleaning up the signal files: %w", err)
+	}
+
+	backup, env, err := info.createBackupObjectForSnapshotRestore(ctx, cli, cluster)
+	if err != nil {
+		return err
+	}
+
+	if _, err := info.restoreCustomWalDir(ctx); err != nil {
+		return err
+	}
+
+	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
+		return err
+	}
+
+	if cluster.IsReplica() {
+		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
+		if !ok {
+			return fmt.Errorf("missing external cluster: %v", cluster.Spec.ReplicaCluster.Source)
+		}
+
+		connectionString, _, err := external.ConfigureConnectionToServer(
+			ctx, cli, info.Namespace, &server)
+		if err != nil {
+			return err
+		}
+
+		// TODO: Using a replication slot on replica cluster is not supported (yet?)
+		_, err = UpdateReplicaConfiguration(info.PgData, connectionString, "")
+		return err
+	}
+
+	if err := info.WriteRestoreHbaConf(); err != nil {
+		return err
+	}
+
+	if err := info.writeRestoreWalConfig(backup, cluster); err != nil {
+		return err
+	}
+
+	return info.ConfigureInstanceAfterRestore(ctx, cluster, env)
+}
+
+// createBackupObjectForSnapshotRestore creates a fake Backup object that can be used during the
+// snapshot restore process
+func (info InitInfo) createBackupObjectForSnapshotRestore(
+	ctx context.Context,
+	typedClient client.Client,
+	cluster *apiv1.Cluster,
+) (*apiv1.Backup, []string, error) {
+	sourceName := cluster.Spec.Bootstrap.Recovery.Source
+
+	if sourceName == "" {
+		return nil, nil, fmt.Errorf("recovery source not specified")
+	}
+
+	log.Info("Recovering from external cluster", "sourceName", sourceName)
+
+	server, found := cluster.ExternalCluster(sourceName)
+	if !found {
+		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
+	}
+	serverName := server.GetServerName()
+
+	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
+		ctx,
+		typedClient,
+		cluster.Namespace,
+		server.BarmanObjectStore,
+		os.Environ())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &apiv1.Backup{
+		Spec: apiv1.BackupSpec{
+			Cluster: apiv1.LocalObjectReference{
+				Name: serverName,
+			},
+		},
+		Status: apiv1.BackupStatus{
+			BarmanCredentials: server.BarmanObjectStore.BarmanCredentials,
+			EndpointCA:        server.BarmanObjectStore.EndpointCA,
+			EndpointURL:       server.BarmanObjectStore.EndpointURL,
+			DestinationPath:   server.BarmanObjectStore.DestinationPath,
+			ServerName:        serverName,
+			Phase:             apiv1.BackupPhaseCompleted,
+		},
+	}, env, nil
+}
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context) error {
@@ -102,6 +213,10 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	// If we need to download data from a backup, we do it
 	backup, env, err := info.loadBackup(ctx, typedClient, cluster)
 	if err != nil {
+		return err
+	}
+
+	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
 		return err
 	}
 
@@ -142,7 +257,50 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore(cluster, env)
+	return info.ConfigureInstanceAfterRestore(ctx, cluster, env)
+}
+
+func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	env []string,
+	backup *apiv1.Backup,
+) error {
+	// it's the full path of the file that will temporarily contain the LastCheckpointRedoWAL
+	const testWALPath = postgresSpec.RecoveryTemporaryDirectory + "/test.wal"
+	contextLogger := log.FromContext(ctx)
+
+	defer func() {
+		if err := fileutils.RemoveFile(testWALPath); err != nil {
+			contextLogger.Error(err, "while deleting the temporary wal file: %w")
+		}
+	}()
+
+	if err := fileutils.EnsureParentDirectoryExist(testWALPath); err != nil {
+		return err
+	}
+
+	rest, err := restorer.New(ctx, cluster, env, walarchive.SpoolDirectory)
+	if err != nil {
+		return err
+	}
+
+	opts, err := barman.CloudWalRestoreOptions(&apiv1.BarmanObjectStoreConfiguration{
+		BarmanCredentials: backup.Status.BarmanCredentials,
+		EndpointCA:        backup.Status.EndpointCA,
+		EndpointURL:       backup.Status.EndpointURL,
+		DestinationPath:   backup.Status.DestinationPath,
+		ServerName:        backup.Status.ServerName,
+	}, cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	if err := rest.Restore(backup.Status.BeginWal, testWALPath, opts); err != nil {
+		return fmt.Errorf("encountered an error while checking the presence of first needed WAL in the archive: %w", err)
+	}
+
+	return nil
 }
 
 // restoreCustomWalDir moves the current pg_wal data to the specified custom wal dir and applies the symlink
@@ -358,16 +516,9 @@ func (info InitInfo) loadBackupFromReference(
 // to complete the WAL recovery from the object storage and then start
 // as a new primary
 func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.Cluster) error {
-	// Ensure restore_command is used to correctly recover WALs
-	// from the object storage
-	major, err := postgresutils.GetMajorVersion(info.PgData)
-	if err != nil {
-		return fmt.Errorf("cannot detect major version: %w", err)
-	}
+	var err error
 
-	const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
-
-	cmd := []string{barmanCloudWalRestoreName}
+	cmd := []string{barmanCapabilities.BarmanCloudWalRestore}
 	if backup.Status.EndpointURL != "" {
 		cmd = append(cmd, "--endpoint-url", backup.Status.EndpointURL)
 	}
@@ -387,6 +538,17 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 			"%s",
 		strings.Join(cmd, " "),
 		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
+
+	return info.writeRecoveryConfiguration(recoveryFileContents)
+}
+
+func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) error {
+	// Ensure restore_command is used to correctly recover WALs
+	// from the object storage
+	major, err := postgresutils.GetMajorVersion(info.PgData)
+	if err != nil {
+		return fmt.Errorf("cannot detect major version: %w", err)
+	}
 
 	log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
 	// Disable archiving
@@ -574,9 +736,16 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 // of the instance to be coherent with the one specified in the
 // cluster. This function also ensures that we can really connect
 // to this cluster using the password in the secrets
-func (info InitInfo) ConfigureInstanceAfterRestore(cluster *apiv1.Cluster, env []string) error {
+func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster *apiv1.Cluster, env []string) error {
+	contextLogger := log.FromContext(ctx)
+
 	instance := info.GetInstance()
 	instance.Env = env
+
+	if err := instance.VerifyPgDataCoherence(ctx); err != nil {
+		contextLogger.Error(err, "while ensuring pgData coherence")
+		return err
+	}
 
 	majorVersion, err := postgresutils.GetMajorVersion(info.PgData)
 	if err != nil {
@@ -668,7 +837,11 @@ func (info *InitInfo) checkBackupDestination(
 	}
 
 	// Check if we're ok to archive in the desired destination
-	return walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions)
+	if utils.IsEmptyWalArchiveCheckEnabled(&cluster.ObjectMeta) {
+		return walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions)
+	}
+
+	return nil
 }
 
 // waitUntilRecoveryFinishes periodically checks the underlying

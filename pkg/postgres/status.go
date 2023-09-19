@@ -28,20 +28,21 @@ import (
 
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
-	CurrentLsn                LSN        `json:"currentLsn,omitempty"`
-	ReceivedLsn               LSN        `json:"receivedLsn,omitempty"`
-	ReplayLsn                 LSN        `json:"replayLsn,omitempty"`
-	SystemID                  string     `json:"systemID"`
-	IsPrimary                 bool       `json:"isPrimary"`
-	ReplayPaused              bool       `json:"replayPaused"`
-	PendingRestart            bool       `json:"pendingRestart"`
-	PendingRestartForDecrease bool       `json:"pendingRestartForDecrease"`
-	IsWalReceiverActive       bool       `json:"isWalReceiverActive"`
-	Node                      string     `json:"node"`
-	Pod                       corev1.Pod `json:"pod"`
-	IsPgRewindRunning         bool       `json:"isPgRewindRunning"`
-	TotalInstanceSize         string     `json:"totalInstanceSize"`
-	MightBeUnavailable        bool       `json:"mightBeUnavailable"`
+	CurrentLsn                LSN         `json:"currentLsn,omitempty"`
+	ReceivedLsn               LSN         `json:"receivedLsn,omitempty"`
+	ReplayLsn                 LSN         `json:"replayLsn,omitempty"`
+	SystemID                  string      `json:"systemID"`
+	IsPrimary                 bool        `json:"isPrimary"`
+	ReplayPaused              bool        `json:"replayPaused"`
+	PendingRestart            bool        `json:"pendingRestart"`
+	PendingRestartForDecrease bool        `json:"pendingRestartForDecrease"`
+	IsWalReceiverActive       bool        `json:"isWalReceiverActive"`
+	IsPgRewindRunning         bool        `json:"isPgRewindRunning"`
+	MightBeUnavailable        bool        `json:"mightBeUnavailable"`
+	IsArchivingWAL            bool        `json:"isArchivingWAL,omitempty"`
+	Node                      string      `json:"node"`
+	Pod                       *corev1.Pod `json:"pod"`
+	TotalInstanceSize         string      `json:"totalInstanceSize"`
 	// populated when MightBeUnavailable reported a healthy status even if it found an error
 	MightBeUnavailableMaskedError string `json:"mightBeUnavailableMaskedError,omitempty"`
 
@@ -51,7 +52,6 @@ type PostgresqlStatus struct {
 	LastArchivedWALTime string `json:"lastArchivedWALTime,omitempty"`
 	LastFailedWAL       string `json:"lastFailedWAL,omitempty"`
 	LastFailedWALTime   string `json:"lastFailedWALTime,omitempty"`
-	IsArchivingWAL      bool   `json:"isArchivingWAL,omitempty"`
 
 	// WAL Status
 
@@ -68,6 +68,17 @@ type PostgresqlStatus struct {
 	// status of a Pod
 	Error error `json:"-"`
 
+	// contains the PgStatReplication rows content.
+	ReplicationInfo PgStatReplicationList `json:"replicationInfo,omitempty"`
+	// contains the PgReplicationSlot rows content.
+	ReplicationSlotsInfo PgReplicationSlotList `json:"replicationSlotsInfo,omitempty"`
+
+	// Status of the instance manager
+	ExecutableHash             string `json:"executableHash"`
+	InstanceManagerVersion     string `json:"instanceManagerVersion"`
+	InstanceArch               string `json:"instanceArch"`
+	IsInstanceManagerUpgrading bool   `json:"isInstanceManagerUpgrading"`
+
 	// This field represents the Kubelet point-of-view of the readiness
 	// status of this instance and may be slightly stale when the Kubelet has
 	// not still invoked the readiness probe.
@@ -77,17 +88,6 @@ type PostgresqlStatus struct {
 	//
 	// This field is never populated in the instance manager.
 	IsPodReady bool `json:"isPodReady"`
-
-	// Status of the instance manager
-	ExecutableHash             string `json:"executableHash"`
-	IsInstanceManagerUpgrading bool   `json:"isInstanceManagerUpgrading"`
-	InstanceManagerVersion     string `json:"instanceManagerVersion"`
-	InstanceArch               string `json:"instanceArch"`
-
-	// contains the PgStatReplication rows content.
-	ReplicationInfo PgStatReplicationList `json:"replicationInfo,omitempty"`
-	// contains the PgReplicationSlot rows content.
-	ReplicationSlotsInfo PgReplicationSlotList `json:"replicationSlotsInfo,omitempty"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
@@ -107,7 +107,7 @@ type PgStatReplication struct {
 
 // AddPod store the Pod inside the status
 func (status *PostgresqlStatus) AddPod(pod corev1.Pod) {
-	status.Pod = pod
+	status.Pod = &pod
 
 	// IsPodReady is not populated by the instance manager, so we detect it from the
 	// Pod status
@@ -141,12 +141,12 @@ type PgReplicationSlot struct {
 	SlotType    string `json:"slotType,omitempty"`
 	Datoid      string `json:"datoid,omitempty"`
 	Database    string `json:"database,omitempty"`
-	Active      bool   `json:"active,omitempty"`
 	Xmin        string `json:"xmin,omitempty"`
 	CatalogXmin string `json:"catalogXmin,omitempty"`
 	RestartLsn  string `json:"restartLsn,omitempty"`
 	WalStatus   string `json:"walStatus,omitempty"`
 	SafeWalSize *int   `json:"safeWalSize,omitempty"`
+	Active      bool   `json:"active,omitempty"`
 }
 
 // PgReplicationSlotList is a list of PgReplicationSlot reported by the primary instance
@@ -363,7 +363,7 @@ func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bo
 func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
 	hasActiveAndReady := false
 	for _, item := range list.Items {
-		podIsActiveAndReady := utils.IsPodActive(item.Pod) && utils.IsPodReady(item.Pod)
+		podIsActiveAndReady := utils.IsPodActive(*item.Pod) && utils.IsPodReady(*item.Pod)
 
 		if !podIsActiveAndReady {
 			continue
@@ -382,7 +382,7 @@ func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
 func (list PostgresqlStatusList) InstancesReportingStatus() int {
 	var n int
 	for _, item := range list.Items {
-		if utils.IsPodActive(item.Pod) && utils.IsPodReady(item.Pod) || item.MightBeUnavailable {
+		if utils.IsPodActive(*item.Pod) && utils.IsPodReady(*item.Pod) || item.MightBeUnavailable {
 			n++
 		}
 	}

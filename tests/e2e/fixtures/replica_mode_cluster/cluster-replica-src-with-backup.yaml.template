@@ -1,0 +1,50 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-replica-src
+spec:
+  instances: 2
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      database: appSrc
+      owner: userSrc
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+    pg_hba:
+      - host replication postgres all md5
+      - hostssl app streaming_replica all cert
+
+  backup:
+    volumeSnapshot:
+      className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}
+    barmanObjectStore:
+      destinationPath: s3://cluster-backups/
+      endpointURL: http://minio-service:9000
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
+      wal:
+        compression: gzip
+      data:
+        immediateCheckpoint: true

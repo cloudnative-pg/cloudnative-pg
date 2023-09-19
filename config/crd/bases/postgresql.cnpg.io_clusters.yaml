@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.0
+    controller-gen.kubebuilder.io/version: v0.13.0
   name: clusters.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -1227,7 +1227,8 @@ spec:
                     description: RetentionPolicy is the retention policy to be used
                       for backups and WALs (i.e. '60d'). The retention policy is expressed
                       in the form of `XXu` where `XX` is a positive integer and `u`
-                      is in `[dwm]` - days, weeks, months.
+                      is in `[dwm]` - days, weeks, months. It's currently only applicable
+                      when using the BarmanObjectStore method.
                     pattern: ^[1-9][0-9]*[dwm]$
                     type: string
                   target:
@@ -1241,6 +1242,41 @@ spec:
                     - primary
                     - prefer-standby
                     type: string
+                  volumeSnapshot:
+                    description: VolumeSnapshot provides the configuration for the
+                      execution of volume snapshot backups.
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations key-value pairs that will be added
+                          to .metadata.annotations snapshot resources.
+                        type: object
+                      className:
+                        description: ClassName specifies the Snapshot Class to be
+                          used for PG_DATA PersistentVolumeClaim. It is the default
+                          class for the other types if no specific class is present
+                        type: string
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: Labels are key-value pairs that will be added
+                          to .metadata.labels snapshot resources.
+                        type: object
+                      snapshotOwnerReference:
+                        default: none
+                        description: SnapshotOwnerReference indicates the type of
+                          owner reference the snapshot should have. .
+                        enum:
+                        - none
+                        - cluster
+                        - backup
+                        type: string
+                      walClassName:
+                        description: WalClassName specifies the Snapshot Class to
+                          be used for the PG_WAL PersistentVolumeClaim.
+                        type: string
+                    type: object
                 type: object
               bootstrap:
                 description: Instructions to bootstrap this cluster
@@ -1505,8 +1541,9 @@ spec:
                               available backup in chronological order.
                             type: string
                           exclusive:
-                            description: Set the target to be exclusive (defaults
-                              to true)
+                            description: Set the target to be exclusive. If omitted,
+                              defaults to false, so that in Postgres, `recovery_target_inclusive`
+                              will be true
                             type: boolean
                           targetImmediate:
                             description: End recovery as soon as a consistent state
@@ -1546,7 +1583,7 @@ spec:
                         description: The external cluster whose backup we will restore.
                           This is also used as the name of the folder under which
                           the backup is stored, so it must be set to the name of the
-                          source cluster Mutually exclusive with `backup` and `volumeSnapshots`.
+                          source cluster Mutually exclusive with `backup`.
                         type: string
                       volumeSnapshots:
                         description: The static PVC data source(s) from which to initiate
@@ -1555,7 +1592,7 @@ spec:
                           PVC group, compatible with CloudNativePG, and taken with
                           a cold backup copy on a fenced Postgres instance (limitation
                           which will be removed in the future when online backup will
-                          be implemented). Mutually exclusive with `backup` and `source`.
+                          be implemented). Mutually exclusive with `backup`.
                         properties:
                           storage:
                             description: Configuration of the storage of the instances
@@ -2420,8 +2457,6 @@ spec:
                     description: Reuse the existing PVC (wait for the node to come
                       up again) or not (recreate it elsewhere - when `instances` >1)
                     type: boolean
-                required:
-                - inProgress
                 type: object
               postgresGID:
                 default: 26
@@ -2824,8 +2859,8 @@ spec:
                     description: If replica mode is enabled, this cluster will be
                       a replica of an existing cluster. Replica cluster can be created
                       from a recovery object store or via streaming through pg_basebackup.
-                      Refer to the Replication page of the documentation for more
-                      information.
+                      Refer to the Replica clusters page of the documentation for
+                      more information.
                     type: boolean
                   source:
                     description: The name of the external cluster which is the replication
@@ -2833,6 +2868,7 @@ spec:
                     minLength: 1
                     type: string
                 required:
+                - enabled
                 - source
                 type: object
               replicationSlots:
@@ -2932,8 +2968,8 @@ spec:
                     description: localhostProfile indicates a profile defined in a
                       file on the node should be used. The profile must be preconfigured
                       on the node to work. Must be a descending path, relative to
-                      the kubelet's configured seccomp profile location. Must only
-                      be set if type is "Localhost".
+                      the kubelet's configured seccomp profile location. Must be set
+                      if type is "Localhost". Must NOT be set for any other type.
                     type: string
                   type:
                     description: "type indicates which kind of seccomp profile will
@@ -4034,6 +4070,9 @@ spec:
                 description: Current write pod
                 type: string
             type: object
+        required:
+        - metadata
+        - spec
         type: object
     served: true
     storage: true

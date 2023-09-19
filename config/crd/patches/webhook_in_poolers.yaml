@@ -7,11 +7,14 @@ metadata:
 spec:
   conversion:
     strategy: Webhook
-    webhookClientConfig:
-      # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
-      # but we're going to set it later using the cert-manager (or potentially a patch if not using cert-manager)
-      caBundle: Cg==
-      service:
-        namespace: system
-        name: webhook-service
-        path: /convert
+    webhook:
+      conversionReviewVersions:
+      - v2
+      clientConfig:
+          service:
+            namespace: system
+            name: webhook-service
+            path: /convert
+          # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
+          # but we're going to set it later using the cert-manager (or potentially a patch if not using cert-manager)
+          caBundle: Cg==

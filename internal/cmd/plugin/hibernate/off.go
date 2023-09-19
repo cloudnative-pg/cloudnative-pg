@@ -114,6 +114,8 @@ func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.Persistent
 	// ensure all the pvcs belong to the same node serial and are hibernated
 	var nodeSerial []string
 	for _, pvc := range pvcs {
+		// IMPORTANT: do not use utils.ClusterManifestAnnotationName, utils.PgControlDataAnnotationName here for backwards
+		// compatibility
 		if err := ensureAnnotationsExists(
 			pvc,
 			utils.HibernateClusterManifestAnnotationName,

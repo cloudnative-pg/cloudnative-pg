@@ -492,3 +492,65 @@ func GetConditionsInClusterStatus(
 
 	return nil, fmt.Errorf("no condition matching requested type found: %v", conditionType)
 }
+
+// CreateVolumeSnapshotBackup use kubectl plugin to create volumesnapshot backup
+func CreateVolumeSnapshotBackup(
+	volumeSnapshotClass,
+	namespace,
+	clusterName,
+	snapshotSuffix,
+	backupName string,
+) error {
+	command := fmt.Sprintf("kubectl cnpg snapshot %v -n %v", clusterName, namespace)
+	if volumeSnapshotClass != "" {
+		command = fmt.Sprintf("%v -c %v", command, volumeSnapshotClass)
+	}
+	if snapshotSuffix != "" {
+		command = fmt.Sprintf("%v -x %v", command, snapshotSuffix)
+	}
+	if backupName != "" {
+		command = fmt.Sprintf("%v -l %v", command, backupName)
+	}
+
+	_, _, err := Run(command)
+	return err
+}
+
+// CreateOnDemandBackup creates a Backup resource for a given cluster name
+func CreateOnDemandBackup(
+	namespace,
+	clusterName,
+	backupName string,
+	target apiv1.BackupTarget,
+	method apiv1.BackupMethod,
+	env *TestingEnvironment,
+) (*apiv1.Backup, error) {
+	targetBackup := &apiv1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: namespace,
+		},
+		Spec: apiv1.BackupSpec{
+			Cluster: apiv1.LocalObjectReference{
+				Name: clusterName,
+			},
+		},
+	}
+
+	if target != "" {
+		targetBackup.Spec.Target = target
+	}
+	if method != "" {
+		targetBackup.Spec.Method = method
+	}
+
+	obj, err := CreateObject(env, targetBackup)
+	if err != nil {
+		return nil, err
+	}
+	backup, ok := obj.(*apiv1.Backup)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of Backup type: %T %v", obj, obj)
+	}
+	return backup, nil
+}

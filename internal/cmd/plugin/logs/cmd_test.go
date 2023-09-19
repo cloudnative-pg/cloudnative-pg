@@ -14,5 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package compatibility provides a layer to cross-compile with OS other than Linux
-package compatibility
+package logs
+
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+var _ = Describe("Get the proper command", func() {
+	It("get the proper command", func() {
+		logsCmd := NewCmd()
+		Expect(logsCmd.Use).To(BeEquivalentTo("logs cluster"))
+		Expect(logsCmd.Short).To(BeEquivalentTo("Collect cluster logs"))
+	})
+})

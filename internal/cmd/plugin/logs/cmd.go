@@ -1,6 +1,3 @@
-//go:build linux || darwin
-// +build linux darwin
-
 /*
 Copyright The CloudNativePG Contributors
 
@@ -17,16 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package compatibility
+package logs
 
 import (
-	"os/exec"
-	"syscall"
+	"github.com/spf13/cobra"
 )
 
-// AddInstanceRunCommands adds specific OS commands to the postgres exec.Cmd
-func AddInstanceRunCommands(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
+// NewCmd creates the new "report" command
+func NewCmd() *cobra.Command {
+	logsCmd := &cobra.Command{
+		Use:   "logs cluster",
+		Short: "Collect cluster logs",
 	}
+
+	logsCmd.AddCommand(clusterCmd())
+
+	return logsCmd
 }

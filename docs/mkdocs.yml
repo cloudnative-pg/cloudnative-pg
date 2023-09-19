@@ -4,9 +4,13 @@ docs_dir: src
 
 theme: readthedocs
 
+extra_css:
+  - css/override.css
+
 markdown_extensions:
   - admonition
   - def_list
+  - attr_list
 
 nav:
   - index.md
@@ -24,7 +28,11 @@ nav:
   - failure_modes.md
   - rolling_update.md
   - replication.md
-  - backup_recovery.md
+  - backup.md
+  - backup_barmanobjectstore.md
+  - wal_archiving.md
+  - backup_volumesnapshot.md
+  - recovery.md
   - postgresql_conf.md
   - declarative_role_management.md
   - operator_conf.md
@@ -55,6 +63,8 @@ nav:
   - benchmarking.md
   - commercial_support.md
   - faq.md
-  - api_reference.md
+  - cloudnative-pg.v1.md
   - supported_releases.md
   - release_notes.md
+  - Appendixes:
+    - appendixes/object_stores.md

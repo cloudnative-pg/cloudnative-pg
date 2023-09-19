@@ -20,26 +20,15 @@ import (
 	"reflect"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// When you add a new label or annotation, please make sure that you also update the
+// publicly visible documentation, namely the `docs/src/labels_annotations.md` file
 const (
 	// ClusterLabelName is the name of cluster which the backup CR belongs to
 	ClusterLabelName = "cnpg.io/cluster"
-
-	// OldClusterLabelName label is applied to objects to link them to the owning
-	// cluster.
-	//
-	// Deprecated: please use ClusterLabelName instead
-	//
-	// TODO: delete as soon as possible. releases 1.16, 1.17 still
-	// have embedded logic relying on "postgresql" as the cluster label
-	// in controllers/cluster_controller.go mapNodeToClusters() at minimum.
-	// Release 1.18 does not have that logic
-	//
-	// IMPORTANT: Removing this is a breaking change and should be announced in Release Notes
-	// utils.ClusterLabelName should be used instead where possible.
-	OldClusterLabelName = "postgresql" // Deprecated: use ClusterLabelName going forward
 
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
 	JobRoleLabelName = "cnpg.io/jobRole"
@@ -52,6 +41,9 @@ const (
 
 	// InstanceNameLabelName is the name of the label containing the instance name
 	InstanceNameLabelName = "cnpg.io/instanceName"
+
+	// BackupNameLabelName is the name of the label containing the backup id
+	BackupNameLabelName = "cnpg.io/backupName"
 
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
@@ -66,13 +58,28 @@ const (
 	ReconciliationLoopAnnotationName = "cnpg.io/reconciliationLoop"
 
 	// HibernateClusterManifestAnnotationName contains the hibernated cluster manifest
+	// Deprecated. Replaced by: ClusterManifestAnnotationName. This annotation is
+	// kept for backward compatibility
 	HibernateClusterManifestAnnotationName = "cnpg.io/hibernateClusterManifest"
 
 	// HibernatePgControlDataAnnotationName contains the pg_controldata output of the hibernated cluster
+	// Deprecated. Replaced by: PgControldataAnnotationName. This annotation is
+	// kept for backward compatibility
 	HibernatePgControlDataAnnotationName = "cnpg.io/hibernatePgControlData"
 
 	// PodEnvHashAnnotationName is the name of the annotation containing the podEnvHash value
+	// Deprecated: the PodSpec annotation covers the environment drift. This annotation is
+	// kept for backward compatibility
 	PodEnvHashAnnotationName = "cnpg.io/podEnvHash"
+
+	// PodSpecAnnotationName is the name of the annotation with the PodSpec derived from the cluster
+	PodSpecAnnotationName = "cnpg.io/podSpec"
+
+	// ClusterManifestAnnotationName contains the cluster manifest
+	ClusterManifestAnnotationName = "cnpg.io/clusterManifest"
+
+	// PgControldataAnnotationName contains the pg_controldata output of the cluster
+	PgControldataAnnotationName = "cnpg.io/pgControldata"
 
 	// skipEmptyWalArchiveCheck turns off the checks that ensure that the WAL archive is empty before writing data
 	skipEmptyWalArchiveCheck = "cnpg.io/skipEmptyWalArchiveCheck"
@@ -182,35 +189,57 @@ func InheritLabels(
 	}
 }
 
-func getAnnotationAppArmor(annotations map[string]string) map[string]string {
+func getAnnotationAppArmor(spec *corev1.PodSpec, annotations map[string]string) map[string]string {
+	containsContainerWithName := func(name string, containers ...corev1.Container) bool {
+		for _, container := range containers {
+			if container.Name == name {
+				return true
+			}
+		}
+
+		return false
+	}
+
 	appArmorAnnotations := make(map[string]string)
 	for annotation, value := range annotations {
 		if strings.HasPrefix(annotation, AppArmorAnnotationPrefix) {
-			appArmorAnnotations[annotation] = value
+			appArmorSplit := strings.SplitN(annotation, "/", 2)
+			if len(appArmorSplit) < 2 {
+				continue
+			}
+
+			containerName := appArmorSplit[1]
+			if containsContainerWithName(containerName, append(spec.Containers, spec.InitContainers...)...) {
+				appArmorAnnotations[annotation] = value
+			}
 		}
 	}
 	return appArmorAnnotations
 }
 
 // IsAnnotationAppArmorPresent checks if one of the annotations is an AppArmor annotation
-func IsAnnotationAppArmorPresent(annotations map[string]string) bool {
-	annotation := getAnnotationAppArmor(annotations)
+func IsAnnotationAppArmorPresent(spec *corev1.PodSpec, annotations map[string]string) bool {
+	annotation := getAnnotationAppArmor(spec, annotations)
 	return len(annotation) != 0
 }
 
 // IsAnnotationAppArmorPresentInObject checks if the AppArmor annotations are present or not in the given Object
-func IsAnnotationAppArmorPresentInObject(object *metav1.ObjectMeta, annotations map[string]string) bool {
-	objAnnotations := getAnnotationAppArmor(object.Annotations)
-	appArmorAnnotations := getAnnotationAppArmor(annotations)
+func IsAnnotationAppArmorPresentInObject(
+	object *metav1.ObjectMeta,
+	spec *corev1.PodSpec,
+	annotations map[string]string,
+) bool {
+	objAnnotations := getAnnotationAppArmor(spec, object.Annotations)
+	appArmorAnnotations := getAnnotationAppArmor(spec, annotations)
 	return reflect.DeepEqual(objAnnotations, appArmorAnnotations)
 }
 
 // AnnotateAppArmor adds an annotation to the pod
-func AnnotateAppArmor(object *metav1.ObjectMeta, annotations map[string]string) {
+func AnnotateAppArmor(object *metav1.ObjectMeta, spec *corev1.PodSpec, annotations map[string]string) {
 	if object.Annotations == nil {
 		object.Annotations = make(map[string]string)
 	}
-	appArmorAnnotations := getAnnotationAppArmor(annotations)
+	appArmorAnnotations := getAnnotationAppArmor(spec, annotations)
 	for annotation, value := range appArmorAnnotations {
 		object.Annotations[annotation] = value
 	}

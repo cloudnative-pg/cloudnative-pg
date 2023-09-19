@@ -200,7 +200,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.4
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -245,7 +245,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.4
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -362,7 +362,7 @@ the credentials, the cluster name, and a user for this certificate
 kubectl cnpg certificate cluster-cert --cnpg-cluster cluster-example --cnpg-user appuser
 ```
 
-After the secrete it's created, you can get it using `kubectl`
+After the secret it's created, you can get it using `kubectl`
 
 ```shell
 kubectl get secret cluster-cert
@@ -690,6 +690,90 @@ Archive:  report_cluster_example_<TIMESTAMP>.zip
   inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-1-initdb-qnnvw.jsonl
   inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-2-join-tvj8r.jsonl
 ```
+
+### Logs
+
+The `kubectl cnpg logs` command allows to follow the logs of a collection
+of pods related to CloudNativePG in a single go.
+
+It has at the moment one available sub-command: `cluster`.
+
+#### Cluster logs
+
+The `cluster` sub-command gathers all the pod logs for a cluster in a single
+stream or file.
+This means that you can get all the pod logs in a single terminal window, with a
+single invocation of the command.
+
+As in all the cnpg plugin sub-commands, you can get instructions and help with
+the `-h` flag:
+
+`kubectl cnpg logs cluster -h`
+
+The `logs` command will display logs in  JSON-lines format, unless the
+`--timestamps` flag is used, in which case, a human readable timestamp will be
+prepended to each line. In this case, lines will no longer be valid JSON,
+and tools such as `jq` may not work as desired.
+
+If the `logs cluster` sub-command is given the `-f` flag (aka `--follow`), it
+will follow the cluster pod logs, and will also watch for any new pods created
+in the cluster after the command has been invoked.
+Any new pods found, including pods that have been restarted or re-created,
+will also have their pods followed.
+The logs will be displayed in the terminal's standard-out.
+This command will only exit when the cluster has no more pods left, or when it
+is interrupted by the user.
+
+If `logs` is called without the `-f` option, it will read the logs from all
+cluster pods until the time of invocation and display them in the terminal's
+standard-out, then exit.
+The `-o` or `--output` flag can be provided, to specify the name
+of the file where the logs should be saved, instead of displaying over
+standard-out.
+The `--tail` flag can be used to specify how many log lines will be retrieved
+from each pod in the cluster. By default, the `logs cluster` sub-command will
+display all the logs from each pod in the cluster. If combined with the "follow"
+flag `-f`, the number of logs specified by `--tail` will be retrieved until the
+current time, and and from then the new logs will be followed.
+
+NOTE: unlike other `cnpg` plugin commands, the `-f` is used to denote "follow"
+rather than specify a file. This keeps with the convention of `kubectl logs`,
+which takes `-f` to mean the logs should be followed.
+
+Usage:
+
+```shell
+kubectl cnpg logs cluster <clusterName> [flags]
+```
+
+Using the `-f` option to follow:
+
+```shell
+kubectl cnpg report cluster cluster-example -f
+```
+
+Using `--tail` option to display 3 lines from each pod and the `-f` option
+to follow:
+
+```shell
+kubectl cnpg report cluster cluster-example -f --tail 3
+```
+
+``` json
+{"level":"info","ts":"2023-06-30T13:37:33Z","logger":"postgres","msg":"2023-06-30 13:37:33.142 UTC [26] LOG:  ending log output to stderr","source":"/controller/log/postgres","logging_pod":"cluster-example-3"}
+{"level":"info","ts":"2023-06-30T13:37:33Z","logger":"postgres","msg":"2023-06-30 13:37:33.142 UTC [26] HINT:  Future log output will go to log destination \"csvlog\".","source":"/controller/log/postgres","logging_pod":"cluster-example-3"}
+…
+…
+```
+
+With the `-o` option omitted, and with `--output` specified:
+
+``` sh
+kubectl-cnpg logs cluster cluster-example --output my-cluster.log
+
+Successfully written logs to "my-cluster.log"
+```
+
 ### Destroy
 
 The `kubectl cnpg destroy` command helps remove an instance and all the
@@ -813,7 +897,7 @@ backup/cluster-example-20230121002300 created
 ```
 By default, new created backup will use the backup target policy defined
 in cluster to choose which instance to run on. You can also use `--backup-target` 
-option to override this policy. please refer to [Backup and Recovery](backup_recovery.md)
+option to override this policy. please refer to the ["Backup" section](backup.md)
 for more information about backup target.
 
 ### Launching psql
@@ -829,7 +913,7 @@ it from the actual pod. This means that you will be using the `postgres` user.
 ```shell
 kubectl cnpg psql cluster-example
 
-psql (15.3 (Debian 15.3-1.pgdg110+1))
+psql (15.4 (Debian 15.4-1.pgdg110+1))
 Type "help" for help.
 
 postgres=#
@@ -840,7 +924,7 @@ select to work against a replica by using the `--replica` option:
 
 ```shell
 kubectl cnpg psql --replica cluster-example
-psql (15.3 (Debian 15.3-1.pgdg110+1))
+psql (15.4 (Debian 15.4-1.pgdg110+1))
 
 Type "help" for help.
 

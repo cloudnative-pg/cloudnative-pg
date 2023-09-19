@@ -427,8 +427,8 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	if err != nil {
 		return fmt.Errorf("while generating service account: %w", err)
 	}
-
-	cluster.SetInheritedDataAndOwnership(&sa.ObjectMeta)
+	// we add the ownerMetadata only when creating the SA
+	cluster.SetInheritedData(&sa.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
 
 	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
@@ -836,6 +836,9 @@ func createOrPatchPodMonitor(
 	default:
 		origPodMonitor := podMonitor.DeepCopy()
 		podMonitor.Spec = expectedPodMonitor.Spec
+		// We don't override the current labels/annotations given that there could be data that isn't managed by us
+		utils.MergeMap(podMonitor.Labels, expectedPodMonitor.Labels)
+		utils.MergeMap(podMonitor.Annotations, expectedPodMonitor.Annotations)
 
 		// If there's no changes we are done
 		if reflect.DeepEqual(origPodMonitor, podMonitor) {
@@ -949,9 +952,9 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		}
 
 		if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots != nil {
-			// We are recovering from an existing PVC snapshot, we
-			// don't need to invoke the recovery job
-			return ctrl.Result{}, nil
+			r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
+			job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, backup)
+			break
 		}
 
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
@@ -1203,6 +1206,8 @@ func findInstancePodToCreate(
 ) (*corev1.Pod, error) {
 	instanceThatHavePods := instancesStatus.GetNames()
 
+	var missingInstancePVC *corev1.PersistentVolumeClaim
+
 	iterablePVCs := cluster.Status.DanglingPVC
 	// appending unusablePVC ensures that some corner cases are covered. (EX: an instance is deleted manually while
 	// new type of PVCs were enabled)
@@ -1225,6 +1230,22 @@ func findInstancePodToCreate(
 			continue
 		}
 
+		// We give the priority to reattaching the primary instance
+		if isPrimary := specs.IsPrimary(pvcs[idx].ObjectMeta); isPrimary {
+			missingInstancePVC = &pvcs[idx]
+			break
+		}
+
+		if missingInstancePVC == nil {
+			missingInstancePVC = &pvcs[idx]
+		}
+	}
+
+	if missingInstancePVC != nil {
+		serial, err := specs.GetNodeSerial(missingInstancePVC.ObjectMeta)
+		if err != nil {
+			return nil, err
+		}
 		return specs.PodWithExistingStorage(*cluster, serial), nil
 	}
 

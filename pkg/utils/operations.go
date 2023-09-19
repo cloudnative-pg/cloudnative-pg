@@ -16,10 +16,6 @@ limitations under the License.
 
 package utils
 
-import (
-	corev1 "k8s.io/api/core/v1"
-)
-
 // CollectDifferencesFromMaps returns a map of the differences (as slice of strings) of the values of two given maps.
 // Map result values are added when a key is present just in one of the input maps, or if the values are different
 // given the same key
@@ -46,8 +42,8 @@ func CollectDifferencesFromMaps(p1 map[string]string, p2 map[string]string) map[
 	return nil
 }
 
-// isMapSubset returns true if mapSubset is a subset of mapSet otherwise false
-func isMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
+// IsMapSubset returns true if mapSubset is a subset of mapSet otherwise false
+func IsMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
 	if len(mapSet) < len(mapSubset) {
 		return false
 	}
@@ -60,27 +56,6 @@ func isMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
 		mapValue := mapSet[subMapKey]
 
 		if mapValue != subMapValue {
-			return false
-		}
-	}
-
-	return true
-}
-
-// isResourceListSubset returns true if subResourceList is a subset of resourceList otherwise false
-func isResourceListSubset(resourceList, subResourceList corev1.ResourceList) bool {
-	if len(resourceList) < len(subResourceList) {
-		return false
-	}
-
-	if len(subResourceList) == 0 {
-		return true
-	}
-
-	for key, subValue := range subResourceList {
-		value := resourceList[key]
-
-		if !subValue.Equal(value) {
 			return false
 		}
 	}
@@ -111,7 +86,7 @@ func IsLabelSubset(
 		}
 	}
 
-	return isMapSubset(mapSet, mapToEvaluate)
+	return IsMapSubset(mapSet, mapToEvaluate)
 }
 
 // IsAnnotationSubset checks if a collection of annotations is a subset of another
@@ -135,11 +110,5 @@ func IsAnnotationSubset(
 		}
 	}
 
-	return isMapSubset(mapSet, mapToEvaluate)
-}
-
-// IsResourceSubset checks if some resource requirements are a subset of another
-func IsResourceSubset(resources, resourcesSubset corev1.ResourceRequirements) bool {
-	return isResourceListSubset(resources.Requests, resourcesSubset.Requests) &&
-		isResourceListSubset(resources.Limits, resourcesSubset.Limits)
+	return IsMapSubset(mapSet, mapToEvaluate)
 }

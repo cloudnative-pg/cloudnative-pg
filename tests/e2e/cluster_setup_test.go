@@ -17,7 +17,9 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -46,7 +48,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		}
 	})
 
-	It("sets up a cluster", func() {
+	It("sets up a cluster", func(ctx SpecContext) {
 		const namespacePrefix = "cluster-storageclass-e2e"
 		var err error
 
@@ -59,7 +61,30 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			}
 			return env.DeleteNamespace(namespace)
 		})
+
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		var buf bytes.Buffer
+		GinkgoWriter.Println("Putting Tail on the cluster logs")
+		go func() {
+			err = env.TailClusterLogs(cluster, &buf, false)
+			if err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
+			}
+		}()
+		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().Failed() {
+				specName := CurrentSpecReport().FullText()
+				capLines := 10
+				GinkgoWriter.Printf("DUMPING tailed Cluster Logs with error/warning (at most %v lines). Failed Spec: %v\n",
+					capLines, specName)
+				GinkgoWriter.Println("================================================================================")
+				saveLogs(&buf, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
+				GinkgoWriter.Println("================================================================================")
+			}
+		})
 
 		By("having three PostgreSQL pods with status ready", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)

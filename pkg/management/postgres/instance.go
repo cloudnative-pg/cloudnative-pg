@@ -35,9 +35,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/compatibility"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -243,6 +243,20 @@ func (instance *Instance) RoleSynchronizerChan() <-chan *apiv1.ManagedConfigurat
 	return instance.roleSynchronizerChan
 }
 
+// VerifyPgDataCoherence checks the PGDATA is correctly configured in terms
+// of file rights and users
+func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Debug("Checking PGDATA coherence")
+
+	if err := fileutils.EnsurePgDataPerms(instance.PgData); err != nil {
+		return err
+	}
+
+	return WritePostgresUserMaps(instance.PgData)
+}
+
 // InstanceCommand are commands for the goroutine managing postgres
 type InstanceCommand string
 
@@ -335,6 +349,12 @@ func (instance *Instance) Startup() error {
 	}
 
 	log.Info("Starting up instance", "pgdata", instance.PgData, "options", options)
+
+	// We need to make sure that the permissions are the right ones
+	// in some systems they may be messed up even if we fix them before
+	if err := fileutils.EnsurePgDataPerms(instance.PgData); err != nil {
+		return err
+	}
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
 	pgCtlCmd.Env = instance.Env
@@ -462,6 +482,12 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 
 	options := []string{
 		"-D", instance.PgData,
+	}
+
+	// We need to make sure that the permissions are the right ones
+	// in some systems they may be messed up even if we fix them before
+	if err := fileutils.EnsurePgDataPerms(instance.PgData); err != nil {
+		return nil, err
 	}
 
 	postgresCmd := exec.Command(postgresName, options...) // #nosec
@@ -884,17 +910,34 @@ func PgIsReady() error {
 	return fmt.Errorf("failure executing %s: %w", pgIsReady, err)
 }
 
+func (instance *Instance) buildPgControldataCommand() *exec.Cmd {
+	pgControlDataCmd := exec.Command(pgControlDataName)
+	pgControlDataCmd.Env = os.Environ()
+	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
+
+	return pgControlDataCmd
+}
+
 // LogPgControldata logs the content of PostgreSQL control data, for debugging and tracing
 func (instance *Instance) LogPgControldata(reason string) {
 	log.Info("Extracting pg_controldata information", "reason", reason)
 
-	pgControlDataCmd := exec.Command(pgControlDataName)
-	pgControlDataCmd.Env = os.Environ()
-	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
+	pgControlDataCmd := instance.buildPgControldataCommand()
 	err := execlog.RunBuffering(pgControlDataCmd, pgControlDataName)
 	if err != nil {
 		log.Error(err, "Error printing the control information of this PostgreSQL instance")
 	}
+}
+
+// GetPgControldata returns the output of pg_controldata and any errors encountered
+func (instance *Instance) GetPgControldata() (string, error) {
+	pgControlDataCmd := instance.buildPgControldataCommand()
+	out, err := pgControlDataCmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("while executing pg_controldata: %w", err)
+	}
+
+	return string(out), nil
 }
 
 // GetInstanceCommandChan is the channel where the lifecycle manager will

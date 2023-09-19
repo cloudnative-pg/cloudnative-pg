@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -2579,7 +2579,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: pointer.Bool(true),
+						Enabled: ptr.To(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -2597,7 +2597,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: pointer.Bool(true),
+						Enabled: ptr.To(true),
 					},
 					UpdateInterval: 0,
 				},
@@ -2620,7 +2620,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster := oldCluster.DeepCopy()
 		newCluster.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{
 			HighAvailability: &ReplicationSlotsHAConfiguration{
-				Enabled:    pointer.Bool(true),
+				Enabled:    ptr.To(true),
 				SlotPrefix: "_test_",
 			},
 		}
@@ -2654,7 +2654,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    pointer.Bool(true),
+						Enabled:    ptr.To(true),
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2673,7 +2673,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    pointer.Bool(true),
+						Enabled:    ptr.To(true),
 						SlotPrefix: "_test_",
 					},
 				},
@@ -2682,7 +2682,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		oldCluster.Default()
 
 		newCluster := oldCluster.DeepCopy()
-		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = pointer.Bool(false)
+		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(false)
 		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
 	})
 })
@@ -2901,7 +2901,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: pointer.Bool(true),
+						Enabled: ptr.To(true),
 					},
 				},
 				PostgresConfiguration: PostgresConfiguration{
@@ -2947,7 +2947,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: ClusterSpec{
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: pointer.Bool(true),
+						Enabled: ptr.To(true),
 					},
 				},
 				PostgresConfiguration: PostgresConfiguration{
@@ -2988,19 +2988,21 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(1))
 	})
 
-	It("should produce an error when requested a recovery target time", func() {
+	It("should produce an error when defining a backupID while recovering using a DataSource", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
 					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							BackupID: "20220616T031500",
+						},
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgdata",
 							},
 						},
-						RecoveryTarget: &RecoveryTarget{},
 					},
 				},
 			},
@@ -3015,12 +3017,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &BootstrapRecovery{
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgwal",
 							},
@@ -3039,12 +3041,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &BootstrapRecovery{
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: pointer.String(""),
+								APIGroup: ptr.To(""),
 								Kind:     "PersistentVolumeClaim",
 								Name:     "pgwal",
 							},
@@ -3061,16 +3063,31 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&BootstrapRecovery{
 			VolumeSnapshots: &DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: pointer.String(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(storagesnapshotv1.GroupName),
 					Kind:     "VolumeSnapshot",
 					Name:     "pgdata",
 				},
 				WalStorage: &corev1.TypedLocalObjectReference{
-					APIGroup: pointer.String(storagesnapshotv1.GroupName),
+					APIGroup: ptr.To(storagesnapshotv1.GroupName),
 					Kind:     "VolumeSnapshot",
 					Name:     "pgwal",
 				},
 			},
+		})
+		Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
+	})
+
+	It("accepts recovery from a VolumeSnapshot, while restoring WALs from an object store", func() {
+		cluster := clusterFromRecovery(&BootstrapRecovery{
+			VolumeSnapshots: &DataSource{
+				Storage: corev1.TypedLocalObjectReference{
+					APIGroup: ptr.To(storagesnapshotv1.GroupName),
+					Kind:     "VolumeSnapshot",
+					Name:     "pgdata",
+				},
+			},
+
+			Source: "pg-cluster",
 		})
 		Expect(cluster.validateBootstrapRecoveryDataSource()).To(BeEmpty())
 	})
@@ -3100,12 +3117,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			cluster := clusterFromRecovery(&BootstrapRecovery{
 				VolumeSnapshots: &DataSource{
 					Storage: corev1.TypedLocalObjectReference{
-						APIGroup: pointer.String(""),
+						APIGroup: ptr.To(""),
 						Kind:     "PersistentVolumeClaim",
 						Name:     "pgdata",
 					},
 					WalStorage: &corev1.TypedLocalObjectReference{
-						APIGroup: pointer.String(""),
+						APIGroup: ptr.To(""),
 						Kind:     "PersistentVolumeClaim",
 						Name:     "pgwal",
 					},
@@ -3119,17 +3136,96 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 		cluster := clusterFromRecovery(&BootstrapRecovery{
 			VolumeSnapshots: &DataSource{
 				Storage: corev1.TypedLocalObjectReference{
-					APIGroup: pointer.String(""),
+					APIGroup: ptr.To(""),
 					Kind:     "Secret",
 					Name:     "pgdata",
 				},
 				WalStorage: &corev1.TypedLocalObjectReference{
-					APIGroup: pointer.String(""),
+					APIGroup: ptr.To(""),
 					Kind:     "ConfigMap",
 					Name:     "pgwal",
 				},
 			},
 		})
 		Expect(cluster.validateBootstrapRecoveryDataSource()).To(HaveLen(2))
+	})
+})
+
+var _ = Describe("validateResources", func() {
+	var cluster *Cluster
+
+	BeforeEach(func() {
+		cluster = &Cluster{
+			Spec: ClusterSpec{
+				Resources: corev1.ResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{},
+					Limits:   map[corev1.ResourceName]resource.Quantity{},
+				},
+			},
+		}
+	})
+
+	It("returns an error when the CPU request is greater than CPU limit", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("2")
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("1")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("CPU request is greater than the limit"))
+	})
+
+	It("returns an error when the Memory request is greater than Memory limit", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Memory request is greater than the limit"))
+	})
+
+	It("returns two errors when both CPU and Memory requests are greater than their limits", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("2")
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("1")
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(2))
+		Expect(errors[0].Detail).To(Equal("CPU request is greater than the limit"))
+		Expect(errors[1].Detail).To(Equal("Memory request is greater than the limit"))
+	})
+
+	It("returns no errors when both CPU and Memory requests are less than or equal to their limits", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("1")
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("2")
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("2Gi")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when CPU request is set but limit is nil", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("1")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when CPU limit is set but request is nil", func() {
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("1")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when Memory request is set but limit is nil", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1Gi")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when Memory limit is set but request is nil", func() {
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
 	})
 })

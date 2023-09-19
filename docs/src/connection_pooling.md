@@ -68,7 +68,7 @@ Additionally, CloudNativePG automatically creates a secret with the
 same name of the pooler containing the configuration files used with PgBouncer.
 
 !!! Seealso "API reference"
-    For details, please refer to [`PgBouncerSpec` section](api_reference.md#PgBouncerSpec)
+    For details, please refer to [`PgBouncerSpec` section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PgBouncerSpec)
     in the API reference.
 
 
@@ -177,7 +177,7 @@ GRANT EXECUTE ON FUNCTION user_search(text)
 
 You can take advantage of pod templates specification in the `template`
 section of a `Pooler` resource. For details, please refer to [`PoolerSpec`
-section](api_reference.md#PoolerSpec) in the API reference.
+section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PoolerSpec) in the API reference.
 
 Through templates you can configure pods as you like, including fine
 control over affinity and anti-affinity rules for pods and nodes.
@@ -346,12 +346,13 @@ metrics having the `cnpg_pgbouncer_` prefix, by running:
 
 Similarly to the CloudNativePG instance, the exporter runs on port
 `9127` of each pod running PgBouncer, and also provides metrics related to the
-Go runtime (with prefix `go_*`). You can debug the exporter on a pod running
-PgBouncer through the following command:
+Go runtime (with prefix `go_*`).
 
-```console
-kubectl exec -ti <PGBOUNCER_POD> -- curl 127.0.0.1:9127/metrics
-```
+!!! Info
+    You can inspect the exported metrics on a pod running PgBouncer, by following
+    the instructions provided in the
+    ["How to inspect the exported metrics" section from the "Monitoring" page](monitoring.md/#how-to-inspect-the-exported-metrics),
+    making sure that you use the correct IP and the `9127` port.
 
 An example of the output for `cnpg_pgbouncer` metrics:
 

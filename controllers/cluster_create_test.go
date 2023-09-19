@@ -175,21 +175,30 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 
 		By("executing createOrPatchServiceAccount (patch)", func() {
-			err := clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-		})
+			By("setting owner reference to nil", func() {
+				sa.ObjectMeta.OwnerReferences = nil
+				err := k8sClient.Update(context.Background(), sa)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
-		By("making sure that the serviceaccount is patched correctly", func() {
-			updatedSA := &corev1.ServiceAccount{}
-			expectResourceExistsWithDefaultClient(cluster.Name, namespace, updatedSA)
-			Expect(updatedSA.Annotations["test"]).To(BeEquivalentTo("annotation"))
-			Expect(updatedSA.Labels["test"]).To(BeEquivalentTo("label"))
-			Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
-				Name: "cluster-pullsecret",
-			}))
-			Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
-				Name: "sa-pullsecret",
-			}))
+			By("running patch", func() {
+				err := clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("making sure that the serviceaccount is patched correctly", func() {
+				updatedSA := &corev1.ServiceAccount{}
+				expectResourceExistsWithDefaultClient(cluster.Name, namespace, updatedSA)
+				Expect(updatedSA.Annotations["test"]).To(BeEquivalentTo("annotation"))
+				Expect(updatedSA.Labels["test"]).To(BeEquivalentTo("label"))
+				Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
+					Name: "cluster-pullsecret",
+				}))
+				Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
+					Name: "sa-pullsecret",
+				}))
+				Expect(updatedSA.OwnerReferences).To(BeNil())
+			})
 		})
 	})
 
@@ -399,5 +408,38 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		)
 		Expect(err).To(HaveOccurred())
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("should patch the PodMonitor with updated labels and annotations", func() {
+		initialLabels := map[string]string{"label1": "value1"}
+		initialAnnotations := map[string]string{"annotation1": "value1"}
+
+		manager.podMonitor.Labels = initialLabels
+		manager.podMonitor.Annotations = initialAnnotations
+		err := fakeCli.Create(ctx, manager.podMonitor)
+		Expect(err).ToNot(HaveOccurred())
+
+		updatedLabels := map[string]string{"label1": "changedValue1", "label2": "value2"}
+		updatedAnnotations := map[string]string{"annotation1": "changedValue1", "annotation2": "value2"}
+
+		manager.podMonitor.Labels = updatedLabels
+		manager.podMonitor.Annotations = updatedAnnotations
+
+		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
+		Expect(err).ToNot(HaveOccurred())
+
+		podMonitor := &v1.PodMonitor{}
+		err = fakeCli.Get(
+			ctx,
+			types.NamespacedName{
+				Name:      manager.podMonitor.Name,
+				Namespace: manager.podMonitor.Namespace,
+			},
+			podMonitor,
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(podMonitor.Labels).To(Equal(updatedLabels))
+		Expect(podMonitor.Annotations).To(Equal(updatedAnnotations))
 	})
 })

@@ -19,6 +19,7 @@ limitations under the License.
 package specs
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -145,6 +146,34 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 	hashValue, _ := hash.ComputeHash(config)
 	config.Hash = hashValue
 	return config
+}
+
+// CreateClusterPodSpec computes the PodSpec corresponding to a cluster
+func CreateClusterPodSpec(
+	podName string,
+	cluster apiv1.Cluster,
+	envConfig EnvConfig,
+	gracePeriod int64,
+) corev1.PodSpec {
+	return corev1.PodSpec{
+		Hostname: podName,
+		InitContainers: []corev1.Container{
+			createBootstrapContainer(cluster),
+		},
+		SchedulerName: cluster.Spec.SchedulerName,
+		Containers:    createPostgresContainers(cluster, envConfig),
+		Volumes:       createPostgresVolumes(cluster, podName),
+		SecurityContext: CreatePodSecurityContext(
+			cluster.GetSeccompProfile(),
+			cluster.GetPostgresUID(),
+			cluster.GetPostgresGID()),
+		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
+		Tolerations:                   cluster.Spec.Affinity.Tolerations,
+		ServiceAccountName:            cluster.Name,
+		NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
+		TerminationGracePeriodSeconds: &gracePeriod,
+		TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
+	}
 }
 
 // createPostgresContainers create the PostgreSQL containers that are
@@ -332,10 +361,11 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
+	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				utils.OldClusterLabelName:   cluster.Name, //nolint
 				utils.ClusterLabelName:      cluster.Name,
 				utils.InstanceNameLabelName: podName,
 				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
@@ -347,25 +377,11 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 			Name:      podName,
 			Namespace: cluster.Namespace,
 		},
-		Spec: corev1.PodSpec{
-			Hostname: podName,
-			InitContainers: []corev1.Container{
-				createBootstrapContainer(cluster),
-			},
-			SchedulerName: cluster.Spec.SchedulerName,
-			Containers:    createPostgresContainers(cluster, envConfig),
-			Volumes:       createPostgresVolumes(cluster, podName),
-			SecurityContext: CreatePodSecurityContext(
-				cluster.GetSeccompProfile(),
-				cluster.GetPostgresUID(),
-				cluster.GetPostgresGID()),
-			Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			Tolerations:                   cluster.Spec.Affinity.Tolerations,
-			ServiceAccountName:            cluster.Name,
-			NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
-			TerminationGracePeriodSeconds: &gracePeriod,
-			TopologySpreadConstraints:     cluster.Spec.TopologySpreadConstraints,
-		},
+		Spec: podSpec,
+	}
+
+	if podSpecMarshaled, err := json.Marshal(podSpec); err == nil {
+		pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecMarshaled)
 	}
 
 	if cluster.Spec.PriorityClassName != "" {
@@ -376,8 +392,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 		pod.Spec.Subdomain = cluster.GetServiceAnyName()
 	}
 
-	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
-		utils.AnnotateAppArmor(&pod.ObjectMeta, cluster.Annotations)
+	if utils.IsAnnotationAppArmorPresent(&pod.Spec, cluster.Annotations) {
+		utils.AnnotateAppArmor(&pod.ObjectMeta, &pod.Spec, cluster.Annotations)
 	}
 	return pod
 }

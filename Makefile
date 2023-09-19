@@ -37,12 +37,12 @@ LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v5.1.0
+KUSTOMIZE_VERSION ?= v5.1.1
 KIND_CLUSTER_NAME ?= pg
-KIND_CLUSTER_VERSION ?= v1.27.3
-CONTROLLER_TOOLS_VERSION ?= v0.12.0
-GORELEASER_VERSION ?= v1.19.1
-SPELLCHECK_VERSION ?= 0.33.0
+KIND_CLUSTER_VERSION ?= v1.28.0
+CONTROLLER_TOOLS_VERSION ?= v0.13.0
+GORELEASER_VERSION ?= v1.20.0
+SPELLCHECK_VERSION ?= 0.33.1
 WOKE_VERSION ?= 0.19.0
 ARCH ?= amd64
 
@@ -200,17 +200,11 @@ licenses: go-licenses ## Generate the licenses folder.
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
 
-apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
-	set -e ;\
-	CONFIG_TMP_DIR=$$(mktemp -d) ;\
-	echo $$CONFIG_TMP_DIR ;\
-	$(K8S_API_DOCGEN) -t md \
-	  -c docs/k8s-api-docgen.yaml \
-	  -m docs/src/api_reference.md.in \
-	  -o $${CONFIG_TMP_DIR}/api_reference.md \
-	  api/v1/*_types.go ;\
-	cp $${CONFIG_TMP_DIR}/api_reference.md docs/src/api_reference.md
-
+apidoc: genref ## Update the API Reference section of the documentation.
+	cd ./docs && \
+	$(GENREF) -c config.yaml \
+      -include cloudnative-pg \
+      -o src
 
 ##@ Cleanup
 
@@ -245,9 +239,9 @@ envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
-K8S_API_DOCGEN = $(LOCALBIN)/k8s-api-docgen
-k8s-api-docgen: ## Download k8s-api-docgen locally if necessary.
-	$(call go-install-tool,$(K8S_API_DOCGEN),github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen@latest)
+GENREF = $(LOCALBIN)/genref
+genref: ## Download kubernetes-sigs/reference-docs/genref locally if necessary.
+	$(call go-install-tool,$(GENREF),github.com/kubernetes-sigs/reference-docs/genref@master) # wokeignore:rule=master
 
 GO_LICENSES = $(LOCALBIN)/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.

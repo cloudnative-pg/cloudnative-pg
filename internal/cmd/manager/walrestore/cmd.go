@@ -125,8 +125,7 @@ func run(ctx context.Context, podName string, args []string) error {
 		return fmt.Errorf("while getting recover configuration: %w", err)
 	}
 
-	options, err := barmanCloudWalRestoreOptions(
-		barmanConfiguration, recoverClusterName)
+	options, err := barman.CloudWalRestoreOptions(barmanConfiguration, recoverClusterName)
 	if err != nil {
 		return fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
 	}
@@ -339,35 +338,6 @@ func gatherWALFilesToRestore(walName string, parallel int) (walList []string, er
 	}
 
 	return walList, err
-}
-
-func barmanCloudWalRestoreOptions(
-	configuration *apiv1.BarmanObjectStoreConfiguration,
-	clusterName string,
-) ([]string, error) {
-	var options []string
-	if len(configuration.EndpointURL) > 0 {
-		options = append(
-			options,
-			"--endpoint-url",
-			configuration.EndpointURL)
-	}
-
-	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
-	if err != nil {
-		return nil, err
-	}
-
-	serverName := clusterName
-	if len(configuration.ServerName) != 0 {
-		serverName = configuration.ServerName
-	}
-
-	options = append(
-		options,
-		configuration.DestinationPath,
-		serverName)
-	return options, nil
 }
 
 // isStreamingAvailable checks if this pod can replicate via streaming connection

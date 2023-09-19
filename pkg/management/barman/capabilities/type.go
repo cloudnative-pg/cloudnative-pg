@@ -25,6 +25,7 @@ import (
 
 // Capabilities collects a set of boolean values that shows the possible capabilities of Barman and the version
 type Capabilities struct {
+	Version *semver.Version
 	// this is not exported because the consumers have to use ShouldExecuteBackupWithName
 	hasName                    bool
 	HasAzure                   bool
@@ -36,7 +37,6 @@ type Capabilities struct {
 	HasSnappy                  bool
 	HasErrorCodesForWALRestore bool
 	HasAzureManagedIdentity    bool
-	Version                    *semver.Version
 }
 
 // ShouldExecuteBackupWithName returns true if the new backup logic should be executed

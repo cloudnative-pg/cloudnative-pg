@@ -1,0 +1,27 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-declarative-backup-restore
+spec:
+  instances: 1
+  primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      volumeSnapshots:
+        storage:
+          name: ${SNAPSHOT_NAME_PGDATA}
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+        walStorage:
+         name: ${SNAPSHOT_NAME_PGWAL}
+         kind: VolumeSnapshot
+         apiGroup: snapshot.storage.k8s.io

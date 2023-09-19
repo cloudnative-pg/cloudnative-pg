@@ -1,0 +1,8 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: backup-with-volume-snapshot
+spec:
+  method: volumeSnapshot
+  cluster:
+    name: cluster-example-with-volume-snapshot

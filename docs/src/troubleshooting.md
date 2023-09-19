@@ -180,7 +180,7 @@ Cluster in healthy state
 Name:               cluster-example
 Namespace:          default
 System ID:          7044925089871458324
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.3-3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15.4-3
 Primary instance:   cluster-example-1
 Instances:          3
 Ready instances:    3
@@ -256,7 +256,7 @@ kubectl describe cluster <CLUSTER_NAME> -n <NAMESPACE> | grep "Image Name"
 Output:
 
 ```shell
-  Image Name:    ghcr.io/cloudnative-pg/postgresql:15.3-3
+  Image Name:    ghcr.io/cloudnative-pg/postgresql:15.4-3
 ```
 
 !!! Note
@@ -646,3 +646,39 @@ spec:
 In the [networking page](networking.md) you can find a network policy file
 that you can customize to create a `NetworkPolicy` explicitly allowing the
 operator to connect cross-namespace to cluster pods.
+
+### Error while bootstrapping the data directory
+
+If your Cluster's initialization job crashes with a "Bus error (core dumped)
+child process exited with exit code 135", you likely need to fix the Cluster
+hugepages settings.
+
+The reason is the incomplete support of hugepages in the cgroup v1 that should
+be fixed in v2. For more information, check the PostgreSQL [BUG #17757: Not
+honoring huge_pages setting during initdb causes DB crash in
+Kubernetes](https://www.postgresql.org/message-id/17757-dbdfc1f1c954a6db%40postgresql.org).
+
+To check whether hugepages are enabled, run `grep HugePages /proc/meminfo` on
+the Kubernetes node and check if hugepages are present, their size, and how many
+are free.
+
+If the hugepages are present, you need to configure how much hugepages memory
+every PostgreSQL pod should have available.
+
+For example:
+
+``` yaml
+  postgresql:
+    parameters:
+      shared_buffers: "128MB"
+
+  resources:
+    requests:
+      memory: "512Mi"
+    limits:
+      hugepages-2Mi: "512Mi"
+```
+
+Please remember that you must have enough hugepages memory available to schedule
+every Pod in the Cluster (in the example above, at least 512MiB per Pod must be
+free).

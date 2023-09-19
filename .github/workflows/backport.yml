@@ -9,21 +9,23 @@ on:
       - main
 
 env:
-  GOLANG_VERSION: "1.20.x"
+  GOLANG_VERSION: "1.21.x"
 
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
   # we backport everything, except those PR that are created or contain `do not backport` explicitly.
   label-source-pr:
     name: Add labels to PR
-    if: github.event.pull_request.merged == false &&
+    if: | 
+        github.event.pull_request.merged == false &&
         !contains(github.event.pull_request.labels.*.name, 'backport-requested') &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
     runs-on: ubuntu-22.04
     steps:
       -
-        name: label the pull request
+        name: Label the pull request
         uses: actions-ecosystem/action-add-labels@v1
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'do not backport') }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           number:  ${{ github.event.pull_request.number }}
@@ -44,6 +46,15 @@ jobs:
             - To stop backporting this pr to a certain release branch, remove the specific branch label: release-x.y
 
           reactions: heart
+      -
+        name: Remove redundant labels
+        uses: actions-ecosystem/action-remove-labels@v1
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'do not backport') }}
+        with:
+          labels: |
+            backport-requested :arrow_backward:
+            release-1.19
+            release-1.20
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
@@ -70,7 +81,7 @@ jobs:
       -
         name: Checkout code
         if: contains( github.event.pull_request.labels.*.name, matrix.branch )
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ matrix.branch }}

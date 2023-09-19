@@ -135,7 +135,24 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 	return initCommand
 }
 
-// CreatePrimaryJobViaRecovery creates a new primary instance in a Pod
+// CreatePrimaryJobViaRestoreSnapshot creates a new primary instance in a Pod, restoring from a volumeSnapshot
+func CreatePrimaryJobViaRestoreSnapshot(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
+	initCommand := []string{
+		"/controller/manager",
+		"instance",
+		"restoresnapshot",
+	}
+
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
+
+	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+
+	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
+
+	return job
+}
+
+// CreatePrimaryJobViaRecovery creates a new primary instance in a Pod, restoring from a Backup
 func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
@@ -217,11 +234,12 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 type jobRole string
 
 const (
-	jobRoleImport       jobRole = "import"
-	jobRoleInitDB       jobRole = "initdb"
-	jobRolePGBaseBackup jobRole = "pgbasebackup"
-	jobRoleFullRecovery jobRole = "full-recovery"
-	jobRoleJoin         jobRole = "join"
+	jobRoleImport           jobRole = "import"
+	jobRoleInitDB           jobRole = "initdb"
+	jobRolePGBaseBackup     jobRole = "pgbasebackup"
+	jobRoleFullRecovery     jobRole = "full-recovery"
+	jobRoleJoin             jobRole = "join"
+	jobRoleSnapshotRecovery jobRole = "snapshot-recovery"
 )
 
 var jobRoleList = []jobRole{jobRoleImport, jobRoleInitDB, jobRolePGBaseBackup, jobRoleFullRecovery, jobRoleJoin}
@@ -307,8 +325,8 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 
 	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
-	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
-		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
+	if utils.IsAnnotationAppArmorPresent(&job.Spec.Template.Spec, cluster.Annotations) {
+		utils.AnnotateAppArmor(&job.ObjectMeta, &job.Spec.Template.Spec, cluster.Annotations)
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {

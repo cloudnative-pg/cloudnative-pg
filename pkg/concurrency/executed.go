@@ -25,8 +25,8 @@ import (
 // but with a way to know whether it was already executed once
 // and waiting only if that's not the case.
 type Executed struct {
-	done bool
 	cond sync.Cond
+	done bool
 }
 
 // MultipleExecuted can be used to wrap multiple Executed conditions that

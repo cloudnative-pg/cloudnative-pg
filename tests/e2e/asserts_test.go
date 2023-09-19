@@ -162,7 +162,12 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 // correspond to the number of Instances in the cluster spec.
 // Important: this is not equivalent to "kubectl apply", and is not able
 // to apply a patch to an existing object.
-func AssertCreateCluster(namespace string, clusterName string, sampleFile string, env *testsUtils.TestingEnvironment) {
+func AssertCreateCluster(
+	namespace string,
+	clusterName string,
+	sampleFile string,
+	env *testsUtils.TestingEnvironment,
+) {
 	By(fmt.Sprintf("having a %v namespace", namespace), func() {
 		// Creating a namespace should be quick
 		namespacedName := types.NamespacedName{
@@ -780,22 +785,18 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 	return completed, nil
 }
 
+// AssertReplicaModeCluster checks that, after inserting some data in a source cluster,
+// a replica cluster can be bootstrapped using pg_basebackup and is properly replicating
+// from the source cluster
 func AssertReplicaModeCluster(
 	namespace,
 	srcClusterName,
-	srcClusterSample,
-	replicaClusterName,
 	replicaClusterSample,
 	checkQuery string,
 	pod *corev1.Pod,
 ) {
 	var primaryReplicaCluster *corev1.Pod
-	var err error
 	commandTimeout := time.Second * 10
-	By("creating source cluster", func() {
-		// Create replica source cluster
-		AssertCreateCluster(namespace, srcClusterName, srcClusterSample, env)
-	})
 
 	By("creating test data in source cluster", func() {
 		cmd := "CREATE TABLE IF NOT EXISTS test_replica AS VALUES (1),(2);"
@@ -816,6 +817,8 @@ func AssertReplicaModeCluster(
 	})
 
 	By("creating replica cluster", func() {
+		replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
+		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, replicaClusterName, replicaClusterSample, env)
 		// Get primary from replica cluster
 		Eventually(func() error {
@@ -860,6 +863,60 @@ func AssertReplicaModeCluster(
 			&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", checkDB)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(strings.Trim(stdOut, "\n")).To(BeEquivalentTo("f"))
+	})
+}
+
+// AssertDetachReplicaModeCluster verifies that a replica cluster can be detached from the
+// source cluster, and its target primary can be promoted. As such, new write operation
+// on the source cluster shouldn't be received anymore by the detached replica cluster.
+// Also, make sure the boostrap fields database and owner of the replica cluster are
+// properly ignored
+func AssertDetachReplicaModeCluster(
+	namespace,
+	srcClusterName,
+	replicaClusterName,
+	srcDatabaseName,
+	replicaDatabaseName,
+	srcTableName string,
+) {
+	var primaryReplicaCluster *corev1.Pod
+	replicaCommandTimeout := time.Second * 10
+
+	By("disabling the replica mode", func() {
+		Eventually(func(g Gomega) {
+			_, _, err := testsUtils.RunUnchecked(fmt.Sprintf(
+				"kubectl patch cluster %v -n %v  -p '{\"spec\":{\"replica\":{\"enabled\":false}}}'"+
+					" --type='merge'",
+				replicaClusterName, namespace))
+			g.Expect(err).ToNot(HaveOccurred())
+		}, 60, 5).Should(Succeed())
+	})
+
+	By("verifying write operation on the replica cluster primary pod", func() {
+		query := "CREATE TABLE IF NOT EXISTS replica_cluster_primary AS VALUES (1),(2);"
+		// Expect write operation to succeed
+		Eventually(func(g Gomega) {
+			var err error
+
+			// Get primary from replica cluster
+			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+				&replicaCommandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
+			g.Expect(err).ToNot(HaveOccurred())
+		}, 300, 15).Should(Succeed())
+	})
+
+	By("verifying the replica database doesn't exist in the replica cluster", func() {
+		AssertDatabaseExists(namespace, primaryReplicaCluster.Name, replicaDatabaseName, false)
+	})
+
+	By("writing some new data to the source cluster", func() {
+		insertRecordIntoTableWithDatabaseName(namespace, srcClusterName, srcDatabaseName, srcTableName, 4, psqlClientPod)
+	})
+
+	By("verifying that replica cluster was not modified", func() {
+		AssertDataExpectedCountWithDatabaseName(namespace, primaryReplicaCluster.Name, srcDatabaseName, srcTableName, 3)
 	})
 }
 
@@ -2478,18 +2535,39 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 		if preRollingUpdateImg == "" {
 			preRollingUpdateImg = os.Getenv("POSTGRES_IMG")
 		}
-		envVars := map[string]string{
-			"E2E_DEFAULT_STORAGE_CLASS":  os.Getenv("E2E_DEFAULT_STORAGE_CLASS"),
-			"AZURE_STORAGE_ACCOUNT":      os.Getenv("AZURE_STORAGE_ACCOUNT"),
-			"POSTGRES_IMG":               os.Getenv("POSTGRES_IMG"),
-			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
+		csiStorageClass := os.Getenv("E2E_CSI_STORAGE_CLASS")
+		if csiStorageClass == "" {
+			csiStorageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 		}
+		envVars := buildTemplateEnvs(map[string]string{
+			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
+			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
+		})
+
 		yaml, err = testsUtils.Envsubst(envVars, data)
 		if err != nil {
 			return nil, wrapErr(err)
 		}
 	}
 	return yaml, nil
+}
+
+func buildTemplateEnvs(additionalEnvs map[string]string) map[string]string {
+	envs := make(map[string]string)
+	rawEnvs := os.Environ()
+	for _, s := range rawEnvs {
+		keyValue := strings.Split(s, "=")
+		if len(keyValue) < 2 {
+			continue
+		}
+		envs[keyValue[0]] = keyValue[1]
+	}
+
+	for key, value := range additionalEnvs {
+		envs[key] = value
+	}
+
+	return envs
 }
 
 // DeleteResourcesFromFile deletes the Kubernetes objects described in the file

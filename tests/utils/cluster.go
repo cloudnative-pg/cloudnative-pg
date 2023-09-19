@@ -29,8 +29,6 @@ import (
 	"github.com/cheynewallace/tabby"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -152,9 +150,7 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLe
 	}()
 
 	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
-	conf := ctrl.GetConfigOrDie()
-	client := kubernetes.NewForConfigOrDie(conf)
-	return logs.GetPodLogs(env.Ctx, client, pod, getPrevious, f, requestedLineLength)
+	return logs.GetPodLogs(env.Ctx, env.Interface, pod, getPrevious, f, requestedLineLength)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
@@ -387,12 +383,27 @@ func PrintClusterResources(namespace, clusterName string, env *TestingEnvironmen
 	pvcList, _ := env.GetPVCList(cluster.GetNamespace())
 	clusterInfo.AddLine()
 	clusterInfo.AddLine("Cluster PVC information: (dumping all pvc under the namespace)")
-	clusterInfo.AddLine("Available PVCCount", cluster.Status.PVCCount)
+	clusterInfo.AddLine("Available Cluster PVCCount", cluster.Status.PVCCount)
 	clusterInfo.AddLine()
 	clusterInfo.AddHeader("Items", "Values")
 	for _, pvc := range pvcList.Items {
 		clusterInfo.AddLine("PVC name", pvc.Name)
 		clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
+		clusterInfo.AddLine("---", "---")
+	}
+
+	snapshotList, _ := env.GetSnapshotList(cluster.Namespace)
+	clusterInfo.AddLine()
+	clusterInfo.AddLine("Cluster Snapshot information: (dumping all snapshot under the namespace)")
+	clusterInfo.AddLine()
+	clusterInfo.AddHeader("Items", "Values")
+	for _, snapshot := range snapshotList.Items {
+		clusterInfo.AddLine("Snapshot name", snapshot.Name)
+		if snapshot.Status.ReadyToUse != nil {
+			clusterInfo.AddLine("Snapshot ready to use", *snapshot.Status.ReadyToUse)
+		} else {
+			clusterInfo.AddLine("Snapshot ready to use", "false")
+		}
 		clusterInfo.AddLine("---", "---")
 	}
 

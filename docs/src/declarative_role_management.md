@@ -39,7 +39,7 @@ spec:
 
 The role specification in `spec.managed.roles` adheres to the
 [PostgreSQL structure and naming conventions](https://www.postgresql.org/docs/current/sql-createrole.html).
-Please refer to the [API reference](api_reference.md#RoleConfiguration) for
+Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-RoleConfiguration) for
 the full list of attributes you can define for each role.
 
 A few points are worth noting:

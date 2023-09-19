@@ -8,7 +8,7 @@ on:
       - v*
 
 env:
-  GOLANG_VERSION: "1.20.x"
+  GOLANG_VERSION: "1.21.x"
 
 permissions:
   contents: write
@@ -21,7 +21,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       -
         name: Get tag
         run: |
@@ -58,7 +58,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
@@ -77,7 +77,7 @@ jobs:
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           tag="${GITHUB_REF#refs/tags/v}"
           skip_krew="false"
-          latest_release_branch=$(git branch -rl '*/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
+          latest_release_branch=$(git branch -rl 'origin/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
           current_release_branch=$(echo "${tag}" | sed -e 's/\([0-9]\+.[0-9]\+\).*/release-\1/')
           if [[ "$latest_release_branch" != "$current_release_branch" ]]; then
             skip_krew="true"
@@ -93,7 +93,7 @@ jobs:
       -
         name: Import GPG key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v5
+        uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -104,7 +104,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: latest
@@ -124,7 +124,7 @@ jobs:
       -
         name: Docker meta
         id: docker-meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGES }}
           tags: |
@@ -138,23 +138,23 @@ jobs:
           echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.1.0
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       -
         name: Login to ghcr.io
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .

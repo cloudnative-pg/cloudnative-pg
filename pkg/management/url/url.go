@@ -37,6 +37,9 @@ const (
 	// PathReady is the URL oath for Ready State
 	PathReady string = "/readyz"
 
+	// PathPGControlData is the URL path for PostgreSQL pg_controldata output
+	PathPGControlData string = "/pg/controldata"
+
 	// PathPgStatus is the URL path for PostgreSQL Status
 	PathPgStatus string = "/pg/status"
 

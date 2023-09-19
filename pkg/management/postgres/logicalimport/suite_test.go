@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 /*
 Copyright The CloudNativePG Contributors
 
@@ -17,13 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package compatibility
+package logicalimport
 
 import (
-	"os/exec"
+	"database/sql"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-// AddInstanceRunCommands adds specific OS commands to the postgres exec.Cmd
-func AddInstanceRunCommands(cmd *exec.Cmd) {
-	return
+func TestLogicalimport(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "logicalimport test suite")
+}
+
+type fakePooler struct {
+	db *sql.DB
+}
+
+func (f fakePooler) Connection(_ string) (*sql.DB, error) {
+	return f.db, nil
+}
+
+func (f fakePooler) GetDsn(dbName string) string {
+	return dbName
+}
+
+func (f fakePooler) ShutdownConnections() {
 }

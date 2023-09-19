@@ -24,16 +24,27 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
+// backupCommandOptions are the options that are provider to the backup
+// cnpg command
+type backupCommandOptions struct {
+	backupName  string
+	clusterName string
+	target      apiv1.BackupTarget
+	method      apiv1.BackupMethod
+}
+
 // NewCmd creates the new "backup" subcommand
 func NewCmd() *cobra.Command {
 	var backupName string
 	var backupTarget string
+	var backupMethod string
 
 	backupSubcommand := &cobra.Command{
 		Use:   "backup [cluster]",
@@ -49,13 +60,34 @@ func NewCmd() *cobra.Command {
 					time.Now().Format("20060102150400"))
 			}
 
-			backupTargetPolicy := apiv1.BackupTarget(backupTarget)
-			switch backupTargetPolicy {
-			case apiv1.BackupTargetPrimary, apiv1.BackupTargetStandby, "":
-				return createBackup(cmd.Context(), backupName, clusterName, backupTargetPolicy)
-			default:
+			// Check if the backup target is correct
+			allowedBackupTargets := []string{
+				"",
+				string(apiv1.BackupTargetPrimary),
+				string(apiv1.BackupTargetStandby),
+			}
+			if !slices.Contains(allowedBackupTargets, backupTarget) {
 				return fmt.Errorf("backup-target: %s is not supported by the backup command", backupTarget)
 			}
+
+			// Check if the backup method is correct
+			allowedBackupMethods := []string{
+				"",
+				string(apiv1.BackupMethodBarmanObjectStore),
+				string(apiv1.BackupMethodVolumeSnapshot),
+			}
+			if !slices.Contains(allowedBackupMethods, backupMethod) {
+				return fmt.Errorf("backup-method: %s is not supported by the backup command", backupMethod)
+			}
+
+			return createBackup(
+				cmd.Context(),
+				backupCommandOptions{
+					backupName:  backupName,
+					clusterName: clusterName,
+					target:      apiv1.BackupTarget(backupTarget),
+					method:      apiv1.BackupMethod(backupMethod),
+				})
 		},
 	}
 
@@ -66,29 +98,39 @@ func NewCmd() *cobra.Command {
 		"The name of the Backup resource that will be created, "+
 			"defaults to \"[cluster]-[current_timestamp]\"",
 	)
-	backupSubcommand.Flags().StringVar(
+	backupSubcommand.Flags().StringVarP(
 		&backupTarget,
 		"backup-target",
+		"t",
 		"",
 		"If present, will override the backup target defined in cluster, "+
-			"valid value are primary and prefer-standby.",
+			"valid values are primary and prefer-standby.",
+	)
+	backupSubcommand.Flags().StringVarP(
+		&backupMethod,
+		"method",
+		"m",
+		"",
+		"If present, will override the backup method defined in backup resource, "+
+			"valid values are volumeSnapshot and barmanObjectStore.",
 	)
 
 	return backupSubcommand
 }
 
 // createBackup handles the Backup resource creation
-func createBackup(ctx context.Context, backupName, clusterName string, backupTarget apiv1.BackupTarget) error {
+func createBackup(ctx context.Context, options backupCommandOptions) error {
 	backup := apiv1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: plugin.Namespace,
-			Name:      backupName,
+			Name:      options.backupName,
 		},
 		Spec: apiv1.BackupSpec{
 			Cluster: apiv1.LocalObjectReference{
-				Name: clusterName,
+				Name: options.clusterName,
 			},
-			Target: backupTarget,
+			Target: options.target,
+			Method: options.method,
 		},
 	}
 

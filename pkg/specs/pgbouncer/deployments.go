@@ -43,7 +43,7 @@ const (
 	PgbouncerNameLabel = specs.MetadataNamespace + "/poolerName"
 
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.19.1"
+	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.20.0"
 )
 
 // Deployment create the deployment of pgbouncer, given

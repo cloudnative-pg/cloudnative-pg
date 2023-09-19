@@ -49,7 +49,7 @@ var _ = Describe("Certificates", func() {
 		clientCASecretName              = "my-postgresql-client-ca" // #nosec
 		defaultCASecretName             = "postgresql-cert-ca"      // #nosec
 		kubectlCNPGClientCertSecretName = "cluster-cert"            // #nosec
-		fixturesCertificatesDir         = fixturesDir + "/cnpg_certificates"
+		fixturesCertificatesDir         = fixturesDir + "/certificates"
 		level                           = tests.Low
 	)
 	BeforeEach(func() {

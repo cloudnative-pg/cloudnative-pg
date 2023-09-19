@@ -19,6 +19,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -65,7 +66,7 @@ func (env TestingEnvironment) DeleteNamespace(name string, opts ...client.Delete
 
 	// Exit immediately if the namespace is listed in PreserveNamespaces
 	for _, v := range env.PreserveNamespaces {
-		if v == name {
+		if strings.HasPrefix(name, v) {
 			return nil
 		}
 	}
@@ -85,7 +86,7 @@ func (env TestingEnvironment) DeleteNamespace(name string, opts ...client.Delete
 func (env TestingEnvironment) DeleteNamespaceAndWait(name string, timeoutSeconds int) error {
 	// Exit immediately if the namespace is listed in PreserveNamespaces
 	for _, v := range env.PreserveNamespaces {
-		if v == name {
+		if strings.HasPrefix(name, v) {
 			return nil
 		}
 	}

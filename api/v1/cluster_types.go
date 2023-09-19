@@ -114,17 +114,56 @@ const (
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 )
 
+// SnapshotOwnerReference defines the reference type for the owner of the snapshot.
+// This specifies which owner the processed resources should relate to.
+type SnapshotOwnerReference string
+
+// Constants to represent the allowed types for SnapshotOwnerReference.
+const (
+	// ShapshotOwnerReferenceNone indicates that the snapshot does not have any owner reference.
+	ShapshotOwnerReferenceNone SnapshotOwnerReference = "none"
+	// SnapshotOwnerReferenceBackup indicates that the snapshot is owned by the backup resource.
+	SnapshotOwnerReferenceBackup SnapshotOwnerReference = "backup"
+	// SnapshotOwnerReferenceCluster indicates that the snapshot is owned by the cluster resource.
+	SnapshotOwnerReferenceCluster SnapshotOwnerReference = "cluster"
+)
+
+// VolumeSnapshotConfiguration represents the configuration for the execution of snapshot backups.
+type VolumeSnapshotConfiguration struct {
+	// Labels are key-value pairs that will be added to .metadata.labels snapshot resources.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations key-value pairs that will be added to .metadata.annotations snapshot resources.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// ClassName specifies the Snapshot Class to be used for PG_DATA PersistentVolumeClaim.
+	// It is the default class for the other types if no specific class is present
+	// +optional
+	ClassName string `json:"className,omitempty"`
+	// WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.
+	// +optional
+	WalClassName string `json:"walClassName,omitempty"`
+	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have. .
+	// +optional
+	// +kubebuilder:validation:Enum=none;cluster;backup
+	// +kubebuilder:default:=none
+	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
+}
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
+	// +optional
 	Description string `json:"description,omitempty"`
 
 	// Metadata that will be inherited by all objects related to the Cluster
+	// +optional
 	InheritedMetadata *EmbeddedObjectMetadata `json:"inheritedMetadata,omitempty"`
 
 	// Name of the container image, supporting both tags (`<image>:<tag>`)
 	// and digests for deterministic and repeatable deployments
 	// (`<image>:<tag>@sha256:<digestValue>`)
+	// +optional
 	ImageName string `json:"imageName,omitempty"`
 
 	// Image pull policy.
@@ -144,10 +183,12 @@ type ClusterSpec struct {
 
 	// The UID of the `postgres` user inside the image, defaults to `26`
 	// +kubebuilder:default:=26
+	// +optional
 	PostgresUID int64 `json:"postgresUID,omitempty"`
 
 	// The GID of the `postgres` user inside the image, defaults to `26`
 	// +kubebuilder:default:=26
+	// +optional
 	PostgresGID int64 `json:"postgresGID,omitempty"`
 
 	// Number of instances required in the cluster
@@ -160,6 +201,7 @@ type ClusterSpec struct {
 	// available.
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	MinSyncReplicas int `json:"minSyncReplicas,omitempty"`
 
 	// The target value for the synchronous replication quorum, that can be
@@ -167,6 +209,7 @@ type ClusterSpec struct {
 	// Undefined or 0 disable synchronous replication.
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	MaxSyncReplicas int `json:"maxSyncReplicas,omitempty"`
 
 	// Configuration of the PostgreSQL server
@@ -174,6 +217,7 @@ type ClusterSpec struct {
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
 	// Replication slots management configuration
+	// +optional
 	ReplicationSlots *ReplicationSlotsConfiguration `json:"replicationSlots,omitempty"`
 
 	// Instructions to bootstrap this cluster
@@ -196,6 +240,7 @@ type ClusterSpec struct {
 	// it when automatically created, and then blank the password of the `postgres`
 	// user by setting it to `NULL`. Enabled by default.
 	// +kubebuilder:default:=true
+	// +optional
 	EnableSuperuserAccess *bool `json:"enableSuperuserAccess,omitempty"`
 
 	// The configuration for the CA and related certificates
@@ -203,6 +248,7 @@ type ClusterSpec struct {
 	Certificates *CertificatesConfiguration `json:"certificates,omitempty"`
 
 	// The list of pull secrets to be used to pull the images
+	// +optional
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// Configuration of the storage of the instances
@@ -214,16 +260,19 @@ type ClusterSpec struct {
 	ServiceAccountTemplate *ServiceAccountTemplate `json:"serviceAccountTemplate,omitempty"`
 
 	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
+	// +optional
 	WalStorage *StorageConfiguration `json:"walStorage,omitempty"`
 
 	// The time in seconds that is allowed for a PostgreSQL instance to
 	// successfully start up (default 30)
 	// +kubebuilder:default:=30
+	// +optional
 	MaxStartDelay int32 `json:"startDelay,omitempty"`
 
 	// The time in seconds that is allowed for a PostgreSQL instance to
 	// gracefully shutdown (default 30)
 	// +kubebuilder:default:=30
+	// +optional
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`
 
 	// The time in seconds that is allowed for a primary PostgreSQL instance
@@ -231,12 +280,14 @@ type ClusterSpec struct {
 	// Default value is 40000000, greater than one year in seconds,
 	// big enough to simulate an infinite delay
 	// +kubebuilder:default:=40000000
+	// +optional
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
 	// The amount of time (in seconds) to wait before triggering a failover
 	// after the primary PostgreSQL instance in the cluster was detected
 	// to be unhealthy
 	// +kubebuilder:default:=0
+	// +optional
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
 
 	// Affinity/Anti-affinity rules for Pods
@@ -259,6 +310,7 @@ type ClusterSpec struct {
 	// specified does not exist, the pod will not be able to schedule.  Please refer to
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
 	// for more information
+	// +optional
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 
 	// Deployment strategy to follow to upgrade the primary server during a rolling
@@ -266,6 +318,7 @@ type ClusterSpec struct {
 	// it can be automated (`unsupervised` - default) or manual (`supervised`)
 	// +kubebuilder:default:=unsupervised
 	// +kubebuilder:validation:Enum:=unsupervised;supervised
+	// +optional
 	PrimaryUpdateStrategy PrimaryUpdateStrategy `json:"primaryUpdateStrategy,omitempty"`
 
 	// Method to follow to upgrade the primary server during a rolling
@@ -273,23 +326,29 @@ type ClusterSpec struct {
 	// it can be with a switchover (`switchover`) or in-place (`restart` - default)
 	// +kubebuilder:default:=restart
 	// +kubebuilder:validation:Enum:=switchover;restart
+	// +optional
 	PrimaryUpdateMethod PrimaryUpdateMethod `json:"primaryUpdateMethod,omitempty"`
 
 	// The configuration to be used for backups
+	// +optional
 	Backup *BackupConfiguration `json:"backup,omitempty"`
 
 	// Define a maintenance window for the Kubernetes nodes
+	// +optional
 	NodeMaintenanceWindow *NodeMaintenanceWindow `json:"nodeMaintenanceWindow,omitempty"`
 
 	// The configuration of the monitoring infrastructure of this cluster
+	// +optional
 	Monitoring *MonitoringConfiguration `json:"monitoring,omitempty"`
 
 	// The list of external clusters which are used in the configuration
+	// +optional
 	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
 
 	// The instances' log level, one of the following values: error, warning, info (default), debug, trace
 	// +kubebuilder:default:=info
 	// +kubebuilder:validation:Enum:=error;warning;info;debug;trace
+	// +optional
 	LogLevel string `json:"logLevel,omitempty"`
 
 	// Template to be used to define projected volumes, projected volumes will be mounted
@@ -310,10 +369,12 @@ type ClusterSpec struct {
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
 	// The configuration that is used by the portions of PostgreSQL that are managed by the instance manager
+	// +optional
 	Managed *ManagedConfiguration `json:"managed,omitempty"`
 
 	// The SeccompProfile applied to every Pod and Container.
 	// Defaults to: `RuntimeDefault`
+	// +optional
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 }
 
@@ -347,6 +408,9 @@ const (
 
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
+
+	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
+	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
 
 	// PhaseOnlineUpgrading for when the instance manager is being upgraded in place
 	PhaseOnlineUpgrading = "Online upgrade in progress"
@@ -399,10 +463,8 @@ type PodName string
 
 // Topology contains the cluster topology
 type Topology struct {
-	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
-	// in synchronous replica election in case of failures
-	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
 	// Instances contains the pod topology of the instances
+	// +optional
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
 
 	// NodesUsed represents the count of distinct nodes accommodating the instances.
@@ -410,7 +472,13 @@ type Topology struct {
 	// implying the absence of High Availability (HA). Ideally, this value should
 	// be the same as the number of instances in the Postgres HA cluster, implying
 	// shared nothing architecture on the compute side.
+	// +optional
 	NodesUsed int32 `json:"nodesUsed,omitempty"`
+
+	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
+	// in synchronous replica election in case of failures
+	// +optional
+	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
 }
 
 // RoleStatus represents the status of a managed role in the cluster
@@ -430,145 +498,187 @@ const (
 // PasswordState represents the state of the password of a managed RoleConfiguration
 type PasswordState struct {
 	// the last transaction ID to affect the role definition in PostgreSQL
+	// +optional
 	TransactionID int64 `json:"transactionID,omitempty"`
 	// the resource version of the password secret
+	// +optional
 	SecretResourceVersion string `json:"resourceVersion,omitempty"`
 }
 
 // ManagedRoles tracks the status of a cluster's managed roles
 type ManagedRoles struct {
 	// ByStatus gives the list of roles in each state
+	// +optional
 	ByStatus map[RoleStatus][]string `json:"byStatus,omitempty"`
 
 	// CannotReconcile lists roles that cannot be reconciled in PostgreSQL,
 	// with an explanation of the cause
+	// +optional
 	CannotReconcile map[string][]string `json:"cannotReconcile,omitempty"`
 
 	// PasswordStatus gives the last transaction id and password secret version for each managed role
+	// +optional
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
+	// +optional
 	Instances int `json:"instances,omitempty"`
 
 	// The total number of ready instances in the cluster. It is equal to the number of ready instance pods.
+	// +optional
 	ReadyInstances int `json:"readyInstances,omitempty"`
 
 	// InstancesStatus indicates in which status the instances are
+	// +optional
 	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
 
 	// The reported state of the instances during the last reconciliation loop
+	// +optional
 	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
 
 	// ManagedRolesStatus reports the state of the managed roles in the cluster
+	// +optional
 	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
+	// +optional
 	TimelineID int `json:"timelineID,omitempty"`
 
 	// Instances topology.
+	// +optional
 	Topology Topology `json:"topology,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
+	// +optional
 	LatestGeneratedNode int `json:"latestGeneratedNode,omitempty"`
 
 	// Current primary instance
+	// +optional
 	CurrentPrimary string `json:"currentPrimary,omitempty"`
 
 	// Target primary instance, this is different from the previous one
 	// during a switchover or a failover
+	// +optional
 	TargetPrimary string `json:"targetPrimary,omitempty"`
 
 	// How many PVCs have been created by this cluster
+	// +optional
 	PVCCount int32 `json:"pvcCount,omitempty"`
 
 	// How many Jobs have been created by this cluster
+	// +optional
 	JobCount int32 `json:"jobCount,omitempty"`
 
 	// List of all the PVCs created by this cluster and still available
 	// which are not attached to a Pod
+	// +optional
 	DanglingPVC []string `json:"danglingPVC,omitempty"`
 
 	// List of all the PVCs that have ResizingPVC condition.
+	// +optional
 	ResizingPVC []string `json:"resizingPVC,omitempty"`
 
 	// List of all the PVCs that are being initialized by this cluster
+	// +optional
 	InitializingPVC []string `json:"initializingPVC,omitempty"`
 
 	// List of all the PVCs not dangling nor initializing
+	// +optional
 	HealthyPVC []string `json:"healthyPVC,omitempty"`
 
 	// List of all the PVCs that are unusable because another PVC is missing
+	// +optional
 	UnusablePVC []string `json:"unusablePVC,omitempty"`
 
 	// Current write pod
+	// +optional
 	WriteService string `json:"writeService,omitempty"`
 
 	// Current list of read pods
+	// +optional
 	ReadService string `json:"readService,omitempty"`
 
 	// Current phase of the cluster
+	// +optional
 	Phase string `json:"phase,omitempty"`
 
 	// Reason for the current phase
+	// +optional
 	PhaseReason string `json:"phaseReason,omitempty"`
 
 	// The list of resource versions of the secrets
 	// managed by the operator. Every change here is done in the
 	// interest of the instance manager, which will refresh the
 	// secret data
+	// +optional
 	SecretsResourceVersion SecretsResourceVersion `json:"secretsResourceVersion,omitempty"`
 
 	// The list of resource versions of the configmaps,
 	// managed by the operator. Every change here is done in the
 	// interest of the instance manager, which will refresh the
 	// configmap data
+	// +optional
 	ConfigMapResourceVersion ConfigMapResourceVersion `json:"configMapResourceVersion,omitempty"`
 
 	// The configuration for the CA and related certificates, initialized with defaults.
+	// +optional
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
 
 	// The first recoverability point, stored as a date in RFC3339 format
+	// +optional
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
 	// Stored as a date in RFC3339 format
+	// +optional
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
 
 	// Stored as a date in RFC3339 format
+	// +optional
 	LastFailedBackup string `json:"lastFailedBackup,omitempty"`
 
 	// The commit hash number of which this operator running
+	// +optional
 	CommitHash string `json:"cloudNativePGCommitHash,omitempty"`
 
 	// The timestamp when the last actual promotion to primary has occurred
+	// +optional
 	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
 
 	// The timestamp when the primary was detected to be unhealthy
 	// This field is reported when spec.failoverDelay is populated or during online upgrades
+	// +optional
 	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 
 	// The timestamp when the last request for a new primary has occurred
+	// +optional
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
 
 	// The integration needed by poolers referencing the cluster
+	// +optional
 	PoolerIntegrations *PoolerIntegrations `json:"poolerIntegrations,omitempty"`
 
 	// The hash of the binary of the operator
+	// +optional
 	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
 
-	// OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster
-	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
-
-	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
-	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
-
 	// Conditions for cluster object
+	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// List of instance names in the cluster
+	// +optional
 	InstanceNames []string `json:"instanceNames,omitempty"`
+
+	// OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster
+	// +optional
+	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
+
+	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
+	// +optional
+	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -576,6 +686,7 @@ type InstanceReportedState struct {
 	// indicates if an instance is the primary one
 	IsPrimary bool `json:"isPrimary"`
 	// indicates on which TimelineId the instance is
+	// +optional
 	TimeLineID int `json:"timeLineID,omitempty"`
 }
 
@@ -591,6 +702,38 @@ const (
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
+)
+
+// A Condition that can be used to communicate the Backup progress
+var (
+	// BackupSucceededCondition is added to a backup
+	// when it was completed correctly
+	BackupSucceededCondition = &metav1.Condition{
+		Type:    string(ConditionBackup),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(ConditionReasonLastBackupSucceeded),
+		Message: "Backup was successful",
+	}
+
+	// BackupStartingCondition is added to a backup
+	// when it started
+	BackupStartingCondition = &metav1.Condition{
+		Type:    string(ConditionBackup),
+		Status:  metav1.ConditionFalse,
+		Reason:  string(ConditionBackupStarted),
+		Message: "New Backup starting up",
+	}
+
+	// BuildClusterBackupFailedCondition builds
+	// ConditionReasonLastBackupFailed condition
+	BuildClusterBackupFailedCondition = func(err error) *metav1.Condition {
+		return &metav1.Condition{
+			Type:    string(ConditionBackup),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(ConditionReasonLastBackupFailed),
+			Message: err.Error(),
+		}
+	}
 )
 
 // ConditionStatus defines conditions of resources
@@ -643,33 +786,37 @@ const (
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
 type EmbeddedObjectMetadata struct {
-	Labels      map[string]string `json:"labels,omitempty"`
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // PoolerIntegrations encapsulates the needed integration for the poolers referencing the cluster
 type PoolerIntegrations struct {
+	// +optional
 	PgBouncerIntegration PgBouncerIntegrationStatus `json:"pgBouncerIntegration,omitempty"`
 }
 
 // PgBouncerIntegrationStatus encapsulates the needed integration for the pgbouncer poolers referencing the cluster
 type PgBouncerIntegrationStatus struct {
+	// +optional
 	Secrets []string `json:"secrets,omitempty"`
 }
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica
 // cluster
 type ReplicaClusterConfiguration struct {
-	// If replica mode is enabled, this cluster will be a replica of an
-	// existing cluster. Replica cluster can be created from a recovery
-	// object store or via streaming through pg_basebackup.
-	// Refer to the Replication page of the documentation for more information.
-	// +optional
-	Enabled bool `json:"enabled"`
-
 	// The name of the external cluster which is the replication origin
 	// +kubebuilder:validation:MinLength=1
 	Source string `json:"source"`
+
+	// If replica mode is enabled, this cluster will be a replica of an
+	// existing cluster. Replica cluster can be created from a recovery
+	// object store or via streaming through pg_basebackup.
+	// Refer to the Replica clusters page of the documentation for more information.
+	Enabled bool `json:"enabled"`
 }
 
 // DefaultReplicationSlotsUpdateInterval is the default in seconds for the replication slots update interval
@@ -682,12 +829,14 @@ const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
 // of replication slots
 type ReplicationSlotsConfiguration struct {
 	// Replication slots for high availability configuration
+	// +optional
 	HighAvailability *ReplicationSlotsHAConfiguration `json:"highAvailability,omitempty"`
 
 	// Standby will update the status of the local replication slots
 	// every `updateInterval` seconds (default 30).
-	//+kubebuilder:default:=30
-	//+kubebuilder:validation:Minimum=1
+	// +kubebuilder:default:=30
+	// +kubebuilder:validation:Minimum=1
+	// +optional
 	UpdateInterval int `json:"updateInterval,omitempty"`
 }
 
@@ -718,13 +867,14 @@ type ReplicationSlotsHAConfiguration struct {
 	// be set at creation time.
 	// +optional
 	// +kubebuilder:default:=false
-	Enabled *bool `json:"enabled"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// Prefix for replication slots managed by the operator for HA.
 	// It may only contain lower case letters, numbers, and the underscore character.
 	// This can only be set at creation time. By default set to `_cnpg_`.
-	//+kubebuilder:default:=_cnpg_
-	//+kubebuilder:validation:Pattern=^[0-9a-z_]*$
+	// +kubebuilder:default:=_cnpg_
+	// +kubebuilder:validation:Pattern=^[0-9a-z_]*$
+	// +optional
 	SlotPrefix string `json:"slotPrefix,omitempty"`
 }
 
@@ -784,15 +934,16 @@ const (
 // This option is only useful when the chosen storage prevents the Pods
 // from being freely moved across nodes.
 type NodeMaintenanceWindow struct {
-	// Is there a node maintenance activity in progress?
-	// +kubebuilder:default:=false
-	InProgress bool `json:"inProgress"`
-
 	// Reuse the existing PVC (wait for the node to come
 	// up again) or not (recreate it elsewhere - when `instances` >1)
 	// +optional
 	// +kubebuilder:default:=true
-	ReusePVC *bool `json:"reusePVC"`
+	ReusePVC *bool `json:"reusePVC,omitempty"`
+
+	// Is there a node maintenance activity in progress?
+	// +optional
+	// +kubebuilder:default:=false
+	InProgress bool `json:"inProgress,omitempty"`
 }
 
 // PrimaryUpdateStrategy contains the strategy to follow when upgrading
@@ -835,6 +986,7 @@ const (
 // PostgresConfiguration defines the PostgreSQL configuration
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
+	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
 	// PostgreSQL Host Based Authentication rules (lines to be appended
@@ -844,13 +996,8 @@ type PostgresConfiguration struct {
 
 	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
 	// set up.
-	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
-
-	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
-	// Default value is 40000000, greater than one year in seconds,
-	// big enough to simulate an infinite timeout
 	// +optional
-	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
+	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
 	// Lists of shared preload libraries to add to the default ones
 	// +optional
@@ -859,6 +1006,12 @@ type PostgresConfiguration struct {
 	// Options to specify LDAP configuration
 	// +optional
 	LDAP *LDAPConfig `json:"ldap,omitempty"`
+
+	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
+	// Default value is 40000000, greater than one year in seconds,
+	// big enough to simulate an infinite timeout
+	// +optional
+	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
@@ -868,13 +1021,16 @@ type PostgresConfiguration struct {
 // information.
 type BootstrapConfiguration struct {
 	// Bootstrap the cluster via initdb
+	// +optional
 	InitDB *BootstrapInitDB `json:"initdb,omitempty"`
 
 	// Bootstrap the cluster from a backup
+	// +optional
 	Recovery *BootstrapRecovery `json:"recovery,omitempty"`
 
 	// Bootstrap the cluster taking a physical backup of another compatible
 	// PostgreSQL instance
+	// +optional
 	PgBaseBackup *BootstrapPgBaseBackup `json:"pg_basebackup,omitempty"`
 }
 
@@ -890,30 +1046,38 @@ const (
 // LDAPConfig contains the parameters needed for LDAP authentication
 type LDAPConfig struct {
 	// LDAP hostname or IP address
+	// +optional
 	Server string `json:"server,omitempty"`
 	// LDAP server port
+	// +optional
 	Port int `json:"port,omitempty"`
 
 	// LDAP schema to be used, possible options are `ldap` and `ldaps`
 	// +kubebuilder:validation:Enum=ldap;ldaps
+	// +optional
 	Scheme LDAPScheme `json:"scheme,omitempty"`
 
-	// Set to 'true' to enable LDAP over TLS. 'false' is default
-	TLS bool `json:"tls,omitempty"`
-
 	// Bind as authentication configuration
+	// +optional
 	BindAsAuth *LDAPBindAsAuth `json:"bindAsAuth,omitempty"`
 
 	// Bind+Search authentication configuration
+	// +optional
 	BindSearchAuth *LDAPBindSearchAuth `json:"bindSearchAuth,omitempty"`
+
+	// Set to 'true' to enable LDAP over TLS. 'false' is default
+	// +optional
+	TLS bool `json:"tls,omitempty"`
 }
 
 // LDAPBindAsAuth provides the required fields to use the
 // bind authentication for LDAP
 type LDAPBindAsAuth struct {
 	// Prefix for the bind authentication option
+	// +optional
 	Prefix string `json:"prefix,omitempty"`
 	// Suffix for the bind authentication option
+	// +optional
 	Suffix string `json:"suffix,omitempty"`
 }
 
@@ -921,15 +1085,20 @@ type LDAPBindAsAuth struct {
 // the bind+search LDAP authentication process
 type LDAPBindSearchAuth struct {
 	// Root DN to begin the user search
+	// +optional
 	BaseDN string `json:"baseDN,omitempty"`
 	// DN of the user to bind to the directory
+	// +optional
 	BindDN string `json:"bindDN,omitempty"`
 	// Secret with the password for the user to bind to the directory
+	// +optional
 	BindPassword *corev1.SecretKeySelector `json:"bindPassword,omitempty"`
 
 	// Attribute to match against the username
+	// +optional
 	SearchAttribute string `json:"searchAttribute,omitempty"`
 	// Search filter to use when doing the search+bind authentication
+	// +optional
 	SearchFilter string `json:"searchFilter,omitempty"`
 }
 
@@ -944,18 +1113,21 @@ type CertificatesConfiguration struct {
 	// used as `sslrootcert` in client connection strings.<br />
 	// - `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
 	// this can be omitted.<br />
+	// +optional
 	ServerCASecret string `json:"serverCASecret,omitempty"`
 
 	// The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as
 	// `ssl_cert_file` and `ssl_key_file` so that clients can connect to postgres securely.
 	// If not defined, ServerCASecret must provide also `ca.key` and a new secret will be
 	// created using the provided CA.
+	// +optional
 	ServerTLSSecret string `json:"serverTLSSecret,omitempty"`
 
 	// The secret of type kubernetes.io/tls containing the client certificate to authenticate as
 	// the `streaming_replica` user.
 	// If not defined, ClientCASecret must provide also `ca.key`, and a new secret will be
 	// created using the provided CA.
+	// +optional
 	ReplicationTLSSecret string `json:"replicationTLSSecret,omitempty"`
 
 	// The secret containing the Client CA certificate. If not defined, a new secret will be created
@@ -967,9 +1139,11 @@ type CertificatesConfiguration struct {
 	// used as `ssl_ca_file` of all the instances.<br />
 	// - `ca.key`: key used to generate client certificates, if ReplicationTLSSecret is provided,
 	// this can be omitted.<br />
+	// +optional
 	ClientCASecret string `json:"clientCASecret,omitempty"`
 
 	// The list of the server alternative DNS names to be added to the generated server TLS certificates, when required.
+	// +optional
 	ServerAltDNSNames []string `json:"serverAltDNSNames,omitempty"`
 }
 
@@ -979,6 +1153,7 @@ type CertificatesStatus struct {
 	CertificatesConfiguration `json:",inline"`
 
 	// Expiration dates for all certificates.
+	// +optional
 	Expirations map[string]string `json:"expirations,omitempty"`
 }
 
@@ -988,12 +1163,12 @@ type CertificatesStatus struct {
 type BootstrapInitDB struct {
 	// Name of the database used by the application. Default: `app`.
 	// +optional
-	Database string `json:"database"`
+	Database string `json:"database,omitempty"`
 
 	// Name of the owner of the database in the instance to be used
 	// by applications. Defaults to the value of the `database` key.
 	// +optional
-	Owner string `json:"owner"`
+	Owner string `json:"owner,omitempty"`
 
 	// Name of the secret containing the initial credentials for the
 	// owner of the user database. If empty a new secret will be
@@ -1005,44 +1180,54 @@ type BootstrapInitDB struct {
 	// Deprecated: This could lead to inconsistent configurations,
 	// please use the explicit provided parameters instead.
 	// If defined, explicit values will be ignored.
+	// +optional
 	Options []string `json:"options,omitempty"`
 
 	// Whether the `-k` option should be passed to initdb,
 	// enabling checksums on data pages (default: `false`)
+	// +optional
 	DataChecksums *bool `json:"dataChecksums,omitempty"`
 
 	// The value to be passed as option `--encoding` for initdb (default:`UTF8`)
+	// +optional
 	Encoding string `json:"encoding,omitempty"`
 
 	// The value to be passed as option `--lc-collate` for initdb (default:`C`)
+	// +optional
 	LocaleCollate string `json:"localeCollate,omitempty"`
 
 	// The value to be passed as option `--lc-ctype` for initdb (default:`C`)
+	// +optional
 	LocaleCType string `json:"localeCType,omitempty"`
 
 	// The value in megabytes (1 to 1024) to be passed to the `--wal-segsize`
 	// option for initdb (default: empty, resulting in PostgreSQL default: 16MB)
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=1024
+	// +optional
 	WalSegmentSize int `json:"walSegmentSize,omitempty"`
 
 	// List of SQL queries to be executed as a superuser immediately
 	// after the cluster has been created - to be used with extreme care
 	// (by default empty)
+	// +optional
 	PostInitSQL []string `json:"postInitSQL,omitempty"`
 
 	// List of SQL queries to be executed as a superuser in the application
 	// database right after is created - to be used with extreme care
 	// (by default empty)
+	// +optional
 	PostInitApplicationSQL []string `json:"postInitApplicationSQL,omitempty"`
 
 	// List of SQL queries to be executed as a superuser in the `template1`
 	// after the cluster has been created - to be used with extreme care
 	// (by default empty)
+	// +optional
 	PostInitTemplateSQL []string `json:"postInitTemplateSQL,omitempty"`
 
 	// Bootstraps the new cluster by importing data from an existing PostgreSQL
 	// instance using logical backup (`pg_dump` and `pg_restore`)
+	// +optional
 	Import *Import `json:"import,omitempty"`
 
 	// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
@@ -1050,6 +1235,7 @@ type BootstrapInitDB struct {
 	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
 	// the implementation order is same as the order of each array
 	// (by default empty)
+	// +optional
 	PostInitApplicationSQLRefs *PostInitApplicationSQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
 }
 
@@ -1077,16 +1263,19 @@ type Import struct {
 	Databases []string `json:"databases"`
 
 	// The roles to import
+	// +optional
 	Roles []string `json:"roles,omitempty"`
 
 	// List of SQL queries to be executed as a superuser in the application
 	// database right after is imported - to be used with extreme care
 	// (by default empty). Only available in microservice type.
+	// +optional
 	PostImportApplicationSQL []string `json:"postImportApplicationSQL,omitempty"`
 
 	// When set to true, only the `pre-data` and `post-data` sections of
 	// `pg_restore` are invoked, avoiding data import. Default: `false`.
 	// +kubebuilder:default:=false
+	// +optional
 	SchemaOnly bool `json:"schemaOnly,omitempty"`
 }
 
@@ -1102,9 +1291,11 @@ type ImportSource struct {
 // the implementation order is same as the order of each array
 type PostInitApplicationSQLRefs struct {
 	// SecretRefs holds a list of references to Secrets
+	// +optional
 	SecretRefs []SecretKeySelector `json:"secretRefs,omitempty"`
 
 	// ConfigMapRefs holds a list of references to ConfigMaps
+	// +optional
 	ConfigMapRefs []ConfigMapKeySelector `json:"configMapRefs,omitempty"`
 }
 
@@ -1121,12 +1312,14 @@ type BootstrapRecovery struct {
 	// The backup object containing the physical base backup from which to
 	// initiate the recovery procedure.
 	// Mutually exclusive with `source` and `volumeSnapshots`.
+	// +optional
 	Backup *BackupSource `json:"backup,omitempty"`
 
 	// The external cluster whose backup we will restore. This is also
 	// used as the name of the folder under which the backup is stored,
 	// so it must be set to the name of the source cluster
-	// Mutually exclusive with `backup` and `volumeSnapshots`.
+	// Mutually exclusive with `backup`.
+	// +optional
 	Source string `json:"source,omitempty"`
 
 	// The static PVC data source(s) from which to initiate the
@@ -1136,7 +1329,8 @@ type BootstrapRecovery struct {
 	// a cold backup copy on a fenced Postgres instance (limitation
 	// which will be removed in the future when online backup
 	// will be implemented).
-	// Mutually exclusive with `backup` and `source`.
+	// Mutually exclusive with `backup`.
+	// +optional
 	VolumeSnapshots *DataSource `json:"volumeSnapshots,omitempty"`
 
 	// By default, the recovery process applies all the available
@@ -1145,16 +1339,17 @@ type BootstrapRecovery struct {
 	// recover to a point-in-time (PITR) by specifying a `RecoveryTarget` object,
 	// as expected by PostgreSQL (i.e., timestamp, transaction Id, LSN, ...).
 	// More info: https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET
+	// +optional
 	RecoveryTarget *RecoveryTarget `json:"recoveryTarget,omitempty"`
 
 	// Name of the database used by the application. Default: `app`.
 	// +optional
-	Database string `json:"database"`
+	Database string `json:"database,omitempty"`
 
 	// Name of the owner of the database in the instance to be used
 	// by applications. Defaults to the value of the `database` key.
 	// +optional
-	Owner string `json:"owner"`
+	Owner string `json:"owner,omitempty"`
 
 	// Name of the secret containing the initial credentials for the
 	// owner of the user database. If empty a new secret will be
@@ -1170,6 +1365,7 @@ type DataSource struct {
 	Storage corev1.TypedLocalObjectReference `json:"storage"`
 
 	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
+	// +optional
 	WalStorage *corev1.TypedLocalObjectReference `json:"walStorage,omitempty"`
 }
 
@@ -1180,6 +1376,7 @@ type BackupSource struct {
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid
 	// errors with certificate issuer and barman-cloud-wal-archive.
+	// +optional
 	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
 }
 
@@ -1192,12 +1389,12 @@ type BootstrapPgBaseBackup struct {
 
 	// Name of the database used by the application. Default: `app`.
 	// +optional
-	Database string `json:"database"`
+	Database string `json:"database,omitempty"`
 
 	// Name of the owner of the database in the instance to be used
 	// by applications. Defaults to the value of the `database` key.
 	// +optional
-	Owner string `json:"owner"`
+	Owner string `json:"owner,omitempty"`
 
 	// Name of the secret containing the initial credentials for the
 	// owner of the user database. If empty a new secret will be
@@ -1213,28 +1410,37 @@ type RecoveryTarget struct {
 	// If empty (default) the operator will automatically detect the backup
 	// based on targetTime or targetLSN if specified. Otherwise use the
 	// latest available backup in chronological order.
+	// +optional
 	BackupID string `json:"backupID,omitempty"`
 
 	// The target timeline ("latest" or a positive integer)
+	// +optional
 	TargetTLI string `json:"targetTLI,omitempty"`
 
 	// The target transaction ID
+	// +optional
 	TargetXID string `json:"targetXID,omitempty"`
 
 	// The target name (to be previously created
 	// with `pg_create_restore_point`)
+	// +optional
 	TargetName string `json:"targetName,omitempty"`
 
 	// The target LSN (Log Sequence Number)
+	// +optional
 	TargetLSN string `json:"targetLSN,omitempty"`
 
 	// The target time as a timestamp in the RFC3339 standard
+	// +optional
 	TargetTime string `json:"targetTime,omitempty"`
 
 	// End recovery as soon as a consistent state is reached
+	// +optional
 	TargetImmediate *bool `json:"targetImmediate,omitempty"`
 
-	// Set the target to be exclusive (defaults to true)
+	// Set the target to be exclusive. If omitted, defaults to false, so that
+	// in Postgres, `recovery_target_inclusive` will be true
+	// +optional
 	Exclusive *bool `json:"exclusive,omitempty"`
 }
 
@@ -1250,6 +1456,7 @@ type StorageConfiguration struct {
 	// Size of the storage. Required if not already specified in the PVC template.
 	// Changes to this field are automatically reapplied to the created PVCs.
 	// Size cannot be decreased.
+	// +optional
 	Size string `json:"size,omitempty"`
 
 	// Resize existent PVCs, defaults to true
@@ -1291,11 +1498,12 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 //
 // In future synchronous replica election restriction by name will be supported.
 type SyncReplicaElectionConstraints struct {
+	// A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not
+	// +optional
+	NodeLabelsAntiAffinity []string `json:"nodeLabelsAntiAffinity,omitempty"`
+
 	// This flag enables the constraints for sync replicas
 	Enabled bool `json:"enabled"`
-
-	// A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not
-	NodeLabelsAntiAffinity []string `json:"nodeLabelsAntiAffinity,omitempty"`
 }
 
 // AffinityConfiguration contains the info we need to create the
@@ -1309,7 +1517,7 @@ type AffinityConfiguration struct {
 	// TopologyKey to use for anti-affinity configuration. See k8s documentation
 	// for more info on that
 	// +optional
-	TopologyKey string `json:"topologyKey"`
+	TopologyKey string `json:"topologyKey,omitempty"`
 
 	// NodeSelector is map of key-value pairs used to define the nodes on which
 	// the pods can run.
@@ -1354,6 +1562,7 @@ type RollingUpdateStatus struct {
 	ImageName string `json:"imageName"`
 
 	// When the update has been started
+	// +optional
 	StartedAt metav1.Time `json:"startedAt,omitempty"`
 }
 
@@ -1405,12 +1614,15 @@ const (
 // BarmanCredentials an object containing the potential credentials for each cloud provider
 type BarmanCredentials struct {
 	// The credentials to use to upload data to Google Cloud Storage
+	// +optional
 	Google *GoogleCredentials `json:"googleCredentials,omitempty"`
 
 	// The credentials to use to upload data to S3
+	// +optional
 	AWS *S3Credentials `json:"s3Credentials,omitempty"`
 
 	// The credentials to use to upload data to Azure Blob Storage
+	// +optional
 	Azure *AzureCredentials `json:"azureCredentials,omitempty"`
 }
 
@@ -1428,11 +1640,13 @@ type BarmanObjectStoreConfiguration struct {
 
 	// Endpoint to be used to upload data to the cloud,
 	// overriding the automatic endpoint discovery
+	// +optional
 	EndpointURL string `json:"endpointURL,omitempty"`
 
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid
 	// errors with certificate issuer and barman-cloud-wal-archive
+	// +optional
 	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
 
 	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
@@ -1443,40 +1657,51 @@ type BarmanObjectStoreConfiguration struct {
 
 	// The server name on S3, the cluster name is used if this
 	// parameter is omitted
+	// +optional
 	ServerName string `json:"serverName,omitempty"`
 
 	// The configuration for the backup of the WAL stream.
 	// When not defined, WAL files will be stored uncompressed and may be
 	// unencrypted in the object store, according to the bucket default policy.
+	// +optional
 	Wal *WalBackupConfiguration `json:"wal,omitempty"`
 
 	// The configuration to be used to backup the data files
 	// When not defined, base backups files will be stored uncompressed and may
 	// be unencrypted in the object store, according to the bucket default
 	// policy.
+	// +optional
 	Data *DataBackupConfiguration `json:"data,omitempty"`
 
 	// Tags is a list of key value pairs that will be passed to the
 	// Barman --tags option.
+	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
 
 	// HistoryTags is a list of key value pairs that will be passed to the
 	// Barman --history-tags option.
+	// +optional
 	HistoryTags map[string]string `json:"historyTags,omitempty"`
 }
 
 // BackupConfiguration defines how the backup of the cluster are taken.
-// Currently the only supported backup method is barmanObjectStore.
+// The supported backup methods are BarmanObjectStore and VolumeSnapshot.
 // For details and examples refer to the Backup and Recovery section of the
 // documentation
 type BackupConfiguration struct {
+	// VolumeSnapshot provides the configuration for the execution of volume snapshot backups.
+	// +optional
+	VolumeSnapshot *VolumeSnapshotConfiguration `json:"volumeSnapshot,omitempty"`
+
 	// The configuration for the barman-cloud tool suite
+	// +optional
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 
 	// RetentionPolicy is the retention policy to be used for backups
 	// and WALs (i.e. '60d'). The retention policy is expressed in the form
 	// of `XXu` where `XX` is a positive integer and `u` is in `[dwm]` -
 	// days, weeks, months.
+	// It's currently only applicable when using the BarmanObjectStore method.
 	// +kubebuilder:validation:Pattern=^[1-9][0-9]*[dwm]$
 	// +optional
 	RetentionPolicy string `json:"retentionPolicy,omitempty"`
@@ -1487,6 +1712,7 @@ type BackupConfiguration struct {
 	// to have backups run preferably on the most updated standby, if available.
 	// +kubebuilder:validation:Enum=primary;prefer-standby
 	// +kubebuilder:default:=prefer-standby
+	// +optional
 	Target BackupTarget `json:"target,omitempty"`
 }
 
@@ -1496,6 +1722,7 @@ type WalBackupConfiguration struct {
 	// Compress a WAL file before sending it to the object store. Available
 	// options are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.
 	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
+	// +optional
 	Compression CompressionType `json:"compression,omitempty"`
 
 	// Whenever to force the encryption of files (if the bucket is
@@ -1503,6 +1730,7 @@ type WalBackupConfiguration struct {
 	// Allowed options are empty string (use the bucket policy, default),
 	// `AES256` and `aws:kms`
 	// +kubebuilder:validation:Enum=AES256;"aws:kms"
+	// +optional
 	Encryption EncryptionType `json:"encryption,omitempty"`
 
 	// Number of WAL files to be either archived in parallel (when the
@@ -1512,6 +1740,7 @@ type WalBackupConfiguration struct {
 	// will be processed one at a time. It accepts a positive integer as a
 	// value - with 1 being the minimum accepted value.
 	// +kubebuilder:validation:Minimum=1
+	// +optional
 	MaxParallel int `json:"maxParallel,omitempty"`
 }
 
@@ -1522,6 +1751,7 @@ type DataBackupConfiguration struct {
 	// to the object store. Available options are empty string (no
 	// compression, default), `gzip`, `bzip2` or `snappy`.
 	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
+	// +optional
 	Compression CompressionType `json:"compression,omitempty"`
 
 	// Whenever to force the encryption of files (if the bucket is
@@ -1529,19 +1759,22 @@ type DataBackupConfiguration struct {
 	// Allowed options are empty string (use the bucket policy, default),
 	// `AES256` and `aws:kms`
 	// +kubebuilder:validation:Enum=AES256;"aws:kms"
+	// +optional
 	Encryption EncryptionType `json:"encryption,omitempty"`
+
+	// The number of parallel jobs to be used to upload the backup, defaults
+	// to 2
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	Jobs *int32 `json:"jobs,omitempty"`
 
 	// Control whether the I/O workload for the backup initial checkpoint will
 	// be limited, according to the `checkpoint_completion_target` setting on
 	// the PostgreSQL server. If set to true, an immediate checkpoint will be
 	// used, meaning PostgreSQL will complete the checkpoint as soon as
 	// possible. `false` by default.
+	// +optional
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
-
-	// The number of parallel jobs to be used to upload the backup, defaults
-	// to 2
-	// +kubebuilder:validation:Minimum=1
-	Jobs *int32 `json:"jobs,omitempty"`
 }
 
 // S3Credentials is the type for the credentials to be used to upload
@@ -1552,20 +1785,24 @@ type DataBackupConfiguration struct {
 // - inheriting the role from the pod environment by setting inheritFromIAMRole to true
 type S3Credentials struct {
 	// The reference to the access key id
+	// +optional
 	AccessKeyIDReference *SecretKeySelector `json:"accessKeyId,omitempty"`
 
 	// The reference to the secret access key
+	// +optional
 	SecretAccessKeyReference *SecretKeySelector `json:"secretAccessKey,omitempty"`
 
 	// The reference to the secret containing the region name
+	// +optional
 	RegionReference *SecretKeySelector `json:"region,omitempty"`
 
 	// The references to the session key
+	// +optional
 	SessionToken *SecretKeySelector `json:"sessionToken,omitempty"`
 
 	// Use the role based authentication without providing explicitly the keys.
 	// +optional
-	InheritFromIAMRole bool `json:"inheritFromIAMRole"`
+	InheritFromIAMRole bool `json:"inheritFromIAMRole,omitempty"`
 }
 
 // AzureCredentials is the type for the credentials to be used to upload
@@ -1579,34 +1816,39 @@ type S3Credentials struct {
 // - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
 type AzureCredentials struct {
 	// The connection string to be used
+	// +optional
 	ConnectionString *SecretKeySelector `json:"connectionString,omitempty"`
 
 	// The storage account where to upload data
+	// +optional
 	StorageAccount *SecretKeySelector `json:"storageAccount,omitempty"`
 
 	// The storage account key to be used in conjunction
 	// with the storage account name
+	// +optional
 	StorageKey *SecretKeySelector `json:"storageKey,omitempty"`
 
 	// A shared-access-signature to be used in conjunction with
 	// the storage account name
+	// +optional
 	StorageSasToken *SecretKeySelector `json:"storageSasToken,omitempty"`
 
 	// Use the Azure AD based authentication without providing explicitly the keys.
 	// +optional
-	InheritFromAzureAD bool `json:"inheritFromAzureAD"`
+	InheritFromAzureAD bool `json:"inheritFromAzureAD,omitempty"`
 }
 
 // GoogleCredentials is the type for the Google Cloud Storage credentials.
 // This needs to be specified even if we run inside a GKE environment.
 type GoogleCredentials struct {
+	// The secret containing the Google Cloud Storage JSON file with the credentials
+	// +optional
+	ApplicationCredentials *SecretKeySelector `json:"applicationCredentials,omitempty"`
+
 	// If set to true, will presume that it's running inside a GKE environment,
 	// default to false.
 	// +optional
-	GKEEnvironment bool `json:"gkeEnvironment"`
-
-	// The secret containing the Google Cloud Storage JSON file with the credentials
-	ApplicationCredentials *SecretKeySelector `json:"applicationCredentials,omitempty"`
+	GKEEnvironment bool `json:"gkeEnvironment,omitempty"`
 }
 
 // MonitoringConfiguration is the type containing all the monitoring
@@ -1616,16 +1858,20 @@ type MonitoringConfiguration struct {
 	// Set it to `true` if you don't want to inject default queries into the cluster.
 	// Default: false.
 	// +kubebuilder:default:=false
+	// +optional
 	DisableDefaultQueries *bool `json:"disableDefaultQueries,omitempty"`
 
 	// The list of config maps containing the custom queries
+	// +optional
 	CustomQueriesConfigMap []ConfigMapKeySelector `json:"customQueriesConfigMap,omitempty"`
 
 	// The list of secrets containing the custom queries
+	// +optional
 	CustomQueriesSecret []SecretKeySelector `json:"customQueriesSecret,omitempty"`
 
 	// Enable or disable the `PodMonitor`
 	// +kubebuilder:default:=false
+	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 }
 
@@ -1641,24 +1887,30 @@ type ExternalCluster struct {
 	Name string `json:"name"`
 
 	// The list of connection parameters, such as dbname, host, username, etc
+	// +optional
 	ConnectionParameters map[string]string `json:"connectionParameters,omitempty"`
 
 	// The reference to an SSL certificate to be used to connect to this
 	// instance
+	// +optional
 	SSLCert *corev1.SecretKeySelector `json:"sslCert,omitempty"`
 
 	// The reference to an SSL private key to be used to connect to this
 	// instance
+	// +optional
 	SSLKey *corev1.SecretKeySelector `json:"sslKey,omitempty"`
 
 	// The reference to an SSL CA public key to be used to connect to this
 	// instance
+	// +optional
 	SSLRootCert *corev1.SecretKeySelector `json:"sslRootCert,omitempty"`
 
 	// The reference to the password to be used to connect to the server
+	// +optional
 	Password *corev1.SecretKeySelector `json:"password,omitempty"`
 
 	// The configuration for the barman-cloud tool suite
+	// +optional
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 }
 
@@ -1685,6 +1937,7 @@ const (
 // by the instance manager
 type ManagedConfiguration struct {
 	// Database roles managed by the `Cluster`
+	// +optional
 	Roles []RoleConfiguration `json:"roles,omitempty"`
 }
 
@@ -1698,42 +1951,72 @@ type RoleConfiguration struct {
 	// Name of the role
 	Name string `json:"name"`
 	// Description of the role
+	// +optional
 	Comment string `json:"comment,omitempty"`
 
 	// Ensure the role is `present` or `absent` - defaults to "present"
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
+	// +optional
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
 	// Secret containing the password of the role (if present)
 	// If null, the password will be ignored unless DisablePassword is set
+	// +optional
 	PasswordSecret *LocalObjectReference `json:"passwordSecret,omitempty"`
-	// DisablePassword indicates that a role's password should be set to NULL in Postgres
-	DisablePassword bool `json:"disablePassword,omitempty"`
-	// Whether the role is a `superuser` who can override all access
-	// restrictions within the database - superuser status is dangerous and
-	// should be used only when really needed. You must yourself be a
-	// superuser to create a new superuser. Defaults is `false`.
-	Superuser bool `json:"superuser,omitempty"`
-	// When set to `true`, the role being defined will be allowed to create
-	// new databases. Specifying `false` (default) will deny a role the
-	// ability to create databases.
-	CreateDB bool `json:"createdb,omitempty"`
-	// Whether the role will be permitted to create, alter, drop, comment
-	// on, change the security label for, and grant or revoke membership in
-	// other roles. Default is `false`.
-	CreateRole bool `json:"createrole,omitempty"`
+
+	// If the role can log in, this specifies how many concurrent
+	// connections the role can make. `-1` (the default) means no limit.
+	// +kubebuilder:default:=-1
+	// +optional
+	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
+
+	// Date and time after which the role's password is no longer valid.
+	// When omitted, the password will never expire (default).
+	// +optional
+	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
+
+	// List of one or more existing roles to which this role will be
+	// immediately added as a new member. Default empty.
+	// +optional
+	InRoles []string `json:"inRoles,omitempty"`
 
 	// Whether a role "inherits" the privileges of roles it is a member of.
 	// Defaults is `true`.
 	// +kubebuilder:default:=true
+	// +optional
 	Inherit *bool `json:"inherit,omitempty"` // IMPORTANT default is INHERIT
+
+	// DisablePassword indicates that a role's password should be set to NULL in Postgres
+	// +optional
+	DisablePassword bool `json:"disablePassword,omitempty"`
+
+	// Whether the role is a `superuser` who can override all access
+	// restrictions within the database - superuser status is dangerous and
+	// should be used only when really needed. You must yourself be a
+	// superuser to create a new superuser. Defaults is `false`.
+	// +optional
+	Superuser bool `json:"superuser,omitempty"`
+
+	// When set to `true`, the role being defined will be allowed to create
+	// new databases. Specifying `false` (default) will deny a role the
+	// ability to create databases.
+	// +optional
+	CreateDB bool `json:"createdb,omitempty"`
+
+	// Whether the role will be permitted to create, alter, drop, comment
+	// on, change the security label for, and grant or revoke membership in
+	// other roles. Default is `false`.
+	// +optional
+	CreateRole bool `json:"createrole,omitempty"`
 
 	// Whether the role is allowed to log in. A role having the `login`
 	// attribute can be thought of as a user. Roles without this attribute
 	// are useful for managing database privileges, but are not users in
 	// the usual sense of the word. Default is `false`.
+	// +optional
 	Login bool `json:"login,omitempty"`
+
 	// Whether a role is a replication role. A role must have this
 	// attribute (or be a superuser) in order to be able to connect to the
 	// server in replication mode (physical or logical replication) and in
@@ -1741,23 +2024,13 @@ type RoleConfiguration struct {
 	// the `replication` attribute is a very highly privileged role, and
 	// should only be used on roles actually used for replication. Default
 	// is `false`.
+	// +optional
 	Replication bool `json:"replication,omitempty"`
+
 	// Whether a role bypasses every row-level security (RLS) policy.
 	// Default is `false`.
+	// +optional
 	BypassRLS bool `json:"bypassrls,omitempty"` // Row-Level Security
-
-	// If the role can log in, this specifies how many concurrent
-	// connections the role can make. `-1` (the default) means no limit.
-	// +kubebuilder:default:=-1
-	ConnectionLimit int64 `json:"connectionLimit,omitempty"`
-
-	// Date and time after which the role's password is no longer valid.
-	// When omitted, the password will never expire (default).
-	ValidUntil *metav1.Time `json:"validUntil,omitempty"`
-
-	// List of one or more existing roles to which this role will be
-	// immediately added as a new member. Default empty.
-	InRoles []string `json:"inRoles,omitempty"`
 }
 
 // GetRoleSecretsName gets the name of the secret which is used to store the role's password
@@ -1776,6 +2049,7 @@ func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
 	return true
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
@@ -1789,14 +2063,15 @@ func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
 // Cluster is the Schema for the PostgreSQL API
 type Cluster struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
 	// Specification of the desired behavior of the cluster.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	Spec ClusterSpec `json:"spec,omitempty"`
+	Spec ClusterSpec `json:"spec"`
 	// Most recently observed status of the cluster. This data may not be up
 	// to date. Populated by the system. Read-only.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
 	Status ClusterStatus `json:"status,omitempty"`
 }
 
@@ -1816,34 +2091,44 @@ type ClusterList struct {
 // managed by the operator
 type SecretsResourceVersion struct {
 	// The resource version of the "postgres" user secret
+	// +optional
 	SuperuserSecretVersion string `json:"superuserSecretVersion,omitempty"`
 
 	// The resource version of the "streaming_replica" user secret
+	// +optional
 	ReplicationSecretVersion string `json:"replicationSecretVersion,omitempty"`
 
 	// The resource version of the "app" user secret
+	// +optional
 	ApplicationSecretVersion string `json:"applicationSecretVersion,omitempty"`
 
 	// The resource versions of the managed roles secrets
+	// +optional
 	ManagedRoleSecretVersions map[string]string `json:"managedRoleSecretVersion,omitempty"`
 
 	// Unused. Retained for compatibility with old versions.
+	// +optional
 	CASecretVersion string `json:"caSecretVersion,omitempty"`
 
 	// The resource version of the PostgreSQL client-side CA secret version
+	// +optional
 	ClientCASecretVersion string `json:"clientCaSecretVersion,omitempty"`
 
 	// The resource version of the PostgreSQL server-side CA secret version
+	// +optional
 	ServerCASecretVersion string `json:"serverCaSecretVersion,omitempty"`
 
 	// The resource version of the PostgreSQL server-side secret version
+	// +optional
 	ServerSecretVersion string `json:"serverSecretVersion,omitempty"`
 
 	// The resource version of the Barman Endpoint CA if provided
+	// +optional
 	BarmanEndpointCA string `json:"barmanEndpointCA,omitempty"`
 
 	// A map with the versions of all the secrets used to pass metrics.
 	// Map keys are the secret names, map values are the versions
+	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
 }
 
@@ -1852,6 +2137,7 @@ type SecretsResourceVersion struct {
 type ConfigMapResourceVersion struct {
 	// A map with the versions of all the config maps used to pass metrics.
 	// Map keys are the config map names, map values are the versions
+	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
 }
 
@@ -2527,10 +2813,15 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 // SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
 // sets all the needed annotations and labels
 func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
+	cluster.SetInheritedData(obj)
+	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
+}
+
+// SetInheritedData sets all the needed annotations and labels
+func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta) {
 	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
 	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 	utils.LabelClusterName(obj, cluster.GetName())
-	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(obj, versions.Version)
 }
 
@@ -2551,6 +2842,12 @@ func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
 	return &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
+}
+
+// IsInplaceRestartPhase returns true if the cluster is in a phase that handles the Inplace restart
+func (cluster *Cluster) IsInplaceRestartPhase() bool {
+	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
+		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination
@@ -2608,13 +2905,10 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"
 	}
-	switch {
-	case target.Exclusive == nil:
-		result += "recovery_target_inclusive = true\n"
-	case *target.Exclusive:
-		result += "recovery_target_inclusive = true\n"
-	default:
+	if target.Exclusive != nil && *target.Exclusive {
 		result += "recovery_target_inclusive = false\n"
+	} else {
+		result += "recovery_target_inclusive = true\n"
 	}
 
 	return result

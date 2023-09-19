@@ -7,12 +7,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.1.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.2.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.1.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.2.yaml
 ```
 
 You can verify that with:
@@ -243,7 +243,7 @@ convention over configuration.
 
 #### Backup from a standby
 
-[Backup from a standby](backup_recovery.md#backup-from-a-standby)
+[Backup from a standby](backup.md#backup-from-a-standby)
 was introduced in CloudNativePG 1.19, but disabled by default - meaning that
 the base backup is taken from the primary unless the target is explicitly
 set to prefer standby.
