@@ -65,7 +65,7 @@ PostgreSQL cluster it deploys:
 * `[cluster name]-superuser`
 * `[cluster name]-app`
 
-The secrets contain the following:
+Each secret contain the following:
 
 * username
 * password
@@ -73,12 +73,12 @@ The secrets contain the following:
 * port number
 * database name
 * a working [`.pgpass file`](https://www.postgresql.org/docs/current/libpq-pgpass.html)
-  for the `postgres` user and the *owner* of the database respectively.
 * [uri](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
 * [jdbc-uri](https://jdbc.postgresql.org/documentation/use/#connecting-to-the-database)
 
 The `-app` credentials are the ones that should be used by applications
-connecting to the PostgreSQL cluster.
+connecting to the PostgreSQL cluster, and correspond to the user *owning* the
+database.
 
-The `-superuser` ones are supposed to be used only for administrative purposes.
-
+The `-superuser` ones are supposed to be used only for administrative purposes,
+and correspond to the `postgres` user.
