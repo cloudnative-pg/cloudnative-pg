@@ -536,6 +536,61 @@ allow-prometheus       cnpg.io/cluster=cluster-example   47m
 default-deny-ingress   <none>                            57m
 ```
 
+## PostgreSQL core dumps
+
+Although rare, PostgreSQL can sometimes crash and generate a core dump
+in the `PGDATA` folder. When that happens, normally it is a bug in PostgreSQL
+(and most likely it has already been solved - this is why it is important
+to always run the latest minor version of PostgreSQL).
+
+CloudNativePG allows you to control what to include in the core dump through
+the `cnpg.io/coredumpFilter` annotation.
+
+!!! Info
+    Please refer to ["Labels and annotations"](labels_annotations.md)
+    for more details on the standard annotations that CloudNativePG provides.
+
+By default, the `cnpg.io/coredumpFilter` is set to `0x31` in order to
+exclude shared memory segments from the dump, as this is the safest
+approach in most cases.
+
+!!! Info
+    Please refer to
+    ["Core dump filtering settings" section of "The `/proc` Filesystem" page of the Linux Kernel documentation](https://docs.kernel.org/filesystems/proc.html#proc-pid-coredump-filter-core-dump-filtering-settings).
+    for more details on how to set the bitmask that controls the core dump filter.
+
+!!! Important
+    Beware that this setting only takes effect during Pod startup and that changing
+    the annotation doesn't trigger an automated rollout of the instances.
+
+Although you might not personally be involved in inspecting core dumps,
+you might be asked to provide them so that a Postgres expert can look
+into them. First, verify that you have a core dump in the `PGDATA`
+directory with the following command (please run it against the
+correct pod where the Postgres instance is running):
+
+```sh
+kubectl exec -ti POD -c postgres \
+  -- find /var/lib/postgresql/data/pgdata -name 'core.*'
+```
+
+Under normal circumstances, this should return an empty set. Suppose, for
+example, that we have a core dump file:
+
+```
+/var/lib/postgresql/data/pgdata/core.14177
+```
+
+Once you have verified the space on disk is sufficient, you can collect the
+core dump on your machine through `kubectl cp` as follows:
+
+```sh
+kubectl cp POD:/var/lib/postgresql/data/pgdata/core.14177 core.14177
+```
+
+You now have the file. Make sure you free the space on the server by
+removing the core dumps.
+
 ## Some common issues
 
 ### Storage is full

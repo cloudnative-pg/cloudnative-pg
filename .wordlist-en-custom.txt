@@ -454,6 +454,7 @@ bindAsAuth
 bindDN
 bindPassword
 bindSearchAuth
+bitmask
 bool
 bootstrapconfiguration
 bootstrapinitdb
@@ -519,6 +520,8 @@ connectionParameters
 connectionString
 conninfo
 containerPort
+coredump
+coredumps
 coreos
 corev
 coverity
