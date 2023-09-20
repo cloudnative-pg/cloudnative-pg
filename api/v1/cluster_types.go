@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -2842,6 +2843,15 @@ func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
 	return &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
+}
+
+// GetCoredumpFilter get the coredump filter value from the cluster annotation
+func (cluster *Cluster) GetCoredumpFilter() string {
+	value, ok := cluster.Annotations[utils.CoredumpFilter]
+	if ok {
+		return value
+	}
+	return system.DefaultCoredumpFilter
 }
 
 // IsInplaceRestartPhase returns true if the cluster is in a phase that handles the Inplace restart

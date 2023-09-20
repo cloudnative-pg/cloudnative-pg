@@ -23,6 +23,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	// this is needed to correctly open the sql connection with the pgx driver
@@ -77,6 +78,11 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 // Join creates a new instance joined to an existing PostgreSQL cluster
 func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
+
+	coredumpFilter := cluster.GetCoredumpFilter()
+	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
+		return err
+	}
 
 	err := ClonePgData(primaryConnInfo, info.PgData, info.PgWal)
 	if err != nil {

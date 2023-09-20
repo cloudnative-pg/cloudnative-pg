@@ -43,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
@@ -324,6 +325,11 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 	cluster, err := info.loadCluster(ctx, typedClient)
 	if err != nil {
+		return err
+	}
+
+	coredumpFilter := cluster.GetCoredumpFilter()
+	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
 		return err
 	}
 
