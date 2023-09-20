@@ -49,6 +49,7 @@ import (
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -253,7 +254,13 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
 	// field in the status
 	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
-	isArchitectureConsistent := r.checkPodsArchitecture(ctx, &instancesStatus)
+	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
+	if err != nil {
+		contextLogger.Error(err, "while getting fenced instances")
+		return ctrl.Result{}, err
+	}
+
+	isArchitectureConsistent := r.checkPodsArchitecture(ctx, fencedInstances, &instancesStatus)
 	if !isArchitectureConsistent && onlineUpdateEnabled {
 		contextLogger.Info("Architecture mismatch detected, disabling instance manager online updates")
 		onlineUpdateEnabled = false
@@ -604,13 +611,17 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Cont
 }
 
 // checkPodsArchitecture checks whether the architecture of the instances is consistent with the runtime one
-func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *postgres.PostgresqlStatusList) bool {
+func (r *ClusterReconciler) checkPodsArchitecture(
+	ctx context.Context,
+	fencedInstances *stringset.Data,
+	status *postgres.PostgresqlStatusList,
+) bool {
 	contextLogger := log.FromContext(ctx)
 	isConsistent := true
 
 	for _, podStatus := range status.Items {
-		// Ignore architecture in podStatus with errors
-		if podStatus.Error != nil {
+		// Ignore architecture in podStatus with errors or that are fenced
+		if podStatus.Error != nil || fencedInstances.Has(podStatus.Pod.Name) {
 			continue
 		}
 
