@@ -38,8 +38,8 @@ Below is a list of predefined labels that are managed by CloudNativePG.
 :   Name of the cluster
 
 `cnpg.io/immediateBackup`
-:   Indicates the first backup of a scheduledBackup is taken immediately or not,
-    applied on `Backup`
+:   Applied to a `Backup` resource if the backup is the first one created from
+    a `ScheduledBackup` object having `immediate` set to `true`.
 
 `cnpg.io/instanceName`
 :   Name of the PostgreSQL instance - this label replaces the old and
@@ -58,14 +58,15 @@ Below is a list of predefined labels that are managed by CloudNativePG.
 :   Purpose of the PVC, such as `PG_DATA` or `PG_WAL`
 
 `cnpg.io/reload`
-:   If resource change will be automatically reloaded by operator or not, values
-    are `true` or `false`, available on `ConfigMap`, `Secret`
+:   Available on `ConfigMap` and `Secret` resources. When set to `true`,
+    a change in the resource will be automatically reloaed by the operator.
 
 `cnpg.io/scheduled-backup`
-:   Name of the parent scheduled backup if had, applied on `Backup`
+:   When available, name of the `ScheduledBackup` resource that created a given
+    `Backup` object.
 
 `role`
-:   Role of the instance pod (i.e. `primary`, `replica`)
+:   Whether the instance running in a pod is a `primary` or a `replica`
 
 ## Predefined annotations
 
@@ -87,25 +88,28 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
     replaces the old and deprecated `cnpg.io/hibernateClusterManifest` label
 
 `cnpg.io/fencedInstances`
-:   Name of the instances to be fenced, the value should be a JSON list of all instances
-    we want to be fenced, e.g `["cluster-example-1","cluster-example-2`"]. If the list
-    contains `*` element, every instance is fenced.
+:   List, expressed in JSON format, of the instances that need to be fenced.
+    The whole cluster is fenced if the list contains the `*` element.
 
 `cnpg.io/forceLegacyBackup`
-:   If `true`, force to call barman-cloud-backup without a reference backup name
-    (without `--name` option)
+:   Applied to a `Cluster` resource for testing purposes only, in order to
+    simulate the behavior of `barman-cloud-backup` prior to version 3.4 (Jan 2023)
+    when the `--name` option was not available.
 
 `cnpg.io/hash`
 :   The hash value of the resource
 
 `cnpg.io/hibernation`
-:   An annotation used to hibernate a cluster, support values are `on`, `off`
+:   Applied to a `Cluster` resource to control the [declarative hibernation feature](declarative_hibernation.md).
+    Allowed values are `on` and `off`.
 
 `cnpg.io/managedSecrets`
-:   Name of image pull secrets managed by operator, applied on `ServiceAccount`
+:   Pull secrets managed by the operator and automatically set in the
+    `ServiceAccount` resources for each Postgres cluster
 
 `cnpg.io/nodeSerial`
-:   Serial number of the instance pod
+:   On a pod resource, identifies the serial number of the instance within the
+    Postgres cluster
 
 `cnpg.io/operatorVersion`
 :   Version of the operator
@@ -122,7 +126,7 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
     the old and deprecated `cnpg.io/podEnvHash` annotation
 
 `cnpg.io/poolerSpecHash`
-:   Hash of the PgBouncer pooler, used by pooler `Deployment`
+:   Hash of the pooler resource
 
 `cnpg.io/pvcStatus`
 :   Current status of the pvc, one of `initializing`, `ready`, `detached`
@@ -140,7 +144,7 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
     risk.
 
 `kubectl.kubernetes.io/restartedAt`
-:  Contains the latest cluster restart time
+:  When available, the time of last requesteed restart of a Postgres cluster
 
 ## Pre-requisites
 
