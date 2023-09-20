@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -42,8 +43,6 @@ var _ = Describe("Verify Volume Snapshot",
 	Label(tests.LabelBackupRestore, tests.LabelStorage, tests.LabelSnapshot), func() {
 		// Initializing a global namespace variable to be used in each test case
 		var namespace string
-		// Gathering the default volumeSnapshot class for the current environment
-		volumeSnapshotClassName := os.Getenv("E2E_DEFAULT_VOLUMESNAPSHOT_CLASS")
 
 		Context("Can create a Volume Snapshot", Ordered, func() {
 			// test env constants
@@ -51,7 +50,6 @@ var _ = Describe("Verify Volume Snapshot",
 				sampleFile      = fixturesDir + "/volume_snapshot/cluster-volume-snapshot.yaml.template"
 				namespacePrefix = "volume-snapshot"
 				level           = tests.High
-				snapshotSuffix  = "test"
 			)
 
 			var clusterName string
@@ -79,55 +77,54 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 
 			It("using the kubectl cnpg plugin", func() {
-				err := testUtils.CreateVolumeSnapshotBackup(
-					volumeSnapshotClassName,
-					namespace,
-					clusterName,
-					"",
-					"",
-				)
-				Expect(err).ToNot(HaveOccurred())
+				var backupObject apiv1.Backup
+				By("creating a volumeSnapshot and waiting until it's completed", func() {
+					err := testUtils.CreateOnDemandBackupViaKubectlPlugin(
+						namespace,
+						clusterName,
+						"",
+						apiv1.BackupTargetStandby,
+						apiv1.BackupMethodVolumeSnapshot,
+					)
+					Expect(err).ToNot(HaveOccurred())
 
-				Eventually(func(g Gomega) {
-					snapshotList, _ := env.GetSnapshotList(namespace)
-					for _, snapshot := range snapshotList.Items {
-						if strings.Contains(snapshot.Name, snapshotSuffix) {
-							continue
+					Eventually(func(g Gomega) {
+						backupList, err := env.GetBackupList(namespace)
+						g.Expect(err).ToNot(HaveOccurred())
+						for _, backup := range backupList.Items {
+							if !strings.Contains(backup.Name, clusterName) {
+								continue
+							}
+							backupObject = backup
+							g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+							g.Expect(backup.Status.BackupSnapshotStatus.Snapshots).To(HaveLen(2))
 						}
-						g.Expect(snapshot.Name).To(ContainSubstring(clusterName))
-					}
-				}).Should(Succeed())
-			})
+					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
+				})
 
-			It("using the kubectl cnpg plugin with a custom suffix and label name", func() {
-				const backupName = "backup-name"
-				err := testUtils.CreateVolumeSnapshotBackup(
-					volumeSnapshotClassName,
-					namespace,
-					clusterName,
-					snapshotSuffix,
-					backupName,
-				)
-				Expect(err).ToNot(HaveOccurred())
-
-				Eventually(func(g Gomega) {
-					snapshotList, _ := env.GetSnapshotList(namespace)
-					for _, snapshot := range snapshotList.Items {
-						if strings.Contains(snapshot.Name, snapshotSuffix) {
-							g.Expect(snapshot.Name).To(ContainSubstring(clusterName))
-							g.Expect(snapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupName))
+				By("checking that volumeSnapshots are properly labeled", func() {
+					Eventually(func(g Gomega) {
+						for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Snapshots {
+							volumeSnapshot, err := env.GetVolumeSnapshot(namespace, snapshot)
+							g.Expect(err).ToNot(HaveOccurred())
+							g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
+							g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
+							g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
 						}
-					}
-				}).Should(Succeed())
+					}).Should(Succeed())
+				})
 			})
 		})
 
 		Context("Can restore from a Volume Snapshot", Ordered, func() {
 			// test env constants
 			const (
-				namespacePrefix = "volume-snapshot-recovery"
-				level           = tests.High
-				filesDir        = fixturesDir + "/volume_snapshot"
+				namespacePrefix       = "volume-snapshot-recovery"
+				level                 = tests.High
+				filesDir              = fixturesDir + "/volume_snapshot"
+				snapshotDataEnv       = "SNAPSHOT_PITR_PGDATA"
+				snapshotWalEnv        = "SNAPSHOT_PITR_PGWAL"
+				recoveryTargetTimeEnv = "SNAPSHOT_PITR"
 			)
 			// minio constants
 			const (
@@ -205,7 +202,14 @@ var _ = Describe("Verify Volume Snapshot",
 
 			It("correctly executes PITR with a cold snapshot", func() {
 				DeferCleanup(func() error {
-					return os.Unsetenv("SNAPSHOT_PITR")
+					if err := os.Unsetenv(snapshotDataEnv); err != nil {
+						return err
+					}
+					if err := os.Unsetenv(snapshotWalEnv); err != nil {
+						return err
+					}
+					err := os.Unsetenv(recoveryTargetTimeEnv)
+					return err
 				})
 
 				By("creating the cluster to snapshot", func() {
@@ -225,15 +229,39 @@ var _ = Describe("Verify Volume Snapshot",
 					}, 60).Should(BeTrue())
 				})
 
-				By("creating the snapshot", func() {
-					const suffix = "test-pitr"
-					err := testUtils.CreateVolumeSnapshotBackup(
-						volumeSnapshotClassName,
+				var backup *apiv1.Backup
+				By("creating a snapshot and waiting until it's completed", func() {
+					var err error
+					backupName := fmt.Sprintf("%s-example", clusterToSnapshotName)
+					backup, err = testUtils.CreateOnDemandBackup(
 						namespace,
 						clusterToSnapshotName,
-						suffix,
-						"",
-					)
+						backupName,
+						apiv1.BackupTargetStandby,
+						apiv1.BackupMethodVolumeSnapshot,
+						env)
+					Expect(err).ToNot(HaveOccurred())
+
+					Eventually(func(g Gomega) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      backupName,
+						}, backup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.BackupSnapshotStatus.Snapshots).To(HaveLen(2))
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
+				})
+
+				By("fetching the volume snapshots", func() {
+					snapshotList := volumesnapshot.VolumeSnapshotList{}
+					err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
+						utils.ClusterLabelName: clusterToSnapshotName,
+					})
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Snapshots)))
+
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -248,7 +276,7 @@ var _ = Describe("Verify Volume Snapshot",
 					// Get the recovery_target_time and pass it to the template engine
 					recoveryTargetTime, err := testUtils.GetCurrentTimestamp(namespace, clusterToSnapshotName, env, psqlClientPod)
 					Expect(err).ToNot(HaveOccurred())
-					err = os.Setenv("SNAPSHOT_PITR", recoveryTargetTime)
+					err = os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
 					Expect(err).ToNot(HaveOccurred())
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
@@ -348,7 +376,7 @@ var _ = Describe("Verify Volume Snapshot",
 						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
-					}, 300).Should(Succeed())
+					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
 				})
 

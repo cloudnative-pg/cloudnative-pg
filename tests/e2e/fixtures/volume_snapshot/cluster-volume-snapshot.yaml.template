@@ -17,3 +17,8 @@ spec:
   walStorage:
     storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
+
+  backup:
+    volumeSnapshot:
+      className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}
+      snapshotOwnerReference: cluster

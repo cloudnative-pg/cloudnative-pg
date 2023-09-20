@@ -295,7 +295,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(backup.Status.BackupSnapshotStatus.Snapshots).To(HaveLen(2))
 					g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
-				}, testTimeouts[testUtils.BackupIsReady]).Should(Succeed())
+				}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 			})
 
 			By("fetching the volume snapshots", func() {
