@@ -987,6 +987,20 @@ func (r *Cluster) validateResources() field.ErrorList {
 		}
 	}
 
+	ephemeralStoragePopulated := !r.Spec.Resources.Requests.StorageEphemeral().IsZero() &&
+		!r.Spec.Resources.Limits.StorageEphemeral().IsZero()
+	if ephemeralStoragePopulated {
+		ephemeralStorageRequestGtThanLimit := r.Spec.Resources.Requests.StorageEphemeral().
+			Cmp(*r.Spec.Resources.Limits.StorageEphemeral()) > 0
+		if ephemeralStorageRequestGtThanLimit {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "resources", "requests", "storage"),
+				r.Spec.Resources.Requests.StorageEphemeral().String(),
+				"Ephemeral storage request is greater than the limit",
+			))
+		}
+	}
+
 	return result
 }
 
