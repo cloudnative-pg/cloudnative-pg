@@ -77,8 +77,8 @@ data:
           },
           "id": 334,
           "options": {
-            "alertInstanceLabelFilter": "",
-            "alertName": "Database",
+            "alertInstanceLabelFilter": "{namespace=~\"$namespace\",pod=~\"$cluster-[0-9]+$\"}",
+            "alertName": "",
             "dashboardAlerts": false,
             "folder": "",
             "groupBy": [],
