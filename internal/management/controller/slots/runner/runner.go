@@ -98,6 +98,13 @@ func (sr *Replicator) reconcile(ctx context.Context, config *apiv1.ReplicationSl
 		}
 	}()
 
+	contextLog := log.FromContext(ctx)
+
+	if sr.instance.IsFenced() {
+		contextLog.Trace("Replication slots reconciliation skipped: instance is fenced.")
+		return nil
+	}
+
 	primaryPool := sr.instance.PrimaryConnectionPool()
 	localPool := sr.instance.ConnectionPool()
 	err = synchronizeReplicationSlots(
