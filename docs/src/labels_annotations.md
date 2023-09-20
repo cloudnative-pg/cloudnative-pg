@@ -59,6 +59,12 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
     See [AppArmor](security.md#restricting-pod-access-using-apparmor)
     documentation for details
 
+`cnpg.io/coredumpFilter`
+:   Filter to control the coredump of Postgres processes, expressed with a
+    bitmask. By default it is set to `0x31` in order to exclude shared memory
+    segments from the dump. Please refer to ["PostgreSQL core dumps"](troubleshooting.md#postgresql-core-dumps)
+    for more information.
+
 `cnpg.io/clusterManifest`
 :   Manifest of the `Cluster` owning this resource (such as a PVC) - this label
     replaces the old and deprecated `cnpg.io/hibernateClusterManifest` label
@@ -84,14 +90,6 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
 :   When set to `true` on a `Cluster` resource, the operator disables the check
     that ensures that the WAL archive is empty before writing data. Use at your own
     risk.
-
-`cnpg.io/coredumpFilter`
-:   Customize the coredump filter bitmask of Postgres processes.
-    Set by default to `0x31` that excludes shared memory.
-    See https://docs.kernel.org/filesystems/proc.html#proc-pid-coredump-filter-core-dump-filtering-settings
-    This setting only takes effect during Pod startup,
-    and changing it doesn't trigger any automatic rollout of the instances.
-
 
 ## Pre-requisites
 
