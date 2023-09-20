@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -87,7 +87,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 			Expect(err).ToNot(HaveOccurred())
 			podList := &corev1.PodList{}
 			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-				ctrlclient.MatchingLabels{utils2.PgbouncerNameLabel: poolerName})
+				ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
 			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
@@ -102,7 +102,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 			Expect(err).ToNot(HaveOccurred())
 			podList := &corev1.PodList{}
 			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-				ctrlclient.MatchingLabels{utils2.PgbouncerNameLabel: poolerName})
+				ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
 			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
@@ -139,7 +139,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				Expect(err).ToNot(HaveOccurred())
 				podList := &corev1.PodList{}
 				err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-					ctrlclient.MatchingLabels{utils2.PgbouncerNameLabel: poolerName})
+					ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 				Expect(err).ToNot(HaveOccurred())
 
 				assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
@@ -154,7 +154,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				Expect(err).ToNot(HaveOccurred())
 				podList := &corev1.PodList{}
 				err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-					ctrlclient.MatchingLabels{utils2.PgbouncerNameLabel: poolerName})
+					ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
 				Expect(err).ToNot(HaveOccurred())
 				assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
 			})

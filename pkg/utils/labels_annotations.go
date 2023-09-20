@@ -138,7 +138,7 @@ const (
 
 	// OperatorManagedSecretsAnnotationName is the name of the annotation containing
 	// the secrets managed by the operator inside the generated service account
-	OperatorManagedSecretsAnnotationName = MetadataNamespace + "/managedSecrets" // #nosec
+	OperatorManagedSecretsAnnotationName = MetadataNamespace + "/managedSecrets"
 
 	// FencedInstanceAnnotation is the annotation to be used for fencing instances, the value should be a
 	// JSON list of all the instances we want to be fenced, e.g. `["cluster-example-1","cluster-example-2`"].
