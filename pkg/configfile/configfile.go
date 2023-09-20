@@ -144,9 +144,20 @@ func RemoveOptionFromConfigurationContents(content string, option string) string
 	return strings.Join(resultContent, "\n") + "\n"
 }
 
-// ReadOptionsFromConfigurationContents read the lines containing options into a map
-func ReadOptionsFromConfigurationContents(content string) (options map[string]string) {
-	options = map[string]string{}
+// ReadOptionsFromConfigurationContents read the options from the configuration file as a map
+func ReadOptionsFromConfigurationContents(content string, options []string) (result map[string]string) {
+	result = make(map[string]string, len(options))
+	for _, option := range options {
+		exists, value := ReadOptionFromConfigurationContents(content, option)
+		if exists {
+			result[option] = value
+		}
+	}
+	return result
+}
+
+// ReadOptionFromConfigurationContents read the option value from the configuration file
+func ReadOptionFromConfigurationContents(content string, option string) (bool, string) {
 	for _, line := range splitLines(content) {
 		trimLine := strings.TrimSpace(line)
 		if len(trimLine) == 0 || trimLine[0] == '#' {
@@ -154,7 +165,11 @@ func ReadOptionsFromConfigurationContents(content string) (options map[string]st
 		}
 
 		kv := strings.SplitN(trimLine, "=", 2)
-		options[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		key := strings.TrimSpace(kv[0])
+
+		if key == option {
+			return true, strings.TrimSpace(kv[1])
+		}
 	}
-	return
+	return false, ""
 }

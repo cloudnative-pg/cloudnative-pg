@@ -247,7 +247,7 @@ func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (change
 		return false, err
 	}
 	if changed {
-		log.Info("Updated replication settings in recovery.conf file")
+		log.Info("Updated replication settings", "filename", "recovery.conf")
 	}
 
 	return changed, nil
@@ -276,7 +276,7 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 	}
 
 	if changed {
-		log.Info("Updated replication settings in %v file", constants.PostgresqlOverrideConfigurationFile)
+		log.Info("Updated replication settings", "filename", constants.PostgresqlOverrideConfigurationFile)
 	}
 
 	return changed, nil
@@ -292,68 +292,87 @@ func createStandbySignal(pgData string) error {
 	return err
 }
 
-// ensureConfOptionsMigration migrates options managed by the operator from `postgresql.auto.conf` file,
-// now moved in the `override.conf` file
-func ensureConfOptionsMigration(ctx context.Context, pgData string) (changed bool, err error) {
+// cleanPostgresAutoConfFile remove all the options historically managed by the operator from
+// `postgresql.auto.conf` file, now moved in the `override.conf` file
+func cleanPostgresAutoConfFile(ctx context.Context, instance *Instance) (changed bool, err error) {
 	contextLogger := log.FromContext(ctx)
-	overrideConfigFile := filepath.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
-
-	existing, err := fileutils.FileExists(overrideConfigFile)
+	targetFile := path.Join(instance.PgData, "postgresql.auto.conf")
+	currentContent, err := fileutils.ReadFile(targetFile)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("error while reading content of %v: %w", targetFile, err)
 	}
 
-	if existing {
-		return false, nil
+	updatedContent := configfile.RemoveOptionsFromConfigurationContents(string(currentContent),
+		[]string{
+			"archive_mode",
+			"primary_slot_name",
+			"primary_conninfo",
+			"recovery_target_timeline",
+			"restore_command",
+		})
+	if changed, err = fileutils.WriteStringToFile(targetFile, updatedContent); err != nil {
+		return false,
+			fmt.Errorf("error while clean replication settings in postgresql.auto.conf file: %w", err)
+	}
+	if changed {
+		contextLogger.Info("Migrated replication settings", "filename", "postgresql.auto.conf")
+		// add include `override.conf` at the end of the `postgresql.conf` file
+		if err = fileutils.AppendStringToFile(
+			path.Join(instance.PgData, "postgresql.conf"),
+			fmt.Sprintf("# load CloudNativePG override configuration\ninclude '%v'\n",
+				constants.PostgresqlOverrideConfigurationFile),
+		); err != nil {
+			return changed, fmt.Errorf(
+				"include override.conf file: %w",
+				err)
+		}
+	}
+	return changed, nil
+}
+
+// migratePostgresAutoConfFile migrates options managed by the operator from `postgresql.auto.conf` file,
+// to `override.conf` file for an upgrade case
+func migratePostgresAutoConfFile(ctx context.Context, instance *Instance) (changed bool, err error) {
+	contextLogger := log.FromContext(ctx)
+	targetFile := filepath.Join(instance.PgData, constants.PostgresqlOverrideConfigurationFile)
+	if err != nil {
+		return false, fmt.Errorf("read override.conf file: %w", err)
 	}
 
-	autoConfFile := filepath.Join(pgData, "postgresql.auto.conf")
+	autoConfFile := filepath.Join(instance.PgData, "postgresql.auto.conf")
 	autoConfContent, err := fileutils.ReadFile(autoConfFile)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("error while reading postgresql.auto.conf file: %w", err)
 	}
-	contextLogger.Info("Output postgresql.auto.conf", "content", string(autoConfContent))
-
-	migratedOptionKeys := []string{
-		"archive_mode",
+	options := configfile.ReadOptionsFromConfigurationContents(string(autoConfContent), []string{
 		"primary_slot_name",
 		"primary_conninfo",
 		"recovery_target_timeline",
 		"restore_command",
+	})
+	// no migration needed
+	if len(options) == 0 {
+		return false, nil
 	}
-
-	// write options managed by the operator into `override.conf`
-	autoConfOptions := configfile.ReadOptionsFromConfigurationContents(string(autoConfContent))
-	migratedOptions := make(map[string]string, len(migratedOptionKeys))
-	for _, key := range migratedOptionKeys {
-		if v, ok := autoConfOptions[key]; ok {
-			migratedOptions[key] = v
+	var builder strings.Builder
+	for key, value := range options {
+		builder.WriteString(key)
+		builder.WriteString("=")
+		builder.WriteString(value)
+		builder.WriteString("\n")
+	}
+	if changed, err = fileutils.WriteStringToFile(targetFile, builder.String()); err != nil {
+		return false, fmt.Errorf("error while migrating replication settings to override.conf file: %w",
+			err)
+	}
+	if changed {
+		contextLogger.Info("Migrated replication settings", "filename",
+			constants.PostgresqlOverrideConfigurationFile)
+		if _, err = cleanPostgresAutoConfFile(ctx, instance); err != nil {
+			return true, err
 		}
 	}
-
-	contextLogger.Info(fmt.Sprintf("Move options managed by the operator from %v to %v", autoConfFile, overrideConfigFile),
-		"migratedOptions", migratedOptions)
-	changed, err = configfile.UpdatePostgresConfigurationFile(overrideConfigFile, migratedOptions)
-	if err != nil {
-		return false, err
-	}
-
-	// add include `override.conf` at the end of the `postgresql.conf` file
-	err = fileutils.AppendStringToFile(
-		path.Join(pgData, "postgresql.conf"),
-		fmt.Sprintf("# load CloudNativePG override configuration\ninclude '%v'\n",
-			constants.PostgresqlOverrideConfigurationFile),
-	)
-	if err != nil {
-		return false, err
-	}
-
-	// remove options  managed by the operator from `postgresql.auto.conf`
-	autoConfFileChanged, err := fileutils.WriteStringToFile(
-		autoConfFile,
-		configfile.RemoveOptionsFromConfigurationContents(string(autoConfContent), migratedOptionKeys),
-	)
-	return changed || autoConfFileChanged, err
+	return changed, nil
 }
 
 // createPostgresqlConfiguration creates the PostgreSQL configuration to be

@@ -37,25 +37,26 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	// TODO: Remove this code when enough time has passed since 1.21 release
 	//       This is due to the operator switching from postgresql.auto.conf
 	//       to override.conf for coordinating replication configuration
-	changed, err = ensureConfOptionsMigration(ctx, instance.PgData)
+	changed, err = migratePostgresAutoConfFile(ctx, instance)
 	if err != nil {
 		return changed, err
 	}
 
 	primary, err := instance.IsPrimary()
 	if err != nil {
-		return false, err
+		return changed, err
 	}
 
 	if primary {
-		return false, nil
+		return changed, nil
 	}
 
 	if cluster.IsReplica() && cluster.Status.TargetPrimary == instance.PodName {
-		return instance.writeReplicaConfigurationForDesignatedPrimary(ctx, cli, cluster)
+		result, err := instance.writeReplicaConfigurationForDesignatedPrimary(ctx, cli, cluster)
+		return changed || result, err
 	}
-
-	return instance.writeReplicaConfigurationForReplica(cluster)
+	result, err := instance.writeReplicaConfigurationForReplica(cluster)
+	return changed || result, err
 }
 
 func (instance *Instance) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {

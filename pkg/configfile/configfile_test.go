@@ -208,18 +208,32 @@ shared_preload_libraries = 'bdr'
 wal_level = 'logical'
 track_commit_timestamp = on
 `
-		options := ReadOptionsFromConfigurationContents(initialContent)
+		options := ReadOptionsFromConfigurationContents(initialContent, []string{
+			"shared_preload_libraries",
+			"wal_level",
+			"track_commit_timestamp",
+		})
 		Expect(options).To(HaveLen(3))
 		Expect(options).To(Equal(map[string]string{
 			"shared_preload_libraries": "'bdr'",
 			"wal_level":                "'logical'",
 			"track_commit_timestamp":   "on",
 		}))
+
+		exists, value := ReadOptionFromConfigurationContents(initialContent, "shared_preload_libraries")
+		Expect(exists).To(BeTrue())
+		Expect(value).To(Equal("'bdr'"))
+
+		exists, value = ReadOptionFromConfigurationContents(initialContent, "not_exists")
+		Expect(exists).To(BeFalse())
+		Expect(value).To(BeEmpty())
 	})
 
 	It("read options from empty content", func() {
 		initialContent := ``
-		options := ReadOptionsFromConfigurationContents(initialContent)
+		options := ReadOptionsFromConfigurationContents(initialContent, []string{
+			"shared_preload_libraries",
+		})
 		Expect(options).To(BeEmpty())
 		Expect(options).To(Equal(map[string]string{}))
 	})
