@@ -59,7 +59,7 @@ Below is a list of predefined labels that are managed by CloudNativePG.
 
 `cnpg.io/reload`
 :   Available on `ConfigMap` and `Secret` resources. When set to `true`,
-    a change in the resource will be automatically reloaed by the operator.
+    a change in the resource will be automatically reloaded by the operator.
 
 `cnpg.io/scheduled-backup`
 :   When available, name of the `ScheduledBackup` resource that created a given
@@ -144,7 +144,7 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
     risk.
 
 `kubectl.kubernetes.io/restartedAt`
-:  When available, the time of last requesteed restart of a Postgres cluster
+:  When available, the time of last requested restart of a Postgres cluster
 
 ## Pre-requisites
 
