@@ -52,6 +52,7 @@ import (
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -323,6 +324,10 @@ func (r *InstanceReconciler) initialize(ctx context.Context, cluster *apiv1.Clus
 	}
 
 	if err := r.verifyPgDataCoherenceForPrimary(ctx, cluster); err != nil {
+		return err
+	}
+
+	if err := system.SetCoredumpFilter(cluster.GetCoredumpFilter()); err != nil {
 		return err
 	}
 
