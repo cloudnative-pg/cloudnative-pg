@@ -51,6 +51,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -81,6 +82,11 @@ var (
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client) error {
 	cluster, err := info.loadCluster(ctx, cli)
 	if err != nil {
+		return err
+	}
+
+	coredumpFilter := cluster.GetCoredumpFilter()
+	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
 		return err
 	}
 
@@ -195,6 +201,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 
 	cluster, err := info.loadCluster(ctx, typedClient)
 	if err != nil {
+		return err
+	}
+
+	coredumpFilter := cluster.GetCoredumpFilter()
+	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
 		return err
 	}
 
