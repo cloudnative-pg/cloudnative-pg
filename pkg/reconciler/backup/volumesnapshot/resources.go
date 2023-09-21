@@ -47,7 +47,8 @@ func (err volumeSnapshotError) Error() string {
 	return *err.InternalError.Message
 }
 
-// GetBackupVolumeSnapshots TODO
+// GetBackupVolumeSnapshots extracts the list of volume snapshots related
+// to a backup name
 func GetBackupVolumeSnapshots(
 	ctx context.Context,
 	cli client.Client,

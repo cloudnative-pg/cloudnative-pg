@@ -47,7 +47,7 @@ type Reconciler struct {
 	instanceStatusClient *instance.StatusClient
 }
 
-// ExecutorBuilder is a struct capable of creating an Reconciler
+// ExecutorBuilder is a struct capable of creating a Reconciler
 type ExecutorBuilder struct {
 	executor Reconciler
 }
