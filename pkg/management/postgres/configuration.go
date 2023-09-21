@@ -316,23 +316,13 @@ func cleanPostgresAutoConfFile(ctx context.Context, instance *Instance) (changed
 	}
 	if changed {
 		contextLogger.Info("Migrated replication settings", "filename", "postgresql.auto.conf")
-		// add include `override.conf` at the end of the `postgresql.conf` file
-		if err = fileutils.AppendStringToFile(
-			path.Join(instance.PgData, "postgresql.conf"),
-			fmt.Sprintf("# load CloudNativePG override configuration\ninclude '%v'\n",
-				constants.PostgresqlOverrideConfigurationFile),
-		); err != nil {
-			return changed, fmt.Errorf(
-				"include override.conf file: %w",
-				err)
-		}
 	}
 	return changed, nil
 }
 
 // migratePostgresAutoConfFile migrates options managed by the operator from `postgresql.auto.conf` file,
 // to `override.conf` file for an upgrade case
-func migratePostgresAutoConfFile(ctx context.Context, instance *Instance) (changed bool, err error) {
+func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, addInclude bool) (changed bool, err error) {
 	contextLogger := log.FromContext(ctx)
 	targetFile := filepath.Join(instance.PgData, constants.PostgresqlOverrideConfigurationFile)
 	if err != nil {
@@ -370,6 +360,17 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance) (chang
 			constants.PostgresqlOverrideConfigurationFile)
 		if _, err = cleanPostgresAutoConfFile(ctx, instance); err != nil {
 			return true, err
+		}
+
+		if addInclude {
+			// add include `override.conf` at the end of the `postgresql.conf` file
+			if err = fileutils.AppendStringToFile(
+				path.Join(instance.PgData, "postgresql.conf"),
+				fmt.Sprintf("# load CloudNativePG override configuration\ninclude '%v'\n",
+					constants.PostgresqlOverrideConfigurationFile),
+			); err != nil {
+				return true, fmt.Errorf("include override.conf file: %w", err)
+			}
 		}
 	}
 	return changed, nil

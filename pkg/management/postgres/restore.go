@@ -244,7 +244,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
 		return err
 	}
-
+	// we need a migration here, otherwise the server will not startup if
+	// we recover from a base which has postgresql.auto.conf
+	if _, err := migratePostgresAutoConfFile(ctx, info.GetInstance(), false); err != nil {
+		return err
+	}
 	if cluster.IsReplica() {
 		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 		if !ok {
@@ -721,7 +725,6 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
-
 	return err
 }
 
