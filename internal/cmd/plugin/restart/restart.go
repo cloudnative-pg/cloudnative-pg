@@ -27,7 +27,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // restart marks the cluster as needing to restart
@@ -44,7 +44,7 @@ func restart(ctx context.Context, clusterName string) error {
 	if clusterRestarted.Annotations == nil {
 		clusterRestarted.Annotations = make(map[string]string)
 	}
-	clusterRestarted.Annotations[specs.ClusterRestartAnnotationName] = time.Now().Format(time.RFC3339)
+	clusterRestarted.Annotations[utils.ClusterRestartAnnotationName] = time.Now().Format(time.RFC3339)
 	clusterRestarted.ManagedFields = nil
 
 	err = plugin.Client.Patch(ctx, clusterRestarted, client.MergeFrom(&cluster))

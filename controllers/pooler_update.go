@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
@@ -90,7 +91,7 @@ func (r *PoolerReconciler) updateDeployment(
 		return nil
 
 	case resources.Deployment != nil:
-		currentVersion := resources.Deployment.Annotations[pgbouncer.PgbouncerPoolerSpecHash]
+		currentVersion := resources.Deployment.Annotations[utils.PoolerSpecHashAnnotationName]
 		updatedVersion, err := hash.ComputeHash(pooler.Spec)
 		if err != nil {
 			return err
@@ -107,7 +108,7 @@ func (r *PoolerReconciler) updateDeployment(
 		if updatedDeployment.Annotations == nil {
 			updatedDeployment.Annotations = make(map[string]string)
 		}
-		updatedDeployment.Annotations[pgbouncer.PgbouncerPoolerSpecHash] = updatedVersion
+		updatedDeployment.Annotations[utils.PoolerSpecHashAnnotationName] = updatedVersion
 
 		contextLog.Info("Updating deployment")
 		err = r.Patch(ctx, updatedDeployment, client.MergeFrom(resources.Deployment))

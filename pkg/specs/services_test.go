@@ -54,7 +54,7 @@ var _ = Describe("Services specification", func() {
 		Expect(service.Name).To(Equal("clustername-ro"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[ClusterRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
+		Expect(service.Spec.Selector[utils.ClusterRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
 	})
 
 	It("create a configured -rw service", func() {
@@ -62,6 +62,6 @@ var _ = Describe("Services specification", func() {
 		Expect(service.Name).To(Equal("clustername-rw"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
-		Expect(service.Spec.Selector[ClusterRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
+		Expect(service.Spec.Selector[utils.ClusterRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
 	})
 })

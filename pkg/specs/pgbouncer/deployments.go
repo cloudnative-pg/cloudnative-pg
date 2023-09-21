@@ -31,17 +31,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/podspec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
 const (
-	// PgbouncerPoolerSpecHash is the annotation added to the deployment to tell
-	// the hash of the Pooler Specification
-	PgbouncerPoolerSpecHash = specs.MetadataNamespace + "/poolerSpecHash"
-
-	// PgbouncerNameLabel is the label of the pgbouncer pod used by default
-	PgbouncerNameLabel = specs.MetadataNamespace + "/poolerName"
-
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
 	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.20.0"
 )
@@ -57,7 +51,7 @@ func Deployment(pooler *apiv1.Pooler,
 	}
 
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
-		WithLabel(PgbouncerNameLabel, pooler.Name).
+		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
@@ -129,14 +123,14 @@ func Deployment(pooler *apiv1.Pooler,
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
 			Annotations: map[string]string{
-				PgbouncerPoolerSpecHash: poolerHash,
+				utils.PoolerSpecHashAnnotationName: poolerHash,
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &pooler.Spec.Instances,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					PgbouncerNameLabel: pooler.Name,
+					utils.PgbouncerNameLabel: pooler.Name,
 				},
 			},
 			Template: corev1.PodTemplateSpec{

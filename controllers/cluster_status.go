@@ -235,7 +235,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusReady {
+	if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
 		return nil
 	}
 
@@ -246,7 +246,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 	if pvc.Annotations == nil {
 		pvc.Annotations = make(map[string]string, 1)
 	}
-	pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] = persistentvolumeclaim.StatusReady
+	pvc.Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusReady
 
 	return r.Patch(ctx, pvc, client.MergeFrom(oldPvc))
 }
