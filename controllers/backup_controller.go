@@ -400,6 +400,12 @@ func (r *BackupReconciler) startSnapshotBackup(
 		return nil, err
 	}
 	pairs := parsePgControldata(controldata)
+
+	_, hasWAL := pairs["Latest checkpoint's REDO WAL file"]
+	if !hasWAL {
+		contextLogger.Error(fmt.Errorf("unexpected ControldData"), controldata)
+	}
+
 	backup.Status.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
 	backup.Status.EndWal = pairs["Latest checkpoint's REDO WAL file"]
 	backup.Status.BeginLSN = pairs["Fake LSN counter for unlogged rels"]

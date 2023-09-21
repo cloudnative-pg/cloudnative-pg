@@ -23,11 +23,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // BackupPhase is the phase of the backup
