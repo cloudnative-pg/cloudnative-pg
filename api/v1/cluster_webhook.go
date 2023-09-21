@@ -58,6 +58,10 @@ const (
 	DefaultApplicationUserName = DefaultApplicationDatabaseName
 )
 
+const (
+	sharedBuffersParameter = "shared_buffers"
+)
+
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
@@ -944,25 +948,40 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 func (r *Cluster) validateResources() field.ErrorList {
 	var result field.ErrorList
 
-	cpuPopulated := !r.Spec.Resources.Requests.Cpu().IsZero() && !r.Spec.Resources.Limits.Cpu().IsZero()
-	if cpuPopulated {
-		cpuRequestGtThanLimit := r.Spec.Resources.Requests.Cpu().Cmp(*r.Spec.Resources.Limits.Cpu()) > 0
+	cpuRequest := r.Spec.Resources.Requests.Cpu()
+	cpuLimits := r.Spec.Resources.Limits.Cpu()
+	if !cpuRequest.IsZero() && !cpuLimits.IsZero() {
+		cpuRequestGtThanLimit := cpuRequest.Cmp(*cpuLimits) > 0
 		if cpuRequestGtThanLimit {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "resources", "requests", "cpu"),
-				r.Spec.Resources.Requests.Cpu().String(),
+				cpuRequest.String(),
 				"CPU request is greater than the limit",
 			))
 		}
 	}
 
-	memoryPopulated := !r.Spec.Resources.Requests.Memory().IsZero() && !r.Spec.Resources.Limits.Memory().IsZero()
-	if memoryPopulated {
-		memoryRequestGtThanLimit := r.Spec.Resources.Requests.Memory().Cmp(*r.Spec.Resources.Limits.Memory()) > 0
+	memoryRequest := r.Spec.Resources.Requests.Memory()
+	rawSharedBuffer := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]
+	if !memoryRequest.IsZero() && rawSharedBuffer != "" {
+		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer); err == nil {
+			if memoryRequest.Cmp(sharedBuffers) < 0 {
+				result = append(result, field.Invalid(
+					field.NewPath("spec", "resources", "requests", "memory"),
+					memoryRequest.String(),
+					"Memory request is lower than the shared_buffer value",
+				))
+			}
+		}
+	}
+
+	memoryLimits := r.Spec.Resources.Limits.Memory()
+	if !memoryRequest.IsZero() && !memoryLimits.IsZero() {
+		memoryRequestGtThanLimit := memoryRequest.Cmp(*memoryLimits) > 0
 		if memoryRequestGtThanLimit {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "resources", "requests", "memory"),
-				r.Spec.Resources.Requests.Memory().String(),
+				memoryRequest.String(),
 				"Memory request is greater than the limit",
 			))
 		}
@@ -1009,6 +1028,17 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
+		if _, err := parsePostgresQuantityValue(value); err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", sharedBuffersParameter),
+					sharedBuffersParameter,
+					fmt.Sprintf("Invalid value for configuration parameter %s", sharedBuffersParameter)))
+		}
+	}
+
 	// verify the postgres setting min_wal_size < max_wal_size < volume size
 	result = append(result, validateWalSizeConfiguration(
 		r.Spec.PostgresConfiguration, r.Spec.WalStorage.GetSizeOrNil())...)
@@ -1040,7 +1070,7 @@ func validateWalSizeConfiguration(
 		minWalSize = minWalSizeDefault
 		hasMinWalSize = false
 	}
-	minWalSizeValue, err := parseWalSettingValue(minWalSize)
+	minWalSizeValue, err := parsePostgresQuantityValue(minWalSize)
 	if err != nil {
 		result = append(
 			result,
@@ -1055,7 +1085,7 @@ func validateWalSizeConfiguration(
 		maxWalSize = maxWalSizeDefault
 		hasMaxWalSize = false
 	}
-	maxWalSizeValue, err := parseWalSettingValue(maxWalSize)
+	maxWalSizeValue, err := parsePostgresQuantityValue(maxWalSize)
 	if err != nil {
 		result = append(
 			result,
@@ -1107,10 +1137,10 @@ func validateWalSizeConfiguration(
 	return result
 }
 
-// parseWalSettingValue converts the WAL sizes in the PostgreSQL configuration
+// parsePostgresQuantityValue converts the  sizes in the PostgreSQL configuration
 // into kubernetes resource.Quantity values
 // Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
-func parseWalSettingValue(value string) (resource.Quantity, error) {
+func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 	// If no suffix, default is MB
 	if _, err := strconv.Atoi(value); err == nil {
 		value += "MB"

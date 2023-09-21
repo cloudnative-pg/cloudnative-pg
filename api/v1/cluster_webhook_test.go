@@ -709,9 +709,9 @@ var _ = Describe("Image name validation", func() {
 	})
 })
 
-var _ = DescribeTable("parseWalSettingValue",
+var _ = DescribeTable("parsePostgresQuantityValue",
 	func(value string, parsedValue resource.Quantity, expectError bool) {
-		quantity, err := parseWalSettingValue(value)
+		quantity, err := parsePostgresQuantityValue(value)
 		if !expectError {
 			Expect(quantity, err).Should(BeComparableTo(parsedValue))
 		} else {
@@ -1051,6 +1051,20 @@ var _ = Describe("configuration change validation", func() {
 			},
 		}
 		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should detect an invalid shared_buffer value", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"shared_buffers": "invalid",
+					},
+				},
+			},
+		}
+
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
 	})
 })
 
@@ -3157,6 +3171,9 @@ var _ = Describe("validateResources", func() {
 	BeforeEach(func() {
 		cluster = &Cluster{
 			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{},
+				},
 				Resources: corev1.ResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{},
 					Limits:   map[corev1.ResourceName]resource.Quantity{},
@@ -3225,6 +3242,36 @@ var _ = Describe("validateResources", func() {
 
 	It("returns no errors when Memory limit is set but request is nil", func() {
 		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns an error when memoryRequest is less than shared_buffers in kB", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "2000000kB"
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Memory request is lower than the shared_buffer value"))
+	})
+
+	It("returns an error when memoryRequest is less than shared_buffers in MB", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1000Mi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "2000MB"
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Memory request is lower than the shared_buffer value"))
+	})
+
+	It("returns no errors when memoryRequest is greater than or equal to shared_buffers in GB", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "1GB"
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no errors when shared_buffers is in a format that can't be parsed", func() {
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("1Gi")
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "invalid_value"
 		errors := cluster.validateResources()
 		Expect(errors).To(BeEmpty())
 	})
