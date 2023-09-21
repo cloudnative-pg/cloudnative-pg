@@ -50,8 +50,8 @@ func Build(
 		BeginMetadata().
 		WithNamespacedName(pvcName, cluster.Namespace).
 		WithAnnotations(map[string]string{
-			specs.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
-			StatusAnnotationName:              configuration.Status,
+			utils.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
+			utils.PVCStatusAnnotationName:     configuration.Status,
 		}).
 		WithLabels(map[string]string{
 			utils.InstanceNameLabelName: instanceName,

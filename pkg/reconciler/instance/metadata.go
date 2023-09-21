@@ -182,20 +182,20 @@ func updateRoleLabels(
 		instance.Labels = make(map[string]string)
 	}
 
-	podRole, hasRole := instance.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+	podRole, hasRole := instance.ObjectMeta.Labels[utils.ClusterRoleLabelName]
 
 	switch {
 	case instance.Name == cluster.Status.CurrentPrimary:
 		if !hasRole || podRole != specs.ClusterRoleLabelPrimary {
 			contextLogger.Info("Setting primary label", "pod", instance.Name)
-			instance.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelPrimary
+			instance.Labels[utils.ClusterRoleLabelName] = specs.ClusterRoleLabelPrimary
 			return true
 		}
 
 	default:
 		if !hasRole || podRole != specs.ClusterRoleLabelReplica {
 			contextLogger.Info("Setting replica label", "pod", instance.Name)
-			instance.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelReplica
+			instance.Labels[utils.ClusterRoleLabelName] = specs.ClusterRoleLabelReplica
 			return true
 		}
 	}

@@ -53,7 +53,7 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 			}
 
 			pvcs[i].OwnerReferences = removeOwnerReference(pvcs[i].OwnerReferences, clusterName)
-			pvcs[i].Annotations[persistentvolumeclaim.StatusAnnotationName] = persistentvolumeclaim.StatusDetached
+			pvcs[i].Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusDetached
 			pvcs[i].Labels[utils.InstanceNameLabelName] = instanceName
 			err = plugin.Client.Update(ctx, &pvcs[i])
 			if err != nil {
@@ -75,7 +75,7 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		// We will only skip the iteration and not delete the pvc if it is not owned by the cluster, and it does not have
 		// the annotation or label
 		if isOwned ||
-			(pvcs[i].Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusDetached &&
+			(pvcs[i].Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusDetached &&
 				pvcs[i].Labels[utils.InstanceNameLabelName] == instanceName) {
 			if err = plugin.Client.Delete(ctx, &pvcs[i]); err != nil {
 				return fmt.Errorf("error deleting pvc %s: %v", pvcs[i].Name, err)

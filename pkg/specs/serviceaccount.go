@@ -25,12 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-)
-
-const (
-	// OperatorManagedSecretsName is the name of the annotation containing the secrets
-	// managed by the operator inside the generated service account
-	OperatorManagedSecretsName = "cnpg.io/managedSecrets" // #nosec
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // UpdateServiceAccount sets the needed values in the ServiceAccount that will be used in every Pod
@@ -62,7 +57,7 @@ func UpdateServiceAccount(imagePullSecretsNames []string, serviceAccount *corev1
 	if serviceAccount.Annotations == nil {
 		serviceAccount.Annotations = map[string]string{}
 	}
-	serviceAccount.Annotations[OperatorManagedSecretsName] = annotationValue
+	serviceAccount.Annotations[utils.OperatorManagedSecretsAnnotationName] = annotationValue
 
 	return nil
 }
@@ -94,7 +89,7 @@ func IsServiceAccountAligned(
 		return false
 	}
 
-	value := sa.Annotations[OperatorManagedSecretsName]
+	value := sa.Annotations[utils.OperatorManagedSecretsAnnotationName]
 	if value == "" {
 		return false
 	}

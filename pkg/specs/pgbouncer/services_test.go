@@ -23,6 +23,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,7 +54,7 @@ var _ = Describe("Pooler Service", func() {
 				Port:       pgBouncerConfig.PgBouncerPort,
 			}))
 			Expect(service.Spec.Selector).To(Equal(map[string]string{
-				PgbouncerNameLabel: pooler.Name,
+				utils.PgbouncerNameLabel: pooler.Name,
 			}))
 		})
 	})
