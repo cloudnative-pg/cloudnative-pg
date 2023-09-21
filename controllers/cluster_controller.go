@@ -619,6 +619,10 @@ func (r *ClusterReconciler) checkPodsArchitecture(
 	contextLogger := log.FromContext(ctx)
 	isConsistent := true
 
+	if fencedInstances.Has(utils.FenceAllServers) {
+		return isConsistent
+	}
+
 	for _, podStatus := range status.Items {
 		// Ignore architecture in podStatus with errors or that are fenced
 		if podStatus.Error != nil || fencedInstances.Has(podStatus.Pod.Name) {
