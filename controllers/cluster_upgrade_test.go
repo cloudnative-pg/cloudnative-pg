@@ -98,7 +98,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		clusterRestart := cluster
 		clusterRestart.Annotations = make(map[string]string)
-		clusterRestart.Annotations[specs.ClusterRestartAnnotationName] = "now"
+		clusterRestart.Annotations[utils.ClusterRestartAnnotationName] = "now"
 
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,

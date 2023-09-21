@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -77,7 +78,7 @@ var _ = Describe("Reconcile resources", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOff,
+					utils.HibernationAnnotationName: HibernationOff,
 				},
 			},
 			Status: apiv1.ClusterStatus{
@@ -100,7 +101,7 @@ var _ = Describe("Reconcile resources", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOff,
+					utils.HibernationAnnotationName: HibernationOff,
 				},
 			},
 			Status: apiv1.ClusterStatus{
@@ -134,7 +135,7 @@ var _ = Describe("Reconcile resources", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOff,
+					utils.HibernationAnnotationName: HibernationOff,
 				},
 				Name: "cluster-example",
 			},
@@ -159,7 +160,7 @@ var _ = Describe("Reconcile resources", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOff,
+					utils.HibernationAnnotationName: HibernationOff,
 				},
 				Name: "cluster-example",
 			},
@@ -185,7 +186,7 @@ func fakePod(name string, role string) corev1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				specs.ClusterRoleLabelName: role,
+				utils.ClusterRoleLabelName: role,
 			},
 		},
 	}

@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var (
@@ -97,6 +97,6 @@ func isOwnedByClusterOrSatisfiesPredicate(
 }
 
 func hasReloadLabelSet(obj client.Object) bool {
-	_, hasLabel := obj.GetLabels()[specs.WatchedLabelName]
+	_, hasLabel := obj.GetLabels()[utils.WatchedLabelName]
 	return hasLabel
 }

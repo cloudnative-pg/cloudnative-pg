@@ -69,9 +69,9 @@ var _ = Describe("testing create function", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(expectedPVC.Annotations).To(Equal(map[string]string{
-				"cnpg.io/nodeSerial":      "1",
-				"cnpg.io/operatorVersion": versions.Version,
-				"cnpg.io/pvcStatus":       "ready",
+				utils.ClusterSerialAnnotationName:   "1",
+				utils.OperatorVersionAnnotationName: versions.Version,
+				utils.PVCStatusAnnotationName:       "ready",
 			}))
 			Expect(expectedPVC.Spec.AccessModes).To(Equal([]corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}))
 			Expect(expectedPVC.Spec.Resources.Requests).To(Equal(corev1.ResourceList{

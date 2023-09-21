@@ -58,11 +58,11 @@ var _ = Describe("object metadata test", func() {
 			updated := updateRoleLabels(context.Background(), cluster, primaryPod)
 			Expect(updated).To(BeTrue())
 
-			Expect(primaryPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
+			Expect(primaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, replicaPod)
 			Expect(updated).To(BeTrue())
-			Expect(replicaPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+			Expect(replicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 
 		// nolint: dupl
@@ -77,7 +77,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "newPrimaryPod",
 					Labels: map[string]string{
-						specs.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
+						utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
 					},
 				},
 			}
@@ -86,18 +86,18 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "newReplicaPod",
 					Labels: map[string]string{
-						specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+						utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
 					},
 				},
 			}
 
 			updated := updateRoleLabels(context.Background(), cluster, newPrimaryPod)
 			Expect(updated).To(BeTrue())
-			Expect(newPrimaryPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
+			Expect(newPrimaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, newReplicaPod)
 			Expect(updated).To(BeTrue())
-			Expect(newReplicaPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+			Expect(newReplicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 
 		It("Should not perform role reconciliation when there is no current primary", func() {
@@ -106,24 +106,24 @@ var _ = Describe("object metadata test", func() {
 			oldPrimaryPod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "oldPrimaryPod",
-					Labels: map[string]string{specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
+					Labels: map[string]string{utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
 				},
 			}
 
 			oldReplicaPod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "oldReplicaPod",
-					Labels: map[string]string{specs.ClusterRoleLabelName: specs.ClusterRoleLabelReplica},
+					Labels: map[string]string{utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica},
 				},
 			}
 
 			updated := updateRoleLabels(context.Background(), cluster, oldPrimaryPod)
 			Expect(updated).To(BeFalse())
-			Expect(oldPrimaryPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
+			Expect(oldPrimaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, oldReplicaPod)
 			Expect(updated).To(BeFalse())
-			Expect(oldReplicaPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+			Expect(oldReplicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 
 		// nolint: dupl
@@ -137,24 +137,24 @@ var _ = Describe("object metadata test", func() {
 			primaryPod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "primaryPod",
-					Labels: map[string]string{specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
+					Labels: map[string]string{utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
 				},
 			}
 
 			replicaPod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "replicaPod",
-					Labels: map[string]string{specs.ClusterRoleLabelName: specs.ClusterRoleLabelReplica},
+					Labels: map[string]string{utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica},
 				},
 			}
 
 			updated := updateRoleLabels(context.Background(), cluster, primaryPod)
 			Expect(updated).To(BeFalse())
-			Expect(primaryPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
+			Expect(primaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 			updated = updateRoleLabels(context.Background(), cluster, replicaPod)
 			Expect(updated).To(BeFalse())
-			Expect(replicaPod.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+			Expect(replicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
 	})
 
@@ -362,7 +362,7 @@ var _ = Describe("object metadata test", func() {
 
 			It("Should correctly add AppArmor annotations if present in the cluster's annotations", func() {
 				const (
-					key   = "container.apparmor.security.beta.kubernetes.io/postgres"
+					key   = utils.AppArmorAnnotationPrefix + "/postgres"
 					value = "runtime/default"
 				)
 
@@ -438,7 +438,7 @@ var _ = Describe("metadata reconciliation test", func() {
 			for _, pod := range updatedInstanceList.Items {
 				Expect(pod.Labels[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
 				Expect(pod.Labels[utils.InstanceNameLabelName]).To(Equal(pod.Name))
-				Expect(pod.Labels[specs.ClusterRoleLabelName]).To(Or(Equal(specs.ClusterRoleLabelPrimary),
+				Expect(pod.Labels[utils.ClusterRoleLabelName]).To(Or(Equal(specs.ClusterRoleLabelPrimary),
 					Equal(specs.ClusterRoleLabelReplica)))
 				Expect(pod.Labels["label1"]).To(Equal("value1"))
 				Expect(pod.Annotations["annotation1"]).To(Equal("value1"))
@@ -485,7 +485,7 @@ var _ = Describe("metadata update functions", func() {
 		It("Should updateRoleLabels correctly", func() {
 			modified := updateRoleLabels(ctx, cluster, instance)
 			Expect(modified).To(BeTrue())
-			Expect(instance.Labels[specs.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
+			Expect(instance.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 		})
 
 		It("Should updateOperatorLabels correctly", func() {

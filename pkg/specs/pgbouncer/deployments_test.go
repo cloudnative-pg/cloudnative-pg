@@ -25,6 +25,7 @@ import (
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -78,7 +79,7 @@ var _ = Describe("Deployment", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 
 		// Check the computed hash
-		Expect(deployment.ObjectMeta.Annotations[PgbouncerPoolerSpecHash]).Should(Equal(expectedHash))
+		Expect(deployment.ObjectMeta.Annotations[utils.PoolerSpecHashAnnotationName]).Should(Equal(expectedHash))
 
 		// Check the metadata
 		Expect(deployment.ObjectMeta.Name).To(Equal(pooler.Name))
@@ -86,12 +87,12 @@ var _ = Describe("Deployment", func() {
 
 		// Check the DeploymentSpec
 		Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
-		Expect(deployment.Spec.Selector.MatchLabels[PgbouncerNameLabel]).To(Equal(pooler.Name))
+		Expect(deployment.Spec.Selector.MatchLabels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
 
 		// Check the PodTemplateSpec
 		podTemplate := deployment.Spec.Template
 		Expect(podTemplate.ObjectMeta.Annotations).To(Equal(pooler.Spec.Template.ObjectMeta.Annotations))
-		Expect(podTemplate.ObjectMeta.Labels[PgbouncerNameLabel]).To(Equal(pooler.Name))
+		Expect(podTemplate.ObjectMeta.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
 
 		// Check the containers
 		Expect(podTemplate.Spec.Containers).ToNot(BeEmpty())

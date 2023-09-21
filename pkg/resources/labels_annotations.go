@@ -18,11 +18,8 @@ package resources
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
 
-const (
-	// AnnotationCNPGHash contains the hash of the used by CNPG expect the pooler that uses PgbouncerPoolerSpecHash
-	AnnotationCNPGHash = "cnpg.io/hash"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // mergeMap transfers the content of a giver map to a receiver
@@ -57,5 +54,5 @@ func inheritAnnotations(
 }
 
 func setHash(meta *metav1.ObjectMeta, hashValue string) {
-	meta.Annotations[AnnotationCNPGHash] = hashValue
+	meta.Annotations[utils.CNPGHashAnnotationName] = hashValue
 }

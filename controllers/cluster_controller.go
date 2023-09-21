@@ -739,7 +739,7 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 			)
 		}
 
-		if pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] == persistentvolumeclaim.StatusReady {
+		if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
 			continue
 		}
 
@@ -1102,7 +1102,7 @@ func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 		err := r.List(ctx, &childPods,
 			client.MatchingFields{".spec.nodeName": node.Name},
 			client.MatchingLabels{
-				specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+				utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
 				utils.PodRoleLabelName:     string(utils.PodRoleInstance),
 			},
 		)
