@@ -278,9 +278,8 @@ type ClusterSpec struct {
 
 	// The time in seconds that is allowed for a primary PostgreSQL instance
 	// to gracefully shutdown during a switchover.
-	// Default value is 40000000, greater than one year in seconds,
-	// big enough to simulate an infinite delay
-	// +kubebuilder:default:=40000000
+	// Default value is 3600 seconds (1 hour).
+	// +kubebuilder:default:=3600
 	// +optional
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
