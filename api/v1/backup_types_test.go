@@ -51,7 +51,7 @@ var _ = Describe("BackupStatus structure", func() {
 
 	It("can be set to contain a snapshot list", func() {
 		status := BackupStatus{}
-		status.BackupSnapshotStatus.SetSnapshotList([]*volumesnapshot.VolumeSnapshot{
+		status.BackupSnapshotStatus.SetSnapshotList([]volumesnapshot.VolumeSnapshot{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-1",
@@ -68,5 +68,254 @@ var _ = Describe("BackupStatus structure", func() {
 		Expect(status.BackupSnapshotStatus.Snapshots).To(ConsistOf(
 			"cluster-example-snapshot-1",
 			"cluster-example-snapshot-2"))
+	})
+
+	Context("backup phases", func() {
+		When("the backup phase is `running`", func() {
+			It("can tell if a backup is in progress or done", func() {
+				b := BackupStatus{
+					Phase: BackupPhaseRunning,
+				}
+				Expect(b.IsInProgress()).To(BeTrue())
+				Expect(b.IsDone()).To(BeFalse())
+			})
+		})
+
+		When("the backup phase is `pending`", func() {
+			It("can tell if a backup is in progress or done", func() {
+				b := BackupStatus{
+					Phase: BackupPhasePending,
+				}
+				Expect(b.IsInProgress()).To(BeTrue())
+				Expect(b.IsDone()).To(BeFalse())
+			})
+		})
+
+		When("the backup phase is `completed`", func() {
+			It("can tell if a backup is in progress or done", func() {
+				b := BackupStatus{
+					Phase: BackupPhaseCompleted,
+				}
+				Expect(b.IsInProgress()).To(BeFalse())
+				Expect(b.IsDone()).To(BeTrue())
+			})
+		})
+
+		When("the backup phase is `failed`", func() {
+			It("can tell if a backup is in progress or done", func() {
+				b := BackupStatus{
+					Phase: BackupPhaseFailed,
+				}
+				Expect(b.IsInProgress()).To(BeFalse())
+				Expect(b.IsDone()).To(BeTrue())
+			})
+		})
+	})
+})
+
+var _ = Describe("BackupList structure", func() {
+	It("can be sorted by name", func() {
+		backupList := BackupList{
+			Items: []Backup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-3",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-2",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-1",
+					},
+				},
+			},
+		}
+		backupList.SortByName()
+
+		Expect(backupList.Items).To(HaveLen(3))
+		Expect(backupList.Items[0].Name).To(Equal("backup-1"))
+		Expect(backupList.Items[1].Name).To(Equal("backup-2"))
+		Expect(backupList.Items[2].Name).To(Equal("backup-3"))
+	})
+
+	It("can isolate pending backups", func() {
+		backupList := BackupList{
+			Items: []Backup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-3",
+					},
+					Status: BackupStatus{
+						Phase: BackupPhaseRunning,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-2",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-5",
+					},
+					Status: BackupStatus{
+						Phase: BackupPhaseCompleted,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "backup-6",
+					},
+					Status: BackupStatus{
+						Phase: BackupPhaseFailed,
+					},
+				},
+			},
+		}
+		backupList.SortByName()
+
+		pendingBackups := backupList.GetPendingBackupNames()
+		Expect(pendingBackups).To(ConsistOf("backup-1", "backup-2"))
+	})
+})
+
+var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
+	When("there's a running backup", func() {
+		It("prevents concurrent backups", func() {
+			backupList := BackupList{
+				Items: []Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-2",
+						},
+						Status: BackupStatus{
+							Phase: BackupPhaseRunning,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-3",
+						},
+					},
+				},
+			}
+
+			// The currently running backup can be executed
+			Expect(backupList.CanExecuteBackup("backup-1")).To(BeFalse())
+			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
+		})
+	})
+
+	When("there are no running backups", func() {
+		It("prevents concurrent backups", func() {
+			backupList := BackupList{
+				Items: []Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-2",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-3",
+						},
+					},
+				},
+			}
+
+			// The currently running backup can be executed
+			Expect(backupList.CanExecuteBackup("backup-1")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-2")).To(BeFalse())
+			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
+		})
+	})
+
+	When("there are multiple running backups", func() {
+		It("prevents concurrent backups", func() {
+			// This could happen if there is a race condition, and in this case we use a
+			// tie-breaker algorithm
+			backupList := BackupList{
+				Items: []Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-2",
+						},
+						Status: BackupStatus{
+							Phase: BackupPhaseRunning,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-3",
+						},
+						Status: BackupStatus{
+							Phase: BackupPhaseRunning,
+						},
+					},
+				},
+			}
+
+			// The currently running backup can be executed
+			Expect(backupList.CanExecuteBackup("backup-1")).To(BeFalse())
+			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
+		})
+	})
+
+	When("there is a complete backup", func() {
+		It("prevents concurrent backups", func() {
+			backupList := BackupList{
+				Items: []Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-1",
+						},
+						Status: BackupStatus{
+							Phase: BackupPhaseCompleted,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-2",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-3",
+						},
+					},
+				},
+			}
+
+			// The currently running backup can be executed
+			Expect(backupList.CanExecuteBackup("backup-1")).To(BeFalse())
+			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
+		})
 	})
 })

@@ -14,26 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package snapshot
-
-import (
-	"errors"
-	"fmt"
-
-	"github.com/spf13/cobra"
-)
-
-// NewCmd implements the `snapshot` subcommand
-func NewCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "snapshot <cluster-name>",
-		Short: "deprecated",
-		Long:  "Replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("This command was replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`")
-			return errors.New("deprecated")
-		},
-	}
-
-	return cmd
-}
+// Package instance contains the client capable of querying the HTTP instances endpoints
+package instance

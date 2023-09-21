@@ -17,9 +17,14 @@ limitations under the License.
 package v1
 
 import (
+	"context"
+	"sort"
+	"strings"
+
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // BackupPhase is the phase of the backup
@@ -257,7 +262,7 @@ func (backupStatus *BackupStatus) SetAsStarted(targetPod *corev1.Pod, method Bac
 }
 
 // SetSnapshotList sets the Snapshots field from a list of VolumeSnapshot
-func (snapshotStatus *BackupSnapshotStatus) SetSnapshotList(snapshots []*volumesnapshot.VolumeSnapshot) {
+func (snapshotStatus *BackupSnapshotStatus) SetSnapshotList(snapshots []volumesnapshot.VolumeSnapshot) {
 	snapshotNames := make([]string, len(snapshots))
 	for idx, volumeSnapshot := range snapshots {
 		snapshotNames[idx] = volumeSnapshot.Name
@@ -272,7 +277,66 @@ func (backupStatus *BackupStatus) IsDone() bool {
 
 // IsInProgress check if a certain backup is in progress or not
 func (backupStatus *BackupStatus) IsInProgress() bool {
-	return !backupStatus.IsDone()
+	return backupStatus.Phase == BackupPhasePending ||
+		backupStatus.Phase == BackupPhaseStarted ||
+		backupStatus.Phase == BackupPhaseRunning
+}
+
+// GetPendingBackupNames returns the pending backup list
+func (list BackupList) GetPendingBackupNames() []string {
+	// Retry the backup if another backup is running
+	pendingBackups := make([]string, 0, len(list.Items))
+	for _, concurrentBackup := range list.Items {
+		if concurrentBackup.Status.IsDone() {
+			continue
+		}
+		if !concurrentBackup.Status.IsInProgress() {
+			pendingBackups = append(pendingBackups, concurrentBackup.Name)
+		}
+	}
+
+	return pendingBackups
+}
+
+// CanExecuteBackup control if we can start a reconciliation loop for a certain backup.
+//
+// A reconciliation loop can start if:
+// - there's no backup running, and if the first of the sorted list of backups
+// - the current backup is running and is the first running backup of the list
+//
+// As a side effect, this function will sort the backup list
+func (list *BackupList) CanExecuteBackup(backupName string) bool {
+	var foundRunningBackup bool
+
+	list.SortByName()
+
+	for _, concurrentBackup := range list.Items {
+		if concurrentBackup.Status.IsInProgress() {
+			if backupName == concurrentBackup.Name && !foundRunningBackup {
+				return true
+			}
+
+			foundRunningBackup = true
+			if backupName != concurrentBackup.Name {
+				return false
+			}
+		}
+	}
+
+	pendingBackups := list.GetPendingBackupNames()
+	if len(pendingBackups) > 0 && pendingBackups[0] != backupName {
+		return false
+	}
+
+	return true
+}
+
+// SortByName sorts the backup items in alphabetical order
+func (list *BackupList) SortByName() {
+	// Sort the list of backups in alphabetical order
+	sort.Slice(list.Items, func(i, j int) bool {
+		return strings.Compare(list.Items[i].Name, list.Items[j].Name) <= 0
+	})
 }
 
 // GetStatus gets the backup status
@@ -293,6 +357,24 @@ func (backup *Backup) GetName() string {
 // GetNamespace get the backup namespace
 func (backup *Backup) GetNamespace() string {
 	return backup.Namespace
+}
+
+// GetAssignedInstance fetches the instance that was assigned to the backup execution
+func (backup *Backup) GetAssignedInstance(ctx context.Context, cli client.Client) (*corev1.Pod, error) {
+	if backup.Status.InstanceID == nil || len(backup.Status.InstanceID.PodName) == 0 {
+		return nil, nil
+	}
+
+	var previouslyElectedPod corev1.Pod
+	if err := cli.Get(
+		ctx,
+		client.ObjectKey{Namespace: backup.Namespace, Name: backup.Status.InstanceID.PodName},
+		&previouslyElectedPod,
+	); err != nil {
+		return nil, err
+	}
+
+	return &previouslyElectedPod, nil
 }
 
 func init() {
