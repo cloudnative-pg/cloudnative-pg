@@ -200,8 +200,8 @@ var _ = Describe("Remove configuration files option", func() {
 	})
 })
 
-var _ = Describe("Read configuration files option", func() {
-	It("read options without comments", func() {
+var _ = Describe("ReadOptionsFromConfigurationContents", func() {
+	It("should correctly parse content that contains comments", func() {
 		initialContent := `
 # Add settings for extensions here
 shared_preload_libraries = 'bdr'
@@ -229,9 +229,8 @@ track_commit_timestamp = on
 		Expect(value).To(BeEmpty())
 	})
 
-	It("read options from empty content", func() {
-		initialContent := ``
-		options := ReadOptionsFromConfigurationContents(initialContent, []string{
+	It("should return an empty map when parsing an empty content", func() {
+		options := ReadOptionsFromConfigurationContents("", []string{
 			"shared_preload_libraries",
 		})
 		Expect(options).To(BeEmpty())
