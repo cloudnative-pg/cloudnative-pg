@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PodCreateAndWaitForReady creates a given pod object and wait for it to be ready
@@ -52,7 +52,7 @@ func PodWaitForReady(env *TestingEnvironment, pod *corev1.Pod, timeoutSeconds ui
 			}, pod); err != nil {
 				return err
 			}
-			if !utils2.IsPodReady(*pod) {
+			if !pkgutils.IsPodReady(*pod) {
 				return fmt.Errorf("pod not ready. Namespace: %v, Name: %v", pod.Namespace, pod.Name)
 			}
 			return nil

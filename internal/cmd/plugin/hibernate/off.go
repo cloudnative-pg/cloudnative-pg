@@ -29,7 +29,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -120,12 +119,12 @@ func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.Persistent
 			pvc,
 			utils.HibernateClusterManifestAnnotationName,
 			utils.HibernatePgControlDataAnnotationName,
-			specs.ClusterSerialAnnotationName,
+			utils.ClusterSerialAnnotationName,
 		); err != nil {
 			return err
 		}
 
-		serial := pvc.Annotations[specs.ClusterSerialAnnotationName]
+		serial := pvc.Annotations[utils.ClusterSerialAnnotationName]
 		if !slices.Contains(nodeSerial, serial) {
 			nodeSerial = append(nodeSerial, serial)
 		}

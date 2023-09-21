@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,13 +38,13 @@ var _ = Describe("Hibernation annotation management", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOn,
+					utils.HibernationAnnotationName: HibernationOn,
 				},
 			},
 		}
 		Expect(getHibernationAnnotationValue(&cluster)).To(BeTrue())
 
-		cluster.ObjectMeta.Annotations[HibernationAnnotationName] = HibernationOff
+		cluster.ObjectMeta.Annotations[utils.HibernationAnnotationName] = HibernationOff
 		Expect(getHibernationAnnotationValue(&cluster)).To(BeFalse())
 	})
 
@@ -51,7 +52,7 @@ var _ = Describe("Hibernation annotation management", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: "not-correct",
+					utils.HibernationAnnotationName: "not-correct",
 				},
 			},
 		}
@@ -71,7 +72,7 @@ var _ = Describe("Status enrichment", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: "not-correct",
+					utils.HibernationAnnotationName: "not-correct",
 				},
 			},
 			Status: apiv1.ClusterStatus{
@@ -90,7 +91,7 @@ var _ = Describe("Status enrichment", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOff,
+					utils.HibernationAnnotationName: HibernationOff,
 				},
 			},
 			Status: apiv1.ClusterStatus{
@@ -113,7 +114,7 @@ var _ = Describe("Status enrichment", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOn,
+					utils.HibernationAnnotationName: HibernationOn,
 				},
 			},
 			Status: apiv1.ClusterStatus{
@@ -132,7 +133,7 @@ var _ = Describe("Status enrichment", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOn,
+					utils.HibernationAnnotationName: HibernationOn,
 				},
 			},
 			Status: apiv1.ClusterStatus{
@@ -151,7 +152,7 @@ var _ = Describe("Status enrichment", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOn,
+					utils.HibernationAnnotationName: HibernationOn,
 				},
 			},
 			Status: apiv1.ClusterStatus{
@@ -168,7 +169,7 @@ var _ = Describe("Status enrichment", func() {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					HibernationAnnotationName: HibernationOn,
+					utils.HibernationAnnotationName: HibernationOn,
 				},
 			},
 			Status: apiv1.ClusterStatus{

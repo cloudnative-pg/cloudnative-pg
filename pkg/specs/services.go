@@ -85,8 +85,8 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 			Type:  corev1.ServiceTypeClusterIP,
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName: cluster.Name,
-				ClusterRoleLabelName:   ClusterRoleLabelReplica,
+				utils.ClusterLabelName:     cluster.Name,
+				utils.ClusterRoleLabelName: ClusterRoleLabelReplica,
 			},
 		},
 	}
@@ -103,8 +103,8 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 			Type:  corev1.ServiceTypeClusterIP,
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName: cluster.Name,
-				ClusterRoleLabelName:   ClusterRoleLabelPrimary,
+				utils.ClusterLabelName:     cluster.Name,
+				utils.ClusterRoleLabelName: ClusterRoleLabelPrimary,
 			},
 		},
 	}
