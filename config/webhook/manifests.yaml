@@ -12,7 +12,7 @@ webhooks:
       namespace: system
       path: /mutate-postgresql-cnpg-io-v1-backup
   failurePolicy: Fail
-  name: mbackup.kb.io
+  name: mbackup.cnpg.io
   rules:
   - apiGroups:
     - postgresql.cnpg.io
@@ -32,7 +32,7 @@ webhooks:
       namespace: system
       path: /mutate-postgresql-cnpg-io-v1-cluster
   failurePolicy: Fail
-  name: mcluster.kb.io
+  name: mcluster.cnpg.io
   rules:
   - apiGroups:
     - postgresql.cnpg.io
@@ -52,7 +52,7 @@ webhooks:
       namespace: system
       path: /mutate-postgresql-cnpg-io-v1-scheduledbackup
   failurePolicy: Fail
-  name: mscheduledbackup.kb.io
+  name: mscheduledbackup.cnpg.io
   rules:
   - apiGroups:
     - postgresql.cnpg.io
@@ -78,7 +78,7 @@ webhooks:
       namespace: system
       path: /validate-postgresql-cnpg-io-v1-backup
   failurePolicy: Fail
-  name: vbackup.kb.io
+  name: vbackup.cnpg.io
   rules:
   - apiGroups:
     - postgresql.cnpg.io
@@ -98,7 +98,7 @@ webhooks:
       namespace: system
       path: /validate-postgresql-cnpg-io-v1-cluster
   failurePolicy: Fail
-  name: vcluster.kb.io
+  name: vcluster.cnpg.io
   rules:
   - apiGroups:
     - postgresql.cnpg.io
@@ -118,7 +118,7 @@ webhooks:
       namespace: system
       path: /validate-postgresql-cnpg-io-v1-pooler
   failurePolicy: Fail
-  name: vpooler.kb.io
+  name: vpooler.cnpg.io
   rules:
   - apiGroups:
     - postgresql.cnpg.io
@@ -138,7 +138,7 @@ webhooks:
       namespace: system
       path: /validate-postgresql-cnpg-io-v1-scheduledbackup
   failurePolicy: Fail
-  name: vscheduledbackup.kb.io
+  name: vscheduledbackup.cnpg.io
   rules:
   - apiGroups:
     - postgresql.cnpg.io
