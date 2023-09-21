@@ -18,9 +18,12 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -268,6 +271,52 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotList(snapshots []volumesn
 		snapshotNames[idx] = volumeSnapshot.Name
 	}
 	snapshotStatus.Snapshots = snapshotNames
+}
+
+// GetSnapshotsInterval gets the earliest and latest creation times
+// from a list of VolumeSnapshots
+func (snapshotStatus *BackupSnapshotStatus) GetSnapshotsInterval(
+	snapshots []volumesnapshot.VolumeSnapshot,
+) (metav1.Time, metav1.Time) {
+	var firstCreation, lastCreation metav1.Time
+	for _, volumeSnapshot := range snapshots {
+		if firstCreation.IsZero() || lastCreation.IsZero() {
+			firstCreation = volumeSnapshot.CreationTimestamp
+			lastCreation = volumeSnapshot.CreationTimestamp
+			continue
+		}
+		if volumeSnapshot.CreationTimestamp.Before(&firstCreation) {
+			firstCreation = volumeSnapshot.CreationTimestamp
+		}
+		if lastCreation.Before(&volumeSnapshot.CreationTimestamp) {
+			lastCreation = volumeSnapshot.CreationTimestamp
+		}
+	}
+	return firstCreation, lastCreation
+}
+
+// GetControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
+func (snapshotStatus *BackupSnapshotStatus) GetControldata(
+	snapshots []volumesnapshot.VolumeSnapshot,
+) (string, error) {
+	for _, volumeSnapshot := range snapshots {
+		data, ok := volumeSnapshot.Annotations[utils.PgControldataAnnotationName]
+		if !ok {
+			continue
+		}
+		type pgControldataResponse struct {
+			Data  string `json:"data,omitempty"`
+			Error error  `json:"error,omitempty"`
+		}
+
+		var result pgControldataResponse
+		err := json.Unmarshal([]byte(data), &result)
+		if err != nil {
+			return "", err
+		}
+		return result.Data, result.Error
+	}
+	return "", fmt.Errorf("could not retrieve pg_controldata from any snapshot")
 }
 
 // IsDone check if a backup is completed or still in progress

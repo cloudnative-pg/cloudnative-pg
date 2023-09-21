@@ -20,15 +20,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -292,6 +295,19 @@ func (r *BackupReconciler) isValidBackupRunning(
 	return false, nil
 }
 
+func parsePgControldata(data string) map[string]string {
+	pairs := make(map[string]string)
+	lines := strings.Split(data, "\n")
+	for _, line := range lines {
+		frags := strings.Split(line, ":")
+		if len(frags) != 2 {
+			continue
+		}
+		pairs[strings.TrimSpace(frags[0])] = strings.TrimSpace(frags[1])
+	}
+	return pairs
+}
+
 func (r *BackupReconciler) startSnapshotBackup(
 	ctx context.Context,
 	targetPod *corev1.Pod,
@@ -322,6 +338,8 @@ func (r *BackupReconciler) startSnapshotBackup(
 		backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
 		// given that we use only kubernetes resources we can use the backup name as ID
 		backup.Status.BackupID = backup.Name
+		backup.Status.BackupName = backup.Name
+		backup.Status.StartedAt = ptr.To(v1.Now())
 		if err := postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup); err != nil {
 			return nil, err
 		}
@@ -375,6 +393,17 @@ func (r *BackupReconciler) startSnapshotBackup(
 	}
 
 	backup.Status.BackupSnapshotStatus.SetSnapshotList(snapshots)
+	_, lastCreation := backup.Status.BackupSnapshotStatus.GetSnapshotsInterval(snapshots)
+	backup.Status.StoppedAt = ptr.To(lastCreation)
+	controldata, err := backup.Status.BackupSnapshotStatus.GetControldata(snapshots)
+	if err != nil {
+		return nil, err
+	}
+	pairs := parsePgControldata(controldata)
+	backup.Status.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
+	backup.Status.EndWal = pairs["Latest checkpoint's REDO WAL file"]
+	backup.Status.BeginLSN = pairs["Fake LSN counter for unlogged rels"]
+	backup.Status.EndLSN = pairs["Fake LSN counter for unlogged rels"]
 
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }
