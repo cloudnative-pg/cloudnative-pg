@@ -51,7 +51,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -377,7 +376,7 @@ func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName
 			// dump pooler pods info
 			podList := &corev1.PodList{}
 			_ = env.Client.List(env.Ctx, podList, client.InNamespace(namespace),
-				client.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
+				client.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
 			for _, pod := range podList.Items {
 				out, _ = json.MarshalIndent(pod, "", "    ")
 				_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)

@@ -44,8 +44,8 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.ClusterLabelName: cluster.Name,
-					ClusterRoleLabelName:   ClusterRoleLabelReplica,
+					utils.ClusterLabelName:     cluster.Name,
+					utils.ClusterRoleLabelName: ClusterRoleLabelReplica,
 				},
 			},
 			MinAvailable: &allReplicasButOne,
@@ -69,8 +69,8 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.ClusterLabelName: cluster.Name,
-					ClusterRoleLabelName:   ClusterRoleLabelPrimary,
+					utils.ClusterLabelName:     cluster.Name,
+					utils.ClusterRoleLabelName: ClusterRoleLabelPrimary,
 				},
 			},
 			MinAvailable: &one,

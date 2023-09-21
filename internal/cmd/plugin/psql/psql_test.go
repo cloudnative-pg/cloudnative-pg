@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -131,7 +132,7 @@ func fakePod(name, role string) corev1.Pod {
 			Name:      name,
 			Namespace: "default",
 			Labels: map[string]string{
-				specs.ClusterRoleLabelName: role,
+				utils.ClusterRoleLabelName: role,
 			},
 		},
 	}

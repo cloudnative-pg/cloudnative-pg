@@ -136,7 +136,7 @@ func getOrphanPVCs(
 				"pvcName", pvc.Name)
 			continue
 		}
-		if _, ok := pvc.Annotations[specs.ClusterSerialAnnotationName]; !ok {
+		if _, ok := pvc.Annotations[utils.ClusterSerialAnnotationName]; !ok {
 			contextLogger.Warning("skipping pvc because it doesn't have serial annotation",
 				"pvcName", pvc.Name)
 			continue
@@ -162,7 +162,7 @@ func getNodeSerialsFromPVCs(
 		if serial > highestSerial {
 			highestSerial = serial
 		}
-		if pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] == specs.ClusterRoleLabelPrimary {
+		if pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] == specs.ClusterRoleLabelPrimary {
 			primarySerial = serial
 		}
 	}
@@ -185,7 +185,7 @@ func restoreOrphanPVCs(
 
 		pvcOrig := pvc.DeepCopy()
 		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
-		pvc.Annotations[persistentvolumeclaim.StatusAnnotationName] = persistentvolumeclaim.StatusReady
+		pvc.Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusReady
 		// we clean hibernation metadata if it exists
 		delete(pvc.Annotations, utils.HibernateClusterManifestAnnotationName)
 		delete(pvc.Annotations, utils.HibernatePgControlDataAnnotationName)

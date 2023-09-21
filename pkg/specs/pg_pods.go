@@ -22,12 +22,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // GetNodeSerial get the serial number of an object created by the operator
 // for a Cluster
 func GetNodeSerial(object metav1.ObjectMeta) (int, error) {
-	nodeSerial, ok := object.Annotations[ClusterSerialAnnotationName]
+	nodeSerial, ok := object.Annotations[utils.ClusterSerialAnnotationName]
 	if !ok {
 		return 0, fmt.Errorf("missing node serial annotation")
 	}
@@ -47,7 +49,7 @@ func IsPodPrimary(pod corev1.Pod) bool {
 
 // IsPrimary check if a certain resource belongs to a primary
 func IsPrimary(meta metav1.ObjectMeta) bool {
-	role, hasRole := meta.Labels[ClusterRoleLabelName]
+	role, hasRole := meta.Labels[utils.ClusterRoleLabelName]
 	if !hasRole {
 		return false
 	}

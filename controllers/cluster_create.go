@@ -264,7 +264,7 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 				&clientCaSecret,
 				certs.CertTypeClient,
 				nil,
-				map[string]string{specs.WatchedLabelName: "true"})
+				map[string]string{utils.WatchedLabelName: "true"})
 			if err != nil {
 				return err
 			}
@@ -628,7 +628,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 				Name:      apiv1.DefaultMonitoringConfigMapName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					specs.WatchedLabelName: "true",
+					utils.WatchedLabelName: "true",
 				},
 			},
 			Data: map[string]string{
@@ -715,7 +715,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 				Name:      apiv1.DefaultMonitoringSecretName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					specs.WatchedLabelName: "true",
+					utils.WatchedLabelName: "true",
 				},
 			},
 			Data: map[string][]byte{
@@ -1138,7 +1138,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	for _, instancePVC := range instancePVCs {
 		// This should not happen. However, we put this guard here
 		// as an assertion to catch unexpected events.
-		pvcStatus := instancePVC.Annotations[persistentvolumeclaim.StatusAnnotationName]
+		pvcStatus := instancePVC.Annotations[utils.PVCStatusAnnotationName]
 		if pvcStatus != persistentvolumeclaim.StatusReady {
 			contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
 				"pvc", instancePVC.Name,
@@ -1163,11 +1163,11 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	}
 
 	// If this cluster has been restarted, mark the Pod with the latest restart time
-	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
+	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok {
 		if instanceToCreate.Annotations == nil {
 			instanceToCreate.Annotations = make(map[string]string)
 		}
-		instanceToCreate.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
+		instanceToCreate.Annotations[utils.ClusterRestartAnnotationName] = clusterRestart
 	}
 
 	contextLogger.Info("Creating new Pod to reattach a PVC",

@@ -22,6 +22,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -71,7 +72,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 				cluster.Annotations = make(map[string]string)
 			}
 			originCluster := cluster.DeepCopy()
-			cluster.Annotations[hibernation.HibernationAnnotationName] = hibernation.HibernationOn
+			cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOn
 
 			Expect(env.Client.Patch(ctx, cluster, ctrlclient.MergeFrom(originCluster))).To(Succeed())
 		})
@@ -96,7 +97,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 				cluster.Annotations = make(map[string]string)
 			}
 			originCluster := cluster.DeepCopy()
-			cluster.Annotations[hibernation.HibernationAnnotationName] = hibernation.HibernationOff
+			cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOff
 			Expect(env.Client.Patch(ctx, cluster, ctrlclient.MergeFrom(originCluster))).To(Succeed())
 		})
 

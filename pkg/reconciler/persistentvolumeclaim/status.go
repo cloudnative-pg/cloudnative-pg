@@ -35,10 +35,6 @@ import (
 type PVCStatus = string
 
 const (
-	// StatusAnnotationName is an annotation that shows the current status of the PVC.
-	// The status can be "initializing", "ready" or "detached"
-	StatusAnnotationName = specs.MetadataNamespace + "/pvcStatus"
-
 	// StatusInitializing is the annotation value for PVC initializing status
 	StatusInitializing PVCStatus = "initializing"
 
@@ -238,9 +234,9 @@ func podUsesPVC(pod corev1.Pod, pvc corev1.PersistentVolumeClaim) bool {
 
 func hasUnknownStatus(ctx context.Context, pvc corev1.PersistentVolumeClaim) bool {
 	// Expected statuses are: Ready, Initializing or empty (that means initializing)
-	if pvc.Annotations[StatusAnnotationName] == StatusReady ||
-		pvc.Annotations[StatusAnnotationName] == StatusInitializing ||
-		pvc.Annotations[StatusAnnotationName] == "" {
+	if pvc.Annotations[utils.PVCStatusAnnotationName] == StatusReady ||
+		pvc.Annotations[utils.PVCStatusAnnotationName] == StatusInitializing ||
+		pvc.Annotations[utils.PVCStatusAnnotationName] == "" {
 		return false
 	}
 
@@ -248,7 +244,7 @@ func hasUnknownStatus(ctx context.Context, pvc corev1.PersistentVolumeClaim) boo
 	contextLogger.Warning("Unknown PVC status",
 		"namespace", pvc.Namespace,
 		"name", pvc.Name,
-		"status", pvc.Annotations[StatusAnnotationName])
+		"status", pvc.Annotations[utils.PVCStatusAnnotationName])
 
 	return true
 }

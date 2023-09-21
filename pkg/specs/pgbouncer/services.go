@@ -23,6 +23,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Service create the specification for the service of
@@ -44,7 +45,7 @@ func Service(pooler *apiv1.Pooler) *corev1.Service {
 				},
 			},
 			Selector: map[string]string{
-				PgbouncerNameLabel: pooler.Name,
+				utils.PgbouncerNameLabel: pooler.Name,
 			},
 		},
 	}

@@ -20,6 +20,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -31,14 +33,14 @@ var _ = Describe("Service accounts", func() {
 		sa := &v1.ServiceAccount{}
 		err := UpdateServiceAccount(nil, sa)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(sa.Annotations[OperatorManagedSecretsName]).To(Equal("null"))
+		Expect(sa.Annotations[utils.OperatorManagedSecretsAnnotationName]).To(Equal("null"))
 	})
 
 	It("correctly create the annotation storing the secret names", func() {
 		sa := &v1.ServiceAccount{}
 		err := UpdateServiceAccount([]string{"one", "two"}, sa)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(sa.Annotations[OperatorManagedSecretsName]).To(Equal(`["one","two"]`))
+		Expect(sa.Annotations[utils.OperatorManagedSecretsAnnotationName]).To(Equal(`["one","two"]`))
 	})
 
 	When("the pull secrets are changed", func() {

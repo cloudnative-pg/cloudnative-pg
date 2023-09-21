@@ -37,7 +37,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -1952,7 +1951,7 @@ func assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath string, expectedP
 		Expect(err).ToNot(HaveOccurred())
 		podList := &corev1.PodList{}
 		err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-			ctrlclient.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
+			ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
 		if err != nil {
 			return false, err
 		}
@@ -2014,7 +2013,7 @@ func assertPodIsRecreated(namespace, poolerSampleFile string) {
 		// gather pgbouncer pod name before deleting
 		podList := &corev1.PodList{}
 		err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-			ctrlclient.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
+			ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(len(podList.Items)).Should(BeEquivalentTo(1))
 		podNameBeforeDelete = podList.Items[0].GetName()
@@ -2029,7 +2028,7 @@ func assertPodIsRecreated(namespace, poolerSampleFile string) {
 		Eventually(func() (bool, error) {
 			podList := &corev1.PodList{}
 			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-				ctrlclient.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
+				ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
 			if err != nil {
 				return false, err
 			}
@@ -2067,7 +2066,7 @@ func assertDeploymentIsRecreated(namespace, poolerSampleFile string) {
 	// Get the pods UIDs. We'll confirm they've changed
 	podList := &corev1.PodList{}
 	err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-		ctrlclient.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
+		ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
 	Expect(err).ToNot(HaveOccurred())
 	uids := make([]types.UID, len(podList.Items))
 	for i, p := range podList.Items {
@@ -2096,7 +2095,7 @@ func assertDeploymentIsRecreated(namespace, poolerSampleFile string) {
 		// We wait for the pods of the previous deployment to be deleted
 		Eventually(func() (int, error) {
 			err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-				ctrlclient.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
+				ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
 			return len(podList.Items), err
 		}, 60).Should(BeNumerically("==", *deployment.Spec.Replicas))
 		newuids := make([]types.UID, len(podList.Items))
@@ -2128,7 +2127,7 @@ func assertPGBouncerEndpointsContainsPodsIP(
 	Expect(err).ToNot(HaveOccurred())
 	podList := &corev1.PodList{}
 	err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-		ctrlclient.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
+		ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(endpoint.Subsets).ToNot(BeEmpty())
 
@@ -2594,7 +2593,7 @@ func AssertPvcHasLabels(
 			// Iterating through PVC list
 			for _, pvc := range pvcList.Items {
 				// Gather the podName related to the current pvc using nodeSerial
-				podName := fmt.Sprintf("%v-%v", clusterName, pvc.Annotations["cnpg.io/nodeSerial"])
+				podName := fmt.Sprintf("%v-%v", clusterName, pvc.Annotations[utils.ClusterSerialAnnotationName])
 				pod := &corev1.Pod{}
 				podNamespacedName := types.NamespacedName{
 					Namespace: namespace,
@@ -2612,9 +2611,9 @@ func AssertPvcHasLabels(
 					ExpectedPvcRole = "PG_WAL"
 				}
 				expectedLabels := map[string]string{
-					"cnpg.io/cluster": clusterName,
-					"cnpg.io/pvcRole": ExpectedPvcRole,
-					"role":            ExpectedRole,
+					utils.ClusterLabelName: clusterName,
+					utils.PvcRoleLabelName: ExpectedPvcRole,
+					"role":                 ExpectedRole,
 				}
 				g.Expect(testsUtils.PvcHasLabels(pvc, expectedLabels)).To(BeTrue(),
 					fmt.Sprintf("expectedLabels: %v and found actualLabels on pvc: %v",
@@ -2709,7 +2708,7 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 		if clusterRestarted.Annotations == nil {
 			clusterRestarted.Annotations = make(map[string]string)
 		}
-		clusterRestarted.Annotations[specs.ClusterRestartAnnotationName] = time.Now().Format(time.RFC3339)
+		clusterRestarted.Annotations[utils.ClusterRestartAnnotationName] = time.Now().Format(time.RFC3339)
 		clusterRestarted.ManagedFields = nil
 		err = env.Client.Patch(env.Ctx, clusterRestarted, ctrlclient.MergeFrom(cluster))
 		Expect(err).ToNot(HaveOccurred())
