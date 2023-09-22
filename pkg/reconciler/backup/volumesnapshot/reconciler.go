@@ -200,7 +200,7 @@ func (se *Reconciler) ensurePodIsFenced(
 		cluster.Namespace,
 		targetPodName,
 		utils.AddFencedInstance,
-	); !errors.Is(err, utils.ErrorServerAlreadyFenced) {
+	); err != nil && !errors.Is(err, utils.ErrorServerAlreadyFenced) {
 		return err
 	}
 	return nil
@@ -223,7 +223,7 @@ func (se *Reconciler) EnsurePodIsUnfenced(
 		cluster.Namespace,
 		targetPod.Name,
 		utils.RemoveFencedInstance,
-	); err != nil {
+	); err != nil && !errors.Is(err, utils.ErrorServerAlreadyUnfenced) {
 		return err
 	}
 

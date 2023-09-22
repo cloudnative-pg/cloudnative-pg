@@ -18,7 +18,6 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -301,21 +300,11 @@ func (snapshotStatus *BackupSnapshotStatus) GetControldata(
 	snapshots []volumesnapshot.VolumeSnapshot,
 ) (string, error) {
 	for _, volumeSnapshot := range snapshots {
-		data, ok := volumeSnapshot.Annotations[utils.PgControldataAnnotationName]
+		pgControlData, ok := volumeSnapshot.Annotations[utils.PgControldataAnnotationName]
 		if !ok {
 			continue
 		}
-		type pgControldataResponse struct {
-			Data  string `json:"data,omitempty"`
-			Error error  `json:"error,omitempty"`
-		}
-
-		var result pgControldataResponse
-		err := json.Unmarshal([]byte(data), &result)
-		if err != nil {
-			return "", err
-		}
-		return result.Data, result.Error
+		return pgControlData, nil
 	}
 	return "", fmt.Errorf("could not retrieve pg_controldata from any snapshot")
 }
