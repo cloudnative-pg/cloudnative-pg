@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -295,19 +294,6 @@ func (r *BackupReconciler) isValidBackupRunning(
 	return false, nil
 }
 
-func parsePgControldata(data string) map[string]string {
-	pairs := make(map[string]string)
-	lines := strings.Split(data, "\n")
-	for _, line := range lines {
-		frags := strings.Split(line, ":")
-		if len(frags) != 2 {
-			continue
-		}
-		pairs[strings.TrimSpace(frags[0])] = strings.TrimSpace(frags[1])
-	}
-	return pairs
-}
-
 func (r *BackupReconciler) startSnapshotBackup(
 	ctx context.Context,
 	targetPod *corev1.Pod,
@@ -393,23 +379,10 @@ func (r *BackupReconciler) startSnapshotBackup(
 	}
 
 	backup.Status.BackupSnapshotStatus.SetSnapshotList(snapshots)
-	_, lastCreation := backup.Status.BackupSnapshotStatus.GetSnapshotsInterval(snapshots)
-	backup.Status.StoppedAt = ptr.To(lastCreation)
-	controldata, err := backup.Status.BackupSnapshotStatus.GetControldata(snapshots)
+	err = backup.Status.BackupSnapshotStatus.EnrichStatus(snapshots, &backup.Status)
 	if err != nil {
-		return nil, err
+		contextLogger.Error(err, "while enriching the backup status")
 	}
-	pairs := parsePgControldata(controldata)
-
-	_, hasWAL := pairs["Latest checkpoint's REDO WAL file"]
-	if !hasWAL {
-		contextLogger.Error(fmt.Errorf("unexpected ControldData"), controldata)
-	}
-
-	backup.Status.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
-	backup.Status.EndWal = pairs["Latest checkpoint's REDO WAL file"]
-	backup.Status.BeginLSN = pairs["Fake LSN counter for unlogged rels"]
-	backup.Status.EndLSN = pairs["Fake LSN counter for unlogged rels"]
 
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }
