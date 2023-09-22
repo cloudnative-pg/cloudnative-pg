@@ -2974,9 +2974,11 @@ spec:
                 - metadata
                 type: object
               startDelay:
-                default: 30
-                description: The time in seconds that is allowed for a PostgreSQL
-                  instance to successfully start up (default 30)
+                default: 3600
+                description: 'The time in seconds that is allowed for a PostgreSQL
+                  instance to successfully start up (default 3600). The startup probe
+                  failure threshold is derived from this value using the formula:
+                  ceiling(startDelay / 10).'
                 format: int32
                 type: integer
               stopDelay:
