@@ -1439,8 +1439,7 @@ gracefully shutdown (default 30)</p>
 <td>
    <p>The time in seconds that is allowed for a primary PostgreSQL instance
 to gracefully shutdown during a switchover.
-Default value is 40000000, greater than one year in seconds,
-big enough to simulate an infinite delay</p>
+Default value is 3600 seconds (1 hour).</p>
 </td>
 </tr>
 <tr><td><code>failoverDelay</code><br/>
