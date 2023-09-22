@@ -77,10 +77,7 @@ in order to ensure that all the data are available on the new primary.
 
 For this reason, the `.spec.switchoverDelay`, expressed in seconds, controls
 the  time given to the former primary to shut down gracefully and archive all 
-the WAL files.
-During this time frame, the primary instance does not accept connections.
-The value defaults is greater than one year in seconds, big enough to simulate
-an infinite delay and therefore preserve data durability.
+the WAL files. By default it is set to `3600` (1 hour).
 
 !!! Warning
     The `.spec.switchoverDelay` option affects the RPO and RTO of your

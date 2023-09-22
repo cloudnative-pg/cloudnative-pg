@@ -3260,11 +3260,10 @@ spec:
                 - name
                 type: object
               switchoverDelay:
-                default: 40000000
+                default: 3600
                 description: The time in seconds that is allowed for a primary PostgreSQL
                   instance to gracefully shutdown during a switchover. Default value
-                  is 40000000, greater than one year in seconds, big enough to simulate
-                  an infinite delay
+                  is 3600 seconds (1 hour).
                 format: int32
                 type: integer
               topologySpreadConstraints:
