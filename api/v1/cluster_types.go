@@ -982,7 +982,9 @@ const (
 	// It is greater than one year in seconds, big enough to simulate an infinite timeout
 	DefaultMaxSwitchoverDelay = 3600
 
-	// DefaultStartupDelay is the default value for startupDelay
+	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
+	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,
+	// the minimum value is 1
 	DefaultStartupDelay = 3600
 )
 

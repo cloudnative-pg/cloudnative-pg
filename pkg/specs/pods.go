@@ -21,6 +21,7 @@ package specs
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 
@@ -255,12 +256,12 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 }
 
 // getStartupProbeFailureThreshold get the startup probe failure threshold
-// FAILURE_THRESHOLD = ceiling(startDelay / periodSeconds) and minimum value is 1
+// FAILURE_THRESHOLD = ceil(startDelay / periodSeconds) and minimum value is 1
 func getStartupProbeFailureThreshold(startupDelay int32) int32 {
 	if startupDelay <= StartupProbePeriod {
 		return 1
 	}
-	return startupDelay / StartupProbePeriod
+	return int32(math.Ceil(float64(startupDelay) / float64(StartupProbePeriod)))
 }
 
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration
