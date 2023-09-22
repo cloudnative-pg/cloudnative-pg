@@ -1461,7 +1461,7 @@ ceiling(startDelay / 10).</p>
 </td>
 <td>
    <p>The time in seconds that is allowed for a PostgreSQL instance to
-gracefully shutdown (default 30)</p>
+gracefully shutdown (default 1800)</p>
 </td>
 </tr>
 <tr><td><code>stopDelaySmart</code><br/>

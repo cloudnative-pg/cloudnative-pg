@@ -273,7 +273,7 @@ type ClusterSpec struct {
 	MaxStartDelay int32 `json:"startDelay,omitempty"`
 
 	// The time in seconds that is allowed for a PostgreSQL instance to
-	// gracefully shutdown (default 30)
+	// gracefully shutdown (default 1800)
 	// +kubebuilder:default:=1800
 	// +optional
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`

@@ -3020,7 +3020,7 @@ spec:
               stopDelay:
                 default: 1800
                 description: The time in seconds that is allowed for a PostgreSQL
-                  instance to gracefully shutdown (default 30)
+                  instance to gracefully shutdown (default 1800)
                 format: int32
                 type: integer
               stopDelaySmart:
