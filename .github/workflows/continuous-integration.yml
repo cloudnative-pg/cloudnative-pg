@@ -374,10 +374,11 @@ jobs:
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
-          echo "PUSH=false" >> $GITHUB_ENV
           if [[ "${GITHUB_REF#refs/heads/}" =~ ^(main|release-) ]]
           then
             echo "PUSH=true" >> $GITHUB_ENV
+          else
+            echo "PUSH=false" >> $GITHUB_ENV
           fi
 
       - name: Check PR label conditions
