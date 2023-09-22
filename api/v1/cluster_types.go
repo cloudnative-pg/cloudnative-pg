@@ -266,6 +266,8 @@ type ClusterSpec struct {
 
 	// The time in seconds that is allowed for a PostgreSQL instance to
 	// successfully start up (default 3600)
+	// The startup probe failure threshold is derived from this value using the formula:
+	// ceiling(startDelay / 10).
 	// +kubebuilder:default:=3600
 	// +optional
 	MaxStartDelay int32 `json:"startDelay,omitempty"`
