@@ -829,3 +829,13 @@ var _ = Describe("PodSpec drift detection", func() {
 		Expect(specsMatch).To(BeFalse())
 	})
 })
+
+var _ = Describe("Compute startup probe failure threshold", func() {
+	It("should take the minimum value 1", func() {
+		Expect(getStartupProbeFailureThreshold(5)).To(BeNumerically("==", 1))
+	})
+
+	It("should take the value from 'startDelay / periodSeconds'", func() {
+		Expect(getStartupProbeFailureThreshold(109)).To(BeNumerically("==", 11))
+	})
+})

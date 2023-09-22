@@ -229,8 +229,10 @@ type ClusterSpec struct {
 	WalStorage *StorageConfiguration `json:"walStorage,omitempty"`
 
 	// The time in seconds that is allowed for a PostgreSQL instance to
-	// successfully start up (default 30)
-	// +kubebuilder:default:=30
+	// successfully start up (default 3600).
+	// The startup probe failure threshold is derived from this value using the formula:
+	// ceiling(startDelay / 10).
+	// +kubebuilder:default:=3600
 	// +optional
 	MaxStartDelay int32 `json:"startDelay,omitempty"`
 
@@ -865,6 +867,11 @@ const (
 	// is gracefully shutdown during a switchover.
 	// It is greater than one year in seconds, big enough to simulate an infinite timeout
 	DefaultMaxSwitchoverDelay = 3600
+
+	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
+	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,
+	// the minimum value is 1
+	DefaultStartupDelay = 3600
 )
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -2109,7 +2116,7 @@ func (cluster *Cluster) GetMaxStartDelay() int32 {
 	if cluster.Spec.MaxStartDelay > 0 {
 		return cluster.Spec.MaxStartDelay
 	}
-	return 30
+	return DefaultStartupDelay
 }
 
 // GetMaxStopDelay get the amount of time PostgreSQL has to stop

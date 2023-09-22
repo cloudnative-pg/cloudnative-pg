@@ -20,6 +20,7 @@ package specs
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 
@@ -80,6 +81,12 @@ const (
 
 	// ReadinessProbePeriod is the period set for the postgres instance readiness probe
 	ReadinessProbePeriod = 10
+
+	// StartupProbePeriod is the period set for the postgres instance startup probe
+	StartupProbePeriod = 10
+
+	// LivenessProbePeriod is the period set for the postgres instance liveness probe
+	LivenessProbePeriod = 10
 )
 
 // EnvConfig carries the environment configuration of a container
@@ -183,6 +190,17 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
+			StartupProbe: &corev1.Probe{
+				FailureThreshold: getStartupProbeFailureThreshold(cluster.GetMaxStartDelay()),
+				PeriodSeconds:    StartupProbePeriod,
+				TimeoutSeconds:   5,
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: url.PathHealth,
+						Port: intstr.FromInt32(int32(url.StatusPort)),
+					},
+				},
+			},
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
 				PeriodSeconds:  ReadinessProbePeriod,
@@ -193,14 +211,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 					},
 				},
 			},
-			// From K8s 1.17 and newer, startup probes will be available for
-			// all users and not just protected from feature gates. For now
-			// let's use the LivenessProbe. When we will drop support for K8s
-			// 1.16, we'll configure a StartupProbe and this will lead to a
-			// better LivenessProbe (without InitialDelaySeconds).
 			LivenessProbe: &corev1.Probe{
-				InitialDelaySeconds: cluster.GetMaxStartDelay(),
-				TimeoutSeconds:      5,
+				PeriodSeconds:  LivenessProbePeriod,
+				TimeoutSeconds: 5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
@@ -238,6 +251,15 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 	addManagerLoggingOptions(cluster, &containers[0])
 
 	return containers
+}
+
+// getStartupProbeFailureThreshold get the startup probe failure threshold
+// FAILURE_THRESHOLD = ceil(startDelay / periodSeconds) and minimum value is 1
+func getStartupProbeFailureThreshold(startupDelay int32) int32 {
+	if startupDelay <= StartupProbePeriod {
+		return 1
+	}
+	return int32(math.Ceil(float64(startupDelay) / float64(StartupProbePeriod)))
 }
 
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration
