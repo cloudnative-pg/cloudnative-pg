@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("backup_controller unit tests", func() {
+var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 	Context("isValidBackupRunning works correctly", func() {
 		const (
 			clusterPrimary = "cluster-example-1"
@@ -144,6 +144,106 @@ var _ = Describe("backup_controller unit tests", func() {
 			res, err := backupReconciler.isValidBackupRunning(ctx, backup, cluster)
 			Expect(err).To(HaveOccurred())
 			Expect(res).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
+	When("there's a running backup", func() {
+		It("prevents concurrent backups", func() {
+			backupList := apiv1.BackupList{
+				Items: []apiv1.Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-2",
+						},
+						Status: apiv1.BackupStatus{
+							Phase: apiv1.BackupPhaseRunning,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-3",
+						},
+					},
+				},
+			}
+
+			// The currently running backup can be executed
+			Expect(backupList.CanExecuteBackup("backup-1")).To(BeFalse())
+			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
+		})
+	})
+
+	When("there are no running backups", func() {
+		It("prevents concurrent backups", func() {
+			backupList := apiv1.BackupList{
+				Items: []apiv1.Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-2",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-3",
+						},
+					},
+				},
+			}
+
+			// The currently running backup can be executed
+			Expect(backupList.CanExecuteBackup("backup-1")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-2")).To(BeFalse())
+			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
+		})
+	})
+
+	When("there are multiple running backups", func() {
+		It("prevents concurrent backups", func() {
+			// This could happen if there is a race condition, and in this case we use a
+			// tie-breaker algorithm
+			backupList := apiv1.BackupList{
+				Items: []apiv1.Backup{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-2",
+						},
+						Status: apiv1.BackupStatus{
+							Phase: apiv1.BackupPhaseRunning,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "backup-3",
+						},
+						Status: apiv1.BackupStatus{
+							Phase: apiv1.BackupPhaseRunning,
+						},
+					},
+				},
+			}
+
+			// The currently running backup can be executed
+			Expect(backupList.CanExecuteBackup("backup-1")).To(BeFalse())
+			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
+			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
 		})
 	})
 })

@@ -47,6 +47,7 @@ const (
 	MinioInstallation         Timeout = "minioInstallation"
 	BackupIsReady             Timeout = "backupIsReady"
 	DrainNode                 Timeout = "drainNode"
+	VolumeSnapshotIsReady     Timeout = "volumeSnapshotIsReady"
 )
 
 // DefaultTestTimeouts contains the default timeout in seconds for various events
@@ -65,6 +66,7 @@ var DefaultTestTimeouts = map[Timeout]int{
 	MinioInstallation:         300,
 	BackupIsReady:             180,
 	DrainNode:                 900,
+	VolumeSnapshotIsReady:     300,
 }
 
 // Timeouts returns the map of timeouts, where each event gets the timeout specificed
