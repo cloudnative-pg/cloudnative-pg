@@ -127,8 +127,8 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				//
 				// This is why we are trying a smart shutdown for half-time
 				// of our stop delay, and then we proceed.
-				log.Info("Received termination signal", "signal", sig)
-				if err := tryShuttingDownSmartFast(i.instance.MaxStopDelay/2, i.instance); err != nil {
+				log.Info("Received termination signal", "signal", sig, "shutdown timeout", i.instance.GetSmartShutdownTimeout())
+				if err := tryShuttingDownSmartFast(i.instance.GetSmartShutdownTimeout(), i.instance); err != nil {
 					log.Error(err, "error while shutting down instance, proceeding")
 				}
 				return nil

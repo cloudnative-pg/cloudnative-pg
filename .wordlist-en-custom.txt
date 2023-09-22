@@ -1027,6 +1027,7 @@ stderr
 stdout
 stedolan
 stopDelay
+stopDelaySmart
 stoppedAt
 storageAccount
 storageClass
