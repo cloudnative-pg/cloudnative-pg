@@ -1451,7 +1451,9 @@ user by setting it to <code>NULL</code>. Enabled by default.</p>
 </td>
 <td>
    <p>The time in seconds that is allowed for a PostgreSQL instance to
-successfully start up (default 30)</p>
+successfully start up (default 3600)
+The startup probe failure threshold is derived from this value using the formula:
+ceiling(startDelay / 10).</p>
 </td>
 </tr>
 <tr><td><code>stopDelay</code><br/>
