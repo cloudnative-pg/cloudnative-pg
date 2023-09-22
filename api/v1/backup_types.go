@@ -292,24 +292,26 @@ func (snapshotStatus *BackupSnapshotStatus) EnrichStatus(
 	snapshots []volumesnapshot.VolumeSnapshot,
 	backupStatus *BackupStatus,
 ) error {
-	_, lastCreation := snapshotStatus.GetSnapshotsInterval(snapshots)
+	_, lastCreation := snapshotStatus.getSnapshotsInterval(snapshots)
 	backupStatus.StoppedAt = ptr.To(lastCreation)
-	controldata, err := snapshotStatus.GetControldata(snapshots)
+	controldata, err := snapshotStatus.getControldata(snapshots)
 	if err != nil {
 		return err
 	}
 	pairs := parsePgControldata(controldata)
 
+	// the begin/end WAL and LSN are the same, since the instance was fenced
+	// for the snapshot
 	backupStatus.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
 	backupStatus.EndWal = pairs["Latest checkpoint's REDO WAL file"]
-	backupStatus.BeginLSN = pairs["Fake LSN counter for unlogged rels"]
-	backupStatus.EndLSN = pairs["Fake LSN counter for unlogged rels"]
+	backupStatus.BeginLSN = pairs["Latest checkpoint's REDO location"]
+	backupStatus.EndLSN = pairs["Latest checkpoint's REDO location"]
 	return nil
 }
 
-// GetSnapshotsInterval gets the earliest and latest creation times
+// getSnapshotsInterval gets the earliest and latest creation times
 // from a list of VolumeSnapshots
-func (snapshotStatus *BackupSnapshotStatus) GetSnapshotsInterval(
+func (snapshotStatus *BackupSnapshotStatus) getSnapshotsInterval(
 	snapshots []volumesnapshot.VolumeSnapshot,
 ) (metav1.Time, metav1.Time) {
 	var firstCreation, lastCreation metav1.Time
@@ -329,8 +331,8 @@ func (snapshotStatus *BackupSnapshotStatus) GetSnapshotsInterval(
 	return firstCreation, lastCreation
 }
 
-// GetControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
-func (snapshotStatus *BackupSnapshotStatus) GetControldata(
+// getControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
+func (snapshotStatus *BackupSnapshotStatus) getControldata(
 	snapshots []volumesnapshot.VolumeSnapshot,
 ) (string, error) {
 	for _, volumeSnapshot := range snapshots {
