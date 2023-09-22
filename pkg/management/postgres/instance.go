@@ -261,6 +261,8 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 }
 
 // GetSmartShutdownTimeout gets the duration in seconds as the timeout of smart shutdown
+// we calculate smart shutdown with following formula
+// max(stopDelay - stopDelaySmart, 30)
 func (instance *Instance) GetSmartShutdownTimeout() int32 {
 	timeout := instance.MaxStopDelay - instance.StopDelaySmart
 	if timeout < 30 {
