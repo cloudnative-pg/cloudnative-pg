@@ -144,8 +144,8 @@ func (se *Reconciler) Execute(
 	}
 
 	// Step 2: create snapshot
-	// we execute the snapshots only if we don't find any
 	if len(volumeSnapshots) == 0 {
+		// we execute the snapshots only if we don't find any
 		if err := se.createSnapshotPVCGroupStep(ctx, cluster, pvcs, backup, targetPod); err != nil {
 			return nil, err
 		}
