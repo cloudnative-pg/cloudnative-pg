@@ -125,8 +125,14 @@ func (se *Reconciler) Execute(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
 
+	// Step 0: check if the snapshots have been created already
+	volumeSnapshots, err := GetBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	// Step 1: fencing
-	if se.shouldFence {
+	if len(volumeSnapshots) == 0 && se.shouldFence {
 		contextLogger.Debug("Checking pre-requisites")
 		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
 			return nil, err
@@ -138,12 +144,8 @@ func (se *Reconciler) Execute(
 	}
 
 	// Step 2: create snapshot
-	volumeSnapshots, err := GetBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
-	if err != nil {
-		return nil, err
-	}
+	// we execute the snapshots only if we don't find any
 	if len(volumeSnapshots) == 0 {
-		// we execute the snapshots only if we don't find any
 		if err := se.createSnapshotPVCGroupStep(ctx, cluster, pvcs, backup, targetPod); err != nil {
 			return nil, err
 		}
@@ -315,6 +317,9 @@ func (se *Reconciler) createSnapshot(
 	pvc *corev1.PersistentVolumeClaim,
 	snapshotSuffix string,
 ) error {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		return fmt.Errorf("tried creating a VolumeSnapshot on a cluster without")
+	}
 	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
 	name := se.getSnapshotName(pvc.Name, snapshotSuffix)
 	var snapshotClassName *string
