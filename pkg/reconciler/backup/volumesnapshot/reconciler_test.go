@@ -23,7 +23,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -103,7 +102,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		Expect(err).ToNot(HaveOccurred())
 		// we should have requested creation of snapshots, and so we'd return to
 		// wait for them to be ready
-		Expect(result).ToNot(Equal(reconcile.Result{}))
+		Expect(result).ToNot(BeNil())
 		hasEvent := false
 		var events string
 		go func() {
@@ -158,7 +157,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		Expect(err).ToNot(HaveOccurred())
 		// we should have found snapshots that are not ready, and so we'd return to
 		// wait for them to be ready
-		Expect(result).ToNot(Equal(reconcile.Result{}))
+		Expect(result).ToNot(BeNil())
 		hasEvent := false
 		var events string
 		go func() {
@@ -219,9 +218,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
 		Expect(err).ToNot(HaveOccurred())
-		// we should have found snapshots that are not ready, and so we'd return to
-		// wait for them to be ready
-		Expect(result).ToNot(Equal(reconcile.Result{}))
+		// we should have found snapshots that are ready, and so the result
+		// should be nil
+		Expect(result).To(BeNil())
 		hasEvent := false
 		var events string
 		go func() {
