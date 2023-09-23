@@ -318,7 +318,7 @@ func (se *Reconciler) createSnapshot(
 	snapshotSuffix string,
 ) error {
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
-		return fmt.Errorf("tried creating a VolumeSnapshot on a cluster without")
+		return fmt.Errorf("cannot create a VolumeSnapshot on a cluster without configuration")
 	}
 	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
 	name := se.getSnapshotName(pvc.Name, snapshotSuffix)
