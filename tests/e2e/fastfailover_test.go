@@ -81,7 +81,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespaceAndWait(namespace, 120)
+				return env.DeleteNamespace(namespace)
 			})
 			AssertFastFailOver(namespace, sampleFileWithoutReplicationSlots, clusterName,
 				webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
@@ -102,7 +102,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespaceAndWait(namespace, 120)
+				return env.DeleteNamespace(namespace)
 			})
 			AssertFastFailOver(namespace, sampleFileWithReplicationSlots,
 				clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
@@ -119,7 +119,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespaceAndWait(namespace, 120)
+				return env.DeleteNamespace(namespace)
 			})
 			AssertFastFailOver(
 				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime)

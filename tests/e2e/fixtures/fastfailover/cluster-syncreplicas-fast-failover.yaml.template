@@ -5,9 +5,10 @@ metadata:
   name: cluster-syncreplicas-fast-failover
 spec:
   instances: 3
+  stopDelay: 210
+  stopDelaySmart: 180
   minSyncReplicas: 1
   maxSyncReplicas: 2
-
   postgresql:
     parameters:
       log_checkpoints: "on"
