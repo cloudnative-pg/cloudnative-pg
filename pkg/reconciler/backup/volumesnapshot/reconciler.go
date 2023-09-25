@@ -174,6 +174,8 @@ func (se *Reconciler) ensurePodIsFenced(
 	backup *apiv1.Backup,
 	targetPodName string,
 ) error {
+	contextLogger := log.FromContext(ctx)
+
 	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
 	if err != nil {
 		return fmt.Errorf("could not check if cluster is fenced: %v", err)
@@ -188,21 +190,27 @@ func (se *Reconciler) ensurePodIsFenced(
 		return errors.New("cannot execute volume snapshot on a cluster that has fenced instances")
 	}
 
-	// The list of fenced instances is empty, so we need to request
-	// fencing for the target pod
-	se.recorder.Eventf(backup, "Normal", "FencePod",
-		"Requesting fencing for Pod %v", targetPodName)
-
-	if err := resources.ApplyFenceFunc(
+	err = resources.ApplyFenceFunc(
 		ctx,
 		se.cli,
 		cluster.Name,
 		cluster.Namespace,
 		targetPodName,
 		utils.AddFencedInstance,
-	); err != nil && !errors.Is(err, utils.ErrorServerAlreadyFenced) {
+	)
+	if errors.Is(err, utils.ErrorServerAlreadyFenced) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
+
+	// The list of fenced instances is empty, so we need to request
+	// fencing for the target pod
+	contextLogger.Info("Fencing Pod", "podName", targetPodName)
+	se.recorder.Eventf(backup, "Normal", "FencePod",
+		"Fencing Pod %v", targetPodName)
+
 	return nil
 }
 
@@ -214,23 +222,28 @@ func (se *Reconciler) EnsurePodIsUnfenced(
 	targetPod *corev1.Pod,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("Unfencing Pod")
 
-	if err := resources.ApplyFenceFunc(
+	err := resources.ApplyFenceFunc(
 		ctx,
 		se.cli,
 		cluster.Name,
 		cluster.Namespace,
 		targetPod.Name,
 		utils.RemoveFencedInstance,
-	); err != nil && !errors.Is(err, utils.ErrorServerAlreadyUnfenced) {
+	)
+	if errors.Is(err, utils.ErrorServerAlreadyUnfenced) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 
 	// The list of fenced instances is empty, so we need to request
 	// fencing for the target pod
+	contextLogger.Info("Unfencing Pod", "podName", targetPod.Name)
 	se.recorder.Eventf(backup, "Normal", "UnfencePod",
-		"Un-fencing Pod %v", targetPod.Name)
+		"Unfencing Pod %v", targetPod.Name)
+
 	return nil
 }
 
