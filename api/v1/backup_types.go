@@ -18,17 +18,13 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // BackupPhase is the phase of the backup
@@ -272,78 +268,6 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotList(snapshots []volumesn
 		snapshotNames[idx] = volumeSnapshot.Name
 	}
 	snapshotStatus.Snapshots = snapshotNames
-}
-
-func parsePgControldata(data string) map[string]string {
-	pairs := make(map[string]string)
-	lines := strings.Split(data, "\n")
-	for _, line := range lines {
-		frags := strings.Split(line, ":")
-		if len(frags) != 2 {
-			continue
-		}
-		pairs[strings.TrimSpace(frags[0])] = strings.TrimSpace(frags[1])
-	}
-	return pairs
-}
-
-// EnrichStatus adds fields to the backup status based on the snapshots
-func (snapshotStatus *BackupSnapshotStatus) EnrichStatus(
-	snapshots []volumesnapshot.VolumeSnapshot,
-	backupStatus *BackupStatus,
-) error {
-	_, lastCreation := snapshotStatus.getSnapshotsInterval(snapshots)
-	backupStatus.StoppedAt = ptr.To(lastCreation)
-	controldata, err := snapshotStatus.getControldata(snapshots)
-	if err != nil {
-		return err
-	}
-	pairs := parsePgControldata(controldata)
-
-	// the begin/end WAL and LSN are the same, since the instance was fenced
-	// for the snapshot
-	backupStatus.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
-	backupStatus.EndWal = pairs["Latest checkpoint's REDO WAL file"]
-	backupStatus.BeginLSN = pairs["Latest checkpoint's REDO location"]
-	backupStatus.EndLSN = pairs["Latest checkpoint's REDO location"]
-	return nil
-}
-
-// getSnapshotsInterval gets the earliest and latest creation times
-// from a list of VolumeSnapshots
-func (snapshotStatus *BackupSnapshotStatus) getSnapshotsInterval(
-	snapshots []volumesnapshot.VolumeSnapshot,
-) (metav1.Time, metav1.Time) {
-	var firstCreation, lastCreation metav1.Time
-	for idx := range snapshots {
-		volumeSnapshot := &snapshots[idx]
-		if firstCreation.IsZero() || lastCreation.IsZero() {
-			firstCreation = volumeSnapshot.CreationTimestamp
-			lastCreation = volumeSnapshot.CreationTimestamp
-			continue
-		}
-		if volumeSnapshot.CreationTimestamp.Before(&firstCreation) {
-			firstCreation = volumeSnapshot.CreationTimestamp
-		}
-		if lastCreation.Before(&volumeSnapshot.CreationTimestamp) {
-			lastCreation = volumeSnapshot.CreationTimestamp
-		}
-	}
-	return firstCreation, lastCreation
-}
-
-// getControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
-func (snapshotStatus *BackupSnapshotStatus) getControldata(
-	snapshots []volumesnapshot.VolumeSnapshot,
-) (string, error) {
-	for _, volumeSnapshot := range snapshots {
-		pgControlData, ok := volumeSnapshot.Annotations[utils.PgControldataAnnotationName]
-		if !ok {
-			continue
-		}
-		return pgControlData, nil
-	}
-	return "", fmt.Errorf("could not retrieve pg_controldata from any snapshot")
 }
 
 // IsDone check if a backup is completed or still in progress

@@ -379,12 +379,33 @@ func (r *BackupReconciler) startSnapshotBackup(
 	}
 
 	backup.Status.BackupSnapshotStatus.SetSnapshotList(snapshots)
-	err = backup.Status.BackupSnapshotStatus.EnrichStatus(snapshots, &backup.Status)
-	if err != nil {
+	if err := backupStatusFromSnapshots(snapshots, &backup.Status); err != nil {
 		contextLogger.Error(err, "while enriching the backup status")
 	}
 
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
+}
+
+// backupStatusFromSnapshots adds fields to the backup status based on the snapshots
+func backupStatusFromSnapshots(
+	snapshots volumesnapshot.Slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	_, lastCreation := snapshots.GetSnapshotsInterval()
+	backupStatus.StoppedAt = ptr.To(lastCreation)
+	controldata, err := snapshots.GetControldata()
+	if err != nil {
+		return err
+	}
+	pairs := utils.ParsePgControldataOutput(controldata)
+
+	// the begin/end WAL and LSN are the same, since the instance was fenced
+	// for the snapshot
+	backupStatus.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
+	backupStatus.EndWal = pairs["Latest checkpoint's REDO WAL file"]
+	backupStatus.BeginLSN = pairs["Latest checkpoint's REDO location"]
+	backupStatus.EndLSN = pairs["Latest checkpoint's REDO location"]
+	return nil
 }
 
 // isErrorRetryable detects is an error is retryable or not
