@@ -244,9 +244,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
 		return err
 	}
-	// we need a migration here, otherwise the server will not startup if
+	// we need a migration here, otherwise the server will not start up if
 	// we recover from a base which has postgresql.auto.conf
-	if _, err := migratePostgresAutoConfFile(ctx, info.GetInstance(), false); err != nil {
+	// the override.conf and include statement is present, what we need to do is to
+	// migrate the content
+	if _, err := migratePostgresAutoConfFile(ctx, info.GetInstance(), true); err != nil {
 		return err
 	}
 	if cluster.IsReplica() {

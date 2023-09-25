@@ -321,14 +321,17 @@ func cleanPostgresAutoConfFile(ctx context.Context, instance *Instance) (changed
 }
 
 // migratePostgresAutoConfFile migrates options managed by the operator from `postgresql.auto.conf` file,
-// to `override.conf` file for an upgrade case
-func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, addInclude bool) (changed bool, err error) {
+// to `override.conf` file for an upgrade case.
+// forceMigrate: even the override.conf is exists, still do a migration, this is used in restore case
+func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceMigrate bool) (changed bool, err error) {
 	contextLogger := log.FromContext(ctx)
 	targetFile := filepath.Join(instance.PgData, constants.PostgresqlOverrideConfigurationFile)
-	if err != nil {
-		return false, fmt.Errorf("read override.conf file: %w", err)
+	var targetFileExists bool
+	if targetFileExists, _ := fileutils.FileExists(targetFile); targetFileExists {
+		if !forceMigrate {
+			return false, nil
+		}
 	}
-
 	autoConfFile := filepath.Join(instance.PgData, "postgresql.auto.conf")
 	autoConfContent, err := fileutils.ReadFile(autoConfFile)
 	if err != nil {
@@ -344,6 +347,9 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, addInc
 	if len(options) == 0 {
 		return false, nil
 	}
+	contextLogger.Info("Start to migrate replication settings", "filename",
+		constants.PostgresqlOverrideConfigurationFile, "targetFileExists", targetFileExists,
+		"targetFileExists", targetFileExists)
 	var builder strings.Builder
 	for key, value := range options {
 		builder.WriteString(key)
@@ -362,7 +368,8 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, addInc
 			return true, err
 		}
 
-		if addInclude {
+		// if the targetFile is not existed while migration, also need add the target file into the postgresql.conf
+		if !targetFileExists {
 			// add include `override.conf` at the end of the `postgresql.conf` file
 			if err = fileutils.AppendStringToFile(
 				path.Join(instance.PgData, "postgresql.conf"),
