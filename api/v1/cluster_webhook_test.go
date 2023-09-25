@@ -1053,7 +1053,7 @@ var _ = Describe("configuration change validation", func() {
 		Expect(clusterNew.validateConfiguration()).To(HaveLen(1))
 	})
 
-	It("should detect an invalid shared_buffer value", func() {
+	It("should detect an invalid `shared_buffers` value", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
