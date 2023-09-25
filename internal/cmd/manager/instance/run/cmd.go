@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
@@ -119,10 +120,10 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 			ByObject: map[client.Object]cache.ByObject{
 				&apiv1.Cluster{}: {
 					Field: fields.OneTermEqualSelector("metadata.name", instance.ClusterName),
+					Namespaces: map[string]cache.Config{
+						instance.Namespace: {},
+					},
 				},
-			},
-			Namespaces: []string{
-				instance.Namespace,
 			},
 		},
 		// We don't need a cache for secrets and configmap, as all reloads
@@ -135,7 +136,9 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 				},
 			},
 		},
-		MetricsBindAddress: "0", // TODO: merge metrics to the manager one
+		Metrics: server.Options{
+			BindAddress: "0", // TODO: merge metrics to the manager one
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to set up overall controller manager")
