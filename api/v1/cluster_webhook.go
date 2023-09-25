@@ -1035,7 +1035,11 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 				field.Invalid(
 					field.NewPath("spec", "postgresql", "parameters", sharedBuffersParameter),
 					sharedBuffersParameter,
-					fmt.Sprintf("Invalid value for configuration parameter %s", sharedBuffersParameter)))
+					fmt.Sprintf(
+						"Invalid value for configuration parameter %s. More info on accepted values format: "+
+							"https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES",
+						sharedBuffersParameter,
+					)))
 		}
 	}
 
