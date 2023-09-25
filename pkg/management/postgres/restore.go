@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 
@@ -68,7 +67,6 @@ var (
 		Steps: math.MaxInt32,
 	}
 
-	enforcedParametersRegex          = regexp.MustCompile(`(?P<PARAM>[a-z_]+) setting:\s+(?P<VALUE>[a-z0-9]+)`)
 	pgControldataSettingsToParamsMap = map[string]string{
 		"max_connections":      "max_connections",
 		"max_wal_senders":      "max_wal_senders",
@@ -641,13 +639,9 @@ func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string
 	log.Debug("pg_controldata stdout", "stdout", stdoutBuffer.String())
 
 	enforcedParams := map[string]string{}
-	for _, line := range strings.Split(stdoutBuffer.String(), "\n") {
-		matches := enforcedParametersRegex.FindStringSubmatch(line)
-		if len(matches) < 3 {
-			continue
-		}
-		if param, ok := pgControldataSettingsToParamsMap[matches[1]]; ok {
-			enforcedParams[param] = matches[2]
+	for key, value := range utils.ParsePgControldataOutput(stderrBuffer.String()) {
+		if param, ok := pgControldataSettingsToParamsMap[key]; ok {
+			enforcedParams[param] = value
 		}
 	}
 	return enforcedParams, nil
