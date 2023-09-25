@@ -124,11 +124,9 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// to our process. In this case we terminate as fast as we can,
 				// otherwise we'll receive a SIGKILL by the Kubelet, possibly
 				// resulting in a data corruption.
-				//
-				// This is why we are trying a smart shutdown for half-time
-				// of our stop delay, and then we proceed.
-				log.Info("Received termination signal", "signal", sig)
-				if err := tryShuttingDownSmartFast(i.instance.MaxStopDelay/2, i.instance); err != nil {
+				smartShutdownTimeout := i.instance.GetSmartShutdownTimeout()
+				log.Info("Received termination signal", "signal", sig, "smartShutdownTimeout", smartShutdownTimeout)
+				if err := tryShuttingDownSmartFast(smartShutdownTimeout, i.instance); err != nil {
 					log.Error(err, "error while shutting down instance, proceeding")
 				}
 				return nil

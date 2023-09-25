@@ -1432,7 +1432,15 @@ ceiling(startDelay / 10).</p>
 </td>
 <td>
    <p>The time in seconds that is allowed for a PostgreSQL instance to
-gracefully shutdown (default 30)</p>
+gracefully shutdown (default 1800)</p>
+</td>
+</tr>
+<tr><td><code>smartStopDelay</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
+this formula to compute the timeout of smart shutdown is <code>max(stopDelay -  smartStopDelay, 30)</code>,</p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>

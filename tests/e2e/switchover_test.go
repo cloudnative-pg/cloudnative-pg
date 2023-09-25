@@ -46,7 +46,7 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 				if CurrentSpecReport().Failed() {
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
-				return env.DeleteNamespaceAndWait(namespace, 60)
+				return env.DeleteNamespace(namespace)
 			})
 			clusterName, err := env.GetResourceNameFromYAML(sampleFileWithReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
@@ -68,7 +68,7 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 				if CurrentSpecReport().Failed() {
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
-				return env.DeleteNamespaceAndWait(namespace, 60)
+				return env.DeleteNamespace(namespace)
 			})
 			clusterName, err := env.GetResourceNameFromYAML(sampleFileWithoutReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())

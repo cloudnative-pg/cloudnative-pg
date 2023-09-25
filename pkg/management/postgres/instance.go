@@ -167,6 +167,9 @@ type Instance struct {
 	// MaxStopDelay is the current MaxStopDelay of the cluster
 	MaxStopDelay int32
 
+	// SmartStopDelay is used to compute the timeout of smart shutdown by the formula `stopDelay -  smartStopDelay`
+	SmartStopDelay int32
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -255,6 +258,17 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 	}
 
 	return WritePostgresUserMaps(instance.PgData)
+}
+
+// GetSmartShutdownTimeout gets the duration in seconds as the timeout of smart shutdown
+// we calculate smart shutdown with following formula
+// max(stopDelay - smartStopDelay, 30)
+func (instance *Instance) GetSmartShutdownTimeout() int32 {
+	timeout := instance.MaxStopDelay - instance.SmartStopDelay
+	if timeout < 30 {
+		timeout = 30
+	}
+	return timeout
 }
 
 // InstanceCommand are commands for the goroutine managing postgres

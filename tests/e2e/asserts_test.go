@@ -2735,11 +2735,14 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
+	// now the upgrade is not a final phase before health
+	// we can verify either it is in upgrade or PhaseWaitingForInstancesToBeActive
 	By("waiting for the cluster to end up in upgrading state", func() {
 		// waiting for cluster phase to end up in "Upgrading cluster" state after restarting the cluster.
 		Eventually(func() (bool, error) {
 			cluster, err := env.GetCluster(namespace, clusterName)
-			return cluster.Status.Phase == apiv1.PhaseUpgrade, err
+			return ( cluster.Status.Phase == apiv1.PhaseUpgrade ) ||
+			 ( cluster.Status.Phase == apiv1.PhaseWaitingForInstancesToBeActive ), err
 		}, 120, 3).Should(BeTrue())
 	})
 	AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
