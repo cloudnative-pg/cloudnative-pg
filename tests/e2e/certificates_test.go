@@ -122,7 +122,7 @@ var _ = Describe("Certificates", func() {
 			})
 
 		It("can authenticate after switching to user-supplied server certs", Label(tests.LabelServiceConnectivity), func() {
-			_, err := env.GetCluster(namespace, clusterName)
+			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			CreateAndAssertServerCertificatesSecrets(
 				namespace,
@@ -154,6 +154,14 @@ var _ = Describe("Certificates", func() {
 				}
 				return certUpdateStatus, err
 			}, 120).Should(BeTrue(), fmt.Sprintf("Error: %v", err))
+
+			err = utils.CreateClientCertificatesViaKubectlPlugin(
+				*cluster,
+				kubectlCNPGClientCertSecretName,
+				"app",
+				env,
+			)
+			Expect(err).ToNot(HaveOccurred())
 
 			pod := utils.DefaultWebapp(
 				namespace,
