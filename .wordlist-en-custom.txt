@@ -1001,6 +1001,7 @@ sig
 sigs
 singlenamespace
 slotPrefix
+smartStopDelay
 snapshotBackupStatus
 snapshotOwnerReference
 snapshotted
@@ -1027,7 +1028,6 @@ stderr
 stdout
 stedolan
 stopDelay
-stopDelaySmart
 stoppedAt
 storageAccount
 storageClass

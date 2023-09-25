@@ -3009,6 +3009,14 @@ spec:
                 required:
                 - metadata
                 type: object
+              smartStopDelay:
+                default: 180
+                description: The time in seconds that controls the window of time
+                  reserved for the smart shutdown of Postgres to complete. this formula
+                  to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay,
+                  30)`,
+                format: int32
+                type: integer
               startDelay:
                 default: 3600
                 description: 'The time in seconds that is allowed for a PostgreSQL
@@ -3021,14 +3029,6 @@ spec:
                 default: 1800
                 description: The time in seconds that is allowed for a PostgreSQL
                   instance to gracefully shutdown (default 1800)
-                format: int32
-                type: integer
-              stopDelaySmart:
-                default: 180
-                description: The time in seconds that controls the window of time
-                  reserved for the smart shutdown of Postgres to complete. this formula
-                  to compute the timeout of smart shutdown is `max(stopDelay -  stopDelaySmart,
-                  30)`,
                 format: int32
                 type: integer
               storage:

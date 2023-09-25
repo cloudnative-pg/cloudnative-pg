@@ -6,7 +6,7 @@ metadata:
 spec:
   instances: 3
   stopDelay: 210
-  stopDelaySmart: 180
+  smartStopDelay: 180
   postgresql:
     parameters:
       log_checkpoints: "on"

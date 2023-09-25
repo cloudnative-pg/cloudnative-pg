@@ -226,13 +226,13 @@ var _ = Describe("check atomic bool", func() {
 })
 
 var _ = Describe("testing the compute of smart shutdown time", func() {
-	It("should be 30 as the result of 'MaxStopDelay - StopDelaySmart'  is less than it", func() {
-		intance := Instance{MaxStopDelay: 100, StopDelaySmart: 100}
-		Expect(intance.GetSmartShutdownTimeout()).To(BeNumerically("==", 30))
+	It("should be 30 as the result of 'MaxStopDelay - SmartStopDelay'  is less than it", func() {
+		instance := Instance{MaxStopDelay: 100, SmartStopDelay: 100}
+		Expect(instance.GetSmartShutdownTimeout()).To(BeNumerically("==", 30))
 	})
 
-	It("should be the result of  'MaxStopDelay - StopDelaySmart'", func() {
-		intance := Instance{MaxStopDelay: 200, StopDelaySmart: 100}
-		Expect(intance.GetSmartShutdownTimeout()).To(BeNumerically("==", 100))
+	It("should be the result of  'MaxStopDelay - SmartStopDelay'", func() {
+		instance := Instance{MaxStopDelay: 200, SmartStopDelay: 100}
+		Expect(instance.GetSmartShutdownTimeout()).To(BeNumerically("==", 100))
 	})
 })

@@ -167,8 +167,8 @@ type Instance struct {
 	// MaxStopDelay is the current MaxStopDelay of the cluster
 	MaxStopDelay int32
 
-	// StopDelaySmart is used to compute the timeout of smart shutdown by the formula `stopDelay -  stopDelaySmart`
-	StopDelaySmart int32
+	// SmartStopDelay is used to compute the timeout of smart shutdown by the formula `stopDelay -  smartStopDelay`
+	SmartStopDelay int32
 
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
@@ -262,9 +262,9 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 
 // GetSmartShutdownTimeout gets the duration in seconds as the timeout of smart shutdown
 // we calculate smart shutdown with following formula
-// max(stopDelay - stopDelaySmart, 30)
+// max(stopDelay - smartStopDelay, 30)
 func (instance *Instance) GetSmartShutdownTimeout() int32 {
-	timeout := instance.MaxStopDelay - instance.StopDelaySmart
+	timeout := instance.MaxStopDelay - instance.SmartStopDelay
 	if timeout < 30 {
 		timeout = 30
 	}
