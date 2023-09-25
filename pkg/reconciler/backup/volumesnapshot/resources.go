@@ -41,7 +41,7 @@ type volumeSnapshotError struct {
 
 // Error implements the error interface
 func (err volumeSnapshotError) Error() string {
-	if err.InternalError.Message != nil {
+	if err.InternalError.Message == nil {
 		return "non specified volume snapshot error"
 	}
 	return *err.InternalError.Message
