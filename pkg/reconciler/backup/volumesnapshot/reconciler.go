@@ -123,6 +123,10 @@ func (se *Reconciler) Execute(
 	targetPod *corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (*ctrl.Result, error) {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
+	}
+
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
 
 	// Step 0: check if the snapshots have been created already
@@ -317,9 +321,6 @@ func (se *Reconciler) createSnapshot(
 	pvc *corev1.PersistentVolumeClaim,
 	snapshotSuffix string,
 ) error {
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
-		return fmt.Errorf("cannot create a VolumeSnapshot on a cluster without configuration")
-	}
 	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
 	name := se.getSnapshotName(pvc.Name, snapshotSuffix)
 	var snapshotClassName *string
