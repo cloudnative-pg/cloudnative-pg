@@ -322,7 +322,7 @@ func cleanPostgresAutoConfFile(ctx context.Context, instance *Instance) (changed
 
 // migratePostgresAutoConfFile migrates options managed by the operator from `postgresql.auto.conf` file,
 // to `override.conf` file for an upgrade case.
-// forceMigrate: even the override.conf is exists, still do a migration, this is used in restore case
+// forceMigrate: even the override.conf is existed, still do a migration, this is used in the restore case
 func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceMigrate bool) (changed bool, err error) {
 	contextLogger := log.FromContext(ctx)
 	targetFile := filepath.Join(instance.PgData, constants.PostgresqlOverrideConfigurationFile)
