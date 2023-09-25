@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// +kubebuilder:scaffold:imports
@@ -108,12 +109,14 @@ func RunController(
 	}
 
 	managerOptions := ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		LeaderElection:     leaderConfig.enable,
-		LeaseDuration:      &leaderConfig.leaseDuration,
-		RenewDeadline:      &leaderConfig.renewDeadline,
-		LeaderElectionID:   LeaderElectionID,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
+		LeaderElection:   leaderConfig.enable,
+		LeaseDuration:    &leaderConfig.leaseDuration,
+		RenewDeadline:    &leaderConfig.renewDeadline,
+		LeaderElectionID: LeaderElectionID,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    port,
 			CertDir: defaultWebhookCertDir,
