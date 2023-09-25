@@ -315,7 +315,8 @@ func (snapshotStatus *BackupSnapshotStatus) getSnapshotsInterval(
 	snapshots []volumesnapshot.VolumeSnapshot,
 ) (metav1.Time, metav1.Time) {
 	var firstCreation, lastCreation metav1.Time
-	for _, volumeSnapshot := range snapshots {
+	for idx := range snapshots {
+		volumeSnapshot := &snapshots[idx]
 		if firstCreation.IsZero() || lastCreation.IsZero() {
 			firstCreation = volumeSnapshot.CreationTimestamp
 			lastCreation = volumeSnapshot.CreationTimestamp
