@@ -86,6 +86,7 @@ spec:
   - sql
   - cloudnativepg
   - cloudnative-pg
+  - cnpg
   minKubeVersion: 1.23.0
   links:
   - name: CloudNativePG
