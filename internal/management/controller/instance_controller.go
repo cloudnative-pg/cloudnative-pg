@@ -873,6 +873,7 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
 	r.instance.MaxSwitchoverDelay = cluster.GetMaxSwitchoverDelay()
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
+	r.instance.SmartStopDelay = cluster.GetSmartStopDelay()
 }
 
 func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster) error {

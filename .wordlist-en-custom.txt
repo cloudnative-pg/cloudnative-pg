@@ -968,6 +968,7 @@ sig
 sigs
 singlenamespace
 slotPrefix
+smartStopDelay
 snapshotted
 snapshotting
 sourceNamespace
