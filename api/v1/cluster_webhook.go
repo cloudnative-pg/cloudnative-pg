@@ -969,7 +969,7 @@ func (r *Cluster) validateResources() field.ErrorList {
 				result = append(result, field.Invalid(
 					field.NewPath("spec", "resources", "requests", "memory"),
 					memoryRequest.String(),
-					"Memory request is lower than the shared_buffer value",
+					"Memory request is lower than PostgreSQL `shared_buffers` value",
 				))
 			}
 		}
