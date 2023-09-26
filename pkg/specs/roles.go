@@ -17,26 +17,16 @@ limitations under the License.
 package specs
 
 import (
+	"golang.org/x/exp/slices"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
 func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
-	involvedConfigMapNames := []string{
-		cluster.Name,
-	}
-
-	if cluster.Spec.Monitoring != nil {
-		// If custom queries are used, the instance manager need privileges to read those
-		// entries
-		for _, configMapName := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
-			involvedConfigMapNames = append(involvedConfigMapNames, configMapName.Name)
-		}
-	}
-
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
@@ -49,7 +39,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"get",
 				"watch",
 			},
-			ResourceNames: involvedConfigMapNames,
+			ResourceNames: getInvolvedConfigMapNames(cluster),
 		},
 		{
 			APIGroups: []string{
@@ -62,7 +52,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"get",
 				"watch",
 			},
-			ResourceNames: secretResourceNames(cluster, backupOrigin),
+			ResourceNames: getInvolvedSecretNames(cluster, backupOrigin),
 		},
 		{
 			APIGroups: []string{
@@ -146,7 +136,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 	}
 }
 
-func secretResourceNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
+func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	involvedSecretNames := []string{
 		cluster.GetReplicationSecretName(),
 		cluster.GetClientCASecretName(),
@@ -154,15 +144,10 @@ func secretResourceNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []st
 		cluster.GetServerTLSSecretName(),
 		cluster.GetApplicationSecretName(),
 		cluster.GetSuperuserSecretName(),
-	}
-
-	if LDAPSecretName := cluster.GetLDAPSecretName(); LDAPSecretName != "" {
-		involvedSecretNames = append(involvedSecretNames, LDAPSecretName)
+		cluster.GetLDAPSecretName(),
 	}
 
 	if cluster.Spec.Monitoring != nil {
-		// If custom queries are used, the instance manager need privileges to read those
-		// entries
 		for _, secretName := range cluster.Spec.Monitoring.CustomQueriesSecret {
 			involvedSecretNames = append(involvedSecretNames, secretName.Name)
 		}
@@ -172,7 +157,32 @@ func secretResourceNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []st
 	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(cluster)...)
 	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(cluster)...)
 
-	return involvedSecretNames
+	return cleanupResourceList(involvedSecretNames)
+}
+
+func getInvolvedConfigMapNames(cluster apiv1.Cluster) []string {
+	involvedConfigMapNames := []string{
+		cluster.Name,
+	}
+
+	if cluster.Spec.Monitoring != nil {
+		// If custom queries are used, the instance manager need privileges to read those
+		// entries
+		for _, configMapName := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
+			involvedConfigMapNames = append(involvedConfigMapNames, configMapName.Name)
+		}
+	}
+
+	return cleanupResourceList(involvedConfigMapNames)
+}
+
+// cleanupResourceList returns a new list with the same elements as resourceList, where
+// the empty and duplicate entries have been removed
+func cleanupResourceList(resourceList []string) []string {
+	result := stringset.From(resourceList).ToSortedList()
+	return slices.DeleteFunc(result, func(s string) bool {
+		return len(s) == 0
+	})
 }
 
 func externalClusterSecrets(cluster apiv1.Cluster) []string {

@@ -226,13 +226,12 @@ var _ = Describe("Secrets", func() {
 	})
 
 	It("should contain default secrets only", func() {
-		Expect(secretResourceNames(cluster, nil)).To(Equal([]string{
-			cluster.GetReplicationSecretName(),
-			cluster.GetClientCASecretName(),
-			cluster.GetServerCASecretName(),
-			cluster.GetServerTLSSecretName(),
-			cluster.GetApplicationSecretName(),
-			cluster.GetSuperuserSecretName(),
+		Expect(getInvolvedSecretNames(cluster, nil)).To(Equal([]string{
+			"thisTest-app",
+			"thisTest-ca",
+			"thisTest-replication",
+			"thisTest-server",
+			"thisTest-superuser",
 		}))
 	})
 })
