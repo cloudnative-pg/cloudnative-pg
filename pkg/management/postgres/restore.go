@@ -68,11 +68,11 @@ var (
 	}
 
 	pgControldataSettingsToParamsMap = map[string]string{
-		"max_connections":      "max_connections",
-		"max_wal_senders":      "max_wal_senders",
-		"max_worker_processes": "max_worker_processes",
-		"max_prepared_xacts":   "max_prepared_transactions",
-		"max_locks_per_xact":   "max_locks_per_transaction",
+		"max_connections setting":      "max_connections",
+		"max_wal_senders setting":      "max_wal_senders",
+		"max_worker_processes setting": "max_worker_processes",
+		"max_prepared_xacts setting":   "max_prepared_transactions",
+		"max_locks_per_xact setting":   "max_locks_per_transaction",
 	}
 )
 
