@@ -380,6 +380,15 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
 				})
 
+				By("checking that the backup status is correctly populated", func() {
+					Expect(backup.Status.BeginWal).ToNot(BeEmpty())
+					Expect(backup.Status.EndWal).ToNot(BeEmpty())
+					Expect(backup.Status.BeginLSN).ToNot(BeEmpty())
+					Expect(backup.Status.EndLSN).ToNot(BeEmpty())
+					Expect(backup.Status.StoppedAt).ToNot(BeNil())
+					Expect(backup.Status.StartedAt).ToNot(BeNil())
+				})
+
 				var clusterToBackup *apiv1.Cluster
 
 				By("fetching the created cluster", func() {
