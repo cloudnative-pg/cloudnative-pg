@@ -79,7 +79,7 @@ func NewBackupReconciler(mgr manager.Manager) *BackupReconciler {
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get
-// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list
+// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
@@ -207,7 +207,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			pod = previousPod
 		}
 
-		res, err := r.startSnapshotBackup(ctx, pod, &cluster, &backup)
+		res, err := r.executeSnapshotBackup(ctx, pod, &cluster, &backup)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -294,7 +294,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 	return false, nil
 }
 
-func (r *BackupReconciler) startSnapshotBackup(
+func (r *BackupReconciler) executeSnapshotBackup(
 	ctx context.Context,
 	targetPod *corev1.Pod,
 	cluster *apiv1.Cluster,
@@ -383,6 +383,10 @@ func (r *BackupReconciler) startSnapshotBackup(
 		contextLogger.Error(err, "while enriching the backup status")
 	}
 
+	if err := executor.AnnotateSnapshots(ctx, snapshots, &backup.Status); err != nil {
+		contextLogger.Error(err, "while enriching the snapshots's status")
+	}
+
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }
 
@@ -391,8 +395,6 @@ func backupStatusFromSnapshots(
 	snapshots volumesnapshot.Slice,
 	backupStatus *apiv1.BackupStatus,
 ) error {
-	_, lastCreation := snapshots.GetSnapshotsInterval()
-	backupStatus.StoppedAt = ptr.To(lastCreation)
 	controldata, err := snapshots.GetControldata()
 	if err != nil {
 		return err

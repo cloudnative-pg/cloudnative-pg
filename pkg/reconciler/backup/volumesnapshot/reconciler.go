@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -101,9 +102,25 @@ func (se *Reconciler) enrichSnapshot(
 	// we grab the pg_controldata just before creating the snapshot
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
 		vs.Annotations[utils.PgControldataAnnotationName] = data
+		pgControlData := utils.ParsePgControldataOutput(data)
+		timelineID, ok := pgControlData["Latest checkpoint's TimeLineID"]
+		if ok {
+			vs.Labels[utils.BackupTimelineLabelName] = timelineID
+		}
+		startWal, ok := pgControlData["Latest checkpoint's REDO WAL file"]
+		if ok {
+			vs.Labels[utils.BackupStartWALAnnotationName] = startWal
+			// TODO: once we have online volumesnapshot backups, this should change
+			vs.Labels[utils.BackupEndWALAnnotationName] = startWal
+		}
 	} else {
 		contextLogger.Error(err, "while querying for pg_controldata")
 	}
+
+	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
+	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
+	// TODO: once we have online volumesnapshot backups, this should change
+	vs.Labels[utils.IsOnlineBackupLabelName] = "false"
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
@@ -390,6 +407,20 @@ func (se *Reconciler) waitSnapshot(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
+	_, hasTimeAnnotation := snapshot.Annotations[utils.SnapshotEndTimeAnnotationName]
+	if !hasTimeAnnotation {
+		oldSnapshot := snapshot.DeepCopy()
+		// as soon as the volume snapshot has stopped running, we should update its
+		// snapshotEndTime annotation
+		snapshot.Annotations[utils.SnapshotEndTimeAnnotationName] = metav1.Now().Format(time.RFC3339)
+		snapshot.Annotations[utils.SnapshotStartTimeAnnotationName] = snapshot.Status.CreationTime.Format(time.RFC3339)
+		if err := se.cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+			contextLogger.Error(err, "while adding time annotations to volume snapshot",
+				"snapshot", snapshot.Name)
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }
 
@@ -403,4 +434,26 @@ func getSnapshotName(backupName string, role utils.PVCRole) (string, error) {
 	default:
 		return "", fmt.Errorf("unhandled PVCRole type: %s", role)
 	}
+}
+
+// AnnotateSnapshots adds labels and annotations to the snapshots using the backup
+// status to facilitate access
+func (se *Reconciler) AnnotateSnapshots(
+	ctx context.Context,
+	snapshots Slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	contextLogger := log.FromContext(ctx)
+	for _, snapshot := range snapshots {
+		snapshot := snapshot
+		oldSnapshot := snapshot.DeepCopy()
+		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
+		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
+		if err := se.cli.Patch(ctx, &snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+			contextLogger.Error(err, "while updating volume snapshot from backup object",
+				"snapshot", snapshot.Name)
+			return err
+		}
+	}
+	return nil
 }
