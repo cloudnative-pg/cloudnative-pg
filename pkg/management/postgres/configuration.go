@@ -303,13 +303,12 @@ func cleanPostgresAutoConfFile(ctx context.Context, instance *Instance) (changed
 	}
 
 	updatedContent := configfile.RemoveOptionsFromConfigurationContents(string(currentContent),
-		[]string{
-			"archive_mode",
-			"primary_slot_name",
-			"primary_conninfo",
-			"recovery_target_timeline",
-			"restore_command",
-		})
+		"archive_mode",
+		"primary_slot_name",
+		"primary_conninfo",
+		"recovery_target_timeline",
+		"restore_command",
+	)
 	if changed, err = fileutils.WriteStringToFile(targetFile, updatedContent); err != nil {
 		return false,
 			fmt.Errorf("error while clean replication settings in postgresql.auto.conf file: %w", err)
@@ -337,12 +336,12 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceM
 	if err != nil {
 		return false, fmt.Errorf("error while reading postgresql.auto.conf file: %w", err)
 	}
-	options := configfile.ReadOptionsFromConfigurationContents(string(autoConfContent), []string{
+	options := configfile.ReadOptionsFromConfigurationContents(string(autoConfContent),
 		"primary_slot_name",
 		"primary_conninfo",
 		"recovery_target_timeline",
 		"restore_command",
-	})
+	)
 	// no migration needed
 	if len(options) == 0 {
 		return false, nil

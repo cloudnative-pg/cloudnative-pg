@@ -47,7 +47,7 @@ func UpdatePostgresConfigurationFile(
 
 	for _, option := range managedOptions {
 		if _, hasOption := options[option]; !hasOption {
-			updatedContent = RemoveOptionFromConfigurationContents(updatedContent, option)
+			updatedContent = RemoveOptionsFromConfigurationContents(updatedContent, option)
 		}
 	}
 
@@ -106,21 +106,12 @@ func UpdateConfigurationContents(content string, options map[string]string) (str
 	return strings.Join(resultContent, "\n") + "\n", nil
 }
 
-// RemoveOptionsFromConfigurationContents deletes the lines containing the
-// given options from the content of a configuration file
-func RemoveOptionsFromConfigurationContents(content string, options []string) string {
-	resultContent := content
-	for _, option := range options {
-		resultContent = RemoveOptionFromConfigurationContents(resultContent, option)
-	}
-	return resultContent
-}
-
-// RemoveOptionFromConfigurationContents deletes the lines containing the given option a configuration file whose
-// content is passed
-func RemoveOptionFromConfigurationContents(content string, option string) string {
+// RemoveOptionsFromConfigurationContents deletes all the lines containing one of the given options
+// from the provided configuration content
+func RemoveOptionsFromConfigurationContents(content string, options ...string) string {
 	resultContent := []string{}
 
+outer:
 	for _, line := range splitLines(content) {
 		// Keep empty lines and comments
 		trimLine := strings.TrimSpace(line)
@@ -134,8 +125,10 @@ func RemoveOptionFromConfigurationContents(content string, option string) string
 
 		// If we find a line containing the input option,
 		// we skip it
-		if key == option {
-			continue
+		for _, option := range options {
+			if key == option {
+				continue outer
+			}
 		}
 
 		resultContent = append(resultContent, line)
@@ -145,19 +138,8 @@ func RemoveOptionFromConfigurationContents(content string, option string) string
 }
 
 // ReadOptionsFromConfigurationContents read the options from the configuration file as a map
-func ReadOptionsFromConfigurationContents(content string, options []string) (result map[string]string) {
+func ReadOptionsFromConfigurationContents(content string, options ...string) (result map[string]string) {
 	result = make(map[string]string, len(options))
-	for _, option := range options {
-		exists, value := ReadOptionFromConfigurationContents(content, option)
-		if exists {
-			result[option] = value
-		}
-	}
-	return result
-}
-
-// ReadOptionFromConfigurationContents read the option value from the configuration file
-func ReadOptionFromConfigurationContents(content string, option string) (bool, string) {
 	for _, line := range splitLines(content) {
 		trimLine := strings.TrimSpace(line)
 		if len(trimLine) == 0 || trimLine[0] == '#' {
@@ -167,9 +149,12 @@ func ReadOptionFromConfigurationContents(content string, option string) (bool, s
 		kv := strings.SplitN(trimLine, "=", 2)
 		key := strings.TrimSpace(kv[0])
 
-		if key == option {
-			return true, strings.TrimSpace(kv[1])
+		for _, option := range options {
+			if key == option {
+				result[option] = strings.TrimSpace(kv[1])
+				break
+			}
 		}
 	}
-	return false, ""
+	return result
 }
