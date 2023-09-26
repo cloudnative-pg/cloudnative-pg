@@ -30,11 +30,7 @@ import (
 
 // excludedPathsFromRestore contains a list of files that should not be included into the restore process
 var excludedPathsFromRestore = []string{
-	"/pg_log/*",
-	"/log/*",
-	"/pg_xlog/*",
-	"/pg_wal/*",
-	"/global/pg_control",
+	"core.*",
 	"pgsql_tmp*",
 	"postgresql.auto.conf.tmp",
 	"current_logfiles.tmp",
@@ -42,13 +38,16 @@ var excludedPathsFromRestore = []string{
 	"postmaster.pid",
 	"postmaster.opts",
 	"recovery.conf",
+	"recovery.signal",
 	"standby.signal",
+	"log/*",
 	"pg_dynshmem/*",
+	"pg_log/*",
 	"pg_notify/*",
 	"pg_replslot/*",
 	"pg_serial/*",
-	"pg_stat_tmp/*",
 	"pg_snapshots/*",
+	"pg_stat_tmp/*",
 	"pg_subtrans/*",
 }
 
