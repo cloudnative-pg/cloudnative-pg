@@ -2793,8 +2793,8 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 		// waiting for cluster phase to end up in "Upgrading cluster" state after restarting the cluster.
 		Eventually(func() (bool, error) {
 			cluster, err := env.GetCluster(namespace, clusterName)
-			return ( cluster.Status.Phase == apiv1.PhaseUpgrade ) ||
-			 ( cluster.Status.Phase == apiv1.PhaseWaitingForInstancesToBeActive ), err
+			return (cluster.Status.Phase == apiv1.PhaseUpgrade) ||
+				(cluster.Status.Phase == apiv1.PhaseWaitingForInstancesToBeActive), err
 		}, 120, 3).Should(BeTrue())
 	})
 	AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
