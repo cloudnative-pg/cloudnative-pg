@@ -442,7 +442,7 @@ func AssertDatabaseExists(namespace, podName, databaseName string, expectedValue
 	})
 }
 
-// AssertDataExpectedCountWithDatabaseName verifies that an expected amount of rows exist on the table
+// AssertDataExpectedCountWithDatabaseName verifies that an expected amount of rows exists on the table
 func AssertDataExpectedCountWithDatabaseName(namespace, podName, databaseName string,
 	tableName string, expectedValue int,
 ) {
@@ -468,7 +468,7 @@ func AssertDataExpectedCountWithDatabaseName(namespace, podName, databaseName st
 	})
 }
 
-// AssertDataExpectedCount verifies that an expected amount of rows exist on the table
+// AssertDataExpectedCount verifies that an expected amount of rows exists on the table
 func AssertDataExpectedCount(namespace, clusterName, tableName string, expectedValue int, pod *corev1.Pod) {
 	By(fmt.Sprintf("verifying test data in table %v", tableName), func() {
 		query := fmt.Sprintf("select count(*) from %v", tableName)
@@ -545,7 +545,7 @@ func AssertClusterStandbysAreStreaming(namespace string, clusterName string, tim
 }
 
 func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout int32) {
-	// Track the start of the assert. We expect to complete before
+	// Track the start of the assertion. We expect to complete before
 	// timeout.
 	start := time.Now()
 
@@ -2813,7 +2813,7 @@ func AssertPVCCount(namespace, clusterName string, pvcCount, timeout int) {
 
 // AssertClusterPhaseIsConsistent expects the phase of a cluster to be consistent for a given number of seconds.
 func AssertClusterPhaseIsConsistent(namespace, clusterName string, phase []string, timeout int) {
-	By(fmt.Sprintf("verifying cluster '%v' phase '%v' is consistent", clusterName, phase), func() {
+	By(fmt.Sprintf("verifying cluster '%v' phase '%+q' is consistent", clusterName, phase), func() {
 		assert := assertPredicateClusterHasPhase(namespace, clusterName, phase)
 		Consistently(assert, timeout, 2).Should(Succeed())
 	})
@@ -2822,7 +2822,7 @@ func AssertClusterPhaseIsConsistent(namespace, clusterName string, phase []strin
 // AssertClusterEventuallyReachesPhase checks the phase of a cluster reaches the phase argument
 // within the specified timeout
 func AssertClusterEventuallyReachesPhase(namespace, clusterName string, phase []string, timeout int) {
-	By(fmt.Sprintf("verifying cluster '%v' phase should eventually become '%v'", clusterName, phase), func() {
+	By(fmt.Sprintf("verifying cluster '%v' phase should eventually become one of '%+q'", clusterName, phase), func() {
 		assert := assertPredicateClusterHasPhase(namespace, clusterName, phase)
 		Eventually(assert, timeout).Should(Succeed())
 	})
