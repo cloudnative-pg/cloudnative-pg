@@ -139,6 +139,10 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client) err
 		return err
 	}
 
+	if err := fileutils.RemoveRestoreExcludedFiles(info.PgData); err != nil {
+		return err
+	}
+
 	return info.ConfigureInstanceAfterRestore(ctx, cluster, env)
 }
 

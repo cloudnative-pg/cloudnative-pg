@@ -28,6 +28,30 @@ import (
 	"time"
 )
 
+// excludedPathsFromRestore contains a list of files that should not be included into the restore process
+var excludedPathsFromRestore = []string{
+	"/pg_log/*",
+	"/log/*",
+	"/pg_xlog/*",
+	"/pg_wal/*",
+	"/global/pg_control",
+	"pgsql_tmp*",
+	"postgresql.auto.conf.tmp",
+	"current_logfiles.tmp",
+	"pg_internal.init",
+	"postmaster.pid",
+	"postmaster.opts",
+	"recovery.conf",
+	"standby.signal",
+	"pg_dynshmem/*",
+	"pg_notify/*",
+	"pg_replslot/*",
+	"pg_serial/*",
+	"pg_stat_tmp/*",
+	"pg_snapshots/*",
+	"pg_subtrans/*",
+}
+
 // AppendStringToFile append the content of the given string to the
 // end of the target file prepending new data with a carriage return
 func AppendStringToFile(targetFile string, content string) (err error) {
@@ -318,6 +342,51 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 	files, err = directory.Readdirnames(readAllNames)
 
 	return
+}
+
+// RemoveFiles deletes the files and directories specified by the filePaths patterns
+// relative to the basePath. If a pattern ends with "/*", it implies that all the
+// contents of the directory (not the directory itself) matching the pattern should
+// be removed. If a pattern does not end with "/*", then the files matching the
+// pattern will be removed.
+//
+// Example:
+// basePath: "/path/to/directory"
+// filePaths: ["file1.txt", "subdir/*"]
+// This would remove "/path/to/direct
+func RemoveFiles(basePath string, filePaths []string) error {
+	for _, pattern := range filePaths {
+		if len(pattern) >= 2 && pattern[len(pattern)-2:] == "/*" {
+			dirPath := filepath.Join(basePath, pattern[:len(pattern)-2])
+			if err := RemoveDirectoryContent(dirPath); err != nil {
+				return err
+			}
+			continue
+		}
+
+		matches, err := filepath.Glob(filepath.Join(basePath, pattern))
+		if err != nil {
+			return err
+		}
+		for _, match := range matches {
+			if err := RemoveFile(match); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// RemoveRestoreExcludedFiles removes files and directories that are excluded during a restore operation.
+// It leverages the RemoveFiles function, using a predefined list of paths that are meant to be excluded.
+//
+// Parameters:
+// - basePath: The root path from which the exclusions should be applied.
+//
+// Returns:
+// - error: Any error encountered during the removal process, or nil if the operation was successful.
+func RemoveRestoreExcludedFiles(basePath string) error {
+	return RemoveFiles(basePath, excludedPathsFromRestore)
 }
 
 // MoveDirectoryContent moves a directory from a source path to its destination by copying
