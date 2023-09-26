@@ -96,6 +96,17 @@ var _ = Describe("Certificates", func() {
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+			// Create the client certificate
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			err = utils.CreateClientCertificatesViaKubectlPlugin(
+				*cluster,
+				kubectlCNPGClientCertSecretName,
+				"app",
+				env,
+			)
+			Expect(err).ToNot(HaveOccurred())
 		})
 		AfterEach(func() {
 			// deleting root CA certificates
@@ -104,26 +115,14 @@ var _ = Describe("Certificates", func() {
 
 		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin",
 			Label(tests.LabelPlugin), func() {
-				cluster, err := env.GetCluster(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				err = utils.CreateClientCertificatesViaKubectlPlugin(
-					*cluster,
-					kubectlCNPGClientCertSecretName,
-					"app",
-					env,
-				)
-				Expect(err).ToNot(HaveOccurred())
-
 				pod := utils.DefaultWebapp(namespace, "app-pod-cert-1",
 					defaultCASecretName, kubectlCNPGClientCertSecretName)
-				err = utils.PodCreateAndWaitForReady(env, &pod, 240)
+				err := utils.PodCreateAndWaitForReady(env, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
 				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 			})
 
 		It("can authenticate after switching to user-supplied server certs", Label(tests.LabelServiceConnectivity), func() {
-			_, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
 			CreateAndAssertServerCertificatesSecrets(
 				namespace,
 				clusterName,
@@ -131,6 +130,8 @@ var _ = Describe("Certificates", func() {
 				serverCertSecretName,
 				false,
 			)
+
+			var err error
 			// Updating defaults certificates entries with user provided certificates,
 			// i.e server CA and TLS secrets inside the cluster
 			Eventually(func() error {
@@ -144,6 +145,7 @@ var _ = Describe("Certificates", func() {
 				}
 				return nil
 			}, 60, 5).Should(BeNil())
+
 			Eventually(func() (bool, error) {
 				certUpdateStatus := false
 				cluster, err := env.GetCluster(namespace, clusterName)
