@@ -639,7 +639,7 @@ func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string
 	log.Debug("pg_controldata stdout", "stdout", stdoutBuffer.String())
 
 	enforcedParams := map[string]string{}
-	for key, value := range utils.ParsePgControldataOutput(stderrBuffer.String()) {
+	for key, value := range utils.ParsePgControldataOutput(stdoutBuffer.String()) {
 		if param, ok := pgControldataSettingsToParamsMap[key]; ok {
 			enforcedParams[param] = value
 		}
