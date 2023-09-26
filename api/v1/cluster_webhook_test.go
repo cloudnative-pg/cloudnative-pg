@@ -3120,7 +3120,7 @@ var _ = Describe("validateResources", func() {
 		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "2000000kB"
 		errors := cluster.validateResources()
 		Expect(errors).To(HaveLen(1))
-		Expect(errors[0].Detail).To(Equal("Memory request is lower than the shared_buffer value"))
+		Expect(errors[0].Detail).To(Equal("Memory request is lower than PostgreSQL `shared_buffers` value"))
 	})
 
 	It("returns an error when memoryRequest is less than shared_buffers in MB", func() {
@@ -3128,7 +3128,7 @@ var _ = Describe("validateResources", func() {
 		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "2000MB"
 		errors := cluster.validateResources()
 		Expect(errors).To(HaveLen(1))
-		Expect(errors[0].Detail).To(Equal("Memory request is lower than the shared_buffer value"))
+		Expect(errors[0].Detail).To(Equal("Memory request is lower than PostgreSQL `shared_buffers` value"))
 	})
 
 	It("returns no errors when memoryRequest is greater than or equal to shared_buffers in GB", func() {
