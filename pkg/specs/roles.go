@@ -25,16 +25,6 @@ import (
 
 // CreateRole create a role with the permissions needed by the instance manager
 func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
-	involvedSecretNames := []string{
-		cluster.GetReplicationSecretName(),
-		cluster.GetClientCASecretName(),
-		cluster.GetServerCASecretName(),
-		cluster.GetServerTLSSecretName(),
-		cluster.GetApplicationSecretName(),
-		cluster.GetSuperuserSecretName(),
-		cluster.GetLDAPSecretName(),
-	}
-
 	involvedConfigMapNames := []string{
 		cluster.Name,
 	}
@@ -42,18 +32,10 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 	if cluster.Spec.Monitoring != nil {
 		// If custom queries are used, the instance manager need privileges to read those
 		// entries
-		for _, secretName := range cluster.Spec.Monitoring.CustomQueriesSecret {
-			involvedSecretNames = append(involvedSecretNames, secretName.Name)
-		}
-
 		for _, configMapName := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
 			involvedConfigMapNames = append(involvedConfigMapNames, configMapName.Name)
 		}
 	}
-
-	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster, backupOrigin)...)
-	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(cluster)...)
-	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(cluster)...)
 
 	rules := []rbacv1.PolicyRule{
 		{
@@ -80,7 +62,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"get",
 				"watch",
 			},
-			ResourceNames: involvedSecretNames,
+			ResourceNames: secretResourceNames(cluster, backupOrigin),
 		},
 		{
 			APIGroups: []string{
@@ -162,6 +144,35 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		Rules: rules,
 	}
+}
+
+func secretResourceNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
+	involvedSecretNames := []string{
+		cluster.GetReplicationSecretName(),
+		cluster.GetClientCASecretName(),
+		cluster.GetServerCASecretName(),
+		cluster.GetServerTLSSecretName(),
+		cluster.GetApplicationSecretName(),
+		cluster.GetSuperuserSecretName(),
+	}
+
+	if LDAPSecretName := cluster.GetLDAPSecretName(); LDAPSecretName != "" {
+		involvedSecretNames = append(involvedSecretNames, LDAPSecretName)
+	}
+
+	if cluster.Spec.Monitoring != nil {
+		// If custom queries are used, the instance manager need privileges to read those
+		// entries
+		for _, secretName := range cluster.Spec.Monitoring.CustomQueriesSecret {
+			involvedSecretNames = append(involvedSecretNames, secretName.Name)
+		}
+	}
+
+	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster, backupOrigin)...)
+	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(cluster)...)
+	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(cluster)...)
+
+	return involvedSecretNames
 }
 
 func externalClusterSecrets(cluster apiv1.Cluster) []string {

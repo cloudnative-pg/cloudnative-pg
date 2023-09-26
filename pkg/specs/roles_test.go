@@ -186,12 +186,16 @@ var _ = Describe("Roles", func() {
 })
 
 var _ = Describe("Secrets", func() {
-	cluster := apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "thisTest",
-			Namespace: "default",
-		},
-	}
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "thisTest",
+				Namespace: "default",
+			},
+		}
+	})
 
 	It("are properly backed up", func() {
 		secrets := backupSecrets(cluster, nil)
@@ -219,6 +223,17 @@ var _ = Describe("Secrets", func() {
 		}
 		secrets = backupSecrets(cluster, nil)
 		Expect(secrets).To(ConsistOf("test-secret", "test-access", "test-endpoint-ca-name"))
+	})
+
+	It("should contain default secrets only", func() {
+		Expect(secretResourceNames(cluster, nil)).To(Equal([]string{
+			cluster.GetReplicationSecretName(),
+			cluster.GetClientCASecretName(),
+			cluster.GetServerCASecretName(),
+			cluster.GetServerTLSSecretName(),
+			cluster.GetApplicationSecretName(),
+			cluster.GetSuperuserSecretName(),
+		}))
 	})
 })
 
