@@ -189,7 +189,7 @@ func createBackup(
 	// So we have no backup running, let's create a backup.
 	// Let's have deterministic names to avoid creating the job two
 	// times
-	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), backupTime.Unix())
+	name := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), utils.ToCompactISO8601(backupTime))
 	backup := scheduledBackup.CreateBackup(name)
 	metadata := &backup.ObjectMeta
 	if metadata.Labels == nil {

@@ -89,3 +89,18 @@ func DifferenceBetweenTimestamps(first, second string) (time.Duration, error) {
 
 	return parsedTimestamp.Sub(parsedTimestampTwo), nil
 }
+
+// ToCompactISO8601 converts a time.Time into a compacted version of the ISO8601 timestamp,
+// removing any separators for brevity.
+//
+// For example:
+//
+//	Given: 2022-01-02 15:04:05 (UTC)
+//	Returns: 20220102150405
+//
+// This compact format is useful for generating concise, yet human-readable timestamps that
+// can serve as suffixes for backup-related objects or any other contexts where space or
+// character count might be a concern.
+func ToCompactISO8601(t time.Time) string {
+	return t.Format("20060102150405")
+}
