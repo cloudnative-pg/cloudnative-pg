@@ -186,13 +186,47 @@ var _ = Describe("Roles", func() {
 })
 
 var _ = Describe("Secrets", func() {
-	var cluster apiv1.Cluster
+	var (
+		cluster apiv1.Cluster
+		backup  apiv1.Backup
+	)
 
 	BeforeEach(func() {
 		cluster = apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "thisTest",
 				Namespace: "default",
+			},
+		}
+		backup = apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "testBackup",
+				Namespace: "default",
+			},
+			Status: apiv1.BackupStatus{
+				BarmanCredentials: apiv1.BarmanCredentials{
+					AWS: &apiv1.S3Credentials{
+						AccessKeyIDReference: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
+								Name: "aws-status-secret-test",
+							},
+						},
+					},
+					Azure: &apiv1.AzureCredentials{
+						StorageKey: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
+								Name: "azure-storage-key-secret-test",
+							},
+						},
+					},
+					Google: &apiv1.GoogleCredentials{
+						ApplicationCredentials: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
+								Name: "google-application-secret-test",
+							},
+						},
+					},
+				},
 			},
 		}
 	})
@@ -227,6 +261,19 @@ var _ = Describe("Secrets", func() {
 
 	It("should contain default secrets only", func() {
 		Expect(getInvolvedSecretNames(cluster, nil)).To(Equal([]string{
+			"thisTest-app",
+			"thisTest-ca",
+			"thisTest-replication",
+			"thisTest-server",
+			"thisTest-superuser",
+		}))
+	})
+
+	It("should created an ordered string list with the backup secrets", func() {
+		Expect(getInvolvedSecretNames(cluster, &backup)).To(Equal([]string{
+			"aws-status-secret-test",
+			"azure-storage-key-secret-test",
+			"google-application-secret-test",
 			"thisTest-app",
 			"thisTest-ca",
 			"thisTest-replication",
