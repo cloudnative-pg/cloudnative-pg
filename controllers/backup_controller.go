@@ -25,10 +25,12 @@ import (
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -322,6 +324,8 @@ func (r *BackupReconciler) startSnapshotBackup(
 		backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
 		// given that we use only kubernetes resources we can use the backup name as ID
 		backup.Status.BackupID = backup.Name
+		backup.Status.BackupName = backup.Name
+		backup.Status.StartedAt = ptr.To(metav1.Now())
 		if err := postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup); err != nil {
 			return nil, err
 		}
@@ -375,8 +379,33 @@ func (r *BackupReconciler) startSnapshotBackup(
 	}
 
 	backup.Status.BackupSnapshotStatus.SetSnapshotList(snapshots)
+	if err := backupStatusFromSnapshots(snapshots, &backup.Status); err != nil {
+		contextLogger.Error(err, "while enriching the backup status")
+	}
 
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
+}
+
+// backupStatusFromSnapshots adds fields to the backup status based on the snapshots
+func backupStatusFromSnapshots(
+	snapshots volumesnapshot.Slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	_, lastCreation := snapshots.GetSnapshotsInterval()
+	backupStatus.StoppedAt = ptr.To(lastCreation)
+	controldata, err := snapshots.GetControldata()
+	if err != nil {
+		return err
+	}
+	pairs := utils.ParsePgControldataOutput(controldata)
+
+	// the begin/end WAL and LSN are the same, since the instance was fenced
+	// for the snapshot
+	backupStatus.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
+	backupStatus.EndWal = pairs["Latest checkpoint's REDO WAL file"]
+	backupStatus.BeginLSN = pairs["Latest checkpoint's REDO location"]
+	backupStatus.EndLSN = pairs["Latest checkpoint's REDO location"]
+	return nil
 }
 
 // isErrorRetryable detects is an error is retryable or not
