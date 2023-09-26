@@ -32,6 +32,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/strings/slices"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -436,7 +437,7 @@ func AssertDatabaseExists(namespace, podName, databaseName string, expectedValue
 	})
 }
 
-// AssertDataExpectedCountWithDatabaseName verifies that an expected amount of rows exist on the table
+// AssertDataExpectedCountWithDatabaseName verifies that an expected amount of rows exists on the table
 func AssertDataExpectedCountWithDatabaseName(namespace, podName, databaseName string,
 	tableName string, expectedValue int,
 ) {
@@ -462,7 +463,7 @@ func AssertDataExpectedCountWithDatabaseName(namespace, podName, databaseName st
 	})
 }
 
-// AssertDataExpectedCount verifies that an expected amount of rows exist on the table
+// AssertDataExpectedCount verifies that an expected amount of rows exists on the table
 func AssertDataExpectedCount(namespace, clusterName, tableName string, expectedValue int, pod *corev1.Pod) {
 	By(fmt.Sprintf("verifying test data in table %v", tableName), func() {
 		query := fmt.Sprintf("select count(*) from %v", tableName)
@@ -539,7 +540,7 @@ func AssertClusterStandbysAreStreaming(namespace string, clusterName string, tim
 }
 
 func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout int32) {
-	// Track the start of the assert. We expect to complete before
+	// Track the start of the assertion. We expect to complete before
 	// timeout.
 	start := time.Now()
 
@@ -2699,7 +2700,7 @@ func AssertClusterReplicationSlots(namespace, clusterName string) {
 	})
 }
 
-// AssertClusterRollingRestart restart given cluster
+// AssertClusterRollingRestart restarts a given cluster
 func AssertClusterRollingRestart(namespace, clusterName string) {
 	By(fmt.Sprintf("restarting cluster %v", clusterName), func() {
 		cluster, err := env.GetCluster(namespace, clusterName)
@@ -2713,17 +2714,8 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 		err = env.Client.Patch(env.Ctx, clusterRestarted, ctrlclient.MergeFrom(cluster))
 		Expect(err).ToNot(HaveOccurred())
 	})
-
-	// now the upgrade is not a final phase before health
-	// we can verify either it is in upgrade or PhaseWaitingForInstancesToBeActive
-	By("waiting for the cluster to end up in upgrading state", func() {
-		// waiting for cluster phase to end up in "Upgrading cluster" state after restarting the cluster.
-		Eventually(func() (bool, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			return (cluster.Status.Phase == apiv1.PhaseUpgrade) ||
-				(cluster.Status.Phase == apiv1.PhaseWaitingForInstancesToBeActive), err
-		}, 120, 3).Should(BeTrue())
-	})
+	AssertClusterEventuallyReachesPhase(namespace, clusterName,
+		[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 120)
 	AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 }
 
@@ -2747,8 +2739,8 @@ func AssertPVCCount(namespace, clusterName string, pvcCount, timeout int) {
 }
 
 // AssertClusterPhaseIsConsistent expects the phase of a cluster to be consistent for a given number of seconds.
-func AssertClusterPhaseIsConsistent(namespace, clusterName, phase string, timeout int) {
-	By(fmt.Sprintf("verifying cluster '%v' phase '%v' is consistent", clusterName, phase), func() {
+func AssertClusterPhaseIsConsistent(namespace, clusterName string, phase []string, timeout int) {
+	By(fmt.Sprintf("verifying cluster '%v' phase '%+q' is consistent", clusterName, phase), func() {
 		assert := assertPredicateClusterHasPhase(namespace, clusterName, phase)
 		Consistently(assert, timeout, 2).Should(Succeed())
 	})
@@ -2756,17 +2748,18 @@ func AssertClusterPhaseIsConsistent(namespace, clusterName, phase string, timeou
 
 // AssertClusterEventuallyReachesPhase checks the phase of a cluster reaches the phase argument
 // within the specified timeout
-func AssertClusterEventuallyReachesPhase(namespace, clusterName, phase string, timeout int) {
-	By(fmt.Sprintf("verifying cluster '%v' phase should eventually become '%v'", clusterName, phase), func() {
+func AssertClusterEventuallyReachesPhase(namespace, clusterName string, phase []string, timeout int) {
+	By(fmt.Sprintf("verifying cluster '%v' phase should eventually become one of '%+q'", clusterName, phase), func() {
 		assert := assertPredicateClusterHasPhase(namespace, clusterName, phase)
 		Eventually(assert, timeout).Should(Succeed())
 	})
 }
 
-func assertPredicateClusterHasPhase(namespace, clusterName, phase string) func(g Gomega) {
+// assertPredicateClusterHasPhase returns true if the Cluster's phase is contained in a given slice of phases
+func assertPredicateClusterHasPhase(namespace, clusterName string, phase []string) func(g Gomega) {
 	return func(g Gomega) {
 		cluster, err := env.GetCluster(namespace, clusterName)
 		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(cluster.Status.Phase).To(BeEquivalentTo(phase))
+		g.Expect(slices.Contains(phase, cluster.Status.Phase)).To(BeTrue())
 	}
 }
