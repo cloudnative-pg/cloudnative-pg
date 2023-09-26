@@ -46,8 +46,11 @@ const (
 	// InstanceNameLabelName is the name of the label containing the instance name
 	InstanceNameLabelName = MetadataNamespace + "/instanceName"
 
-	// BackupNameLabelName is the name of the label containing the backup id, available on backup resources
+	// BackupNameLabelName is the name of the label containing the backup name, available on backup resources
 	BackupNameLabelName = MetadataNamespace + "/backupName"
+
+	// BackupIDLabelName contains the unique identifier for a given backup
+	BackupIDLabelName = MetadataNamespace + "/backupId"
 
 	// PgbouncerNameLabel is the name of the label of containing the pooler name
 	PgbouncerNameLabel = MetadataNamespace + "/poolerName"

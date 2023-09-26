@@ -320,8 +320,7 @@ func (r *BackupReconciler) startSnapshotBackup(
 
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
 		backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
-		// given that we use only kubernetes resources we can use the backup name as ID
-		backup.Status.BackupID = backup.Name
+		backup.Status.BackupID = string(backup.ObjectMeta.GetUID())
 		if err := postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup); err != nil {
 			return nil, err
 		}
@@ -369,7 +368,7 @@ func (r *BackupReconciler) startSnapshotBackup(
 	}
 
 	backup.Status.SetAsCompleted()
-	snapshots, err := volumesnapshot.GetBackupVolumeSnapshots(ctx, r.Client, backup.Namespace, backup.Name)
+	snapshots, err := volumesnapshot.GetBackupVolumeSnapshots(ctx, r.Client, backup)
 	if err != nil {
 		return nil, err
 	}

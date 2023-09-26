@@ -23,6 +23,7 @@ import (
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -68,16 +69,15 @@ func (err volumeSnapshotError) Error() string {
 func GetBackupVolumeSnapshots(
 	ctx context.Context,
 	cli client.Client,
-	namespace string,
-	backupLabelName string,
+	backup *apiv1.Backup,
 ) ([]storagesnapshotv1.VolumeSnapshot, error) {
 	var list storagesnapshotv1.VolumeSnapshotList
 
 	if err := cli.List(
 		ctx,
 		&list,
-		client.InNamespace(namespace),
-		client.MatchingLabels{utils.BackupNameLabelName: backupLabelName},
+		client.InNamespace(backup.Namespace),
+		client.MatchingLabels{utils.BackupNameLabelName: backup.Name, utils.BackupIDLabelName: string(backup.GetUID())},
 	); err != nil {
 		return nil, err
 	}

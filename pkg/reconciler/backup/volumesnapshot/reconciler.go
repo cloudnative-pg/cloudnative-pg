@@ -88,6 +88,7 @@ func (se *Reconciler) enrichSnapshot(
 	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
 
 	vs.Labels[utils.BackupNameLabelName] = backup.Name
+	vs.Labels[utils.BackupIDLabelName] = string(backup.GetUID())
 
 	switch snapshotConfig.SnapshotOwnerReference {
 	case apiv1.SnapshotOwnerReferenceCluster:
@@ -138,7 +139,7 @@ func (se *Reconciler) Execute(
 	}
 
 	// Step 2: create snapshot
-	volumeSnapshots, err := GetBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
+	volumeSnapshots, err := GetBackupVolumeSnapshots(ctx, se.cli, backup)
 	if err != nil {
 		return nil, err
 	}
