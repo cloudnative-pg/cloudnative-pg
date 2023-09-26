@@ -137,7 +137,6 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	) ;\
 	rm -fr bundle bundle.Dockerfile ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
-	#sed -e 's/name: cnpg-controller-manager$$/name: cnpg-controller-manager-${VERSION}/g' | \
 	sed -e "s@\$${CREATED_AT}@$$(LANG=C date -Iseconds -u)@g" | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
 	docker buildx build --no-cache -f bundle.Dockerfile --push -t ${BUNDLE_IMG} . ;\
