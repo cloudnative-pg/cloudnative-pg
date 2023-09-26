@@ -263,13 +263,11 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) error {
-	snapshotSuffix := fmt.Sprintf("%d", time.Now().Unix())
-
 	for i := range pvcs {
 		se.recorder.Eventf(backup, "Normal", "CreateSnapshot",
 			"Creating VolumeSnapshot for PVC %v", pvcs[i].Name)
 
-		err := se.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[i], snapshotSuffix)
+		err := se.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[i])
 		if err != nil {
 			return err
 		}
@@ -300,12 +298,15 @@ func (se *Reconciler) createSnapshot(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 	pvc *corev1.PersistentVolumeClaim,
-	snapshotSuffix string,
 ) error {
-	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
-	name := se.getSnapshotName(pvc.Name, snapshotSuffix)
-	var snapshotClassName *string
 	role := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+	name, err := getSnapshotName(backup.Name, role)
+	if err != nil {
+		return err
+	}
+
+	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
+	var snapshotClassName *string
 	if role == utils.PVCRolePgWal && snapshotConfig.WalClassName != "" {
 		snapshotClassName = &snapshotConfig.WalClassName
 	}
@@ -345,8 +346,7 @@ func (se *Reconciler) createSnapshot(
 		return err
 	}
 
-	err := se.cli.Create(ctx, &snapshot)
-	if err != nil {
+	if err := se.cli.Create(ctx, &snapshot); err != nil {
 		return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
 	}
 
@@ -375,6 +375,13 @@ func (se *Reconciler) waitSnapshot(
 }
 
 // getSnapshotName gets the snapshot name for a certain PVC
-func (se *Reconciler) getSnapshotName(pvcName string, snapshotSuffix string) string {
-	return fmt.Sprintf("%s-%s", pvcName, snapshotSuffix)
+func getSnapshotName(backupName string, role utils.PVCRole) (string, error) {
+	switch role {
+	case utils.PVCRolePgData, "":
+		return backupName, nil
+	case utils.PVCRolePgWal:
+		return fmt.Sprintf("%s-wal", backupName), nil
+	default:
+		return "", fmt.Errorf("unhandled PVCRole type: %s", role)
+	}
 }
