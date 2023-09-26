@@ -36,7 +36,7 @@ import (
 func (r *InstanceReconciler) updateCacheFromCluster(
 	ctx context.Context, cluster *apiv1.Cluster,
 ) shoudRequeue {
-	cache.Store(cache.ClusterKey, cluster)
+	cache.StoreCluster(cluster)
 
 	var requeue shoudRequeue
 
