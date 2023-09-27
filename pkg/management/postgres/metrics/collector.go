@@ -456,11 +456,19 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 		}
 	}()
 
+	// Set the application name
 	_, err = tx.Exec("SET application_name TO cnpg_metrics_exporter")
 	if err != nil {
 		return nil, err
 	}
 
+	// Ensure standard_conforming_strings is enforced
+	_, err = tx.Exec("SET standard_conforming_strings TO on")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the pg_monitor role
 	_, err = tx.Exec("SET ROLE TO pg_monitor")
 
 	return tx, err
