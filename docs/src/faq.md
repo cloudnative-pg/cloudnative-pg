@@ -132,6 +132,32 @@ Kubernetes controller. If the desired state and the actual state don't
 match, reconciliation loops trigger self-healing procedures. That's
 where an operator like CloudNativePG comes into play.
 
+**Are there any other operators for Postgres out there?**
+
+Yes, of course. And our advice is that you look at all of them and compare
+them with CloudNativePG before making your decision. You will see that
+most of these operators use an external failover management tool (Patroni
+or similar) and rely on StatefulSets.
+
+Here is a non exhaustive list, in chronological order from their
+publication on GitHub:
+
+* [Crunchy Data Postgres Operator](https://github.com/CrunchyData/postgres-operator) (2017)
+* [Zalando Postgres Operator](https://github.com/zalando/postgres-operator) (2017)
+* [Stackgres](https://github.com/ongres/stackgres) (2020)
+* [Percona Operator for PostgreSQL](https://github.com/percona/percona-postgresql-operator) (2021)
+* [Kubegres](https://github.com/reactive-tech/kubegres) (2021)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=cloudnative-pg/cloudnative-pg,zalando/postgres-operator,CrunchyData/postgres-operator,ongres/stackgres,percona/percona-postgresql-operator,reactive-tech/kubegres&type=Date)](https://star-history.com/#cloudnative-pg/cloudnative-pg&zalando/postgres-operator&CrunchyData/postgres-operator&ongres/stackgres&percona/percona-postgresql-operator&reactive-tech/kubegres&Date)
+
+Feel free to report any relevant missing entry as a PR.
+
+!!! Info
+    The [Data on Kubernetes Community](https://dok.community)
+    (which includes some of our maintainers) is working on an independent and
+    vendor neutral project to list the operators called
+    [Operator Feature Matrix](https://github.com/dokc/operator-feature-matrix).
+
 **You say that CloudNativePG is a fully declarative operator.
 What do you mean by that?**
 
@@ -209,32 +235,6 @@ failover?**
 
 No. The operator does that automatically for you, and relies on `pg_rewind` to
 synchronize the former primary with the new one.
-
-**Are there any other operators for Postgres out there?**
-
-Yes, of course. And our advice is that you look at all of them and compare
-them with CloudNativePG before making your decision. You will see that
-most of these operators use an external failover management tool (Patroni
-or similar) and rely on StatefulSets.
-
-Here is a non exhaustive list, in chronological order from their
-publication on GitHub:
-
-* [Crunchy Data Postgres Operator](https://github.com/CrunchyData/postgres-operator) (2017)
-* [Zalando Postgres Operator](https://github.com/zalando/postgres-operator) (2017)
-* [Stackgres](https://github.com/ongres/stackgres) (2020)
-* [Percona Operator for PostgreSQL](https://github.com/percona/percona-postgresql-operator) (2021)
-* [Kubegres](https://github.com/reactive-tech/kubegres) (2021)
-
-[![Star History Chart](https://api.star-history.com/svg?repos=cloudnative-pg/cloudnative-pg,zalando/postgres-operator,CrunchyData/postgres-operator,ongres/stackgres,percona/percona-postgresql-operator,reactive-tech/kubegres&type=Date)](https://star-history.com/#cloudnative-pg/cloudnative-pg&zalando/postgres-operator&CrunchyData/postgres-operator&ongres/stackgres&percona/percona-postgresql-operator&reactive-tech/kubegres&Date)
-
-Feel free to report any relevant missing entry as a PR.
-
-!!! Info
-    The [Data on Kubernetes Community](https://dok.community)
-    (which includes some of our maintainers) is working on an independent and
-    vendor neutral project to list the operators called
-    [Operator Feature Matrix](https://github.com/dokc/operator-feature-matrix).
 
 
 <!--
