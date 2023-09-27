@@ -1,4 +1,3 @@
-
 /*
 Copyright The CloudNativePG Contributors
 
@@ -19,6 +18,7 @@ package volumesnapshot
 
 import (
 	"fmt"
+	"strconv"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
@@ -69,10 +69,11 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		backupName  = "theBakcup"
 	)
 	var (
-		cluster   *apiv1.Cluster
-		targetPod *v1.Pod
-		pvcs      []v1.PersistentVolumeClaim
-		backup    *apiv1.Backup
+		cluster       *apiv1.Cluster
+		targetPod     *v1.Pod
+		pvcs          []v1.PersistentVolumeClaim
+		backup        *apiv1.Backup
+		backupCounter = 1
 	)
 
 	BeforeEach(func() {
@@ -102,21 +103,28 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      clusterName + "-2",
 					Namespace: namespace,
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+					},
 				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      clusterName + "-2-wal",
 					Namespace: namespace,
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+					},
 				},
 			},
 		}
 		backup = &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
-				Name:      backupName,
+				Name:      backupName + strconv.Itoa(backupCounter),
 			},
 		}
+		backupCounter++
 	})
 
 	It("should fence the target pod when there are no volumesnapshots", func(ctx SpecContext) {
@@ -155,18 +163,18 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
-						Name:      clusterName + "-2",
+						Name:      backup.Name,
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backupName,
+							utils.BackupNameLabelName: backup.Name,
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
-						Name:      clusterName + "-2-wal",
+						Name:      backup.Name + "-wal",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backupName,
+							utils.BackupNameLabelName: backup.Name,
 						},
 					},
 				},
@@ -205,9 +213,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
-						Name:      clusterName + "-2",
+						Name:      backup.Name,
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backupName,
+							utils.BackupNameLabelName: backup.Name,
 						},
 					},
 					Status: &storagesnapshotv1.VolumeSnapshotStatus{
@@ -218,9 +226,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
-						Name:      clusterName + "-2-wal",
+						Name:      backup.Name + "-wal",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backupName,
+							utils.BackupNameLabelName: backup.Name,
 						},
 					},
 					Status: &storagesnapshotv1.VolumeSnapshotStatus{
