@@ -159,6 +159,7 @@ Jitendra
 KinD
 Krew
 KubeCon
+Kubegres
 Kumar
 LDAP
 LDAPBindAsAuth
@@ -224,6 +225,7 @@ PPROF
 PV
 PVCs
 Patroni
+Percona
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
 PgBouncer's
@@ -326,6 +328,7 @@ Silvela
 Slonik
 SnapshotType
 Snapshotting
+Stackgres
 StatefulSets
 StorageClass
 StorageConfiguration
@@ -363,6 +366,7 @@ XXu
 YXBw
 YY
 YYYY
+Zalando
 abd
 accessKeyId
 accessModes
