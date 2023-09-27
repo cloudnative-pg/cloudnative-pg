@@ -144,9 +144,9 @@ type VolumeSnapshotConfiguration struct {
 	// WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.
 	// +optional
 	WalClassName string `json:"walClassName,omitempty"`
-	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have. .
+	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have
 	// +optional
-	// +kubebuilder:validation:Enum=none;cluster;backup
+	// +kubebuilder:validation:Enum:=none;cluster;backup
 	// +kubebuilder:default:=none
 	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
 }
@@ -279,7 +279,7 @@ type ClusterSpec struct {
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`
 
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
-	// this formula to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay, 30)`,
+	// this formula to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay, 30)`
 	// +kubebuilder:default:=180
 	// +optional
 	SmartStopDelay int32 `json:"smartStopDelay,omitempty"`

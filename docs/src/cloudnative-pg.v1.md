@@ -1469,7 +1469,7 @@ gracefully shutdown (default 1800)</p>
 </td>
 <td>
    <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
-this formula to compute the timeout of smart shutdown is <code>max(stopDelay -  smartStopDelay, 30)</code>,</p>
+this formula to compute the timeout of smart shutdown is <code>max(stopDelay -  smartStopDelay, 30)</code></p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>
@@ -4243,7 +4243,7 @@ It is the default class for the other types if no specific class is present</p>
 <a href="#postgresql-cnpg-io-v1-SnapshotOwnerReference"><i>SnapshotOwnerReference</i></a>
 </td>
 <td>
-   <p>SnapshotOwnerReference indicates the type of owner reference the snapshot should have. .</p>
+   <p>SnapshotOwnerReference indicates the type of owner reference the snapshot should have</p>
 </td>
 </tr>
 </tbody>
