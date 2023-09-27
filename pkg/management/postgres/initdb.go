@@ -33,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
@@ -148,14 +149,9 @@ func (info InitInfo) CreateDataDirectory() error {
 	}
 
 	// Always read the custom and override configuration files created by the operator
-	postgresConfTrailer := fmt.Sprintf("# load CloudNativePG custom and override configuration\n"+
-		"include '%v'\n"+
-		"include '%v'\n",
+	_, err = configfile.EnsureInclude(path.Join(info.PgData, "postgresql.conf"),
 		constants.PostgresqlCustomConfigurationFile,
-		constants.PostgresqlOverrideConfigurationFile)
-	err = fileutils.AppendStringToFile(
-		path.Join(info.PgData, "postgresql.conf"),
-		postgresConfTrailer,
+		constants.PostgresqlOverrideConfigurationFile,
 	)
 	if err != nil {
 		return fmt.Errorf("appending inclusion directives to postgresql.conf file resulted in an error: %w", err)

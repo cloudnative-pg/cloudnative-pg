@@ -727,6 +727,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
+
 	return err
 }
 

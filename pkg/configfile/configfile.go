@@ -158,3 +158,37 @@ func ReadOptionsFromConfigurationContents(content string, options ...string) (re
 	}
 	return result
 }
+
+// EnsureInclude makes sure the passed PostgreSQL configuration file has an include directive
+// to every filesToInclude.
+func EnsureInclude(fileName string, filesToInclude ...string) (changed bool, err error) {
+	includeLinesToAdd := make(map[string]string, len(filesToInclude))
+	for _, fileToInclude := range filesToInclude {
+		includeLinesToAdd[fileToInclude] = fmt.Sprintf("include '%v'", fileToInclude)
+	}
+
+	rawCurrentContent, err := fileutils.ReadFile(fileName)
+	if err != nil {
+		return false, fmt.Errorf("error while reading lines of %v: %w", fileName, err)
+	}
+
+	lines := splitLines(string(rawCurrentContent))
+	for _, line := range lines {
+		trimLine := strings.TrimSpace(line)
+		for targetFile, includeLine := range includeLinesToAdd {
+			if trimLine == includeLine {
+				delete(includeLinesToAdd, targetFile)
+			}
+		}
+	}
+
+	for _, fileToInclude := range filesToInclude {
+		if includeLine, present := includeLinesToAdd[fileToInclude]; present {
+			lines = append(lines, "")
+			lines = append(lines, fmt.Sprintf("# load CloudNativePG %v configuration", fileToInclude))
+			lines = append(lines, includeLine)
+		}
+	}
+
+	return fileutils.WriteStringToFile(fileName, strings.Join(lines, "\n")+"\n")
+}
