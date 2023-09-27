@@ -1,4 +1,3 @@
 licenses
 testdata
 releases/
-.github/workflows/continuous-delivery.yml
