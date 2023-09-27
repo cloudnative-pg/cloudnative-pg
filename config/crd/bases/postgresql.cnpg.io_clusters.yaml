@@ -1266,7 +1266,7 @@ spec:
                       snapshotOwnerReference:
                         default: none
                         description: SnapshotOwnerReference indicates the type of
-                          owner reference the snapshot should have. .
+                          owner reference the snapshot should have
                         enum:
                         - none
                         - cluster
@@ -3014,7 +3014,7 @@ spec:
                 description: The time in seconds that controls the window of time
                   reserved for the smart shutdown of Postgres to complete. this formula
                   to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay,
-                  30)`,
+                  30)`
                 format: int32
                 type: integer
               startDelay:
