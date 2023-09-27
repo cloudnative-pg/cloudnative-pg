@@ -110,8 +110,8 @@ defined in your PostgreSQL cluster.
 !!! Info
     In case you are using a different storage class for `PGDATA` and
     WAL files, you can specify a separate `VolumeSnapshotClass` for
-    that volume through the `walClassName` option (by default set to
-    `className`).
+    that volume through the `walClassName` option (which defaults to
+    the same value as `className`).
 
 Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
@@ -139,16 +139,16 @@ In case a `VolumeSnapshot` is deleted, the `deletionPolicy` specified in the
 - if set to `Delete`, the `VolumeSnapshotContent` object is removed as well
 
 !!! Warning
-    `VolumeSnapshotContent` object do not keep all the information regarding the
+    `VolumeSnapshotContent` objects do not keep all the information regarding the
     backup and the cluster they refer to (like the annotations and labels that
     are contained in the `VolumeSnapshot` object). Although possible, restoring
     from just this kind of object might not be straightforward. For this reason,
-    our recommendation is to always backup the `VolumeSnapshot` definitions somewhere,
+    our recommendation is to always backup the `VolumeSnapshot` definitions,
     even using a Kubernetes level data protection solution.
 
 The value in `VolumeSnapshotContent` is determined by the `deletionPolicy` set
-in the corresponding `VolumeSnapshotClass` definition, the one that you
-have referenced in the `.spec.backup.volumeSnapshot.className` option.
+in the corresponding `VolumeSnapshotClass` definition, which is
+referenced in the `.spec.backup.volumeSnapshot.className` option.
 
 Please refer to the [Kubernetes documentation on Volume Snapshot Classes](https://kubernetes.io/docs/concepts/storage/volume-snapshot-classes/)
 for details on this standard behavior.
