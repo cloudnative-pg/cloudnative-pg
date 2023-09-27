@@ -1439,7 +1439,7 @@ to update the <code>postgres</code> user password (if the secret is
 not present, the operator will automatically create one). When this
 option is disabled, the operator will ignore the <code>SuperuserSecret</code> content, delete
 it when automatically created, and then blank the password of the <code>postgres</code>
-user by setting it to <code>NULL</code>. Enabled by default.</p>
+user by setting it to <code>NULL</code>. Disabled by default.</p>
 </td>
 </tr>
 <tr><td><code>certificates</code><br/>

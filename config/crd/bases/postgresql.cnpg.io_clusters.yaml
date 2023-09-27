@@ -1687,13 +1687,13 @@ spec:
                 description: Description of this PostgreSQL cluster
                 type: string
               enableSuperuserAccess:
-                default: true
+                default: false
                 description: When this option is enabled, the operator will use the
                   `SuperuserSecret` to update the `postgres` user password (if the
                   secret is not present, the operator will automatically create one).
                   When this option is disabled, the operator will ignore the `SuperuserSecret`
                   content, delete it when automatically created, and then blank the
-                  password of the `postgres` user by setting it to `NULL`. Enabled
+                  password of the `postgres` user by setting it to `NULL`. Disabled
                   by default.
                 type: boolean
               env:

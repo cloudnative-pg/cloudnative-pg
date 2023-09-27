@@ -240,8 +240,8 @@ type ClusterSpec struct {
 	// not present, the operator will automatically create one). When this
 	// option is disabled, the operator will ignore the `SuperuserSecret` content, delete
 	// it when automatically created, and then blank the password of the `postgres`
-	// user by setting it to `NULL`. Enabled by default.
-	// +kubebuilder:default:=true
+	// user by setting it to `NULL`. Disabled by default.
+	// +kubebuilder:default:=false
 	// +optional
 	EnableSuperuserAccess *bool `json:"enableSuperuserAccess,omitempty"`
 
