@@ -218,6 +218,7 @@ type ClusterSpec struct {
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
 	// Replication slots management configuration
+	// +kubebuilder:default:={"highAvailability":{"enabled":true}}
 	// +optional
 	ReplicationSlots *ReplicationSlotsConfiguration `json:"replicationSlots,omitempty"`
 
@@ -837,6 +838,7 @@ const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
 // of replication slots
 type ReplicationSlotsConfiguration struct {
 	// Replication slots for high availability configuration
+	// +kubebuilder:default:={"enabled": true}
 	// +optional
 	HighAvailability *ReplicationSlotsHAConfiguration `json:"highAvailability,omitempty"`
 
@@ -873,7 +875,7 @@ type ReplicationSlotsHAConfiguration struct {
 	// This feature also controls replication slots in replica cluster,
 	// from the designated primary to its cascading replicas.
 	// +optional
-	// +kubebuilder:default:=false
+	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// Prefix for replication slots managed by the operator for HA.

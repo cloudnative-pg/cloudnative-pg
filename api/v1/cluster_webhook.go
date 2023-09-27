@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -142,6 +143,17 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	// and defaultQueries not disabled on cluster crd
 	if !r.Spec.Monitoring.AreDefaultQueriesDisabled() {
 		r.defaultMonitoringQueries(configuration.Current)
+	}
+
+	// If the API or validation webhooks are disable we set the replicationSlots to true if nil
+	if r.Spec.ReplicationSlots == nil {
+		r.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{}
+	}
+	if r.Spec.ReplicationSlots.HighAvailability == nil {
+		r.Spec.ReplicationSlots.HighAvailability = &ReplicationSlotsHAConfiguration{
+			Enabled:    ptr.To(true),
+			SlotPrefix: "_cnpg_",
+		}
 	}
 }
 
@@ -1806,10 +1818,16 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 }
 
 func (r *Cluster) validateReplicationSlots() field.ErrorList {
+	if r.Spec.ReplicationSlots == nil {
+		r.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{
+			HighAvailability: &ReplicationSlotsHAConfiguration{
+				Enabled: ptr.To(true),
+			},
+		}
+	}
 	replicationSlots := r.Spec.ReplicationSlots
-	if replicationSlots == nil ||
-		replicationSlots.HighAvailability == nil ||
-		!replicationSlots.HighAvailability.GetEnabled() {
+
+	if !replicationSlots.HighAvailability.GetEnabled() {
 		return nil
 	}
 

@@ -2872,13 +2872,18 @@ spec:
                 - source
                 type: object
               replicationSlots:
+                default:
+                  highAvailability:
+                    enabled: true
                 description: Replication slots management configuration
                 properties:
                   highAvailability:
+                    default:
+                      enabled: true
                     description: Replication slots for high availability configuration
                     properties:
                       enabled:
-                        default: false
+                        default: true
                         description: If enabled (default), the operator will automatically
                           manage replication slots on the primary instance and use
                           them in streaming replication connections with all the standby

@@ -2623,10 +2623,47 @@ var _ = Describe("validation of replication slots configuration", func() {
 		Expect(result).To(BeEmpty())
 	})
 
+	It("set replicationSlots by default", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.ReplicationSlots).ToNot(BeNil())
+		Expect(cluster.Spec.ReplicationSlots.HighAvailability).ToNot(BeNil())
+		Expect(cluster.Spec.ReplicationSlots.HighAvailability.Enabled).To(HaveValue(BeTrue()))
+
+		result := cluster.validateReplicationSlots()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("set replicationSlots.highAvailability by default", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					UpdateInterval: 30,
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.ReplicationSlots.HighAvailability).ToNot(BeNil())
+		Expect(cluster.Spec.ReplicationSlots.HighAvailability.Enabled).To(HaveValue(BeTrue()))
+
+		result := cluster.validateReplicationSlots()
+		Expect(result).To(BeEmpty())
+	})
+
 	It("allows enabling replication slots on the fly", func() {
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled: ptr.To(false),
+					},
+				},
 			},
 		}
 		oldCluster.Default()
@@ -2643,13 +2680,12 @@ var _ = Describe("validation of replication slots configuration", func() {
 	})
 
 	It("prevents changing the slot prefix while replication slots are enabled", func() {
-		trueValue := true
 		oldCluster := &Cluster{
 			Spec: ClusterSpec{
 				ImageName: versions.DefaultImageName,
 				ReplicationSlots: &ReplicationSlotsConfiguration{
 					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled:    &trueValue,
+						Enabled:    ptr.To(true),
 						SlotPrefix: "_test_",
 					},
 				},
