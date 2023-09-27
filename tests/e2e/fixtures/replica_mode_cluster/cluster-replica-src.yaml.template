@@ -15,13 +15,14 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
     pg_hba:
-      - host replication postgres all md5
-      - hostssl app streaming_replica all cert
+      - host replication userSrc all md5
 
   bootstrap:
     initdb:
       database: appSrc
       owner: userSrc
+      postInitApplicationSQL:
+        - ALTER ROLE "userSrc" REPLICATION
 
   storage:
     size: 1Gi

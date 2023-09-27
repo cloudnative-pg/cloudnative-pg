@@ -22,12 +22,12 @@ spec:
             - name: PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: cluster-syncreplicas-fast-failover-superuser
+                  name: cluster-syncreplicas-fast-failover-app
                   key: password
             - name: USER
               valueFrom:
                 secretKeyRef:
-                  name: cluster-syncreplicas-fast-failover-superuser
+                  name: cluster-syncreplicas-fast-failover-app
                   key: username
             - name: DATABASE_URL
               value: "postgres://$(USER):$(PASSWORD)@cluster-syncreplicas-fast-failover-rw/app?sslmode=require&connect_timeout=2"

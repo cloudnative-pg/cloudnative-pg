@@ -962,7 +962,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
-			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
 				testUtils.ExecuteBackup(namespace, sourceTakeThirdBackupFileMinio, false,
 					testTimeouts[testUtils.BackupIsReady], env)

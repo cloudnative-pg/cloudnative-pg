@@ -17,8 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	"strings"
-
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -26,150 +25,104 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Bootstrap with pg_basebackup using basic auth", Label(tests.LabelRecovery), func() {
+var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), func() {
 	const (
-		namespacePrefix = "cluster-pg-basebackup-basic-auth"
+		namespacePrefix = "cluster-pg-basebackup"
 		srcCluster      = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
-		srcClusterName  = "pg-basebackup-src"
-		dstCluster      = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml.template"
-		dstClusterName  = "pg-basebackup-dst-basic-auth"
-		checkQuery      = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
+		dstClusterBasic = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml.template"
+		dstClusterTLS   = fixturesDir + "/pg_basebackup/cluster-dst-tls.yaml.template"
+		tableName       = "to_bootstrap"
+		appUser         = "appuser"
 		level           = tests.High
 	)
-	var namespace string
+	var namespace, srcClusterName string
+	var err error
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-
-	It("can bootstrap with pg_basebackup using basic auth", func() {
-		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
-		primarySrc := AssertSetupPgBasebackup(namespace, srcClusterName, srcCluster)
-
-		primaryDst := dstClusterName + "-1"
-
-		By("creating the dst cluster", func() {
-			AssertCreateCluster(namespace, dstClusterName, dstCluster, env)
-
-			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
-		})
-
-		By("checking the dst cluster with auto generated app password connectable", func() {
-			secretName := dstClusterName + "-app"
-			AssertApplicationDatabaseConnection(namespace, dstClusterName, "appuser", "app", "", secretName, psqlClientPod)
-		})
-
-		By("update user application password for dst cluster and verify connectivity", func() {
-			secretName := dstClusterName + "-app"
-			const newPassword = "eeh2Zahohx" //nolint:gosec
-			AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
-			AssertApplicationDatabaseConnection(
-				namespace,
-				dstClusterName,
-				"appuser",
-				"app",
-				newPassword,
-				secretName,
-				psqlClientPod)
-		})
-
-		By("checking data have been copied correctly", func() {
-			// Test data should be present on restored primary
-			out, _, err := env.ExecQueryInInstancePod(
-				utils.PodLocator{
-					Namespace: namespace,
-					PodName:   primaryDst,
-				},
-				utils.DatabaseName("app"),
-				"SELECT count(*) FROM to_bootstrap")
-			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
-		})
-
-		By("writing some new data to the dst cluster", func() {
-			insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3, psqlClientPod)
-		})
-
-		By("checking the src cluster was not modified", func() {
-			out, _, err := env.ExecQueryInInstancePod(
-				utils.PodLocator{
-					Namespace: namespace,
-					PodName:   primarySrc,
-				},
-				utils.DatabaseName("app"),
-				"SELECT count(*) FROM to_bootstrap")
-			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
-			Expect(err).ToNot(HaveOccurred())
-		})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
 	})
-})
 
-var _ = Describe("Bootstrap with pg_basebackup using TLS auth", Label(tests.LabelRecovery), func() {
-	const namespacePrefix = "cluster-pg-basebackup-tls-auth"
-
-	const srcCluster = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
-	const srcClusterName = "pg-basebackup-src"
-
-	const dstCluster = fixturesDir + "/pg_basebackup/cluster-dst-tls.yaml.template"
-	const dstClusterName = "pg-basebackup-dst-tls-auth"
-
-	var namespace string
-	It("can bootstrap with pg_basebackup using TLS auth", func() {
-		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
+	Context("can bootstrap via pg_basebackup", Ordered, func() {
+		BeforeAll(func() {
+			// Create a cluster in a namespace we'll delete after the test
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
+			// Create the source Cluster
+			srcClusterName, err = env.GetResourceNameFromYAML(srcCluster)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
+			AssertCreateTestData(namespace, srcClusterName, tableName, psqlClientPod)
 		})
-		primarySrc := AssertSetupPgBasebackup(namespace, srcClusterName, srcCluster)
 
-		primaryDst := dstClusterName + "-1"
-		By("creating the dst cluster", func() {
-			AssertCreateCluster(namespace, dstClusterName, dstCluster, env)
-
+		It("using basic authentication", func() {
+			// Create the destination Cluster
+			dstClusterName, err := env.GetResourceNameFromYAML(dstClusterBasic)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateCluster(namespace, dstClusterName, dstClusterBasic, env)
 			// We give more time than the usual 600s, since the recovery is slower
 			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
+
+			secretName := dstClusterName + apiv1.ApplicationUserSecretSuffix
+
+			By("checking the dst cluster with auto generated app password connectable", func() {
+				AssertApplicationDatabaseConnection(namespace, dstClusterName,
+					appUser, utils.AppDBName, "", secretName, psqlClientPod)
+			})
+
+			By("update user application password for dst cluster and verify connectivity", func() {
+				const newPassword = "eeh2Zahohx" //nolint:gosec
+				AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
+				AssertApplicationDatabaseConnection(
+					namespace,
+					dstClusterName,
+					appUser,
+					utils.AppDBName,
+					newPassword,
+					secretName,
+					psqlClientPod)
+			})
+
+			By("checking data have been copied correctly", func() {
+				AssertDataExpectedCount(namespace, dstClusterName, tableName, 2, psqlClientPod)
+			})
+
+			By("writing some new data to the dst cluster", func() {
+				insertRecordIntoTable(namespace, dstClusterName, tableName, 3, psqlClientPod)
+			})
+
+			By("checking the src cluster was not modified", func() {
+				AssertDataExpectedCount(namespace, srcClusterName, tableName, 2, psqlClientPod)
+			})
 		})
 
-		By("checking data have been copied correctly", func() {
-			// Test data should be present on restored primary
-			out, _, err := env.ExecQueryInInstancePod(
-				utils.PodLocator{
-					Namespace: namespace,
-					PodName:   primaryDst,
-				},
-				utils.DatabaseName("app"),
-				"SELECT count(*) FROM to_bootstrap")
+		It("using TLS authentication", func() {
+			// Create the destination Cluster
+			dstClusterName, err := env.GetResourceNameFromYAML(dstClusterTLS)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
-		})
+			AssertCreateCluster(namespace, dstClusterName, dstClusterTLS, env)
+			// We give more time than the usual 600s, since the recovery is slower
+			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
 
-		By("writing some new data to the dst cluster", func() {
-			insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3, psqlClientPod)
-		})
+			By("checking data have been copied correctly", func() {
+				AssertDataExpectedCount(namespace, dstClusterName, tableName, 2, psqlClientPod)
+			})
 
-		By("checking the src cluster was not modified", func() {
-			out, _, err := env.ExecQueryInInstancePod(
-				utils.PodLocator{
-					Namespace: namespace,
-					PodName:   primarySrc,
-				},
-				utils.DatabaseName("app"),
-				"SELECT count(*) FROM to_bootstrap")
-			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
-			Expect(err).ToNot(HaveOccurred())
+			By("writing some new data to the dst cluster", func() {
+				insertRecordIntoTable(namespace, dstClusterName, tableName, 3, psqlClientPod)
+			})
+
+			By("checking the src cluster was not modified", func() {
+				AssertDataExpectedCount(namespace, srcClusterName, tableName, 2, psqlClientPod)
+			})
 		})
 	})
 })

@@ -32,9 +32,9 @@ spec:
     - name: pg-basebackup-src
       connectionParameters:
         host: pg-basebackup-src-rw
-        user: postgres
+        user: appuser
         port: "5432"
         dbname: app
       password:
-        name: pg-basebackup-src-superuser
+        name: pg-basebackup-src-app
         key: password
