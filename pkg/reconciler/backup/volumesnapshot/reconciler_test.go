@@ -114,6 +114,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		data, err := utils.GetFencedInstances(latestCluster.Annotations)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(data.Len()).To(Equal(1))
+		Expect(data.Has(targetPod.Name)).To(BeTrue())
 
 		var snapshotList storagesnapshotv1.VolumeSnapshotList
 		err = mockClient.List(ctx, &snapshotList)
