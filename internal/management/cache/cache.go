@@ -59,8 +59,22 @@ func LoadEnv(c string) ([]string, error) {
 	return nil, ErrUnsupportedObject
 }
 
-// LoadCluster loads a key from the local cache
-func LoadCluster() (*apiv1.Cluster, error) {
+// StoreCluster write a cluster object into the local cache
+func StoreCluster(cluster *apiv1.Cluster) {
+	// We need to make a copy of the cluster object, because
+	// the cluster object contains attribute with concurrent unsafe type
+	// such as map, slice, etc.
+	cache.Store(ClusterKey, cluster.DeepCopy())
+}
+
+// LoadClusterUnsafe retrieves a cluster from the local cache.
+// Warning:
+//
+//	The returned pointer can potentially be accessed concurrently.
+//	Only use this function for read-only operations. If you need to
+//	modify the cluster, always create a DeepCopy of the returned object
+//	before writing to it.
+func LoadClusterUnsafe() (*apiv1.Cluster, error) {
 	value, ok := cache.Load(ClusterKey)
 	if !ok {
 		return nil, ErrCacheMiss
