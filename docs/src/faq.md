@@ -204,14 +204,45 @@ of truth to:
 - control the Kubernetes services, that is the entry points for your
   applications
 
+**Should I manually resync a former primary with the new one following a
+failover?**
+
+No. The operator does that automatically for you, and relies on `pg_rewind` to
+synchronize the former primary with the new one.
+
+**Are there any other operators for Postgres out there?**
+
+Yes, of course. And our advice is that you look at all of them and compare
+them with CloudNativePG before forming your decision. You will see that
+most of these operators use an external failover management tool (Patroni
+or similar) and rely on stateful sets.
+
+Here is a non exhaustive list, in chronological order from their
+publication on GitHub:
+
+* [Crunchy Data Postgres Operator](https://github.com/CrunchyData/postgres-operator) (2017)
+* [Zalando Postgres Operator](https://github.com/zalando/postgres-operator) (2017)
+* [Stackgres](https://github.com/ongres/stackgres) (2020)
+* [Percona Operator for PostgreSQL](https://github.com/percona/percona-postgresql-operator) (2021)
+* [Kubegres](https://github.com/reactive-tech/kubegres) (2021)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=cloudnative-pg/cloudnative-pg,zalando/postgres-operator,CrunchyData/postgres-operator,ongres/stackgres,percona/percona-postgresql-operator,reactive-tech/kubegres&type=Date)](https://star-history.com/#cloudnative-pg/cloudnative-pg&zalando/postgres-operator&CrunchyData/postgres-operator&ongres/stackgres&percona/percona-postgresql-operator&reactive-tech/kubegres&Date)
+
+Feel free to report any relevant missing entry as a PR.
+
+!!! Info
+    The [Data on Kubernetes Community](https://dok.community)
+    (which includes some of our maintainers) is working on an independent and
+    vendor neutral project to list the operators called
+    [Operator Feature Matrix](https://github.com/dokc/operator-feature-matrix).
+
+
 <!--
 How can I ensure that failover (unplanned) and switchover (planned)
 times are within our SLA of 99.995% per year?
 
 TODO
 
-Should I manually resync a former primary with the new one following a
-failover?
 
 TODO
 
@@ -365,9 +396,9 @@ Postgres instance, with dedicated storage.
 We proved that this extreme architectural pattern works when we benchmarked
 [running PostgreSQL on bare metal Kubernetes with local persistent
 volumes](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/).
-A current limitation of CloudNativePG, which will be overcome in future
-releases, is the lack of support for tablespaces so that horizontal
-partitioning can be easily implemented.
+A current limitation of CloudNativePG, which will be overcome in version 1.22,
+is the lack of support for tablespaces so that horizontal partitioning can be
+easily implemented.
 
 **How can I specify a time zone in the PostgreSQL cluster?**
 

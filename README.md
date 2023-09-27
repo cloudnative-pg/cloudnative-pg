@@ -23,7 +23,7 @@ section in the documentation.
 The goal of CloudNativePG is to increase the adoption of PostgreSQL, one of the
 most loved DBMS in traditional VM and bare metal environments, inside
 Kubernetes, thus making the database an integral part of the development
-process and CI/CD automated pipelines.
+process and GitOps CI/CD automated pipelines.
 
 ### In scope
 
@@ -110,9 +110,15 @@ MariaDB cluster).
 - [Website](https://cloudnative-pg.io)
 - [FAQ](docs/src/faq.md)
 - [Blog](https://cloudnative-pg.io/blog/)
-- ["Why Run Postgres in Kubernetes?"](https://containerjournal.com/kubecon-cnc-eu-2022/why-run-postgres-in-kubernetes/) (May 2022)
-- ["Shift-Left Security: The Path To PostgreSQL On Kubernetes"](https://www.tfir.io/shift-left-security-the-path-to-postgresql-on-kubernetes/) (April 2021)
-- ["Local Persistent Volumes and PostgreSQL usage in Kubernetes"](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/) (June 2020)
+
+### Useful links
+
+- [Data on Kubernetes (DoK) Community](https://dok.community/)
+- ["The Current State of Major PostgreSQL Upgrades with CloudNativePG" by Gabriele Bartolini](https://www.enterprisedb.com/blog/current-state-major-postgresql-upgrades-cloudnativepg-kubernetes) (August 2023)
+- ["The Rise of the Kubernetes Native Database" by Jeff Carpenter](https://thenewstack.io/the-rise-of-the-kubernetes-native-database/) (December 2022)
+- ["Why Run Postgres in Kubernetes?" by Gabriele Bartolini](https://cloudnativenow.com/kubecon-cnc-eu-2022/why-run-postgres-in-kubernetes/) (May 2022)
+- ["Shift-Left Security: The Path To PostgreSQL On Kubernetes" by Gabriele Bartolini](https://www.tfir.io/shift-left-security-the-path-to-postgresql-on-kubernetes/) (April 2021)
+- ["Local Persistent Volumes and PostgreSQL usage in Kubernetes" by Gabriele Bartolini](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/) (June 2020)
 
 ## Maintainers
 
