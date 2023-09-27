@@ -65,7 +65,7 @@ spec:
         description: Replica {{ $labels.pod }} is failing to replicate
         summary: Checks if the replica is failing to replicate
       expr: |-
-        (1 - cnpg_pg_replication_in_recovery + cnpg_pg_replication_is_wal_receiver_up) < 1
+        cnpg_pg_replication_in_recovery > cnpg_pg_replication_is_wal_receiver_up
       for: 1m
       labels:
         severity: warning
