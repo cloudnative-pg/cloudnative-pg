@@ -83,7 +83,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 	var js []byte
 	switch requestedObject {
 	case cache.ClusterKey:
-		response, err := cache.LoadCluster()
+		response, err := cache.LoadClusterUnsafe()
 		if errors.Is(err, cache.ErrCacheMiss) {
 			w.WriteHeader(http.StatusNotFound)
 			return
