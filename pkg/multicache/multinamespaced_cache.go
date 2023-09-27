@@ -47,7 +47,9 @@ var _ cache.Cache = &multiNamespaceCache{}
 // ones.
 func DelegatingMultiNamespacedCacheBuilder(namespaces []string, operatorNamespace string) cache.NewCacheFunc {
 	return func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-		opts.Namespaces = namespaces
+		for _, namespace := range namespaces {
+			opts.DefaultNamespaces[namespace] = cache.Config{}
+		}
 		multiCache, err := cache.New(config, opts)
 		if err != nil {
 			return nil, err
@@ -55,7 +57,7 @@ func DelegatingMultiNamespacedCacheBuilder(namespaces []string, operatorNamespac
 
 		// create a cache for external resources
 		externalOpts := opts
-		externalOpts.Namespaces = []string{operatorNamespace}
+		externalOpts.DefaultNamespaces[operatorNamespace] = cache.Config{}
 		externalCache, err := cache.New(config, externalOpts)
 		if err != nil {
 			return nil, fmt.Errorf("error creating global cache %v", err)
@@ -69,16 +71,21 @@ func DelegatingMultiNamespacedCacheBuilder(namespaces []string, operatorNamespac
 	}
 }
 
-// Methods for multiNamespaceCache to conform to the cache.Informers interface.
-
-func (c *multiNamespaceCache) GetInformer(ctx context.Context, obj client.Object) (cache.Informer, error) {
-	return c.multiCache.GetInformer(ctx, obj)
+// GetInformer Methods for multiNamespaceCache to conform to the cache.Informers interface.
+func (c *multiNamespaceCache) GetInformer(
+	ctx context.Context,
+	obj client.Object,
+	opts ...cache.InformerGetOption,
+) (cache.Informer, error) {
+	return c.multiCache.GetInformer(ctx, obj, opts...)
 }
 
 func (c *multiNamespaceCache) GetInformerForKind(
-	ctx context.Context, gvk schema.GroupVersionKind,
+	ctx context.Context,
+	gvk schema.GroupVersionKind,
+	opts ...cache.InformerGetOption,
 ) (cache.Informer, error) {
-	return c.multiCache.GetInformerForKind(ctx, gvk)
+	return c.multiCache.GetInformerForKind(ctx, gvk, opts...)
 }
 
 func (c *multiNamespaceCache) Start(ctx context.Context) error {
