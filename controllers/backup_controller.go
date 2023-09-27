@@ -207,7 +207,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			pod = previousPod
 		}
 
-		res, err := r.executeSnapshotBackup(ctx, pod, &cluster, &backup)
+		res, err := r.reconcileSnapshotBackup(ctx, pod, &cluster, &backup)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -294,7 +294,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 	return false, nil
 }
 
-func (r *BackupReconciler) executeSnapshotBackup(
+func (r *BackupReconciler) reconcileSnapshotBackup(
 	ctx context.Context,
 	targetPod *corev1.Pod,
 	cluster *apiv1.Cluster,
@@ -383,11 +383,34 @@ func (r *BackupReconciler) executeSnapshotBackup(
 		contextLogger.Error(err, "while enriching the backup status")
 	}
 
-	if err := executor.AnnotateSnapshots(ctx, snapshots, &backup.Status); err != nil {
+	if err := annotateSnapshotsWithBackupData(ctx, r.Client, snapshots, &backup.Status); err != nil {
 		contextLogger.Error(err, "while enriching the snapshots's status")
 	}
 
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
+}
+
+// AnnotateSnapshots adds labels and annotations to the snapshots using the backup
+// status to facilitate access
+func annotateSnapshotsWithBackupData(
+	ctx context.Context,
+	cli client.Client,
+	snapshots volumesnapshot.Slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	contextLogger := log.FromContext(ctx)
+	for idx := range snapshots {
+		snapshot := &snapshots[idx]
+		oldSnapshot := snapshot.DeepCopy()
+		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
+		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
+		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+			contextLogger.Error(err, "while updating volume snapshot from backup object",
+				"snapshot", snapshot.Name)
+			return err
+		}
+	}
+	return nil
 }
 
 // backupStatusFromSnapshots adds fields to the backup status based on the snapshots

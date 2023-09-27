@@ -318,7 +318,7 @@ func (se *Reconciler) waitSnapshotToBeReadyStep(
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshot(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -389,8 +389,9 @@ func (se *Reconciler) createSnapshot(
 	return nil
 }
 
-// waitSnapshot waits for a certain snapshot to be ready to use
-func (se *Reconciler) waitSnapshot(
+// waitSnapshotAndAnnotate waits for a certain snapshot to be ready to use. Once ready it annotates the snapshot with
+// SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
+func (se *Reconciler) waitSnapshotAndAnnotate(
 	ctx context.Context,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
@@ -434,26 +435,4 @@ func getSnapshotName(backupName string, role utils.PVCRole) (string, error) {
 	default:
 		return "", fmt.Errorf("unhandled PVCRole type: %s", role)
 	}
-}
-
-// AnnotateSnapshots adds labels and annotations to the snapshots using the backup
-// status to facilitate access
-func (se *Reconciler) AnnotateSnapshots(
-	ctx context.Context,
-	snapshots Slice,
-	backupStatus *apiv1.BackupStatus,
-) error {
-	contextLogger := log.FromContext(ctx)
-	for _, snapshot := range snapshots {
-		snapshot := snapshot
-		oldSnapshot := snapshot.DeepCopy()
-		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
-		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
-		if err := se.cli.Patch(ctx, &snapshot, client.MergeFrom(oldSnapshot)); err != nil {
-			contextLogger.Error(err, "while updating volume snapshot from backup object",
-				"snapshot", snapshot.Name)
-			return err
-		}
-	}
-	return nil
 }
