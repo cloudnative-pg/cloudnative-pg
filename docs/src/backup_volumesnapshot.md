@@ -103,8 +103,55 @@ As you can see, the `backup` section contains both the `volumeSnapshot` stanza
     both volume snapshot and object store backup strategies simultaneously
     to take physical backups.
 
+The `volumeSnapshot.className` option allows you to reference the default
+`VolumeSnapshotClass` object used for all the storage volumes you have
+defined in your PostgreSQL cluster.
+
+!!! Info
+    In case you are using a different storage class for `PGDATA` and
+    WAL files, you can specify a separate `VolumeSnapshotClass` for
+    that volume through the `walClassName` option (by default set to
+    `className`).
+
 Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
+
+## Persistence of volume snapshot objects
+
+By default, `VolumeSnapshot` objects created by CloudNativePG are retained after
+deleting the `Backup` object that originated them, or the `Cluster` they refer to.
+Such behavior is controlled by the `.spec.backup.volumeSnapshot.snapshotOwnerReference`
+option which accepts the following values:
+
+- `none`: no ownership is set, meaning that `VolumeSnapshot` objects persist
+   after the `Backup` and/or the `Cluster` resources are removed
+- `backup`: the `VolumeSnapshot` object is owned by the `Backup` resource that
+   originated it, and when the backup object is removed, the volume snapshot is
+   also removed
+- `cluster`: the `VolumeSnapshot` object is owned by the `Cluster` resource that
+   is backed up, and when the Postgres cluster is removed, the volume snapshot is
+   also removed
+
+In case a `VolumeSnapshot` is deleted, the `deletionPolicy` specified in the
+`VolumeSnapshotContent` is evaluated:
+
+- if set to `Retain`, the `VolumeSnapshotContent` object is kept
+- if set to `Delete`, the `VolumeSnapshotContent` object is removed as well
+
+!!! Warning
+    `VolumeSnapshotContent` object do not keep all the information regarding the
+    backup and the cluster they refer to (like the annotations and labels that
+    are contained in the `VolumeSnapshot` object). Although possible, it might not be
+    straightforward to restore from just this kind of objects. For this reason,
+    our recommendation is to always backup the `VolumeSnapshot` definitions somewhere,
+    even using a Kubernetes level data protection solution.
+
+The value in `VolumeSnapshotContent` is determined by the `deletionPolicy` set
+in the corresponding `VolumeSnapshotClass` definition, the one that you
+have referenced in the `.spec.backup.volumeSnapshot.className` option.
+
+Please refer to the [Kubernetes documentation on Volume Snapshot Classes](https://kubernetes.io/docs/concepts/storage/volume-snapshot-classes/)
+for details on this standard behavior.
 
 ## Example
 
