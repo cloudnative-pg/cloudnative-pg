@@ -17,6 +17,10 @@ limitations under the License.
 // Package stringset implements a basic set of strings
 package stringset
 
+import (
+	"golang.org/x/exp/slices"
+)
+
 // Data represent a set of strings
 type Data struct {
 	innerMap map[string]struct{}
@@ -50,7 +54,7 @@ func (set *Data) Delete(key string) {
 	delete(set.innerMap, key)
 }
 
-// Has check if a string is in the set or not
+// Has checks if a string is in the set or not
 func (set *Data) Has(key string) bool {
 	_, ok := set.innerMap[key]
 	return ok
@@ -69,6 +73,14 @@ func (set *Data) ToList() (result []string) {
 		result = append(result, key)
 	}
 	return
+}
+
+// ToSortedList returns the string container in this set
+// as a sorted string slice
+func (set *Data) ToSortedList() []string {
+	result := set.ToList()
+	slices.Sort(result)
+	return result
 }
 
 // Eq compares two string sets for equality
