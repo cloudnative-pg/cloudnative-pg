@@ -18,11 +18,20 @@ package controllers
 
 import (
 	"context"
+	"time"
 
+
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	volumesnapshotbackup "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/backup/volumesnapshot"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -245,5 +254,42 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
 			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("annotateSnapshotsWithBackupData", func() {
+	var (
+		fakeClient   k8client.Client
+		snapshots    volumesnapshot.VolumeSnapshotList
+		backupStatus *apiv1.BackupStatus
+		startedAt    metav1.Time
+		stoppedAt    metav1.Time
+	)
+
+	BeforeEach(func() {
+		snapshots = volumesnapshot.VolumeSnapshotList{
+			Items: volumesnapshotbackup.Slice{
+				{ObjectMeta: metav1.ObjectMeta{Name: "snapshot-1", Annotations: map[string]string{"avoid": "nil"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "snapshot-2", Annotations: map[string]string{"avoid": "nil"}}},
+			},
+		}
+		startedAt = metav1.Now()
+		stoppedAt = metav1.NewTime(time.Now().Add(time.Hour))
+		backupStatus = &apiv1.BackupStatus{
+			StartedAt: ptr.To(startedAt),
+			StoppedAt: ptr.To(stoppedAt),
+		}
+		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithLists(&snapshots).Build()
+	})
+
+	It("should update all snapshots with backup time annotations", func(ctx context.Context) {
+		err := annotateSnapshotsWithBackupData(ctx, fakeClient, snapshots.Items, backupStatus)
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, snapshot := range snapshots.Items {
+			Expect(snapshot.Annotations[utils.BackupStartTimeAnnotationName]).To(BeEquivalentTo(startedAt.Format(time.RFC3339)))
+			Expect(snapshot.Annotations[utils.BackupEndTimeAnnotationName]).To(BeEquivalentTo(stoppedAt.Format(time.RFC3339)))
+		}
 	})
 })
