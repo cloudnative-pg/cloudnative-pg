@@ -17,9 +17,12 @@ limitations under the License.
 package volumesnapshot
 
 import (
+	"fmt"
+
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -48,8 +51,10 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	BeforeEach(func() {
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: namespace,
-				Name:      clusterName,
+				Namespace:   namespace,
+				Name:        clusterName,
+				Labels:      map[string]string{},
+				Annotations: map[string]string{},
 			},
 			Spec: apiv1.ClusterSpec{
 				Backup: &apiv1.BackupConfiguration{
@@ -100,22 +105,21 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
 		Expect(err).ToNot(HaveOccurred())
-		// we should have requested creation of snapshots, and so we'd return to
-		// wait for them to be ready
 		Expect(result).ToNot(BeNil())
-		hasEvent := false
-		var events string
-		go func() {
-			evts := <-fakeRecorder.Events
-			hasEvent = true
-			events = evts
-		}()
-		Eventually(func() bool {
-			return hasEvent
-		}).Should(BeTrue())
-		Eventually(func() string {
-			return events
-		}).Should(ContainSubstring("Requesting fencing for Pod " + targetPod.Name))
+
+		var latestCluster apiv1.Cluster
+		err = mockClient.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &latestCluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		data, err := utils.GetFencedInstances(latestCluster.Annotations)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(data.Len()).To(Equal(1))
+		Expect(data.Has(targetPod.Name)).To(BeTrue())
+
+		var snapshotList storagesnapshotv1.VolumeSnapshotList
+		err = mockClient.List(ctx, &snapshotList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(snapshotList.Items).NotTo(BeEmpty())
 	})
 
 	It("should not fence the target pod when there are existing volumesnapshots", func(ctx SpecContext) {
@@ -158,19 +162,14 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		// we should have found snapshots that are not ready, and so we'd return to
 		// wait for them to be ready
 		Expect(result).ToNot(BeNil())
-		hasEvent := false
-		var events string
-		go func() {
-			evts := <-fakeRecorder.Events
-			hasEvent = true
-			events = evts
-		}()
-		Consistently(func() bool {
-			return hasEvent
-		}).Should(BeFalse())
-		Consistently(func() string {
-			return events
-		}).Should(BeEmpty())
+
+		var latestCluster apiv1.Cluster
+		err = mockClient.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &latestCluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		data, err := utils.GetFencedInstances(latestCluster.Annotations)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(data.Len()).To(Equal(0))
 	})
 
 	It("should unfence the target pod when the snapshots are ready", func(ctx SpecContext) {
@@ -205,6 +204,8 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			},
 		}
 
+		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
+
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithObjects(cluster, targetPod).
@@ -221,18 +222,13 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		// we should have found snapshots that are ready, and so the result
 		// should be nil
 		Expect(result).To(BeNil())
-		hasEvent := false
-		var events string
-		go func() {
-			evts := <-fakeRecorder.Events
-			hasEvent = true
-			events = evts
-		}()
-		Eventually(func() bool {
-			return hasEvent
-		}).Should(BeTrue())
-		Eventually(func() string {
-			return events
-		}).Should(ContainSubstring("Un-fencing Pod " + targetPod.Name))
+
+		var latestCluster apiv1.Cluster
+		err = mockClient.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &latestCluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		data, err := utils.GetFencedInstances(latestCluster.Annotations)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(data.Len()).To(Equal(0))
 	})
 })
