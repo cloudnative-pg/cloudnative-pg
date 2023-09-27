@@ -167,6 +167,7 @@ Jitendra
 KinD
 Krew
 KubeCon
+Kubegres
 Kumar
 LDAP
 LDAPBindAsAuth
@@ -241,6 +242,7 @@ PasswordConfiguration
 PasswordState
 PasswordStatus
 Patroni
+Percona
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
 PgBouncer's
@@ -351,6 +353,7 @@ Slonik
 SnapshotOwnerReference
 SnapshotType
 Snapshotting
+Stackgres
 StatefulSets
 StorageClass
 StorageConfiguration
@@ -392,6 +395,7 @@ XXu
 YXBw
 YY
 YYYY
+Zalando
 abd
 accessKeyId
 accessModes
