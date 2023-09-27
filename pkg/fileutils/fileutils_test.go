@@ -226,6 +226,7 @@ var _ = Describe("RemoveFiles", func() {
 		err := RemoveFiles(tempDir, []string{
 			"file1.txt",
 			"dir1/*",
+			"non_existent_dir/*",
 		})
 		Expect(err).NotTo(HaveOccurred())
 

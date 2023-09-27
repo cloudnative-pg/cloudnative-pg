@@ -357,8 +357,14 @@ func RemoveFiles(basePath string, filePaths []string) error {
 	for _, pattern := range filePaths {
 		if len(pattern) >= 2 && pattern[len(pattern)-2:] == "/*" {
 			dirPath := filepath.Join(basePath, pattern[:len(pattern)-2])
-			if err := RemoveDirectoryContent(dirPath); err != nil {
+			dirExists, err := FileExists(dirPath)
+			if err != nil {
 				return err
+			}
+			if dirExists {
+				if err := RemoveDirectoryContent(dirPath); err != nil {
+					return err
+				}
 			}
 			continue
 		}
