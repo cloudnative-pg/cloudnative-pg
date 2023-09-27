@@ -141,8 +141,8 @@ In case a `VolumeSnapshot` is deleted, the `deletionPolicy` specified in the
 !!! Warning
     `VolumeSnapshotContent` object do not keep all the information regarding the
     backup and the cluster they refer to (like the annotations and labels that
-    are contained in the `VolumeSnapshot` object). Although possible, it might not be
-    straightforward to restore from just this kind of objects. For this reason,
+    are contained in the `VolumeSnapshot` object). Although possible, restoring
+    from just this kind of object might not be straightforward. For this reason,
     our recommendation is to always backup the `VolumeSnapshot` definitions somewhere,
     even using a Kubernetes level data protection solution.
 
