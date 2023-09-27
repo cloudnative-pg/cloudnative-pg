@@ -213,7 +213,7 @@ synchronize the former primary with the new one.
 **Are there any other operators for Postgres out there?**
 
 Yes, of course. And our advice is that you look at all of them and compare
-them with CloudNativePG before forming your decision. You will see that
+them with CloudNativePG before making your decision. You will see that
 most of these operators use an external failover management tool (Patroni
 or similar) and rely on stateful sets.
 
