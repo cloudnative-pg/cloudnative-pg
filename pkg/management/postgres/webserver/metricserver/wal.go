@@ -219,7 +219,7 @@ func collectPGWalSettings(exporter *Exporter, db *sql.DB) error {
 }
 
 func getWalVolumeSize() float64 {
-	cluster, err := cache.LoadCluster()
+	cluster, err := cache.LoadClusterUnsafe()
 	if err != nil || !cluster.ShouldCreateWalArchiveVolume() {
 		return 0
 	}

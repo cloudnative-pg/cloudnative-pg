@@ -67,14 +67,14 @@ func StoreCluster(cluster *apiv1.Cluster) {
 	cache.Store(ClusterKey, cluster.DeepCopy())
 }
 
-// LoadCluster retrieves a cluster from the local cache.
+// LoadClusterUnsafe retrieves a cluster from the local cache.
 // Warning:
 //
 //	The returned pointer can potentially be accessed concurrently.
 //	Only use this function for read-only operations. If you need to
 //	modify the cluster, always create a DeepCopy of the returned object
 //	before writing to it.
-func LoadCluster() (*apiv1.Cluster, error) {
+func LoadClusterUnsafe() (*apiv1.Cluster, error) {
 	value, ok := cache.Load(ClusterKey)
 	if !ok {
 		return nil, ErrCacheMiss
