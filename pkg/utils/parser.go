@@ -14,5 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install implements the install plugin command
-package install
+package utils
+
+import "strings"
+
+// ParsePgControldataOutput parses a pg_controldata output into a map of key-value pairs
+func ParsePgControldataOutput(data string) map[string]string {
+	pairs := make(map[string]string)
+	lines := strings.Split(data, "\n")
+	for _, line := range lines {
+		frags := strings.Split(line, ":")
+		if len(frags) != 2 {
+			continue
+		}
+		pairs[strings.TrimSpace(frags[0])] = strings.TrimSpace(frags[1])
+	}
+	return pairs
+}

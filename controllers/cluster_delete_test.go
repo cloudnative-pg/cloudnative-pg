@@ -47,10 +47,10 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 				Client:          clusterReconciler.Client,
 				indexerAdapters: []indexAdapter{clusterDefaultQueriesFalsePathIndexAdapter},
 			},
-			Scheme:               clusterReconciler.Scheme,
-			Recorder:             clusterReconciler.Recorder,
-			DiscoveryClient:      clusterReconciler.DiscoveryClient,
-			instanceStatusClient: clusterReconciler.instanceStatusClient,
+			Scheme:          clusterReconciler.Scheme,
+			Recorder:        clusterReconciler.Recorder,
+			DiscoveryClient: clusterReconciler.DiscoveryClient,
+			StatusClient:    clusterReconciler.StatusClient,
 		}
 
 		By("creating the required monitoring configmap", func() {
@@ -87,10 +87,10 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 				Client:          clusterReconciler.Client,
 				indexerAdapters: []indexAdapter{clusterDefaultQueriesFalsePathIndexAdapter},
 			},
-			Scheme:               clusterReconciler.Scheme,
-			Recorder:             clusterReconciler.Recorder,
-			DiscoveryClient:      clusterReconciler.DiscoveryClient,
-			instanceStatusClient: clusterReconciler.instanceStatusClient,
+			Scheme:          clusterReconciler.Scheme,
+			Recorder:        clusterReconciler.Recorder,
+			DiscoveryClient: clusterReconciler.DiscoveryClient,
+			StatusClient:    clusterReconciler.StatusClient,
 		}
 		namespace := newFakeNamespace()
 		var cluster *apiv1.Cluster

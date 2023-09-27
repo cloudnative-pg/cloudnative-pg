@@ -1451,7 +1451,9 @@ user by setting it to <code>NULL</code>. Enabled by default.</p>
 </td>
 <td>
    <p>The time in seconds that is allowed for a PostgreSQL instance to
-successfully start up (default 30)</p>
+successfully start up (default 3600).
+The startup probe failure threshold is derived from this value using the formula:
+ceiling(startDelay / 10).</p>
 </td>
 </tr>
 <tr><td><code>stopDelay</code><br/>
@@ -1459,7 +1461,15 @@ successfully start up (default 30)</p>
 </td>
 <td>
    <p>The time in seconds that is allowed for a PostgreSQL instance to
-gracefully shutdown (default 30)</p>
+gracefully shutdown (default 1800)</p>
+</td>
+</tr>
+<tr><td><code>smartStopDelay</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
+this formula to compute the timeout of smart shutdown is <code>max(stopDelay -  smartStopDelay, 30)</code>,</p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>
@@ -1468,8 +1478,7 @@ gracefully shutdown (default 30)</p>
 <td>
    <p>The time in seconds that is allowed for a primary PostgreSQL instance
 to gracefully shutdown during a switchover.
-Default value is 40000000, greater than one year in seconds,
-big enough to simulate an infinite delay</p>
+Default value is 3600 seconds (1 hour).</p>
 </td>
 </tr>
 <tr><td><code>failoverDelay</code><br/>

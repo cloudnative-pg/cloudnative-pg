@@ -53,7 +53,7 @@ func DrainPrimaryNode(
 		// Draining the primary pod's node
 		var stdout, stderr string
 		Eventually(func() error {
-			cmd := fmt.Sprintf("kubectl drain %v --ignore-daemonsets --delete-local-data --force --timeout=%ds",
+			cmd := fmt.Sprintf("kubectl drain %v --ignore-daemonsets --delete-emptydir-data --force --timeout=%ds",
 				primaryNode, timeoutSeconds)
 			stdout, stderr, err = utils.RunUnchecked(cmd)
 			return err

@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package snapshot contains reusable snapshot execution logic
-package snapshot
+// Package volumesnapshot contains the VolumeSnapshot reconciler
+// that is used to take VolumeSnapshot backups
+package volumesnapshot

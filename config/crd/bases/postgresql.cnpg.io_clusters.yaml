@@ -3009,16 +3009,26 @@ spec:
                 required:
                 - metadata
                 type: object
+              smartStopDelay:
+                default: 180
+                description: The time in seconds that controls the window of time
+                  reserved for the smart shutdown of Postgres to complete. this formula
+                  to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay,
+                  30)`,
+                format: int32
+                type: integer
               startDelay:
-                default: 30
-                description: The time in seconds that is allowed for a PostgreSQL
-                  instance to successfully start up (default 30)
+                default: 3600
+                description: 'The time in seconds that is allowed for a PostgreSQL
+                  instance to successfully start up (default 3600). The startup probe
+                  failure threshold is derived from this value using the formula:
+                  ceiling(startDelay / 10).'
                 format: int32
                 type: integer
               stopDelay:
-                default: 30
+                default: 1800
                 description: The time in seconds that is allowed for a PostgreSQL
-                  instance to gracefully shutdown (default 30)
+                  instance to gracefully shutdown (default 1800)
                 format: int32
                 type: integer
               storage:
@@ -3260,11 +3270,10 @@ spec:
                 - name
                 type: object
               switchoverDelay:
-                default: 40000000
+                default: 3600
                 description: The time in seconds that is allowed for a primary PostgreSQL
                   instance to gracefully shutdown during a switchover. Default value
-                  is 40000000, greater than one year in seconds, big enough to simulate
-                  an infinite delay
+                  is 3600 seconds (1 hour).
                 format: int32
                 type: integer
               topologySpreadConstraints:

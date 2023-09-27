@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -493,23 +494,24 @@ func GetConditionsInClusterStatus(
 	return nil, fmt.Errorf("no condition matching requested type found: %v", conditionType)
 }
 
-// CreateVolumeSnapshotBackup use kubectl plugin to create volumesnapshot backup
-func CreateVolumeSnapshotBackup(
-	volumeSnapshotClass,
+// CreateOnDemandBackupViaKubectlPlugin uses the kubectl plugin to create a backup
+func CreateOnDemandBackupViaKubectlPlugin(
 	namespace,
 	clusterName,
-	snapshotSuffix,
 	backupName string,
+	target apiv1.BackupTarget,
+	method apiv1.BackupMethod,
 ) error {
-	command := fmt.Sprintf("kubectl cnpg snapshot %v -n %v", clusterName, namespace)
-	if volumeSnapshotClass != "" {
-		command = fmt.Sprintf("%v -c %v", command, volumeSnapshotClass)
-	}
-	if snapshotSuffix != "" {
-		command = fmt.Sprintf("%v -x %v", command, snapshotSuffix)
-	}
+	command := fmt.Sprintf("kubectl cnpg backup %v -n %v", clusterName, namespace)
+
 	if backupName != "" {
-		command = fmt.Sprintf("%v -l %v", command, backupName)
+		command = fmt.Sprintf("%v --backup-name %v", command, backupName)
+	}
+	if target != "" {
+		command = fmt.Sprintf("%v --backup-target %v", command, target)
+	}
+	if method != "" {
+		command = fmt.Sprintf("%v --method %v", command, method)
 	}
 
 	_, _, err := Run(command)
@@ -553,4 +555,21 @@ func CreateOnDemandBackup(
 		return nil, fmt.Errorf("created object is not of Backup type: %T %v", obj, obj)
 	}
 	return backup, nil
+}
+
+// GetVolumeSnapshot gets a VolumeSnapshot given name and namespace
+func (env TestingEnvironment) GetVolumeSnapshot(
+	namespace,
+	name string,
+) (*volumesnapshot.VolumeSnapshot, error) {
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	volumeSnapshot := &volumesnapshot.VolumeSnapshot{}
+	err := GetObject(&env, namespacedName, volumeSnapshot)
+	if err != nil {
+		return nil, err
+	}
+	return volumeSnapshot, nil
 }

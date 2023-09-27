@@ -48,20 +48,22 @@ When a Pod running Postgres is deleted, either manually or by Kubernetes
 following a node drain operation, the kubelet will send a termination signal to the
 instance manager, and the instance manager will take care of shutting down
 PostgreSQL in an appropriate way.
-The `.spec.stopDelay`, expressed in seconds, is the amount of time
-given to PostgreSQL to shut down. The value defaults to 30 seconds.
+The `.spec.smartStopDelay` and `.spec.stopDelay` options, expressed in seconds,
+control the amount of time given to PostgreSQL to shut down. The values default
+to 180 and 1800 seconds, respectively.
 
 The shutdown procedure is composed of two steps:
 
 1. The instance manager requests a **smart** shut down, disallowing any
-new connection to PostgreSQL. This step will last for half of the
-time set in `.spec.stopDelay`.
+new connection to PostgreSQL. This step will last for up to
+`.spec.smartStopDelay` seconds.
 
 2. If PostgreSQL is still up, the instance manager requests a **fast**
 shut down, terminating any existing connection and exiting promptly.
 If the instance is archiving and/or streaming WAL files, the process
-will wait for up to the remaining half of the time set in `.spec.stopDelay`
-to complete the operation and then forcibly shut down.
+will wait for up to the remaining time set in `.spec.stopDelay` to complete the
+operation and then forcibly shut down. Such timeout is calculated using the
+following formula: `max(stopDelay - smartStopDelay, 30)`.
 
 !!! Important
     In order to avoid any data loss in the Postgres cluster, which impacts
@@ -77,10 +79,7 @@ in order to ensure that all the data are available on the new primary.
 
 For this reason, the `.spec.switchoverDelay`, expressed in seconds, controls
 the  time given to the former primary to shut down gracefully and archive all 
-the WAL files.
-During this time frame, the primary instance does not accept connections.
-The value defaults is greater than one year in seconds, big enough to simulate
-an infinite delay and therefore preserve data durability.
+the WAL files. By default it is set to `3600` (1 hour).
 
 !!! Warning
     The `.spec.switchoverDelay` option affects the RPO and RTO of your

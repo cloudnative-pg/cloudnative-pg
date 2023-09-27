@@ -68,7 +68,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 				if CurrentSpecReport().Failed() {
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
-				return env.DeleteNamespaceAndWait(namespace, 60)
+				return env.DeleteNamespace(namespace)
 			})
 			assertFastSwitchover(namespace, sampleFileWithoutReplicationSlots, clusterName, webTestFile, webTestJob)
 		})
@@ -84,7 +84,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 				if CurrentSpecReport().Failed() {
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
-				return env.DeleteNamespaceAndWait(namespace, 60)
+				return env.DeleteNamespace(namespace)
 			})
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
 			AssertClusterReplicationSlots(namespace, clusterName)

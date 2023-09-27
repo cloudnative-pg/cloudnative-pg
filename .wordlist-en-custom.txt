@@ -18,6 +18,7 @@ AzurePVCUpdateEnabled
 Azurite
 BDR
 BackupConfiguration
+BackupFrom
 BackupList
 BackupMethod
 BackupPhase
@@ -217,6 +218,9 @@ OLTP
 OOM
 OU
 ObjectMeta
+OngoingBackupStatus
+OngoingBackups
+OngoingSnapshotBackups
 OnlineUpdateEnabled
 OnlineUpgrading
 OpenShift
@@ -306,6 +310,9 @@ RoleConfiguration
 RolePasswordStatus
 RoleStatus
 RollingUpdateStatus
+RunningBackupStatus
+RunningBackups
+RunningSnapshotBackups
 RuntimeDefault
 Ruocco
 SAS
@@ -816,6 +823,7 @@ observability
 oc
 ol
 olm
+ongoingBackups
 onlineUpdateEnabled
 openldap
 openshift
@@ -993,6 +1001,7 @@ sig
 sigs
 singlenamespace
 slotPrefix
+smartStopDelay
 snapshotBackupStatus
 snapshotOwnerReference
 snapshotted

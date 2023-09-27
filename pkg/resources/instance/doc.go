@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install implements the install plugin command
-package install
+// Package instance contains the client capable of querying the HTTP instances endpoints
+package instance

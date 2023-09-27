@@ -57,4 +57,10 @@ var _ = Describe("String set", func() {
 		Expect(From([]string{"one", "two"}).Eq(From([]string{"one", "two", "three"}))).To(BeFalse())
 		Expect(From([]string{"one", "two", "three"}).Eq(From([]string{"one", "two"}))).To(BeFalse())
 	})
+
+	It("constructs a sorted string slice given a set", func() {
+		Expect(From([]string{"one", "two", "three", "four"}).ToSortedList()).To(
+			HaveExactElements("four", "one", "three", "two"))
+		Expect(New().ToList()).To(BeEmpty())
+	})
 })
