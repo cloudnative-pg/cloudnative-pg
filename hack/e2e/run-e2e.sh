@@ -124,7 +124,7 @@ kubectl wait --for=condition=Available --timeout=2m \
 unset DEBUG
 
 # Build kubectl-cnpg and export its path
-make build
+make build-plugin
 export PATH=${ROOT_DIR}/bin/:${PATH}
 
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
