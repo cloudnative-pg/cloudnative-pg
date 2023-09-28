@@ -91,11 +91,12 @@ kubectl delete pod [primary pod] --grace-period=1
     Never use `--grace-period=0` in your failover simulation tests, as this
     might produce misleading results with your PostgreSQL cluster. A grace
     period of 0 guarantees that the pod is immediately removed from the
-    Kubernetes API server, without guaranteeing that the PID 1 process of
+    Kubernetes API server, without first ensuring that the PID 1 process of
     the `postgres` container (the instance manager) is shut down - contrary
-    to what would happen in case of a real failure (e.g. unplug the power cord cable).
+    to what would happen in case of a real failure (e.g. unplug the power cord
+    cable or network partitioning).
     As a result, the operator doesn't see the pod of the primary anymore, and
-    triggers an automated failover promoting the most aligned standby without
+    triggers a failover promoting the most aligned standby, without
     the guarantee that the primary had been shut down.
 
 
