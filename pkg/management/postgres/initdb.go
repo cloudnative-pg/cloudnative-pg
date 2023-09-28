@@ -149,7 +149,7 @@ func (info InitInfo) CreateDataDirectory() error {
 	}
 
 	// Always read the custom and override configuration files created by the operator
-	_, err = configfile.EnsureInclude(path.Join(info.PgData, "postgresql.conf"),
+	_, err = configfile.EnsureIncludes(path.Join(info.PgData, "postgresql.conf"),
 		constants.PostgresqlCustomConfigurationFile,
 		constants.PostgresqlOverrideConfigurationFile,
 	)

@@ -159,9 +159,9 @@ func ReadOptionsFromConfigurationContents(content string, options ...string) (re
 	return result
 }
 
-// EnsureInclude makes sure the passed PostgreSQL configuration file has an include directive
+// EnsureIncludes makes sure the passed PostgreSQL configuration file has an include directive
 // to every filesToInclude.
-func EnsureInclude(fileName string, filesToInclude ...string) (changed bool, err error) {
+func EnsureIncludes(fileName string, filesToInclude ...string) (changed bool, err error) {
 	includeLinesToAdd := make(map[string]string, len(filesToInclude))
 	for _, fileToInclude := range filesToInclude {
 		includeLinesToAdd[fileToInclude] = fmt.Sprintf("include '%v'", fileToInclude)
@@ -172,8 +172,8 @@ func EnsureInclude(fileName string, filesToInclude ...string) (changed bool, err
 		return false, fmt.Errorf("error while reading lines of %v: %w", fileName, err)
 	}
 
-	lines := splitLines(string(rawCurrentContent))
-	for _, line := range lines {
+	content := string(rawCurrentContent)
+	for _, line := range splitLines(content) {
 		trimLine := strings.TrimSpace(line)
 		for targetFile, includeLine := range includeLinesToAdd {
 			if trimLine == includeLine {
@@ -182,13 +182,24 @@ func EnsureInclude(fileName string, filesToInclude ...string) (changed bool, err
 		}
 	}
 
+	if len(includeLinesToAdd) == 0 {
+		return false, nil
+	}
+
+	if content[len(content)-1] != '\n' {
+		content += "\n"
+	}
+
 	for _, fileToInclude := range filesToInclude {
 		if includeLine, present := includeLinesToAdd[fileToInclude]; present {
-			lines = append(lines, "")
-			lines = append(lines, fmt.Sprintf("# load CloudNativePG %v configuration", fileToInclude))
-			lines = append(lines, includeLine)
+			content += fmt.Sprintf(
+				"\n"+
+					"# load CloudNativePG %s configuration\n"+
+					"%s\n",
+				fileToInclude, includeLine,
+			)
 		}
 	}
 
-	return fileutils.WriteStringToFile(fileName, strings.Join(lines, "\n")+"\n")
+	return fileutils.WriteStringToFile(fileName, content)
 }

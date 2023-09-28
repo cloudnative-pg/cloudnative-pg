@@ -369,7 +369,7 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceM
 		return true, err
 	}
 
-	_, err = configfile.EnsureInclude(
+	_, err = configfile.EnsureIncludes(
 		path.Join(instance.PgData, "postgresql.conf"),
 		constants.PostgresqlOverrideConfigurationFile,
 	)

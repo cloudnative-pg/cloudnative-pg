@@ -127,6 +127,63 @@ var _ = Describe("update Postgres configuration files", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(finalContent)).To(Equal(wantedContent))
 	})
+
+	It("must add missing includes", func() {
+		initialContent := "# This is a test file!\n" +
+			"# Comments are ignored\n" +
+			"one_key = 'one value'\n" +
+			"another_key = On"
+
+		testFile := filepath.Join(tmpDir, "postgresql.conf")
+		Expect(fileutils.WriteStringToFile(testFile, initialContent)).To(BeTrue())
+
+		Expect(EnsureIncludes(testFile, "custom.conf", "override.conf")).To(BeTrue())
+
+		wantedContent := "# This is a test file!\n" +
+			"# Comments are ignored\n" +
+			"one_key = 'one value'\n" +
+			"another_key = On\n" +
+			"\n" +
+			"# load CloudNativePG custom.conf configuration\n" +
+			"include 'custom.conf'\n" +
+			"\n" +
+			"# load CloudNativePG override.conf configuration\n" +
+			"include 'override.conf'\n"
+
+		finalContent, err := fileutils.ReadFile(testFile)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(finalContent)).To(Equal(wantedContent))
+	})
+
+	It("must left untouched existing includes", func() {
+		initialContent := "# This is a test file!\n" +
+			"# Comments are ignored\n" +
+			"one_key = 'one value'\n" +
+			"another_key = On\n" +
+			"\n" +
+			"# customized comment\n" +
+			"include 'custom.conf'"
+
+		testFile := filepath.Join(tmpDir, "postgresql.conf")
+		Expect(fileutils.WriteStringToFile(testFile, initialContent)).To(BeTrue())
+
+		Expect(EnsureIncludes(testFile, "custom.conf", "override.conf")).To(BeTrue())
+
+		wantedContent := "# This is a test file!\n" +
+			"# Comments are ignored\n" +
+			"one_key = 'one value'\n" +
+			"another_key = On\n" +
+			"\n" +
+			"# customized comment\n" +
+			"include 'custom.conf'\n" +
+			"\n" +
+			"# load CloudNativePG override.conf configuration\n" +
+			"include 'override.conf'\n"
+
+		finalContent, err := fileutils.ReadFile(testFile)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(finalContent)).To(Equal(wantedContent))
+	})
 })
 
 var _ = Describe("Update configuration files", func() {
