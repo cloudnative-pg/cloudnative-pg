@@ -42,10 +42,6 @@ export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-}
 export DOCKER_REGISTRY_MIRROR=${DOCKER_REGISTRY_MIRROR:-}
 export TEST_CLOUD_VENDOR="local"
 
-# Build kubectl-cnpg and export its path
-make build-plugin
-export PATH=${ROOT_DIR}/bin/:${PATH}
-
 cleanup() {
   if [ "${PRESERVE_CLUSTER}" = false ]; then
     "${HACK_DIR}/setup-cluster.sh" destroy || true
