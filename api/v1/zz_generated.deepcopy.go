@@ -684,6 +684,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		}
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
+	if in.EmptyDirLimit != nil {
+		in, out := &in.EmptyDirLimit, &out.EmptyDirLimit
+		*out = new(string)
+		**out = **in
+	}
 	if in.Backup != nil {
 		in, out := &in.Backup, &out.Backup
 		*out = new(BackupConfiguration)

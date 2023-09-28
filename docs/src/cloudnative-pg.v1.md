@@ -1546,6 +1546,13 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 for more information.</p>
 </td>
 </tr>
+<tr><td><code>emptyDirLimit</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>EmptyDirLimit set the limit for the ephemeral volumes</p>
+</td>
+</tr>
 <tr><td><code>priorityClassName</code><br/>
 <i>string</i>
 </td>

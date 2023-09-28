@@ -1686,6 +1686,9 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              emptyDirLimit:
+                description: EmptyDirLimit set the limit for the ephemeral volumes
+                type: string
               enableSuperuserAccess:
                 default: false
                 description: When this option is enabled, the operator will use the

@@ -315,6 +315,10 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// EmptyDirLimit set the limit for the ephemeral volumes
+	// +optional
+	EmptyDirLimit *string `json:"emptyDirLimit,omitempty"`
+
 	// Name of the priority class which will be used in every generated Pod, if the PriorityClass
 	// specified does not exist, the pod will not be able to schedule.  Please refer to
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
@@ -2877,6 +2881,17 @@ func (cluster *Cluster) GetCoredumpFilter() string {
 func (cluster *Cluster) IsInplaceRestartPhase() bool {
 	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
 		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
+}
+
+// GetEmptyDirLimit provides the limit for the EmptyDir volumes inside every container
+func (cluster *Cluster) GetEmptyDirLimit() *resource.Quantity {
+	if cluster.Spec.EmptyDirLimit == nil {
+		return nil
+	}
+
+	emptyDirLimit := resource.MustParse(*cluster.Spec.EmptyDirLimit)
+
+	return &emptyDirLimit
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

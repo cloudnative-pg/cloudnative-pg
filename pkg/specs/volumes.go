@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -33,7 +32,7 @@ const PgWalVolumePath = "/var/lib/postgresql/wal"
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
-	ephemeralStorageVolumeLimit := resource.MustParse("50Mi")
+	ephemeralStorageVolumeLimit := cluster.GetEmptyDirLimit()
 
 	result := []corev1.Volume{
 		{
@@ -48,7 +47,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 			Name: "scratch-data",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: &ephemeralStorageVolumeLimit,
+					SizeLimit: ephemeralStorageVolumeLimit,
 				},
 			},
 		},
@@ -57,7 +56,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					Medium:    "Memory",
-					SizeLimit: &ephemeralStorageVolumeLimit,
+					SizeLimit: ephemeralStorageVolumeLimit,
 				},
 			},
 		},

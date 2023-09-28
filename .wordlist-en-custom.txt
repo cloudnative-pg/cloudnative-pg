@@ -115,6 +115,7 @@ EKS
 EOF
 EOL
 EmbeddedObjectMetadata
+EmptyDirLimit
 EncryptionType
 EndpointCA
 EnsureOption
@@ -612,6 +613,7 @@ dx
 ecdsa
 edb
 eks
+emptyDirLimit
 enablePodAntiAffinity
 enablePodMonitor
 enableSuperuserAccess
