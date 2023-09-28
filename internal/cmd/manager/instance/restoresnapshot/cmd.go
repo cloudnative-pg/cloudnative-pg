@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
@@ -56,7 +57,11 @@ func NewCmd() *cobra.Command {
 				PgWal:       pgWal,
 			}
 
-			return execute(ctx, info)
+			err := execute(ctx, info)
+			if err != nil {
+				log.Error(err, "Error while recovering Volume Snapshot backup")
+			}
+			return err
 		},
 		PostRunE: func(cmd *cobra.Command, args []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
