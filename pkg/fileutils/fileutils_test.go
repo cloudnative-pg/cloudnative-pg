@@ -200,3 +200,94 @@ var _ = Describe("function MoveDirectoryContent", func() {
 		Expect(files).Should(BeEmpty())
 	})
 })
+
+var _ = Describe("RemoveFiles", func() {
+	var tempDir string
+
+	BeforeEach(func() {
+		var err error
+		tempDir, err = os.MkdirTemp("", "test")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Create some sample files and directories
+		Expect(os.WriteFile(filepath.Join(tempDir, "file1.txt"), []byte("test"), 0o600)).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(tempDir, "file2.txt"), []byte("test"), 0o600)).To(Succeed())
+		Expect(os.Mkdir(filepath.Join(tempDir, "dir1"), 0o750)).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(tempDir, "dir1", "file3.txt"), []byte("test"), 0o600)).To(Succeed())
+	})
+
+	AfterEach(func() {
+		// Cleanup
+		Expect(os.RemoveAll(tempDir)).To(Succeed())
+	})
+
+	It("removes specified files and directories", func() {
+		// Use the RemoveFiles function
+		err := RemoveFiles(tempDir, []string{
+			"file1.txt",
+			"dir1/*",
+			"non_existent_dir/*",
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Assert files and directories are removed as expected
+		_, err = os.Stat(filepath.Join(tempDir, "file1.txt"))
+		Expect(os.IsNotExist(err)).To(BeTrue(), "Expected file1.txt to be removed")
+
+		_, err = os.Stat(filepath.Join(tempDir, "file2.txt"))
+		Expect(err).NotTo(HaveOccurred(), "Expected file2.txt to not be removed")
+
+		_, err = os.Stat(filepath.Join(tempDir, "dir1", "file3.txt"))
+		Expect(os.IsNotExist(err)).To(BeTrue(), "Expected dir1/file3.txt to be removed")
+
+		_, err = os.Stat(filepath.Join(tempDir, "dir1"))
+		Expect(err).NotTo(HaveOccurred(), "Expected dir1 to not be removed")
+	})
+})
+
+var _ = Describe("RemoveRestoreExcludedFiles", func() {
+	var tempDir string
+
+	BeforeEach(func() {
+		var err error
+		tempDir, err = os.MkdirTemp("", "test")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Create temporary directories and files
+		for _, path := range excludedPathsFromRestore {
+			fullPath := filepath.Join(tempDir, path)
+			if len(path) >= 2 && path[len(path)-2:] == "/*" {
+				dirToCreate := fullPath[:len(fullPath)-2]
+				Expect(os.Mkdir(dirToCreate, 0o750)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(dirToCreate, "testfile.txt"), []byte("test"), 0o600)).To(Succeed())
+				continue
+			}
+			// Ensure directory exists before creating the file
+			dirOfTheFile := filepath.Dir(fullPath)
+			if _, err := os.Stat(dirOfTheFile); os.IsNotExist(err) {
+				Expect(os.MkdirAll(dirOfTheFile, 0o750)).To(Succeed())
+			}
+			Expect(os.WriteFile(fullPath, []byte("test"), 0o600)).To(Succeed())
+
+		}
+	})
+
+	AfterEach(func() {
+		_ = os.RemoveAll(tempDir)
+	})
+
+	It("should correctly remove specified files and directories", func() {
+		Expect(RemoveRestoreExcludedFiles(tempDir)).To(Succeed())
+
+		for _, path := range excludedPathsFromRestore {
+			fullPath := filepath.Join(tempDir, path)
+			if len(path) >= 2 && path[len(path)-2:] == "/*" {
+				_, err := os.Stat(filepath.Join(fullPath[:len(fullPath)-2], "testfile.txt"))
+				Expect(os.IsNotExist(err)).To(BeTrue(), "Expected directory contents to be removed: "+fullPath)
+			} else {
+				_, err := os.Stat(fullPath)
+				Expect(os.IsNotExist(err)).To(BeTrue(), "Expected file to be removed: "+fullPath)
+			}
+		}
+	})
+})

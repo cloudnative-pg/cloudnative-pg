@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-restore-pitr
+  name: cluster-restore-full
 spec:
   instances: 3
 
@@ -9,29 +9,10 @@ spec:
     size: 1Gi
     storageClass: csi-hostpath-sc
 
-  externalClusters:
-    - name: origin
-
-      barmanObjectStore:
-        serverName: cluster-example-with-backup
-        destinationPath: s3://backups/
-        endpointURL: http://minio:9000
-        s3Credentials:
-          accessKeyId:
-            name: minio
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: minio
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
-
   bootstrap:
     recovery:
-      source: origin
-
       volumeSnapshots:
         storage:
-          name: cluster-example-with-backup-3-1692618163
+          name: cluster-example-2-1695821489
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
