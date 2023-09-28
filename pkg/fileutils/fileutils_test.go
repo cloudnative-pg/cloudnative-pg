@@ -214,6 +214,9 @@ var _ = Describe("RemoveFiles", func() {
 		Expect(os.WriteFile(filepath.Join(tempDir, "file2.txt"), []byte("test"), 0o600)).To(Succeed())
 		Expect(os.Mkdir(filepath.Join(tempDir, "dir1"), 0o750)).To(Succeed())
 		Expect(os.WriteFile(filepath.Join(tempDir, "dir1", "file3.txt"), []byte("test"), 0o600)).To(Succeed())
+		Expect(os.Mkdir(filepath.Join(tempDir, "pg_replslot"), 0o750)).To(Succeed())
+		Expect(os.Mkdir(filepath.Join(tempDir, "pg_replslot", "myrepslot"), 0o750)).To(Succeed())
+		Expect(os.WriteFile(filepath.Join(tempDir, "pg_replslot", "myrepslot", "state"), []byte("test"), 0o600)).To(Succeed())
 	})
 
 	AfterEach(func() {
@@ -227,6 +230,7 @@ var _ = Describe("RemoveFiles", func() {
 			"file1.txt",
 			"dir1/*",
 			"non_existent_dir/*",
+			"pg_replslot/*",
 		})
 		Expect(err).NotTo(HaveOccurred())
 
@@ -239,6 +243,12 @@ var _ = Describe("RemoveFiles", func() {
 
 		_, err = os.Stat(filepath.Join(tempDir, "dir1", "file3.txt"))
 		Expect(os.IsNotExist(err)).To(BeTrue(), "Expected dir1/file3.txt to be removed")
+
+		_, err = os.Stat(filepath.Join(tempDir, "pg_replslot", "myrepslot", "state"))
+		Expect(os.IsNotExist(err)).To(BeTrue(), "Expected pg_replslot/myrepslot/state to be removed")
+
+		_, err = os.Stat(filepath.Join(tempDir, "pg_replslot", "myrepslot"))
+		Expect(os.IsNotExist(err)).To(BeTrue(), "Expected pg_replslot/myrepslot directory to be removed")
 
 		_, err = os.Stat(filepath.Join(tempDir, "dir1"))
 		Expect(err).NotTo(HaveOccurred(), "Expected dir1 to not be removed")
