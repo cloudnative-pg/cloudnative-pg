@@ -178,6 +178,41 @@ var _ = Describe("object metadata test", func() {
 			Expect(replicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 			Expect(replicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
 		})
+
+		It("should update existing instances with the new role label", func() {
+			cluster := &apiv1.Cluster{
+				Status: apiv1.ClusterStatus{
+					CurrentPrimary: "primaryPod",
+				},
+			}
+
+			primaryPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "primaryPod",
+					Labels: map[string]string{
+						utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+					},
+				},
+			}
+
+			replicaPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "replicaPod",
+					Labels: map[string]string{
+						utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
+					},
+				},
+			}
+			updated := updateRoleLabels(context.Background(), cluster, primaryPod)
+			Expect(updated).To(BeTrue())
+			Expect(primaryPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
+			Expect(primaryPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
+
+			updated = updateRoleLabels(context.Background(), cluster, replicaPod)
+			Expect(updated).To(BeTrue())
+			Expect(replicaPod.Labels[utils.ClusterRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+			Expect(replicaPod.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelReplica))
+		})
 	})
 
 	Context("updateOperatorLabelsOnInstances", func() {
