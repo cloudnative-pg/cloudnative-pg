@@ -15,14 +15,15 @@
 #
 
 # Image URL to use all building/pushing image targets
+IMAGE_NAME ?= ghcr.io/cloudnative-pg/cloudnative-pg-testing
 
 # Prevent e2e tests to proceed with empty tag which
 # will be considered as "latest".
 ifeq (,$(CONTROLLER_IMG))
 IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
-CONTROLLER_IMG = ghcr.io/cloudnative-pg/cloudnative-pg-testing:${IMAGE_TAG}
-BUNDLE_IMG = ghcr.io/cloudnative-pg/cloudnative-pg-testing:bundle-${IMAGE_TAG}
+CONTROLLER_IMG = ${IMAGE_NAME}:${IMAGE_TAG}
+BUNDLE_IMG = ${IMAGE_NAME}:bundle-${IMAGE_TAG}
 endif
 endif
 
@@ -155,7 +156,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	    - Image: ${BUNDLE_IMG}" | envsubst > cloudnative-pg-operator-template.yaml
 	$(OPM) alpha render-template semver -o yaml < cloudnative-pg-operator-template.yaml > catalog/catalog.yaml ;\
 	$(OPM) validate catalog/ ;\
-	DOCKER_BUILDKIT=1 docker buildx build --push -f catalog.Dockerfile -t ghcr.io/cloudnative-pg/cloudnative-pg-testing:catalog-${VERSION} --push . ;\
+	DOCKER_BUILDKIT=1 docker buildx build --push -f catalog.Dockerfile -t ${IMAGE_NAME}:catalog-${VERSION} --push . ;\
 	echo -e "apiVersion: operators.coreos.com/v1alpha1\n\
 	kind: CatalogSource\n\
 	metadata:\n\
@@ -163,7 +164,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	   namespace: operators\n\
 	spec:\n\
 	   sourceType: grpc\n\
-	   image: ghcr.io/cloudnative-pg/cloudnative-pg-testing:catalog-${VERSION}" | envsubst > cloudnative-pg-catalog.yaml ;\
+	   image: ${IMAGE_NAME}:catalog-${VERSION}" | envsubst > cloudnative-pg-catalog.yaml ;\
 
 ##@ Deployment
 install: manifests kustomize ## Install CRDs into a cluster.
