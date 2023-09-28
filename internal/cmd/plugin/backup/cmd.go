@@ -29,6 +29,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // backupCommandOptions are the options that are provider to the backup
@@ -57,7 +58,8 @@ func NewCmd() *cobra.Command {
 				backupName = fmt.Sprintf(
 					"%s-%s",
 					clusterName,
-					time.Now().Format("20060102150405"))
+					utils.ToCompactISO8601(time.Now()),
+				)
 			}
 
 			// Check if the backup target is correct
