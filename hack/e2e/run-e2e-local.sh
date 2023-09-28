@@ -42,6 +42,10 @@ export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
 
+# Build kubectl-cnpg and export its path
+make build-plugin
+export PATH=${ROOT_DIR}/bin/:${PATH}
+
 LABEL_FILTERS=${FEATURE_TYPE//,/ ||}
 readonly LABEL_FILTERS
 

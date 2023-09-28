@@ -109,6 +109,9 @@ build: generate fmt vet ## Build binaries.
 	go build -o bin/manager -ldflags ${LDFLAGS} ./cmd/manager
 	go build -o bin/kubectl-cnpg -ldflags ${LDFLAGS} ./cmd/kubectl-cnpg
 
+build-plugin: generate fmt vet ## Build plugin binary.
+	go build -o bin/kubectl-cnpg -ldflags ${LDFLAGS} ./cmd/kubectl-cnpg
+
 run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config.
 	go run ./cmd/manager
 
