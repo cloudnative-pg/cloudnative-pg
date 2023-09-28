@@ -2814,7 +2814,7 @@ data:
             {
               "datasource": "${DS_PROMETHEUS}",
               "exemplar": true,
-              "expr": "cnpg_pg_settings_setting{name=\"effective_cache_size\",namespace=~\"$namespace\",pod=~\"$instances\"}",
+              "expr": "max by (pod) (cnpg_pg_settings_setting{name=\"effective_cache_size\",namespace=~\"$namespace\",pod=~\"$instances\"}) * max by (pod) (cnpg_pg_settings_setting{name=\"block_size\",namespace=~\"$namespace\",pod=~\"$instances\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "{{pod}}",
