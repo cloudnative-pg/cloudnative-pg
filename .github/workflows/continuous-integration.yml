@@ -353,6 +353,7 @@ jobs:
       commit_version: ${{ env.VERSION }}
       commit: ${{ env.COMMIT_SHA }}
       platforms: ${{ env.PLATFORMS }}
+      image_name: ${{ env.IMAGE_NAME }}
       controller_img: ${{ env.CONTROLLER_IMG }}
       bundle_img: ${{ env.BUNDLE_IMG }}
     steps:
@@ -482,18 +483,22 @@ jobs:
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
 
-      - name: Outputs
+      - name: Output images
         env:
-          IMAGE: ${{ steps.docker-meta.outputs.tags }}
+          TAGS: ${{ steps.docker-meta.outputs.tags }}
         run: |
-          echo $IMAGE
-          TAG=${IMAGE#*:}
-          echo "CONTROLLER_IMG=${IMAGE}" >> $GITHUB_ENV
-          echo "BUNDLE_IMG=${CNPG_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+          LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
+          TAG=${TAGS#*:}
+          echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
 
   olm-bundle:
-    name: Create OLM Bundle and Catalog
+    name: Create OLM bundle and catalog
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
     needs:
       - buildx
     if: |
@@ -509,7 +514,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          plafforms: ${{ needs.buildx.outputs.platforms }}
+          platforms: ${{ needs.buildx.outputs.platforms }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -523,6 +528,7 @@ jobs:
 
       - name: Create bundle
         env:
+          IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
         run: |
@@ -539,7 +545,7 @@ jobs:
           retention-days: 7
 
   olm-scorecard:
-    name: Scorecard test
+    name: Run OLM scorecard test
     runs-on: ubuntu-22.04
     needs:
       - buildx
@@ -560,7 +566,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          plafforms: ${{ needs.buildx.outputs.platforms }}
+          platforms: ${{ needs.buildx.outputs.platforms }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -585,9 +591,10 @@ jobs:
 
   olm-tests:
     strategy:
+      fail-fast: false
       matrix:
         test: [ kiwi, lemon, orange ]
-    name: Running ${{ matrix.test }} test
+    name: Run OLM ${{ matrix.test }} test
     runs-on: ubuntu-22.04
     needs:
       - buildx
@@ -596,16 +603,24 @@ jobs:
       (always() && !cancelled()) &&
       needs.olm-scorecard.result == 'success'
     env:
-        VERSION: ${{ needs.buildx.outputs.commit_version }}
-        OPP_DEBUG: 1
-        OPP_PRODUCTION_TYPE: "k8s"
-        OPP_CONTAINER_OPT: "-t"
-        OPP_RELEASE_INDEX_NAME: "catalog_tmp"
+      VERSION: ${{ needs.buildx.outputs.commit_version }}
+      OPP_DEBUG: 1
+      OPP_PRODUCTION_TYPE: "k8s"
+      OPP_CONTAINER_OPT: "-t"
+      OPP_RELEASE_INDEX_NAME: "catalog_tmp"
     steps:
       - name: Checkout community-operators
         uses: actions/checkout@v4
         with:
           repository: k8s-operatorhub/community-operators
+          persist-credentials: false
+
+      - name: Login to ghcr.io
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download the bundle
         uses: actions/download-artifact@v3
@@ -621,76 +636,3 @@ jobs:
       - name: Test bundle
         run: |
           bash <(curl -sL ${{ env.OPP_SCRIPT_URL }}) ${{ matrix.test }} operators/cloudnative-pg/${{ env.VERSION }}/
-
-# TODO: Uncomment when the first release is done since we need to manually create the first PR
-# with the ci.yaml file and also mark as a new operator
-#  operatorhub_pr:
-#    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-#    name: Create remote PR for OperatorHub
-#    needs:
-#      - operatorhub_tests
-#    runs-on: ubuntu-22.04
-#    steps:
-#      - name: Checkout community-operators
-#        uses: actions/checkout@v4
-#        with:
-#          repository: k8s-operatorhub/community-operators
-#          fetch-depth: 0
-#          persist-credentials: false
-#      - name: Download the bundle
-#        uses: actions/download-artifact@v3
-#        with:
-#          name: bundle
-#      - name: Setup env
-#        run: |
-#          echo "OH_BUNDLE_DIR=$(pwd)/operators/cloudnativepg" >> $GITHUB_ENV
-#          echo "OH_BUNDLE_VERSION=$( echo ${{ github.ref }} | sed s@^refs/tags/v@@ )" >> $GITHUB_ENV
-#      - name: Copy bundle in the community-operators
-#        run: |
-#          mkdir -p "${{ env.OH_BUNDLE_DIR }}/${{ env.OH_BUNDLE_VERSION }}"
-#          cp -R bundle/* "${{ env.OH_BUNDLE_DIR }}/${{ env.OH_BUNDLE_VERSION }}"
-#          rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
-#      - name: Create Remote Pull Request
-#        uses: peter-evans/create-pull-request@v5.0.2
-#        with:
-#          token: ${{ secrets.REPO_GHA_PAT }}
-#          commit-message: "operators cloudnativepg (${{ env.OH_BUNDLE_VERSION }})"
-#          title: "operators cloudnativepg (${{ env.OH_BUNDLE_VERSION }})"
-#          signoff: true
-#          branch: release-cloudnativepg-${{ env.OH_BUNDLE_VERSION }}
-#          delete-branch: true
-#          push-to-fork: cloudnative-pg/community-operators
-#          body: |
-#            Thanks submitting your Operator. Please check below list before you create your Pull Request.
-#            ### Updates to existing Operators
-#
-#              * [x]  Did you create a `ci.yaml` file according to the [update instructions](https://github.com/operator-framework/community-operators/blob/master/docs/operator-ci-yaml.md)?
-#              * [x]  Is your new CSV pointing to the previous version with the `replaces` property if you chose `replaces-mode` via the `updateGraph` property in `ci.yaml`?
-#              * [x]  Is your new CSV referenced in the [appropriate channel](https://github.com/operator-framework/community-operators/blob/master/docs/packaging-operator.md#channels) defined in the `package.yaml` or `annotations.yaml` ?
-#              * [x]  Have you tested an update to your Operator when deployed via OLM?
-#              * [x]  Is your submission [signed](https://github.com/operator-framework/community-operators/blob/master/docs/contributing-prerequisites.md#sign-your-work)?
-#
-#            ### Your submission should not
-#              * [x]  Modify more than one operator
-#              * [x]  Modify an Operator you don't own
-#              * [x]  Rename an operator - please remove and add with a different name instead
-#              * [x]  Modify any files outside the above mentioned folders
-#              * [x]  Contain more than one commit. **Please squash your commits.**
-#
-#            ### Operator Description must contain (in order)
-#              1. [x]  Description about the managed Application and where to find more information
-#              2. [x]  Features and capabilities of your Operator and how to use it
-#              3. [x]  Any manual steps about potential pre-requisites for using your Operator
-#
-#            ### Operator Metadata should contain
-#              * [x]  Human readable name and 1-liner description about your Operator
-#              * [x]  Valid [category name](https://github.com/operator-framework/community-operators/blob/master/docs/packaging-operator.md#categories)<sup>1</sup>
-#              * [x]  One of the pre-defined [capability levels](https://github.com/operator-framework/operator-courier/blob/4d1a25d2c8d52f7de6297ec18d8afd6521236aa2/operatorcourier/validate.py#L556)<sup>2</sup>
-#              * [x]  Links to the maintainer, source code and documentation
-#              * [x]  Example templates for all Custom Resource Definitions intended to be used
-#              * [x]  A quadratic logo
-#
-#            Remember that you can preview your CSV [here](https://operatorhub.io/preview).
-#            --
-#            <sup>1</sup> If you feel your Operator does not fit any of the pre-defined categories, file an issue against this repo and explain your need
-#            <sup>2</sup> For more information see [here](https://sdk.operatorframework.io/docs/overview/#operator-capability-level)
