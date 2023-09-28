@@ -53,7 +53,11 @@ const (
 	PgbouncerNameLabel = MetadataNamespace + "/poolerName"
 
 	// ClusterRoleLabelName is the name of label applied to instances to mark primary/replica
+	// Deprecated: Use ClusterInstanceRoleLabelName.
 	ClusterRoleLabelName = "role"
+
+	// ClusterInstanceRoleLabelName is the name of label applied to instances to mark primary/replica
+	ClusterInstanceRoleLabelName = MetadataNamespace + "/instanceRole"
 
 	// ImmediateBackupLabelName is the name of the label applied to backups to tell if the first scheduled backup is
 	// taken immediately or not
@@ -360,4 +364,25 @@ func MergeMap(receiver, giver map[string]string) {
 	for key, value := range giver {
 		receiver[key] = value
 	}
+}
+
+// GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map
+func GetInstanceRole(labels map[string]string) (string, bool) {
+	if value := labels[ClusterRoleLabelName]; value != "" {
+		return value, true
+	}
+	if value := labels[ClusterInstanceRoleLabelName]; value != "" {
+		return value, true
+	}
+
+	return "", false
+}
+
+// SetInstanceRole sets both ClusterRoleLabelName and ClusterInstanceRoleLabelName on the given ObjectMeta
+func SetInstanceRole(meta metav1.ObjectMeta, role string) {
+	if meta.Labels == nil {
+		meta.Labels = map[string]string{}
+	}
+	meta.Labels[ClusterRoleLabelName] = role
+	meta.Labels[ClusterInstanceRoleLabelName] = role
 }

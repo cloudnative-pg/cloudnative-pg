@@ -162,7 +162,9 @@ func getNodeSerialsFromPVCs(
 		if serial > highestSerial {
 			highestSerial = serial
 		}
-		if pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] == specs.ClusterRoleLabelPrimary {
+
+		instanceRole, _ := utils.GetInstanceRole(pvc.ObjectMeta.Labels)
+		if instanceRole == specs.ClusterRoleLabelPrimary {
 			primarySerial = serial
 		}
 	}

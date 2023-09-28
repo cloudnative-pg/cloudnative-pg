@@ -130,7 +130,7 @@ func (psql *psqlCommand) getPodName() (string, error) {
 	}
 
 	for i := range psql.podList {
-		podRole := psql.podList[i].Labels[utils.ClusterRoleLabelName]
+		podRole, _ := utils.GetInstanceRole(psql.podList[i].Labels)
 		if podRole == targetPodRole {
 			return psql.podList[i].Name, nil
 		}
