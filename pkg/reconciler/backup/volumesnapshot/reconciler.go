@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -101,9 +102,25 @@ func (se *Reconciler) enrichSnapshot(
 	// we grab the pg_controldata just before creating the snapshot
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
 		vs.Annotations[utils.PgControldataAnnotationName] = data
+		pgControlData := utils.ParsePgControldataOutput(data)
+		timelineID, ok := pgControlData["Latest checkpoint's TimeLineID"]
+		if ok {
+			vs.Labels[utils.BackupTimelineLabelName] = timelineID
+		}
+		startWal, ok := pgControlData["Latest checkpoint's REDO WAL file"]
+		if ok {
+			vs.Labels[utils.BackupStartWALAnnotationName] = startWal
+			// TODO: once we have online volumesnapshot backups, this should change
+			vs.Labels[utils.BackupEndWALAnnotationName] = startWal
+		}
 	} else {
 		contextLogger.Error(err, "while querying for pg_controldata")
 	}
+
+	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
+	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
+	// TODO: once we have online volumesnapshot backups, this should change
+	vs.Labels[utils.IsOnlineBackupLabelName] = "false"
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
@@ -301,7 +318,7 @@ func (se *Reconciler) waitSnapshotToBeReadyStep(
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshot(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -372,8 +389,9 @@ func (se *Reconciler) createSnapshot(
 	return nil
 }
 
-// waitSnapshot waits for a certain snapshot to be ready to use
-func (se *Reconciler) waitSnapshot(
+// waitSnapshotAndAnnotate waits for a certain snapshot to be ready to use. Once ready it annotates the snapshot with
+// SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
+func (se *Reconciler) waitSnapshotAndAnnotate(
 	ctx context.Context,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
@@ -388,6 +406,20 @@ func (se *Reconciler) waitSnapshot(
 			"Waiting for VolumeSnapshot to be ready to use",
 			"volumeSnapshotName", snapshot.Name)
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	_, hasTimeAnnotation := snapshot.Annotations[utils.SnapshotEndTimeAnnotationName]
+	if !hasTimeAnnotation {
+		oldSnapshot := snapshot.DeepCopy()
+		// as soon as the volume snapshot has stopped running, we should update its
+		// snapshotEndTime annotation
+		snapshot.Annotations[utils.SnapshotEndTimeAnnotationName] = metav1.Now().Format(time.RFC3339)
+		snapshot.Annotations[utils.SnapshotStartTimeAnnotationName] = snapshot.Status.CreationTime.Format(time.RFC3339)
+		if err := se.cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+			contextLogger.Error(err, "while adding time annotations to volume snapshot",
+				"snapshot", snapshot.Name)
+			return nil, err
+		}
 	}
 
 	return nil, nil

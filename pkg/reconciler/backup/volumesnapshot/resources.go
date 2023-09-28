@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -67,26 +66,6 @@ func (err volumeSnapshotError) Error() string {
 
 // Slice represents a slice of []storagesnapshotv1.VolumeSnapshot
 type Slice []storagesnapshotv1.VolumeSnapshot
-
-// GetSnapshotsInterval gets the earliest and latest creation times from a list of VolumeSnapshots
-func (s Slice) GetSnapshotsInterval() (metav1.Time, metav1.Time) {
-	var firstCreation, lastCreation metav1.Time
-	for idx := range s {
-		volumeSnapshot := &s[idx]
-		if firstCreation.IsZero() || lastCreation.IsZero() {
-			firstCreation = volumeSnapshot.CreationTimestamp
-			lastCreation = volumeSnapshot.CreationTimestamp
-			continue
-		}
-		if volumeSnapshot.CreationTimestamp.Before(&firstCreation) {
-			firstCreation = volumeSnapshot.CreationTimestamp
-		}
-		if lastCreation.Before(&volumeSnapshot.CreationTimestamp) {
-			lastCreation = volumeSnapshot.CreationTimestamp
-		}
-	}
-	return firstCreation, lastCreation
-}
 
 // GetControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
 func (s Slice) GetControldata() (string, error) {
