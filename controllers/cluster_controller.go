@@ -540,6 +540,11 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
+	// PhaseInplacePrimaryRestart will be patched to healthy in instance manager
+	if cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
 	// When everything is reconciled, update the status
 	if err = r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
 		return ctrl.Result{}, err
