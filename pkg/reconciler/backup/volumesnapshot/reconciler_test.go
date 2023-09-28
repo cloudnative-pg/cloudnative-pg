@@ -18,6 +18,7 @@ package volumesnapshot
 
 import (
 	"fmt"
+	"strconv"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +36,32 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var _ = Describe("getSnapshotName", func() {
+	It("should return only the backup name when the role is PVCRolePgData", func() {
+		name, err := getSnapshotName("backup123", utils.PVCRolePgData)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(name).To(Equal("backup123"))
+	})
+
+	It("should return only the backup name when the role is an empty string", func() {
+		name, err := getSnapshotName("backup123", "")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(name).To(Equal("backup123"))
+	})
+
+	It("should append '-wal' to the backup name when the role is PVCRolePgWal", func() {
+		name, err := getSnapshotName("backup123", utils.PVCRolePgWal)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(name).To(Equal("backup123-wal"))
+	})
+
+	It("should return an error for unhandled PVCRole types", func() {
+		_, err := getSnapshotName("backup123", "UNKNOWN_ROLE")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(Equal("unhandled PVCRole type: UNKNOWN_ROLE"))
+	})
+})
+
 var _ = Describe("Volumesnapshot reconciler", func() {
 	const (
 		namespace   = "test-namespace"
@@ -42,10 +69,11 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		backupName  = "theBakcup"
 	)
 	var (
-		cluster   *apiv1.Cluster
-		targetPod *v1.Pod
-		pvcs      []v1.PersistentVolumeClaim
-		backup    *apiv1.Backup
+		cluster       *apiv1.Cluster
+		targetPod     *v1.Pod
+		pvcs          []v1.PersistentVolumeClaim
+		backup        *apiv1.Backup
+		backupCounter = 1
 	)
 
 	BeforeEach(func() {
@@ -75,21 +103,28 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      clusterName + "-2",
 					Namespace: namespace,
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+					},
 				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      clusterName + "-2-wal",
 					Namespace: namespace,
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+					},
 				},
 			},
 		}
 		backup = &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
-				Name:      backupName,
+				Name:      backupName + strconv.Itoa(backupCounter),
 			},
 		}
+		backupCounter++
 	})
 
 	It("should fence the target pod when there are no volumesnapshots", func(ctx SpecContext) {
@@ -128,18 +163,18 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
-						Name:      clusterName + "-2",
+						Name:      backup.Name,
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backupName,
+							utils.BackupNameLabelName: backup.Name,
 						},
 					},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
-						Name:      clusterName + "-2-wal",
+						Name:      backup.Name + "-wal",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backupName,
+							utils.BackupNameLabelName: backup.Name,
 						},
 					},
 				},
@@ -178,9 +213,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
-						Name:      clusterName + "-2",
+						Name:      backup.Name,
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backupName,
+							utils.BackupNameLabelName: backup.Name,
 						},
 					},
 					Status: &storagesnapshotv1.VolumeSnapshotStatus{
@@ -191,9 +226,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: namespace,
-						Name:      clusterName + "-2-wal",
+						Name:      backup.Name + "-wal",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backupName,
+							utils.BackupNameLabelName: backup.Name,
 						},
 					},
 					Status: &storagesnapshotv1.VolumeSnapshotStatus{
