@@ -142,8 +142,8 @@ kind: Cluster
 spec:
   backup:
     barmanObjectStore:
-      destinationPath: "<destination path here>"
-      endpointURL: "https://bucket.us-east1.linodeobjects.com"
+      destinationPath: "s3://bucket/"
+      endpointURL: "https://us-east1.linodeobjects.com"
       s3Credentials:
         [...]
 ```
