@@ -83,6 +83,8 @@ spec:
           runAsGroup: 10001
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
           capabilities:
             drop:
               - "ALL"
