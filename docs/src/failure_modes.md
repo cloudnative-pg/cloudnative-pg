@@ -72,6 +72,33 @@ or starting from a physical backup of the *primary* otherwise.
 
 Self-healing will happen as soon as the *apiserver* is notified.
 
+You can trigger a sudden failure on a given pod of the cluster using the
+following generic command:
+
+```sh
+kubectl delete -n [namespace] \
+  pod/[cluster-name]-[serial] --grace-period=1
+```
+
+For example, if you want to simulate a real failure on the primary and trigger
+the failover process, you can run:
+
+```sh
+kubectl delete pod [primary pod] --grace-period=1
+```
+
+!!! Warning
+    Never use `--grace-period=0` in your failover simulation tests, as this
+    might produce misleading results with your PostgreSQL cluster. A grace
+    period of 0 guarantees that the pod is immediately removed from the
+    Kubernetes API server, without guaranteeing that the PID 1 process of
+    the `postgres` container (the instance manager) is shut down - contrary
+    to what would happen in case of a real failure (e.g. unplug the power cord cable).
+    As a result, the operator doesn't see the pod of the primary anymore, and
+    triggers an automated failover promoting the most aligned standby without
+    the guarantee that the primary had been shut down.
+
+
 ### Readiness probe failure
 
 After 3 failures, the pod will be considered *not ready*. The pod will still
