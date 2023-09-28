@@ -105,8 +105,12 @@ e2e-test-local: ## Run e2e tests locally using the default kubernetes context.
 	hack/e2e/run-e2e-local.sh
 
 ##@ Build
-build: generate fmt vet ## Build binaries.
+build: generate fmt vet build-manager build-plugin ## Build binaries.
+
+build-manager: generate fmt vet ## Build manager binary.
 	go build -o bin/manager -ldflags ${LDFLAGS} ./cmd/manager
+
+build-plugin: generate fmt vet ## Build plugin binary.
 	go build -o bin/kubectl-cnpg -ldflags ${LDFLAGS} ./cmd/kubectl-cnpg
 
 run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config.
