@@ -1106,6 +1106,7 @@ func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 		err := r.List(ctx, &childPods,
 			client.MatchingFields{".spec.nodeName": node.Name},
 			client.MatchingLabels{
+				// TODO: eventually migrate to the new label
 				utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
 				utils.PodRoleLabelName:     string(utils.PodRoleInstance),
 			},

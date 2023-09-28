@@ -85,7 +85,8 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 			Type:  corev1.ServiceTypeClusterIP,
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName:     cluster.Name,
+				utils.ClusterLabelName: cluster.Name,
+				// TODO: eventually migrate to the new label
 				utils.ClusterRoleLabelName: ClusterRoleLabelReplica,
 			},
 		},
