@@ -63,6 +63,27 @@ func isMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
 	return true
 }
 
+// IsMapSubset returns true if mapSubset is a subset of mapSet otherwise false
+func IsMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
+	if len(mapSet) < len(mapSubset) {
+		return false
+	}
+
+	if len(mapSubset) == 0 {
+		return true
+	}
+
+	for subMapKey, subMapValue := range mapSubset {
+		mapValue := mapSet[subMapKey]
+
+		if mapValue != subMapValue {
+			return false
+		}
+	}
+
+	return true
+}
+
 // IsLabelSubset checks if a collection of labels is a subset of another
 //
 // NOTE: there are two parameters for the labels to check. The `fixed` one

@@ -61,7 +61,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	err = r.createPostgresServices(ctx, cluster)
+	err = r.reconcilePostgresServices(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -274,46 +274,71 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 	return nil
 }
 
-func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
 	if configuration.Current.CreateAnyService {
 		anyService := specs.CreateClusterAnyService(*cluster)
 		cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
 
-		if err := resources.CreateIfNotFound(ctx, r.Client, anyService); err != nil {
-			if !apierrs.IsAlreadyExists(err) {
-				return err
-			}
+		if err := r.serviceReconciler(ctx, anyService); err != nil {
+			return err
 		}
 	}
 
 	readService := specs.CreateClusterReadService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
 
-	if err := resources.CreateIfNotFound(ctx, r.Client, readService); err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			return err
-		}
+	if err := r.serviceReconciler(ctx, readService); err != nil {
+		return err
 	}
 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
 
-	if err := resources.CreateIfNotFound(ctx, r.Client, readOnlyService); err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			return err
-		}
+	if err := r.serviceReconciler(ctx, readOnlyService); err != nil {
+		return err
 	}
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
 
-	if err := resources.CreateIfNotFound(ctx, r.Client, readWriteService); err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			return err
-		}
+	return r.serviceReconciler(ctx, readWriteService)
+}
+
+func (r *ClusterReconciler) serviceReconciler(ctx context.Context, proposed *corev1.Service) error {
+	var livingService corev1.Service
+	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
+	if apierrs.IsNotFound(err) {
+		return r.Client.Create(ctx, proposed)
+	}
+	if err != nil {
+		return err
 	}
 
-	return nil
+	var shouldUpdate bool
+
+	// we ensure that the selector perfectly match
+	if !reflect.DeepEqual(proposed.Spec.Selector, livingService.Spec.Selector) {
+		livingService.Spec.Selector = proposed.Spec.Selector
+		shouldUpdate = true
+	}
+
+	// we preserve existing labels/annotation that could be added by third parties
+	if !utils.IsMapSubset(livingService.Labels, proposed.Labels) {
+		utils.MergeMap(livingService.Labels, proposed.Labels)
+		shouldUpdate = true
+	}
+
+	if !utils.IsMapSubset(livingService.Annotations, proposed.Annotations) {
+		utils.MergeMap(livingService.Annotations, proposed.Annotations)
+		shouldUpdate = true
+	}
+
+	if !shouldUpdate {
+		return nil
+	}
+
+	// we update to ensure that we substitute the selectors
+	return r.Client.Update(ctx, &livingService)
 }
 
 // createOrPatchOwnedPodDisruptionBudget ensures that we have a PDB requiring to remove one node at a time
