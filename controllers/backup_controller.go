@@ -137,7 +137,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
 		message := fmt.Sprintf(
-			"cannot proceed with the backup because Kubernetes cluster have no VolumeSnapshot support")
+			"cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support")
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
 		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
