@@ -78,6 +78,8 @@ var (
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client) error {
+	contextLogger := log.FromContext(ctx)
+
 	cluster, err := info.loadCluster(ctx, cli)
 	if err != nil {
 		return err
@@ -88,10 +90,11 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client) err
 		return err
 	}
 
-	log.Info("Recovering from volume snapshot",
+	contextLogger.Info("Recovering from volume snapshot",
 		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
 
-	if err := fileutils.RemoveRestoreExcludedFiles(info.PgData); err != nil {
+	contextLogger.Info("Cleaning up PGDATA from stale files")
+	if err := fileutils.RemoveRestoreExcludedFiles(ctx, info.PgData); err != nil {
 		return fmt.Errorf("error while cleaning up the recovered PGDATA: %w", err)
 	}
 
