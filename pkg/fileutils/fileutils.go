@@ -351,10 +351,18 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 // be removed. If a pattern does not end with "/*", then the files matching the
 // pattern will be removed.
 //
+// Parameters:
+// - ctx: A context used for logging
+// - basePath: The root directory where the filePaths are applied.
+// - filePaths: List of relative paths or patterns to be removed.
+//
+// Returns:
+// - error: Any error encountered during the removal process, or nil if the operation was successful.
+//
 // Example:
 // basePath: "/path/to/directory"
 // filePaths: ["file1.txt", "subdir/*"]
-// This would remove "/path/to/direct
+// This would remove "/path/to/directory/file1.txt" and the "path/to/directory/subdir" folder
 func RemoveFiles(ctx context.Context, basePath string, filePaths []string) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -392,6 +400,7 @@ func RemoveFiles(ctx context.Context, basePath string, filePaths []string) error
 // It leverages the RemoveFiles function, using a predefined list of paths that are meant to be excluded.
 //
 // Parameters:
+// - ctx: A context used for logging.
 // - basePath: The root path from which the exclusions should be applied.
 //
 // Returns:
