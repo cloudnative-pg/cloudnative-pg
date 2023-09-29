@@ -20,12 +20,10 @@ package configfile
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/lib/pq"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/cnpgerrors"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
@@ -38,41 +36,33 @@ func UpdatePostgresConfigurationFile(
 	options map[string]string,
 	managedOptions ...string,
 ) (changed bool, err error) {
-	rawCurrentContent, err := fileutils.ReadFile(fileName)
+	lines, err := fileutils.ReadFileLines(fileName)
 	if err != nil {
 		return false, fmt.Errorf("error while reading content of %v: %w", fileName, err)
 	}
 
-	updatedContent := string(rawCurrentContent)
-
 	for _, option := range managedOptions {
 		if _, hasOption := options[option]; !hasOption {
-			updatedContent = RemoveOptionsFromConfigurationContents(updatedContent, option)
+			lines = RemoveOptionsFromConfigurationContents(lines, option)
 		}
 	}
 
-	updatedContent, err = UpdateConfigurationContents(updatedContent, options)
+	lines, err = UpdateConfigurationContents(lines, options)
 	if err != nil {
 		return false, fmt.Errorf("error while updating configuration from %v: %w", fileName, err)
 	}
-	return fileutils.WriteStringToFile(fileName, updatedContent)
+	return fileutils.WriteLinesToFile(fileName, lines)
 }
 
 // UpdateConfigurationContents search and replace options in a configuration file whose
 // content is passed
-func UpdateConfigurationContents(content string, options map[string]string) (string, error) {
-	lines := splitLines(content)
-	if len(lines) >= math.MaxInt-len(options) {
-		return "", fmt.Errorf("could not updateConfigurationContents: %w",
-			cnpgerrors.ErrMemoryAllocation)
-	}
-	resultLength := len(lines) + len(options)
-	// Change matching existing lines
-	resultContent := make([]string, 0, resultLength)
+func UpdateConfigurationContents(lines []string, options map[string]string) ([]string, error) {
+	resultContent := make([]string, 0, len(lines)+len(options))
 	foundKeys := stringset.New()
 	for _, line := range lines {
-		// Keep empty lines and comments
 		trimLine := strings.TrimSpace(line)
+
+		// Keep empty lines and comments
 		if len(trimLine) == 0 || trimLine[0] == '#' {
 			resultContent = append(resultContent, line)
 			continue
@@ -103,18 +93,19 @@ func UpdateConfigurationContents(content string, options map[string]string) (str
 		}
 	}
 
-	return strings.Join(resultContent, "\n") + "\n", nil
+	return resultContent, nil
 }
 
 // RemoveOptionsFromConfigurationContents deletes all the lines containing one of the given options
 // from the provided configuration content
-func RemoveOptionsFromConfigurationContents(content string, options ...string) string {
-	resultContent := []string{}
+func RemoveOptionsFromConfigurationContents(lines []string, options ...string) []string {
+	resultContent := make([]string, 0, len(lines))
+	optionSet := stringset.From(options)
 
-outer:
-	for _, line := range splitLines(content) {
-		// Keep empty lines and comments
+	for _, line := range lines {
 		trimLine := strings.TrimSpace(line)
+
+		// Keep empty lines and comments
 		if len(trimLine) == 0 || trimLine[0] == '#' {
 			resultContent = append(resultContent, line)
 			continue
@@ -123,24 +114,18 @@ outer:
 		kv := strings.SplitN(trimLine, "=", 2)
 		key := strings.TrimSpace(kv[0])
 
-		// If we find a line containing the input option,
-		// we skip it
-		for _, option := range options {
-			if key == option {
-				continue outer
-			}
+		if !optionSet.Has(key) {
+			resultContent = append(resultContent, line)
 		}
-
-		resultContent = append(resultContent, line)
 	}
 
-	return strings.Join(resultContent, "\n") + "\n"
+	return resultContent
 }
 
-// ReadOptionsFromConfigurationContents read the options from the configuration file as a map
-func ReadOptionsFromConfigurationContents(content string, options ...string) (result map[string]string) {
-	result = make(map[string]string, len(options))
-	for _, line := range splitLines(content) {
+// ReadLinesFromConfigurationContents read the options from the configuration file as a map
+func ReadLinesFromConfigurationContents(content []string, options ...string) []string {
+	result := make([]string, 0, len(options))
+	for _, line := range content {
 		trimLine := strings.TrimSpace(line)
 		if len(trimLine) == 0 || trimLine[0] == '#' {
 			continue
@@ -151,15 +136,12 @@ func ReadOptionsFromConfigurationContents(content string, options ...string) (re
 
 		for _, option := range options {
 			if key == option {
-				value := strings.TrimSpace(kv[1])
-				if value[0] == '\'' && value[len(value)-1] == '\'' {
-					value = value[1 : len(value)-1]
-				}
-				result[option] = value
+				result = append(result, line)
 				break
 			}
 		}
 	}
+
 	return result
 }
 
@@ -171,13 +153,12 @@ func EnsureIncludes(fileName string, filesToInclude ...string) (changed bool, er
 		includeLinesToAdd[fileToInclude] = fmt.Sprintf("include '%v'", fileToInclude)
 	}
 
-	rawCurrentContent, err := fileutils.ReadFile(fileName)
+	lines, err := fileutils.ReadFileLines(fileName)
 	if err != nil {
 		return false, fmt.Errorf("error while reading lines of %v: %w", fileName, err)
 	}
 
-	content := string(rawCurrentContent)
-	for _, line := range splitLines(content) {
+	for _, line := range lines {
 		trimLine := strings.TrimSpace(line)
 		for targetFile, includeLine := range includeLinesToAdd {
 			if trimLine == includeLine {
@@ -190,20 +171,15 @@ func EnsureIncludes(fileName string, filesToInclude ...string) (changed bool, er
 		return false, nil
 	}
 
-	if content[len(content)-1] != '\n' {
-		content += "\n"
-	}
-
 	for _, fileToInclude := range filesToInclude {
 		if includeLine, present := includeLinesToAdd[fileToInclude]; present {
-			content += fmt.Sprintf(
-				"\n"+
-					"# load CloudNativePG %s configuration\n"+
-					"%s\n",
-				fileToInclude, includeLine,
+			lines = append(lines,
+				"",
+				fmt.Sprintf("# load CloudNativePG %s configuration", fileToInclude),
+				includeLine,
 			)
 		}
 	}
 
-	return fileutils.WriteStringToFile(fileName, content)
+	return fileutils.WriteLinesToFile(fileName, lines)
 }

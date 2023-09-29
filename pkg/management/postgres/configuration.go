@@ -292,7 +292,14 @@ func createStandbySignal(pgData string) error {
 	return err
 }
 
-var postgresAutoConfOptions = []string{
+var migrateAutoConfOptions = []string{
+	"archive_mode",
+	"primary_slot_name",
+	"primary_conninfo",
+	"restore_command",
+}
+
+var cleanupAutoConfOptions = []string{
 	"archive_mode",
 	"primary_slot_name",
 	"primary_conninfo",
@@ -311,14 +318,14 @@ var postgresAutoConfOptions = []string{
 func cleanPostgresAutoConfFile(ctx context.Context, instance *Instance) (changed bool, err error) {
 	contextLogger := log.FromContext(ctx)
 	targetFile := path.Join(instance.PgData, "postgresql.auto.conf")
-	currentContent, err := fileutils.ReadFile(targetFile)
+	currentContent, err := fileutils.ReadFileLines(targetFile)
 	if err != nil {
 		return false, fmt.Errorf("error while reading content of %v: %w", targetFile, err)
 	}
 
 	updatedContent := configfile.RemoveOptionsFromConfigurationContents(
-		string(currentContent), postgresAutoConfOptions...)
-	if changed, err = fileutils.WriteStringToFile(targetFile, updatedContent); err != nil {
+		currentContent, cleanupAutoConfOptions...)
+	if changed, err = fileutils.WriteLinesToFile(targetFile, updatedContent); err != nil {
 		return false,
 			fmt.Errorf("error while clean replication settings in postgresql.auto.conf file: %w", err)
 	}
@@ -341,12 +348,12 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceM
 	}
 
 	autoConfFile := filepath.Join(instance.PgData, "postgresql.auto.conf")
-	autoConfContent, err := fileutils.ReadFile(autoConfFile)
+	autoConfContent, err := fileutils.ReadFileLines(autoConfFile)
 	if err != nil {
 		return false, fmt.Errorf("error while reading postgresql.auto.conf file: %w", err)
 	}
 
-	options := configfile.ReadOptionsFromConfigurationContents(string(autoConfContent), postgresAutoConfOptions...)
+	options := configfile.ReadLinesFromConfigurationContents(autoConfContent, migrateAutoConfOptions...)
 	if len(options) == 0 {
 		return false, nil
 	}
@@ -356,7 +363,7 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceM
 		"targetFileExists", targetFileExists,
 		"forceMigrate", forceMigrate,
 	)
-	_, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	_, err = fileutils.WriteLinesToFile(targetFile, options)
 	if err != nil {
 		return false, fmt.Errorf("migrating replication settings: %w",
 			err)
