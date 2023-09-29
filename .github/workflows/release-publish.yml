@@ -17,6 +17,7 @@ permissions:
 jobs:
 
   release:
+    name: Create Github release
     runs-on: ubuntu-22.04
     steps:
       -
@@ -55,6 +56,7 @@ jobs:
     outputs:
       version: ${{ steps.build-meta.outputs.version }}
       digest: ${{ steps.build.outputs.digest }}
+      platforms: ${{ env.PLATFORMS }}
     steps:
       -
         name: Checkout
@@ -140,7 +142,6 @@ jobs:
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          image: tonistiigi/binfmt:qemu-v6.1.0
           platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
@@ -162,3 +163,123 @@ jobs:
           build-args: |
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
+
+  olm-bundle:
+    name: Create OLM bundle and catalog
+    runs-on: ubuntu-22.04
+    needs:
+      - release-binaries
+    if: |
+      (always() && !cancelled()) &&
+      needs.release-binaries.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ needs.release-binaries.outputs.platforms }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create bundle
+        env:
+          IMAGE_NAME: ghcr.io/cloudnative-pg/cloudnative-pg
+        run: |
+          make olm-bundle
+
+      - name: Archive the bundle manifests
+        uses: actions/upload-artifact@v3
+        with:
+          name: bundle
+          path: |
+            bundle.Dockerfile
+            bundle/
+
+# TODO: Uncomment when the first release is done since we need to manually create the first PR
+# with the ci.yaml file and also mark as a new operator
+#  operatorhub_pr:
+#    name: Create remote PR for OperatorHub
+#    runs-on: ubuntu-22.04
+#    needs:
+#      - release-binaries
+#      - olm-bundle
+#    if: |
+#      (always() && !cancelled()) &&
+#      needs.olm-bundle.result == 'success'
+#    env:
+#      VERSION: ${{ needs.release-binaries.outputs.version }}
+#    steps:
+#      - name: Checkout community-operators
+#        uses: actions/checkout@v4
+#        with:
+#          repository: k8s-operatorhub/community-operators
+#          fetch-depth: 0
+#          persist-credentials: false
+#
+#      - name: Download the bundle
+#        uses: actions/download-artifact@v3
+#        with:
+#          name: bundle
+#
+#      - name: Copy bundle in the community-operators
+#        run: |
+#          mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
+#          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+#          rm -fr bundle.Dockerfile *.zip bundle/
+#
+#      - name: Create Remote Pull Request
+#        uses: peter-evans/create-pull-request@v5
+#        with:
+#          token: ${{ secrets.REPO_GHA_PAT }}
+#          commit-message: "operators cloudnativepg (${{ env.VERSION }})"
+#          title: "operators cloudnativepg (${{ env.VERSION }})"
+#          signoff: true
+#          branch: release-cloudnativepg-${{ env.VERSION }}
+#          delete-branch: true
+#          push-to-fork: cloudnative-pg/community-operators
+#          body: |
+#            Thanks submitting your Operator. Please check below list before you create your Pull Request.
+#            ### Updates to existing Operators
+#
+#              * [x]  Did you create a `ci.yaml` file according to the [update instructions](https://github.com/operator-framework/community-operators/blob/master/docs/operator-ci-yaml.md)?
+#              * [x]  Is your new CSV pointing to the previous version with the `replaces` property if you chose `replaces-mode` via the `updateGraph` property in `ci.yaml`?
+#              * [x]  Is your new CSV referenced in the [appropriate channel](https://github.com/operator-framework/community-operators/blob/master/docs/packaging-operator.md#channels) defined in the `package.yaml` or `annotations.yaml` ?
+#              * [x]  Have you tested an update to your Operator when deployed via OLM?
+#              * [x]  Is your submission [signed](https://github.com/operator-framework/community-operators/blob/master/docs/contributing-prerequisites.md#sign-your-work)?
+#
+#            ### Your submission should not
+#              * [x]  Modify more than one operator
+#              * [x]  Modify an Operator you don't own
+#              * [x]  Rename an operator - please remove and add with a different name instead
+#              * [x]  Modify any files outside the above mentioned folders
+#              * [x]  Contain more than one commit. **Please squash your commits.**
+#
+#            ### Operator Description must contain (in order)
+#              1. [x]  Description about the managed Application and where to find more information
+#              2. [x]  Features and capabilities of your Operator and how to use it
+#              3. [x]  Any manual steps about potential pre-requisites for using your Operator
+#
+#            ### Operator Metadata should contain
+#              * [x]  Human readable name and 1-liner description about your Operator
+#              * [x]  Valid [category name](https://github.com/operator-framework/community-operators/blob/master/docs/packaging-operator.md#categories)<sup>1</sup>
+#              * [x]  One of the pre-defined [capability levels](https://github.com/operator-framework/operator-courier/blob/4d1a25d2c8d52f7de6297ec18d8afd6521236aa2/operatorcourier/validate.py#L556)<sup>2</sup>
+#              * [x]  Links to the maintainer, source code and documentation
+#              * [x]  Example templates for all Custom Resource Definitions intended to be used
+#              * [x]  A quadratic logo
+#
+#            Remember that you can preview your CSV [here](https://operatorhub.io/preview).
+#            --
+#            <sup>1</sup> If you feel your Operator does not fit any of the pre-defined categories, file an issue against this repo and explain your need
+#            <sup>2</sup> For more information see [here](https://sdk.operatorframework.io/docs/overview/#operator-capability-level)
