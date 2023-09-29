@@ -81,7 +81,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	// This check is still needed for when the backup resource creation is forced through the webhook
+	// This check is still needed for when the scheduled backup resource creation is forced through the webhook
 	if scheduledBackup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
 		contextLogger.Error(
 			errors.New("cannot execute due to missing VolumeSnapshot CRD"),

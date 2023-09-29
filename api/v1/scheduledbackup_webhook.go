@@ -95,7 +95,10 @@ func (r *ScheduledBackup) validate() field.ErrorList {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "method"),
 			r.Spec.Method,
-			"Cannot use volumeSnapshot backup method due to missing VolumeSnapshot CRD",
+			"Cannot use volumeSnapshot backup method due to missing "+
+				"VolumeSnapshot CRD. If you installed the CRD after having "+
+				"started the operator, please restart it to enable "+
+				"VolumeSnapshot support",
 		))
 	}
 
