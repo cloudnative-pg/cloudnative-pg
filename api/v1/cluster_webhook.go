@@ -145,7 +145,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.defaultMonitoringQueries(configuration.Current)
 	}
 
-	// If the API or validation webhooks are disable we set the replicationSlots to true if nil
+	// If the ReplicationSlots or HighAvailability stanzas are nil, we create them and enable slots
 	if r.Spec.ReplicationSlots == nil {
 		r.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{}
 	}
