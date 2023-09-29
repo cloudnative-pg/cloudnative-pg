@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -247,3 +249,86 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 		})
 	})
 })
+
+
+var _ = Describe("update first recoverability point", func() {
+	var (
+		snapshots          volumesnapshot.VolumeSnapshotList
+		cluster            *apiv1.Cluster
+		earlierTime        = time.Now().Add(-3 * time.Hour).Format(time.RFC3339)
+		firstSnapshotTime  = time.Now().Add(-2 * time.Hour).Format(time.RFC3339)
+		secondSnapshotTime = time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
+	)
+
+	BeforeEach(func() {
+		namespace := newFakeNamespace()
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: namespace,
+			},
+			Status: apiv1.ClusterStatus{
+				TargetPrimary: "cluster-example-2",
+			},
+		}
+		snapshots = volumesnapshot.VolumeSnapshotList{
+			Items: volumesnapshotbackup.Slice{
+				{ObjectMeta: metav1.ObjectMeta{
+					Name:      "snapshot-0",
+					Namespace: namespace,
+					Annotations: map[string]string{
+						utils.BackupEndTimeAnnotationName: earlierTime,
+					},
+					Labels: map[string]string{
+						utils.ClusterLabelName: "DIFFERENT-CLUSTER",
+					},
+				}},
+				{ObjectMeta: metav1.ObjectMeta{
+					Name:      "snapshot-1",
+					Namespace: namespace,
+					Annotations: map[string]string{
+						utils.BackupEndTimeAnnotationName: firstSnapshotTime,
+					},
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+					},
+				}},
+				{ObjectMeta: metav1.ObjectMeta{
+					Name:      "snapshot-2",
+					Namespace: namespace,
+					Annotations: map[string]string{
+						utils.BackupEndTimeAnnotationName: secondSnapshotTime,
+					},
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+					},
+				}},
+			},
+		}
+	})
+
+	It("should update cluster with no FRP with the oldest snapshot", func(ctx context.Context) {
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(BeEmpty())
+		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			WithLists(&snapshots).Build()
+
+		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(firstSnapshotTime))
+	})
+
+	It("should not update cluster FRP if it is older than oldest snapshot", func(ctx context.Context) {
+		cluster.Status.FirstRecoverabilityPoint = earlierTime
+		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			WithLists(&snapshots).Build()
+
+		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(earlierTime))
+	})
+})
+

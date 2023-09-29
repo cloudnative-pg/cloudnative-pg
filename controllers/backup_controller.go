@@ -219,6 +219,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if res != nil {
 			return *res, nil
 		}
+		err = updateFirstRecoverabilityPoint(ctx, r.Client, &cluster)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	default:
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
 	}
@@ -434,6 +438,61 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 	contextLogger.Debug("Found pod for backup", "pod", targetPod.Name)
 
 	return targetPod, nil
+}
+
+// updateFirstRecoverabilityPoint updates a cluster's FirstRecoverabilityPoint
+// based on the oldest completed snapshot available
+func updateFirstRecoverabilityPoint(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+) error {
+	contextLogger := log.FromContext(ctx)
+	wrapErr := func(msg string, err error) error {
+		return fmt.Errorf("in updateFirstRecoverabilityPont, %s: %w", msg, err)
+	}
+
+	// refresh the cluster, as this function will get called after the backup
+	// has finished, potentially a long time
+	var clusterNow apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}, &clusterNow); err != nil {
+		return wrapErr("could not refresh cluster", err)
+	}
+
+	snapshots, err := volumesnapshot.GetClusterVolumeSnapshots(ctx, cli,
+		cluster.Namespace, cluster.Name)
+	if err != nil {
+		return wrapErr("could not get snapshots", err)
+	}
+	oldestSnapshot, err := snapshots.GetOldestSnapshot()
+	if err != nil {
+		return wrapErr("could not get latest snapshot", err)
+	}
+
+	var firstRecoverabilityTime time.Time
+	if clusterNow.Status.FirstRecoverabilityPoint != "" {
+		ts, err := time.Parse(time.RFC3339, clusterNow.Status.FirstRecoverabilityPoint)
+		if err != nil {
+			contextLogger.Error(err, "while getting Cluster FirstRecoverabilityPoint")
+			return wrapErr("could not get cluster FRP", err)
+		}
+		firstRecoverabilityTime = ts
+	}
+	if clusterNow.Status.FirstRecoverabilityPoint == "" ||
+		oldestSnapshot.Before(firstRecoverabilityTime) {
+		oldCluster := clusterNow.DeepCopy()
+		clusterNow.Status.FirstRecoverabilityPoint = oldestSnapshot.Format(time.RFC3339)
+		err = cli.Patch(ctx, &clusterNow, client.MergeFrom(oldCluster))
+		if err != nil {
+			return wrapErr("could not patch cluster status", err)
+		}
+		// updating the input argument makes this function testable with the fake client
+		cluster.Status.FirstRecoverabilityPoint = oldestSnapshot.Format(time.RFC3339)
+	}
+	return nil
 }
 
 // isErrorRetryable detects is an error is retryable or not
