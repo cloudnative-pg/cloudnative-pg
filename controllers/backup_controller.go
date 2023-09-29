@@ -27,6 +27,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -60,6 +61,8 @@ const clusterName = ".spec.cluster.name"
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
+	DiscoveryClient discovery.DiscoveryInterface
+
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 
@@ -67,9 +70,10 @@ type BackupReconciler struct {
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler
-func NewBackupReconciler(mgr manager.Manager) *BackupReconciler {
+func NewBackupReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *BackupReconciler {
 	return &BackupReconciler{
 		Client:               mgr.GetClient(),
+		DiscoveryClient:      discoveryClient,
 		Scheme:               mgr.GetScheme(),
 		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"),
 		instanceStatusClient: instance.NewStatusClient(),
@@ -127,6 +131,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			clusterName)
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupConfig", message)
+		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
+		return ctrl.Result{}, nil
+	}
+
+	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
+		message := fmt.Sprintf(
+			"cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support")
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
 		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
 		return ctrl.Result{}, nil
 	}
@@ -562,19 +575,21 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Backup{}).
 		Watches(&apiv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(r.mapClustersToBackup()),
 			builder.WithPredicates(clustersWithBackupPredicate),
-		).
-		Watches(
+		)
+	if utils.HaveVolumeSnapshot() {
+		controllerBuilder = controllerBuilder.Watches(
 			&storagesnapshotv1.VolumeSnapshot{},
 			handler.EnqueueRequestsFromMapFunc(r.mapVolumeSnapshotsToBackups()),
 			builder.WithPredicates(volumeSnapshotsPredicate),
-		).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 5}).
-		Complete(r)
+		)
+	}
+	controllerBuilder = controllerBuilder.WithOptions(controller.Options{MaxConcurrentReconciles: 5})
+	return controllerBuilder.Complete(r)
 }
 
 func tryFlagBackupAsFailed(
