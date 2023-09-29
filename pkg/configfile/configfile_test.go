@@ -272,8 +272,8 @@ track_commit_timestamp = on
 		)
 		Expect(options).To(HaveLen(3))
 		Expect(options).To(Equal(map[string]string{
-			"shared_preload_libraries": "'bdr'",
-			"wal_level":                "'logical'",
+			"shared_preload_libraries": "bdr",
+			"wal_level":                "logical",
 			"track_commit_timestamp":   "on",
 		}))
 	})

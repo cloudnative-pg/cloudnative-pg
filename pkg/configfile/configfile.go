@@ -151,7 +151,11 @@ func ReadOptionsFromConfigurationContents(content string, options ...string) (re
 
 		for _, option := range options {
 			if key == option {
-				result[option] = strings.TrimSpace(kv[1])
+				value := strings.TrimSpace(kv[1])
+				if value[0] == '\'' && value[len(value)-1] == '\'' {
+					value = value[1 : len(value)-1]
+				}
+				result[option] = value
 				break
 			}
 		}
