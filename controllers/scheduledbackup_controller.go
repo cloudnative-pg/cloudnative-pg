@@ -162,7 +162,7 @@ func ReconcileScheduledBackup(
 		if cluster.Status.Phase != apiv1.PhaseHealthy {
 			event.Eventf(
 				scheduledBackup,
-				"Normal",
+				"Warning",
 				"ClusterNotHealthy",
 				"Waiting for cluster to be healthy, was \"%v\"",
 				cluster.Status.Phase,
