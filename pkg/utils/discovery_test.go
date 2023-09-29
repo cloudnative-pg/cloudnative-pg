@@ -127,4 +127,29 @@ var _ = Describe("Detect resources properly when", func() {
 
 		Expect(HaveSecurityContextConstraints()).To(BeTrue())
 	})
+
+	It("should not detect VolumeSnapshots", func() {
+		err := DetectVolumeSnapshotExist(client.Discovery())
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(HaveVolumeSnapshot()).To(BeFalse())
+	})
+
+	It("should detect VolumeSnapshots resource", func() {
+		resources := []*metav1.APIResourceList{
+			{
+				GroupVersion: "snapshot.storage.k8s.io/v1",
+				APIResources: []metav1.APIResource{
+					{
+						Name: "volumesnapshots",
+					},
+				},
+			},
+		}
+		fakeDiscovery.Resources = resources
+		err := DetectVolumeSnapshotExist(client.Discovery())
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(HaveVolumeSnapshot()).To(BeTrue())
+	})
 })
