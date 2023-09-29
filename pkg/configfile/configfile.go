@@ -57,69 +57,61 @@ func UpdatePostgresConfigurationFile(
 // UpdateConfigurationContents search and replace options in a configuration file whose
 // content is passed
 func UpdateConfigurationContents(lines []string, options map[string]string) ([]string, error) {
-	resultContent := make([]string, 0, len(lines)+len(options))
 	foundKeys := stringset.New()
+	index := 0
 	for _, line := range lines {
-		trimLine := strings.TrimSpace(line)
-
-		// Keep empty lines and comments
-		if len(trimLine) == 0 || trimLine[0] == '#' {
-			resultContent = append(resultContent, line)
-			continue
-		}
-
-		kv := strings.SplitN(trimLine, "=", 2)
+		kv := strings.SplitN(strings.TrimSpace(line), "=", 2)
 		key := strings.TrimSpace(kv[0])
 
 		// If we find a line containing one of the option we have to manage,
 		// we replace it with the provided content
-		if value, ok := options[key]; ok {
+		if value, has := options[key]; has {
 			// We output only the first occurrence of the option,
 			// discarding further occurrences
-			if !foundKeys.Has(key) {
-				foundKeys.Put(key)
-				resultContent = append(resultContent, key+" = "+pq.QuoteLiteral(value))
+			if foundKeys.Has(key) {
+				continue
 			}
+
+			foundKeys.Put(key)
+			lines[index] = key + " = " + pq.QuoteLiteral(value)
+			index++
 			continue
 		}
 
-		resultContent = append(resultContent, line)
+		lines[index] = line
+		index++
 	}
+	lines = lines[:index]
 
 	// Append missing options to the end of the file
 	for key, value := range options {
 		if !foundKeys.Has(key) {
-			resultContent = append(resultContent, key+" = "+pq.QuoteLiteral(value))
+			lines = append(lines, key+" = "+pq.QuoteLiteral(value))
 		}
 	}
 
-	return resultContent, nil
+	return lines, nil
 }
 
 // RemoveOptionsFromConfigurationContents deletes all the lines containing one of the given options
 // from the provided configuration content
 func RemoveOptionsFromConfigurationContents(lines []string, options ...string) []string {
-	resultContent := make([]string, 0, len(lines))
 	optionSet := stringset.From(options)
 
+	index := 0
 	for _, line := range lines {
-		trimLine := strings.TrimSpace(line)
-
-		// Keep empty lines and comments
-		if len(trimLine) == 0 || trimLine[0] == '#' {
-			resultContent = append(resultContent, line)
-			continue
-		}
-
-		kv := strings.SplitN(trimLine, "=", 2)
+		kv := strings.SplitN(strings.TrimSpace(line), "=", 2)
 		key := strings.TrimSpace(kv[0])
 
-		if !optionSet.Has(key) {
-			resultContent = append(resultContent, line)
+		if optionSet.Has(key) {
+			continue
 		}
+		lines[index] = line
+		index++
 	}
+	lines = lines[:index]
 
-	return resultContent
+	return lines
 }
 
 // ReadLinesFromConfigurationContents read the options from the configuration file as a map
