@@ -135,6 +135,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// This check is still needed for when the backup resource creation is forced through the webhook
 	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
 		message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
 		contextLogger.Warning(message)
