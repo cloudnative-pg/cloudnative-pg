@@ -224,9 +224,9 @@ var _ = Describe("RemoveFiles", func() {
 		Expect(os.RemoveAll(tempDir)).To(Succeed())
 	})
 
-	It("removes specified files and directories", func() {
+	It("removes specified files and directories", func(ctx SpecContext) {
 		// Use the RemoveFiles function
-		err := RemoveFiles(tempDir, []string{
+		err := RemoveFiles(ctx, tempDir, []string{
 			"file1.txt",
 			"dir1/*",
 			"non_existent_dir/*",
@@ -286,8 +286,8 @@ var _ = Describe("RemoveRestoreExcludedFiles", func() {
 		_ = os.RemoveAll(tempDir)
 	})
 
-	It("should correctly remove specified files and directories", func() {
-		Expect(RemoveRestoreExcludedFiles(tempDir)).To(Succeed())
+	It("should correctly remove specified files and directories", func(ctx SpecContext) {
+		Expect(RemoveRestoreExcludedFiles(ctx, tempDir)).To(Succeed())
 
 		for _, path := range excludedPathsFromRestore {
 			fullPath := filepath.Join(tempDir, path)

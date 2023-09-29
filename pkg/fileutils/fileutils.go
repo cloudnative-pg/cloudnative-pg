@@ -26,6 +26,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // excludedPathsFromRestore contains a list of files that should not be included into the restore process
@@ -353,7 +355,9 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 // basePath: "/path/to/directory"
 // filePaths: ["file1.txt", "subdir/*"]
 // This would remove "/path/to/direct
-func RemoveFiles(basePath string, filePaths []string) error {
+func RemoveFiles(ctx context.Context, basePath string, filePaths []string) error {
+	contextLogger := log.FromContext(ctx)
+
 	for _, pattern := range filePaths {
 		if len(pattern) >= 2 && pattern[len(pattern)-2:] == "/*" {
 			dirPath := filepath.Join(basePath, pattern[:len(pattern)-2])
@@ -362,6 +366,7 @@ func RemoveFiles(basePath string, filePaths []string) error {
 				return err
 			}
 			if dirExists {
+				contextLogger.Debug("Removing directory", "dirPath", dirPath)
 				if err := RemoveDirectoryContent(dirPath); err != nil {
 					return err
 				}
@@ -374,6 +379,7 @@ func RemoveFiles(basePath string, filePaths []string) error {
 			return err
 		}
 		for _, match := range matches {
+			contextLogger.Debug("Removing file", "fileName", match)
 			if err := RemoveFile(match); err != nil {
 				return err
 			}
@@ -390,8 +396,8 @@ func RemoveFiles(basePath string, filePaths []string) error {
 //
 // Returns:
 // - error: Any error encountered during the removal process, or nil if the operation was successful.
-func RemoveRestoreExcludedFiles(basePath string) error {
-	return RemoveFiles(basePath, excludedPathsFromRestore)
+func RemoveRestoreExcludedFiles(ctx context.Context, basePath string) error {
+	return RemoveFiles(ctx, basePath, excludedPathsFromRestore)
 }
 
 // MoveDirectoryContent moves a directory from a source path to its destination by copying
