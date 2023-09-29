@@ -120,12 +120,7 @@ func RemoveOptionsFromConfigurationContents(lines []string, options ...string) [
 func ReadLinesFromConfigurationContents(content []string, options ...string) []string {
 	result := make([]string, 0, len(options))
 	for _, line := range content {
-		trimLine := strings.TrimSpace(line)
-		if len(trimLine) == 0 || trimLine[0] == '#' {
-			continue
-		}
-
-		kv := strings.SplitN(trimLine, "=", 2)
+		kv := strings.SplitN(strings.TrimSpace(line), "=", 2)
 		key := strings.TrimSpace(kv[0])
 
 		for _, option := range options {
