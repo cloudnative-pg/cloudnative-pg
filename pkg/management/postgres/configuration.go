@@ -356,7 +356,7 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceM
 		"targetFileExists", targetFileExists,
 		"forceMigrate", forceMigrate,
 	)
-	_, err = configfile.UpdatePostgresConfigurationFile(constants.PostgresqlOverrideConfigurationFile, options)
+	_, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
 	if err != nil {
 		return false, fmt.Errorf("migrating replication settings: %w",
 			err)
