@@ -106,6 +106,12 @@ func DetectVolumeSnapshotExist(client discovery.DiscoveryInterface) (err error) 
 	return nil
 }
 
+// SetVolumeSnapshot set the haveVolumeSnapshot variable to a specific value for testing purposes
+// IMPORTANT: use it only in the unit tests
+func SetVolumeSnapshot(value bool) {
+	haveVolumeSnapshot = value
+}
+
 // HaveVolumeSnapshot returns true if we're running under a system that implements
 // having the VolumeSnapshot CRD
 func HaveVolumeSnapshot() bool {

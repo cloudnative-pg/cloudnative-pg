@@ -17,12 +17,16 @@ limitations under the License.
 package v1
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // backupLog is for logging in this package.
@@ -52,17 +56,41 @@ var _ webhook.Validator = &Backup{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateCreate() (admission.Warnings, error) {
 	backupLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
-	return nil, nil
+	allErrs := r.validate()
+	if len(allErrs) == 0 {
+		return nil, nil
+	}
+
+	return nil, apierrors.NewInvalid(
+		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Backup"},
+		r.Name, allErrs)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
 	backupLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
-	return nil, nil
+	return r.ValidateCreate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateDelete() (admission.Warnings, error) {
 	backupLog.Info("validate delete", "name", r.Name, "namespace", r.Namespace)
 	return nil, nil
+}
+
+func (r *Backup) validate() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.Method == BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
+		return append(result, field.Invalid(
+			field.NewPath("spec", "method"),
+			r.Spec.Method,
+			"Cannot use volumeSnapshot backup method due to missing "+
+				"VolumeSnapshot CRD. If you installed the CRD after having "+
+				"started the operator, please restart it to enable "+
+				"VolumeSnapshot support",
+		))
+	}
+
+	return result
 }

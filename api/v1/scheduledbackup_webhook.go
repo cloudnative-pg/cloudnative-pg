@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // scheduledBackupLog is for logging in this package.
@@ -58,7 +59,7 @@ func (r *ScheduledBackup) ValidateCreate() (admission.Warnings, error) {
 	var allErrs field.ErrorList
 	scheduledBackupLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 
-	allErrs = append(allErrs, r.validateSchedule()...)
+	allErrs = append(allErrs, r.validate()...)
 
 	if len(allErrs) == 0 {
 		return nil, nil
@@ -81,7 +82,7 @@ func (r *ScheduledBackup) ValidateDelete() (admission.Warnings, error) {
 	return nil, nil
 }
 
-func (r *ScheduledBackup) validateSchedule() field.ErrorList {
+func (r *ScheduledBackup) validate() field.ErrorList {
 	var result field.ErrorList
 
 	if _, err := cron.Parse(r.GetSchedule()); err != nil {
@@ -89,6 +90,16 @@ func (r *ScheduledBackup) validateSchedule() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "schedule"),
 				r.Spec.Schedule, err.Error()))
+	}
+	if r.Spec.Method == BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "method"),
+			r.Spec.Method,
+			"Cannot use volumeSnapshot backup method due to missing "+
+				"VolumeSnapshot CRD. If you installed the CRD after having "+
+				"started the operator, please restart it to enable "+
+				"VolumeSnapshot support",
+		))
 	}
 
 	return result
