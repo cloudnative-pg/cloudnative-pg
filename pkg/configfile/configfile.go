@@ -41,11 +41,13 @@ func UpdatePostgresConfigurationFile(
 		return false, fmt.Errorf("error while reading content of %v: %w", fileName, err)
 	}
 
+	optionsToRemove := make([]string, 0, len(managedOptions))
 	for _, option := range managedOptions {
 		if _, hasOption := options[option]; !hasOption {
-			lines = RemoveOptionsFromConfigurationContents(lines, option)
+			optionsToRemove = append(optionsToRemove, option)
 		}
 	}
+	lines = RemoveOptionsFromConfigurationContents(lines, optionsToRemove...)
 
 	lines, err = UpdateConfigurationContents(lines, options)
 	if err != nil {
