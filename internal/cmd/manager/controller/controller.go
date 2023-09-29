@@ -194,7 +194,7 @@ func RunController(
 		return err
 	}
 
-	// Detect if we are running under a system that implements Volume Snapshots
+	// Detect if we are running under a system that provides Volume Snapshots
 	if err = utils.DetectVolumeSnapshotExist(discoveryClient); err != nil {
 		setupLog.Error(err, "unable to detect the if the cluster have the VolumeSnapshot CRD installed")
 		return err
