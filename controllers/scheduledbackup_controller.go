@@ -138,6 +138,39 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{}, err
 	}
 
+	// Immediate volume snapshot backups can be scheduled only when the cluster
+	// is ready as taking a cold backup meanwhile is being created may stop the
+	// cluster creation because the primary instance could be fenced.
+	isVolumeSnapshot := scheduledBackup.Spec.Method == apiv1.BackupMethodVolumeSnapshot
+	if isVolumeSnapshot && scheduledBackup.Status.LastCheckTime == nil && scheduledBackup.IsImmediate() {
+		var cluster apiv1.Cluster
+		if err := cli.Get(ctx, client.ObjectKey{
+			Namespace: scheduledBackup.Namespace,
+			Name:      scheduledBackup.Spec.Cluster.Name,
+		}, &cluster); err != nil {
+			event.Eventf(
+				scheduledBackup,
+				"Normal",
+				"InvalidCluster",
+				"Cannot get cluster %v, %v",
+				scheduledBackup.Spec.Cluster.Name,
+				err.Error(),
+			)
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+
+		if cluster.Status.Phase != apiv1.PhaseHealthy {
+			event.Eventf(
+				scheduledBackup,
+				"Normal",
+				"ClusterNotHealthy",
+				"Waiting for cluster to be healthy, was \"%v\"",
+				cluster.Status.Phase,
+			)
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+	}
+
 	now := time.Now()
 	origScheduled := scheduledBackup.DeepCopy()
 
@@ -150,11 +183,6 @@ func ReconcileScheduledBackup(
 		}
 		err := cli.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled))
 		if err != nil {
-			if apierrs.IsConflict(err) {
-				// Retry later, the cache is stale
-				contextLogger.Debug("Conflict while reconciling the scheduled backup", "error", err)
-				return ctrl.Result{}, nil
-			}
 			return ctrl.Result{}, err
 		}
 
