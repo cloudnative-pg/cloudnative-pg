@@ -144,9 +144,9 @@ type VolumeSnapshotConfiguration struct {
 	// WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.
 	// +optional
 	WalClassName string `json:"walClassName,omitempty"`
-	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have. .
+	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have
 	// +optional
-	// +kubebuilder:validation:Enum=none;cluster;backup
+	// +kubebuilder:validation:Enum:=none;cluster;backup
 	// +kubebuilder:default:=none
 	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
 }
@@ -218,6 +218,7 @@ type ClusterSpec struct {
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
 	// Replication slots management configuration
+	// +kubebuilder:default:={"highAvailability":{"enabled":true}}
 	// +optional
 	ReplicationSlots *ReplicationSlotsConfiguration `json:"replicationSlots,omitempty"`
 
@@ -279,7 +280,7 @@ type ClusterSpec struct {
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`
 
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
-	// this formula to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay, 30)`,
+	// this formula to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay, 30)`
 	// +kubebuilder:default:=180
 	// +optional
 	SmartStopDelay int32 `json:"smartStopDelay,omitempty"`
@@ -837,6 +838,7 @@ const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
 // of replication slots
 type ReplicationSlotsConfiguration struct {
 	// Replication slots for high availability configuration
+	// +kubebuilder:default:={"enabled": true}
 	// +optional
 	HighAvailability *ReplicationSlotsHAConfiguration `json:"highAvailability,omitempty"`
 
@@ -865,16 +867,15 @@ func (r *ReplicationSlotsConfiguration) GetUpdateInterval() time.Duration {
 // when a streaming client (in this specific case a replica that
 // is part of the HA cluster) gets disconnected.
 type ReplicationSlotsHAConfiguration struct {
-	// If enabled, the operator will automatically manage replication slots
+	// If enabled (default), the operator will automatically manage replication slots
 	// on the primary instance and use them in streaming replication
 	// connections with all the standby instances that are part of the HA
-	// cluster. If disabled (default), the operator will not take advantage
+	// cluster. If disabled, the operator will not take advantage
 	// of replication slots in streaming connections with the replicas.
 	// This feature also controls replication slots in replica cluster,
-	// from the designated primary to its cascading replicas. This can only
-	// be set at creation time.
+	// from the designated primary to its cascading replicas.
 	// +optional
-	// +kubebuilder:default:=false
+	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// Prefix for replication slots managed by the operator for HA.
@@ -911,12 +912,12 @@ func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceNa
 	return sanitizedName
 }
 
-// GetEnabled returns true if replication slots are enabled, default is false
+// GetEnabled returns false if replication slots are disabled, default is true
 func (r *ReplicationSlotsHAConfiguration) GetEnabled() bool {
 	if r != nil && r.Enabled != nil {
 		return *r.Enabled
 	}
-	return false
+	return true
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to

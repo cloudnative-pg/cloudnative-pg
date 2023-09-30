@@ -66,6 +66,18 @@ const (
 	// WatchedLabelName the name of the label which tell if a resource change will be automatically reloaded by instance
 	// or not, use for Secrets or ConfigMaps
 	WatchedLabelName = MetadataNamespace + "/reload"
+
+	// BackupTimelineLabelName is the name or the label where the timeline of a backup is kept
+	BackupTimelineLabelName = MetadataNamespace + "/backupTimeline"
+
+	// BackupYearLabelName is the name of the label where the year of a backup is kept
+	BackupYearLabelName = MetadataNamespace + "/backupYear"
+
+	// BackupMonthLabelName is the name of the label where the month of a backup is kept
+	BackupMonthLabelName = MetadataNamespace + "/backupMonth"
+
+	// IsOnlineBackupLabelName is the name of the label used to specify whether a backup was online
+	IsOnlineBackupLabelName = MetadataNamespace + "/onlineBackup"
 )
 
 const (
@@ -148,6 +160,24 @@ const (
 	// CNPGHashAnnotationName is the name of the annotation containing the hash of the resource used by operator
 	// expect the pooler that uses PoolerSpecHashAnnotationName
 	CNPGHashAnnotationName = MetadataNamespace + "/hash"
+
+	// BackupStartWALAnnotationName is the name of the annotation where a backup's start WAL is kept
+	BackupStartWALAnnotationName = MetadataNamespace + "/backupStartWAL"
+
+	// BackupEndWALAnnotationName is the name of the annotation where a backup's end WAL is kept
+	BackupEndWALAnnotationName = MetadataNamespace + "/backupEndWAL"
+
+	// BackupStartTimeAnnotationName is the name of the annotation where a backup's start time is kept
+	BackupStartTimeAnnotationName = MetadataNamespace + "/backupStartTime"
+
+	// BackupEndTimeAnnotationName is the name of the annotation where a backup's end time is kept
+	BackupEndTimeAnnotationName = MetadataNamespace + "/backupEndTime"
+
+	// SnapshotStartTimeAnnotationName is the name of the annotation where a snapshot's start time is kept
+	SnapshotStartTimeAnnotationName = MetadataNamespace + "/snapshotStartTime"
+
+	// SnapshotEndTimeAnnotationName is the name of the annotation where a snapshot's end time is kept
+	SnapshotEndTimeAnnotationName = MetadataNamespace + "/snapshotEndTime"
 
 	// ClusterRestartAnnotationName is the name of the annotation containing the
 	// latest required restart time

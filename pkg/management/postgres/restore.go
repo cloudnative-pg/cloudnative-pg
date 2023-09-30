@@ -78,6 +78,8 @@ var (
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
 func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client) error {
+	contextLogger := log.FromContext(ctx)
+
 	cluster, err := info.loadCluster(ctx, cli)
 	if err != nil {
 		return err
@@ -88,17 +90,19 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client) err
 		return err
 	}
 
+	contextLogger.Info("Recovering from volume snapshot",
+		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
+
+	contextLogger.Info("Cleaning up PGDATA from stale files")
+	if err := fileutils.RemoveRestoreExcludedFiles(ctx, info.PgData); err != nil {
+		return fmt.Errorf("error while cleaning up the recovered PGDATA: %w", err)
+	}
+
 	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil ||
 		cluster.Spec.Bootstrap.Recovery.Source == "" {
 		// We are recovering from an existing PVC snapshot, we
 		// don't need to invoke the recovery job
 		return nil
-	}
-
-	log.Info("Recovering from volume snapshot",
-		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
-	if err := removeSignalFiles(info.PgData); err != nil {
-		return fmt.Errorf("error while cleaning up the signal files: %w", err)
 	}
 
 	backup, env, err := info.createBackupObjectForSnapshotRestore(ctx, cli, cluster)

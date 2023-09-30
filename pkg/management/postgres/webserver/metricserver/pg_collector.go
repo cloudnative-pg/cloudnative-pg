@@ -358,7 +358,7 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName).Set(1)
+	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName, e.instance.ClusterName).Set(1)
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
@@ -430,7 +430,7 @@ func (e *Exporter) setTimestampMetric(
 	errorLabel string,
 	getTimestampFunc func(cluster *apiv1.Cluster) string,
 ) {
-	cluster, err := cache.LoadCluster()
+	cluster, err := cache.LoadClusterUnsafe()
 	// there isn't a cached object yet
 	if errors.Is(err, cache.ErrCacheMiss) {
 		return
@@ -472,7 +472,7 @@ func (e *Exporter) setTimestampMetric(
 func (e *Exporter) collectNodesUsed() {
 	const notExtractedValue float64 = -1
 
-	cluster, err := cache.LoadCluster()
+	cluster, err := cache.LoadClusterUnsafe()
 	if err != nil {
 		log.Error(err, "unable to collect metrics")
 		e.Metrics.Error.Set(1)

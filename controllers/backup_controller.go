@@ -27,6 +27,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -60,6 +61,8 @@ const clusterName = ".spec.cluster.name"
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
+	DiscoveryClient discovery.DiscoveryInterface
+
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 
@@ -67,9 +70,10 @@ type BackupReconciler struct {
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler
-func NewBackupReconciler(mgr manager.Manager) *BackupReconciler {
+func NewBackupReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *BackupReconciler {
 	return &BackupReconciler{
 		Client:               mgr.GetClient(),
+		DiscoveryClient:      discoveryClient,
 		Scheme:               mgr.GetScheme(),
 		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"),
 		instanceStatusClient: instance.NewStatusClient(),
@@ -79,7 +83,7 @@ func NewBackupReconciler(mgr manager.Manager) *BackupReconciler {
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get
-// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list
+// +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
@@ -127,6 +131,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			clusterName)
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupConfig", message)
+		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
+		return ctrl.Result{}, nil
+	}
+
+	// This check is still needed for when the backup resource creation is forced through the webhook
+	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
+		message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasNoVolumeSnapshotCRD", message)
 		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
 		return ctrl.Result{}, nil
 	}
@@ -207,7 +220,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			pod = previousPod
 		}
 
-		res, err := r.startSnapshotBackup(ctx, pod, &cluster, &backup)
+		res, err := r.reconcileSnapshotBackup(ctx, pod, &cluster, &backup)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -294,7 +307,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 	return false, nil
 }
 
-func (r *BackupReconciler) startSnapshotBackup(
+func (r *BackupReconciler) reconcileSnapshotBackup(
 	ctx context.Context,
 	targetPod *corev1.Pod,
 	cluster *apiv1.Cluster,
@@ -383,7 +396,34 @@ func (r *BackupReconciler) startSnapshotBackup(
 		contextLogger.Error(err, "while enriching the backup status")
 	}
 
+	if err := annotateSnapshotsWithBackupData(ctx, r.Client, snapshots, &backup.Status); err != nil {
+		contextLogger.Error(err, "while enriching the snapshots's status")
+	}
+
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
+}
+
+// AnnotateSnapshots adds labels and annotations to the snapshots using the backup
+// status to facilitate access
+func annotateSnapshotsWithBackupData(
+	ctx context.Context,
+	cli client.Client,
+	snapshots volumesnapshot.Slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	contextLogger := log.FromContext(ctx)
+	for idx := range snapshots {
+		snapshot := &snapshots[idx]
+		oldSnapshot := snapshot.DeepCopy()
+		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
+		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
+		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+			contextLogger.Error(err, "while updating volume snapshot from backup object",
+				"snapshot", snapshot.Name)
+			return err
+		}
+	}
+	return nil
 }
 
 // backupStatusFromSnapshots adds fields to the backup status based on the snapshots
@@ -391,8 +431,6 @@ func backupStatusFromSnapshots(
 	snapshots volumesnapshot.Slice,
 	backupStatus *apiv1.BackupStatus,
 ) error {
-	_, lastCreation := snapshots.GetSnapshotsInterval()
-	backupStatus.StoppedAt = ptr.To(lastCreation)
 	controldata, err := snapshots.GetControldata()
 	if err != nil {
 		return err
@@ -537,19 +575,21 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Backup{}).
 		Watches(&apiv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(r.mapClustersToBackup()),
 			builder.WithPredicates(clustersWithBackupPredicate),
-		).
-		Watches(
+		)
+	if utils.HaveVolumeSnapshot() {
+		controllerBuilder = controllerBuilder.Watches(
 			&storagesnapshotv1.VolumeSnapshot{},
 			handler.EnqueueRequestsFromMapFunc(r.mapVolumeSnapshotsToBackups()),
 			builder.WithPredicates(volumeSnapshotsPredicate),
-		).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 5}).
-		Complete(r)
+		)
+	}
+	controllerBuilder = controllerBuilder.WithOptions(controller.Options{MaxConcurrentReconciles: 5})
+	return controllerBuilder.Complete(r)
 }
 
 func tryFlagBackupAsFailed(

@@ -33,10 +33,8 @@ import (
 // updateCacheFromCluster will update the internal cache with the cluster
 //
 // returns true if the update was not total, and should be retried
-func (r *InstanceReconciler) updateCacheFromCluster(
-	ctx context.Context, cluster *apiv1.Cluster,
-) shoudRequeue {
-	cache.Store(cache.ClusterKey, cluster)
+func (r *InstanceReconciler) updateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) shoudRequeue {
+	cache.StoreCluster(cluster)
 
 	var requeue shoudRequeue
 
@@ -50,10 +48,7 @@ func (r *InstanceReconciler) updateCacheFromCluster(
 	return requeue
 }
 
-func (r *InstanceReconciler) updateWALRestoreSettingsCache(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-) {
+func (r *InstanceReconciler) updateWALRestoreSettingsCache(ctx context.Context, cluster *apiv1.Cluster) {
 	_, env, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.PodName)
 	if errors.Is(err, walrestore.ErrNoBackupConfigured) {
 		cache.Delete(cache.WALRestoreKey)

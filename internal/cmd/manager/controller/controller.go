@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// +kubebuilder:scaffold:imports
@@ -108,12 +109,14 @@ func RunController(
 	}
 
 	managerOptions := ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		LeaderElection:     leaderConfig.enable,
-		LeaseDuration:      &leaderConfig.leaseDuration,
-		RenewDeadline:      &leaderConfig.renewDeadline,
-		LeaderElectionID:   LeaderElectionID,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
+		LeaderElection:   leaderConfig.enable,
+		LeaseDuration:    &leaderConfig.leaseDuration,
+		RenewDeadline:    &leaderConfig.renewDeadline,
+		LeaderElectionID: LeaderElectionID,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    port,
 			CertDir: defaultWebhookCertDir,
@@ -191,6 +194,12 @@ func RunController(
 		return err
 	}
 
+	// Detect if we are running under a system that provides Volume Snapshots
+	if err = utils.DetectVolumeSnapshotExist(discoveryClient); err != nil {
+		setupLog.Error(err, "unable to detect the if the cluster have the VolumeSnapshot CRD installed")
+		return err
+	}
+
 	// Detect if we support SeccompProfile
 	if err = utils.DetectSeccompSupport(discoveryClient); err != nil {
 		setupLog.Error(err, "unable to detect SeccompProfile support")
@@ -206,7 +215,8 @@ func RunController(
 	setupLog.Info("Kubernetes system metadata",
 		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints(),
-		"haveSeccompProfile", utils.HaveSeccompSupport())
+		"haveSeccompProfile", utils.HaveSeccompSupport(),
+		"haveVolumeSnapshot", utils.HaveVolumeSnapshot())
 
 	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir); err != nil {
 		return err
@@ -217,7 +227,7 @@ func RunController(
 		return err
 	}
 
-	if err = controllers.NewBackupReconciler(mgr).SetupWithManager(ctx, mgr); err != nil {
+	if err = controllers.NewBackupReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}

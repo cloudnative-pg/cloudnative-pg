@@ -132,13 +132,15 @@ data:
             description: "Number of streaming replicas connected to the instance"
 
     pg_replication_slots:
-      primary: true
       query: |
         SELECT slot_name,
           slot_type,
           database,
           active,
-          pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), restart_lsn)
+          (CASE pg_catalog.pg_is_in_recovery()
+            WHEN TRUE THEN pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_last_wal_receive_lsn(), restart_lsn)
+            ELSE pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), restart_lsn)
+          END) as pg_wal_lsn_diff
         FROM pg_catalog.pg_replication_slots
         WHERE NOT temporary
       metrics:

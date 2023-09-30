@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -101,9 +102,25 @@ func (se *Reconciler) enrichSnapshot(
 	// we grab the pg_controldata just before creating the snapshot
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
 		vs.Annotations[utils.PgControldataAnnotationName] = data
+		pgControlData := utils.ParsePgControldataOutput(data)
+		timelineID, ok := pgControlData["Latest checkpoint's TimeLineID"]
+		if ok {
+			vs.Labels[utils.BackupTimelineLabelName] = timelineID
+		}
+		startWal, ok := pgControlData["Latest checkpoint's REDO WAL file"]
+		if ok {
+			vs.Labels[utils.BackupStartWALAnnotationName] = startWal
+			// TODO: once we have online volumesnapshot backups, this should change
+			vs.Labels[utils.BackupEndWALAnnotationName] = startWal
+		}
 	} else {
 		contextLogger.Error(err, "while querying for pg_controldata")
 	}
+
+	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
+	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
+	// TODO: once we have online volumesnapshot backups, this should change
+	vs.Labels[utils.IsOnlineBackupLabelName] = "false"
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
@@ -123,10 +140,20 @@ func (se *Reconciler) Execute(
 	targetPod *corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (*ctrl.Result, error) {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
+	}
+
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
 
+	// Step 0: check if the snapshots have been created already
+	volumeSnapshots, err := GetBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	// Step 1: fencing
-	if se.shouldFence {
+	if len(volumeSnapshots) == 0 && se.shouldFence {
 		contextLogger.Debug("Checking pre-requisites")
 		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
 			return nil, err
@@ -138,10 +165,6 @@ func (se *Reconciler) Execute(
 	}
 
 	// Step 2: create snapshot
-	volumeSnapshots, err := GetBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
-	if err != nil {
-		return nil, err
-	}
 	if len(volumeSnapshots) == 0 {
 		// we execute the snapshots only if we don't find any
 		if err := se.createSnapshotPVCGroupStep(ctx, cluster, pvcs, backup, targetPod); err != nil {
@@ -276,13 +299,11 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) error {
-	snapshotSuffix := fmt.Sprintf("%d", time.Now().Unix())
-
 	for i := range pvcs {
 		se.recorder.Eventf(backup, "Normal", "CreateSnapshot",
 			"Creating VolumeSnapshot for PVC %v", pvcs[i].Name)
 
-		err := se.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[i], snapshotSuffix)
+		err := se.createSnapshot(ctx, cluster, backup, targetPod, &pvcs[i])
 		if err != nil {
 			return err
 		}
@@ -297,7 +318,7 @@ func (se *Reconciler) waitSnapshotToBeReadyStep(
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshot(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -313,12 +334,15 @@ func (se *Reconciler) createSnapshot(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 	pvc *corev1.PersistentVolumeClaim,
-	snapshotSuffix string,
 ) error {
-	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
-	name := se.getSnapshotName(pvc.Name, snapshotSuffix)
-	var snapshotClassName *string
 	role := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+	name, err := getSnapshotName(backup.Name, role)
+	if err != nil {
+		return err
+	}
+
+	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
+	var snapshotClassName *string
 	if role == utils.PVCRolePgWal && snapshotConfig.WalClassName != "" {
 		snapshotClassName = &snapshotConfig.WalClassName
 	}
@@ -358,16 +382,16 @@ func (se *Reconciler) createSnapshot(
 		return err
 	}
 
-	err := se.cli.Create(ctx, &snapshot)
-	if err != nil {
+	if err := se.cli.Create(ctx, &snapshot); err != nil {
 		return fmt.Errorf("while creating VolumeSnapshot %s: %w", snapshot.Name, err)
 	}
 
 	return nil
 }
 
-// waitSnapshot waits for a certain snapshot to be ready to use
-func (se *Reconciler) waitSnapshot(
+// waitSnapshotAndAnnotate waits for a certain snapshot to be ready to use. Once ready it annotates the snapshot with
+// SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
+func (se *Reconciler) waitSnapshotAndAnnotate(
 	ctx context.Context,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
@@ -384,10 +408,31 @@ func (se *Reconciler) waitSnapshot(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
+	_, hasTimeAnnotation := snapshot.Annotations[utils.SnapshotEndTimeAnnotationName]
+	if !hasTimeAnnotation {
+		oldSnapshot := snapshot.DeepCopy()
+		// as soon as the volume snapshot has stopped running, we should update its
+		// snapshotEndTime annotation
+		snapshot.Annotations[utils.SnapshotEndTimeAnnotationName] = metav1.Now().Format(time.RFC3339)
+		snapshot.Annotations[utils.SnapshotStartTimeAnnotationName] = snapshot.Status.CreationTime.Format(time.RFC3339)
+		if err := se.cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+			contextLogger.Error(err, "while adding time annotations to volume snapshot",
+				"snapshot", snapshot.Name)
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }
 
 // getSnapshotName gets the snapshot name for a certain PVC
-func (se *Reconciler) getSnapshotName(pvcName string, snapshotSuffix string) string {
-	return fmt.Sprintf("%s-%s", pvcName, snapshotSuffix)
+func getSnapshotName(backupName string, role utils.PVCRole) (string, error) {
+	switch role {
+	case utils.PVCRolePgData, "":
+		return backupName, nil
+	case utils.PVCRolePgWal:
+		return fmt.Sprintf("%s-wal", backupName), nil
+	default:
+		return "", fmt.Errorf("unhandled PVCRole type: %s", role)
+	}
 }

@@ -1469,7 +1469,7 @@ gracefully shutdown (default 1800)</p>
 </td>
 <td>
    <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
-this formula to compute the timeout of smart shutdown is <code>max(stopDelay -  smartStopDelay, 30)</code>,</p>
+this formula to compute the timeout of smart shutdown is <code>max(stopDelay -  smartStopDelay, 30)</code></p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>
@@ -3499,14 +3499,13 @@ is part of the HA cluster) gets disconnected.</p>
 <i>bool</i>
 </td>
 <td>
-   <p>If enabled, the operator will automatically manage replication slots
+   <p>If enabled (default), the operator will automatically manage replication slots
 on the primary instance and use them in streaming replication
 connections with all the standby instances that are part of the HA
-cluster. If disabled (default), the operator will not take advantage
+cluster. If disabled, the operator will not take advantage
 of replication slots in streaming connections with the replicas.
 This feature also controls replication slots in replica cluster,
-from the designated primary to its cascading replicas. This can only
-be set at creation time.</p>
+from the designated primary to its cascading replicas.</p>
 </td>
 </tr>
 <tr><td><code>slotPrefix</code><br/>
@@ -4243,7 +4242,7 @@ It is the default class for the other types if no specific class is present</p>
 <a href="#postgresql-cnpg-io-v1-SnapshotOwnerReference"><i>SnapshotOwnerReference</i></a>
 </td>
 <td>
-   <p>SnapshotOwnerReference indicates the type of owner reference the snapshot should have. .</p>
+   <p>SnapshotOwnerReference indicates the type of owner reference the snapshot should have</p>
 </td>
 </tr>
 </tbody>

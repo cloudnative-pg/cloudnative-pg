@@ -26,7 +26,32 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
+
+// excludedPathsFromRestore contains a list of files that should not be included into the restore process
+var excludedPathsFromRestore = []string{
+	"core.*",
+	"pgsql_tmp*",
+	"postgresql.auto.conf.tmp",
+	"current_logfiles.tmp",
+	"pg_internal.init",
+	"postmaster.pid",
+	"postmaster.opts",
+	"recovery.conf",
+	"recovery.signal",
+	"standby.signal",
+	"log/*",
+	"pg_dynshmem/*",
+	"pg_log/*",
+	"pg_notify/*",
+	"pg_replslot/*",
+	"pg_serial/*",
+	"pg_snapshots/*",
+	"pg_stat_tmp/*",
+	"pg_subtrans/*",
+}
 
 // AppendStringToFile append the content of the given string to the
 // end of the target file prepending new data with a carriage return
@@ -318,6 +343,70 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 	files, err = directory.Readdirnames(readAllNames)
 
 	return
+}
+
+// RemoveFiles deletes the files and directories specified by the filePaths patterns
+// relative to the basePath. If a pattern ends with "/*", it implies that all the
+// contents of the directory (not the directory itself) matching the pattern should
+// be removed. If a pattern does not end with "/*", then the files matching the
+// pattern will be removed.
+//
+// Parameters:
+// - ctx: A context used for logging
+// - basePath: The root directory where the filePaths are applied.
+// - filePaths: List of relative paths or patterns to be removed.
+//
+// Returns:
+// - error: Any error encountered during the removal process, or nil if the operation was successful.
+//
+// Example:
+// basePath: "/path/to/directory"
+// filePaths: ["file1.txt", "subdir/*"]
+// This would remove "/path/to/directory/file1.txt" and the "path/to/directory/subdir" folder
+func RemoveFiles(ctx context.Context, basePath string, filePaths []string) error {
+	contextLogger := log.FromContext(ctx)
+
+	for _, pattern := range filePaths {
+		if len(pattern) >= 2 && pattern[len(pattern)-2:] == "/*" {
+			dirPath := filepath.Join(basePath, pattern[:len(pattern)-2])
+			dirExists, err := FileExists(dirPath)
+			if err != nil {
+				return err
+			}
+			if dirExists {
+				contextLogger.Debug("Removing directory", "dirPath", dirPath)
+				if err := RemoveDirectoryContent(dirPath); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+
+		matches, err := filepath.Glob(filepath.Join(basePath, pattern))
+		if err != nil {
+			return err
+		}
+		for _, match := range matches {
+			contextLogger.Debug("Removing file", "fileName", match)
+			if err := RemoveFile(match); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// RemoveRestoreExcludedFiles removes files and directories that are excluded during a restore operation.
+// It leverages the RemoveFiles function, using a predefined list of paths that are meant to be excluded.
+//
+// Parameters:
+// - ctx: A context used for logging.
+// - basePath: The root path from which the exclusions should be applied.
+//
+// Returns:
+// - error: Any error encountered during the removal process, or nil if the operation was successful.
+func RemoveRestoreExcludedFiles(ctx context.Context, basePath string) error {
+	return RemoveFiles(ctx, basePath, excludedPathsFromRestore)
 }
 
 // MoveDirectoryContent moves a directory from a source path to its destination by copying
