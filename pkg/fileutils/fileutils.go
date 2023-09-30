@@ -365,6 +365,7 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 // This would remove "/path/to/directory/file1.txt" and the "path/to/directory/subdir" folder
 func RemoveFiles(ctx context.Context, basePath string, filePaths []string) error {
 	contextLogger := log.FromContext(ctx)
+
 	for _, pattern := range filePaths {
 		if len(pattern) >= 2 && pattern[len(pattern)-2:] == "/*" {
 			dirPath := filepath.Join(basePath, pattern[:len(pattern)-2])
