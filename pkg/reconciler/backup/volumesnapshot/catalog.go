@@ -27,8 +27,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// GetClusterVolumeSnapshots extracts the list of volume snapshots taken
-// for a cluster
+// GetClusterVolumeSnapshots extracts the list of volume snapshots of PG_DATA
+// volumes taken for a cluster
 func GetClusterVolumeSnapshots(
 	ctx context.Context,
 	cli client.Client,
@@ -41,7 +41,10 @@ func GetClusterVolumeSnapshots(
 		ctx,
 		&list,
 		client.InNamespace(namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName},
+		client.MatchingLabels{
+			utils.ClusterLabelName: clusterName,
+			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+		},
 	); err != nil {
 		return nil, err
 	}
@@ -49,13 +52,11 @@ func GetClusterVolumeSnapshots(
 	return list.Items, nil
 }
 
-// GetOldestSnapshot gets the time the oldest snapshot was completed, and in
-// case there were no snapshots, or no endTime annotations could be parsed, will
-// return an error
+// GetOldestSnapshot gets the time the oldest snapshot was completed, or error
 func (s Slice) GetOldestSnapshot() (time.Time, error) {
 	var oldestSnaphsot time.Time
 	if len(s) == 0 {
-		return oldestSnaphsot, fmt.Errorf("there were zero snapshots")
+		return oldestSnaphsot, fmt.Errorf("there were no snapshots")
 	}
 	for _, volumeSnapshot := range s {
 		endTimeStr, hasTime := volumeSnapshot.Annotations[utils.BackupEndTimeAnnotationName]
@@ -70,7 +71,7 @@ func (s Slice) GetOldestSnapshot() (time.Time, error) {
 		}
 	}
 	if oldestSnaphsot.IsZero() {
-		return oldestSnaphsot, fmt.Errorf("there were no snapshots")
+		return oldestSnaphsot, fmt.Errorf("no backup end time annotations found")
 	}
 	return oldestSnaphsot, nil
 }

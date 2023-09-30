@@ -281,6 +281,18 @@ var _ = Describe("update first recoverability point", func() {
 					},
 					Labels: map[string]string{
 						utils.ClusterLabelName: "DIFFERENT-CLUSTER",
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+					},
+				}},
+				{ObjectMeta: metav1.ObjectMeta{
+					Name:      "snapshot-01",
+					Namespace: namespace,
+					Annotations: map[string]string{
+						utils.BackupEndTimeAnnotationName: earlierTime,
+					},
+					Labels: map[string]string{
+						utils.ClusterLabelName: cluster.Name,
+						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
 					},
 				}},
 				{ObjectMeta: metav1.ObjectMeta{
@@ -291,6 +303,7 @@ var _ = Describe("update first recoverability point", func() {
 					},
 					Labels: map[string]string{
 						utils.ClusterLabelName: cluster.Name,
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				}},
 				{ObjectMeta: metav1.ObjectMeta{
@@ -301,6 +314,7 @@ var _ = Describe("update first recoverability point", func() {
 					},
 					Labels: map[string]string{
 						utils.ClusterLabelName: cluster.Name,
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				}},
 			},
@@ -311,6 +325,7 @@ var _ = Describe("update first recoverability point", func() {
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(BeEmpty())
 		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster).
+			WithStatusSubresource(cluster).
 			WithLists(&snapshots).Build()
 
 		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster)
@@ -323,6 +338,7 @@ var _ = Describe("update first recoverability point", func() {
 		cluster.Status.FirstRecoverabilityPoint = earlierTime
 		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster).
+			WithStatusSubresource(cluster).
 			WithLists(&snapshots).Build()
 
 		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster)
