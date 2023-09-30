@@ -24,6 +24,7 @@ import (
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -249,6 +250,7 @@ func (backupStatus *BackupStatus) SetAsFailed(
 func (backupStatus *BackupStatus) SetAsCompleted() {
 	backupStatus.Phase = BackupPhaseCompleted
 	backupStatus.Error = ""
+	backupStatus.StoppedAt = ptr.To(metav1.Now())
 }
 
 // SetAsStarted marks a certain backup as started

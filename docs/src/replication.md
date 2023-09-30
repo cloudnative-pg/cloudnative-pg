@@ -232,7 +232,7 @@ can be disabled via configuration. For details, please refer to the
 Here follows a brief description of the main options:
 
 `.spec.replicationSlots.highAvailability.enabled`
-: if true, the feature is enabled (`true` is the default - since 1.20)
+: if true, the feature is enabled (`true` is the default since 1.21)
 
 `.spec.replicationSlots.highAvailability.slotPrefix`
 : the prefix that identifies replication slots managed by the operator
@@ -257,8 +257,8 @@ Here follows a brief description of the main options:
 Although it is not recommended, if you desire a different behavior, you can
 customize the above options.
 
-For example, the following manifest will create a cluster without replication
-slots enabled.
+For example, the following manifest will create a cluster with replication
+slots disabled.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1

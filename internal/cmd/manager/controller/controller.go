@@ -194,6 +194,12 @@ func RunController(
 		return err
 	}
 
+	// Detect if we are running under a system that provides Volume Snapshots
+	if err = utils.DetectVolumeSnapshotExist(discoveryClient); err != nil {
+		setupLog.Error(err, "unable to detect the if the cluster have the VolumeSnapshot CRD installed")
+		return err
+	}
+
 	// Detect if we support SeccompProfile
 	if err = utils.DetectSeccompSupport(discoveryClient); err != nil {
 		setupLog.Error(err, "unable to detect SeccompProfile support")
@@ -209,7 +215,8 @@ func RunController(
 	setupLog.Info("Kubernetes system metadata",
 		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints(),
-		"haveSeccompProfile", utils.HaveSeccompSupport())
+		"haveSeccompProfile", utils.HaveSeccompSupport(),
+		"haveVolumeSnapshot", utils.HaveVolumeSnapshot())
 
 	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir); err != nil {
 		return err
@@ -220,7 +227,7 @@ func RunController(
 		return err
 	}
 
-	if err = controllers.NewBackupReconciler(mgr).SetupWithManager(ctx, mgr); err != nil {
+	if err = controllers.NewBackupReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}

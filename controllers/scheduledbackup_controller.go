@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -78,6 +79,15 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
+	}
+
+	// This check is still needed for when the scheduled backup resource creation is forced through the webhook
+	if scheduledBackup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
+		contextLogger.Error(
+			errors.New("cannot execute due to missing VolumeSnapshot CRD"),
+			"While checking for VolumeSnapshot CRD",
+		)
+		return ctrl.Result{}, nil
 	}
 
 	if scheduledBackup.IsSuspended() {
@@ -189,7 +199,7 @@ func createBackup(
 	// So we have no backup running, let's create a backup.
 	// Let's have deterministic names to avoid creating the job two
 	// times
-	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), backupTime.Unix())
+	name := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), utils.ToCompactISO8601(backupTime))
 	backup := scheduledBackup.CreateBackup(name)
 	metadata := &backup.ObjectMeta
 	if metadata.Labels == nil {

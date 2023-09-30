@@ -3499,14 +3499,13 @@ is part of the HA cluster) gets disconnected.</p>
 <i>bool</i>
 </td>
 <td>
-   <p>If enabled, the operator will automatically manage replication slots
+   <p>If enabled (default), the operator will automatically manage replication slots
 on the primary instance and use them in streaming replication
 connections with all the standby instances that are part of the HA
-cluster. If disabled (default), the operator will not take advantage
+cluster. If disabled, the operator will not take advantage
 of replication slots in streaming connections with the replicas.
 This feature also controls replication slots in replica cluster,
-from the designated primary to its cascading replicas. This can only
-be set at creation time.</p>
+from the designated primary to its cascading replicas.</p>
 </td>
 </tr>
 <tr><td><code>slotPrefix</code><br/>

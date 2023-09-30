@@ -113,3 +113,17 @@ var _ = Describe("Parsing targetTime", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 })
+
+var _ = Describe("ToCompactISO8601", func() {
+	It("should return a string in the expected format for a given time", func() {
+		testTime := time.Date(2022, 0o1, 0o2, 15, 0o4, 0o5, 0, time.UTC)
+		compactISO8601 := ToCompactISO8601(testTime)
+		Expect(compactISO8601).To(Equal("20220102150405"))
+	})
+
+	It("should return a string of length 14", func() {
+		testTime := time.Now()
+		compactISO8601 := ToCompactISO8601(testTime)
+		Expect(compactISO8601).To(HaveLen(14))
+	})
+})

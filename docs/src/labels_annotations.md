@@ -68,6 +68,18 @@ Below is a list of predefined labels that are managed by CloudNativePG.
 `role`
 :   Whether the instance running in a pod is a `primary` or a `replica`
 
+`cnpg.io/backupTimeline`
+: The timeline of the instance when a backup was taken.
+
+`cnpg.io/backupYear`
+: The year a backup was taken.
+
+`cnpg.io/backupMonth`
+: The year/month when a backup was taken.
+
+`cnpg.io/onlineBackup`
+: Whether a backup was cold or online (hot).
+
 ## Predefined annotations
 
 Below is a list of predefined annotations that are managed by CloudNativePG.
@@ -142,6 +154,24 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
 :   When set to `true` on a `Cluster` resource, the operator disables the check
     that ensures that the WAL archive is empty before writing data. Use at your own
     risk.
+
+`cnpg.io/backupStartWAL`
+: The WAL at the start of a backup.
+
+`cnpg.io/backupEndWAL`
+: The WAL at the conclusion of a backup.
+
+`cnpg.io/backupStartTime`
+: The time a backup started.
+
+`cnpg.io/backupEndTime`
+: The time a backup ended.
+
+`cnpg.io/snapshotStartTime`
+: The time a snapshot started.
+
+`cnpg.io/snapshotEndTime`
+: The time a snapshot was marked as ready to use.
 
 `kubectl.kubernetes.io/restartedAt`
 :  When available, the time of last requested restart of a Postgres cluster

@@ -27,13 +27,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// This variable stores the result of the DetectSecurityContextConstraints check
+// haveSCC stores the result of the DetectSecurityContextConstraints check
 var haveSCC bool
 
-// This variable specifies whether we should set the SeccompProfile or not in the pods
+// haveVolumeSnapshot stores the result of the VolumeSnapshotExist function
+var haveVolumeSnapshot bool
+
+// supportSeccomp specifies whether we should set the SeccompProfile or not in the pods
 var supportSeccomp bool
 
-// `minorVersionRegexp` is used to extract the minor version from
+// minorVersionRegexp is used to extract the minor version from
 // the Kubernetes API server version. Some providers, like AWS,
 // append a "+" to the Kubernetes minor version to presumably
 // indicate that some maintenance patches have been back-ported
@@ -90,6 +93,29 @@ func DetectSecurityContextConstraints(client discovery.DiscoveryInterface) (err 
 // It panics if called before DetectSecurityContextConstraints
 func HaveSecurityContextConstraints() bool {
 	return haveSCC
+}
+
+// DetectVolumeSnapshotExist connects to the discovery API and find out if
+// the VolumeSnapshot CRD exist in the cluster
+func DetectVolumeSnapshotExist(client discovery.DiscoveryInterface) (err error) {
+	haveVolumeSnapshot, err = resourceExist(client, "snapshot.storage.k8s.io/v1", "volumesnapshots")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetVolumeSnapshot set the haveVolumeSnapshot variable to a specific value for testing purposes
+// IMPORTANT: use it only in the unit tests
+func SetVolumeSnapshot(value bool) {
+	haveVolumeSnapshot = value
+}
+
+// HaveVolumeSnapshot returns true if we're running under a system that implements
+// having the VolumeSnapshot CRD
+func HaveVolumeSnapshot() bool {
+	return haveVolumeSnapshot
 }
 
 // PodMonitorExist tries to find the PodMonitor resource in the current cluster

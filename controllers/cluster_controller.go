@@ -225,7 +225,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
 		if apierrs.IsConflict(err) {
-			contextLogger.Debug("Conflict error while reconciling cluster status nad instance state",
+			contextLogger.Debug("Conflict error while reconciling cluster status and instance state",
 				"error", err)
 			return ctrl.Result{Requeue: true}, nil
 		}
@@ -293,7 +293,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			contextLogger.Info(
 				"Waiting for the Kubelet to refresh the readiness probe",
 				"mostAdvancedInstanceName", mostAdvancedInstance.Node,
-				"mostAdvancedInstanceStatus", mostAdvancedInstance,
 				"hasHTTPStatus", hasHTTPStatus,
 				"isPodReady", isPodReady)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
@@ -537,6 +536,11 @@ func (r *ClusterReconciler) reconcileResources(
 
 	// If we still need more instances, we need to wait before setting healthy status
 	if instancesStatus.InstancesReportingStatus() != cluster.Spec.Instances {
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
+	// PhaseInplacePrimaryRestart will be patched to healthy in instance manager
+	if cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
