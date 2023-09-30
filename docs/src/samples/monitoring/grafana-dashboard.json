@@ -726,10 +726,23 @@
           "expr": "max(max by(persistentvolumeclaim) (1 - kubelet_volume_stats_available_bytes{namespace=\"$namespace\", persistentvolumeclaim=~\"$instances\"} / kubelet_volume_stats_capacity_bytes{namespace=\"$namespace\", persistentvolumeclaim=~\"$instances\"}))",
           "format": "time_series",
           "interval": "",
-          "legendFormat": "{{persistentvolumeclaim}}",
+          "legendFormat": "DATA",
           "range": true,
-          "refId": "FREE_SPACE"
-        }
+          "refId": "DATA"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max(max by(persistentvolumeclaim) (1 - kubelet_volume_stats_available_bytes{namespace=\"$namespace\", persistentvolumeclaim=~\"(${instances})-wal\"} / kubelet_volume_stats_capacity_bytes{namespace=\"$namespace\", persistentvolumeclaim=~\"(${instances})-wal\"}))",
+          "format": "time_series",
+          "interval": "",
+          "legendFormat": "WAL",
+          "range": true,
+          "refId": "WAL"
+        }        
       ],
       "title": "Volume Space Usage",
       "type": "gauge"
@@ -3153,7 +3166,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "exemplar": true,
-          "expr": "cnpg_pg_settings_setting{name=\"effective_cache_size\",namespace=~\"$namespace\",pod=~\"$instances\"}",
+          "expr": "max by (pod) (cnpg_pg_settings_setting{name=\"effective_cache_size\",namespace=~\"$namespace\",pod=~\"$instances\"}) * max by (pod) (cnpg_pg_settings_setting{name=\"block_size\",namespace=~\"$namespace\",pod=~\"$instances\"})",
           "instant": true,
           "interval": "",
           "legendFormat": "{{pod}}",
@@ -4366,7 +4379,20 @@
               "legendFormat": "{{persistentvolumeclaim}}",
               "range": true,
               "refId": "FREE_SPACE"
-            }
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "max by(persistentvolumeclaim) (1 - kubelet_volume_stats_available_bytes{namespace=\"$namespace\", persistentvolumeclaim=~\"(${instances})-wal\"} / kubelet_volume_stats_capacity_bytes{namespace=\"$namespace\", persistentvolumeclaim=~\"(${instances})-wal\"})",
+              "format": "time_series",
+              "interval": "",
+              "legendFormat": "{{persistentvolumeclaim}}",
+              "range": true,
+              "refId": "FREE_SPACE_WAL"
+            }            
           ],
           "title": "Volume Space Usage",
           "transformations": [],
@@ -4439,7 +4465,20 @@
               "legendFormat": "{{persistentvolumeclaim}}",
               "range": true,
               "refId": "FREE_INODES"
-            }
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "max by(persistentvolumeclaim) (kubelet_volume_stats_inodes_used{namespace=\"$namespace\", persistentvolumeclaim=~\"(${instances})-wal\"} / kubelet_volume_stats_inodes{namespace=\"$namespace\", persistentvolumeclaim=~\"(${instances})-wal\"})",
+              "format": "time_series",
+              "interval": "",
+              "legendFormat": "{{persistentvolumeclaim}}",
+              "range": true,
+              "refId": "FREE_INODES_WAL"
+            }            
           ],
           "title": "Volume Inode Usage",
           "transformations": [],
