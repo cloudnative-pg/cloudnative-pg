@@ -233,49 +233,6 @@ func getStorageConfiguration(
 	return *storageConfiguration, nil
 }
 
-func getStorageSource(
-	cluster *apiv1.Cluster,
-	role utils.PVCRole,
-	serial int,
-) (*corev1.TypedLocalObjectReference, error) {
-	// Only the first PVC group can be recovered from
-	// an existing source
-	if serial != 1 {
-		return nil, nil
-	}
-
-	if cluster.Spec.Bootstrap == nil {
-		return nil, nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery == nil {
-		return nil, nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
-		return nil, nil
-	}
-
-	volumeSnapshots := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
-
-	var source *corev1.TypedLocalObjectReference
-	switch role {
-	case utils.PVCRolePgData:
-		source = &volumeSnapshots.Storage
-	case utils.PVCRolePgWal:
-		source = volumeSnapshots.WalStorage
-	default:
-		return nil, fmt.Errorf("unknown pvcRole: %s", string(role))
-	}
-
-	if source == nil {
-		return nil,
-			fmt.Errorf("volume source doesn't exist for the given PVC role: %s", role)
-	}
-
-	return source, nil
-}
-
 // GetInstancePVCs gets all the PVC associated with a given instance
 func GetInstancePVCs(
 	ctx context.Context,

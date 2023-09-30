@@ -954,10 +954,15 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
+	// Get the source storage from where do create the primary instance.
+	// We don't consider any pre-existing backups here
+	candidateSource := persistentvolumeclaim.GetCandidateStorageSource(cluster, apiv1.BackupList{})
+
 	if err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
+		candidateSource,
 		nodeSerial,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
@@ -1080,14 +1085,30 @@ func (r *ClusterReconciler) joinReplicaInstance(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
+	var backupList apiv1.BackupList
+	if err := r.List(ctx, &backupList,
+		client.MatchingFields{clusterName: cluster.Name},
+	); err != nil {
+		contextLogger.Error(err, "Error while getting backup list, when bootstrapping a new replica")
+		return ctrl.Result{}, err
+	}
+
 	var job *batchv1.Job
 	var err error
 
-	job = specs.JoinReplicaInstance(*cluster, nodeSerial)
+	// If we can bootstrap this replica from a pre-existing source, we do it
+	storageSource := persistentvolumeclaim.GetCandidateStorageSource(cluster, backupList)
+	if storageSource != nil {
+		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
+	} else {
+		job = specs.JoinReplicaInstance(*cluster, nodeSerial)
+	}
 
 	contextLogger.Info("Creating new Job",
 		"job", job.Name,
-		"primary", false)
+		"primary", false,
+		"storageSource", storageSource,
+	)
 
 	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
 		"Creating instance %v-%v", cluster.Name, nodeSerial)
@@ -1128,6 +1149,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		ctx,
 		r.Client,
 		cluster,
+		storageSource,
 		nodeSerial,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err

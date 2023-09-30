@@ -34,9 +34,10 @@ func CreateInstancePVCs(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
+	source *StorageSource,
 	serial int,
 ) error {
-	_, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil)
+	_, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil, source)
 	return err
 }
 
@@ -56,7 +57,7 @@ func reconcileMultipleInstancesMissingPVCs(
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		res, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, pvcs)
+		res, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, pvcs, nil)
 		if err != nil {
 			return res, err
 		}
@@ -75,6 +76,7 @@ func reconcileSingleInstanceMissingPVCs(
 	cluster *apiv1.Cluster,
 	serial int,
 	pvcs []corev1.PersistentVolumeClaim,
+	source *StorageSource,
 ) (ctrl.Result, error) {
 	var shouldReconcile bool
 	instanceName := specs.GetInstanceName(cluster.Name, serial)
@@ -88,12 +90,12 @@ func reconcileSingleInstanceMissingPVCs(
 			return ctrl.Result{}, err
 		}
 
-		source, err := getStorageSource(cluster, expectedPVC.role, serial)
+		pvcSource, err := source.ForRole(expectedPVC.role)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		createConfiguration := expectedPVC.toCreateConfiguration(serial, conf, source)
+		createConfiguration := expectedPVC.toCreateConfiguration(serial, conf, pvcSource)
 
 		if err := createIfNotExists(ctx, c, cluster, createConfiguration); err != nil {
 			return ctrl.Result{}, err
