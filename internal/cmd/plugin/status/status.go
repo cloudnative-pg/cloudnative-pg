@@ -197,6 +197,13 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)
 	} else {
 		summary.AddLine("Primary instance:", primaryInstance)
+		primaryInstanceTimestamp, err := time.Parse("2006-01-02T15:04:05.999999Z07:00", cluster.Status.CurrentPrimaryTimestamp)
+		if err != nil {
+			fmt.Printf("could not parse primary instance timestamp: %v", err)
+		}
+		summary.AddLine("Primary start time:", primaryInstanceTimestamp.Round(time.Second))
+		uptime := time.Since(primaryInstanceTimestamp)
+		summary.AddLine("Primary uptime:", uptime.Round(time.Second))
 	}
 	summary.AddLine("Status:", fullStatus.getStatus(isPrimaryFenced, cluster))
 	if cluster.Spec.Instances == cluster.Status.Instances {
