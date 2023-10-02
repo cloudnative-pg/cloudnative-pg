@@ -4,7 +4,7 @@ resources:
 - ../default
 
 patches:
-- path: openshift_changes.yaml
+- path: olm_changes.yaml
   target:
     group: apps
     version: v1
