@@ -9,12 +9,12 @@ webhooks:
   - clientConfig:
       service:
         containerPort: 9443
-    name: mcluster.kb.io
+    name: mcluster.cnpg.io
   - clientConfig:
       service:
         containerPort: 9443
-    name: mbackup.kb.io
+    name: mbackup.cnpg.io
   - clientConfig:
       service:
         containerPort: 9443
-    name: mscheduledbackup.kb.io
+    name: mscheduledbackup.cnpg.io
