@@ -18,7 +18,7 @@ kubectl apply -f \
 You can verify that with:
 
 ```sh
-kubectl get deploy -n cnpg-system cnpg-controller-manager
+kubectl get deployment -n cnpg-system cnpg-controller-manager
 ```
 
 ### Using the `cnpg` plugin for `kubectl`
@@ -82,6 +82,63 @@ curl -sSfL \
 ### Using the Helm Chart
 
 The operator can be installed using the provided [Helm chart](https://github.com/cloudnative-pg/charts).
+
+### Using OLM
+
+The operator is also published in [OpertorHub.io](https://operatorhub.io) in the following [link](https://operatorhub.io/operator/cloudnative-pg)
+
+If OLM is already deployed and running in your current cluster it's enough by creating the following subscription:
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: cloudnative-pg
+  namespace: operators
+spec:
+  channel: stable
+  name: cloudnative-pg
+  source: operatorhubio-catalog
+  sourceNamespace: olm
+```
+
+The installation can be verify by running:
+
+```shell
+kubectl get deployment  -n operators cnpg-controller-manager
+```
+
+### Using OLM catalog from releases
+
+Every release contains a bundle.zip file with catalog file inside called `cloudnative-pg-catalog.yaml` that will
+provide a catalog with the proper index to the release, this file can be installed in the following format with
+a cluster with OLM deployed:
+
+```shell
+kubectl apply -f cloudnative-pg-catalog.yaml
+```
+
+It will ue a catalog with a single operator inside that lives in the CloudNativePG GitHub registry.
+After the catalog is deployed the subscription can be created like this:
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: cloudnative-pg
+  namespace: operators
+spec:
+  channel: stable-v1
+  name: cloudnative-pg
+  source: cloudnative-pg-catalog
+  sourceNamespace: operators
+```
+
+The installation can be verify by running:
+
+```shell
+kubectl get deployment  -n operators cnpg-controller-manager
+```
 
 ## Details about the deployment
 
@@ -305,4 +362,3 @@ spec:
      highAvailability:
        enabled: false
 ```
-
