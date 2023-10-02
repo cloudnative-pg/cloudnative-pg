@@ -42,8 +42,8 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		operatorNamespace = "cnpg-system"
 		level             = tests.Highest
-		mutatingWebhook   = "mcluster.kb.io"
-		validatingWebhook = "vcluster.kb.io"
+		mutatingWebhook   = "mcluster.cnpg.io"
+		validatingWebhook = "vcluster.cnpg.io"
 	)
 
 	var webhookNamespace, clusterName string
