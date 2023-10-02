@@ -87,6 +87,5 @@ func (instance *Instance) writeReplicaConfigurationForDesignatedPrimary(
 			pgpassfile)
 	}
 
-	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
-	return UpdateReplicaConfiguration(instance.PgData, connectionString, slotName)
+	return UpdateReplicaConfiguration(instance.PgData, connectionString, "")
 }
