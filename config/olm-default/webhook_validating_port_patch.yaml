@@ -9,16 +9,16 @@ webhooks:
   - clientConfig:
       service:
         containerPort: 9443
-    name: vcluster.kb.io
+    name: vcluster.cnpg.io
   - clientConfig:
       service:
         containerPort: 9443
-    name: vbackup.kb.io
+    name: vbackup.cnpg.io
   - clientConfig:
       service:
         containerPort: 9443
-    name: vscheduledbackup.kb.io
+    name: vscheduledbackup.cnpg.io
   - clientConfig:
       service:
         containerPort: 9443
-    name: vpooler.kb.io
+    name: vpooler.cnpg.io
