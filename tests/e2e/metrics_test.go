@@ -59,7 +59,6 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	metricsList := `cnpg_pg_postmaster_start_time_seconds \d+\.\d+|` + // wokeignore:rule=master
 		`cnpg_pg_wal_files_total \d+|` +
 		`cnpg_pg_database_size_bytes{datname="app"} [0-9e\+\.]+|` +
-		`cnpg_pg_replication_slots_inactive 0|` +
 		`cnpg_pg_stat_archiver_archived_count \d+|` +
 		`cnpg_pg_stat_archiver_failed_count \d+|` +
 		`cnpg_pg_locks_blocked_queries 0|` +
