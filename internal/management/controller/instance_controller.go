@@ -168,6 +168,22 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
+	restarted, err := r.reconcilePrimary(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	restartedFromOldPrimary, err := r.reconcileOldPrimary(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	restarted = restarted || restartedFromOldPrimary
+
+	if r.IsDBUp(ctx) != nil {
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
 	r.configureSlotReplicator(cluster)
 
 	if result, err := reconciler.ReconcileReplicationSlots(
@@ -184,22 +200,6 @@ func (r *InstanceReconciler) Reconcile(
 		if err != nil || !result.IsZero() {
 			return result, err
 		}
-	}
-
-	restarted, err := r.reconcilePrimary(ctx, cluster)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	restartedFromOldPrimary, err := r.reconcileOldPrimary(ctx, cluster)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	restarted = restarted || restartedFromOldPrimary
-
-	if r.IsDBUp(ctx) != nil {
-		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
 	restartedInplace, err := r.restartPrimaryInplaceIfRequested(ctx, cluster)
