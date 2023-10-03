@@ -120,7 +120,7 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	// Refresh the cache
-	requeue := r.updateCacheFromCluster(ctx, cluster)
+	requeueOnMissingPermissions := r.updateCacheFromCluster(ctx, cluster)
 
 	// Reconcile monitoring section
 	r.reconcileMetrics(cluster)
@@ -184,6 +184,26 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
+	restartedInplace, err := r.restartPrimaryInplaceIfRequested(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	restarted = restarted || restartedInplace
+
+	if reloadNeeded && !restarted {
+		contextLogger.Info("reloading the instance")
+		if err = r.instance.Reload(); err != nil {
+			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
+		}
+		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
+			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
+		}
+	}
+
+	// IMPORTANT
+	// From now on, the database can be assumed as running. Every operation
+	// needing the database to be up should be put below this line.
+
 	r.configureSlotReplicator(cluster)
 
 	if result, err := reconciler.ReconcileReplicationSlots(
@@ -202,24 +222,6 @@ func (r *InstanceReconciler) Reconcile(
 		}
 	}
 
-	restartedInplace, err := r.restartPrimaryInplaceIfRequested(ctx, cluster)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-	restarted = restarted || restartedInplace
-
-	// from now on the database can be assumed as running
-
-	if reloadNeeded && !restarted {
-		contextLogger.Info("reloading the instance")
-		if err = r.instance.Reload(); err != nil {
-			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
-		}
-		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
-			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
-		}
-	}
-
 	if err = r.refreshCredentialsFromSecret(ctx, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("while updating database owner password: %w", err)
 	}
@@ -228,16 +230,22 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
-	// Extremely important.
-	// It could happen that current primary is reconciled before all the topology is extracted by the operator.
-	// We should detect that and schedule the instance manager for another run otherwise we will end up having
-	// an incoherent state of electable synchronous_names inside the configuration.
-	// This is only relevant if syncReplicaElectionConstraint is enabled
-	if !requeue {
-		requeue = r.shouldRequeueForMissingTopology(cluster)
-	}
-
-	if requeue {
+	// EXTREMELY IMPORTANT
+	//
+	// The reconciliation loop may not have applied all the changes needed. In this case
+	// we ensure another reconciliation loop will happen.
+	// This is going to happen when:
+	//
+	// 1. We still don't have permissions to read the referenced secrets. This will
+	//    happen when the secrets referenced in the Cluster change and the operator
+	//    have not still reconciled the Role, or when the Role have not been applied
+	//    by the API Server.
+	//
+	// 2. The current primary is reconciled before all the topology is extracted by the
+	//    operator. Without another reconciliation loop we would have an incoherent
+	//    state of electable synchronous_names inside the configuration.
+	//    (this is only relevant if syncReplicaElectionConstraint is enabled)
+	if requeueOnMissingPermissions || r.shouldRequeueForMissingTopology(cluster) {
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
