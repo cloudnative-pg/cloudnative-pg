@@ -145,6 +145,16 @@ var _ = Describe("Roles", func() {
 							Name: "testS3Access",
 						},
 					},
+					RegionReference: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "testS3Region",
+						},
+					},
+					SessionToken: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "testS3Session",
+						},
+					},
 				},
 			},
 		},
@@ -173,6 +183,8 @@ var _ = Describe("Roles", func() {
 			"testSecretKeySelector",
 			"testS3Secret",
 			"testS3Access",
+			"testS3Region",
+			"testS3Session",
 			"testAzureStorageAccount",
 			"testAzureStorageKey",
 			"testAzureStorageSasToken",
@@ -245,6 +257,12 @@ var _ = Describe("Secrets", func() {
 							AccessKeyIDReference: &apiv1.SecretKeySelector{
 								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-access"},
 							},
+							RegionReference: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-region"},
+							},
+							SessionToken: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-session"},
+							},
 						},
 					},
 					EndpointCA: &apiv1.SecretKeySelector{
@@ -255,7 +273,7 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 		secrets = backupSecrets(cluster, nil)
-		Expect(secrets).To(ConsistOf("test-secret", "test-access", "test-endpoint-ca-name"))
+		Expect(secrets).To(ConsistOf("test-secret", "test-access", "test-region", "test-session", "test-endpoint-ca-name"))
 	})
 
 	It("should contain default secrets only", func() {
