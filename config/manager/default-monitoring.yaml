@@ -321,6 +321,7 @@ data:
        SELECT usename
          , COALESCE(application_name, '') AS application_name
          , COALESCE(client_addr::text, '') AS client_addr
+         , COALESCE(client_port::text, '') AS client_port
          , EXTRACT(EPOCH FROM backend_start) AS backend_start
          , COALESCE(pg_catalog.age(backend_xmin), 0) AS backend_xmin_age
          , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), sent_lsn) AS sent_diff_bytes
@@ -341,6 +342,9 @@ data:
         - client_addr:
             usage: "LABEL"
             description: "Client IP address"
+        - client_port:
+            usage: "LABEL"
+            description: "Client TCP port"
         - backend_start:
             usage: "COUNTER"
             description: "Time when this process was started"
