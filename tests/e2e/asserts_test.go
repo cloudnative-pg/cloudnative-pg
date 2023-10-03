@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -2782,5 +2783,50 @@ func assertPredicateClusterHasPhase(namespace, clusterName string, phase []strin
 		cluster, err := env.GetCluster(namespace, clusterName)
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(slices.Contains(phase, cluster.Status.Phase)).To(BeTrue())
+	}
+}
+
+// assertMetrics is a utility function used for asserting that specific metrics, defined by regular expressions in
+// the 'expectedMetrics' map, are present in the 'rawMetricsOutput' string.
+// It also checks whether the metrics match the expected format defined by their regular expressions.
+// If any assertion fails, it prints an error message to GinkgoWriter.
+//
+// Parameters:
+//   - rawMetricsOutput: The raw metrics data string to be checked.
+//   - expectedMetrics: A map of metric names to regular expressions that describe the expected format of the metrics.
+//
+// Example usage:
+//
+//	expectedMetrics := map[string]*regexp.Regexp{
+//	    "cpu_usage":   regexp.MustCompile(`^\d+\.\d+$`), // Example: "cpu_usage 0.25"
+//	    "memory_usage": regexp.MustCompile(`^\d+\s\w+$`), // Example: "memory_usage 512 MiB"
+//	}
+//	assertMetrics(rawMetricsOutput, expectedMetrics)
+//
+// The function will assert that the specified metrics exist in 'rawMetricsOutput' and match their expected formats.
+// If any assertion fails, it will print an error message with details about the failed metric collection.
+//
+// Note: This function is typically used in testing scenarios to validate metric collection behavior.
+func assertMetrics(rawMetricsOutput string, expectedMetrics map[string]*regexp.Regexp) {
+	debugDetails := fmt.Sprintf("Priting rawMetricsOutput:\n%s", rawMetricsOutput)
+	withDebugDetails := func(baseErrMessage string) string {
+		return fmt.Sprintf("%s\n%s\n", baseErrMessage, debugDetails)
+	}
+
+	for key, valueRe := range expectedMetrics {
+		re := regexp.MustCompile(fmt.Sprintf(`(?m)^(` + key + `).*$`))
+
+		// match a metric with the value of expectedMetrics key
+		match := re.FindString(rawMetricsOutput)
+		Expect(match).NotTo(BeEmpty(), withDebugDetails(fmt.Sprintf("Found no match for metric %s", key)))
+
+		// extract the value from the metric previously matched
+		value := strings.Fields(match)[1]
+		Expect(strings.Fields(match)[1]).NotTo(BeEmpty(),
+			withDebugDetails(fmt.Sprintf("Found no result for metric %s.Metric line: %s", key, match)))
+
+		// expect the expectedMetrics regexp to match the value of the metric
+		Expect(valueRe.MatchString(value)).To(BeTrue(),
+			withDebugDetails(fmt.Sprintf("Expected %s to have value %v but got %s", key, valueRe, value)))
 	}
 }
