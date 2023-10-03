@@ -275,7 +275,7 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "primary"},
+		client.MatchingLabels{utils.ClusterLabelName: clusterName, utils.ClusterInstanceRoleLabelName: "primary"},
 	)
 	if err != nil {
 		return &corev1.Pod{}, err
