@@ -551,7 +551,8 @@ jobs:
       - olm-bundle
     if: |
       (always() && !cancelled()) &&
-      needs.olm-bundle.result == 'success'
+      needs.olm-bundle.result == 'success' &&
+      github.repository_owner == 'cloudnative-pg'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -600,7 +601,8 @@ jobs:
       - olm-scorecard
     if: |
       (always() && !cancelled()) &&
-      needs.olm-scorecard.result == 'success'
+      needs.olm-scorecard.result == 'success' &&
+      github.repository_owner == 'cloudnative-pg'
     env:
       VERSION: ${{ needs.buildx.outputs.commit_version }}
       OPP_DEBUG: 1
