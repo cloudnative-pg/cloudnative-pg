@@ -47,6 +47,31 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		level                          = tests.Low
 	)
 
+	buildExpectedMetrics := func(cluster *apiv1.Cluster, isReplicaPod bool) map[string]*regexp.Regexp {
+		const replicationSlotsStatus = "cnpg_pg_replication_slots_status_inactive"
+
+		// We define a few metrics in the tests. We check that all of them exist and
+		// there are no errors during the collection.
+		expectedMetrics := map[string]*regexp.Regexp{
+			"cnpg_pg_postmaster_start_time_seconds":        regexp.MustCompile(`\d+\.\d+`), // wokeignore:rule=master
+			"cnpg_pg_wal_files_total":                      regexp.MustCompile(`\d+`),
+			"cnpg_pg_database_size_bytes{datname=\"app\"}": regexp.MustCompile(`[0-9e+.]+`),
+			"cnpg_pg_stat_archiver_archived_count":         regexp.MustCompile(`\d+`),
+			"cnpg_pg_stat_archiver_failed_count":           regexp.MustCompile(`\d+`),
+			"cnpg_pg_locks_blocked_queries":                regexp.MustCompile(`0`),
+			"cnpg_runonserver_match_fixed":                 regexp.MustCompile(`42`),
+			"cnpg_collector_last_collection_error":         regexp.MustCompile(`0`),
+			replicationSlotsStatus:                         regexp.MustCompile("0"),
+		}
+
+		if isReplicaPod {
+			inactiveSlots := strconv.Itoa(cluster.Spec.Instances - 2)
+			expectedMetrics[replicationSlotsStatus] = regexp.MustCompile(inactiveSlots)
+		}
+
+		return expectedMetrics
+	}
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -56,77 +81,6 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	// Cluster identifiers
 	var namespace, metricsClusterName, curlPodName string
 	var err error
-
-	// We define a few metrics in the tests. We check that all of them exist and
-	// there are no errors during the collection.
-	metricsMap := map[string]*regexp.Regexp{
-		"cnpg_pg_postmaster_start_time_seconds":        regexp.MustCompile(`\d+\.\d+`), // wokeignore:rule=master
-		"cnpg_pg_wal_files_total":                      regexp.MustCompile(`\d+`),
-		"cnpg_pg_database_size_bytes{datname=\"app\"}": regexp.MustCompile(`[0-9e+.]+`),
-		"cnpg_pg_stat_archiver_archived_count":         regexp.MustCompile(`\d+`),
-		"cnpg_pg_stat_archiver_failed_count":           regexp.MustCompile(`\d+`),
-		"cnpg_pg_locks_blocked_queries":                regexp.MustCompile(`0`),
-		"cnpg_runonserver_match_fixed":                 regexp.MustCompile(`42`),
-		"cnpg_collector_last_collection_error":         regexp.MustCompile(`0`),
-	}
-
-	AssertMetrics := func(metrics string, expectedMetrics map[string]*regexp.Regexp, podName string) {
-		collectionError := fmt.Sprintf(
-			"\nMetric collection issues on %v.\nPrinting metrics:\n%v\n",
-			podName,
-			metrics,
-		)
-
-		for key, valueRe := range expectedMetrics {
-			re := regexp.MustCompile(fmt.Sprintf(`(?m)^(` + key + `).*$`))
-
-			// match a metric with the value of expectedMetrics key
-			match := re.FindString(metrics)
-			if match == "" {
-				_, _ = fmt.Fprint(GinkgoWriter, collectionError)
-			}
-			Expect(match).NotTo(BeEmpty(),
-				"\nFound no match for metric %v\n", key)
-
-			// extract the value from the metric previously matched
-			value := strings.Fields(match)[1]
-			if value == "" {
-				_, _ = fmt.Fprint(GinkgoWriter, collectionError)
-			}
-			Expect(value).NotTo(BeEmpty(),
-				"\nFound no result for metric %v.\nMetric line: %v\n", key, match)
-
-			// expect the expectedMetrics regexp to match the value of the metric
-			result := valueRe.MatchString(value)
-			if result != true {
-				_, _ = fmt.Fprint(GinkgoWriter, collectionError)
-			}
-			Expect(result).To(BeTrue(),
-				"\nExpected %v to have value %v but got %v\n", key, valueRe, value)
-		}
-	}
-
-	buildMetrics := func(
-		expectedMetrics map[string]*regexp.Regexp,
-		namespace,
-		clusterName string,
-		pod corev1.Pod,
-	) (map[string]*regexp.Regexp, error) {
-		cluster, err := env.GetCluster(namespace, clusterName)
-		if err != nil {
-			return nil, err
-		}
-
-		inactiveSlots := cluster.Spec.Instances - 2
-
-		if specs.IsPodPrimary(pod) {
-			expectedMetrics["cnpg_pg_replication_slots_status_inactive"] = regexp.MustCompile("0")
-		} else {
-			expectedMetrics["cnpg_pg_replication_slots_status_inactive"] = regexp.MustCompile(strconv.Itoa(inactiveSlots))
-		}
-
-		return expectedMetrics, nil
-	}
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
@@ -158,17 +112,21 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsFile, env)
 
-		By("collecting metrics on each pod", func() {
+		By("ensuring metrics are correct on each pod", func() {
+			metricsCluster, err := env.GetCluster(namespace, metricsClusterName)
+			Expect(err).ToNot(HaveOccurred())
+
 			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
+
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
-				podIP := pod.Status.PodIP
-				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
-				Expect(err).ToNot(HaveOccurred())
-				expectedMetrics, err := buildMetrics(metricsMap, namespace, metricsClusterName, pod)
-				Expect(err).ToNot(HaveOccurred())
-				AssertMetrics(out, expectedMetrics, pod.GetName())
+				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
+					out, err := utils.CurlGetMetrics(namespace, curlPodName, pod.Status.PodIP, 9187)
+					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
+					expectedMetrics := buildExpectedMetrics(metricsCluster, !specs.IsPodPrimary(pod))
+					assertMetrics(out, expectedMetrics)
+				})
 			}
 		})
 
