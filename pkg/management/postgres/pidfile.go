@@ -50,6 +50,12 @@ func (instance *Instance) CheckForExistingPostmaster(postgresExecutables ...stri
 	contextLog := log.WithValues("file", pidFile)
 	pidFileContents, pid, err := instance.GetPostmasterPidFromFile(pidFile)
 	if err != nil {
+		// There's no PID file. This is the first time we start PostgreSQL
+		// or PostgreSQL have been correctly shut down.
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+
 		// The content of the PID file is wrong.
 		// In this case we just remove the PID file, which is assumed
 		// to be stale, and continue our work

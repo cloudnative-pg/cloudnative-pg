@@ -36,16 +36,16 @@ import (
 func (r *InstanceReconciler) updateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) shoudRequeue {
 	cache.StoreCluster(cluster)
 
-	var requeue shoudRequeue
+	var missingPermissions shoudRequeue
 
 	// Populate the cache with the backup configuration
 	if r.shouldUpdateWALArchiveSettingsCache(ctx, cluster) {
-		requeue = true
+		missingPermissions = true
 	}
 
 	// Populate the cache with the recover configuration
 	r.updateWALRestoreSettingsCache(ctx, cluster)
-	return requeue
+	return missingPermissions
 }
 
 func (r *InstanceReconciler) updateWALRestoreSettingsCache(ctx context.Context, cluster *apiv1.Cluster) {
