@@ -190,6 +190,11 @@ spec:
 This bootstrap method allows you to specify just a reference to the
 backup that needs to be restored.
 
+The previous example implies the application database and its owning user to be
+the default one, `app`. If the PostgreSQL cluster being restore were using
+different names, they can be specified as documented in the [Configure the
+application database](#configure-the-application-database) section.
+
 ## Additional considerations
 
 Whether you recover from a recovery object store, a volume snapshot, or an
