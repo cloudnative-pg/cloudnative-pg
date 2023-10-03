@@ -19,12 +19,14 @@ package e2e
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -45,6 +47,31 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		level                          = tests.Low
 	)
 
+	buildExpectedMetrics := func(cluster *apiv1.Cluster, isReplicaPod bool) map[string]*regexp.Regexp {
+		const replicationSlotsStatus = "cnpg_e2e_tests_replication_slots_status_inactive"
+
+		// We define a few metrics in the tests. We check that all of them exist and
+		// there are no errors during the collection.
+		expectedMetrics := map[string]*regexp.Regexp{
+			"cnpg_pg_postmaster_start_time_seconds":        regexp.MustCompile(`\d+\.\d+`), // wokeignore:rule=master
+			"cnpg_pg_wal_files_total":                      regexp.MustCompile(`\d+`),
+			"cnpg_pg_database_size_bytes{datname=\"app\"}": regexp.MustCompile(`[0-9e+.]+`),
+			"cnpg_pg_stat_archiver_archived_count":         regexp.MustCompile(`\d+`),
+			"cnpg_pg_stat_archiver_failed_count":           regexp.MustCompile(`\d+`),
+			"cnpg_pg_locks_blocked_queries":                regexp.MustCompile(`0`),
+			"cnpg_runonserver_match_fixed":                 regexp.MustCompile(`42`),
+			"cnpg_collector_last_collection_error":         regexp.MustCompile(`0`),
+			replicationSlotsStatus:                         regexp.MustCompile("0"),
+		}
+
+		if isReplicaPod {
+			inactiveSlots := strconv.Itoa(cluster.Spec.Instances - 2)
+			expectedMetrics[replicationSlotsStatus] = regexp.MustCompile(inactiveSlots)
+		}
+
+		return expectedMetrics
+	}
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -54,19 +81,6 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	// Cluster identifiers
 	var namespace, metricsClusterName, curlPodName string
 	var err error
-	// We define a few metrics in the tests. We check that all of them exist and
-	// there are no errors during the collection.
-	metricsList := `cnpg_pg_postmaster_start_time_seconds \d+\.\d+|` + // wokeignore:rule=master
-		`cnpg_pg_wal_files_total \d+|` +
-		`cnpg_pg_database_size_bytes{datname="app"} [0-9e\+\.]+|` +
-		`cnpg_pg_replication_slots_inactive 0|` +
-		`cnpg_pg_stat_archiver_archived_count \d+|` +
-		`cnpg_pg_stat_archiver_failed_count \d+|` +
-		`cnpg_pg_locks_blocked_queries 0|` +
-		`cnpg_runonserver_match_fixed 42|` +
-		`cnpg_collector_last_collection_error 0)`
-
-	metricsRegexp := regexp.MustCompile(fmt.Sprintf(`(?m:^(` + metricsList + `$)`))
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
@@ -98,16 +112,21 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsFile, env)
 
-		By("collecting metrics on each pod", func() {
+		By("ensuring metrics are correct on each pod", func() {
+			metricsCluster, err := env.GetCluster(namespace, metricsClusterName)
+			Expect(err).ToNot(HaveOccurred())
+
 			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
+
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
-				podIP := pod.Status.PodIP
-				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
-				matches := metricsRegexp.FindAllString(out, -1)
-				Expect(matches, err).To(HaveLen(len(strings.Split(metricsList, "|"))),
-					"Metric collection issues on %v.\nCollected metrics:\n%v", pod.GetName(), out)
+				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
+					out, err := utils.CurlGetMetrics(namespace, curlPodName, pod.Status.PodIP, 9187)
+					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
+					expectedMetrics := buildExpectedMetrics(metricsCluster, !specs.IsPodPrimary(pod))
+					assertMetrics(out, expectedMetrics)
+				})
 			}
 		})
 
