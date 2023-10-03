@@ -304,6 +304,14 @@ func s3CredentialsSecrets(s3Credentials *apiv1.S3Credentials) []string {
 		secrets = append(secrets, s3Credentials.SecretAccessKeyReference.Name)
 	}
 
+	if s3Credentials.RegionReference != nil {
+		secrets = append(secrets, s3Credentials.RegionReference.Name)
+	}
+
+	if s3Credentials.SessionToken != nil {
+		secrets = append(secrets, s3Credentials.SessionToken.Name)
+	}
+
 	return secrets
 }
 
