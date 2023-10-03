@@ -48,7 +48,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	)
 
 	buildExpectedMetrics := func(cluster *apiv1.Cluster, isReplicaPod bool) map[string]*regexp.Regexp {
-		const replicationSlotsStatus = "cnpg_pg_replication_slots_status_inactive"
+		const replicationSlotsStatus = "cnpg_e2e_tests_replication_slots_status_inactive"
 
 		// We define a few metrics in the tests. We check that all of them exist and
 		// there are no errors during the collection.
