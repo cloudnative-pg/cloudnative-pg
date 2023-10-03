@@ -77,7 +77,7 @@ func reconcileMetadataComingFromInstance(
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	for _, pod := range runningInstances {
-		podRole, podHasRole := pod.ObjectMeta.Labels[utils.ClusterRoleLabelName]
+		podRole, podHasRole := utils.GetInstanceRole(pod.ObjectMeta.Labels)
 		podSerial, podSerialErr := specs.GetNodeSerial(pod.ObjectMeta)
 		if podSerialErr != nil {
 			return podSerialErr
@@ -89,6 +89,9 @@ func reconcileMetadataComingFromInstance(
 				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] != podRole {
 					return false
 				}
+				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName] != podRole {
+					return false
+				}
 
 				if serial, err := specs.GetNodeSerial(pvc.ObjectMeta); err != nil || serial != podSerial {
 					return false
@@ -97,11 +100,7 @@ func reconcileMetadataComingFromInstance(
 				return true
 			},
 			update: func(pvc *corev1.PersistentVolumeClaim) {
-				// this is needed, because on older versions pvc.labels could be nil
-				if pvc.Labels == nil {
-					pvc.Labels = map[string]string{}
-				}
-				pvc.Labels[utils.ClusterRoleLabelName] = podRole
+				utils.SetInstanceRole(pvc.ObjectMeta, podRole)
 
 				if pvc.Annotations == nil {
 					pvc.Annotations = map[string]string{}
