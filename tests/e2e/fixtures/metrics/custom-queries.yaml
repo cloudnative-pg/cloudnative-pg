@@ -58,7 +58,7 @@ data:
             description: "Disk space used by the database"
 
   additional-queries: |
-    pg_replication_slots:
+    pg_replication_slots_status:
       query: "SELECT count(*) AS inactive FROM pg_replication_slots WHERE NOT active"
       primary: false
       metrics:
