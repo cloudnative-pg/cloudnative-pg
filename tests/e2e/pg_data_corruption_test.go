@@ -33,34 +33,33 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
+var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func() {
 	const (
 		namespacePrefix = "pg-data-corruption"
-		sampleFile      = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"
-		clusterName     = "cluster-pg-data-corruption"
 		level           = tests.Medium
 	)
-	BeforeEach(func() {
+	var namespace string
+	BeforeAll(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-	})
-	var namespace string
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
-	It("can recover cluster after pgdata corruption on primary", func() {
-		var oldPrimaryPodName, oldPrimaryPVCName string
 		var err error
-		tableName := "test_pg_data_corruption"
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.DeleteNamespace(namespace)
 		})
+	})
+
+	testDataCorruption := func(
+		namespace string,
+		sampleFile string,
+	) {
+		var oldPrimaryPodName, oldPrimaryPVCName string
+		var err error
+		tableName := "test_pg_data_corruption"
+		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
 
@@ -193,5 +192,41 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), func() {
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 		AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
+	}
+
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
+
+	Context("plain cluster", func() {
+		It("can recover cluster after pgdata corruption on primary", func() {
+			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"
+			DeferCleanup(func() {
+				_ = DeleteResourcesFromFile(namespace, sampleFile)
+			})
+			testDataCorruption(namespace, sampleFile)
+		})
+	})
+
+	Context("cluster without replication slots", func() {
+		It("can recover cluster after pgdata corruption on primary", func() {
+			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption-no-slots.yaml.template"
+			DeferCleanup(func() {
+				_ = DeleteResourcesFromFile(namespace, sampleFile)
+			})
+			testDataCorruption(namespace, sampleFile)
+		})
+	})
+
+	Context("cluster with managed roles", func() {
+		It("can recover cluster after pgdata corruption on primary", func() {
+			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption-roles.yaml.template"
+			DeferCleanup(func() {
+				_ = DeleteResourcesFromFile(namespace, sampleFile)
+			})
+			testDataCorruption(namespace, sampleFile)
+		})
 	})
 })
