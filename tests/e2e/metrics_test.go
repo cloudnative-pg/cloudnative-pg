@@ -83,7 +83,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// match a metric with the value of expectedMetrics key
 			match := re.FindString(metrics)
 			if match == "" {
-				_, _ = fmt.Fprintf(GinkgoWriter, collectionError)
+				_, _ = fmt.Fprint(GinkgoWriter, collectionError)
 			}
 			Expect(match).NotTo(BeEmpty(),
 				"\nFound no match for metric %v\n", key)
@@ -91,7 +91,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// extract the value from the metric previously matched
 			value := strings.Fields(match)[1]
 			if value == "" {
-				_, _ = fmt.Fprintf(GinkgoWriter, collectionError)
+				_, _ = fmt.Fprint(GinkgoWriter, collectionError)
 			}
 			Expect(value).NotTo(BeEmpty(),
 				"\nFound no result for metric %v.\nMetric line: %v\n", key, match)
@@ -99,7 +99,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// expect the expectedMetrics regexp to match the value of the metric
 			result := valueRe.MatchString(value)
 			if result != true {
-				_, _ = fmt.Fprintf(GinkgoWriter, collectionError)
+				_, _ = fmt.Fprint(GinkgoWriter, collectionError)
 			}
 			Expect(result).To(BeTrue(),
 				"\nExpected %v to have value %v but got %v\n", key, valueRe, value)
