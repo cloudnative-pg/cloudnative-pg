@@ -35,9 +35,16 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 		validatingWebhookConfigList v1.ValidatingWebhookConfigurationList
 		mWebhookConfig              v1.MutatingWebhookConfigurationList
 		vWebhookConfig              v1.ValidatingWebhookConfigurationList
-		mutatingWebhookNames        = []string{"mbackup.cnpg.io", "mcluster.cnpg.io", "mscheduledbackup.cnpg.io"}
-		validatingWebhookNames      = []string{
-			"vbackup.cnpg.io", "vcluster.cnpg.io", "vpooler.cnpg.io", "vscheduledbackup.cnpg.io",
+		mutatingWebhookNames        = []string{
+			"mbackup.cnpg.io",
+			"mcluster.cnpg.io",
+			"mscheduledbackup.cnpg.io",
+		}
+		validatingWebhookNames = []string{
+			"vbackup.cnpg.io",
+			"vcluster.cnpg.io",
+			"vpooler.cnpg.io",
+			"vscheduledbackup.cnpg.io",
 		}
 	)
 
