@@ -49,7 +49,7 @@ func IsPodPrimary(pod corev1.Pod) bool {
 
 // IsPrimary check if a certain resource belongs to a primary
 func IsPrimary(meta metav1.ObjectMeta) bool {
-	role, hasRole := meta.Labels[utils.ClusterRoleLabelName]
+	role, hasRole := utils.GetInstanceRole(meta.Labels)
 	if !hasRole {
 		return false
 	}
