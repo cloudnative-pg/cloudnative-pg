@@ -18,11 +18,13 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -252,6 +254,73 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 			Expect(backupList.CanExecuteBackup("backup-1")).To(BeFalse())
 			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
 			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
+		})
+	})
+
+	When("cold snapshot backup has the primary as target", func() {
+		It("marks the backup as failed and exits the reconciliation with error", func(ctx SpecContext) {
+			namespace := "foo"
+			clusterName := "bar"
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      clusterName,
+				},
+				Spec: apiv1.ClusterSpec{
+					Backup: &apiv1.BackupConfiguration{
+						VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
+							ClassName: "csi-hostpath-snapclass",
+						},
+					},
+				},
+				Status: apiv1.ClusterStatus{
+					TargetPrimary:  "targetPrimary",
+					CurrentPrimary: "currentPrimary",
+				},
+			}
+			primaryPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      "currentPrimary",
+				},
+			}
+			backup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      "theBackup",
+				},
+				Spec: apiv1.BackupSpec{
+					Cluster: apiv1.LocalObjectReference{
+						Name: cluster.Name,
+					},
+				},
+			}
+			backupList := apiv1.BackupList{
+				ListMeta: metav1.ListMeta{},
+				Items:    []apiv1.Backup{},
+			}
+
+			indexer := func(o k8client.Object) []string {
+				return []string{".spec.cluster.name"}
+			}
+			mockClient := fake.NewClientBuilder().
+				WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+				WithObjects(cluster, primaryPod, backup).
+				WithLists(&backupList).
+				WithIndex(&apiv1.Backup{}, ".spec.cluster.name", indexer).
+				Build()
+
+			fakeBackupReconciler := &BackupReconciler{
+				Client:   mockClient,
+				Scheme:   scheme,
+				Recorder: record.NewFakeRecorder(3),
+			}
+
+			res, err := fakeBackupReconciler.reconcileSnapshotBackup(ctx, primaryPod, cluster, backup)
+			Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
+			Expect(res).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(errors.Is(err, errColdBackupOnPrimary)).To(BeTrue())
 		})
 	})
 })

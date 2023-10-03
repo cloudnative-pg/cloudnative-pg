@@ -58,6 +58,8 @@ const backupPhase = ".status.phase"
 // where the name of the cluster is written
 const clusterName = ".spec.cluster.name"
 
+var errColdBackupOnPrimary = errors.New("cannot take a cold volume snapshot of the primary")
+
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -212,6 +214,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{}, nil
 		}
 
+		// if the backup already has a target pod assigned (on a previous reconciliation loop)
+		// it will keep it. Otherwise will use the pod computed by r.getBackupTargetPod()
 		if previousPod, err := backup.GetAssignedInstance(ctx, r.Client); err != nil {
 			return ctrl.Result{}, err
 		} else if previousPod != nil {
@@ -321,6 +325,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		ctx,
 		&clusterBackups,
 		client.MatchingFields{clusterName: cluster.Name},
+		client.InNamespace(backup.GetNamespace()),
 	); err != nil {
 		return nil, err
 	}
@@ -331,6 +336,21 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 			"targetBackup", backup.Name,
 		)
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// TODO: at the moment, volume snapshot backups are cold and require fencing
+	// the target pod. This makes them unsuitable to run on the primary, so we
+	// mark the backup as failed and exit the reconciliation.
+	// When hot volume snapshots become available, this logic should be refined.
+	if targetPod.Name == cluster.Status.CurrentPrimary ||
+		targetPod.Name == cluster.Status.TargetPrimary {
+		err := errColdBackupOnPrimary
+		tryFlagBackupAsFailed(ctx, r.Client, backup, err)
+		contextLogger.Info(
+			"Cold Snapshot Backup has the primary as the target and cannot proceed",
+			"targetBackup", backup.Name, "targetPod", targetPod.Name,
+		)
+		return nil, err
 	}
 
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
@@ -451,7 +471,7 @@ func isErrorRetryable(err error) bool {
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err)
 }
 
-// getBackupTargetPod returns the correct pod that should run the backup according to the current
+// getBackupTargetPod returns the pod that should run the backup according to the current
 // cluster's target policy
 func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	cluster *apiv1.Cluster,
