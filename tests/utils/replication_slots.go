@@ -27,6 +27,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PrintReplicationSlots prints replications slots with their restart_lsn
@@ -47,7 +48,7 @@ func PrintReplicationSlots(
 		}
 		if len(slots) == 0 {
 			return fmt.Sprintf("No Replication slots have been found on %v pod %v\n",
-				pod.Labels["role"],
+				pod.Labels[utils.ClusterInstanceRoleLabelName],
 				pod.GetName())
 		}
 		m := make(map[string]string)
@@ -64,7 +65,8 @@ func PrintReplicationSlots(
 			}
 			m[slot] = strings.TrimSpace(restartLsn)
 		}
-		output.WriteString(fmt.Sprintf("Replication slots on %v pod %v: %v\n", pod.Labels["role"], pod.GetName(), m))
+		output.WriteString(fmt.Sprintf("Replication slots on %v pod %v: %v\n",
+			pod.Labels[utils.ClusterInstanceRoleLabelName], pod.GetName(), m))
 	}
 	return output.String()
 }
