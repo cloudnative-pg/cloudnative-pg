@@ -63,22 +63,25 @@ Below is a list of predefined labels that are managed by CloudNativePG.
 
 `cnpg.io/scheduled-backup`
 :   When available, name of the `ScheduledBackup` resource that created a given
-    `Backup` object.
+    `Backup` object
 
 `role`
 :   Whether the instance running in a pod is a `primary` or a `replica`
 
 `cnpg.io/backupTimeline`
-: The timeline of the instance when a backup was taken.
+: The timeline of the instance when a backup was taken
 
 `cnpg.io/backupYear`
-: The year a backup was taken.
+: The year a backup was taken
 
 `cnpg.io/backupMonth`
-: The year/month when a backup was taken.
+: The year/month when a backup was taken
+
+`cnpg.io/backupDate`
+: The date in ISO  8601 format (`YYYYMMDD`) of the backup
 
 `cnpg.io/onlineBackup`
-: Whether a backup was cold or online (hot).
+: Whether the backup is online (hot) or cold (taken when Postgres is down)
 
 ## Predefined annotations
 
@@ -156,22 +159,22 @@ Below is a list of predefined annotations that are managed by CloudNativePG.
     risk.
 
 `cnpg.io/backupStartWAL`
-: The WAL at the start of a backup.
+: The WAL at the start of a backup
 
 `cnpg.io/backupEndWAL`
-: The WAL at the conclusion of a backup.
+: The WAL at the conclusion of a backup
 
 `cnpg.io/backupStartTime`
-: The time a backup started.
+: The time a backup started
 
 `cnpg.io/backupEndTime`
-: The time a backup ended.
+: The time a backup ended
 
 `cnpg.io/snapshotStartTime`
-: The time a snapshot started.
+: The time a snapshot started
 
 `cnpg.io/snapshotEndTime`
-: The time a snapshot was marked as ready to use.
+: The time a snapshot was marked as ready to use
 
 `kubectl.kubernetes.io/restartedAt`
 :  When available, the time of last requested restart of a Postgres cluster
