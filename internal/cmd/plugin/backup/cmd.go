@@ -26,11 +26,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // backupCommandOptions are the options that are provider to the backup
@@ -94,7 +94,7 @@ func NewCmd() *cobra.Command {
 				&cluster,
 			)
 			if err != nil {
-				return fmt.Errorf("Cluster %s does not exist", clusterName)
+				return fmt.Errorf("cluster %s does not exist", clusterName)
 			}
 
 			return createBackup(
