@@ -911,3 +911,44 @@ var _ = Describe("SeccompProfile usages", func() {
 		Expect(returnedProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
 	})
 })
+
+var _ = Describe("Cluster ShouldRecoveryCreateApplicationDatabase", func() {
+	var cluster *Cluster
+
+	BeforeEach(func() {
+		cluster = &Cluster{}
+	})
+
+	It("should return false if the cluster is a replica", func() {
+		cluster.Spec.ReplicaCluster = &ReplicaClusterConfiguration{Enabled: true}
+		result := cluster.ShouldRecoveryCreateApplicationDatabase()
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false if Spec.Bootstrap is nil", func() {
+		result := cluster.ShouldRecoveryCreateApplicationDatabase()
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false if Spec.Bootstrap.Recovery is nil", func() {
+		cluster.Spec.Bootstrap = &BootstrapConfiguration{Recovery: nil}
+		result := cluster.ShouldRecoveryCreateApplicationDatabase()
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return true if BootstrapRecovery.Owner and BootstrapRecovery.Database are set", func() {
+		cluster.Spec.Bootstrap = &BootstrapConfiguration{
+			Recovery: &BootstrapRecovery{
+				Owner:    "someOwner",
+				Database: "someDatabase",
+			},
+		}
+		result := cluster.ShouldRecoveryCreateApplicationDatabase()
+		Expect(result).To(BeTrue())
+	})
+
+	It("should return false if none of the conditions are met", func() {
+		result := cluster.ShouldRecoveryCreateApplicationDatabase()
+		Expect(result).To(BeFalse())
+	})
+})

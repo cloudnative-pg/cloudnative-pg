@@ -236,12 +236,6 @@ func (r *Cluster) defaultInitDB() {
 
 // defaultRecovery enriches the recovery with defaults if not all the required arguments were passed
 func (r *Cluster) defaultRecovery() {
-	// if none area is provided, will ignore the application database configuration
-	if r.Spec.Bootstrap.Recovery.Database == "" &&
-		r.Spec.Bootstrap.Recovery.Owner == "" &&
-		r.Spec.Bootstrap.Recovery.Secret == nil {
-		return
-	}
 	if r.Spec.Bootstrap.Recovery.Database == "" {
 		r.Spec.Bootstrap.Recovery.Database = DefaultApplicationDatabaseName
 	}
@@ -252,12 +246,6 @@ func (r *Cluster) defaultRecovery() {
 
 // defaultPgBaseBackup enriches the pg_basebackup with defaults if not all the required arguments were passed
 func (r *Cluster) defaultPgBaseBackup() {
-	// if none area is provided, will ignore the application database configuration
-	if r.Spec.Bootstrap.PgBaseBackup.Database == "" &&
-		r.Spec.Bootstrap.PgBaseBackup.Owner == "" &&
-		r.Spec.Bootstrap.PgBaseBackup.Secret == nil {
-		return
-	}
 	if r.Spec.Bootstrap.PgBaseBackup.Database == "" {
 		r.Spec.Bootstrap.PgBaseBackup.Database = DefaultApplicationDatabaseName
 	}
