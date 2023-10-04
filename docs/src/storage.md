@@ -44,13 +44,19 @@ guarantees higher and more predictable performance.
     to know more, please read the
     ["Custom Pod Controller"](controller.md) document.
 
+## Backup and recovery
+
+Since CloudNativePG supports volume snapshots for both backup and recovery,
+we recommend that you also consider this aspect when you choose your storage
+solution, especially if you manage very large databases.
+
 ## Benchmarking CloudNativePG
 
-EDB maintains [cnp-bench](https://github.com/EnterpriseDB/cnp-bench),
-an open source set of guidelines and Helm charts for benchmarking CloudNativePG
-in a controlled Kubernetes environment, before deploying the database in production.
+We recommend that you benchmark CloudNativePG in a controlled Kubernetes
+environment, before deploying the database in production, by following
+the [guidelines in the "Benchmarking" section](benchmarking.md).
 
-Briefly, `cnp-bench` is designed to operate at two levels:
+Briefly, our advice is to operate at two levels:
 
 - measuring the performance of the underlying storage using `fio`, with relevant
   metrics for database workloads such as throughput for sequential reads, sequential
