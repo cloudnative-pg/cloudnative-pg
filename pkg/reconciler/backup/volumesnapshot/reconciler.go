@@ -117,7 +117,7 @@ func (se *Reconciler) enrichSnapshot(
 		contextLogger.Error(err, "while querying for pg_controldata")
 	}
 
-	vs.Labels[utils.BackupDateLabelName] = time.Now().Format("20060101")
+	vs.Labels[utils.BackupDateLabelName] = time.Now().Format("20060102")
 	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
 	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
 	// TODO: once we have online volumesnapshot backups, this should change
