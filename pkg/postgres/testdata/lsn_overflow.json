@@ -20,7 +20,7 @@
           "creationTimestamp": "2021-12-09T16:10:34Z",
           "labels": {
             "cnpg.io/cluster": "sandbox",
-            "role": "replica"
+            "cnpg.io/instanceRole": "replica"
           },
           "annotations": {
             "cnpg.io/nodeSerial": "6",
@@ -829,7 +829,7 @@
           "creationTimestamp": "2021-12-09T15:23:04Z",
           "labels": {
             "cnpg.io/cluster": "sandbox",
-            "role": "replica"
+            "cnpg.io/instanceRole": "replica"
           },
           "annotations": {
             "cnpg.io/nodeSerial": "3",

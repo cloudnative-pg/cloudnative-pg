@@ -499,11 +499,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				if err != nil {
 					return 0, err
 				}
+				if len(currentUIDs) != len(podUIDs) {
+					return 0, fmt.Errorf("unexpected number of pod IDs. Should have %d", len(podUIDs))
+				}
 				for _, pod := range currentPodList.Items {
 					currentUIDs = append(currentUIDs, pod.GetUID())
 				}
 				return len(funk.Join(currentUIDs, podUIDs, funk.InnerJoin).([]types.UID)), nil
-			}, 300).Should(BeEquivalentTo(0))
+			}, 300).Should(BeEquivalentTo(0), "No pods should have the same UID they had before the upgrade")
 		} else {
 			GinkgoWriter.Printf("online upgrade\n")
 			// Pods shouldn't change and there should be an event
