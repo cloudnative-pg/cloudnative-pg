@@ -499,8 +499,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				if err != nil {
 					return 0, err
 				}
-				if len(currentUIDs) != len(podUIDs) {
-					return 0, fmt.Errorf("unexpected number of pod IDs. Should have %d", len(podUIDs))
+				if len(currentPodList.Items) != len(podUIDs) {
+					return 0, fmt.Errorf("unexpected number of pods. Should have %d, has %d",
+						len(podUIDs), len(currentPodList.Items))
 				}
 				for _, pod := range currentPodList.Items {
 					currentUIDs = append(currentUIDs, pod.GetUID())
