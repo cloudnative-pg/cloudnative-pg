@@ -80,6 +80,9 @@ const (
 	// BackupMonthLabelName is the name of the label where the month of a backup is kept
 	BackupMonthLabelName = MetadataNamespace + "/backupMonth"
 
+	// BackupDateLabelName is the name of the label where the date of a backup in 'YYYYMMDD' format is kept
+	BackupDateLabelName = MetadataNamespace + "/backupDate"
+
 	// IsOnlineBackupLabelName is the name of the label used to specify whether a backup was online
 	IsOnlineBackupLabelName = MetadataNamespace + "/onlineBackup"
 )
