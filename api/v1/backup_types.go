@@ -18,6 +18,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -26,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // BackupPhase is the phase of the backup
@@ -90,9 +93,20 @@ type BackupSpec struct {
 
 // BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
 type BackupSnapshotStatus struct {
-	// The snapshot lists, populated if it is a snapshot type backup
+	// The parts list, populated if it is a snapshot type backup
 	// +optional
-	Snapshots []string `json:"snapshots,omitempty"`
+	Parts BackupSnapshotStatusParts `json:"parts,omitempty"`
+}
+
+// BackupSnapshotStatusParts the volumeSnapshots composing the backup
+type BackupSnapshotStatusParts struct {
+	// The PostgreSQL data snapshot name
+	// +optional
+	Data string `json:"data,omitempty"`
+
+	// The PostgreSQL WAL (Write-Ahead Log) snapshot name
+	// +optional
+	Wal string `json:"wal,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
@@ -264,13 +278,34 @@ func (backupStatus *BackupStatus) SetAsStarted(targetPod *corev1.Pod, method Bac
 	backupStatus.Method = method
 }
 
-// SetSnapshotList sets the Snapshots field from a list of VolumeSnapshot
-func (snapshotStatus *BackupSnapshotStatus) SetSnapshotList(snapshots []volumesnapshot.VolumeSnapshot) {
-	snapshotNames := make([]string, len(snapshots))
-	for idx, volumeSnapshot := range snapshots {
-		snapshotNames[idx] = volumeSnapshot.Name
+// SetSnapshots sets the components field from a list of VolumeSnapshot
+func (snapshotStatus *BackupSnapshotStatus) SetSnapshots(snapshots []volumesnapshot.VolumeSnapshot) error {
+	for _, volumeSnapshot := range snapshots {
+		role := utils.PVCRole(volumeSnapshot.Labels[utils.PvcRoleLabelName])
+		switch role {
+		case utils.PVCRolePgData, "":
+			snapshotStatus.Parts.Data = volumeSnapshot.Name
+		case utils.PVCRolePgWal:
+			snapshotStatus.Parts.Wal = volumeSnapshot.Name
+		default:
+			// Unrecognized snapshot
+			return fmt.Errorf("unrecognised role %s in snapshot %s", role, volumeSnapshot.Name)
+		}
 	}
-	snapshotStatus.Snapshots = snapshotNames
+
+	return nil
+}
+
+// GetSnapshots returns the list of snapshot names
+func (snapshotStatus *BackupSnapshotStatus) GetSnapshots() []string {
+	var snapshots []string
+	if snapshotStatus.Parts.Data != "" {
+		snapshots = append(snapshots, snapshotStatus.Parts.Data)
+	}
+	if snapshotStatus.Parts.Wal != "" {
+		snapshots = append(snapshots, snapshotStatus.Parts.Wal)
+	}
+	return snapshots
 }
 
 // IsDone check if a backup is completed or still in progress

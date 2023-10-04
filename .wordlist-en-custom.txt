@@ -23,6 +23,7 @@ BackupList
 BackupMethod
 BackupPhase
 BackupSnapshotStatus
+BackupSnapshotStatusParts
 BackupSource
 BackupSpec
 BackupStatus

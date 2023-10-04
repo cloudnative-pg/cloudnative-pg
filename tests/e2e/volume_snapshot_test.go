@@ -97,14 +97,14 @@ var _ = Describe("Verify Volume Snapshot",
 							}
 							backupObject = backup
 							g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
-							g.Expect(backup.Status.BackupSnapshotStatus.Snapshots).To(HaveLen(2))
+							g.Expect(backup.Status.BackupSnapshotStatus.GetSnapshots()).To(HaveLen(2))
 						}
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 				})
 
 				By("checking that volumeSnapshots are properly labeled", func() {
 					Eventually(func(g Gomega) {
-						for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Snapshots {
+						for _, snapshot := range backupObject.Status.BackupSnapshotStatus.GetSnapshots() {
 							volumeSnapshot, err := env.GetVolumeSnapshot(namespace, snapshot)
 							g.Expect(err).ToNot(HaveOccurred())
 							g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
@@ -248,7 +248,7 @@ var _ = Describe("Verify Volume Snapshot",
 							Name:      backupName,
 						}, backup)
 						g.Expect(err).ToNot(HaveOccurred())
-						g.Expect(backup.Status.BackupSnapshotStatus.Snapshots).To(HaveLen(2))
+						g.Expect(backup.Status.BackupSnapshotStatus.GetSnapshots()).To(HaveLen(2))
 						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 				})
@@ -259,7 +259,7 @@ var _ = Describe("Verify Volume Snapshot",
 						utils.ClusterLabelName: clusterToSnapshotName,
 					})
 					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Snapshots)))
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.GetSnapshots())))
 
 					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
 					Expect(err).ToNot(HaveOccurred())
@@ -402,7 +402,7 @@ var _ = Describe("Verify Volume Snapshot",
 						utils.ClusterLabelName: clusterToBackupName,
 					})
 					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Snapshots)))
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.GetSnapshots())))
 				})
 
 				By("ensuring that the additional labels and annotations are present", func() {
