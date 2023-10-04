@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -34,6 +35,7 @@ import (
 func NewCmd() *cobra.Command {
 	var backupName string
 	var backupTarget string
+	var cluster apiv1.Cluster
 
 	backupSubcommand := &cobra.Command{
 		Use:   "backup [cluster]",
@@ -47,6 +49,19 @@ func NewCmd() *cobra.Command {
 					"%s-%s",
 					clusterName,
 					time.Now().Format("20060102150400"))
+			}
+
+			// check if the cluster exists
+			err := plugin.Client.Get(
+				cmd.Context(),
+				client.ObjectKey{
+					Namespace: plugin.Namespace,
+					Name:      clusterName,
+				},
+				&cluster,
+			)
+			if err != nil {
+				return fmt.Errorf("cluster %s does not exist", clusterName)
 			}
 
 			backupTargetPolicy := apiv1.BackupTarget(backupTarget)
