@@ -61,7 +61,7 @@ func NewCmd() *cobra.Command {
 				&cluster,
 			)
 			if err != nil {
-				return fmt.Errorf("cluster %s does not exist", clusterName)
+				return fmt.Errorf("while getting cluster %s: %w", clusterName, err)
 			}
 
 			backupTargetPolicy := apiv1.BackupTarget(backupTarget)
