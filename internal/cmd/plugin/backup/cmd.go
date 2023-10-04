@@ -30,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // backupCommandOptions are the options that are provider to the backup
@@ -46,6 +47,7 @@ func NewCmd() *cobra.Command {
 	var backupName string
 	var backupTarget string
 	var backupMethod string
+	var cluster apiv1.Cluster
 
 	backupSubcommand := &cobra.Command{
 		Use:   "backup [cluster]",
@@ -80,6 +82,19 @@ func NewCmd() *cobra.Command {
 			}
 			if !slices.Contains(allowedBackupMethods, backupMethod) {
 				return fmt.Errorf("backup-method: %s is not supported by the backup command", backupMethod)
+			}
+
+			// check if the cluster exists
+			err := plugin.Client.Get(
+				cmd.Context(),
+				client.ObjectKey{
+					Namespace: plugin.Namespace,
+					Name:      clusterName,
+				},
+				&cluster,
+			)
+			if err != nil {
+				return fmt.Errorf("Cluster %s does not exist", clusterName)
 			}
 
 			return createBackup(
