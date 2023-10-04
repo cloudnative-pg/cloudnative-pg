@@ -47,7 +47,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		level                          = tests.Low
 	)
 
-	buildExpectedMetrics := func(cluster *apiv1.Cluster, isReplicaPod, slotsEnabled bool) map[string]*regexp.Regexp {
+	buildExpectedMetrics := func(cluster *apiv1.Cluster, isReplicaPod bool) map[string]*regexp.Regexp {
 		const inactiveReplicationSlotsCount = "cnpg_e2e_tests_replication_slots_status_inactive"
 
 		// We define a few metrics in the tests. We check that all of them exist and
@@ -62,6 +62,12 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			"cnpg_runonserver_match_fixed":                 regexp.MustCompile(`42`),
 			"cnpg_collector_last_collection_error":         regexp.MustCompile(`0`),
 			inactiveReplicationSlotsCount:                  regexp.MustCompile("0"),
+		}
+
+		slotsEnabled := true
+		if cluster.Spec.ReplicationSlots == nil ||
+			!cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
+			slotsEnabled = false
 		}
 
 		if slotsEnabled && isReplicaPod {
@@ -119,18 +125,12 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			slotsEnabled := true
-			if metricsCluster.Spec.ReplicationSlots == nil ||
-				!metricsCluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
-				slotsEnabled = false
-			}
-
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
 					out, err := utils.CurlGetMetrics(namespace, curlPodName, pod.Status.PodIP, 9187)
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
-					expectedMetrics := buildExpectedMetrics(metricsCluster, !specs.IsPodPrimary(pod), slotsEnabled)
+					expectedMetrics := buildExpectedMetrics(metricsCluster, !specs.IsPodPrimary(pod))
 					assertMetrics(out, expectedMetrics)
 				})
 			}
