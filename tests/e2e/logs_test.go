@@ -144,6 +144,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 			}, timeout).Should(BeTrue())
 
 			// Retrieve cluster replicas
+			// Deprecated: Use utils.ClusterInstanceRoleLabelName instead of "role"
 			podList := &corev1.PodList{}
 			listError := env.Client.List(
 				env.Ctx, podList, client.InNamespace(namespace),

@@ -52,6 +52,7 @@ const (
 	ClusterReloadAnnotationName = utils.ClusterReloadAnnotationName
 
 	// ClusterRoleLabelName label is applied to Pods to mark primary ones
+	// Deprecated: Use utils.ClusterInstanceRoleLabelName
 	ClusterRoleLabelName = utils.ClusterRoleLabelName
 
 	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded

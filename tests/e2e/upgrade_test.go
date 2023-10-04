@@ -146,7 +146,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			oldPrimary := cluster.Status.CurrentPrimary
 			oldPrimaryTimestamp := cluster.Status.CurrentPrimaryTimestamp
 			// Update the configuration. It may take some time after the
-			// upgrade for the webhook "mcluster.kb.io" to work and accept
+			// upgrade for the webhook "mcluster.cnpg.io" to work and accept
 			// the `apply` command
 
 			Eventually(func() error {
@@ -499,11 +499,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				if err != nil {
 					return 0, err
 				}
+				if len(currentPodList.Items) != len(podUIDs) {
+					return 0, fmt.Errorf("unexpected number of pods. Should have %d, has %d",
+						len(podUIDs), len(currentPodList.Items))
+				}
 				for _, pod := range currentPodList.Items {
 					currentUIDs = append(currentUIDs, pod.GetUID())
 				}
 				return len(funk.Join(currentUIDs, podUIDs, funk.InnerJoin).([]types.UID)), nil
-			}, 300).Should(BeEquivalentTo(0))
+			}, 300).Should(BeEquivalentTo(0), "No pods should have the same UID they had before the upgrade")
 		} else {
 			GinkgoWriter.Printf("online upgrade\n")
 			// Pods shouldn't change and there should be an event

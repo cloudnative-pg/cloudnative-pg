@@ -460,7 +460,7 @@ var _ = Describe("cluster configuration", func() {
 		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("appdb"))
 	})
 
-	It("defaults to not to create an application database if recovery is used", func() {
+	It("defaults to create an application database if recovery is used", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
@@ -469,9 +469,9 @@ var _ = Describe("cluster configuration", func() {
 			},
 		}
 		cluster.Default()
-		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).Should(BeFalse())
-		Expect(cluster.Spec.Bootstrap.Recovery.Database).Should(BeEmpty())
-		Expect(cluster.Spec.Bootstrap.Recovery.Owner).Should(BeEmpty())
+		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).Should(BeTrue())
+		Expect(cluster.Spec.Bootstrap.Recovery.Database).ShouldNot(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.Recovery.Owner).ShouldNot(BeEmpty())
 		Expect(cluster.Spec.Bootstrap.Recovery.Secret).Should(BeNil())
 	})
 
@@ -490,7 +490,7 @@ var _ = Describe("cluster configuration", func() {
 		Expect(cluster.Spec.Bootstrap.Recovery.Owner).To(Equal("appdb"))
 	})
 
-	It("defaults not to create an application database if pg_basebackup is used", func() {
+	It("defaults to create an application database if pg_basebackup is used", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
@@ -499,9 +499,9 @@ var _ = Describe("cluster configuration", func() {
 			},
 		}
 		cluster.Default()
-		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).Should(BeFalse())
-		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Database).Should(BeEmpty())
-		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Owner).Should(BeEmpty())
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).Should(BeTrue())
+		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Database).ShouldNot(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Owner).ShouldNot(BeEmpty())
 		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Secret).Should(BeNil())
 	})
 

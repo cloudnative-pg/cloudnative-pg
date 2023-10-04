@@ -73,7 +73,7 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},path=/mutate-postgresql-cnpg-io-v1-cluster,mutating=true,failurePolicy=fail,groups=postgresql.cnpg.io,resources=clusters,verbs=create;update,versions=v1,name=mcluster.kb.io,sideEffects=None
+// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},path=/mutate-postgresql-cnpg-io-v1-cluster,mutating=true,failurePolicy=fail,groups=postgresql.cnpg.io,resources=clusters,verbs=create;update,versions=v1,name=mcluster.cnpg.io,sideEffects=None
 
 var _ webhook.Defaulter = &Cluster{}
 
@@ -236,12 +236,6 @@ func (r *Cluster) defaultInitDB() {
 
 // defaultRecovery enriches the recovery with defaults if not all the required arguments were passed
 func (r *Cluster) defaultRecovery() {
-	// if none area is provided, will ignore the application database configuration
-	if r.Spec.Bootstrap.Recovery.Database == "" &&
-		r.Spec.Bootstrap.Recovery.Owner == "" &&
-		r.Spec.Bootstrap.Recovery.Secret == nil {
-		return
-	}
 	if r.Spec.Bootstrap.Recovery.Database == "" {
 		r.Spec.Bootstrap.Recovery.Database = DefaultApplicationDatabaseName
 	}
@@ -252,12 +246,6 @@ func (r *Cluster) defaultRecovery() {
 
 // defaultPgBaseBackup enriches the pg_basebackup with defaults if not all the required arguments were passed
 func (r *Cluster) defaultPgBaseBackup() {
-	// if none area is provided, will ignore the application database configuration
-	if r.Spec.Bootstrap.PgBaseBackup.Database == "" &&
-		r.Spec.Bootstrap.PgBaseBackup.Owner == "" &&
-		r.Spec.Bootstrap.PgBaseBackup.Secret == nil {
-		return
-	}
 	if r.Spec.Bootstrap.PgBaseBackup.Database == "" {
 		r.Spec.Bootstrap.PgBaseBackup.Database = DefaultApplicationDatabaseName
 	}
@@ -267,7 +255,7 @@ func (r *Cluster) defaultPgBaseBackup() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},verbs=create;update,path=/validate-postgresql-cnpg-io-v1-cluster,mutating=false,failurePolicy=fail,groups=postgresql.cnpg.io,resources=clusters,versions=v1,name=vcluster.kb.io,sideEffects=None
+// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},verbs=create;update,path=/validate-postgresql-cnpg-io-v1-cluster,mutating=false,failurePolicy=fail,groups=postgresql.cnpg.io,resources=clusters,versions=v1,name=vcluster.cnpg.io,sideEffects=None
 
 var _ webhook.Validator = &Cluster{}
 
