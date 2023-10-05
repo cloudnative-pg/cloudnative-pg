@@ -128,6 +128,11 @@ nodes:
 - role: control-plane
 EOF
 
+  # Disable ipvs on darwin arm64
+  if [[ "$OS" == "darwin" && "$ARCH" == "arm64" ]]; then
+    sed -i -E -e 's/kubeProxyMode: "ipvs"//g' "${config_file}"
+  fi
+
   if [ "$NODES" -gt 1 ]; then
     for ((i = 0; i < NODES; i++)); do
       echo '- role: worker' >>"${config_file}"
@@ -164,10 +169,14 @@ EOF
     docker network connect "kind" "${registry_name}" &>/dev/null || true
   fi
 
-  # Workaround for https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files
-  for node in $(kind get nodes --name "${cluster_name}"); do
-    docker exec "$node" sysctl fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=512
-  done
+  if [[ "$OS" == "darwin" && "$ARCH" == "arm64" ]]; then
+    echo "disabled too-many-open-files workaround on darwin arm64"
+  else
+    # Workaround for https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files
+    for node in $(kind get nodes --name "${cluster_name}"); do
+      docker exec "$node" sysctl fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=512
+    done
+  fi
 }
 
 export_logs_kind() {
