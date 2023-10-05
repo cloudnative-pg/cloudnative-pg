@@ -18,7 +18,9 @@ package persistentvolumeclaim
 
 import (
 	"context"
-	"fmt"
+	"errors"
+
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -27,10 +29,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// ErrUnknownRole is raised when asking a storage source
-// for a PVC role that is not known
-var ErrUnknownRole = fmt.Errorf("unknown PVC role")
-
 // StorageSource the storage source to be used when creating a set
 // of PVCs
 type StorageSource struct {
@@ -38,7 +36,23 @@ type StorageSource struct {
 	DataSource corev1.TypedLocalObjectReference `json:"dataSource"`
 
 	// The (optional) data source that should be used for WALs
-	WALSource *corev1.TypedLocalObjectReference `json:"WALSource"`
+	WALSource *corev1.TypedLocalObjectReference `json:"walSource"`
+}
+
+// ForRole gets the storage source given a PVC role
+func (source *StorageSource) ForRole(role utils.PVCRole) (*corev1.TypedLocalObjectReference, error) {
+	if source == nil {
+		return nil, nil
+	}
+
+	switch role {
+	case utils.PVCRolePgData:
+		return &source.DataSource, nil
+	case utils.PVCRolePgWal:
+		return source.WALSource, nil
+	default:
+		return nil, errors.New("unknown PVC role for StorageSource")
+	}
 }
 
 // GetCandidateStorageSource gets the candidate storage source
@@ -48,8 +62,7 @@ func GetCandidateStorageSource(
 	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
 ) *StorageSource {
-	result := getCandidateSourceFromBackupList(ctx, backupList)
-	if result != nil {
+	if result := getCandidateSourceFromBackupList(ctx, backupList); result != nil {
 		return result
 	}
 
@@ -78,27 +91,29 @@ func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.Back
 	contextLogger := log.FromContext(ctx)
 
 	backupList.SortByReverseCreationTime()
-	for _, backup := range backupList.Items {
-		backup := backup
-		if !isBackupCandidate(&backup) {
-			contextLogger.Trace("is not a storage source candidate", "backupName", backup.Name)
+	for idx := range backupList.Items {
+		backup := &backupList.Items[idx]
+		if !backup.IsCompletedVolumeSnapshot() {
+			contextLogger.Trace("skipping backup, not a valid storage source candidate",
+				"backupName", backup.Name)
 			continue
 		}
 
-		contextLogger.Debug("is a storage source candidate", "backupName", backup.Name)
+		contextLogger.Debug("found a backup that is a valid storage source candidate",
+			"backupName", backup.Name)
 
 		result := &StorageSource{
 			DataSource: corev1.TypedLocalObjectReference{
-				APIGroup: ptr.To("snapshot.storage.k8s.io"),
+				APIGroup: ptr.To(volumesnapshot.GroupName),
 				Kind:     "VolumeSnapshot",
-				Name:     backup.Name,
+				Name:     GetName(backup.Name, utils.PVCRolePgData),
 			},
 		}
 		if len(backup.Status.BackupSnapshotStatus.Snapshots) > 1 {
 			result.WALSource = &corev1.TypedLocalObjectReference{
-				APIGroup: ptr.To("snapshot.storage.k8s.io"),
+				APIGroup: ptr.To(volumesnapshot.GroupName),
 				Kind:     "VolumeSnapshot",
-				Name:     fmt.Sprintf("%s-wal", backup.Name), // TODO: remove from here, isolate
+				Name:     GetName(backup.Name, utils.PVCRolePgWal),
 			}
 		}
 
@@ -106,34 +121,4 @@ func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.Back
 	}
 
 	return nil
-}
-
-// isBackupCandidate checks if a backup can be used to bootstrap a
-// PVC
-func isBackupCandidate(backup *apiv1.Backup) bool {
-	if backup.Spec.Method != apiv1.BackupMethodVolumeSnapshot {
-		return false
-	}
-
-	if backup.Status.Phase != apiv1.BackupPhaseCompleted {
-		return false
-	}
-
-	return true
-}
-
-// ForRole gets the storage source given a PVC role
-func (source *StorageSource) ForRole(role utils.PVCRole) (*corev1.TypedLocalObjectReference, error) {
-	if source == nil {
-		return nil, nil
-	}
-
-	switch role {
-	case utils.PVCRolePgData:
-		return &source.DataSource, nil
-	case utils.PVCRolePgWal:
-		return source.WALSource, nil
-	default:
-		return nil, ErrUnknownRole
-	}
 }

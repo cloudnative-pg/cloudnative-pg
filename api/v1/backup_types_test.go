@@ -361,3 +361,55 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 		})
 	})
 })
+
+var _ = Describe("IsCompletedVolumeSnapshot", func() {
+	now := time.Now()
+	completedBackup := Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.NewTime(now),
+			Name:              "completed-backup",
+		},
+		Spec: BackupSpec{
+			Method: BackupMethodVolumeSnapshot,
+		},
+		Status: BackupStatus{
+			Phase: BackupPhaseCompleted,
+		},
+	}
+
+	nonCompletedBackup := Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.NewTime(now),
+			Name:              "non-completed-backup",
+		},
+		Spec: BackupSpec{
+			Method: BackupMethodVolumeSnapshot,
+		},
+		Status: BackupStatus{},
+	}
+
+	objectStoreBackup := Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.NewTime(now),
+			Name:              "object-store-backup",
+		},
+		Spec: BackupSpec{
+			Method: BackupMethodBarmanObjectStore,
+		},
+		Status: BackupStatus{
+			Phase: BackupPhaseCompleted,
+		},
+	}
+
+	It("should return true for a completed volume snapshot", func() {
+		Expect(completedBackup.IsCompletedVolumeSnapshot()).To(BeTrue())
+	})
+
+	It("should return false for a completed objectStore", func() {
+		Expect(objectStoreBackup.IsCompletedVolumeSnapshot()).To(BeFalse())
+	})
+
+	It("should return false for an incomplete volume snapshot", func() {
+		Expect(nonCompletedBackup.IsCompletedVolumeSnapshot()).To(BeFalse())
+	})
+})

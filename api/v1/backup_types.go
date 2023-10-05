@@ -292,6 +292,13 @@ func (backupStatus *BackupStatus) IsDone() bool {
 	return backupStatus.Phase == BackupPhaseCompleted || backupStatus.Phase == BackupPhaseFailed
 }
 
+// IsCompletedVolumeSnapshot checks if a backup is completed using the volume snapshot method.
+// It returns true if the backup's method is BackupMethodVolumeSnapshot and its status phase is BackupPhaseCompleted.
+// Otherwise, it returns false.
+func (backup *Backup) IsCompletedVolumeSnapshot() bool {
+	return backup.Spec.Method == BackupMethodVolumeSnapshot && backup.Status.Phase == BackupPhaseCompleted
+}
+
 // IsInProgress check if a certain backup is in progress or not
 func (backupStatus *BackupStatus) IsInProgress() bool {
 	return backupStatus.Phase == BackupPhasePending ||

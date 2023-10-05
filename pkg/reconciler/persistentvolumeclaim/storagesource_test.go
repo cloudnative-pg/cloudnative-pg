@@ -198,18 +198,6 @@ var _ = Describe("candidate backups", func() {
 		},
 	}
 
-	It("considers a volumesnapshot completed backup as candidate", func() {
-		Expect(isBackupCandidate(&completedBackup)).To(BeTrue())
-	})
-
-	It("considers a objectStore completed backup as not candidate", func() {
-		Expect(isBackupCandidate(&objectStoreBackup)).To(BeFalse())
-	})
-
-	It("considers a backup that is not completed as not candidate", func() {
-		Expect(isBackupCandidate(&nonCompletedBackup)).To(BeFalse())
-	})
-
 	It("takes the most recent candidate backup as source", func(ctx context.Context) {
 		backupList := apiv1.BackupList{
 			Items: []apiv1.Backup{
