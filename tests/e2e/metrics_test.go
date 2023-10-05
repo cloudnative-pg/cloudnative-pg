@@ -48,7 +48,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	)
 
 	buildExpectedMetrics := func(cluster *apiv1.Cluster, isReplicaPod bool) map[string]*regexp.Regexp {
-		const replicationSlotsStatus = "cnpg_e2e_tests_replication_slots_status_inactive"
+		const inactiveReplicationSlotsCount = "cnpg_e2e_tests_replication_slots_status_inactive"
 
 		// We define a few metrics in the tests. We check that all of them exist and
 		// there are no errors during the collection.
@@ -61,12 +61,18 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			"cnpg_pg_locks_blocked_queries":                regexp.MustCompile(`0`),
 			"cnpg_runonserver_match_fixed":                 regexp.MustCompile(`42`),
 			"cnpg_collector_last_collection_error":         regexp.MustCompile(`0`),
-			replicationSlotsStatus:                         regexp.MustCompile("0"),
+			inactiveReplicationSlotsCount:                  regexp.MustCompile("0"),
 		}
 
-		if isReplicaPod {
+		slotsEnabled := true
+		if cluster.Spec.ReplicationSlots == nil ||
+			!cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
+			slotsEnabled = false
+		}
+
+		if slotsEnabled && isReplicaPod {
 			inactiveSlots := strconv.Itoa(cluster.Spec.Instances - 2)
-			expectedMetrics[replicationSlotsStatus] = regexp.MustCompile(inactiveSlots)
+			expectedMetrics[inactiveReplicationSlotsCount] = regexp.MustCompile(inactiveSlots)
 		}
 
 		return expectedMetrics
