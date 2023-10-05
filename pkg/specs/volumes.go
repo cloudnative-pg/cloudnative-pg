@@ -32,8 +32,6 @@ const PgWalVolumePath = "/var/lib/postgresql/wal"
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
-	ephemeralStorageVolumeLimit := cluster.GetEmptyDirLimit()
-
 	result := []corev1.Volume{
 		{
 			Name: "pgdata",
@@ -47,7 +45,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 			Name: "scratch-data",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: ephemeralStorageVolumeLimit,
+					SizeLimit: cluster.Spec.EphemeralVolumesSizeLimit.GetTemporaryDataLimit(),
 				},
 			},
 		},
@@ -56,7 +54,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					Medium:    "Memory",
-					SizeLimit: ephemeralStorageVolumeLimit,
+					SizeLimit: cluster.Spec.EphemeralVolumesSizeLimit.GetShmLimit(),
 				},
 			},
 		},

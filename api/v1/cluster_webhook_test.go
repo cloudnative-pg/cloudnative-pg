@@ -3236,6 +3236,30 @@ var _ = Describe("validateResources", func() {
 		Expect(errors[0].Detail).To(Equal("Memory request is greater than the limit"))
 	})
 
+	It("returns an error when the ephemeral storage request is greater than ephemeral storage limit", func() {
+		cluster.Spec.Resources.Requests["ephemeral-storage"] = resource.MustParse("2")
+		cluster.Spec.Resources.Limits["ephemeral-storage"] = resource.MustParse("1")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Ephemeral storage request is greater than the limit"))
+	})
+
+	It("returns three errors when CPU, Memory, and ephemeral storage requests are greater than limits", func() {
+		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("2")
+		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("1")
+		cluster.Spec.Resources.Requests["memory"] = resource.MustParse("2Gi")
+		cluster.Spec.Resources.Limits["memory"] = resource.MustParse("1Gi")
+		cluster.Spec.Resources.Requests["ephemeral-storage"] = resource.MustParse("2")
+		cluster.Spec.Resources.Limits["ephemeral-storage"] = resource.MustParse("1")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(HaveLen(3))
+		Expect(errors[0].Detail).To(Equal("CPU request is greater than the limit"))
+		Expect(errors[1].Detail).To(Equal("Memory request is greater than the limit"))
+		Expect(errors[2].Detail).To(Equal("Ephemeral storage request is greater than the limit"))
+	})
+
 	It("returns two errors when both CPU and Memory requests are greater than their limits", func() {
 		cluster.Spec.Resources.Requests["cpu"] = resource.MustParse("2")
 		cluster.Spec.Resources.Limits["cpu"] = resource.MustParse("1")

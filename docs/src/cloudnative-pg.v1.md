@@ -1546,11 +1546,12 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 for more information.</p>
 </td>
 </tr>
-<tr><td><code>emptyDirLimit</code><br/>
-<i>string</i>
+<tr><td><code>ephemeralVolumesSizeLimit</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-EphemeralVolumesSizeLimitConfiguration"><i>EphemeralVolumesSizeLimitConfiguration</i></a>
 </td>
 <td>
-   <p>EmptyDirLimit set the limit for the ephemeral volumes</p>
+   <p>EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
+volumes</p>
 </td>
 </tr>
 <tr><td><code>priorityClassName</code><br/>
@@ -2166,6 +2167,38 @@ a Role in a PostgreSQL instance</p>
 
 
 
+
+## EphemeralVolumesSizeLimitConfiguration     {#postgresql-cnpg-io-v1-EphemeralVolumesSizeLimitConfiguration}
+
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral
+storage</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>shm</code> <B>[Required]</B><br/>
+<i>k8s.io/apimachinery/pkg/api/resource.Quantity</i>
+</td>
+<td>
+   <p>Shm is the size limit of the shared memory volume</p>
+</td>
+</tr>
+<tr><td><code>temporaryData</code> <B>[Required]</B><br/>
+<i>k8s.io/apimachinery/pkg/api/resource.Quantity</i>
+</td>
+<td>
+   <p>TemporaryData is the size limit of the temporary data volume</p>
+</td>
+</tr>
+</tbody>
+</table>
 
 ## ExternalCluster     {#postgresql-cnpg-io-v1-ExternalCluster}
 
