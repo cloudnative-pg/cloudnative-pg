@@ -1093,21 +1093,19 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	var job *batchv1.Job
-	var err error
+	job := specs.JoinReplicaInstance(*cluster, nodeSerial)
 
 	// If we can bootstrap this replica from a pre-existing source, we do it
 	storageSource := persistentvolumeclaim.GetCandidateStorageSource(ctx, cluster, backupList)
 	if storageSource != nil {
 		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
-	} else {
-		job = specs.JoinReplicaInstance(*cluster, nodeSerial)
 	}
 
 	contextLogger.Info("Creating new Job",
 		"job", job.Name,
 		"primary", false,
 		"storageSource", storageSource,
+		"role", job.Spec.Template.ObjectMeta.Labels[utils.JobRoleLabelName],
 	)
 
 	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
@@ -1134,7 +1132,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
-	if err = r.Create(ctx, job); err != nil {
+	if err := r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			contextLogger.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
