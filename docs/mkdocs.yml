@@ -1,4 +1,4 @@
-site_name: CloudNativePG
+site_name: CloudNativePG<br/><sub>v1.20.2</sub>
 site_author: The CloudNativePG Contributors
 docs_dir: src
 
