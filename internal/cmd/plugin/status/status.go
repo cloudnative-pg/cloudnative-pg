@@ -553,7 +553,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	//      	print "Standby (file based)"
 	//    	else:
 	//  		if pg_rewind is running, print "Standby (pg_rewind)"  - #liveness OK, readiness Not OK
-	//		    else print "Standby (starting up)"
+	//              else print "Standby (starting up)"
 	//  else:
 	//  	if it is paused, print "Standby (paused)"
 	//  	else if SyncState = sync/quorum print "Standby (sync)"
