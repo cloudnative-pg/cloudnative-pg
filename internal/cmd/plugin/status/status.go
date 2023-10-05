@@ -202,9 +202,15 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 			cluster.Status.CurrentPrimaryTimestamp,
 		)
 		if err == nil {
-			summary.AddLine("Primary start time:", primaryInstanceTimestamp.Round(time.Second))
 			uptime := time.Since(primaryInstanceTimestamp)
-			summary.AddLine("Primary uptime:", uptime.Round(time.Second))
+			summary.AddLine(
+				"Primary start time:",
+				fmt.Sprintf(
+					"%s (uptime %s)",
+					primaryInstanceTimestamp.Round(time.Second),
+					uptime.Round(time.Second),
+				),
+			)
 		} else {
 			summary.AddLine("Primary start time:", aurora.Red("error: "+err.Error()))
 		}
