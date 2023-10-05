@@ -742,7 +742,7 @@
           "legendFormat": "WAL",
           "range": true,
           "refId": "WAL"
-        }        
+        }
       ],
       "title": "Volume Space Usage",
       "type": "gauge"
@@ -768,6 +768,18 @@
                   "text": "Invalid date"
                 },
                 "to": 1e+42
+              },
+              "type": "range"
+            },
+            {
+              "options": {
+                "from": -2147483648,
+                "result": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "No backups"
+                },
+                "to": -1577847600
               },
               "type": "range"
             }
@@ -1403,6 +1415,16 @@
             "mode": "thresholds"
           },
           "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "No backups"
+                }
+              },
+              "type": "value"
+            },
             {
               "options": {
                 "match": "null",
@@ -2230,6 +2252,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -4392,7 +4415,7 @@
               "legendFormat": "{{persistentvolumeclaim}}",
               "range": true,
               "refId": "FREE_SPACE_WAL"
-            }            
+            }
           ],
           "title": "Volume Space Usage",
           "transformations": [],
@@ -4478,7 +4501,7 @@
               "legendFormat": "{{persistentvolumeclaim}}",
               "range": true,
               "refId": "FREE_INODES_WAL"
-            }            
+            }
           ],
           "title": "Volume Inode Usage",
           "transformations": [],
@@ -6358,7 +6381,7 @@
   },
   "timezone": "",
   "title": "CloudNativePG",
-  "uid": "z7FCA4Nnk",
-  "version": 9,
+  "uid": "cloudnative-pg",
+  "version": 1,
   "weekStart": ""
 }
