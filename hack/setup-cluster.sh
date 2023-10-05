@@ -552,7 +552,10 @@ load() {
   fi
 
   echo "${bright}Building operator from current worktree${reset}"
-
+  
+  if [[ "$OS" == "darwin" && "$ARCH" == "arm64" ]]; then
+    export GORELEASER_CURRENT_TAG=v0.0.0
+  fi
   CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
   make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" ARCH="${ARCH}" docker-build
 
