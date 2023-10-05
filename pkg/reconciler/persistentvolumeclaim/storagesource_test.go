@@ -95,7 +95,7 @@ var _ = Describe("Storage source", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("should return the correct source when chosing pgdata", func(ctx context.Context) {
+		It("should return the correct source when choosing pgdata", func(ctx context.Context) {
 			source, err := GetCandidateStorageSource(
 				ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgData)
 			Expect(err).ToNot(HaveOccurred())
@@ -103,7 +103,7 @@ var _ = Describe("Storage source", func() {
 			Expect(source.Name).To(Equal(pgDataSnapshotVolumeName))
 		})
 
-		It("should return the correct source when chosing pgwal", func(ctx context.Context) {
+		It("should return the correct source when choosing pgwal", func(ctx context.Context) {
 			source, err := GetCandidateStorageSource(
 				ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgWal)
 			Expect(err).ToNot(HaveOccurred())
