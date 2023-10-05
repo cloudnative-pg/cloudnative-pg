@@ -17,12 +17,15 @@ limitations under the License.
 package persistentvolumeclaim
 
 import (
+	"context"
 	"fmt"
+
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -43,10 +46,11 @@ type StorageSource struct {
 // GetCandidateStorageSource gets the candidate storage source
 // to be used to create a PVC
 func GetCandidateStorageSource(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
 ) *StorageSource {
-	result := getCandidateSourceFromBackupList(backupList)
+	result := getCandidateSourceFromBackupList(ctx, backupList)
 	if result != nil {
 		return result
 	}
@@ -72,15 +76,18 @@ func GetCandidateStorageSource(
 
 // getCandidateSourceFromBackupList gets a candidate storage source
 // given a backup list
-func getCandidateSourceFromBackupList(backupList apiv1.BackupList) *StorageSource {
+func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.BackupList) *StorageSource {
+	contextLogger := log.FromContext(ctx)
+
 	backupList.SortByReverseCreationTime()
 	for _, backup := range backupList.Items {
 		backup := backup
 		if !isBackupCandidate(&backup) {
-			fmt.Println(backup.Name, " is not candidate")
+			contextLogger.Trace("is not a storage source candidate", "backupName", backup.Name)
 			continue
 		}
-		fmt.Println(backup.Name, " is candidate")
+
+		contextLogger.Debug("is a storage source candidate", "backupName", backup.Name)
 
 		result := &StorageSource{
 			DataSource: corev1.TypedLocalObjectReference{

@@ -956,7 +956,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	// Get the source storage from where do create the primary instance.
 	// We don't consider any pre-existing backups here
-	candidateSource := persistentvolumeclaim.GetCandidateStorageSource(cluster, apiv1.BackupList{})
+	candidateSource := persistentvolumeclaim.GetCandidateStorageSource(ctx, cluster, apiv1.BackupList{})
 
 	if err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
@@ -1097,7 +1097,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	var err error
 
 	// If we can bootstrap this replica from a pre-existing source, we do it
-	storageSource := persistentvolumeclaim.GetCandidateStorageSource(cluster, backupList)
+	storageSource := persistentvolumeclaim.GetCandidateStorageSource(ctx, cluster, backupList)
 	if storageSource != nil {
 		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
 	} else {

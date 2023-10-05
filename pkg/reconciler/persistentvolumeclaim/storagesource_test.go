@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolumeclaim
 
 import (
+	"context"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -89,22 +90,22 @@ var _ = Describe("Storage source", func() {
 	}
 
 	When("bootstrapping from a VolumeSnapshot", func() {
-		It("should fail when looking for a wrong role", func() {
-			_, err := GetCandidateStorageSource(clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole("NoRol")
+		It("should fail when looking for a wrong role", func(ctx context.Context) {
+			_, err := GetCandidateStorageSource(ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole("NoRol")
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("should return the correct source when chosing pgdata", func() {
+		It("should return the correct source when chosing pgdata", func(ctx context.Context) {
 			source, err := GetCandidateStorageSource(
-				clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgData)
+				ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgData)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(source).ToNot(BeNil())
 			Expect(source.Name).To(Equal(pgDataSnapshotVolumeName))
 		})
 
-		It("should return the correct source when chosing pgwal", func() {
+		It("should return the correct source when chosing pgwal", func(ctx context.Context) {
 			source, err := GetCandidateStorageSource(
-				clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgWal)
+				ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgWal)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(source).ToNot(BeNil())
 			Expect(source.Name).To(Equal(pgWalSnapshotVolumeName))
@@ -112,8 +113,8 @@ var _ = Describe("Storage source", func() {
 	})
 
 	When("not bootstrapping from a VolumeSnapshot with no backups", func() {
-		It("should return an empty storage source", func() {
-			source, err := GetCandidateStorageSource(clusterEmpty, apiv1.BackupList{}).ForRole(utils.PVCRolePgData)
+		It("should return an empty storage source", func(ctx context.Context) {
+			source, err := GetCandidateStorageSource(ctx, clusterEmpty, apiv1.BackupList{}).ForRole(utils.PVCRolePgData)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(source).To(BeNil())
 		})
@@ -137,8 +138,8 @@ var _ = Describe("Storage source", func() {
 			},
 		}
 
-		It("should return the backup as storage source", func() {
-			source, err := GetCandidateStorageSource(clusterEmpty, backupList).ForRole(utils.PVCRolePgData)
+		It("should return the backup as storage source", func(ctx context.Context) {
+			source, err := GetCandidateStorageSource(ctx, clusterEmpty, backupList).ForRole(utils.PVCRolePgData)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(source.Name).To(Equal("completed-backup"))
 		})
@@ -209,7 +210,7 @@ var _ = Describe("candidate backups", func() {
 		Expect(isBackupCandidate(&nonCompletedBackup)).To(BeFalse())
 	})
 
-	It("takes the most recent candidate backup as source", func() {
+	It("takes the most recent candidate backup as source", func(ctx context.Context) {
 		backupList := apiv1.BackupList{
 			Items: []apiv1.Backup{
 				objectStoreBackup,
@@ -220,7 +221,7 @@ var _ = Describe("candidate backups", func() {
 		}
 		backupList.SortByReverseCreationTime()
 
-		source := getCandidateSourceFromBackupList(backupList)
+		source := getCandidateSourceFromBackupList(ctx, backupList)
 		Expect(source).ToNot(BeNil())
 		Expect(source.DataSource.Name).To(Equal("completed-backup"))
 	})
