@@ -552,7 +552,8 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	//      	print "Standby (file based)"
 	//    	else:
 	//  		if pg_rewind is running, print "Standby (pg_rewind)"  - #liveness OK, readiness Not OK
-	//    		else print "Standby (starting up)"  - #liveness OK, readiness Not OK
+	//    		else if fenced, print "Fenced" - #liveness OK, readiness Not OK
+	//		else print "Standby (starting up)"
 	//  else:
 	//  	if it is paused, print "Standby (paused)"
 	//  	else if SyncState = sync/quorum print "Standby (sync)"
@@ -682,6 +683,9 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if fullStatus.isReplicaClusterDesignatedPrimary(instance) {
 		return "Designated primary"
 	}
+	//if instance.IsFenced {
+		//return "Fenced"
+	//}
 
 	if !instance.IsWalReceiverActive {
 		if utils.IsPodReady(*instance.Pod) {
