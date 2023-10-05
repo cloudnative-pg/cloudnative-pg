@@ -197,6 +197,23 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)
 	} else {
 		summary.AddLine("Primary instance:", primaryInstance)
+		primaryInstanceTimestamp, err := time.Parse(
+			metav1.RFC3339Micro,
+			cluster.Status.CurrentPrimaryTimestamp,
+		)
+		if err == nil {
+			uptime := time.Since(primaryInstanceTimestamp)
+			summary.AddLine(
+				"Primary start time:",
+				fmt.Sprintf(
+					"%s (uptime %s)",
+					primaryInstanceTimestamp.Round(time.Second),
+					uptime.Round(time.Second),
+				),
+			)
+		} else {
+			summary.AddLine("Primary start time:", aurora.Red("error: "+err.Error()))
+		}
 	}
 	summary.AddLine("Status:", fullStatus.getStatus(isPrimaryFenced, cluster))
 	if cluster.Spec.Instances == cluster.Status.Instances {
