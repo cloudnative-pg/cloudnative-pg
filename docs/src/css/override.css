@@ -1,3 +1,8 @@
 .wy-table-responsive table td, .wy-table-responsive table th {
     white-space: normal;
 }
+
+.wy-side-nav-search div.version {
+    font-size: small;
+    color: #fcfcfc;
+}

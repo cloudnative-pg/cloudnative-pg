@@ -1,8 +1,11 @@
-site_name: CloudNativePG<br/><sub>v1.20.2</sub>
+site_name: CloudNativePG
 site_author: The CloudNativePG Contributors
 docs_dir: src
 
 theme: readthedocs
+
+extra:
+   version: !ENV [CNPG_VERSION]
 
 extra_css:
   - css/override.css
@@ -68,3 +71,4 @@ nav:
   - release_notes.md
   - Appendixes:
     - appendixes/object_stores.md
+
