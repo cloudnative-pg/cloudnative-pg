@@ -34,6 +34,10 @@ ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
 NODES=${NODES:-3}
+# This option is telling the docker to use node image with certain arch, i.e kindest/node in kind.
+# In M1/M2,  if enable amd64 emulation then we keep it as linux/amd64.
+# if did not enable amd64 emulation we need keep it as linux/arm64,  otherwise,  kind will not start success
+DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-}
 
 # Define the directories used by the script
 ROOT_DIR=$(cd "$(dirname "$0")/../"; pwd)
@@ -50,6 +54,12 @@ case $ARCH in
   x86_64) ARCH="amd64" ;;
   aarch64) ARCH="arm64" ;;
 esac
+
+# If arm64 and user did not set it explicitly
+if [ "${ARCH}" = "arm64" ]  && [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
+  DOCKER_DEFAULT_PLATFORM=linux/arm64
+fi
+
 
 # Constants
 registry_volume=registry_dev_data
