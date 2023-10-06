@@ -166,15 +166,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	case apiv1.BackupMethodBarmanObjectStore:
 		// If no good running backups are found we elect a pod for the backup
 		pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
+				"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
+			contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
+				cluster.Status.TargetPrimary)
+			backup.Status.Phase = apiv1.BackupPhasePending
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
+		}
 		if err != nil {
-			if apierrs.IsNotFound(err) {
-				r.Recorder.Eventf(&backup, "Warning", "FindingPod",
-					"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
-				contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
-					cluster.Status.TargetPrimary)
-				backup.Status.Phase = apiv1.BackupPhasePending
-				return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
-			}
 			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("while getting pod: %w", err))
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
 				cluster.Status.TargetPrimary)
@@ -307,26 +307,25 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	contextLogger := log.FromContext(ctx)
 
 	targetPod, err := r.getSnapshotTargetPod(ctx, cluster, backup)
+	if apierrs.IsNotFound(err) {
+		r.Recorder.Eventf(
+			backup,
+			"Warning",
+			"FindingPod",
+			"Couldn't find target pod %s, will retry in 30 seconds",
+			cluster.Status.TargetPrimary,
+		)
+		contextLogger.Info(
+			"Couldn't find target pod, will retry in 30 seconds",
+			"target",
+			cluster.Status.TargetPrimary,
+		)
+		origBackup := backup.DeepCopy()
+		backup.Status.Phase = apiv1.BackupPhasePending
+		err := r.Patch(ctx, backup, client.MergeFrom(origBackup))
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
 	if err != nil {
-		if apierrs.IsNotFound(err) {
-			r.Recorder.Eventf(
-				backup,
-				"Warning",
-				"FindingPod",
-				"Couldn't find target pod %s, will retry in 30 seconds",
-				cluster.Status.TargetPrimary,
-			)
-			contextLogger.Info(
-				"Couldn't find target pod, will retry in 30 seconds",
-				"target",
-				cluster.Status.TargetPrimary,
-			)
-			origBackup := backup.DeepCopy()
-			backup.Status.Phase = apiv1.BackupPhasePending
-			err := r.Patch(ctx, backup, client.MergeFrom(origBackup))
-			return &ctrl.Result{RequeueAfter: 30 * time.Second}, err
-		}
-
 		tryFlagBackupAsFailed(ctx, r.Client, backup, fmt.Errorf("while getting pod: %w", err))
 		r.Recorder.Eventf(backup, "Warning", "FindingPod", "Error getting target pod: %s",
 			cluster.Status.TargetPrimary)
@@ -338,8 +337,8 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	if err := r.List(
 		ctx,
 		&clusterBackups,
-		client.MatchingFields{clusterName: cluster.Name},
 		client.InNamespace(backup.GetNamespace()),
+		client.MatchingFields{clusterName: cluster.Name},
 	); err != nil {
 		return nil, err
 	}

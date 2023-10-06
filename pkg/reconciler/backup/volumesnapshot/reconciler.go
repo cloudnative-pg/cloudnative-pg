@@ -214,8 +214,7 @@ func (se *Reconciler) ensurePodIsFenced(
 		return errors.New("cannot execute volume snapshot on a cluster that has fenced instances")
 	}
 
-	if targetPodName == cluster.Status.CurrentPrimary ||
-		targetPodName == cluster.Status.TargetPrimary {
+	if targetPodName == cluster.Status.CurrentPrimary || targetPodName == cluster.Status.TargetPrimary {
 		contextLogger.Warning(
 			"Cold Snapshot Backup targets the primary. Primary will be fenced",
 			"targetBackup", backup.Name, "targetPod", targetPodName,
