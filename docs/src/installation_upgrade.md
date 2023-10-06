@@ -258,7 +258,24 @@ Most of the changes will affect new PostgreSQL clusters only.
     Please read carefully the list of changes below and how to change the
     `Cluster` manifests to retain the existing behavior, in case you don't want to
     disrupt your existing workloads. Alternatively, postpone the upgrade to 1.21
-    until you are sure.
+    until you are sure. In general, we recommend the you adopt these default
+    values, unless you have valid reasons not to.
+
+If you want to explicitly keep the existing behavior of CloudNativePG,
+preferably just temporarily, you need to set these values in all your `Cluster`
+definitions **before upgrading** to version 1.21:
+
+```yaml
+spec:
+   ...
+   startDelay: 30
+   stopDelay: 30
+   switchoverDelay: 40000000
+   enableSuperuserAccess: true
+   replicationSlots:
+     highAvailability:
+       enabled: false
+```
 
 #### Delay for PostgreSQL shutdown
 
@@ -283,7 +300,6 @@ If you want to retain the old behavior, you need to explicitly set:
 spec:
    ...
    stopDelay: 30
-   smartStopDelay: 30
 ```
 
 #### Delay for PostgreSQL startup
@@ -294,6 +310,11 @@ delay for the Kubernetes liveness probe. Given that all Kubernetes supported
 releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
 version 1.21 has adopted this approach as well (`startDelay` is now
 automatically divided in periods of the duration of 10 seconds each).
+
+!!! Important
+    In order to add the `startupProbe`, each pod needs to be restarted.
+    As a result, when you upgrade the operator, an extraordinary rolling
+    update of the cluster will be executed even in the online update case.
 
 Despite the recommendations to change and tune this value, almost all the cases
 we have examined during support incidents or community issues show that this
@@ -330,19 +351,34 @@ spec:
    switchoverDelay: 40000000
 ```
 
-#### Disable superuser access
+#### Superuser access disabled
 
-Disable superuser access by default (#2899)
+Pushing towards *security-by-default*, all new clusters created with
+CloudNativePG don't enable superuser access (`postgres` user) via the network,
+unless explicitly requested.
+
+If you want to restore this behavior, you need to explicitly set:
+
+```yaml
+spec:
+   ...
+   enableSuperuserAccess: true
+```
 
 #### Replication slots for HA
 
-Enable replication slots for HA by default (#2903)
-See note for 1.20
+[As already anticipated in release 1.20](installation_upgrade.md#replication-slots-for-high-availability),
+replication slots for High Availability are now enabled by default.
 
 #### Labels
 
-Stop supporting the `postgresql` label - replaced by `cnpg.io/cluster` in 1.18 (#2744)
+In version 1.18 we deprecated the `postgresql` label in pods to identify the
+name of the cluster, and replaced it with the more canonical `cnpg.io/cluster`
+label. Such a label is no longer maintained.
 
+Similarly, from this version the `role` label is deprecated. The new label
+`cnpg.io/instanceRole` is now set and will entirely replace the `role` one in a
+future release.
 
 ### Upgrading to 1.20 from a previous minor version
 

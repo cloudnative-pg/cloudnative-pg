@@ -40,9 +40,9 @@ which defaults to 3600 seconds. The correct value for your cluster is
 related to the time needed by PostgreSQL to start.
 
 !!! Warning
-   If `.spec.startDelay` is too low, the liveness probe will start working
-   before the PostgreSQL startup, and the Pod could be restarted
-   inappropriately.
+    If `.spec.startDelay` is too low, the liveness probe will start working
+    before the PostgreSQL startup, and the Pod could be restarted
+    inappropriately.
 
 ## Shutdown control
 
