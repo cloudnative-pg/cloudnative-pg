@@ -291,7 +291,12 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot and PITR", func() {
-					AssertCreateCluster(namespace, clusterToRestoreName, clusterSnapshotRestoreFile, env)
+					CreateResourceFromFile(namespace, clusterSnapshotRestoreFile)
+				})
+
+				By("ensuring replicas are being bootstrapped from the volume snapshot", func() {
+					replicaRecoveryJobName := clusterToRestoreName + "-2-snapshot-recovery"
+					assertJobRole(namespace, replicaRecoveryJobName, 120)
 					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[testUtils.ClusterIsReadySlow], env)
 				})
 
@@ -440,7 +445,13 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("executing the restore", func() {
-					AssertCreateCluster(namespace, clusterToRestoreName, clusterToRestoreFilePath, env)
+					CreateResourceFromFile(namespace, clusterToRestoreFilePath)
+				})
+
+				By("ensuring replicas are being bootstrapped from the volume snapshot", func() {
+					replicaRecoveryJobName := clusterToRestoreName + "-2-snapshot-recovery"
+					assertJobRole(namespace, replicaRecoveryJobName, 120)
+					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[testUtils.ClusterIsReady], env)
 				})
 
 				By("checking that the data is present on the restored cluster", func() {

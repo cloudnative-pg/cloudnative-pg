@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-declarative-backup-restore
 spec:
-  instances: 1
+  instances: 2
   primaryUpdateStrategy: unsupervised
 
   # Persistent storage configuration
