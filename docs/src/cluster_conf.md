@@ -35,6 +35,29 @@ spec:
 You can find a complete example using projected volume template to mount Secret and Configmap in
 the [cluster-example-projected-volume.yaml](samples/cluster-example-projected-volume.yaml) deployment manifest.
 
+## scratch-data Volume
+
+An ephemeral volume used for temporary storage. An upper bound on the size can be
+configured via the `spec.ephemeralVolumesSizeLimit.temporaryData` field in the cluster
+spec. This volume exists on the node's filesystem and is ephemeral, meaning
+that it will not persist across pod restarts.
+
+## shm Volume
+
+This volume is used as shared memory space for Postgres, also an ephemeral type but
+stored in-memory. An upper bound on the size can be configured via the
+`spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec.
+
+## superuser-secret Volume
+
+Created if the `spec.enableSuperuserAccess` field is set to true. This volume mounts a
+Kubernetes Secret that contains superuser credentials for the Postgres database.
+
+## app-secret Volume
+
+Created when application database creation is enabled through various methods. This
+volume mounts a Kubernetes Secret that contains credentials for the application database.
+
 ## Environment variables
 
 Some system behavior can be customized using environment variables. One example is
