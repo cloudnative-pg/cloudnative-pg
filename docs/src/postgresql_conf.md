@@ -49,6 +49,7 @@ The `custom.conf` file will contain the user-defined settings in the
     Refer to the PostgreSQL documentation for
     [more information on the available parameters](https://www.postgresql.org/docs/current/runtime-config.html),
     also known as GUC (Grand Unified Configuration).
+    Please note that CNPG accept only strings for the PostgreSQL parameters.
 
 The content of `custom.conf` is automatically generated and maintained by the
 operator by applying the following sections in this order:
