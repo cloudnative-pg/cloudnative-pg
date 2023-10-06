@@ -336,10 +336,6 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	// TODO: at the moment, volume snapshot backups are cold and require fencing
-	// the target pod. This makes them unsuitable to run on the primary, so we
-	// mark the backup as failed and exit the reconciliation.
-	// When hot volume snapshots become available, this logic should be refined.
 	if targetPod.Name == cluster.Status.CurrentPrimary ||
 		targetPod.Name == cluster.Status.TargetPrimary {
 		contextLogger.Warning(
