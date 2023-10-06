@@ -424,13 +424,15 @@ the selected PostgreSQL instance</p>
 <i>string</i>
 </td>
 <td>
-   <span class="text-muted">No description provided.</span></td>
+   <p>Name is the snapshot resource name</p>
+</td>
 </tr>
 <tr><td><code>type</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <span class="text-muted">No description provided.</span></td>
+   <p>Type is tho role of the snapshot in the cluster, such as PG_DATA and PG_WAL</p>
+</td>
 </tr>
 </tbody>
 </table>

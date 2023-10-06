@@ -317,8 +317,11 @@ spec:
                         that is part of a volume snapshot method backup
                       properties:
                         name:
+                          description: Name is the snapshot resource name
                           type: string
                         type:
+                          description: Type is tho role of the snapshot in the cluster,
+                            such as PG_DATA and PG_WAL
                           type: string
                       required:
                       - name

@@ -99,7 +99,10 @@ type BackupSnapshotStatus struct {
 
 // BackupSnapshotElementStatus is a volume snapshot that is part of a volume snapshot method backup
 type BackupSnapshotElementStatus struct {
+	// Name is the snapshot resource name
 	Name string `json:"name"`
+
+	// Type is tho role of the snapshot in the cluster, such as PG_DATA and PG_WAL
 	Type string `json:"type"`
 }
 
