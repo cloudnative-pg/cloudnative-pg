@@ -21,6 +21,9 @@ spec:
     - jsonPath: .spec.cluster.name
       name: Cluster
       type: string
+    - jsonPath: .spec.method
+      name: Method
+      type: string
     - jsonPath: .status.phase
       name: Phase
       type: string
