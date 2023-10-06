@@ -801,7 +801,7 @@ data:
                     "result": {
                       "color": "red",
                       "index": 1,
-                      "text": "No backups"
+                      "text": "N/A"
                     },
                     "to": -1577847600
                   },
