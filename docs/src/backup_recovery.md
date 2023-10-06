@@ -543,9 +543,9 @@ You can also schedule your backups periodically by creating a
 resource named `ScheduledBackup`. The latter is similar to a
 `Backup` but with an added field, called `schedule`.
 
-The schedule *does not* follow the same format used in Kubernetes 
-CronJobs as it includes an additional seconds specifier, see 
-[cron expression format](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
+The schedule allows you to define a *six-term cron schedule* specification,
+which includes seconds, as expressed in
+the [Go `cron` package format](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
 
 This is an example of a scheduled backup:
 
@@ -561,7 +561,12 @@ spec:
     name: pg-backup
 ```
 
-The above example will schedule a backup every day at midnight.
+The above example will schedule a backup every day at midnight because the schedule
+specifies zero for the second, minute, and hour, while specifying wildcard, meaning all,
+for day of the month, month, and day of the week.
+
+In Kubernetes CronJobs, the equivalent expression is `0 0 * * *` because seconds
+are not included.
 
 !!! Hint
     Backup frequency might impact your recovery time object (RTO) after a
