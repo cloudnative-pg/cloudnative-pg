@@ -23,9 +23,9 @@ spec:
   - name: cluster-replica-src
     connectionParameters:
       host: cluster-replica-src-rw
-      user: postgres
-      dbname: postgres
+      user: userSrc
+      dbname: appSrc
       port: "5432"
     password:
-      name: cluster-replica-src-superuser
+      name: cluster-replica-src-app
       key: password

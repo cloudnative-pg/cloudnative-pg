@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -56,23 +56,19 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
+		commandTimeout := time.Second * 10
 		// First we check that the starting situation is the expected one
 		By("checking that we have the correct amount of syncreplicas", func() {
 			// We should have 2 candidates for quorum standbys
-			timeout := time.Second * 60
 			Eventually(func() (int, error, error) {
+				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
 				query := "SELECT count(*) from pg_stat_replication WHERE sync_state = 'quorum'"
-				out, _, err := env.ExecCommandWithPsqlClient(
-					namespace,
-					clusterName,
-					psqlClientPod,
-					apiv1.SuperUserSecretSuffix,
-					utils.AppDBName,
-					query,
-				)
+				out, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
+					"psql", "-U", "postgres", "-tAc", query)
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
-			}, timeout).Should(BeEquivalentTo(2))
+			}, RetryTimeout).Should(BeEquivalentTo(2))
 		})
 		By("checking that synchronous_standby_names reflects cluster's changes", func() {
 			// Set MaxSyncReplicas to 1
@@ -82,7 +78,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 				cluster.Spec.MaxSyncReplicas = 1
 				return env.Client.Update(env.Ctx, cluster)
-			}, 60, 5).Should(BeNil())
+			}, RetryTimeout, 5).Should(BeNil())
 
 			// Scale the cluster down to 2 pods
 			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace, clusterName))
@@ -108,7 +104,6 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			ExpectedValue := "ANY " + fmt.Sprint(cluster.Spec.MaxSyncReplicas) + " (\"" + strings.Join(podNames, "\",\"") + "\")"
 
 			// Verify the parameter has been updated in every pod
-			commandTimeout := time.Second * 10
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
 				Eventually(func() (string, error) {

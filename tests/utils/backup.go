@@ -198,9 +198,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 
 			Bootstrap: &apiv1.BootstrapConfiguration{
 				Recovery: &apiv1.BootstrapRecovery{
-					Database: "appdb",
-					Owner:    "appuser",
-					Source:   sourceClusterName,
+					Source: sourceClusterName,
 					RecoveryTarget: &apiv1.RecoveryTarget{
 						TargetTime: targetTime,
 					},
@@ -282,9 +280,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 
 			Bootstrap: &apiv1.BootstrapConfiguration{
 				Recovery: &apiv1.BootstrapRecovery{
-					Database: "appdb",
-					Owner:    "appuser",
-					Source:   sourceClusterName,
+					Source: sourceClusterName,
 					RecoveryTarget: &apiv1.RecoveryTarget{
 						TargetTime: targetTime,
 					},
@@ -374,9 +370,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 
 			Bootstrap: &apiv1.BootstrapConfiguration{
 				Recovery: &apiv1.BootstrapRecovery{
-					Database: "appdb",
-					Owner:    "appuser",
-					Source:   sourceClusterName,
+					Source: sourceClusterName,
 					RecoveryTarget: &apiv1.RecoveryTarget{
 						TargetTime: targetTime,
 					},

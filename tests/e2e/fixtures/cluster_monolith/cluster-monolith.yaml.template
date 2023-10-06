@@ -1,18 +1,21 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: external-cluster-azurite
+  name: cluster-monolith
 spec:
-  instances: 2
+  instances: 3
+  enableSuperuserAccess: true
 
   postgresql:
     parameters:
+      max_connections: "110"
       log_checkpoints: "on"
       log_lock_waits: "on"
       log_min_duration_statement: '1000'
       log_statement: 'ddl'
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
 
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all
@@ -20,27 +23,17 @@ spec:
   # - supervised: requires manual supervision to perform
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
 
   # Persistent storage configuration
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
-
-  bootstrap:
-    recovery:
-      # cluster name in source cluster
-      source: pg-backup-azurite
-
-  externalClusters:
-    - name: pg-backup-azurite
-      barmanObjectStore:
-        destinationPath: https://azurite:10000/storageaccountname/pg-backup-azurite
-        endpointCA:
-          key: ca.crt
-          name: azurite-ca-secret
-        azureCredentials:
-          connectionString:
-            name: azurite
-            key: AZURE_CONNECTION_STRING
-        wal:
-          compression: gzip
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

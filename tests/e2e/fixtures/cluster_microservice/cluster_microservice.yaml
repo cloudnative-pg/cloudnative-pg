@@ -20,8 +20,8 @@ spec:
     - name: cluster-microservice
       connectionParameters:
         host: cluster-microservice-rw.microservice-error.svc
-        user: postgres
-        dbname: postgres
+        user: app
+        dbname: app
       password:
-        name: cluster-microservice-superuser
+        name: cluster-microservice-app
         key: password
