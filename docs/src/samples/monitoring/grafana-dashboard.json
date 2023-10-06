@@ -579,7 +579,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "cnpg_pg_replication_lag{namespace=~\"$namespace\",pod=~\"$instances\"}",
+          "expr": "max(cnpg_pg_replication_lag{namespace=~\"$namespace\",pod=~\"$instances\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -742,7 +742,7 @@
           "legendFormat": "WAL",
           "range": true,
           "refId": "WAL"
-        }        
+        }
       ],
       "title": "Volume Space Usage",
       "type": "gauge"
@@ -768,6 +768,18 @@
                   "text": "Invalid date"
                 },
                 "to": 1e+42
+              },
+              "type": "range"
+            },
+            {
+              "options": {
+                "from": -2147483648,
+                "result": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "N/A"
+                },
+                "to": -1577847600
               },
               "type": "range"
             }
@@ -917,7 +929,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "(1 - cnpg_pg_replication_in_recovery{namespace=~\"$namespace\",pod=~\"$instances\"} + cnpg_pg_replication_is_wal_receiver_up{namespace=~\"$namespace\",pod=~\"$instances\"}) * (time() - timestamp(cnpg_pg_stat_archiver_seconds_since_last_archival{namespace=~\"$namespace\",pod=~\"$instances\"}) -\ncnpg_pg_stat_archiver_seconds_since_last_archival{namespace=~\"$namespace\",pod=~\"$instances\"})",
+          "expr": "min((1 - cnpg_pg_replication_in_recovery{namespace=~\"$namespace\",pod=~\"$instances\"} + cnpg_pg_replication_is_wal_receiver_up{namespace=~\"$namespace\",pod=~\"$instances\"}) * (time() - timestamp(cnpg_pg_stat_archiver_seconds_since_last_archival{namespace=~\"$namespace\",pod=~\"$instances\"}) -\ncnpg_pg_stat_archiver_seconds_since_last_archival{namespace=~\"$namespace\",pod=~\"$instances\"}))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "__auto",
@@ -1403,6 +1415,16 @@
             "mode": "thresholds"
           },
           "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "N/A"
+                }
+              },
+              "type": "value"
+            },
             {
               "options": {
                 "match": "null",
@@ -2230,6 +2252,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -4392,7 +4415,7 @@
               "legendFormat": "{{persistentvolumeclaim}}",
               "range": true,
               "refId": "FREE_SPACE_WAL"
-            }            
+            }
           ],
           "title": "Volume Space Usage",
           "transformations": [],
@@ -4478,7 +4501,7 @@
               "legendFormat": "{{persistentvolumeclaim}}",
               "range": true,
               "refId": "FREE_INODES_WAL"
-            }            
+            }
           ],
           "title": "Volume Inode Usage",
           "transformations": [],
@@ -6358,7 +6381,7 @@
   },
   "timezone": "",
   "title": "CloudNativePG",
-  "uid": "z7FCA4Nnk",
-  "version": 9,
+  "uid": "cloudnative-pg",
+  "version": 1,
   "weekStart": ""
 }
