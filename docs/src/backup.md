@@ -164,8 +164,9 @@ CloudNativePG. They are managed by the `ScheduledBackup` resource.
     Please refer to [`ScheduledBackupSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ScheduledBackupSpec)
     in the API reference for a full list of options.
 
-The `schedule` field allows you to define a *cron schedule* specification,
-expressed in the [Go `cron` package format](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
+The `schedule` field allows you to define a *six-term cron schedule* specification,
+which includes seconds, as expressed in
+the [Go `cron` package format](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
 
 !!! Warning
     Beware that this format accepts also the `seconds` field, and it is
@@ -185,7 +186,12 @@ spec:
     name: pg-backup
 ```
 
-The above example will schedule a backup every day at midnight.
+The above example will schedule a backup every day at midnight because the schedule
+specifies zero for the second, minute, and hour, while specifying wildcard, meaning all,
+for day of the month, month, and day of the week.
+
+In Kubernetes CronJobs, the equivalent expression is `0 0 * * *` because seconds
+are not included.
 
 !!! Hint
     Backup frequency might impact your recovery time object (RTO) after a
