@@ -236,6 +236,72 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
+### Upgrading to 1.21 from a previous minor version
+
+With the goal to keep improving out-of-the box the *convention over
+configuration* behavior of the operator, CloudNativePG 1.21 changes the default
+value of several knobs in the following areas:
+
+- delays at startup and shutdown of the PostgreSQL instance
+- self-healing
+- security
+- labels
+
+Most of the changes will affect new PostgreSQL clusters only.
+
+!!! Warning
+    Please read carefully the list of changes below and how to change the
+    `Cluster` manifests to retain the existing behavior, in case you don't want to
+    disrupt your existing workloads. Alternatively, postpone the upgrade to 1.21
+    until you are sure.
+
+#### Delay for PostgreSQL shutdown
+
+Up to now, `stopDelay` was set to 30 seconds. Despite the recommendations to
+change and tune this value, almost all the cases we have examined during
+support incidents or community issues show that this value is left unchanged.
+
+The new value is set to 1800 seconds, equivalent of 30 minutes.
+
+A new parameter has been introduced to define the maximum time window, within
+the `stopDelay` one, reserved to gracefully stop PostgreSQL using the `smart`
+shutdown procedure. Once completed, the remaining time up to `stopDelay` will
+be reserved for PostgreSQL to complete its duties in terms of WAL commitments
+with both the archive and the streaming replicas, in order to ensure no data
+loss.
+
+If you want to retain the old behavior, you need to explicitly set:
+
+```yaml
+spec:
+   ...
+   stopDelay: 30
+   smartStopDelay: 30
+```
+
+#### Delay for PostgreSQL startup
+
+* Change the default value of `startDelay` to 3600, instead of 30 seconds (#2847)
+* Replace the livenessProbe's initial delay with a more proper Kubernetes startup probe to deal with the start of a Postgres server (#2847)
+
+#### Delay for PostgreSQL switchover
+
+* Change the default value of `switchoverDelay` to 3600 seconds instead of 40000000 seconds (#2846)
+
+#### Disable superuser access
+
+Disable superuser access by default (#2899)
+
+#### Replication slots for HA
+
+Enable replication slots for HA by default (#2903)
+See note for 1.20
+
+#### Labels
+
+Stop supporting the `postgresql` label - replaced by `cnpg.io/cluster` in 1.18 (#2744)
+
+
 ### Upgrading to 1.20 from a previous minor version
 
 CloudNativePG 1.20 introduces some changes from previous versions of the
