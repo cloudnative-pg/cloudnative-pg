@@ -3236,6 +3236,14 @@ var _ = Describe("validateResources", func() {
 		Expect(errors[0].Detail).To(Equal("Memory request is greater than the limit"))
 	})
 
+	It("returns no error when the ephemeral storage request is correctly set", func() {
+		cluster.Spec.Resources.Requests["ephemeral-storage"] = resource.MustParse("1")
+		cluster.Spec.Resources.Limits["ephemeral-storage"] = resource.MustParse("1")
+
+		errors := cluster.validateResources()
+		Expect(errors).To(BeEmpty())
+	})
+
 	It("returns an error when the ephemeral storage request is greater than ephemeral storage limit", func() {
 		cluster.Spec.Resources.Requests["ephemeral-storage"] = resource.MustParse("2")
 		cluster.Spec.Resources.Limits["ephemeral-storage"] = resource.MustParse("1")

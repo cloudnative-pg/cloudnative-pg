@@ -955,7 +955,7 @@ var _ = Describe("Cluster ShouldRecoveryCreateApplicationDatabase", func() {
 })
 
 var _ = Describe("Ephemeral volume size limits", func() {
-	It("don't panic if the specification is nil", func() {
+	It("doesn't panic if the specification is nil", func() {
 		var spec *EphemeralVolumesSizeLimitConfiguration
 		Expect(spec.GetShmLimit()).To(BeNil())
 		Expect(spec.GetTemporaryDataLimit()).To(BeNil())
