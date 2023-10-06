@@ -295,9 +295,19 @@ operand          | 5432         | PostgreSQL instance | `postgresql`        |  o
 ### PostgreSQL
 
 The current implementation of CloudNativePG automatically creates
-passwords and `.pgpass` files for the `postgres` superuser and the database owner.
+passwords and `.pgpass` files for the the database owner and, only
+if requested by setting `enableSuperuserAccess` to `true`, for the
+`postgres` superuser.
 
-As far as encryption of password is concerned, CloudNativePG follows
+!!! Warning
+    Prior to CloudNativePG 1.21, `enableSuperuserAccess` was set to `true` by
+    default. This change has been implemented to improve the security-by-default
+    posture of the operator, fostering a microservice approach where changes to
+    PostgreSQL are performed in a declarative way through the `spec` of the
+    `Cluster` resource, while providing developers with full powers inside the
+    database through the database owner user.
+
+As far as password encryption is concerned, CloudNativePG follows
 the default behavior of PostgreSQL: starting from PostgreSQL 14,
 `password_encryption` is by default set to `scram-sha-256`, while on earlier
 versions it is set to `md5`.
@@ -305,9 +315,6 @@ versions it is set to `md5`.
 !!! Important
     Please refer to the ["Password authentication"](https://www.postgresql.org/docs/current/auth-password.html)
     section in the PostgreSQL documentation for details.
-
-You can disable management of the `postgres` user password via secrets by setting
-`enableSuperuserAccess` to `false`.
 
 !!! Note
     The operator supports toggling the `enableSuperuserAccess` option. When you
