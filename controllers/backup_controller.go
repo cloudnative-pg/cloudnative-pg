@@ -58,8 +58,6 @@ const backupPhase = ".status.phase"
 // where the name of the cluster is written
 const clusterName = ".spec.cluster.name"
 
-var errColdBackupOnPrimary = errors.New("cannot take a cold volume snapshot of the primary")
-
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -182,16 +180,16 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	contextLogger.Debug("Found pod for backup", "pod", pod.Name)
 
-	if !utils.IsPodReady(*pod) {
-		contextLogger.Info("Not ready backup target, will retry in 30 seconds", "target", pod.Name)
-		backup.Status.Phase = apiv1.BackupPhasePending
-		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
-			cluster.Status.TargetPrimary)
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
-	}
-
 	switch backup.Spec.Method {
 	case apiv1.BackupMethodBarmanObjectStore:
+		if !utils.IsPodReady(*pod) {
+			contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
+			backup.Status.Phase = apiv1.BackupPhasePending
+			r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
+				cluster.Status.TargetPrimary)
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
+		}
+
 		contextLogger.Info("Starting backup",
 			"cluster", cluster.Name,
 			"pod", pod.Name)
@@ -344,13 +342,10 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	// When hot volume snapshots become available, this logic should be refined.
 	if targetPod.Name == cluster.Status.CurrentPrimary ||
 		targetPod.Name == cluster.Status.TargetPrimary {
-		err := errColdBackupOnPrimary
-		tryFlagBackupAsFailed(ctx, r.Client, backup, err)
-		contextLogger.Info(
-			"Cold Snapshot Backup has the primary as the target and cannot proceed",
+		contextLogger.Warning(
+			"Cold Snapshot Backup targets the primary. Primary will be fenced",
 			"targetBackup", backup.Name, "targetPod", targetPod.Name,
 		)
-		return nil, err
 	}
 
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {

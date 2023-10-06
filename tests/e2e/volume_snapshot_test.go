@@ -44,7 +44,7 @@ var _ = Describe("Verify Volume Snapshot",
 		// Initializing a global namespace variable to be used in each test case
 		var namespace string
 
-		Context("Can create a Volume Snapshot", Ordered, func() {
+		Context("using the kubectl cnpg plugin", Ordered, func() {
 			// test env constants
 			const (
 				sampleFile      = fixturesDir + "/volume_snapshot/cluster-volume-snapshot.yaml.template"
@@ -76,7 +76,7 @@ var _ = Describe("Verify Volume Snapshot",
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			})
 
-			It("using the kubectl cnpg plugin", func() {
+			It("can create a Volume Snapshot", func() {
 				var backupObject apiv1.Backup
 				By("creating a volumeSnapshot and waiting until it's completed", func() {
 					err := testUtils.CreateOnDemandBackupViaKubectlPlugin(
@@ -317,12 +317,49 @@ var _ = Describe("Verify Volume Snapshot",
 				clusterToBackupFilePath  = filesDir + "/declarative-backup-cluster.yaml.template"
 				clusterToRestoreFilePath = filesDir + "/declarative-backup-cluster-restore.yaml.template"
 				backupFileFilePath       = filesDir + "/declarative-backup.yaml.template"
+				backupPrimaryFilePath    = filesDir + "/declarative-backup-on-primary.yaml.template"
 			)
 
 			// database constants
 			const (
 				tableName = "test"
 			)
+
+			var clusterToBackupName string
+
+			getAndVerifySnapshots := func(
+				backupName string,
+				clusterToBackup *apiv1.Cluster,
+				backup apiv1.Backup,
+			) volumesnapshot.VolumeSnapshotList {
+				snapshotList := volumesnapshot.VolumeSnapshotList{}
+				By("fetching the volume snapshots", func() {
+					err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
+						utils.ClusterLabelName:    clusterToBackupName,
+						utils.BackupNameLabelName: backupName,
+					})
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+				})
+
+				By("ensuring that the additional labels and annotations are present", func() {
+					clusterObj := &apiv1.Cluster{}
+					for _, item := range snapshotList.Items {
+						snapshotConfig := clusterToBackup.Spec.Backup.VolumeSnapshot
+						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
+						Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
+						Expect(item.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
+						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).ToNot(BeEmpty())
+						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).To(ContainSubstring(clusterToBackupName))
+						Expect(item.Annotations[utils.PgControldataAnnotationName]).ToNot(BeEmpty())
+						Expect(item.Annotations[utils.PgControldataAnnotationName]).To(ContainSubstring("pg_control version number:"))
+						// Ensure the ClusterManifestAnnotationName is a valid Cluster Object
+						err := json.Unmarshal([]byte(item.Annotations[utils.ClusterManifestAnnotationName]), clusterObj)
+						Expect(err).ToNot(HaveOccurred())
+					}
+				})
+				return snapshotList
+			}
 
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
@@ -348,16 +385,15 @@ var _ = Describe("Verify Volume Snapshot",
 					}
 					return env.DeleteNamespace(namespace)
 				})
-			})
-
-			It("creating a declarative cold backup and restoring it", func() {
-				clusterToBackupName, err := env.GetResourceNameFromYAML(clusterToBackupFilePath)
+				clusterToBackupName, err = env.GetResourceNameFromYAML(clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster on which to execute the backup", func() {
 					AssertCreateCluster(namespace, clusterToBackupName, clusterToBackupFilePath, env)
 				})
+			})
 
+			It("can create a declarative cold backup and restoring using it", func() {
 				By("inserting test data", func() {
 					AssertCreateTestData(namespace, clusterToBackupName, tableName, psqlClientPod)
 				})
@@ -396,32 +432,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				snapshotList := volumesnapshot.VolumeSnapshotList{}
-				By("fetching the volume snapshots", func() {
-					err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
-						utils.ClusterLabelName: clusterToBackupName,
-					})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
-				})
-
-				By("ensuring that the additional labels and annotations are present", func() {
-					clusterObj := &apiv1.Cluster{}
-					for _, item := range snapshotList.Items {
-						snapshotConfig := clusterToBackup.Spec.Backup.VolumeSnapshot
-						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
-						Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
-						Expect(item.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
-						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).ToNot(BeEmpty())
-						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).To(ContainSubstring(clusterToBackupName))
-						Expect(item.Annotations[utils.PgControldataAnnotationName]).ToNot(BeEmpty())
-						Expect(item.Annotations[utils.PgControldataAnnotationName]).To(ContainSubstring("pg_control version number:"))
-						// Ensure the ClusterManifestAnnotationName is a valid Cluster Object
-						err = json.Unmarshal([]byte(item.Annotations[utils.ClusterManifestAnnotationName]), clusterObj)
-						Expect(err).ToNot(HaveOccurred())
-					}
-				})
-
+				snapshotList := getAndVerifySnapshots(backupName, clusterToBackup, backup)
 				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -434,6 +445,111 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("checking that the data is present on the restored cluster", func() {
 					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, psqlClientPod)
+				})
+			})
+			It("can take a snapshot targeting the primary", func() {
+				backupName, err := env.GetResourceNameFromYAML(backupPrimaryFilePath)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("executing the backup", func() {
+					err := CreateResourcesFromFileWithError(namespace, backupPrimaryFilePath)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				var backup apiv1.Backup
+				By("waiting the backup to complete", func() {
+					Eventually(func(g Gomega) {
+						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
+					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
+				})
+
+				By("checking that the backup status is correctly populated", func() {
+					Expect(backup.Status.BeginWal).ToNot(BeEmpty())
+					Expect(backup.Status.EndWal).ToNot(BeEmpty())
+					Expect(backup.Status.BeginLSN).ToNot(BeEmpty())
+					Expect(backup.Status.EndLSN).ToNot(BeEmpty())
+					Expect(backup.Status.StoppedAt).ToNot(BeNil())
+					Expect(backup.Status.StartedAt).ToNot(BeNil())
+				})
+
+				var clusterToBackup *apiv1.Cluster
+
+				By("fetching the created cluster", func() {
+					clusterToBackup, err = env.GetCluster(namespace, clusterToBackupName)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				_ = getAndVerifySnapshots(backupName, clusterToBackup, backup)
+
+				By("ensuring cluster resumes after snapshot", func() {
+					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[testUtils.ClusterIsReadyQuick], env)
+				})
+			})
+
+			It("can take a snapshot in a single instance cluster", func() {
+				By("scaling down the cluster to a single instance", func() {
+					cluster, err := env.GetCluster(namespace, clusterToBackupName)
+					Expect(err).ToNot(HaveOccurred())
+
+					updated := cluster.DeepCopy()
+					updated.Spec.Instances = 1
+					err = env.Client.Patch(env.Ctx, updated, k8client.MergeFrom(cluster))
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				By("ensuring there is only one pod", func() {
+					Eventually(func(g Gomega) {
+						pods, err := env.GetClusterPodList(namespace, clusterToBackupName)
+						g.Expect(err).NotTo(HaveOccurred())
+						g.Expect(pods.Items).To(HaveLen(1))
+					}, testTimeouts[testUtils.ClusterIsReadyQuick]).Should(Succeed())
+				})
+
+				backupName := "single-instance-snap"
+				By("taking a backup snapshot", func() {
+					_, err := testUtils.CreateOnDemandBackup(
+						namespace,
+						clusterToBackupName,
+						backupName,
+						apiv1.BackupTargetStandby,
+						apiv1.BackupMethodVolumeSnapshot,
+						env)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				var backup apiv1.Backup
+				By("waiting the backup to complete", func() {
+					Eventually(func(g Gomega) {
+						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
+					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
+				})
+
+				By("checking that the backup status is correctly populated", func() {
+					Expect(backup.Status.BeginWal).ToNot(BeEmpty())
+					Expect(backup.Status.EndWal).ToNot(BeEmpty())
+					Expect(backup.Status.BeginLSN).ToNot(BeEmpty())
+					Expect(backup.Status.EndLSN).ToNot(BeEmpty())
+					Expect(backup.Status.StoppedAt).ToNot(BeNil())
+					Expect(backup.Status.StartedAt).ToNot(BeNil())
+				})
+
+				var clusterToBackup *apiv1.Cluster
+				By("fetching the created cluster", func() {
+					var err error
+					clusterToBackup, err = env.GetCluster(namespace, clusterToBackupName)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				_ = getAndVerifySnapshots(backupName, clusterToBackup, backup)
+
+				By("ensuring cluster resumes after snapshot", func() {
+					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[testUtils.ClusterIsReadyQuick], env)
 				})
 			})
 		})
