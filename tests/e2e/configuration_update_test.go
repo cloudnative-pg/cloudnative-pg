@@ -445,7 +445,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 
 				oldPrimaryPodName = primaryPodInfo.GetName()
 
-				superUser, superUserPass, err := utils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+				appUser, appUserPass, err := utils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 				Expect(err).ToNot(HaveOccurred())
 				host, err := utils.GetHostName(namespace, clusterName, env)
 				Expect(err).ToNot(HaveOccurred())
@@ -454,8 +454,8 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 					psqlClientPod,
 					host,
 					utils.AppDBName,
-					superUser,
-					superUserPass,
+					appUser,
+					appUserPass,
 					query,
 					env)
 				Expect(cmdErr).ToNot(HaveOccurred())
@@ -467,8 +467,8 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 					psqlClientPod,
 					host,
 					utils.AppDBName,
-					utils.PostgresUser,
-					superUserPass,
+					appUser,
+					appUserPass,
 					query,
 					env)
 				Expect(cmdErr).ToNot(HaveOccurred())

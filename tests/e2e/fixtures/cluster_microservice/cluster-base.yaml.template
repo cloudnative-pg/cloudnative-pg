@@ -22,6 +22,7 @@ spec:
       # Creates a fake plpgsql function to prove that restore works
       postInitApplicationSQL:
       - "CREATE FUNCTION one() RETURNS INT LANGUAGE plpgsql IMMUTABLE AS 'BEGIN RETURN 1; END;'"
+      - ALTER ROLE "app" REPLICATION
 
   # Persistent storage configuration
   storage:

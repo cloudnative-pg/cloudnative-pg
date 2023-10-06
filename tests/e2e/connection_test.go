@@ -53,17 +53,6 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		superuserPassword string,
 		env *utils.TestingEnvironment,
 	) {
-		// we use a pod in the cluster to have a psql client ready and
-		// internal access to the k8s cluster
-		podName := clusterName + "-1"
-		pod := &corev1.Pod{}
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      podName,
-		}
-		err := env.Client.Get(env.Ctx, namespacedName, pod)
-		Expect(err).ToNot(HaveOccurred())
-
 		// We test -rw, -ro and -r services with the app user and the superuser
 		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 		rService := fmt.Sprintf("%v-r.%v.svc", clusterName, namespace)
@@ -140,8 +129,8 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		// If we have specified secrets, we test that we're able to use them
 		// to connect
 		It("can connect with user-supplied passwords", func() {
-			const suppliedSuperuserPassword = "v3ry54f3" // NOSONAR
-			const suppliedAppUserPassword = "4ls054f3"   // NOSONAR
+			const suppliedSuperuserPassword = "v3ry54f3"
+			const suppliedAppUserPassword = "4ls054f3"
 
 			// Create a cluster in a namespace we'll delete after the test
 			var err error

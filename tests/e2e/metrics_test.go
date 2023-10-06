@@ -286,7 +286,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 		By("grant select permission for test_replica table to pg_monitor", func() {
 			cmd := "GRANT SELECT ON test_replica TO pg_monitor"
-			superUser, superUserPass, err := utils.GetCredentials(srcClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+			appUser, appUserPass, err := utils.GetCredentials(srcClusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			host, err := utils.GetHostName(namespace, srcClusterName, env)
 			Expect(err).ToNot(HaveOccurred())
@@ -294,8 +294,8 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 				psqlClientPod,
 				host,
 				"appSrc",
-				superUser,
-				superUserPass,
+				appUser,
+				appUserPass,
 				cmd,
 				env)
 			Expect(err).ToNot(HaveOccurred())

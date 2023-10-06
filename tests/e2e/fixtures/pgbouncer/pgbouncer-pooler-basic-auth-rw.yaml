@@ -11,5 +11,5 @@ spec:
   pgbouncer:
     poolMode: session
     authQuerySecret:
-      name: cluster-pgbouncer-superuser
+      name: cluster-pgbouncer-app
     authQuery: SELECT usename, passwd FROM pg_shadow WHERE usename=$1
