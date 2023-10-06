@@ -351,7 +351,7 @@ func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.
 			namespace,
 			clusterName,
 			pod,
-			apiv1.SuperUserSecretSuffix,
+			apiv1.ApplicationUserSecretSuffix,
 			testsUtils.AppDBName,
 			query,
 		)
@@ -364,7 +364,7 @@ func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, dat
 	By("creating large object", func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS image (name text,raster oid); "+
 			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_from_bytea(%d, '%s'));", oid, data)
-		superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+		appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		host, err := testsUtils.GetHostName(namespace, clusterName, env)
 		Expect(err).ToNot(HaveOccurred())
@@ -372,8 +372,8 @@ func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, dat
 			pod,
 			host,
 			testsUtils.AppDBName,
-			superUser,
-			superUserPass,
+			appUser,
+			appUserPass,
 			query,
 			env)
 		Expect(err).ToNot(HaveOccurred())
@@ -390,7 +390,7 @@ func insertRecordIntoTableWithDatabaseName(
 	pod *corev1.Pod,
 ) {
 	query := fmt.Sprintf("INSERT INTO %v VALUES (%v);", tableName, value)
-	superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+	appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 	Expect(err).ToNot(HaveOccurred())
 	host, err := testsUtils.GetHostName(namespace, clusterName, env)
 	Expect(err).ToNot(HaveOccurred())
@@ -398,8 +398,8 @@ func insertRecordIntoTableWithDatabaseName(
 		pod,
 		host,
 		databaseName,
-		superUser,
-		superUserPass,
+		appUser,
+		appUserPass,
 		query,
 		env)
 	Expect(err).ToNot(HaveOccurred())
@@ -412,7 +412,7 @@ func insertRecordIntoTable(namespace, clusterName, tableName string, value int, 
 		namespace,
 		clusterName,
 		pod,
-		apiv1.SuperUserSecretSuffix,
+		apiv1.ApplicationUserSecretSuffix,
 		testsUtils.AppDBName,
 		query,
 	)
@@ -473,7 +473,7 @@ func AssertDataExpectedCount(namespace, clusterName, tableName string, expectedV
 				namespace,
 				clusterName,
 				pod,
-				apiv1.SuperUserSecretSuffix,
+				apiv1.ApplicationUserSecretSuffix,
 				testsUtils.AppDBName,
 				query)
 			if err != nil {
@@ -491,7 +491,8 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string,
 		query := fmt.Sprintf("SELECT encode(lo_get(%v), 'escape');", oid)
 		Eventually(func() (string, error) {
 			// We keep getting the pod, since there could be a new pod with the same name
-			superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+			appUser, appUserPass, err := testsUtils.GetCredentials(
+				clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			host, err := testsUtils.GetHostName(namespace, clusterName, env)
 			Expect(err).ToNot(HaveOccurred())
@@ -499,8 +500,8 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string,
 				pod,
 				host,
 				testsUtils.AppDBName,
-				superUser,
-				superUserPass,
+				appUser,
+				appUserPass,
 				query,
 				env)
 			if err != nil {
@@ -800,8 +801,8 @@ func AssertReplicaModeCluster(
 
 	By("creating test data in source cluster", func() {
 		cmd := "CREATE TABLE IF NOT EXISTS test_replica AS VALUES (1),(2);"
-		superUser, superUserPass, err := testsUtils.GetCredentials(srcClusterName, namespace,
-			apiv1.SuperUserSecretSuffix, env)
+		appUser, appUserPass, err := testsUtils.GetCredentials(srcClusterName, namespace,
+			apiv1.ApplicationUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		host, err := testsUtils.GetHostName(namespace, srcClusterName, env)
 		Expect(err).ToNot(HaveOccurred())
@@ -809,8 +810,8 @@ func AssertReplicaModeCluster(
 			pod,
 			host,
 			"appSrc",
-			superUser,
-			superUserPass,
+			appUser,
+			appUserPass,
 			cmd,
 			env)
 		Expect(err).ToNot(HaveOccurred())
@@ -985,20 +986,16 @@ func AssertFastFailOver(
 			", PRIMARY KEY (id)" +
 			")"
 
-		commandTimeout := time.Second * 10
-		primaryPodName := clusterName + "-1"
-		primaryPod := &corev1.Pod{}
-
-		Eventually(func(g Gomega) {
-			err := env.Client.Get(env.Ctx, types.NamespacedName{
-				Namespace: namespace,
-				Name:      primaryPodName,
-			}, primaryPod)
-			g.Expect(err).ToNot(HaveOccurred())
-		}).Should(Succeed())
-
-		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		_, _, err = env.ExecCommandWithPsqlClient(
+			namespace,
+			clusterName,
+			primaryPod,
+			apiv1.ApplicationUserSecretSuffix,
+			testsUtils.AppDBName,
+			query,
+		)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -1086,18 +1083,22 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 	By(fmt.Sprintf("creating target database '%v' and table '%v'", targetDBName, tableName), func() {
 		host, err := testsUtils.GetHostName(namespace, clusterName, env)
 		Expect(err).ToNot(HaveOccurred())
-		_, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+		appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 
-		createDBQuery := fmt.Sprintf("CREATE DATABASE %v;", targetDBName)
+		// We need to gather the cluster primary to create the database via superuser
+		currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
 		// Create database
-		_, _, err = env.ExecCommandWithPsqlClient(
-			namespace,
-			clusterName,
-			pod,
-			apiv1.SuperUserSecretSuffix,
-			testsUtils.PostgresDBName,
-			createDBQuery,
+		commandTimeout := time.Second * 10
+		createDBQuery := fmt.Sprintf("CREATE DATABASE %v OWNER %v", targetDBName, appUser)
+		_, _, err = env.ExecCommand(
+			env.Ctx,
+			*currentPrimary,
+			specs.PostgresContainerName,
+			&commandTimeout,
+			"psql", "-U", "postgres", "-tAc", createDBQuery,
 		)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -1107,8 +1108,8 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 			pod,
 			host,
 			targetDBName,
-			testsUtils.PostgresUser,
-			superUserPass,
+			appUser,
+			appUserPass,
 			createTableQuery,
 			env,
 		)
@@ -1120,8 +1121,8 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 			pod,
 			host,
 			targetDBName,
-			testsUtils.PostgresUser,
-			superUserPass,
+			appUser,
+			appUserPass,
 			grantRoleQuery,
 			env,
 		)
@@ -1243,22 +1244,6 @@ func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName str
 	})
 }
 
-func AssertSetupPgBasebackup(namespace, srcClusterName, srcCluster string) string {
-	// Create the src Cluster
-	AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
-
-	// Get Current Primary Pod
-	primaryPod, err := env.GetClusterPrimary(namespace, srcClusterName)
-	Expect(err).ToNot(HaveOccurred())
-
-	// Create test Data in the app database
-	query := "CREATE TABLE IF NOT EXISTS to_bootstrap AS VALUES (1),(2);"
-	_, _, err = testsUtils.RunQueryFromPod(primaryPod, testsUtils.PGLocalSocketDir,
-		"app", "postgres", "''", query, env)
-	Expect(err).ToNot(HaveOccurred())
-	return primaryPod.GetName()
-}
-
 func AssertCreateSASTokenCredentials(namespace string, id string, key string) {
 	// Adding 24 hours to the current time
 	date := time.Now().UTC().Add(time.Hour * 24)
@@ -1319,30 +1304,36 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
-		primary, err := env.GetClusterPrimary(namespace, restoredClusterName)
+		// NOTE: We use the credentials from the `source-cluster` for the psql connection
+		// given that this is a replica cluster
+		restoredPrimary, err := env.GetClusterPrimary(namespace, restoredClusterName)
 		Expect(err).ToNot(HaveOccurred())
-
-		// Use `source-cluster` read write service and `superuser` credentials for psql connection.
-		superUser, superUserPass, err := testsUtils.GetCredentials(
-			sourceClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+		appUser, appUserPass, err := testsUtils.GetCredentials(
+			sourceClusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
-		rwService := testsUtils.CreateServiceFQDN(namespace, testsUtils.GetReadWriteServiceName(sourceClusterName))
-
+		rwService := testsUtils.CreateServiceFQDN(namespace, testsUtils.GetReadWriteServiceName(restoredClusterName))
 		query := "SELECT count(*) FROM " + tableName
 		out, _, err := testsUtils.RunQueryFromPod(
-			psqlClientPod, rwService, testsUtils.AppDBName, superUser, superUserPass, query, env)
+			restoredPrimary,
+			rwService,
+			testsUtils.AppDBName,
+			appUser,
+			appUserPass,
+			query,
+			env,
+		)
 		Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 
+		// Insert new data in the source cluster
 		insertRecordIntoTable(namespace, sourceClusterName, tableName, 3, pod)
 		AssertArchiveWalOnMinio(namespace, sourceClusterName, sourceClusterName)
-
 		AssertDataExpectedCount(namespace, sourceClusterName, tableName, 3, pod)
 
 		cluster, err := env.GetCluster(namespace, restoredClusterName)
 		Expect(err).ToNot(HaveOccurred())
 		expectedReplicas := cluster.Spec.Instances - 1
 		// Cascading replicas should be attached to primary replica
-		connectedReplicas, err := testsUtils.CountReplicas(env, primary)
+		connectedReplicas, err := testsUtils.CountReplicas(env, restoredPrimary)
 		Expect(connectedReplicas, err).To(BeEquivalentTo(expectedReplicas))
 	})
 }
@@ -1358,46 +1349,50 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 		AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
 
 		// Test data should be present on restored primary
-		primary := restoredClusterName + "-1"
 		AssertDataExpectedCount(namespace, restoredClusterName, tableName, 2, pod)
-
-		// Restored primary should be on timeline 2
-		out, _, err := env.ExecQueryInInstancePod(
-			testsUtils.PodLocator{
-				Namespace: namespace,
-				PodName:   primary,
-			},
-			testsUtils.DatabaseName("app"),
-			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
-		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
-
-		// Restored standby should be attached to restored primary
-		AssertClusterStandbysAreStreaming(namespace, restoredClusterName, 120)
 	})
 
+	By("Ensuring the restored cluster is on timeline 2", func() {
+		out, _, err := env.ExecCommandWithPsqlClient(
+			namespace,
+			restoredClusterName,
+			pod,
+			apiv1.ApplicationUserSecretSuffix,
+			testsUtils.AppDBName,
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
+	})
+
+	// Restored standby should be attached to restored primary
+	AssertClusterStandbysAreStreaming(namespace, restoredClusterName, 120)
+
+	// Gather Credentials
+	appUser, appUserPass, err := testsUtils.GetCredentials(restoredClusterName, namespace,
+		apiv1.ApplicationUserSecretSuffix, env)
+	Expect(err).ToNot(HaveOccurred())
+	secretName := restoredClusterName + apiv1.ApplicationUserSecretSuffix
+
 	By("checking the restored cluster with pre-defined app password connectable", func() {
-		// Get the app user password from the auto generated -app secret
-		const suppliedAppUserPassword = "4ls054f3"        // NOSONAR
-		const secretName = "postgresql-user-supplied-app" //nolint:gosec
 		AssertApplicationDatabaseConnection(
 			namespace,
 			restoredClusterName,
-			"appuser",
-			"appdb",
-			suppliedAppUserPassword,
+			appUser,
+			testsUtils.AppDBName,
+			appUserPass,
 			secretName,
 			pod)
 	})
 
 	By("update user application password for restored cluster and verify connectivity", func() {
-		const secretName = "postgresql-user-supplied-app" //nolint:gosec
-		const newPassword = "eeh2Zahohx"                  //nolint:gosec
+		const newPassword = "eeh2Zahohx" //nolint:gosec
 		AssertUpdateSecret("password", newPassword, secretName, namespace, restoredClusterName, 30, env)
 		AssertApplicationDatabaseConnection(
 			namespace,
 			restoredClusterName,
-			"appuser",
-			"appdb",
+			appUser,
+			testsUtils.AppDBName,
 			newPassword,
 			secretName,
 			pod)
@@ -1565,30 +1560,23 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 }
 
 func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, tableName, lsn string, pod *corev1.Pod) {
-	primaryInfo := &corev1.Pod{}
-	var err error
+	// We give more time than the usual 600s, since the recovery is slower
+	AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
 
-	By("restoring a backup cluster with PITR in a new cluster", func() {
-		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
+	// Gather the recovered cluster primary
+	primaryInfo, err := env.GetClusterPrimary(namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+	secretName := clusterName + apiv1.ApplicationUserSecretSuffix
 
-		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
+	By("Ensuring the restored cluster is on timeline 3", func() {
 		// Restored primary should be on timeline 3
-		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
-		host, err := testsUtils.GetHostName(namespace, clusterName, env)
-		Expect(err).ToNot(HaveOccurred())
-		superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
-		Expect(err).ToNot(HaveOccurred())
-		stdOut, _, err := testsUtils.RunQueryFromPod(
+		stdOut, _, err := env.ExecCommandWithPsqlClient(
+			namespace,
+			clusterName,
 			pod,
-			host,
+			apiv1.ApplicationUserSecretSuffix,
 			testsUtils.AppDBName,
-			superUser,
-			superUserPass,
-			query,
-			env,
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(strings.Trim(stdOut, "\n"), err).To(Equal(lsn))
@@ -1602,27 +1590,29 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 		AssertDataExpectedCount(namespace, clusterName, tableName, 2, pod)
 	})
 
+	// Gather credentials
+	appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
+	Expect(err).ToNot(HaveOccurred())
+
 	By("checking the restored cluster with auto generated app password connectable", func() {
-		secretName := clusterName + "-app"
 		AssertApplicationDatabaseConnection(
 			namespace,
 			clusterName,
-			"appuser",
-			"appdb",
-			"",
+			appUser,
+			testsUtils.AppDBName,
+			appUserPass,
 			secretName,
 			pod)
 	})
 
 	By("update user application password for restored cluster and verify connectivity", func() {
-		secretName := clusterName + "-app"
 		const newPassword = "eeh2Zahohx" //nolint:gosec
 		AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
 		AssertApplicationDatabaseConnection(
 			namespace,
 			clusterName,
-			"appuser",
-			"appdb",
+			appUser,
+			testsUtils.AppDBName,
 			newPassword,
 			secretName,
 			pod)
@@ -1640,19 +1630,13 @@ func AssertClusterWasRestoredWithPITR(namespace, clusterName, tableName, lsn str
 		Expect(err).ToNot(HaveOccurred())
 
 		// Restored primary should be on timeline 3
-		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
-		host, err := testsUtils.GetHostName(namespace, clusterName, env)
-		Expect(err).ToNot(HaveOccurred())
-		superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
-		Expect(err).ToNot(HaveOccurred())
-		stdOut, _, err := testsUtils.RunQueryFromPod(
+		stdOut, _, err := env.ExecCommandWithPsqlClient(
+			namespace,
+			clusterName,
 			pod,
-			host,
+			apiv1.ApplicationUserSecretSuffix,
 			testsUtils.AppDBName,
-			superUser,
-			superUserPass,
-			query,
-			env,
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(strings.Trim(stdOut, "\n"), err).To(Equal(lsn))

@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
+	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -62,7 +63,7 @@ var _ = Describe("cluster_create unit tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("making sure that the superUser secret have been created", func() {
+		By("making sure that the superUser secret has been created", func() {
 			superUser := corev1.Secret{}
 			err := k8sClient.Get(
 				ctx,
@@ -72,7 +73,7 @@ var _ = Describe("cluster_create unit tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("making sure that the appUserSecret have been created", func() {
+		By("making sure that the appUserSecret has been created", func() {
 			appUser := corev1.Secret{}
 			err := k8sClient.Get(
 				ctx,
@@ -80,9 +81,12 @@ var _ = Describe("cluster_create unit tests", func() {
 				&appUser,
 			)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(string(appUser.Data["username"])).To(Equal("app"))
+			Expect(string(appUser.Data["password"])).To(HaveLen(64))
+			Expect(string(appUser.Data["dbname"])).To(Equal("app"))
 		})
 
-		By("making sure that the pooler secrets have been created", func() {
+		By("making sure that the pooler secrets has been created", func() {
 			poolerSecret := corev1.Secret{}
 			err := k8sClient.Get(
 				ctx,
@@ -90,6 +94,31 @@ var _ = Describe("cluster_create unit tests", func() {
 				&poolerSecret,
 			)
 			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	It("should make sure that superUser secret is created if EnableSuperuserAccess is enabled", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace()
+		cluster := newFakeCNPGCluster(namespace)
+		cluster.Spec.EnableSuperuserAccess = ptr.To(true)
+
+		By("executing reconcilePostgresSecrets", func() {
+			err := clusterReconciler.reconcilePostgresSecrets(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("making sure that the superUser secret has been created correctly", func() {
+			superUser := corev1.Secret{}
+			err := k8sClient.Get(
+				ctx,
+				types.NamespacedName{Name: cluster.GetSuperuserSecretName(), Namespace: namespace},
+				&superUser,
+			)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(superUser.Data["username"])).To(Equal("postgres"))
+			Expect(string(superUser.Data["password"])).To(HaveLen(64))
+			Expect(string(superUser.Data["dbname"])).To(Equal("*"))
 		})
 	})
 

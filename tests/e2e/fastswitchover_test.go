@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -149,16 +150,17 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			", PRIMARY KEY (id)" +
 			")"
 
-		commandTimeout := time.Second * 10
-		primaryPod := &corev1.Pod{}
-		primaryPodNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      oldPrimary,
-		}
-		err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
+		primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+
+		_, _, err = env.ExecCommandWithPsqlClient(
+			namespace,
+			clusterName,
+			primaryPod,
+			apiv1.ApplicationUserSecretSuffix,
+			utils.AppDBName,
+			query,
+		)
 		Expect(err).ToNot(HaveOccurred())
 	})
 

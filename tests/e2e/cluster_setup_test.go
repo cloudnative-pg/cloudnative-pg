@@ -103,9 +103,9 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			err := env.Client.Get(env.Ctx, namespacedName, pod)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Put something in the database. We'll check later if it
-			// still exists
-			superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+			// Put something in the database. We'll check later if it still exists
+			appUser, appUserPass, err := testsUtils.GetCredentials(
+				clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 			Expect(err).NotTo(HaveOccurred())
 			host, err := testsUtils.GetHostName(namespace, clusterName, env)
 			Expect(err).NotTo(HaveOccurred())
@@ -114,8 +114,8 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				psqlClientPod,
 				host,
 				testsUtils.AppDBName,
-				superUser,
-				superUserPass,
+				appUser,
+				appUserPass,
 				query,
 				env,
 			)
@@ -154,7 +154,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 					namespace,
 					clusterName,
 					psqlClientPod,
-					apiv1.SuperUserSecretSuffix,
+					apiv1.ApplicationUserSecretSuffix,
 					testsUtils.AppDBName,
 					query,
 				)

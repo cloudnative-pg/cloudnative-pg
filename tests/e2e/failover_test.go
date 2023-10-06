@@ -22,8 +22,6 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -39,6 +37,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 	failoverTest := func(namespace, clusterName string, hasDelay bool) {
 		var pods []string
 		var currentPrimary, targetPrimary, pausedReplica, pid string
+		commandTimeout := time.Second * 10
 
 		// We check that the currentPrimary is the -1 instance as expected,
 		// and we define the targetPrimary (-3) and pausedReplica (-2).
@@ -63,116 +62,78 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		// In this way we know that this standby will lag behind when
 		// we do some work on the primary.
 		By("pausing the walreceiver on the 2nd node of the Cluster", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      pausedReplica,
-			}
-			pausedPod := corev1.Pod{}
-			err := env.Client.Get(env.Ctx, namespacedName, &pausedPod)
+			primaryPod, err := env.GetPod(namespace, currentPrimary)
+			Expect(err).ToNot(HaveOccurred())
+			pausedPod, err := env.GetPod(namespace, pausedReplica)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Get the walreceiver pid
-			timeout := time.Second * 10
 			query := "SELECT pid FROM pg_stat_activity WHERE backend_type = 'walreceiver'"
 			out, _, err := env.EventuallyExecCommand(
-				env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
+				env.Ctx, *pausedPod, specs.PostgresContainerName, &commandTimeout,
 				"psql", "-U", "postgres", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 			pid = strings.Trim(out, "\n")
 
 			// Send the SIGSTOP
-			_, _, err = env.EventuallyExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *pausedPod, specs.PostgresContainerName, &commandTimeout,
 				"sh", "-c", fmt.Sprintf("kill -STOP %v", pid))
 			Expect(err).ToNot(HaveOccurred())
 
 			// Terminate the pausedReplica walsender on the primary.
-			// We don't wont to wait for the replication timeout.
+			// We don't want to wait for the replication timeout.
 			query = fmt.Sprintf("SELECT pg_terminate_backend(pid) FROM pg_stat_replication "+
 				"WHERE application_name = '%v'", pausedReplica)
-			_, _, err = env.ExecCommandWithPsqlClient(
-				namespace,
-				clusterName,
-				psqlClientPod,
-				apiv1.SuperUserSecretSuffix,
-				utils.AppDBName,
-				query,
-			)
+			_, _, err = env.EventuallyExecCommand(
+				env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
+				"psql", "-U", "postgres", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Expect the primary to have lost connection with the stopped standby
-			timeout = time.Second * 60
 			Eventually(func() (int, error) {
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      currentPrimary,
-				}
-				primaryPod := corev1.Pod{}
-				err := env.Client.Get(env.Ctx, namespacedName, &primaryPod)
+				primaryPod, err = env.GetPod(namespace, currentPrimary)
 				Expect(err).ToNot(HaveOccurred())
-				return utils.CountReplicas(env, &primaryPod)
-			}, timeout).Should(BeEquivalentTo(1))
+				return utils.CountReplicas(env, primaryPod)
+			}, RetryTimeout).Should(BeEquivalentTo(1))
 		})
 
 		// Perform a CHECKPOINT on the primary and wait for the working standby
 		// to replicate at it
 		By("generating some WAL traffic in the Cluster", func() {
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      currentPrimary,
-			}
-			primaryPod := corev1.Pod{}
-			err := env.Client.Get(env.Ctx, namespacedName, &primaryPod)
+			primaryPod, err := env.GetPod(namespace, currentPrimary)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Get the current lsn
-			superUser, superUserPass, err := utils.GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+			// Gather the current WAL LSN
+			initialLSN, _, err := env.EventuallyExecCommand(
+				env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
+				"psql", "-U", "postgres", "-tAc", "SELECT pg_current_wal_lsn()")
 			Expect(err).ToNot(HaveOccurred())
-			rwService, err := utils.GetHostName(namespace, clusterName, env)
-			Expect(err).ToNot(HaveOccurred())
-			initialLSN, _, err := utils.RunQueryFromPod(
-				psqlClientPod,
-				rwService,
-				utils.AppDBName,
-				superUser,
-				superUserPass,
-				"SELECT pg_current_wal_lsn()",
-				env)
-			Expect(err).ToNot(HaveOccurred())
-			_, _, err = utils.RunQueryFromPod(
-				psqlClientPod,
-				rwService,
-				utils.AppDBName,
-				utils.PostgresUser,
-				superUserPass,
-				"CHECKPOINT",
-				env)
+
+			// Execute a checkpoint
+			_, _, err = env.EventuallyExecCommand(
+				env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
+				"psql", "-U", "postgres", "-tAc", "CHECKPOINT")
 			Expect(err).ToNot(HaveOccurred())
 
 			// The replay_lsn of the targetPrimary should be ahead
 			// of the one before the checkpoint
-			timeout := time.Second * 60
 			Eventually(func() (string, error) {
-				primaryPod := corev1.Pod{}
-				err := env.Client.Get(env.Ctx, namespacedName, &primaryPod)
+				primaryPod, err = env.GetPod(namespace, currentPrimary)
 				Expect(err).ToNot(HaveOccurred())
 				query := fmt.Sprintf("SELECT true FROM pg_stat_replication "+
 					"WHERE application_name = '%v' AND replay_lsn > '%v'",
 					targetPrimary, strings.Trim(initialLSN, "\n"))
-				out, _, err := env.ExecCommandWithPsqlClient(
-					namespace,
-					clusterName,
-					psqlClientPod,
-					apiv1.SuperUserSecretSuffix,
-					utils.AppDBName,
-					query,
-				)
+				out, _, err := env.EventuallyExecCommand(
+					env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
+					"psql", "-U", "postgres", "-tAc", query)
 				return strings.TrimSpace(out), err
-			}, timeout).Should(BeEquivalentTo("t"))
+			}, RetryTimeout).Should(BeEquivalentTo("t"))
 		})
 
 		// Force-delete the primary. Eventually the cluster should elect a
 		// new target primary (and we check that it's the expected one)
 		By("deleting the CurrentPrimary node to trigger a failover", func() {
+			// Delete the target primary
 			quickDelete := &ctrlclient.DeleteOptions{
 				GracePeriodSeconds: &quickDeletionPeriod,
 			}
@@ -182,27 +143,22 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			// We wait until the operator knows that the primary is dead.
 			// At this point the promotion is waiting for all the walreceivers
 			// to be disconnected. We can send the SIGCONT now.
-			timeout := 60
 			Eventually(func() (int, error) {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(2))
+			}, RetryTimeout).Should(BeEquivalentTo(2))
 
-			namespacedPausedPodName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      pausedReplica,
-			}
-			pausedPod := corev1.Pod{}
-			err = env.Client.Get(env.Ctx, namespacedPausedPodName, &pausedPod)
+			pausedPod, err := env.GetPod(namespace, pausedReplica)
 			Expect(err).ToNot(HaveOccurred())
-			commandTimeout := time.Second * 10
-			_, _, err = env.EventuallyExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName,
+
+			// Send the SIGCONT to the walreceiver PID to resume execution
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *pausedPod, specs.PostgresContainerName,
 				&commandTimeout, "sh", "-c", fmt.Sprintf("kill -CONT %v", pid))
 			Expect(err).ToNot(HaveOccurred())
 
 			if hasDelay {
 				By("making sure that the operator is enforcing the switchover delay")
-				timeout = 120
+				timeout := 120
 				Eventually(func() (string, error) {
 					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.CurrentPrimaryFailingSinceTimestamp, err
@@ -252,8 +208,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 	// before deciding which instance to promote (which should be the third).
 	It("reacts to primary failure", func() {
 		const (
-			sampleFile      = fixturesDir + "/base/cluster-storage-class.yaml.template"
-			clusterName     = "postgresql-storage-class"
+			sampleFile      = fixturesDir + "/failover/cluster-failover.yaml.template"
 			namespacePrefix = "failover-e2e"
 		)
 		var namespace string
@@ -268,6 +223,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			return env.DeleteNamespace(namespace)
 		})
 
+		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+		Expect(err).ToNot(HaveOccurred())
+
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		failoverTest(namespace, clusterName, false)
@@ -276,7 +234,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 	It("reacts to primary failure while respecting the delay", func() {
 		const (
 			sampleFile      = fixturesDir + "/failover/cluster-failover-delay.yaml.template"
-			clusterName     = "failover-delay"
 			namespacePrefix = "failover-e2e-delay"
 		)
 		var namespace string
@@ -289,6 +246,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			}
 			return env.DeleteNamespace(namespace)
 		})
+
+		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 

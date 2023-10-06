@@ -30,7 +30,7 @@ func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment,
 	if err != nil {
 		return "", err
 	}
-	superUser, superUserPass, err := GetCredentials(clusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+	appUser, appUserPass, err := GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 	if err != nil {
 		return "", err
 	}
@@ -39,8 +39,8 @@ func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment,
 		podName,
 		host,
 		AppDBName,
-		superUser,
-		superUserPass,
+		appUser,
+		appUserPass,
 		query,
 		env,
 	)

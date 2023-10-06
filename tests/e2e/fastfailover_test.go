@@ -67,7 +67,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		}
 	})
 
-	Context("with async replicas cluster", func() {
+	Context("with async replicas cluster (without HA Replication Slots)", func() {
 		// Confirm that a standby closely following the primary doesn't need more
 		// than 10 seconds to be promoted and be able to start inserting records.
 		// We test this setting up an application pointing to the rw service,
