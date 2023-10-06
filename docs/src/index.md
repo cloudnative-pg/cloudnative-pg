@@ -105,6 +105,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * `cnpg` plugin for `kubectl`
 * Simple bind and search+bind LDAP client authentication
 * Multi-arch format container images
+* OLM installation
 
 !!! Info
     CloudNativePG does not use `StatefulSet`s for managing data persistence.

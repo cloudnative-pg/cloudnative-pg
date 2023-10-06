@@ -18,7 +18,7 @@ kubectl apply -f \
 You can verify that with:
 
 ```sh
-kubectl get deploy -n cnpg-system cnpg-controller-manager
+kubectl get deployment -n cnpg-system cnpg-controller-manager
 ```
 
 ### Using the `cnpg` plugin for `kubectl`
@@ -82,6 +82,12 @@ curl -sSfL \
 ### Using the Helm Chart
 
 The operator can be installed using the provided [Helm chart](https://github.com/cloudnative-pg/charts).
+
+### Using OLM
+
+CloudNativePG can also be installed using the
+[Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/docs/)
+directly from [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg).
 
 ## Details about the deployment
 
@@ -305,4 +311,3 @@ spec:
      highAvailability:
        enabled: false
 ```
-

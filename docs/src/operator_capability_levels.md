@@ -242,8 +242,8 @@ the ["PostgreSQL documentation: LDAP authentication" section](https://www.postgr
 
 The operator can be installed through a Kubernetes manifest via `kubectl
 apply`, to be used in a traditional Kubernetes installation in public
-and private cloud environments. Additionally, a Helm Chart for the operator is
-also available.
+and private cloud environments. Additionally, CloudNativePG supports
+installation via a Helm Chart or OLM bundle from OperatorHub.io.
 
 ### Convention over configuration
 

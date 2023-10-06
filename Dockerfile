@@ -26,10 +26,9 @@ LABEL summary="$SUMMARY" \
 
 WORKDIR /
 
-USER nonroot:nonroot
-
 # Needs to copy the entire content, otherwise, it will not
 # copy the symlink properly.
 COPY --from=builder /home/nonroot/ .
+USER 65532:65532
 
 ENTRYPOINT ["/manager"]
