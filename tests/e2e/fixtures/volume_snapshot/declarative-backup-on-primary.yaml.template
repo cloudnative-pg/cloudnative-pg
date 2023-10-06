@@ -1,0 +1,9 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: cluster-declarative-backup-primary
+spec:
+  method: volumeSnapshot
+  target: primary
+  cluster:
+    name: cluster-declarative-backup

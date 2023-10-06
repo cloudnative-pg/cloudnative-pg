@@ -162,9 +162,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	origBackup := backup.DeepCopy()
-	// If no good running backups are found we elect a pod for the backup
-	pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
-	if err != nil {
+	switch backup.Spec.Method {
+	case apiv1.BackupMethodBarmanObjectStore:
+		// If no good running backups are found we elect a pod for the backup
+		pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
 				"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
@@ -173,23 +174,22 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			backup.Status.Phase = apiv1.BackupPhasePending
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
 		}
-		tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("while getting pod: %w", err))
-		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
-			cluster.Status.TargetPrimary)
-		return ctrl.Result{}, nil
-	}
-	contextLogger.Debug("Found pod for backup", "pod", pod.Name)
+		if err != nil {
+			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("while getting pod: %w", err))
+			r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
+				cluster.Status.TargetPrimary)
+			return ctrl.Result{}, nil
+		}
+		contextLogger.Debug("Found pod for backup", "pod", pod.Name)
 
-	if !utils.IsPodReady(*pod) {
-		contextLogger.Info("Not ready backup target, will retry in 30 seconds", "target", pod.Name)
-		backup.Status.Phase = apiv1.BackupPhasePending
-		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
-			cluster.Status.TargetPrimary)
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
-	}
+		if !utils.IsPodReady(*pod) {
+			contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
+			backup.Status.Phase = apiv1.BackupPhasePending
+			r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
+				cluster.Status.TargetPrimary)
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Patch(ctx, &backup, client.MergeFrom(origBackup))
+		}
 
-	switch backup.Spec.Method {
-	case apiv1.BackupMethodBarmanObjectStore:
 		contextLogger.Info("Starting backup",
 			"cluster", cluster.Name,
 			"pod", pod.Name)
@@ -212,15 +212,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{}, nil
 		}
 
-		if previousPod, err := backup.GetAssignedInstance(ctx, r.Client); err != nil {
-			return ctrl.Result{}, err
-		} else if previousPod != nil {
-			contextLogger.Info("found a previously elected pod, reusing it",
-				"targetPodName", pod.Name)
-			pod = previousPod
-		}
-
-		res, err := r.reconcileSnapshotBackup(ctx, pod, &cluster, &backup)
+		res, err := r.reconcileSnapshotBackup(ctx, &cluster, &backup)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -309,17 +301,43 @@ func (r *BackupReconciler) isValidBackupRunning(
 
 func (r *BackupReconciler) reconcileSnapshotBackup(
 	ctx context.Context,
-	targetPod *corev1.Pod,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	targetPod, err := r.getSnapshotTargetPod(ctx, cluster, backup)
+	if apierrs.IsNotFound(err) {
+		r.Recorder.Eventf(
+			backup,
+			"Warning",
+			"FindingPod",
+			"Couldn't find target pod %s, will retry in 30 seconds",
+			cluster.Status.TargetPrimary,
+		)
+		contextLogger.Info(
+			"Couldn't find target pod, will retry in 30 seconds",
+			"target",
+			cluster.Status.TargetPrimary,
+		)
+		origBackup := backup.DeepCopy()
+		backup.Status.Phase = apiv1.BackupPhasePending
+		err := r.Patch(ctx, backup, client.MergeFrom(origBackup))
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	}
+	if err != nil {
+		tryFlagBackupAsFailed(ctx, r.Client, backup, fmt.Errorf("while getting pod: %w", err))
+		r.Recorder.Eventf(backup, "Warning", "FindingPod", "Error getting target pod: %s",
+			cluster.Status.TargetPrimary)
+		return &ctrl.Result{}, nil
+	}
 
 	// Validate we don't have other running backups
 	var clusterBackups apiv1.BackupList
 	if err := r.List(
 		ctx,
 		&clusterBackups,
+		client.InNamespace(backup.GetNamespace()),
 		client.MatchingFields{clusterName: cluster.Name},
 	); err != nil {
 		return nil, err
@@ -403,6 +421,35 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
 }
 
+func (r *BackupReconciler) getSnapshotTargetPod(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) (*corev1.Pod, error) {
+	contextLogger := log.FromContext(ctx)
+
+	// If the backup already has a target pod assigned (on a previous reconciliation loop)
+	// it will keep it. Otherwise, will use the pod computed by r.getBackupTargetPod()
+	targetPod, err := backup.GetAssignedInstance(ctx, r.Client)
+	if err != nil {
+		return nil, err
+	}
+	if targetPod != nil {
+		contextLogger.Info("found a previously elected pod, reusing it",
+			"targetPodName", targetPod.Name)
+		return targetPod, nil
+	}
+
+	// If no good running backups are found we elect a pod for the backup
+	targetPod, err = r.getBackupTargetPod(ctx, cluster, backup)
+	if err != nil {
+		return nil, err
+	}
+	contextLogger.Debug("Found pod for backup", "pod", targetPod.Name)
+
+	return targetPod, nil
+}
+
 // AnnotateSnapshots adds labels and annotations to the snapshots using the backup
 // status to facilitate access
 func annotateSnapshotsWithBackupData(
@@ -451,7 +498,7 @@ func isErrorRetryable(err error) bool {
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err)
 }
 
-// getBackupTargetPod returns the correct pod that should run the backup according to the current
+// getBackupTargetPod returns the pod that should run the backup according to the current
 // cluster's target policy
 func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	cluster *apiv1.Cluster,
