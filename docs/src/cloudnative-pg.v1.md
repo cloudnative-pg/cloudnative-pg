@@ -406,6 +406,35 @@ the selected PostgreSQL instance</p>
 
 
 
+## BackupSnapshotElementStatus     {#postgresql-cnpg-io-v1-BackupSnapshotElementStatus}
+
+
+**Appears in:**
+
+- [BackupSnapshotStatus](#postgresql-cnpg-io-v1-BackupSnapshotStatus)
+
+
+<p>BackupSnapshotElementStatus is a volume snapshot that is part of a volume snapshot method backup</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>type</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
 ## BackupSnapshotStatus     {#postgresql-cnpg-io-v1-BackupSnapshotStatus}
 
 
@@ -420,42 +449,11 @@ the selected PostgreSQL instance</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>parts</code><br/>
-<a href="#postgresql-cnpg-io-v1-BackupSnapshotStatusParts"><i>BackupSnapshotStatusParts</i></a>
+<tr><td><code>elements</code><br/>
+<a href="#postgresql-cnpg-io-v1-BackupSnapshotElementStatus"><i>[]BackupSnapshotElementStatus</i></a>
 </td>
 <td>
-   <p>The parts list, populated if it is a snapshot type backup</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## BackupSnapshotStatusParts     {#postgresql-cnpg-io-v1-BackupSnapshotStatusParts}
-
-
-**Appears in:**
-
-- [BackupSnapshotStatus](#postgresql-cnpg-io-v1-BackupSnapshotStatus)
-
-
-<p>BackupSnapshotStatusParts the volumeSnapshots composing the backup</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>data</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The PostgreSQL data snapshot name</p>
-</td>
-</tr>
-<tr><td><code>wal</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The PostgreSQL WAL (Write-Ahead Log) snapshot name</p>
+   <p>The elements list, populated with the gathered volume snapshots</p>
 </td>
 </tr>
 </tbody>

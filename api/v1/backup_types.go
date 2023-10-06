@@ -18,7 +18,6 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -93,20 +92,15 @@ type BackupSpec struct {
 
 // BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
 type BackupSnapshotStatus struct {
-	// The parts list, populated if it is a snapshot type backup
+	// The elements list, populated with the gathered volume snapshots
 	// +optional
-	Parts BackupSnapshotStatusParts `json:"parts,omitempty"`
+	Elements []BackupSnapshotElementStatus `json:"elements,omitempty"`
 }
 
-// BackupSnapshotStatusParts the volumeSnapshots composing the backup
-type BackupSnapshotStatusParts struct {
-	// The PostgreSQL data snapshot name
-	// +optional
-	Data string `json:"data,omitempty"`
-
-	// The PostgreSQL WAL (Write-Ahead Log) snapshot name
-	// +optional
-	Wal string `json:"wal,omitempty"`
+// BackupSnapshotElementStatus is a volume snapshot that is part of a volume snapshot method backup
+type BackupSnapshotElementStatus struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 // BackupStatus defines the observed state of Backup
@@ -278,34 +272,16 @@ func (backupStatus *BackupStatus) SetAsStarted(targetPod *corev1.Pod, method Bac
 	backupStatus.Method = method
 }
 
-// SetSnapshots sets the components field from a list of VolumeSnapshot
-func (snapshotStatus *BackupSnapshotStatus) SetSnapshots(snapshots []volumesnapshot.VolumeSnapshot) error {
-	for _, volumeSnapshot := range snapshots {
-		role := utils.PVCRole(volumeSnapshot.Labels[utils.PvcRoleLabelName])
-		switch role {
-		case utils.PVCRolePgData, "":
-			snapshotStatus.Parts.Data = volumeSnapshot.Name
-		case utils.PVCRolePgWal:
-			snapshotStatus.Parts.Wal = volumeSnapshot.Name
-		default:
-			// Unrecognized snapshot
-			return fmt.Errorf("unrecognised role %s in snapshot %s", role, volumeSnapshot.Name)
+// SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot
+func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volumesnapshot.VolumeSnapshot) {
+	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
+	for idx, volumeSnapshot := range snapshots {
+		snapshotNames[idx] = BackupSnapshotElementStatus{
+			Name: volumeSnapshot.Name,
+			Type: volumeSnapshot.Labels[utils.PvcRoleLabelName],
 		}
 	}
-
-	return nil
-}
-
-// GetSnapshots returns the list of snapshot names
-func (snapshotStatus *BackupSnapshotStatus) GetSnapshots() []string {
-	var snapshots []string
-	if snapshotStatus.Parts.Data != "" {
-		snapshots = append(snapshots, snapshotStatus.Parts.Data)
-	}
-	if snapshotStatus.Parts.Wal != "" {
-		snapshots = append(snapshots, snapshotStatus.Parts.Wal)
-	}
-	return snapshots
+	snapshotStatus.Elements = snapshotNames
 }
 
 // IsDone check if a backup is completed or still in progress

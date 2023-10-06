@@ -22,8 +22,8 @@ BackupFrom
 BackupList
 BackupMethod
 BackupPhase
+BackupSnapshotElementStatus
 BackupSnapshotStatus
-BackupSnapshotStatusParts
 BackupSource
 BackupSpec
 BackupStatus

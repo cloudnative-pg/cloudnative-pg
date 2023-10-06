@@ -309,18 +309,22 @@ spec:
               snapshotBackupStatus:
                 description: Status of the volumeSnapshot backup
                 properties:
-                  parts:
-                    description: The parts list, populated if it is a snapshot type
-                      backup
-                    properties:
-                      data:
-                        description: The PostgreSQL data snapshot name
-                        type: string
-                      wal:
-                        description: The PostgreSQL WAL (Write-Ahead Log) snapshot
-                          name
-                        type: string
-                    type: object
+                  elements:
+                    description: The elements list, populated with the gathered volume
+                      snapshots
+                    items:
+                      description: BackupSnapshotElementStatus is a volume snapshot
+                        that is part of a volume snapshot method backup
+                      properties:
+                        name:
+                          type: string
+                        type:
+                          type: string
+                      required:
+                      - name
+                      - type
+                      type: object
+                    type: array
                 type: object
               startedAt:
                 description: When the backup was started

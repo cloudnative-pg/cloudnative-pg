@@ -53,7 +53,7 @@ var _ = Describe("BackupStatus structure", func() {
 
 	It("can be set to contain a snapshot list", func() {
 		status := BackupStatus{}
-		err := status.BackupSnapshotStatus.SetSnapshots([]volumesnapshot.VolumeSnapshot{
+		status.BackupSnapshotStatus.SetSnapshotElements([]volumesnapshot.VolumeSnapshot{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-1",
@@ -71,10 +71,11 @@ var _ = Describe("BackupStatus structure", func() {
 				},
 			},
 		})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(status.BackupSnapshotStatus.GetSnapshots()).To(HaveLen(2))
-		Expect(status.BackupSnapshotStatus.Parts.Data).To(Equal("cluster-example-snapshot-1"))
-		Expect(status.BackupSnapshotStatus.Parts.Wal).To(Equal("cluster-example-snapshot-2"))
+		Expect(status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
+			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-1", Type: string(utils.PVCRolePgData)}))
+		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
+			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-2", Type: string(utils.PVCRolePgWal)}))
 	})
 
 	Context("backup phases", func() {
