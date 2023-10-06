@@ -46,6 +46,7 @@ environment variable:
 - [Kind](https://kind.sigs.k8s.io/) v0.11.x or greater
 - [golangci-lint](https://github.com/golangci/golangci-lint)
 - [goreleaser](https://goreleaser.com/)
+- [Operator SDK CLI](https://sdk.operatorframework.io/)
 
 In addition, check that the following packages are installed in your system:
 
