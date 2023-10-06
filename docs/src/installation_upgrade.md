@@ -238,11 +238,16 @@ only the operator itself.
 
 ### Upgrading to 1.21 from a previous minor version
 
+!!! Important
+    If you are upgrading from 1.19 or older, please read the
+    [instructions to upgrade to version 1.20](#upgrading-to-120-from-a-previous-minor-version)
+    first.
+
 With the goal to keep improving out-of-the box the *convention over
 configuration* behavior of the operator, CloudNativePG 1.21 changes the default
 value of several knobs in the following areas:
 
-- delays at startup and shutdown of the PostgreSQL instance
+- startup and shutdown control of the PostgreSQL instance
 - self-healing
 - security
 - labels
@@ -257,18 +262,20 @@ Most of the changes will affect new PostgreSQL clusters only.
 
 #### Delay for PostgreSQL shutdown
 
-Up to now, `stopDelay` was set to 30 seconds. Despite the recommendations to
-change and tune this value, almost all the cases we have examined during
-support incidents or community issues show that this value is left unchanged.
+Up to now, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
+was set to 30 seconds. Despite the recommendations to change and tune this
+value, almost all the cases we have examined during support incidents or
+community issues show that this value is left unchanged.
 
-The new value is set to 1800 seconds, equivalent of 30 minutes.
+The [new value is set to 1800 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9f7f18c5b9d9103423a53d180c0e2f2189e71c3c),
+the equivalent of 30 minutes.
 
 A new parameter has been introduced to define the maximum time window, within
 the `stopDelay` one, reserved to gracefully stop PostgreSQL using the `smart`
 shutdown procedure. Once completed, the remaining time up to `stopDelay` will
 be reserved for PostgreSQL to complete its duties in terms of WAL commitments
-with both the archive and the streaming replicas, in order to ensure no data
-loss.
+with both the archive and the streaming replicas, in order to ensure the cluster
+doesn't lose any data.
 
 If you want to retain the old behavior, you need to explicitly set:
 
@@ -281,12 +288,47 @@ spec:
 
 #### Delay for PostgreSQL startup
 
-* Change the default value of `startDelay` to 3600, instead of 30 seconds (#2847)
-* Replace the livenessProbe's initial delay with a more proper Kubernetes startup probe to deal with the start of a Postgres server (#2847)
+Until now, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
+was set to 30 seconds and CloudNativePG was using this parameter as initial
+delay for the Kubernetes liveness probe. Given that all Kubernetes supported
+releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
+version 1.21 has adopted this approach as well (`startDelay` is now
+automatically divided in periods of the duration of 10 seconds each).
+
+Despite the recommendations to change and tune this value, almost all the cases
+we have examined during support incidents or community issues show that this
+value is left unchanged. Given that this parameter influences the startup of
+a PostgreSQL instance, a low value of `startDelay` would cause Postgres to
+never reach a consistent recovery state and be restarted indefinitely.
+
+For this reason, `startDelay` has been [raised by default to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/4f4cd96bc6f8e284a200705c11a2b41652d58146),
+the equivalent of 1 hour.
+
+You can restore a similar behavior, based on startup probes instead of
+initially delayed liveness probes, by explicitly setting:
+
+```yaml
+spec:
+   ...
+   startDelay: 30
+```
 
 #### Delay for PostgreSQL switchover
 
-* Change the default value of `switchoverDelay` to 3600 seconds instead of 40000000 seconds (#2846)
+Up to now, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
+was set to 40000000 seconds (over 15 months), in order to simulate a very long
+interval.
+
+The [new value has been lowered to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9565f9f2ebab8bc648d9c361198479974664c322),
+the equivalent of 1 hour.
+
+If you want to retain the old behavior, you need to explicitly set:
+
+```yaml
+spec:
+   ...
+   switchoverDelay: 40000000
+```
 
 #### Disable superuser access
 
