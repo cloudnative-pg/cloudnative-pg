@@ -1444,7 +1444,7 @@ data:
                     "0": {
                       "color": "red",
                       "index": 1,
-                      "text": "No backups"
+                      "text": "N/A"
                     }
                   },
                   "type": "value"
