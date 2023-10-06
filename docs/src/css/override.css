@@ -2,7 +2,10 @@
     white-space: normal;
 }
 
+.wy-side-nav-search div.version a {
+    color: #fcfcfc;
+}
+
 .wy-side-nav-search div.version {
-    font-size: small;
     color: #fcfcfc;
 }
