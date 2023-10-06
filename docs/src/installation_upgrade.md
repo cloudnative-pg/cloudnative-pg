@@ -243,7 +243,7 @@ only the operator itself.
     [instructions to upgrade to version 1.20](#upgrading-to-120-from-a-previous-minor-version)
     first.
 
-With the goal to keep improving out-of-the box the *convention over
+With the goal to keep improving out-of-the-box the *convention over
 configuration* behavior of the operator, CloudNativePG 1.21 changes the default
 value of several knobs in the following areas:
 
@@ -258,10 +258,10 @@ Most of the changes will affect new PostgreSQL clusters only.
     Please read carefully the list of changes below and how to change the
     `Cluster` manifests to retain the existing behavior, in case you don't want to
     disrupt your existing workloads. Alternatively, postpone the upgrade to 1.21
-    until you are sure. In general, we recommend the you adopt these default
-    values, unless you have valid reasons not to.
+    until you are sure. In general, we recommend adopting these default
+    values unless you have valid reasons not to.
 
-If you want to explicitly keep the existing behavior of CloudNativePG,
+If you want to keep the existing behavior of CloudNativePG explicitly,
 preferably just temporarily, you need to set these values in all your `Cluster`
 definitions **before upgrading** to version 1.21:
 
@@ -287,14 +287,14 @@ community issues show that this value is left unchanged.
 The [new value is set to 1800 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9f7f18c5b9d9103423a53d180c0e2f2189e71c3c),
 the equivalent of 30 minutes.
 
-A new parameter has been introduced to define the maximum time window, within
+A new parameter has been introduced to define the maximum time window within
 the `stopDelay` one, reserved to gracefully stop PostgreSQL using the `smart`
 shutdown procedure. Once completed, the remaining time up to `stopDelay` will
-be reserved for PostgreSQL to complete its duties in terms of WAL commitments
-with both the archive and the streaming replicas, in order to ensure the cluster
+be reserved for PostgreSQL to complete its duties regarding WAL commitments
+with both the archive and the streaming replicas to ensure the cluster
 doesn't lose any data.
 
-If you want to retain the old behavior, you need to explicitly set:
+If you want to retain the old behavior, you need to set explicitly:
 
 ```yaml
 spec:
