@@ -21,6 +21,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -51,23 +53,29 @@ var _ = Describe("BackupStatus structure", func() {
 
 	It("can be set to contain a snapshot list", func() {
 		status := BackupStatus{}
-		status.BackupSnapshotStatus.SetSnapshotList([]volumesnapshot.VolumeSnapshot{
+		status.BackupSnapshotStatus.SetSnapshotElements([]volumesnapshot.VolumeSnapshot{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-1",
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+					},
 				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-2",
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+					},
 				},
 			},
 		})
-
-		Expect(status.BackupSnapshotStatus.Snapshots).To(HaveLen(2))
-		Expect(status.BackupSnapshotStatus.Snapshots).To(ConsistOf(
-			"cluster-example-snapshot-1",
-			"cluster-example-snapshot-2"))
+		Expect(status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
+			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-1", Type: string(utils.PVCRolePgData)}))
+		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
+			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-2", Type: string(utils.PVCRolePgWal)}))
 	})
 
 	Context("backup phases", func() {

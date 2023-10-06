@@ -309,11 +309,24 @@ spec:
               snapshotBackupStatus:
                 description: Status of the volumeSnapshot backup
                 properties:
-                  snapshots:
-                    description: The snapshot lists, populated if it is a snapshot
-                      type backup
+                  elements:
+                    description: The elements list, populated with the gathered volume
+                      snapshots
                     items:
-                      type: string
+                      description: BackupSnapshotElementStatus is a volume snapshot
+                        that is part of a volume snapshot method backup
+                      properties:
+                        name:
+                          description: Name is the snapshot resource name
+                          type: string
+                        type:
+                          description: Type is tho role of the snapshot in the cluster,
+                            such as PG_DATA and PG_WAL
+                          type: string
+                      required:
+                      - name
+                      - type
+                      type: object
                     type: array
                 type: object
               startedAt:

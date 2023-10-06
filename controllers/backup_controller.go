@@ -391,7 +391,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return nil, err
 	}
 
-	backup.Status.BackupSnapshotStatus.SetSnapshotList(snapshots)
+	backup.Status.BackupSnapshotStatus.SetSnapshotElements(snapshots)
 	if err := backupStatusFromSnapshots(snapshots, &backup.Status); err != nil {
 		contextLogger.Error(err, "while enriching the backup status")
 	}

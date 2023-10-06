@@ -293,7 +293,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 						Name:      snapshotName,
 					}, backup)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(backup.Status.BackupSnapshotStatus.Snapshots).To(HaveLen(2))
+					g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
 					g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 				}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 			})
@@ -304,7 +304,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					utils.ClusterLabelName: clusterName,
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Snapshots)))
+				Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
 				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
 				Expect(err).ToNot(HaveOccurred())

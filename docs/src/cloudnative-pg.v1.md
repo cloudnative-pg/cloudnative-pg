@@ -406,6 +406,37 @@ the selected PostgreSQL instance</p>
 
 
 
+## BackupSnapshotElementStatus     {#postgresql-cnpg-io-v1-BackupSnapshotElementStatus}
+
+
+**Appears in:**
+
+- [BackupSnapshotStatus](#postgresql-cnpg-io-v1-BackupSnapshotStatus)
+
+
+<p>BackupSnapshotElementStatus is a volume snapshot that is part of a volume snapshot method backup</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the snapshot resource name</p>
+</td>
+</tr>
+<tr><td><code>type</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Type is tho role of the snapshot in the cluster, such as PG_DATA and PG_WAL</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## BackupSnapshotStatus     {#postgresql-cnpg-io-v1-BackupSnapshotStatus}
 
 
@@ -420,11 +451,11 @@ the selected PostgreSQL instance</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>snapshots</code><br/>
-<i>[]string</i>
+<tr><td><code>elements</code><br/>
+<a href="#postgresql-cnpg-io-v1-BackupSnapshotElementStatus"><i>[]BackupSnapshotElementStatus</i></a>
 </td>
 <td>
-   <p>The snapshot lists, populated if it is a snapshot type backup</p>
+   <p>The elements list, populated with the gathered volume snapshots</p>
 </td>
 </tr>
 </tbody>

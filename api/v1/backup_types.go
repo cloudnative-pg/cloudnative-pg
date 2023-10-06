@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // BackupPhase is the phase of the backup
@@ -90,9 +92,18 @@ type BackupSpec struct {
 
 // BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
 type BackupSnapshotStatus struct {
-	// The snapshot lists, populated if it is a snapshot type backup
+	// The elements list, populated with the gathered volume snapshots
 	// +optional
-	Snapshots []string `json:"snapshots,omitempty"`
+	Elements []BackupSnapshotElementStatus `json:"elements,omitempty"`
+}
+
+// BackupSnapshotElementStatus is a volume snapshot that is part of a volume snapshot method backup
+type BackupSnapshotElementStatus struct {
+	// Name is the snapshot resource name
+	Name string `json:"name"`
+
+	// Type is tho role of the snapshot in the cluster, such as PG_DATA and PG_WAL
+	Type string `json:"type"`
 }
 
 // BackupStatus defines the observed state of Backup
@@ -264,13 +275,16 @@ func (backupStatus *BackupStatus) SetAsStarted(targetPod *corev1.Pod, method Bac
 	backupStatus.Method = method
 }
 
-// SetSnapshotList sets the Snapshots field from a list of VolumeSnapshot
-func (snapshotStatus *BackupSnapshotStatus) SetSnapshotList(snapshots []volumesnapshot.VolumeSnapshot) {
-	snapshotNames := make([]string, len(snapshots))
+// SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot
+func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volumesnapshot.VolumeSnapshot) {
+	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
 	for idx, volumeSnapshot := range snapshots {
-		snapshotNames[idx] = volumeSnapshot.Name
+		snapshotNames[idx] = BackupSnapshotElementStatus{
+			Name: volumeSnapshot.Name,
+			Type: volumeSnapshot.Labels[utils.PvcRoleLabelName],
+		}
 	}
-	snapshotStatus.Snapshots = snapshotNames
+	snapshotStatus.Elements = snapshotNames
 }
 
 // IsDone check if a backup is completed or still in progress
