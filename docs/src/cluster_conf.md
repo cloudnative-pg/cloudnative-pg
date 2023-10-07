@@ -41,18 +41,6 @@ CloudNativePG relies on [ephemeral volumes](https://kubernetes.io/docs/concepts/
 for part of the internal activities. Ephemeral volumes exist for the sole duration of
 a pod's life, without persisting across pod restarts.
 
-### Volume for the superuser secret
-
-Created if the `spec.enableSuperuserAccess` field is set to true. This volume mounts a
-Kubernetes Secret under `/etc/superuser-secret` that contains superuser
-credentials for the Postgres database.
-
-### Volume for the application user secret
-
-Created when application database creation is enabled through various methods. This
-volume mounts a Kubernetes Secret under `/etc/app-secret` that contains
-credentials for the application database.
-
 ### Volume for temporary storage
 
 An ephemeral volume used for temporary storage. An upper bound on the size can be
@@ -63,7 +51,8 @@ spec.
 
 This volume is used as shared memory space for Postgres, also an ephemeral type but
 stored in-memory. An upper bound on the size can be configured via the
-`spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec.
+`spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec. This is used only
+in case of [PostgreSQL running with `posix` shared memory dynamic allocation](postgresql_conf.md#dynamic-shared-memory-settings).
 
 ## Environment variables
 
