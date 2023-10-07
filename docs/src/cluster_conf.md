@@ -35,28 +35,35 @@ spec:
 You can find a complete example using projected volume template to mount Secret and Configmap in
 the [cluster-example-projected-volume.yaml](samples/cluster-example-projected-volume.yaml) deployment manifest.
 
-## scratch-data Volume
+## Ephemeral volumes
+
+CloudNativePG relies on [ephemeral volumes](https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/)
+for part of the internal activities. Ephemeral volumes exist for the sole duration of
+a pod's life, without persisting across pod restarts.
+
+### Volume for the superuser secret
+
+Created if the `spec.enableSuperuserAccess` field is set to true. This volume mounts a
+Kubernetes Secret under `/etc/superuser-secret` that contains superuser
+credentials for the Postgres database.
+
+### Volume for the application user secret
+
+Created when application database creation is enabled through various methods. This
+volume mounts a Kubernetes Secret under `/etc/app-secret` that contains
+credentials for the application database.
+
+### Volume for temporary storage
 
 An ephemeral volume used for temporary storage. An upper bound on the size can be
 configured via the `spec.ephemeralVolumesSizeLimit.temporaryData` field in the cluster
-spec. This volume exists on the node's filesystem and is ephemeral, meaning
-that it will not persist across pod restarts.
+spec.
 
-## shm Volume
+### Volume for shared memory
 
 This volume is used as shared memory space for Postgres, also an ephemeral type but
 stored in-memory. An upper bound on the size can be configured via the
 `spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec.
-
-## superuser-secret Volume
-
-Created if the `spec.enableSuperuserAccess` field is set to true. This volume mounts a
-Kubernetes Secret that contains superuser credentials for the Postgres database.
-
-## app-secret Volume
-
-Created when application database creation is enabled through various methods. This
-volume mounts a Kubernetes Secret that contains credentials for the application database.
 
 ## Environment variables
 
