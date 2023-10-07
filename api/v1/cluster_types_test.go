@@ -18,6 +18,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -918,5 +919,23 @@ var _ = Describe("Cluster ShouldRecoveryCreateApplicationDatabase", func() {
 	It("should return false if none of the conditions are met", func() {
 		result := cluster.ShouldRecoveryCreateApplicationDatabase()
 		Expect(result).To(BeFalse())
+	})
+})
+
+var _ = Describe("Ephemeral volume size limits", func() {
+	It("doesn't panic if the specification is nil", func() {
+		var spec *EphemeralVolumesSizeLimitConfiguration
+		Expect(spec.GetShmLimit()).To(BeNil())
+		Expect(spec.GetTemporaryDataLimit()).To(BeNil())
+	})
+
+	It("works correctly when fully specified", func() {
+		spec := &EphemeralVolumesSizeLimitConfiguration{
+			Shm:           ptr.To(resource.MustParse("10Mi")),
+			TemporaryData: ptr.To(resource.MustParse("20Mi")),
+		}
+
+		Expect(spec.GetShmLimit().String()).To(Equal("10Mi"))
+		Expect(spec.GetTemporaryDataLimit().String()).To(Equal("20Mi"))
 	})
 })

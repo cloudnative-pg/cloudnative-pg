@@ -1806,6 +1806,26 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
+              ephemeralVolumesSizeLimit:
+                description: EphemeralVolumesSizeLimit allows the user to set the
+                  limits for the ephemeral volumes
+                properties:
+                  shm:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: Shm is the size limit of the shared memory volume
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  temporaryData:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: TemporaryData is the size limit of the temporary
+                      data volume
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
               externalClusters:
                 description: The list of external clusters which are used in the configuration
                 items:
