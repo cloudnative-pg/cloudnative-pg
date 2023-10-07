@@ -79,69 +79,126 @@ var _ = Describe("Storage source", func() {
 					},
 				},
 			},
+			Backup: &apiv1.BackupConfiguration{
+				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					DestinationPath: "s3://test",
+				},
+			},
 		},
 	}
 
-	clusterEmpty := &apiv1.Cluster{
+	clusterWithBackupSection := &apiv1.Cluster{
 		Spec: apiv1.ClusterSpec{
 			StorageConfiguration: apiv1.StorageConfiguration{},
 			WalStorage:           &apiv1.StorageConfiguration{},
+			Backup: &apiv1.BackupConfiguration{
+				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					DestinationPath: "s3://test",
+				},
+			},
+		},
+	}
+
+	backupList := apiv1.BackupList{
+		Items: []apiv1.Backup{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1.NewTime(time.Now()),
+					Name:              "completed-backup",
+				},
+				Spec: apiv1.BackupSpec{
+					Method: apiv1.BackupMethodVolumeSnapshot,
+				},
+				Status: apiv1.BackupStatus{
+					Phase: apiv1.BackupPhaseCompleted,
+				},
+			},
 		},
 	}
 
 	When("bootstrapping from a VolumeSnapshot", func() {
-		It("should fail when looking for a wrong role", func(ctx context.Context) {
-			_, err := GetCandidateStorageSource(ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole("NoRol")
-			Expect(err).To(HaveOccurred())
+		When("we don't have backups", func() {
+			When("there's no source WAL archive", func() {
+				It("should fail when looking for a wrong role", func(ctx context.Context) {
+					_, err := ptr.To(StorageSource{}).ForRole("NoRol")
+					Expect(err).To(HaveOccurred())
+				})
+
+				It("should return the correct source when choosing pgdata", func(ctx context.Context) {
+					source, err := GetCandidateStorageSource(
+						ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgData)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(source).ToNot(BeNil())
+					Expect(source.Name).To(Equal(pgDataSnapshotVolumeName))
+				})
+
+				It("should return the correct source when choosing pgwal", func(ctx context.Context) {
+					source, err := GetCandidateStorageSource(
+						ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgWal)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(source).ToNot(BeNil())
+					Expect(source.Name).To(Equal(pgWalSnapshotVolumeName))
+				})
+			})
+
+			When("there's a source WAL archive", func() {
+				It("should return an empty storage source", func(ctx context.Context) {
+					clusterSourceWALArchive := clusterWithBootstrapSnapshot.DeepCopy()
+					clusterSourceWALArchive.Spec.Bootstrap.Recovery.Source = "test"
+					source, err := GetCandidateStorageSource(
+						ctx,
+						clusterSourceWALArchive,
+						apiv1.BackupList{},
+					).ForRole(utils.PVCRolePgData)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(source).To(BeNil())
+				})
+			})
 		})
 
-		It("should return the correct source when choosing pgdata", func(ctx context.Context) {
-			source, err := GetCandidateStorageSource(
-				ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgData)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(source).ToNot(BeNil())
-			Expect(source.Name).To(Equal(pgDataSnapshotVolumeName))
-		})
-
-		It("should return the correct source when choosing pgwal", func(ctx context.Context) {
-			source, err := GetCandidateStorageSource(
-				ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgWal)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(source).ToNot(BeNil())
-			Expect(source.Name).To(Equal(pgWalSnapshotVolumeName))
+		When("we have backups", func() {
+			It("should return the correct backup", func(ctx context.Context) {
+				source, err := GetCandidateStorageSource(
+					ctx,
+					clusterWithBootstrapSnapshot,
+					backupList,
+				).ForRole(utils.PVCRolePgData)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(source).ToNot(BeNil())
+				Expect(source.Name).To(Equal("completed-backup"))
+			})
 		})
 	})
 
 	When("not bootstrapping from a VolumeSnapshot with no backups", func() {
 		It("should return an empty storage source", func(ctx context.Context) {
-			source, err := GetCandidateStorageSource(ctx, clusterEmpty, apiv1.BackupList{}).ForRole(utils.PVCRolePgData)
+			source, err := GetCandidateStorageSource(
+				ctx,
+				clusterWithBackupSection,
+				apiv1.BackupList{},
+			).ForRole(utils.PVCRolePgData)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(source).To(BeNil())
 		})
 	})
 
 	When("not bootstrapping from a VolumeSnapshot with backups", func() {
-		backupList := apiv1.BackupList{
-			Items: []apiv1.Backup{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						CreationTimestamp: metav1.NewTime(time.Now()),
-						Name:              "completed-backup",
-					},
-					Spec: apiv1.BackupSpec{
-						Method: apiv1.BackupMethodVolumeSnapshot,
-					},
-					Status: apiv1.BackupStatus{
-						Phase: apiv1.BackupPhaseCompleted,
-					},
-				},
-			},
-		}
-
 		It("should return the backup as storage source", func(ctx context.Context) {
-			source, err := GetCandidateStorageSource(ctx, clusterEmpty, backupList).ForRole(utils.PVCRolePgData)
+			source, err := GetCandidateStorageSource(ctx, clusterWithBackupSection, backupList).ForRole(utils.PVCRolePgData)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(source).ToNot(BeNil())
 			Expect(source.Name).To(Equal("completed-backup"))
+		})
+	})
+
+	When("there's no WAL archiving", func() {
+		It("should return an empty storage source", func(ctx context.Context) {
+			clusterNoWalArchiving := clusterWithBackupSection.DeepCopy()
+			clusterNoWalArchiving.Spec.Backup = nil
+
+			source, err := GetCandidateStorageSource(ctx, clusterNoWalArchiving, backupList).ForRole(utils.PVCRolePgData)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(source).To(BeNil())
 		})
 	})
 })

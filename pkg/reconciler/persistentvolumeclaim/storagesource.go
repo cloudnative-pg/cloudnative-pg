@@ -62,6 +62,32 @@ func GetCandidateStorageSource(
 	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
 ) *StorageSource {
+	// We can't use a Backup to create a replica when:
+	//
+	// 1. we don't have WAL archiving, because the backup may be old
+	//    and the primary may not have the WAL files needed for the
+	//    new replica to be in-sync
+	//
+	// 2. we need two different WAL object stores, because we cannot
+	//    access them at the same time. This can happen when we have:
+	//
+	//    - the object store where we upload the WAL files
+	//      i.e. `.spec.backup.barmanObjectStore`
+	//
+	//    - the object store where were we aed WAL files to create the
+	//      bootstrap primary instance
+	//      i.e. `.spec.externalClusters[i].barmanObjectStore` and
+	//      `.spec.bootstrap.recovery.source`
+	//
+	//    This is true only for the backup that was used to bootstrap
+	//    the cluster itself. Other backups are fine because the required
+	//    WALs have been archived in the cluster object store.
+
+	// WAL archiving need to be active
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		return nil
+	}
+
 	if result := getCandidateSourceFromBackupList(ctx, backupList); result != nil {
 		return result
 	}
@@ -75,6 +101,12 @@ func GetCandidateStorageSource(
 	}
 
 	if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+		return nil
+	}
+
+	// We support one and only one object store, see commit at the beginning
+	// of this function
+	if len(cluster.Spec.Bootstrap.Recovery.Source) > 0 {
 		return nil
 	}
 
@@ -109,7 +141,7 @@ func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.Back
 				Name:     GetName(backup.Name, utils.PVCRolePgData),
 			},
 		}
-		if len(backup.Status.BackupSnapshotStatus.Snapshots) > 1 {
+		if len(backup.Status.BackupSnapshotStatus.Elements) > 1 {
 			result.WALSource = &corev1.TypedLocalObjectReference{
 				APIGroup: ptr.To(volumesnapshot.GroupName),
 				Kind:     "VolumeSnapshot",
