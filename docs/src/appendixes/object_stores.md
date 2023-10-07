@@ -96,7 +96,14 @@ spec:
 
 ### S3 lifecycle policy
 
-Barman writes objects to S3, then does not update them until they are deleted by the Barman retention policy. A recommended approach for an S3 lifecycle policy is to expire the current version of objects a few days longer than the Barman retention policy, enable object versioning, and expire non-current versions after a number of days. Such a policy protects against accidental deletion, and also allows for restricting permissions to the CNPG workload so that it may delete objects from S3 without granting permissions to permanently delete objects.
+Barman Cloud writes objects to S3, then does not update them until they are
+deleted by the Barman Cloud retention policy. A recommended approach for an S3
+lifecycle policy is to expire the current version of objects a few days longer
+than the Barman retention policy, enable object versioning, and expire
+non-current versions after a number of days. Such a policy protects against
+accidental deletion, and also allows for restricting permissions to the
+CloudNativePG workload so that it may delete objects from S3 without granting
+permissions to permanently delete objects.
 
 ### Other S3-compatible Object Storages providers
 
