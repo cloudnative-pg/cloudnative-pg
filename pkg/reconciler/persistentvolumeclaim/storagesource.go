@@ -55,9 +55,17 @@ func (source *StorageSource) ForRole(role utils.PVCRole) (*corev1.TypedLocalObje
 	}
 }
 
-// GetCandidateStorageSource gets the candidate storage source
-// to be used to create a PVC
-func GetCandidateStorageSource(
+// GetCandidateStorageSourceForPrimary gets the candidate storage source
+// to be used to create a primary PVC
+func GetCandidateStorageSourceForPrimary(
+	cluster *apiv1.Cluster,
+) *StorageSource {
+	return getCandidateSourceFromClusterDefinition(cluster)
+}
+
+// GetCandidateStorageSourceForReplica gets the candidate storage source
+// to be used to create a replica PVC
+func GetCandidateStorageSourceForReplica(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backupList apiv1.BackupList,
@@ -83,7 +91,7 @@ func GetCandidateStorageSource(
 	//    the cluster itself. Other backups are fine because the required
 	//    WALs have been archived in the cluster object store.
 
-	// WAL archiving need to be active
+	// Unless WAL archiving is active, we can't recover a replica from a backup
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		return nil
 	}
@@ -92,34 +100,23 @@ func GetCandidateStorageSource(
 		return result
 	}
 
-	if cluster.Spec.Bootstrap == nil {
-		return nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery == nil {
-		return nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
-		return nil
-	}
-
 	// We support one and only one object store, see commit at the beginning
 	// of this function
-	if len(cluster.Spec.Bootstrap.Recovery.Source) > 0 {
+	if cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.Recovery != nil &&
+		len(cluster.Spec.Bootstrap.Recovery.Source) > 0 {
 		return nil
 	}
 
-	volumeSnapshots := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
-	return &StorageSource{
-		DataSource: volumeSnapshots.Storage,
-		WALSource:  volumeSnapshots.WalStorage,
-	}
+	// Try using the backup the Cluster have been bootstrapped from
+	return getCandidateSourceFromClusterDefinition(cluster)
 }
 
 // getCandidateSourceFromBackupList gets a candidate storage source
 // given a backup list
 func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.BackupList) *StorageSource {
+	// TODO: support recovering from Barman Object Store
+
 	contextLogger := log.FromContext(ctx)
 
 	backupList.SortByReverseCreationTime()
@@ -153,4 +150,29 @@ func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.Back
 	}
 
 	return nil
+}
+
+// getCandidateSourceFromClusterDefinition gets a candidate storage source
+// from a Cluster definition, taking into consideration the backup that the
+// cluster have been bootstrapped from
+func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSource {
+	// TODO: support recovering from Barman Object Store
+
+	if cluster.Spec.Bootstrap == nil {
+		return nil
+	}
+
+	if cluster.Spec.Bootstrap.Recovery == nil {
+		return nil
+	}
+
+	if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+		return nil
+	}
+
+	volumeSnapshots := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
+	return &StorageSource{
+		DataSource: volumeSnapshots.Storage,
+		WALSource:  volumeSnapshots.WalStorage,
+	}
 }
