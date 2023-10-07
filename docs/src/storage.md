@@ -443,12 +443,13 @@ You can use a pre-provisioned volume in CloudNativePG by following these steps:
     if the condition persists investigate why this is happening.
 
 ## Block storage considerations (Ceph, Longhorn)
-Most block storage solutions in Kubernetes suggest to have multiple 'replicas' of a volume
-to improve resiliency. This works well for workloads that do not have resiliency built into the 
-application. However Cloud Native Postgres has this resiliency built into 
-the Postgres Cluster through the number of instances and the persistent volume that is
-attached to them. 
 
-In these cases it makes sense to define the  storage class in the cnpg kubernetes cluster
-to be defined as  1 replica. By having additional replicas defined in the storage solution like 
-Longhorn and  Ceph adds on more disk i/o and space being used unnecessarily.
+Most block storage solutions in Kubernetes suggest to have multiple 'replicas' of a volume
+to improve resiliency. This works well for workloads that don't have resiliency built into the 
+application. However, CloudNativePG has this resiliency built directly into the Postgres `Cluster`
+through the number of instances and the persistent volumes that are attached to them. 
+
+In these cases it makes sense to define the  storage class used by the Postgres clusters
+to be defined as 1 replica. By having additional replicas defined in the storage solution like 
+Longhorn and Ceph you might incur in the issue known as write amplification, unnecessarily
+increasing disk I/O and space used.
