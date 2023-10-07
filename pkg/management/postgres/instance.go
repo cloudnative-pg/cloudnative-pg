@@ -914,7 +914,7 @@ func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
 }
 
 // RequestFastImmediateShutdown request the lifecycle manager to shut down
-// PostegreSQL using the fast strategy and then the immediate strategy.
+// PostgreSQL using the fast strategy and then the immediate strategy.
 func (instance *Instance) RequestFastImmediateShutdown() {
 	instance.instanceCommandChan <- ShutDownFastImmediate
 }
