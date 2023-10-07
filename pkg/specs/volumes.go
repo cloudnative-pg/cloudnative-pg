@@ -44,14 +44,17 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 		{
 			Name: "scratch-data",
 			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: cluster.Spec.EphemeralVolumesSizeLimit.GetTemporaryDataLimit(),
+				},
 			},
 		},
 		{
 			Name: "shm",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium: "Memory",
+					Medium:    "Memory",
+					SizeLimit: cluster.Spec.EphemeralVolumesSizeLimit.GetShmLimit(),
 				},
 			},
 		},

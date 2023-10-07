@@ -35,6 +35,25 @@ spec:
 You can find a complete example using projected volume template to mount Secret and Configmap in
 the [cluster-example-projected-volume.yaml](samples/cluster-example-projected-volume.yaml) deployment manifest.
 
+## Ephemeral volumes
+
+CloudNativePG relies on [ephemeral volumes](https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/)
+for part of the internal activities. Ephemeral volumes exist for the sole duration of
+a pod's life, without persisting across pod restarts.
+
+### Volume for temporary storage
+
+An ephemeral volume used for temporary storage. An upper bound on the size can be
+configured via the `spec.ephemeralVolumesSizeLimit.temporaryData` field in the cluster
+spec.
+
+### Volume for shared memory
+
+This volume is used as shared memory space for Postgres, also an ephemeral type but
+stored in-memory. An upper bound on the size can be configured via the
+`spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec. This is used only
+in case of [PostgreSQL running with `posix` shared memory dynamic allocation](postgresql_conf.md#dynamic-shared-memory-settings).
+
 ## Environment variables
 
 Some system behavior can be customized using environment variables. One example is

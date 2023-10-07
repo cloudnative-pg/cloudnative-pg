@@ -278,6 +278,10 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
+	// volumes
+	EphemeralVolumesSizeLimit *EphemeralVolumesSizeLimitConfiguration `json:"ephemeralVolumesSizeLimit,omitempty"`
+
 	// Name of the priority class which will be used in every generated Pod, if the PriorityClass
 	// specified does not exist, the pod will not be able to schedule.  Please refer to
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
@@ -391,6 +395,34 @@ const (
 	// change is being detected
 	PhaseApplyingConfiguration = "Applying configuration"
 )
+
+// EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral
+// storage
+type EphemeralVolumesSizeLimitConfiguration struct {
+	// Shm is the size limit of the shared memory volume
+	Shm *resource.Quantity `json:"shm,omitempty"`
+
+	// TemporaryData is the size limit of the temporary data volume
+	TemporaryData *resource.Quantity `json:"temporaryData,omitempty"`
+}
+
+// GetShmLimit gets the `/dev/shm` memory size limit
+func (e *EphemeralVolumesSizeLimitConfiguration) GetShmLimit() *resource.Quantity {
+	if e == nil {
+		return nil
+	}
+
+	return e.Shm
+}
+
+// GetTemporaryDataLimit gets the temporary storage size limit
+func (e *EphemeralVolumesSizeLimitConfiguration) GetTemporaryDataLimit() *resource.Quantity {
+	if e == nil {
+		return nil
+	}
+
+	return e.TemporaryData
+}
 
 // ServiceAccountTemplate contains the template needed to generate the service accounts
 type ServiceAccountTemplate struct {
