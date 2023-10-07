@@ -123,6 +123,8 @@ EnterpriseDB's
 EnvFrom
 EnvFromSource
 EnvVar
+EphemeralVolumesSizeLimit
+EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
 Fei
 Filesystem
@@ -366,6 +368,7 @@ TCP
 TLS
 TOC
 TODO
+TemporaryData
 TimelineId
 TopologyKey
 TopologySpreadConstraint
@@ -419,6 +422,7 @@ apiGroup
 apiGroups
 apiVersion
 apidoc
+apimachinery
 apis
 apiserver
 apparmor
@@ -623,6 +627,7 @@ endpointURL
 enterprisedb
 env
 envFrom
+ephemeralVolumesSizeLimit
 executables
 expirations
 extensibility
@@ -1077,6 +1082,7 @@ targetXID
 tbody
 tcp
 td
+temporaryData
 th
 thead
 timeLineID

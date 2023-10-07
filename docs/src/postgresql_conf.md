@@ -440,6 +440,16 @@ You should get something similar to the following output:
 shm on /dev/shm type tmpfs (rw,nosuid,nodev,noexec,relatime,size=******)
 ```
 
+If you would like to set a maximum size for the `shm` volume, you can do so by
+setting the `spec.ephemeralVolumesSizeLimit.shm` field in the `Cluster` resource.
+For example:
+
+```yaml
+spec:
+  ephemeralVolumesSizeLimit:
+    shm: 1Gi
+```
+
 ### System V shared memory
 
 In case your Kubernetes cluster has a high enough value for the `SHMMAX`
