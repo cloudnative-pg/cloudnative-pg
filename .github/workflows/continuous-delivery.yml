@@ -1755,7 +1755,7 @@ jobs:
           artifact_directory: test-artifacts/data
 
       - name: If there is an overflow summary, archive it
-        if: always() && steps.generate-summary.outputs.Overflow
+        if: steps.generate-summary.outputs.Overflow
         uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.generate-summary.outputs.Overflow }}
@@ -1765,8 +1765,8 @@ jobs:
       - name: If there are alerts, send them over Slack
         uses: rtCamp/action-slack-notify@v2
         if: |
-          always() &&
-          steps.generate-summary.outputs.alerts
+          steps.generate-summary.outputs.alerts &&
+          github.ref == 'refs/heads/main'
         env:
           SLACK_COLOR: "danger"
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
