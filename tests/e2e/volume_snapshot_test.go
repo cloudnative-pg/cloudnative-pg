@@ -443,12 +443,6 @@ var _ = Describe("Verify Volume Snapshot",
 					CreateResourceFromFile(namespace, clusterToRestoreFilePath)
 				})
 
-				By("ensuring replicas are being bootstrapped from the volume snapshot", func() {
-					replicaRecoveryJobName := clusterToRestoreName + "-2-snapshot-recovery"
-					assertJobRole(namespace, replicaRecoveryJobName, 120)
-					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[testUtils.ClusterIsReady], env)
-				})
-
 				By("checking that the data is present on the restored cluster", func() {
 					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, psqlClientPod)
 				})

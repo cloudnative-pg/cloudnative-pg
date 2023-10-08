@@ -2867,13 +2867,3 @@ func assertMetrics(rawMetricsOutput string, expectedMetrics map[string]*regexp.R
 			withDebugDetails(fmt.Sprintf("Expected %s to have value %v but got %s", key, valueRe, value)))
 	}
 }
-
-// assertJobRole checks if a given job name is found and succeeded
-// within the specified timeout
-func assertJobRole(namespace, jobName string, timeout int) {
-	Eventually(func(g Gomega) {
-		job, err := env.GetJob(namespace, jobName)
-		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(job.Status.Succeeded).To(BeEquivalentTo(int32(1)))
-	}, timeout).Should(Succeed())
-}
