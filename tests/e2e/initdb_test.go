@@ -113,7 +113,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 					}, utils.DatabaseName("postgres"),
 					"SELECT count(*) FROM pg_available_extensions WHERE name LIKE 'intarray'")
 				Expect(err).ToNot(HaveOccurred())
-				Expect(stdout, err).To(Equal("1\n"))
+				Expect(stdout, err).To(Equal("100\n"))
 			})
 			By("checking inside the database the default locale", func() {
 				stdout, _, err := env.ExecQueryInInstancePod(
