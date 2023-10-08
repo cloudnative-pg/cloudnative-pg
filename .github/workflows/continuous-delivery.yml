@@ -1765,7 +1765,8 @@ jobs:
       - name: If there are alerts, send them over Slack
         uses: rtCamp/action-slack-notify@v2
         if: |
-          steps.generate-summary.outputs.alerts &&
+          always() &&
+          steps.generate-summary.outputs.alerts
         env:
           SLACK_COLOR: "danger"
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
