@@ -1754,8 +1754,11 @@ jobs:
         with:
           artifact_directory: test-artifacts/data
 
+      - name: If there are alerts, echo them
+        run: echo "ALERT ${ steps.generate-summary.outputs.alerts }"
+
       - name: If there is an overflow summary, archive it
-        if: steps.generate-summary.outputs.Overflow
+        if: always() && steps.generate-summary.outputs.Overflow
         uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.generate-summary.outputs.Overflow }}
