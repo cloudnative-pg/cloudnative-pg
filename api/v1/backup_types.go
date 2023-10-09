@@ -363,9 +363,9 @@ func (list *BackupList) SortByName() {
 	})
 }
 
-// SortByReverseCreationTime sorts the backup items in reserved creation time (starting from the latest one)
+// SortByReverseCreationTime sorts the backup items in reverse creation time (starting from the latest one)
 func (list *BackupList) SortByReverseCreationTime() {
-	// Sort the list of backups in alphabetical order
+	// Sort the list of backups in reverse creation time
 	sort.Slice(list.Items, func(i, j int) bool {
 		return list.Items[i].CreationTimestamp.Time.Compare(list.Items[j].CreationTimestamp.Time) > 0
 	})

@@ -100,7 +100,7 @@ func GetCandidateStorageSourceForReplica(
 		return result
 	}
 
-	// We support one and only one object store, see commit at the beginning
+	// We support one and only one object store, see comment at the beginning
 	// of this function
 	if cluster.Spec.Bootstrap != nil &&
 		cluster.Spec.Bootstrap.Recovery != nil &&
@@ -108,7 +108,7 @@ func GetCandidateStorageSourceForReplica(
 		return nil
 	}
 
-	// Try using the backup the Cluster have been bootstrapped from
+	// Try using the backup the Cluster has been bootstrapped from
 	return getCandidateSourceFromClusterDefinition(cluster)
 }
 
@@ -154,7 +154,7 @@ func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.Back
 
 // getCandidateSourceFromClusterDefinition gets a candidate storage source
 // from a Cluster definition, taking into consideration the backup that the
-// cluster have been bootstrapped from
+// cluster has been bootstrapped from
 func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSource {
 	// TODO: support recovering from Barman Object Store
 
