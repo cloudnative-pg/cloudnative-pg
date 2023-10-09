@@ -1767,7 +1767,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         if: |
           steps.generate-summary.outputs.alerts &&
-          github.organization == 'cloudnative-pg' &&
+          github.repository_owner == 'cloudnative-pg' &&
           github.ref == 'refs/heads/main'
         env:
           SLACK_COLOR: "danger"
