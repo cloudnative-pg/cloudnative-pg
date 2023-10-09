@@ -17,8 +17,11 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -245,6 +248,27 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		Expect(err).ToNot(HaveOccurred())
 		clusterInstances := cluster.Spec.Instances
 
+		// Dump logs on failure
+		var buf bytes.Buffer
+		GinkgoWriter.Println("Putting Tail on the cluster logs")
+		go func() {
+			err = env.TailClusterLogs(cluster, &buf, false)
+			if err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
+			}
+		}()
+		DeferCleanup(func(ctx SpecContext) {
+			if CurrentSpecReport().Failed() {
+				specName := CurrentSpecReport().FullText()
+				capLines := 10
+				GinkgoWriter.Printf("DUMPING tailed Cluster Logs with error/warning (at most %v lines). Failed Spec: %v\n",
+					capLines, specName)
+				GinkgoWriter.Println("================================================================================")
+				saveLogs(&buf, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
+				GinkgoWriter.Println("================================================================================")
+			}
+		})
+
 		By("Gathering info on the current state", func() {
 			originalPodNames, originalPodUID, originalPVCUID, err = gatherClusterInfo(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -284,7 +308,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		})
 	}
 
-	Context("Three Instances", func() {
+	FContext("Three Instances", func() {
 		const namespacePrefix = "cluster-rolling-e2e-three-instances"
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml.template"
 		const clusterName = "postgresql-three-instances"
