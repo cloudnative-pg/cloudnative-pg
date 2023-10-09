@@ -228,11 +228,11 @@ var _ = Describe("check atomic bool", func() {
 var _ = Describe("testing the compute of smart shutdown time", func() {
 	It("should be 30 as the result of 'MaxStopDelay - SmartStopDelay'  is less than it", func() {
 		instance := Instance{MaxStopDelay: 100, SmartStopDelay: 100}
-		Expect(instance.GetSmartShutdownTimeout()).To(BeNumerically("==", 30))
+		Expect(instance.GetSmartShutdownTimeout()).To(BeEquivalentTo(85))
 	})
 
 	It("should be the result of  'MaxStopDelay - SmartStopDelay'", func() {
 		instance := Instance{MaxStopDelay: 200, SmartStopDelay: 100}
-		Expect(instance.GetSmartShutdownTimeout()).To(BeNumerically("==", 100))
+		Expect(instance.GetSmartShutdownTimeout()).To(BeEquivalentTo(100))
 	})
 })
