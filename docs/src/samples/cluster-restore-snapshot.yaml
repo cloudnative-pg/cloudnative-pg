@@ -13,7 +13,7 @@ spec:
     recovery:
       volumeSnapshots:
         storage:
-          name: cluster-example-with-backup-3-1692618163
+          name: cluster-example-20230930084154
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 

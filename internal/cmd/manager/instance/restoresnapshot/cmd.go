@@ -37,6 +37,7 @@ func NewCmd() *cobra.Command {
 	var namespace string
 	var pgData string
 	var pgWal string
+	var immediate bool
 
 	cmd := &cobra.Command{
 		Use:           "restoresnapshot [flags]",
@@ -57,7 +58,7 @@ func NewCmd() *cobra.Command {
 				PgWal:       pgWal,
 			}
 
-			err := execute(ctx, info)
+			err := execute(ctx, info, immediate)
 			if err != nil {
 				log.Error(err, "Error while recovering Volume Snapshot backup")
 			}
@@ -78,15 +79,16 @@ func NewCmd() *cobra.Command {
 		"the cluster")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be restored")
 	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "The PGWAL to be restored")
+	cmd.Flags().BoolVar(&immediate, "immediate", false, "Do not start PostgreSQL but just recover the snapshot")
 
 	return cmd
 }
 
-func execute(ctx context.Context, info postgres.InitInfo) error {
+func execute(ctx context.Context, info postgres.InitInfo, immediate bool) error {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
 	}
 
-	return info.RestoreSnapshot(ctx, typedClient)
+	return info.RestoreSnapshot(ctx, typedClient, immediate)
 }

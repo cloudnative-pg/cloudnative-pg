@@ -292,6 +292,13 @@ func (backupStatus *BackupStatus) IsDone() bool {
 	return backupStatus.Phase == BackupPhaseCompleted || backupStatus.Phase == BackupPhaseFailed
 }
 
+// IsCompletedVolumeSnapshot checks if a backup is completed using the volume snapshot method.
+// It returns true if the backup's method is BackupMethodVolumeSnapshot and its status phase is BackupPhaseCompleted.
+// Otherwise, it returns false.
+func (backup *Backup) IsCompletedVolumeSnapshot() bool {
+	return backup.Spec.Method == BackupMethodVolumeSnapshot && backup.Status.Phase == BackupPhaseCompleted
+}
+
 // IsInProgress check if a certain backup is in progress or not
 func (backupStatus *BackupStatus) IsInProgress() bool {
 	return backupStatus.Phase == BackupPhasePending ||
@@ -353,6 +360,14 @@ func (list *BackupList) SortByName() {
 	// Sort the list of backups in alphabetical order
 	sort.Slice(list.Items, func(i, j int) bool {
 		return strings.Compare(list.Items[i].Name, list.Items[j].Name) <= 0
+	})
+}
+
+// SortByReverseCreationTime sorts the backup items in reverse creation time (starting from the latest one)
+func (list *BackupList) SortByReverseCreationTime() {
+	// Sort the list of backups in reverse creation time
+	sort.Slice(list.Items, func(i, j int) bool {
+		return list.Items[i].CreationTimestamp.Time.Compare(list.Items[j].CreationTimestamp.Time) > 0
 	})
 }
 

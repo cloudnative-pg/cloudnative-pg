@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -148,6 +150,38 @@ var _ = Describe("BackupList structure", func() {
 		Expect(backupList.Items[0].Name).To(Equal("backup-1"))
 		Expect(backupList.Items[1].Name).To(Equal("backup-2"))
 		Expect(backupList.Items[2].Name).To(Equal("backup-3"))
+	})
+
+	It("can be sorted by reverse creation time", func() {
+		now := time.Now()
+		backupList := BackupList{
+			Items: []Backup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-ten-minutes",
+						CreationTimestamp: metav1.NewTime(now.Add(-10 * time.Minute)),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-five-minutes",
+						CreationTimestamp: metav1.NewTime(now.Add(-5 * time.Minute)),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "backup-now",
+						CreationTimestamp: metav1.NewTime(now),
+					},
+				},
+			},
+		}
+		backupList.SortByReverseCreationTime()
+
+		Expect(backupList.Items).To(HaveLen(3))
+		Expect(backupList.Items[0].Name).To(Equal("backup-now"))
+		Expect(backupList.Items[1].Name).To(Equal("backup-five-minutes"))
+		Expect(backupList.Items[2].Name).To(Equal("backup-ten-minutes"))
 	})
 
 	It("can isolate pending backups", func() {
@@ -325,5 +359,57 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 			Expect(backupList.CanExecuteBackup("backup-2")).To(BeTrue())
 			Expect(backupList.CanExecuteBackup("backup-3")).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("IsCompletedVolumeSnapshot", func() {
+	now := time.Now()
+	completedBackup := Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.NewTime(now),
+			Name:              "completed-backup",
+		},
+		Spec: BackupSpec{
+			Method: BackupMethodVolumeSnapshot,
+		},
+		Status: BackupStatus{
+			Phase: BackupPhaseCompleted,
+		},
+	}
+
+	nonCompletedBackup := Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.NewTime(now),
+			Name:              "non-completed-backup",
+		},
+		Spec: BackupSpec{
+			Method: BackupMethodVolumeSnapshot,
+		},
+		Status: BackupStatus{},
+	}
+
+	objectStoreBackup := Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.NewTime(now),
+			Name:              "object-store-backup",
+		},
+		Spec: BackupSpec{
+			Method: BackupMethodBarmanObjectStore,
+		},
+		Status: BackupStatus{
+			Phase: BackupPhaseCompleted,
+		},
+	}
+
+	It("should return true for a completed volume snapshot", func() {
+		Expect(completedBackup.IsCompletedVolumeSnapshot()).To(BeTrue())
+	})
+
+	It("should return false for a completed objectStore", func() {
+		Expect(objectStoreBackup.IsCompletedVolumeSnapshot()).To(BeFalse())
+	})
+
+	It("should return false for an incomplete volume snapshot", func() {
+		Expect(nonCompletedBackup.IsCompletedVolumeSnapshot()).To(BeFalse())
 	})
 })

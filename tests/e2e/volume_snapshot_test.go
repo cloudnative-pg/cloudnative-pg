@@ -440,7 +440,7 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				By("executing the restore", func() {
-					AssertCreateCluster(namespace, clusterToRestoreName, clusterToRestoreFilePath, env)
+					CreateResourceFromFile(namespace, clusterToRestoreFilePath)
 				})
 
 				By("checking that the data is present on the restored cluster", func() {
