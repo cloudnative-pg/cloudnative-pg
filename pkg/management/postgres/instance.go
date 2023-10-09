@@ -262,13 +262,16 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 
 // GetSmartShutdownTimeout gets the duration in seconds as the timeout of smart shutdown
 // we calculate smart shutdown with following formula
-// max(stopDelay - smartStopDelay, 30)
+// min(stopDelay - smartStopDelay, 10)
 func (instance *Instance) GetSmartShutdownTimeout() int32 {
-	timeout := instance.MaxStopDelay - instance.SmartStopDelay
-	if timeout < 30 {
-		timeout = 30
+	const minFastStopTime = 15
+	if instance.MaxStopDelay-instance.SmartStopDelay < minFastStopTime {
+		if smartStopTime := instance.MaxStopDelay - minFastStopTime; smartStopTime > 0 {
+			return smartStopTime
+		}
+		return 0
 	}
-	return timeout
+	return instance.SmartStopDelay
 }
 
 // InstanceCommand are commands for the goroutine managing postgres

@@ -51,15 +51,21 @@ func tryShuttingDownFastImmediate(timeout int32, instance *postgres.Instance) er
 // then in case of failure or the given timeout expiration,
 // it will issue a fast shutdown request and wait for it to complete.
 func tryShuttingDownSmartFast(timeout int32, instance *postgres.Instance) error {
-	log.Info("Requesting smart shutdown of the PostgreSQL instance")
-	err := instance.Shutdown(postgres.ShutdownOptions{
-		Mode:    postgres.ShutdownModeSmart,
-		Wait:    true,
-		Timeout: &timeout,
-	})
-	if err != nil {
-		log.Warning("Error while handling the smart shutdown request: requiring fast shutdown",
-			"err", err)
+	var err error
+	if timeout > 0 {
+		log.Info("Requesting smart shutdown of the PostgreSQL instance")
+		err = instance.Shutdown(postgres.ShutdownOptions{
+			Mode:    postgres.ShutdownModeSmart,
+			Wait:    true,
+			Timeout: &timeout,
+		})
+		if err != nil {
+			log.Warning("Error while handling the smart shutdown request", "err", err)
+		}
+	}
+
+	if err != nil || timeout == 0 {
+		log.Info("Requesting fast shutdown of the PostgreSQL instance")
 		err = instance.Shutdown(postgres.ShutdownOptions{
 			Mode: postgres.ShutdownModeFast,
 			Wait: true,
@@ -67,8 +73,9 @@ func tryShuttingDownSmartFast(timeout int32, instance *postgres.Instance) error 
 	}
 	if err != nil {
 		log.Error(err, "Error while shutting down the PostgreSQL instance")
-	} else {
-		log.Info("PostgreSQL instance shut down")
+		return err
 	}
-	return err
+
+	log.Info("PostgreSQL instance shut down")
+	return nil
 }
