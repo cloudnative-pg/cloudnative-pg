@@ -414,7 +414,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         if: |
           failure() &&
-          github.organization == 'cloudnative-pg' &&
+          github.repository_owner == 'cloudnative-pg' &&
           (
             github.event_name == 'schedule' ||
             (
