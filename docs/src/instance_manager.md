@@ -62,8 +62,8 @@ new connection to PostgreSQL. This step will last for up to
 shut down, terminating any existing connection and exiting promptly.
 If the instance is archiving and/or streaming WAL files, the process
 will wait for up to the remaining time set in `.spec.stopDelay` to complete the
-operation and then forcibly shut down. Such timeout is calculated using the
-following formula: `max(stopDelay - smartStopDelay, 30)`.
+operation and then forcibly shut down. Such a timeout needs to be at least 15
+seconds.
 
 !!! Important
     In order to avoid any data loss in the Postgres cluster, which impacts
