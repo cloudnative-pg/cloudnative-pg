@@ -305,11 +305,11 @@ spec:
 #### Delay for PostgreSQL startup
 
 Until now, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
-was set to 30 seconds and CloudNativePG was using this parameter as initial
-delay for the Kubernetes liveness probe. Given that all Kubernetes supported
+was set to 30 seconds, and CloudNativePG was using this parameter as the initial
+delay for the Kubernetes liveness probe. Given that all the supported Kubernetes
 releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
 version 1.21 has adopted this approach as well (`startDelay` is now
-automatically divided in periods of the duration of 10 seconds each).
+automatically divided into periods of the duration of 10 seconds each).
 
 !!! Important
     In order to add the `startupProbe`, each pod needs to be restarted.
@@ -319,14 +319,14 @@ automatically divided in periods of the duration of 10 seconds each).
 Despite the recommendations to change and tune this value, almost all the cases
 we have examined during support incidents or community issues show that this
 value is left unchanged. Given that this parameter influences the startup of
-a PostgreSQL instance, a low value of `startDelay` would cause Postgres to
-never reach a consistent recovery state and be restarted indefinitely.
+a PostgreSQL instance, a low value of `startDelay` would cause Postgres
+never to reach a consistent recovery state and be restarted indefinitely.
 
 For this reason, `startDelay` has been [raised by default to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/4f4cd96bc6f8e284a200705c11a2b41652d58146),
 the equivalent of 1 hour.
 
-You can restore a similar behavior, based on startup probes instead of
-initially delayed liveness probes, by explicitly setting:
+You can achieve similar behavior using the startup probe instead of
+liveness probes with an initial delay by explicitly setting:
 
 ```yaml
 spec:
@@ -337,13 +337,13 @@ spec:
 #### Delay for PostgreSQL switchover
 
 Up to now, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
-was set to 40000000 seconds (over 15 months), in order to simulate a very long
+was set to 40000000 seconds (over 15 months) to simulate a very long
 interval.
 
 The [new value has been lowered to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9565f9f2ebab8bc648d9c361198479974664c322),
 the equivalent of 1 hour.
 
-If you want to retain the old behavior, you need to explicitly set:
+If you want to retain the old behavior, you need to set explicitly:
 
 ```yaml
 spec:
@@ -353,11 +353,11 @@ spec:
 
 #### Superuser access disabled
 
-Pushing towards *security-by-default*, all new clusters created with
-CloudNativePG don't enable superuser access (`postgres` user) via the network,
+Pushing towards *security-by-default*, CloudNativePG now disables
+superuser access (`postgres` user) via the network in all new clusters
 unless explicitly requested.
 
-If you want to restore this behavior, you need to explicitly set:
+If you want to restore the previous behavior, you need to set explicitly:
 
 ```yaml
 spec:
@@ -372,11 +372,11 @@ replication slots for High Availability are now enabled by default.
 
 #### Labels
 
-In version 1.18 we deprecated the `postgresql` label in pods to identify the
-name of the cluster, and replaced it with the more canonical `cnpg.io/cluster`
+In version 1.18, we deprecated the `postgresql` label in pods to identify the
+name of the cluster and replaced it with the more canonical `cnpg.io/cluster`
 label. Such a label is no longer maintained.
 
-Similarly, from this version the `role` label is deprecated. The new label
+Similarly, from this version, the `role` label is deprecated. The new label
 `cnpg.io/instanceRole` is now set and will entirely replace the `role` one in a
 future release.
 

@@ -22,16 +22,16 @@ probe checks if the database is up and able to accept connections using the
 superuser credentials.
 
 The readiness probe is positive when the Pod is ready to accept traffic.
-The liveness probe controls when to restart the container, immediately
+The liveness probe controls when to restart the container immediately
 after the startup probe interval.
 
 !!! Important
     The liveness and readiness probes will report a failure if the probe command
-    fails 3 times with a 10 seconds interval between each check.
+    fails three times with a 10-seconds interval between each check.
 
-The liveness probe is used to detect if the PostgreSQL instance is in a
+The liveness probe detects if the PostgreSQL instance is in a
 broken state and needs to be restarted. The value in `startDelay` is used
-to delay the probe's execution, which is used to prevent an
+to delay the probe's execution, preventing an
 instance with a long startup time from being restarted.
 
 The number of seconds after the Pod has started before the liveness
