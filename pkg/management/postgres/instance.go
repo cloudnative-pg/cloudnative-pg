@@ -1137,7 +1137,7 @@ func (instance *Instance) HandleInstanceCommandRequests(
 	case FenceOn:
 		log.Info("Fencing request received, will proceed shutting down the instance")
 		instance.SetFencing(true)
-		err := instance.TryShuttingDownSmartFast()
+		err := instance.TryShuttingDownFastImmediate()
 		if err != nil {
 			err = fmt.Errorf("while shutting down the instance to fence it: %w", err)
 		}
