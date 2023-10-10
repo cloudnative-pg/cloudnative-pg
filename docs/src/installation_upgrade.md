@@ -277,6 +277,14 @@ spec:
        enabled: false
 ```
 
+Once the upgrade is completed, also add:
+
+```yaml
+spec:
+   ...
+   smartShutdownTimeout: 30
+```
+
 #### Delay for PostgreSQL shutdown
 
 Up to now, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
@@ -300,8 +308,13 @@ If you want to retain the old behavior, you need to set explicitly:
 spec:
    ...
    stopDelay: 30
+   # IMPORTANT: add `smartShutdownTimeout` only after you've upgraded
    smartShutdownTimeout: 15
 ```
+
+!!! Important
+    This change has been backported to all supported minor releases. As a
+    result, it will also be available in versions 1.20.3 and 1.19.5.
 
 #### Delay for PostgreSQL startup
 
@@ -335,6 +348,10 @@ spec:
    startDelay: 30
 ```
 
+!!! Important
+    This change has been backported to all supported minor releases. As a
+    result, it will also be available in versions 1.20.3 and 1.19.5.
+
 #### Delay for PostgreSQL switchover
 
 Up to now, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
@@ -351,6 +368,10 @@ spec:
    ...
    switchoverDelay: 40000000
 ```
+
+!!! Important
+    This change has been backported to all supported minor releases. As a
+    result, it will also be available in versions 1.20.3 and 1.19.5.
 
 #### Superuser access disabled
 
