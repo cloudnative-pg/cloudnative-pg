@@ -1495,12 +1495,13 @@ ceiling(startDelay / 10).</p>
 gracefully shutdown (default 1800)</p>
 </td>
 </tr>
-<tr><td><code>smartStopDelay</code><br/>
+<tr><td><code>smartShutdownTimeout</code><br/>
 <i>int32</i>
 </td>
 <td>
    <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
-Make sure you reserve enough time for the operator to request a fast shutdown of Postgres.</p>
+Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
+(that is: <code>stopDelay</code> - <code>smartShutdownTimeout</code>).</p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>

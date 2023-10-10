@@ -48,7 +48,7 @@ When a Pod running Postgres is deleted, either manually or by Kubernetes
 following a node drain operation, the kubelet will send a termination signal to the
 instance manager, and the instance manager will take care of shutting down
 PostgreSQL in an appropriate way.
-The `.spec.smartStopDelay` and `.spec.stopDelay` options, expressed in seconds,
+The `.spec.smartShutdownTimeout` and `.spec.stopDelay` options, expressed in seconds,
 control the amount of time given to PostgreSQL to shut down. The values default
 to 180 and 1800 seconds, respectively.
 
@@ -56,7 +56,7 @@ The shutdown procedure is composed of two steps:
 
 1. The instance manager requests a **smart** shut down, disallowing any
 new connection to PostgreSQL. This step will last for up to
-`.spec.smartStopDelay` seconds.
+`.spec.smartShutdownTimeout` seconds.
 
 2. If PostgreSQL is still up, the instance manager requests a **fast**
 shut down, terminating any existing connection and exiting promptly.
