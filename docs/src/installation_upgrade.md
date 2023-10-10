@@ -236,15 +236,22 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.21 from a previous minor version
+### Upgrading to 1.21.0, 1.20.3 or 1.19.5
 
 !!! Important
-    If you are upgrading from 1.19 or older, please read the
-    [instructions to upgrade to version 1.20](#upgrading-to-120-from-a-previous-minor-version)
-    first.
+    We encourage all existing users of CloudNativePG to upgrade to version
+    1.21.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.20.3 or 1.19.5).
+
+!!! Warning
+    Everytime you are upgrading to a higher minor release, make sure you
+    go through the release notes and upgrade instructions of all the
+    intermediate minor releases. For example, if you want to move
+    from 1.19.x to 1.21, make sure you go through the release notes
+    and upgrade instructions for 1.20 and 1.21.
 
 With the goal to keep improving out-of-the-box the *convention over
-configuration* behavior of the operator, CloudNativePG 1.21 changes the default
+configuration* behavior of the operator, CloudNativePG changes the default
 value of several knobs in the following areas:
 
 - startup and shutdown control of the PostgreSQL instance
@@ -252,40 +259,61 @@ value of several knobs in the following areas:
 - security
 - labels
 
-Most of the changes will affect new PostgreSQL clusters only.
+Some of the above changes have been backported to 1.20.3 and 1.19.5, as
+detailed below. Most of the changes will affect new PostgreSQL clusters only.
 
 !!! Warning
     Please read carefully the list of changes below, and how to change the
     `Cluster` manifests to retain the existing behavior if you don't want to
-    disrupt your existing workloads. Alternatively, postpone the upgrade to 1.21
+    disrupt your existing workloads. Alternatively, postpone the upgrade to
     until you are sure. In general, we recommend adopting these default
     values unless you have valid reasons not to.
 
-If you want to keep the existing behavior of CloudNativePG explicitly,
-(we advise not indefinitely,) you need to set these values in all your `Cluster`
-definitions **before upgrading** to version 1.21:
+#### Superuser access disabled
+
+!!! Important
+    This change takes effect starting from CloudNativePG 1.21.0.
+
+Pushing towards *security-by-default*, CloudNativePG now disables access
+`postgres` superuser access via the network in all new clusters, unless
+explicitly enabled.
+
+If you want to ensure superuser access to the PostgreSQL cluster, regardless
+which version of CloudNativePG you are running, we advise you to explicitly
+declare it by setting:
 
 ```yaml
 spec:
    ...
-   startDelay: 30
-   stopDelay: 30
-   switchoverDelay: 40000000
    enableSuperuserAccess: true
+```
+
+#### Replication slots for HA
+
+!!! Important
+    This change takes effect starting from CloudNativePG 1.21.0.
+
+[As already anticipated in release 1.20](installation_upgrade.md#replication-slots-for-high-availability),
+replication slots for High Availability are now enabled by default.
+
+If you want to ensure replication slots are disabled, regardless of which
+version of CloudNativePG you are running, we advise you to explicitly declare
+it by setting:
+
+```yaml
+spec:
+   ...
    replicationSlots:
      highAvailability:
        enabled: false
 ```
 
-Once the upgrade is completed, also add:
-
-```yaml
-spec:
-   ...
-   smartShutdownTimeout: 15
-```
-
 #### Delay for PostgreSQL shutdown
+
+!!! Important
+    This change has been backported to all supported minor releases. As a
+    result, it will be available starting from versions 1.21.0, 1.20.3 and
+    1.19.5.
 
 Up to now, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
 was set to 30 seconds. Despite the recommendations to change and tune this
@@ -296,11 +324,14 @@ The [new default value is 1800 seconds](https://github.com/cloudnative-pg/cloudn
 the equivalent of 30 minutes.
 
 The new `smartShutdownTimeout` parameter has been introduced to define
-the maximum time window within the `stopDelay` value, reserved to gracefully
-stop PostgreSQL using the `smart` shutdown procedure.  Once elapsed, the
-remaining time up to `stopDelay` will be reserved for PostgreSQL to complete
-its duties regarding WAL commitments with both the archive and the streaming
-replicas to ensure the cluster doesn't lose any data.
+the maximum time window within the `stopDelay` value reserved to complete
+the `smart` shutdown procedure in PostgreSQL. During this time, the
+Postgres servers denies any new connection while waiting for all regular
+sessions to terminate.
+
+Once elapsed, the remaining time up to `stopDelay` will be reserved for
+PostgreSQL to complete its duties regarding WAL commitments with both the
+archive and the streaming replicas to ensure the cluster doesn't lose any data.
 
 If you want to retain the old behavior, you need to set explicitly:
 
@@ -319,16 +350,17 @@ spec:
    smartShutdownTimeout: 15
 ```
 
-!!! Important
-    This change has been backported to all supported minor releases. As a
-    result, it will also be available in versions 1.20.3 and 1.19.5.
-
 #### Delay for PostgreSQL startup
 
+!!! Important
+    This change has been backported to all supported minor releases. As a
+    result, it will be available starting from versions 1.21.0, 1.20.3 and
+    1.19.5.
+
 Until now, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
-was set to 30 seconds, and CloudNativePG was using this parameter as the initial
-delay for the Kubernetes liveness probe. Given that all the supported Kubernetes
-releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
+was set to 30 seconds, and CloudNativePG used this parameter as
+`initialDelaySeconds` for the Kubernetes liveness probe. Given that all the
+supported Kubernetes releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
 version 1.21 has adopted this approach as well (`startDelay` is now
 automatically divided into periods of 10 seconds of duration  each).
 
@@ -346,8 +378,8 @@ never to reach a consistent recovery state and be restarted indefinitely.
 For this reason, `startDelay` has been [raised by default to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/4f4cd96bc6f8e284a200705c11a2b41652d58146),
 the equivalent of 1 hour.
 
-You can achieve similar behavior using the startup probe instead of
-liveness probes with an initial delay by explicitly setting:
+If you want to retain the existing behavior using the new implementation, you
+can do that by explicitly setting:
 
 ```yaml
 spec:
@@ -355,11 +387,12 @@ spec:
    startDelay: 30
 ```
 
+#### Delay for PostgreSQL switchover
+
 !!! Important
     This change has been backported to all supported minor releases. As a
-    result, it will also be available in versions 1.20.3 and 1.19.5.
-
-#### Delay for PostgreSQL switchover
+    result, it will be available starting from versions 1.21.0, 1.20.3 and
+    1.19.5.
 
 Up to now, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
 was set by default to 40000000 seconds (over 15 months) to simulate a very long
@@ -376,30 +409,12 @@ spec:
    switchoverDelay: 40000000
 ```
 
+#### Labels
+
 !!! Important
     This change has been backported to all supported minor releases. As a
-    result, it will also be available in versions 1.20.3 and 1.19.5.
-
-#### Superuser access disabled
-
-Pushing towards *security-by-default*, CloudNativePG now disables
-superuser access (`postgres` user) via the network in all new clusters,
-unless explicitly enabled.
-
-If you want to restore the previous behavior, you need to set explicitly:
-
-```yaml
-spec:
-   ...
-   enableSuperuserAccess: true
-```
-
-#### Replication slots for HA
-
-[As already anticipated in release 1.20](installation_upgrade.md#replication-slots-for-high-availability),
-replication slots for High Availability are now enabled by default.
-
-#### Labels
+    result, it will be available starting from versions 1.21.0, 1.20.3 and
+    1.19.5.
 
 In version 1.18, we deprecated the `postgresql` label in pods to identify the
 name of the cluster and replaced it with the more canonical `cnpg.io/cluster`
@@ -408,6 +423,34 @@ label. The `postgresql` label is no longer maintained.
 Similarly, from this version, the `role` label is deprecated. The new label
 `cnpg.io/instanceRole` is now set, and will entirely replace the `role` label
 in a future release.
+
+#### Shortcut for keeping the existing behavior
+
+If you want to explicitly keep the existing behavior of CloudNativePG
+(we advise not to), you need to set these values in all your `Cluster`
+definitions **before upgrading** to version 1.21.0, 1.20.3 or 1.19.5:
+
+```yaml
+spec:
+   ...
+   # Changed in 1.21.0, 1.20.3 and 1.19.5
+   startDelay: 30
+   stopDelay: 30
+   switchoverDelay: 40000000
+   # Changed in 1.21.0 only
+   enableSuperuserAccess: true
+   replicationSlots:
+     highAvailability:
+       enabled: false
+```
+
+Once the upgrade is completed, also add:
+
+```yaml
+spec:
+   ...
+   smartShutdownTimeout: 15
+```
 
 ### Upgrading to 1.20 from a previous minor version
 
