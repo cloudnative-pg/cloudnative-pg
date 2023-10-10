@@ -442,7 +442,7 @@ You can use a pre-provisioned volume in CloudNativePG by following these steps:
     for any pods stuck in `Pending` after you have deployed the cluster, and
     if the condition persists investigate why this is happening.
 
-## Block storage considerations (Ceph, Longhorn)
+## Block storage considerations (Ceph/ Longhorn)
 
 Most block storage solutions in Kubernetes suggest to have multiple 'replicas' of a volume
 to improve resiliency. This works well for workloads that don't have resiliency built into the 
