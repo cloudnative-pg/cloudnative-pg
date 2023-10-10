@@ -287,12 +287,12 @@ community issues show that this value is left unchanged.
 The [new value is set to 1800 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9f7f18c5b9d9103423a53d180c0e2f2189e71c3c),
 the equivalent of 30 minutes.
 
-A new parameter has been introduced to define the maximum time window within
-the `stopDelay` one, reserved to gracefully stop PostgreSQL using the `smart`
-shutdown procedure. Once completed, the remaining time up to `stopDelay` will
-be reserved for PostgreSQL to complete its duties regarding WAL commitments
-with both the archive and the streaming replicas to ensure the cluster
-doesn't lose any data.
+The new `smartShutdownTimeout` parameter has been introduced to define
+the maximum time window within the `stopDelay` value, reserved to gracefully
+stop PostgreSQL using the `smart` shutdown procedure.  Once completed, the
+remaining time up to `stopDelay` will be reserved for PostgreSQL to complete
+its duties regarding WAL commitments with both the archive and the streaming
+replicas to ensure the cluster doesn't lose any data.
 
 If you want to retain the old behavior, you need to set explicitly:
 
