@@ -300,6 +300,7 @@ If you want to retain the old behavior, you need to set explicitly:
 spec:
    ...
    stopDelay: 30
+   smartShutdownTimeout: 15
 ```
 
 #### Delay for PostgreSQL startup
