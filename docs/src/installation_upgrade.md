@@ -282,7 +282,7 @@ Once the upgrade is completed, also add:
 ```yaml
 spec:
    ...
-   smartShutdownTimeout: 30
+   smartShutdownTimeout: 15
 ```
 
 #### Delay for PostgreSQL shutdown
