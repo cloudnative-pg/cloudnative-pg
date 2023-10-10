@@ -77,9 +77,9 @@ kubectl cnpg fencing off cluster-example "*"
 ## How fencing works
 
 Once an instance is set for fencing, the procedure to shut down the
-`postmaster` process is initiated. This consists of an initial smart shutdown
-with a timeout set to `.spec.smartShutdownTimeout`, followed by a fast shutdown if
-required for up to `.spec.stopDelay` seconds. Then:
+`postmaster` process is initiated, identical to the one of the switchover.
+This consists of an initial fast shutdown with a timeout set to
+`.spec.switchoverDelay`, followed by an immediate shutdown. Then:
 
 - the Pod will be kept alive
 
