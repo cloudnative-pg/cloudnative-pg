@@ -280,7 +280,8 @@ type ClusterSpec struct {
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`
 
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
-	// this formula to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay, 30)`
+	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
+	// (that is: `stopDelay` - `smartStopDelay`).
 	// +kubebuilder:default:=180
 	// +optional
 	SmartStopDelay int32 `json:"smartStopDelay,omitempty"`
