@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"os"
-	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -182,14 +181,24 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	}
 
 	// Verify that the -rw endpoint points to the expected primary
-	AssertPrimary := func(namespace string, clusterName string, expectedPrimaryIdx int) {
-		podName := clusterName + "-" + strconv.Itoa(expectedPrimaryIdx)
-		pod := &corev1.Pod{}
-		podNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      podName,
-		}
-		err := env.Client.Get(env.Ctx, podNamespacedName, pod)
+	AssertPrimary := func(namespace, clusterName string,
+		oldPrimaryPod *corev1.Pod, expectNewPrimaryIdx bool,
+	) {
+		var cluster *apiv1.Cluster
+		var err error
+
+		Eventually(func(g Gomega) {
+			cluster, err = env.GetCluster(namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			if expectNewPrimaryIdx {
+				g.Expect(cluster.Status.CurrentPrimary).ToNot(BeEquivalentTo(oldPrimaryPod.Name))
+			} else {
+				g.Expect(cluster.Status.CurrentPrimary).To(BeEquivalentTo(oldPrimaryPod.Name))
+			}
+		}, RetryTimeout).Should(Succeed())
+
+		// Get the new current primary Pod
+		currentPrimaryPod, err := env.GetPod(namespace, cluster.Status.CurrentPrimary)
 		Expect(err).ToNot(HaveOccurred())
 
 		endpointName := clusterName + "-rw"
@@ -203,7 +212,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			endpoint := &corev1.Endpoints{}
 			err := env.Client.Get(env.Ctx, endpointNamespacedName, endpoint)
 			return testsUtils.FirstEndpointIP(endpoint), err
-		}, timeout).Should(BeEquivalentTo(pod.Status.PodIP))
+		}, timeout).Should(BeEquivalentTo(currentPrimaryPod.Status.PodIP))
 	}
 
 	// Verify that the IPs of the pods match the ones in the -r endpoint and
@@ -233,17 +242,22 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	}
 
 	AssertRollingUpdate := func(namespace string, clusterName string,
-		sampleFile string, expectedPrimaryIdx int,
+		sampleFile string, expectNewPrimaryIdx bool,
 	) {
 		var originalPodNames []string
 		var originalPodUID []types.UID
 		var originalPVCUID []types.UID
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
 		// Gather the number of instances in this Cluster
 		cluster, err := env.GetCluster(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		clusterInstances := cluster.Spec.Instances
+
+		// Gather the original primary Pod
+		originalPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
 
 		By("Gathering info on the current state", func() {
 			originalPodNames, originalPodUID, originalPVCUID, err = gatherClusterInfo(namespace, clusterName)
@@ -272,11 +286,11 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			AssertPvcHasLabels(namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
-		// should go to our new TargetPrimary.
+		// should go to a new TargetPrimary.
 		// In case of single-instance cluster, we expect the primary to just
 		// be deleted and recreated.
 		By("having the current primary on the new TargetPrimary", func() {
-			AssertPrimary(namespace, clusterName, expectedPrimaryIdx)
+			AssertPrimary(namespace, clusterName, originalPrimaryPod, expectNewPrimaryIdx)
 		})
 		// Check that the new pods are included in the endpoint
 		By("having each pod included in the -r service", func() {
@@ -285,18 +299,17 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	}
 
 	Context("Three Instances", func() {
-		const namespacePrefix = "cluster-rolling-e2e-three-instances"
-		const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml.template"
-		const clusterName = "postgresql-three-instances"
-		var namespace string
+		const (
+			namespacePrefix = "cluster-rolling-e2e-three-instances"
+			sampleFile      = fixturesDir + "/rolling_updates/cluster-three-instances.yaml.template"
+		)
 		It("can do a rolling update", func() {
-			var err error
 			// We set up a cluster with a previous release of the same PG major
 			// The yaml has been previously generated from a template and
 			// the image name has to be tagged as foo:MAJ.MIN. We'll update
 			// it to foo:MAJ, representing the latest minor.
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -304,23 +317,24 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				}
 				return env.DeleteNamespace(namespace)
 			})
-			AssertRollingUpdate(namespace, clusterName, sampleFile, 2)
+			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			AssertRollingUpdate(namespace, clusterName, sampleFile, true)
 		})
 	})
 
 	Context("Single Instance", func() {
-		const namespacePrefix = "cluster-rolling-e2e-single-instance"
-		const sampleFile = fixturesDir + "/rolling_updates/cluster-single-instance.yaml.template"
-		const clusterName = "postgresql-single-instance"
-		var namespace string
+		const (
+			namespacePrefix = "cluster-rolling-e2e-single-instance"
+			sampleFile      = fixturesDir + "/rolling_updates/cluster-single-instance.yaml.template"
+		)
 		It("can do a rolling updates on a single instance", func() {
-			var err error
 			// We set up a cluster with a previous release of the same PG major
 			// The yaml has been previously generated from a template and
 			// the image name has to be tagged as foo:MAJ.MIN. We'll update
 			// it to foo:MAJ, representing the latest minor.
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -328,18 +342,19 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				}
 				return env.DeleteNamespace(namespace)
 			})
-			AssertRollingUpdate(namespace, clusterName, sampleFile, 1)
+			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			AssertRollingUpdate(namespace, clusterName, sampleFile, false)
 		})
 	})
 
 	Context("primaryUpdateMethod set to restart", func() {
-		const sampleFile = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
-		var namespace, clusterName string
-
+		const (
+			namespacePrefix = "cluster-rolling-with-primary-update-method"
+			sampleFile      = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
+		)
 		It("can do rolling update", func() {
-			const namespacePrefix = "cluster-rolling-with-primary-update-method"
-			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
@@ -347,10 +362,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				}
 				return env.DeleteNamespace(namespace)
 			})
-
-			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
+			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
-			AssertRollingUpdate(namespace, clusterName, sampleFile, 1)
+			AssertRollingUpdate(namespace, clusterName, sampleFile, false)
 		})
 	})
 })
