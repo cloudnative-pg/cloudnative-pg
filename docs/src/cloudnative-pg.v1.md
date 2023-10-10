@@ -1500,7 +1500,7 @@ gracefully shutdown (default 1800)</p>
 </td>
 <td>
    <p>The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
-Please ensure that at least 15 seconds are left for the operator to request a fast shutdown of Postgres.</p>
+Make sure you reserve enough time for the operator to request a fast shutdown of Postgres.</p>
 </td>
 </tr>
 <tr><td><code>switchoverDelay</code><br/>
