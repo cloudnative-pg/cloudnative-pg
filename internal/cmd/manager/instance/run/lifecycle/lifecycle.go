@@ -19,7 +19,6 @@ package lifecycle
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -104,17 +103,15 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				}
 			case <-ctx.Done():
 				// The controller manager asked us to terminate our operations.
-				// We shut down PostgreSQL and terminate using the maximum available
-				// stop delay. We are doing that because we are not going to receive
-				// a SIGKILL by the Kubelet, which is not informed about what's
-				// happening.
+				// We shut down PostgreSQL and terminate using the smart
+				// stop delay.
 				if i.instance.InstanceManagerIsUpgrading.Load() {
 					log.Info("Context has been cancelled, but an instance manager online upgrade is in progress, " +
 						"will just exit")
 					return nil
 				}
 				log.Info("Context has been cancelled, shutting down and exiting")
-				if err := tryShuttingDownSmartFast(i.instance.MaxStopDelay, i.instance); err != nil {
+				if err := i.instance.TryShuttingDownSmartFast(); err != nil {
 					log.Error(err, "error shutting down instance, proceeding")
 				}
 				return nil
@@ -124,9 +121,11 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// to our process. In this case we terminate as fast as we can,
 				// otherwise we'll receive a SIGKILL by the Kubelet, possibly
 				// resulting in a data corruption.
-				smartShutdownTimeout := i.instance.GetSmartShutdownTimeout()
-				log.Info("Received termination signal", "signal", sig, "smartShutdownTimeout", smartShutdownTimeout)
-				if err := tryShuttingDownSmartFast(smartShutdownTimeout, i.instance); err != nil {
+				log.Info("Received termination signal",
+					"signal", sig,
+					"smartShutdownTimeout", i.instance.SmartStopDelay,
+				)
+				if err := i.instance.TryShuttingDownSmartFast(); err != nil {
 					log.Error(err, "error while shutting down instance, proceeding")
 				}
 				return nil
@@ -137,7 +136,7 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				log.Info("Received request for postgres", "req", req)
 
 				// We execute the requested operation
-				restartNeeded, err := i.handleInstanceCommandRequests(req)
+				restartNeeded, err := i.instance.HandleInstanceCommandRequests(req)
 				if err != nil {
 					log.Error(err, "while handling instance command request")
 				}
@@ -151,42 +150,5 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 		log.Debug("exiting the postgres loop")
 		// Here the postmaster is terminated. We need to start a new postmaster
 		// process
-	}
-}
-
-// handleInstanceCommandRequests execute a command requested by the reconciliation
-// loop.
-func (i *PostgresLifecycle) handleInstanceCommandRequests(
-	req postgres.InstanceCommand,
-) (restartNeeded bool, err error) {
-	if i.instance.IsFenced() {
-		switch req {
-		case postgres.FenceOff:
-			log.Info("Fence lifting request received, will proceed with restarting the instance if needed")
-			i.instance.SetFencing(false)
-			return true, nil
-		default:
-			log.Warning("Received request while fencing, ignored", "req", req)
-			return false, nil
-		}
-	}
-	switch req {
-	case postgres.FenceOn:
-		log.Info("Fencing request received, will proceed shutting down the instance")
-		i.instance.SetFencing(true)
-		err := tryShuttingDownSmartFast(i.instance.MaxStopDelay, i.instance)
-		if err != nil {
-			err = fmt.Errorf("while shutting down the instance to fence it: %w", err)
-		}
-		return false, err
-	case postgres.RestartSmartFast:
-		return true, tryShuttingDownSmartFast(i.instance.MaxStopDelay, i.instance)
-	case postgres.ShutDownFastImmediate:
-		if err := tryShuttingDownFastImmediate(i.instance.MaxSwitchoverDelay, i.instance); err != nil {
-			log.Error(err, "error shutting down instance, proceeding")
-		}
-		return false, nil
-	default:
-		return false, fmt.Errorf("unrecognized request: %s", req)
 	}
 }

@@ -167,7 +167,7 @@ type Instance struct {
 	// MaxStopDelay is the current MaxStopDelay of the cluster
 	MaxStopDelay int32
 
-	// SmartStopDelay is used to compute the timeout of smart shutdown by the formula `stopDelay -  smartStopDelay`
+	// SmartStopDelay is used to control PostgreSQL smart shutdown timeout
 	SmartStopDelay int32
 
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
@@ -403,6 +403,72 @@ func (instance *Instance) Shutdown(options ShutdownOptions) error {
 	}
 
 	return nil
+}
+
+// TryShuttingDownSmartFast first tries to shut down the instance with mode smart,
+// then in case of failure or the given timeout expiration,
+// it will issue a fast shutdown request and wait for it to complete.
+func (instance *Instance) TryShuttingDownSmartFast() error {
+	var err error
+
+	smartTimeout := instance.SmartStopDelay
+	if instance.MaxStopDelay <= instance.SmartStopDelay {
+		log.Warning("Ignoring smartStopDelay",
+			"smartStopDelay", instance.SmartStopDelay,
+			"maxStopDelay", instance.MaxStopDelay,
+		)
+		smartTimeout = 0
+	}
+
+	if smartTimeout > 0 {
+		log.Info("Requesting smart shutdown of the PostgreSQL instance")
+		err = instance.Shutdown(ShutdownOptions{
+			Mode:    ShutdownModeSmart,
+			Wait:    true,
+			Timeout: &smartTimeout,
+		})
+		if err != nil {
+			log.Warning("Error while handling the smart shutdown request", "err", err)
+		}
+	}
+
+	if err != nil || smartTimeout == 0 {
+		log.Info("Requesting fast shutdown of the PostgreSQL instance")
+		err = instance.Shutdown(ShutdownOptions{
+			Mode: ShutdownModeFast,
+			Wait: true,
+		})
+	}
+	if err != nil {
+		log.Error(err, "Error while shutting down the PostgreSQL instance")
+		return err
+	}
+
+	log.Info("PostgreSQL instance shut down")
+	return nil
+}
+
+// TryShuttingDownFastImmediate first tries to shut down the instance with mode fast,
+// then in case of failure or the given timeout expiration,
+// it will issue an immediate shutdown request and wait for it to complete.
+// N.B. immediate shutdown can cause data loss.
+func (instance *Instance) TryShuttingDownFastImmediate() error {
+	log.Info("Requesting fast shutdown of the PostgreSQL instance")
+	err := instance.Shutdown(ShutdownOptions{
+		Mode:    ShutdownModeFast,
+		Wait:    true,
+		Timeout: &instance.MaxSwitchoverDelay,
+	})
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		log.Info("Graceful shutdown failed. Issuing immediate shutdown",
+			"exitCode", exitError.ExitCode())
+		err = instance.Shutdown(ShutdownOptions{
+			Mode: ShutdownModeImmediate,
+			Wait: true,
+		})
+	}
+	return err
 }
 
 // isStatusRunning checks the status of a running server using pg_ctl status
@@ -1013,4 +1079,41 @@ func (instance *Instance) DropConnections() error {
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
 	return buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
+}
+
+// HandleInstanceCommandRequests execute a command requested by the reconciliation
+// loop.
+func (instance *Instance) HandleInstanceCommandRequests(
+	req InstanceCommand,
+) (restartNeeded bool, err error) {
+	if instance.IsFenced() {
+		switch req {
+		case FenceOff:
+			log.Info("Fence lifting request received, will proceed with restarting the instance if needed")
+			instance.SetFencing(false)
+			return true, nil
+		default:
+			log.Warning("Received request while fencing, ignored", "req", req)
+			return false, nil
+		}
+	}
+	switch req {
+	case FenceOn:
+		log.Info("Fencing request received, will proceed shutting down the instance")
+		instance.SetFencing(true)
+		err := instance.TryShuttingDownSmartFast()
+		if err != nil {
+			err = fmt.Errorf("while shutting down the instance to fence it: %w", err)
+		}
+		return false, err
+	case RestartSmartFast:
+		return true, instance.TryShuttingDownSmartFast()
+	case ShutDownFastImmediate:
+		if err := instance.TryShuttingDownFastImmediate(); err != nil {
+			log.Error(err, "error shutting down instance, proceeding")
+		}
+		return false, nil
+	default:
+		return false, fmt.Errorf("unrecognized request: %s", req)
+	}
 }
