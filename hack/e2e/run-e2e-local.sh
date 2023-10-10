@@ -27,6 +27,17 @@ if [ "${DEBUG-}" = true ]; then
   set -x
 fi
 
+function notinpath() {
+    case "$PATH" in
+        *:$1:* | *:$1 | $1:*)
+            return 1
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
 function get_default_storage_class() {
   kubectl get storageclass -o json | jq  -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)'
 }
@@ -38,6 +49,16 @@ function get_postgres_image() {
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_storage_class)}
 export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
+
+# Ensure GOBIN is in path, we'll use this to install and execute ginkgo
+go_bin="$(go env GOPATH)/bin"
+if notinpath "${go_bin}"; then
+  export PATH="${go_bin}:${PATH}"
+fi
+
+if ! which ginkgo &>/dev/null; then
+  go install github.com/onsi/ginkgo/v2/ginkgo
+fi
 
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
