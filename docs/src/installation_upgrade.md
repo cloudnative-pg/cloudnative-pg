@@ -244,7 +244,7 @@ only the operator itself.
     currently using (namely 1.20.3 or 1.19.5).
 
 !!! Warning
-    Everytime you are upgrading to a higher minor release, make sure you
+    Every time you are upgrading to a higher minor release, make sure you
     go through the release notes and upgrade instructions of all the
     intermediate minor releases. For example, if you want to move
     from 1.19.x to 1.21, make sure you go through the release notes
@@ -263,7 +263,7 @@ Some of the above changes have been backported to 1.20.3 and 1.19.5, as
 detailed below. Most of the changes will affect new PostgreSQL clusters only.
 
 !!! Warning
-    Please read carefully the list of changes below, and how to change the
+    Please read carefully the list of changes below, and how to modify the
     `Cluster` manifests to retain the existing behavior if you don't want to
     disrupt your existing workloads. Alternatively, postpone the upgrade to
     until you are sure. In general, we recommend adopting these default
