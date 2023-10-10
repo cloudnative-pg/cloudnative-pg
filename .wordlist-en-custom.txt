@@ -55,6 +55,7 @@ CSVs
 CannotReconcile
 Canovai
 Cecchi
+Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
