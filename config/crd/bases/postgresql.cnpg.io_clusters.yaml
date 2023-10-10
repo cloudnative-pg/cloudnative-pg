@@ -2995,10 +2995,10 @@ spec:
                 type: object
               smartStopDelay:
                 default: 180
-                description: The time in seconds that controls the window of time
-                  reserved for the smart shutdown of Postgres to complete. this formula
-                  to compute the timeout of smart shutdown is `max(stopDelay -  smartStopDelay,
-                  30)`,
+                description: 'The time in seconds that controls the window of time
+                  reserved for the smart shutdown of Postgres to complete. Make sure
+                  you reserve enough time for the operator to request a fast shutdown
+                  of Postgres (that is: `stopDelay` - `smartStopDelay`).'
                 format: int32
                 type: integer
               startDelay:
