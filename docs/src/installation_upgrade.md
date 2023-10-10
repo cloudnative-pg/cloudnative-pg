@@ -255,14 +255,14 @@ value of several knobs in the following areas:
 Most of the changes will affect new PostgreSQL clusters only.
 
 !!! Warning
-    Please read carefully the list of changes below and how to change the
-    `Cluster` manifests to retain the existing behavior, in case you don't want to
+    Please read carefully the list of changes below, and how to change the
+    `Cluster` manifests to retain the existing behavior if you don't want to
     disrupt your existing workloads. Alternatively, postpone the upgrade to 1.21
     until you are sure. In general, we recommend adopting these default
     values unless you have valid reasons not to.
 
 If you want to keep the existing behavior of CloudNativePG explicitly,
-preferably just temporarily, you need to set these values in all your `Cluster`
+(we advise not indefinitely,) you need to set these values in all your `Cluster`
 definitions **before upgrading** to version 1.21:
 
 ```yaml
@@ -292,12 +292,12 @@ was set to 30 seconds. Despite the recommendations to change and tune this
 value, almost all the cases we have examined during support incidents or
 community issues show that this value is left unchanged.
 
-The [new value is set to 1800 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9f7f18c5b9d9103423a53d180c0e2f2189e71c3c),
+The [new default value is 1800 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9f7f18c5b9d9103423a53d180c0e2f2189e71c3c),
 the equivalent of 30 minutes.
 
 The new `smartShutdownTimeout` parameter has been introduced to define
 the maximum time window within the `stopDelay` value, reserved to gracefully
-stop PostgreSQL using the `smart` shutdown procedure.  Once completed, the
+stop PostgreSQL using the `smart` shutdown procedure.  Once elapsed, the
 remaining time up to `stopDelay` will be reserved for PostgreSQL to complete
 its duties regarding WAL commitments with both the archive and the streaming
 replicas to ensure the cluster doesn't lose any data.
@@ -308,7 +308,14 @@ If you want to retain the old behavior, you need to set explicitly:
 spec:
    ...
    stopDelay: 30
-   # IMPORTANT: add `smartShutdownTimeout` only after you've upgraded
+```
+
+And, **after** the upgrade has completed, specify `smartShutdownTimeout`:
+
+```yaml
+spec:
+   ...
+   stopDelay: 30
    smartShutdownTimeout: 15
 ```
 
@@ -323,11 +330,11 @@ was set to 30 seconds, and CloudNativePG was using this parameter as the initial
 delay for the Kubernetes liveness probe. Given that all the supported Kubernetes
 releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
 version 1.21 has adopted this approach as well (`startDelay` is now
-automatically divided into periods of the duration of 10 seconds each).
+automatically divided into periods of 10 seconds of duration  each).
 
 !!! Important
     In order to add the `startupProbe`, each pod needs to be restarted.
-    As a result, when you upgrade the operator, an extraordinary rolling
+    As a result, when you upgrade the operator, a one-time rolling
     update of the cluster will be executed even in the online update case.
 
 Despite the recommendations to change and tune this value, almost all the cases
@@ -355,10 +362,10 @@ spec:
 #### Delay for PostgreSQL switchover
 
 Up to now, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
-was set to 40000000 seconds (over 15 months) to simulate a very long
+was set by default to 40000000 seconds (over 15 months) to simulate a very long
 interval.
 
-The [new value has been lowered to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9565f9f2ebab8bc648d9c361198479974664c322),
+The [default value has been lowered to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9565f9f2ebab8bc648d9c361198479974664c322),
 the equivalent of 1 hour.
 
 If you want to retain the old behavior, you need to set explicitly:
@@ -376,8 +383,8 @@ spec:
 #### Superuser access disabled
 
 Pushing towards *security-by-default*, CloudNativePG now disables
-superuser access (`postgres` user) via the network in all new clusters
-unless explicitly requested.
+superuser access (`postgres` user) via the network in all new clusters,
+unless explicitly enabled.
 
 If you want to restore the previous behavior, you need to set explicitly:
 
@@ -396,11 +403,11 @@ replication slots for High Availability are now enabled by default.
 
 In version 1.18, we deprecated the `postgresql` label in pods to identify the
 name of the cluster and replaced it with the more canonical `cnpg.io/cluster`
-label. Such a label is no longer maintained.
+label. The `postgresql` label is no longer maintained.
 
 Similarly, from this version, the `role` label is deprecated. The new label
-`cnpg.io/instanceRole` is now set and will entirely replace the `role` one in a
-future release.
+`cnpg.io/instanceRole` is now set, and will entirely replace the `role` label
+in a future release.
 
 ### Upgrading to 1.20 from a previous minor version
 

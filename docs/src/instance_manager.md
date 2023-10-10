@@ -17,17 +17,17 @@ of the Pod, the instance manager acts as a backend to handle the
 
 ## Startup, liveness and readiness probes
 
-The startup and liveness probe relies on `pg_isready`, while the readiness
+The startup and liveness probes rely on `pg_isready`, while the readiness
 probe checks if the database is up and able to accept connections using the
 superuser credentials.
 
 The readiness probe is positive when the Pod is ready to accept traffic.
-The liveness probe controls when to restart the container immediately
-after the startup probe interval.
+The liveness probe controls when to restart the container once
+the startup probe interval has elapsed.
 
 !!! Important
     The liveness and readiness probes will report a failure if the probe command
-    fails three times with a 10-seconds interval between each check.
+    fails three times with a 10-second interval between each check.
 
 The liveness probe detects if the PostgreSQL instance is in a
 broken state and needs to be restarted. The value in `startDelay` is used
@@ -41,7 +41,7 @@ related to the time needed by PostgreSQL to start.
 
 !!! Warning
     If `.spec.startDelay` is too low, the liveness probe will start working
-    before the PostgreSQL startup, and the Pod could be restarted
+    before the PostgreSQL startup is complete, and the Pod could be restarted
     inappropriately.
 
 ## Shutdown control
