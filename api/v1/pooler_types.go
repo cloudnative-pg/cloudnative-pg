@@ -31,7 +31,7 @@ const (
 	// PoolerTypeRW means that the pooler involves only the primary server
 	PoolerTypeRW = PoolerType("rw")
 
-	// PoolerTypeRO means that the pooler involves every server
+	// PoolerTypeRO means that the pooler involves only the replicas
 	PoolerTypeRO = PoolerType("ro")
 
 	// DefaultPgBouncerPoolerAuthQuery is the default auth_query for PgBouncer
