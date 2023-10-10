@@ -50,6 +50,7 @@ CSV
 CSVs
 Canovai
 Cecchi
+Ceph
 CertificatesConfiguration
 CertificatesStatus
 Certmanager
