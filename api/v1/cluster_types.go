@@ -281,10 +281,10 @@ type ClusterSpec struct {
 
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
-	// (that is: `stopDelay` - `smartStopDelay`).
+	// (that is: `stopDelay` - `smartShutdownTimeout`).
 	// +kubebuilder:default:=180
 	// +optional
-	SmartStopDelay int32 `json:"smartStopDelay,omitempty"`
+	SmartShutdownTimeout int32 `json:"smartShutdownTimeout,omitempty"`
 
 	// The time in seconds that is allowed for a primary PostgreSQL instance
 	// to gracefully shutdown during a switchover.
@@ -2439,10 +2439,10 @@ func (cluster *Cluster) GetMaxStopDelay() int32 {
 	return 1800
 }
 
-// GetSmartStopDelay is used to compute the timeout of smart shutdown by the formula `stopDelay -  smartStopDelay`
-func (cluster *Cluster) GetSmartStopDelay() int32 {
-	if cluster.Spec.SmartStopDelay > 0 {
-		return cluster.Spec.SmartStopDelay
+// GetSmartShutdownTimeout is used to ensure that smart shutdown timeout is a positive integer
+func (cluster *Cluster) GetSmartShutdownTimeout() int32 {
+	if cluster.Spec.SmartShutdownTimeout > 0 {
+		return cluster.Spec.SmartShutdownTimeout
 	}
 	return 180
 }

@@ -432,8 +432,8 @@ func (instance *Instance) TryShuttingDownSmartFast() error {
 
 	smartTimeout := instance.SmartStopDelay
 	if instance.MaxStopDelay <= instance.SmartStopDelay {
-		log.Warning("Ignoring smartStopDelay",
-			"smartStopDelay", instance.SmartStopDelay,
+		log.Warning("Ignoring maxStopDelay <= smartShutdownTimeout",
+			"smartShutdownTimeout", instance.SmartStopDelay,
 			"maxStopDelay", instance.MaxStopDelay,
 		)
 		smartTimeout = 0

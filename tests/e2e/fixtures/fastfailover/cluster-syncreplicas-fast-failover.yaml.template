@@ -6,7 +6,7 @@ metadata:
 spec:
   instances: 3
   stopDelay: 210
-  smartStopDelay: 180
+  smartShutdownTimeout: 180
   minSyncReplicas: 1
   maxSyncReplicas: 2
   postgresql:
