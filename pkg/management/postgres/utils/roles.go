@@ -18,6 +18,7 @@ package utils
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -27,11 +28,11 @@ import (
 // DisableSuperuserPassword disables the password for the `postgres` user
 func DisableSuperuserPassword(db *sql.DB) error {
 	var hasPassword bool
-	passwordCheck := `select rolpassword is not null
-		from pg_catalog.pg_authid
-		where rolname='postgres'`
+	passwordCheck := `SELECT rolpassword IS NOT NULL
+		FROM pg_catalog.pg_authid
+		WHERE rolname='postgres'`
 	err := db.QueryRow(passwordCheck).Scan(&hasPassword)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	if !hasPassword {

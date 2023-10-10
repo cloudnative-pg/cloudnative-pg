@@ -44,9 +44,9 @@ var _ = Describe("Credentials management functions", func() {
 	It("will not disable the password if the PostgreSQL user has no password", func() {
 		rowsHasPassword := sqlmock.NewRows([]string{""}).
 			AddRow(false)
-		mock.ExpectQuery(`select rolpassword is not null
-		from pg_catalog.pg_authid
-		where rolname='postgres'`).WillReturnRows(rowsHasPassword)
+		mock.ExpectQuery(`SELECT rolpassword IS NOT NULL
+		FROM pg_catalog.pg_authid
+		WHERE rolname='postgres'`).WillReturnRows(rowsHasPassword)
 
 		Expect(DisableSuperuserPassword(db)).To(Succeed())
 	})
@@ -54,9 +54,9 @@ var _ = Describe("Credentials management functions", func() {
 	It("can disable the password for the PostgreSQL user", func() {
 		rowsHasPassword := sqlmock.NewRows([]string{""}).
 			AddRow(true)
-		mock.ExpectQuery(`select rolpassword is not null
-		from pg_catalog.pg_authid
-		where rolname='postgres'`).WillReturnRows(rowsHasPassword)
+		mock.ExpectQuery(`SELECT rolpassword IS NOT NULL
+		FROM pg_catalog.pg_authid
+		WHERE rolname='postgres'`).WillReturnRows(rowsHasPassword)
 		mock.ExpectBegin()
 		mock.ExpectExec("SET LOCAL synchronous_commit to LOCAL").
 			WillReturnResult(sqlmock.NewResult(0, 0))
