@@ -326,7 +326,7 @@ the equivalent of 30 minutes.
 The new `smartShutdownTimeout` parameter has been introduced to define
 the maximum time window within the `stopDelay` value reserved to complete
 the `smart` shutdown procedure in PostgreSQL. During this time, the
-Postgres servers denies any new connection while waiting for all regular
+Postgres servers rejects any new connection while waiting for all regular
 sessions to terminate.
 
 Once elapsed, the remaining time up to `stopDelay` will be reserved for
