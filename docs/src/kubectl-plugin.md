@@ -878,7 +878,7 @@ kubectl cnpg fio <fio-job-name> -n <namespace>
 
 Refer to the [Benchmarking fio section](benchmarking.md#fio) for more details.
 
-### Requesting a new backup
+### Requesting a new physical backup
 
 The `kubectl cnpg backup` command requests a new physical backup for
 an existing Postgres cluster by creating a new `Backup` resource.
@@ -955,5 +955,6 @@ reachable in your `PATH` variable to correctly work.
 ### Snapshotting a Postgres cluster
 
 !!! Warning
-    The `kubectl cnpg snapshot` is deprecated. Please use the [backup command](#requesting-a-new-backup)
-    to request backups using volume snapshots.
+    The `kubectl cnpg snapshot` command has been deprecated and removed.
+    Please use the [`backup` command](#requesting-a-new-backup) to request
+    backups using volume snapshots.
