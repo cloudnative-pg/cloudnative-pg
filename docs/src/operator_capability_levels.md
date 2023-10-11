@@ -363,7 +363,7 @@ the application container image under GNU GPL 3 terms.
 Object store backups are taken while PostgreSQL is up and running (hot
 backups). Volume Snapshot backups are currently taken after PostgreSQL has
 been shut down (cold backups). This limitation will be lifted in the future
-when support for online Volume Snapshot backups will be introduced.
+when support for online Volume Snapshot backups is introduced.
 
 ### Backups from a standby
 
