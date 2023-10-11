@@ -692,6 +692,7 @@ jobCount
 jq
 json
 jsonpath
+kb
 kbytes
 kms
 kube
@@ -729,6 +730,7 @@ linters
 linux
 listmeta
 liveness
+livenessProbe
 lm
 localeCType
 localeCollate
@@ -1077,6 +1079,7 @@ unix
 unusablePVC
 updateInterval
 upgradable
+uptime
 uri
 usename
 usernamepassword
