@@ -326,7 +326,7 @@ the equivalent of 30 minutes.
 The new `smartShutdownTimeout` parameter has been introduced to define
 the maximum time window within the `stopDelay` value reserved to complete
 the `smart` shutdown procedure in PostgreSQL. During this time, the
-Postgres servers rejects any new connection while waiting for all regular
+Postgres server rejects any new connections while waiting for all regular
 sessions to terminate.
 
 Once elapsed, the remaining time up to `stopDelay` will be reserved for
@@ -417,11 +417,11 @@ spec:
     1.19.5.
 
 In version 1.18, we deprecated the `postgresql` label in pods to identify the
-name of the cluster and replaced it with the more canonical `cnpg.io/cluster`
+name of the cluster, and replaced it with the more canonical `cnpg.io/cluster`
 label. The `postgresql` label is no longer maintained.
 
 Similarly, from this version, the `role` label is deprecated. The new label
-`cnpg.io/instanceRole` is now set, and will entirely replace the `role` label
+`cnpg.io/instanceRole` is now used, and will entirely replace the `role` label
 in a future release.
 
 #### Shortcut for keeping the existing behavior

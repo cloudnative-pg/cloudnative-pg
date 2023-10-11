@@ -34,7 +34,7 @@ broken state and needs to be restarted. The value in `startDelay` is used
 to delay the probe's execution, preventing an
 instance with a long startup time from being restarted.
 
-The number of seconds after the Pod has started before the liveness
+The interval (in seconds) after the Pod has started before the liveness
 probe starts working is expressed in the `.spec.startDelay` parameter,
 which defaults to 3600 seconds. The correct value for your cluster is
 related to the time needed by PostgreSQL to start.
@@ -42,7 +42,7 @@ related to the time needed by PostgreSQL to start.
 !!! Warning
     If `.spec.startDelay` is too low, the liveness probe will start working
     before the PostgreSQL startup is complete, and the Pod could be restarted
-    inappropriately.
+    prematurely.
 
 ## Shutdown control
 
@@ -80,7 +80,7 @@ general case. Indeed, the operator requires the former primary to issue a
 in order to ensure that all the data are available on the new primary.
 
 For this reason, the `.spec.switchoverDelay`, expressed in seconds, controls
-the  time given to the former primary to shut down gracefully and archive all 
+the  time given to the former primary to shut down gracefully and archive all
 the WAL files. By default it is set to `3600` (1 hour).
 
 !!! Warning
