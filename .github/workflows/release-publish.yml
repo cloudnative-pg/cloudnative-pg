@@ -110,7 +110,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --rm-dist
+          args: release --rm-dist --timeout 60m
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
