@@ -113,13 +113,11 @@ spec:
 ## Recovery from `VolumeSnapshot` objects
 
 !!! Warning
-    If using using volume snapshots for recovery, the primary instance will be
-    created quickly using the snapshot(s). If there's no WAL archive
-    available, the standby instances will be created through `pg_basebackup`
-    rather than the snapshot(s). This might be significantly slower depending on
-    the size of the database. If a WAL archive is available for the recovered
-    cluster, standby instances will also be recovered taking advantage of the snapshots.
-
+    When creating replicas after having recovered the primary instance from
+    the volume snapshot, the operator might end up using `pg_basebackup`
+    to synchronize them, resulting in a slower process depending on the size
+    of the database. This limitation will be lifted in the future when support
+    for online backups will be introduced.
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
 existing `Cluster` that's been taken using the declarative API for
 [volume snapshot backups](backup_volumesnapshot.md).
