@@ -25,7 +25,7 @@ Base backups may be taken either on object stores, or using volume snapshots
 (from version 1.21).
 
 !!! Warning
-    Recovery using volumeSnapshots had an initial release on 1.20.1. Because of
+    Recovery using volume snapshots had an initial release on 1.20.1. Because of
     the amount of progress on the feature for 1.21.0, it is strongly advised
     that you upgrade to 1.21.0 or more advanced releases to use volume
     snapshots.
@@ -49,11 +49,11 @@ compatible, from a physical replication standpoint, with the original one.
 For recovery using volume snapshots:
 
 - take a consistent cold backup of the Postgres cluster from a standby through
-  the `kubectl backup` command (see the [plugin document](kubectl-plugin.md#requesting-a-new-base-backup) for reference),
-  which creates the necessary `VolumeSnapshot` objects (two if you have a
-  separate volume for WALs, one if you don't)
-- recover from the above *VolumeSnapshot* objects through the `volumeSnapshots`
-  option in the `.spec.bootstrap.recovery` stanza, as described in
+  the `kubectl cnpg backup` command (see the [plugin document](kubectl-plugin.md#requesting-a-new-base-backup)
+  for reference), which creates the necessary `VolumeSnapshot` objects (two if
+  you have a separate volume for WALs, one if you don't) - recover from the above
+  *VolumeSnapshot* objects through the `volumeSnapshots` option in the
+  `.spec.bootstrap.recovery` stanza, as described in
   ["Recovery from `VolumeSnapshot` objects"](#recovery-from-volumesnapshot-objects)
   below
 
@@ -114,11 +114,11 @@ spec:
 
 !!! Warning
     If using using volume snapshots for recovery, the primary instance will be
-    created quickly using the snapshot. If there is not a WAL archive
-    available, the standby instances will be created from `pg_basebackup`
-    rather than the snapshot. This is significantly slower.
-    If a WAL archive is available for the recovered cluster, standby instances
-    will also be recovered taking advantage of the snapshots.
+    created quickly using the snapshot(s). If there's no WAL archive
+    available, the standby instances will be created through `pg_basebackup`
+    rather than the snapshot(s). This might be significantly slower depending on
+    the size of the database. If a WAL archive is available for the recovered
+    cluster, standby instances will also be recovered taking advantage of the snapshots.
 
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
 existing `Cluster` that's been taken using the declarative API for
