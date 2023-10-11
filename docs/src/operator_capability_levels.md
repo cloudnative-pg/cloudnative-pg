@@ -331,7 +331,7 @@ in the archive. In addition to that `Instance Manager` automatically checks
 the correctness of the archive destination, by performing `barman-cloud-check-wal-archive` 
 command before beginning to ship the very first set of WAL files.
 
-### PostgreSQL Hot Backups
+### PostgreSQL Backups
 
 The operator has been designed to provide application-level backups using
 PostgreSQL’s native continuous hot backup technology based on
@@ -359,6 +359,11 @@ alongside WAL files.
 
 Both `barman-cloud-wal-restore` and `barman-cloud-backup` are distributed in
 the application container image under GNU GPL 3 terms.
+
+Object store backups are taken meanwhile PostgreSQL is up and running (hot
+backups). Volume Snapshots backups are for now taking after PostgreSQL have
+been shut down (cold backups). This limitation will be lifted in the future
+when support for online Volume Snapshot backups will be introduced.
 
 ### Backups from a standby
 
