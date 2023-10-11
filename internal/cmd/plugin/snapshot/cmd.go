@@ -27,7 +27,7 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "snapshot <cluster-name>",
-		Short: "deprecated",
+		Short: "command removed",
 		Long:  "Replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("This command was replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`")
