@@ -214,7 +214,8 @@ in the `backup` stanza of the cluster, you can set `method: volumeSnapshot`
 to start scheduling base backups on volume snapshots.
 
 ScheduledBackups can be suspended if needed by setting `.spec.suspend: true`,
-this will stop any new backup to be scheduled as long as the option is set to false.
+this will stop any new backup from being scheduled as long as the option is set
+to false.
 
 In case you want to issue a backup as soon as the ScheduledBackup resource is created
 you can set `.spec.immediate: true`.
@@ -348,8 +349,10 @@ spec:
 
 !!! Warning
     Beware of setting the target to primary when performing a cold backup
-    strategy on volume snapshots, as this will shut down the primary for
+    with volume snapshots, as this will shut down the primary for
     the time needed to take the snapshot, impacting write operations.
+    This also applies to taking a cold backup in a single-instance cluster, even
+    if you did not explicitly set the primary as the target.
 
 When the backup target is set to `prefer-standby`, such policy will ensure
 backups are run on the most up-to-date available secondary instance, or if no

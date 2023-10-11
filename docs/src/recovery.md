@@ -1,7 +1,7 @@
 # Recovery
 
 In PostgreSQL terminology, recovery is the process of starting a PostgreSQL
-instance using a previously taken backup. PostgreSQL recovery mechanism
+instance using a previously taken backup. The PostgreSQL recovery mechanism
 is very solid and rich. It also supports Point In Time Recovery, which allows
 you to restore a given cluster up to any point in time from the first available
 backup in your catalog to the last archived WAL (as you can see, the WAL
@@ -21,14 +21,18 @@ from the archive.
 
 WAL files are pulled from the defined *recovery object store*.
 
-Base backups depend on the actual method used to take them, either object
-stores or volume snapshots.
+Base backups may be taken either on object stores, or using volume snapshots
+(from version 1.21).
 
-<!-- TODO: this needs to cover volume snapshots -->
+!!! Warning
+    Recovery using volumeSnapshots had an initial release on 1.20.1. Because of
+    the amount of progress on the feature for 1.21.0, it is strongly advised
+    that you upgrade to 1.21.0 or more advanced releases to use volume
+    snapshots.
 
 Recovery from a *recovery object store* can be achieved in two ways:
 
-- using a recovery object store, that is a backup of another cluster
+- using a recovery object store, that is, a backup of another cluster
   created by Barman Cloud and defined via the `barmanObjectStore` option
   in the `externalClusters` section (*recommended*)
 - using an existing `Backup` object in the same namespace (this was the
@@ -37,17 +41,17 @@ Recovery from a *recovery object store* can be achieved in two ways:
 Both recovery methods enable either full recovery (up to the last
 available WAL) or up to a [point in time](#point-in-time-recovery-pitr).
 When performing a full recovery, the cluster can also be started
-in replica mode. Also, make sure that the PostgreSQL configuration
+in replica mode (see [replica clusters](replica_cluster.md) for reference).
+If using replica mode, make sure that the PostgreSQL configuration
 (`.spec.postgresql.parameters`) of the recovered cluster is
 compatible, from a physical replication standpoint, with the original one.
 
-CloudNativePG is also introducing support for Kubernetes' volume snapshots.
-With the current version of CloudNativePG, you can:
+For recovery using volume snapshots:
 
 - take a consistent cold backup of the Postgres cluster from a standby through
-  the `kubectl cnpg snapshot` command - which creates the necessary
-  `VolumeSnapshot` objects (currently one or two, if you have WALs in a separate
-  volume)
+  the `kubectl backup` command (see the [plugin document](kubectl-plugin.md#requesting-a-new-base-backup) for reference),
+  which creates the necessary `VolumeSnapshot` objects (two if you have a
+  separate volume for WALs, one if you don't)
 - recover from the above *VolumeSnapshot* objects through the `volumeSnapshots`
   option in the `.spec.bootstrap.recovery` stanza, as described in
   ["Recovery from `VolumeSnapshot` objects"](#recovery-from-volumesnapshot-objects)
@@ -56,7 +60,7 @@ With the current version of CloudNativePG, you can:
 ## Recovery from an object store
 
 You can recover from a backup created by Barman Cloud and stored on a supported
-object storage. Once you have defined the external cluster, including all the
+object store. Once you have defined the external cluster, including all the
 required configuration in the `barmanObjectStore` section, you need to
 reference it in the `.spec.recovery.source` option. The following example
 defines a recovery object store in a blob container in Azure:
@@ -93,11 +97,10 @@ spec:
 
 !!! Important
     By default the `recovery` method strictly uses the `name` of the
-    cluster in the `externalClusters` section to locate the main folder
+    cluster in the `externalClusters` section as the name of the main folder
     of the backup data within the object store, which is normally reserved
-    for the name of the server. You can specify a different one with the
-    `barmanObjectStore.serverName` property (by default assigned to the
-    value of `name` in the external clusters definition).
+    for the name of the server. You can specify a different folder name
+    with the `barmanObjectStore.serverName` property.
 
 !!! Note
     In the above example we are taking advantage of the parallel WAL restore
@@ -109,10 +112,18 @@ spec:
 
 ## Recovery from `VolumeSnapshot` objects
 
+!!! Warning
+    If using using volume snapshots for recovery, the primary instance will be
+    created quickly using the snapshot. If there is not a WAL archive
+    available, the standby instances will be created from `pg_basebackup`
+    rather than the snapshot. This is significantly slower.
+    If a WAL archive is available for the recovered cluster, standby instances
+    will also be recovered taking advantage of the snapshots.
+
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
 existing `Cluster` that's been taken using the declarative API for
 [volume snapshot backups](backup_volumesnapshot.md).
-You need to specify the name of the snapshot as in the following example:
+You will need to specify the name of the snapshot, as in the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -130,11 +141,6 @@ bootstrap:
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 ```
-
-!!! Warning
-    As the development of declarative support for Kubernetes' `VolumeSnapshot` API
-    progresses, you'll be able to use this technique in conjunction with a WAL
-    archive for Point In Time Recovery operations or replica clusters.
 
 In case the backed-up cluster was using a separate PVC to store the WAL files,
 the recovery must include that too:
@@ -160,6 +166,16 @@ bootstrap:
           kind: VolumeSnapshot
           apiGroup: snapshot.storage.k8s.io
 ```
+
+!!! Warning
+    If bootstrapping a replica-mode cluster from snapshots, to leverage
+    snapshots for the standby instances and not just the primary,
+    it would be advisable to:
+
+    1. start with a single instance replica cluster. The primary instance will
+      be recovered using the snapshot and available WALs form the source cluster
+    2. take a snapshot of the primary in the replica cluster
+    3. increase the number of instances in the replica cluster as desired
 
 ## Recovery from a `Backup` object
 
@@ -232,7 +248,7 @@ base backup. PostgreSQL uses this technique to achieve *point-in-time* recovery
 The operator will generate the configuration parameters required for this
 feature to work in case a recovery target is specified.
 
-#### PITR from an object store
+### PITR from an object store
 
 The example below uses a recovery object store in Azure that contains both
 the base backups and the WAL archive. The recovery target is based on a
@@ -340,7 +356,7 @@ spec:
 !!! Note
     In case the backed up Cluster had `walStorage` enabled, you also must
     specify the volume snapshot containing the `PGWAL` directory, as mentioned
-    in the [Recovery from VolumeSnapshot objects](#recovery-from-volumeSnapshot-objects)
+    in the [Recovery from VolumeSnapshot objects](#recovery-from-volumesnapshot-objects)
     section.
 
 !!! Warning
