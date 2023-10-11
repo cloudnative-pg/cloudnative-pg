@@ -407,7 +407,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build --skip-validate --rm-dist --id kubectl-cnpg
+          args: build --skip-validate --rm-dist --id kubectl-cnpg --timeout 60m
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
