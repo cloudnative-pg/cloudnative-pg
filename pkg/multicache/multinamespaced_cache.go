@@ -47,6 +47,9 @@ var _ cache.Cache = &multiNamespaceCache{}
 // ones.
 func DelegatingMultiNamespacedCacheBuilder(namespaces []string, operatorNamespace string) cache.NewCacheFunc {
 	return func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+		if opts.DefaultNamespaces == nil {
+			opts.DefaultNamespaces = make(map[string]cache.Config)
+		}
 		for _, namespace := range namespaces {
 			opts.DefaultNamespaces[namespace] = cache.Config{}
 		}
