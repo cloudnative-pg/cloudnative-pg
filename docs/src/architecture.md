@@ -4,6 +4,10 @@ This section covers the main architectural aspects you need to consider
 when deploying PostgreSQL in Kubernetes.
 
 !!! Important
+    We encourage you to read an article that we've written for the CNCF blog
+    with title ["Recommended Architectures for PostgreSQL in Kubernetes"](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/).
+
+!!! Important
     If you are deploying PostgreSQL in a self-managed Kubernetes environment,
     please make sure you read the ["Kubernetes architecture"](#kubernetes-architecture)
     below when you start planning your journey to the Cloud Native world.

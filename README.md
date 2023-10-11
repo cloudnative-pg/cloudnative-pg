@@ -114,6 +114,7 @@ MariaDB cluster).
 ### Useful links
 
 - [Data on Kubernetes (DoK) Community](https://dok.community/)
+- ["Recommended Architectures for PostgreSQL in Kubernetes" by Gabriele Bartolini](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/)
 - ["How CloudNativePG manages physical replication slots for PostgreSQL in Kubernetes" by Gabriele Bartolini](https://www.enterprisedb.com/blog/how-cloudnativepg-manages-replication-slots) (September 2023)
 - ["The Current State of Major PostgreSQL Upgrades with CloudNativePG" by Gabriele Bartolini](https://www.enterprisedb.com/blog/current-state-major-postgresql-upgrades-cloudnativepg-kubernetes) (August 2023)
 - ["The Rise of the Kubernetes Native Database" by Jeff Carpenter](https://thenewstack.io/the-rise-of-the-kubernetes-native-database/) (December 2022)
