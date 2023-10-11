@@ -6,9 +6,19 @@
     Hot backup with direct support of
     [PostgreSQL's low level API for base backups](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-LOWLEVEL-BASE-BACKUP)
     will be added in version 1.22. Having said this, the current implementation
-    is suitable for production HA environments as, by honoring the backup
-    target settings, will work on the most aligned standby without impacting the
-    primary.
+    is suitable for production HA environments, as it will by default work on
+    the most aligned standby without impacting the primary.
+
+!!! Warning
+    As noted in the [backup document](backup.md), a cold snapshot explicitly
+    set to target the primary will result in the primary being fenced for
+    the duration of the backup, rendering the cluster read-only during that
+    time.
+
+!!! Warning
+    A volume snapshot backup requires fencing the target instance. For safety,
+    in a cluster already containing fenced instances, a cold snapshot would be
+    rejected.
 
 CloudNativePG is one of the first known cases of database operators that
 directly leverages the Kubernetes native Volume Snapshot API for both
