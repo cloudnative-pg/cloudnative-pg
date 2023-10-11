@@ -955,6 +955,6 @@ reachable in your `PATH` variable to correctly work.
 ### Snapshotting a Postgres cluster
 
 !!! Warning
-    The `kubectl cnpg snapshot` command has been deprecated and removed.
+    The `kubectl cnpg snapshot` command has been deprecated.
     Please use the [`backup` command](#requesting-a-new-backup) to request
     backups using volume snapshots.
