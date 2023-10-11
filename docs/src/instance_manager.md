@@ -12,35 +12,37 @@ The field `.spec.instances` specifies how many instances to create.
 
 Each Pod will start the instance manager as the parent process (PID 1) for the
 main container, which in turn runs the PostgreSQL instance. During the lifetime
-of the Pod, the instance manager acts as a backend to handle the [liveness and
-readiness probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes).
+of the Pod, the instance manager acts as a backend to handle the
+[startup, liveness and readiness probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes).
 
-## Liveness and readiness probes
+## Startup, liveness and readiness probes
 
-The liveness probe relies on `pg_isready`, while the readiness probe checks if
-the database is up and able to accept connections using the superuser
-credentials.
+The startup and liveness probes rely on `pg_isready`, while the readiness
+probe checks if the database is up and able to accept connections using the
+superuser credentials.
+
 The readiness probe is positive when the Pod is ready to accept traffic.
-The liveness probe controls when to restart the container.
+The liveness probe controls when to restart the container once
+the startup probe interval has elapsed.
 
-> The two probes will report a failure if the probe command fails 3 times with a 10 seconds interval between each check.
+!!! Important
+    The liveness and readiness probes will report a failure if the probe command
+    fails three times with a 10-second interval between each check.
 
-For now, the operator doesn't configure a `startupProbe` on the Pods, since
-startup probes have been introduced only in Kubernetes 1.17.
-
-The liveness probe is used to detect if the PostgreSQL instance is in a
+The liveness probe detects if the PostgreSQL instance is in a
 broken state and needs to be restarted. The value in `startDelay` is used
-to delay the probe's execution, which is used to prevent an
+to delay the probe's execution, preventing an
 instance with a long startup time from being restarted.
 
-The number of seconds after the Pod has started before the liveness
+The interval (in seconds) after the Pod has started before the liveness
 probe starts working is expressed in the `.spec.startDelay` parameter,
-which defaults to 30 seconds. The correct value for your cluster is
+which defaults to 3600 seconds. The correct value for your cluster is
 related to the time needed by PostgreSQL to start.
 
-If `.spec.startDelay` is too low, the liveness probe will start working
-before the PostgreSQL startup, and the Pod could be restarted
-inappropriately.
+!!! Warning
+    If `.spec.startDelay` is too low, the liveness probe will start working
+    before the PostgreSQL startup is complete, and the Pod could be restarted
+    prematurely.
 
 ## Shutdown control
 
@@ -78,7 +80,7 @@ general case. Indeed, the operator requires the former primary to issue a
 in order to ensure that all the data are available on the new primary.
 
 For this reason, the `.spec.switchoverDelay`, expressed in seconds, controls
-the  time given to the former primary to shut down gracefully and archive all 
+the  time given to the former primary to shut down gracefully and archive all
 the WAL files. By default it is set to `3600` (1 hour).
 
 !!! Warning
