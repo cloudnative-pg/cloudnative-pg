@@ -61,7 +61,7 @@ func (i *PostgresLifecycle) GetGlobalContext() context.Context {
 // Start starts running the PostgresLifecycle
 // nolint:gocognit
 func (i *PostgresLifecycle) Start(ctx context.Context) error {
-	contextLog := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx)
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
@@ -71,14 +71,14 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 
 	// Every cycle correspond to the lifespan of a postmaster process
 	for {
-		log.Debug("starting the postgres loop")
+		contextLogger.Debug("starting the postgres loop")
 		// Start the postmaster. The postMasterErrChan channel
 		// will contain any error returned by the process.
 		postMasterErrChan := i.runPostgresAndWait(ctx)
 
 	signalLoop:
 		for {
-			log.Debug("starting signal loop")
+			contextLogger.Debug("starting signal loop")
 			select {
 			case err := <-postMasterErrChan:
 				// We didn't request postmaster to shut down or to restart, nevertheless
@@ -93,9 +93,9 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				if err != nil {
 					var exitError *exec.ExitError
 					if !errors.As(err, &exitError) {
-						contextLog.Error(err, "Error waiting on the PostgreSQL process")
+						contextLogger.Error(err, "Error waiting on the PostgreSQL process")
 					} else {
-						contextLog.Error(exitError, "PostgreSQL process exited with errors")
+						contextLogger.Error(exitError, "PostgreSQL process exited with errors")
 					}
 				}
 				if !i.instance.MightBeUnavailable() {
@@ -106,13 +106,13 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// We shut down PostgreSQL and terminate using the smart
 				// stop delay.
 				if i.instance.InstanceManagerIsUpgrading.Load() {
-					log.Info("Context has been cancelled, but an instance manager online upgrade is in progress, " +
+					contextLogger.Info("Context has been cancelled, but an instance manager online upgrade is in progress, " +
 						"will just exit")
 					return nil
 				}
-				log.Info("Context has been cancelled, shutting down and exiting")
-				if err := i.instance.TryShuttingDownSmartFast(); err != nil {
-					log.Error(err, "error shutting down instance, proceeding")
+				contextLogger.Info("Context has been cancelled, shutting down and exiting")
+				if err := i.instance.TryShuttingDownSmartFast(ctx); err != nil {
+					contextLogger.Error(err, "error shutting down instance, proceeding")
 				}
 				return nil
 
@@ -121,33 +121,33 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// to our process. In this case we terminate as fast as we can,
 				// otherwise we'll receive a SIGKILL by the Kubelet, possibly
 				// resulting in a data corruption.
-				log.Info("Received termination signal",
+				contextLogger.Info("Received termination signal",
 					"signal", sig,
 					"smartShutdownTimeout", i.instance.SmartStopDelay,
 				)
-				if err := i.instance.TryShuttingDownSmartFast(); err != nil {
-					log.Error(err, "error while shutting down instance, proceeding")
+				if err := i.instance.TryShuttingDownSmartFast(ctx); err != nil {
+					contextLogger.Error(err, "error while shutting down instance, proceeding")
 				}
 				return nil
 
 			case req := <-i.instance.GetInstanceCommandChan():
 				// We received a command issued by the reconciliation loop of
 				// the instance manager.
-				log.Info("Received request for postgres", "req", req)
+				contextLogger.Info("Received request for postgres", "req", req)
 
 				// We execute the requested operation
-				restartNeeded, err := i.instance.HandleInstanceCommandRequests(req)
+				restartNeeded, err := i.instance.HandleInstanceCommandRequests(ctx, req)
 				if err != nil {
-					log.Error(err, "while handling instance command request")
+					contextLogger.Error(err, "while handling instance command request")
 				}
 				if restartNeeded {
-					log.Info("Restarting the instance")
+					contextLogger.Info("Restarting the instance")
 					break signalLoop
 				}
 			}
-			log.Debug("exiting signal loop")
+			contextLogger.Debug("exiting signal loop")
 		}
-		log.Debug("exiting the postgres loop")
+		contextLogger.Debug("exiting the postgres loop")
 		// Here the postmaster is terminated. We need to start a new postmaster
 		// process
 	}

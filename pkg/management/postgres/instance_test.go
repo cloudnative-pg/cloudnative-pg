@@ -17,6 +17,7 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,8 +73,8 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 		Expect(isPrimary).To(BeFalse())
 	})
 
-	It("should properly demote a primary", func() {
-		err := instance.Demote(&apiv1.Cluster{})
+	It("should properly demote a primary", func(ctx context.Context) {
+		err := instance.Demote(ctx, &apiv1.Cluster{})
 		Expect(err).ToNot(HaveOccurred())
 
 		assertFileExists(signalPath, "standby.signal")

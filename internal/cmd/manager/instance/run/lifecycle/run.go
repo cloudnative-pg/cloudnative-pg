@@ -56,8 +56,8 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 			return
 		}
 
-		i.instance.LogPgControldata("postmaster start up")
-		defer i.instance.LogPgControldata("postmaster has exited")
+		i.instance.LogPgControldata(ctx, "postmaster start up")
+		defer i.instance.LogPgControldata(ctx, "postmaster has exited")
 
 		streamingCmd, err := i.instance.Run()
 		if err != nil {
