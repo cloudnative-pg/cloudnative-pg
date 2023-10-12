@@ -118,16 +118,13 @@ jobs:
           VERSION: ${{ steps.build-meta.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-#
-# Skipping Krew publishing because of:
-# https://github.com/cloudnative-pg/cloudnative-pg/actions/runs/6488402237/job/17620763351#step:9:13
-#
-#      -
-#        name: Publish Krew
-#        if: ${{ env.SKIP_KREW == 'false' }}
-#        uses: rajatjindal/krew-release-bot@v0.0.46
-#        with:
-#          krew_template_file: dist/cnpg.yaml
+
+      -
+        name: Publish Krew
+        if: ${{ env.SKIP_KREW == 'false' }}
+        uses: rajatjindal/krew-release-bot@v0.0.46
+        with:
+          krew_template_file: dist/krew/cnpg.yaml
       -
         name: Docker meta
         id: docker-meta
