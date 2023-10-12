@@ -481,6 +481,7 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
+          secrets: GIT_AUTH_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
       - name: Output images
         env:
