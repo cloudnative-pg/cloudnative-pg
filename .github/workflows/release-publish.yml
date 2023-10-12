@@ -9,6 +9,7 @@ on:
 
 env:
   GOLANG_VERSION: "1.21.x"
+  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}"
 
 permissions:
   contents: write
@@ -168,6 +169,17 @@ jobs:
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
 
+      -
+        name: Output images
+        env:
+          TAGS: ${{ steps.docker-meta.outputs.tags }}
+        run: |
+          LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
+          TAG=${TAGS#*:}
+          echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+
   olm-bundle:
     name: Create OLM bundle and catalog
     runs-on: ubuntu-22.04
@@ -199,9 +211,11 @@ jobs:
 
       - name: Create bundle
         env:
-          IMAGE_NAME: ghcr.io/cloudnative-pg/cloudnative-pg
+          IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img }}
+          BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
         run: |
-          make olm-bundle
+          make olm-catalog
 
       - name: Archive the bundle manifests
         uses: actions/upload-artifact@v3
