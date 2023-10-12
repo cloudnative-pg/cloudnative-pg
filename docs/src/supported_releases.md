@@ -63,12 +63,12 @@ Git tags for versions are prepended with `v`.
 
 ## Support status of CloudNativePG releases
 
-| Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported | Supported Postgres Versions |
-|-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.21.x          | Yes                  | October 11, 2023  | ~ April 11, 2024         | 1.25, 1.26, 1.27, 1.28        | 1.23, 1.24                | 12 - 16                     |
-| 1.20.x          | Yes                  | April 27, 2023    | ~ December 28, 2023      | 1.24, 1.25, 1.26, 1.27        | 1.23                      | 11 - 16                     |
-| 1.19.x          | Yes                  | February 14, 2023 | November 11, 2023        | 1.23, 1.24, 1.25, 1.26        | 1.27                      | 11 - 16                     |
-| main            | No, development only |                   |                          |                               |                           | 11 - 16                     |
+| Version         | Currently Supported  | Release Date      | End of Life         | Supported Kubernetes Versions | Tested, but not supported | Supported Postgres Versions |
+|-----------------|----------------------|-------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
+| 1.21.x          | Yes                  | October 12, 2023  | ~ April 12, 2024    | 1.25, 1.26, 1.27, 1.28        | 1.23, 1.24                | 12 - 16                     |
+| 1.20.x          | Yes                  | April 27, 2023    | ~ December 28, 2023 | 1.24, 1.25, 1.26, 1.27        | 1.23                      | 11 - 16                     |
+| 1.19.x          | Yes                  | February 14, 2023 | November 11, 2023   | 1.23, 1.24, 1.25, 1.26        | 1.27                      | 11 - 16                     |
+| main            | No, development only |                   |                     |                               |                           | 11 - 16                     |
 
 The list of supported Kubernetes versions in the above table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
