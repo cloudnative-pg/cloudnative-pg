@@ -181,6 +181,7 @@ LDAPScheme
 LPV
 LSN
 LTS
+LabelFile
 LastBackupFailed
 LastBackupSucceeded
 LastFailedArchiveTime
@@ -226,6 +227,7 @@ ObjectMeta
 OngoingBackupStatus
 OngoingBackups
 OngoingSnapshotBackups
+OnlineConfiguration
 OnlineUpdateEnabled
 OnlineUpgrading
 OpenShift
@@ -357,6 +359,7 @@ Slonik
 SnapshotOwnerReference
 SnapshotType
 Snapshotting
+SpcmapFile
 Stackgres
 StatefulSets
 StorageClass
@@ -734,6 +737,7 @@ kubelet
 kubernetes
 labelColumnName
 labelColumnValue
+labelFile
 labelName
 labelSelector
 labelValue
@@ -1021,6 +1025,7 @@ snapshotOwnerReference
 snapshotted
 snapshotting
 sourceNamespace
+spcmapFile
 specificities
 sql
 src
@@ -1131,6 +1136,7 @@ volumeMounts
 volumeSnapshot
 volumeSnapshots
 volumesnapshot
+waitForArchive
 wal
 walClassName
 walSegmentSize

@@ -118,6 +118,9 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				instance.Namespace: {},
+			},
 			ByObject: map[client.Object]cache.ByObject{
 				&apiv1.Cluster{}: {
 					Field: fields.OneTermEqualSelector("metadata.name", instance.ClusterName),
@@ -155,10 +158,9 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	exitedConditions := concurrency.MultipleExecuted{}
 
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsServer)
-	err = ctrl.NewControllerManagedBy(mgr).
+	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
-		Complete(reconciler)
-	if err != nil {
+		Complete(reconciler); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		return err
 	}

@@ -18,7 +18,6 @@ package volumesnapshot
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -26,10 +25,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
-
-// ErrUnexpectedFencedInstances is raised when there are more than one Pod fenced or when
-// there are no Pod fenced at all.
-var ErrUnexpectedFencedInstances = errors.New("expected one and only one instance to be fenced")
 
 // volumeSnapshotInfo host information about a volume snapshot
 type volumeSnapshotInfo struct {
@@ -64,11 +59,11 @@ func (err volumeSnapshotError) Error() string {
 	return *err.InternalError.Message
 }
 
-// Slice represents a slice of []storagesnapshotv1.VolumeSnapshot
-type Slice []storagesnapshotv1.VolumeSnapshot
+// slice represents a slice of []storagesnapshotv1.VolumeSnapshot
+type slice []storagesnapshotv1.VolumeSnapshot
 
-// GetControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
-func (s Slice) GetControldata() (string, error) {
+// getControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
+func (s slice) getControldata() (string, error) {
 	for _, volumeSnapshot := range s {
 		pgControlData, ok := volumeSnapshot.Annotations[utils.PgControldataAnnotationName]
 		if !ok {
@@ -79,14 +74,14 @@ func (s Slice) GetControldata() (string, error) {
 	return "", fmt.Errorf("could not retrieve pg_controldata from any snapshot")
 }
 
-// GetBackupVolumeSnapshots extracts the list of volume snapshots related
+// getBackupVolumeSnapshots extracts the list of volume snapshots related
 // to a backup name
-func GetBackupVolumeSnapshots(
+func getBackupVolumeSnapshots(
 	ctx context.Context,
 	cli client.Client,
 	namespace string,
 	backupLabelName string,
-) (Slice, error) {
+) (slice, error) {
 	var list storagesnapshotv1.VolumeSnapshotList
 
 	if err := cli.List(

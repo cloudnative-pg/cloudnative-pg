@@ -95,6 +95,12 @@ type InitInfo struct {
 	// PostInitApplicationSQLRefsFolder is the folder which contains a bunch
 	// of SQL files to be executed just after having configured a new instance
 	PostInitApplicationSQLRefsFolder string
+
+	// LabelFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
+	LabelFile string
+
+	// SpcmapFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
+	SpcmapFile string
 }
 
 // VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error

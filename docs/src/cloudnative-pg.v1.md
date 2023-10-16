@@ -535,6 +535,14 @@ standby, if available.</p>
 and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
 </td>
 </tr>
+<tr><td><code>online</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Online if the elected instance should not be taken offline.
+Supports only 'spec.target=Primary' with 'spec.method=volumeSnapshot'.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -684,6 +692,20 @@ parameter is omitted</p>
    <p>The backup command output in case of error</p>
 </td>
 </tr>
+<tr><td><code>labelFile</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>LabelFile used in case of Online backups</p>
+</td>
+</tr>
+<tr><td><code>spcmapFile</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>SpcmapFile used in case of Online backups</p>
+</td>
+</tr>
 <tr><td><code>instanceID</code><br/>
 <a href="#postgresql-cnpg-io-v1-InstanceID"><i>InstanceID</i></a>
 </td>
@@ -703,6 +725,13 @@ parameter is omitted</p>
 </td>
 <td>
    <p>The backup method being used</p>
+</td>
+</tr>
+<tr><td><code>online</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Indicates if the backup was executed in the Online mode</p>
 </td>
 </tr>
 </tbody>
@@ -2846,6 +2875,48 @@ up again) or not (recreate it elsewhere - when <code>instances</code> &gt;1)</p>
 </tbody>
 </table>
 
+## OnlineConfiguration     {#postgresql-cnpg-io-v1-OnlineConfiguration}
+
+
+**Appears in:**
+
+- [VolumeSnapshotConfiguration](#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
+
+
+<p>OnlineConfiguration contains the configuration parameters for the online volume snapshot</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>waitForArchive</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>If false, the function will return immediately after the backup is completed, without waiting for WAL to be archived.
+This behavior is only useful with backup software that independently monitors WAL archiving.
+Otherwise, WAL required to make the backup consistent might be missing and make the backup useless.
+By default or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is
+enabled.
+On a standby, this means that it will wait only when archive_mode = always.
+If write activity on the primary is low, it may be useful to run pg_switch_wal on the primary in order to trigger
+an immediate segment switch.</p>
+</td>
+</tr>
+<tr><td><code>immediateCheckpoint</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Control whether the I/O workload for the backup initial checkpoint will
+be limited, according to the <code>checkpoint_completion_target</code> setting on
+the PostgreSQL server. If set to true, an immediate checkpoint will be
+used, meaning PostgreSQL will complete the checkpoint as soon as
+possible. <code>false</code> by default.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## PasswordState     {#postgresql-cnpg-io-v1-PasswordState}
 
 
@@ -4315,6 +4386,13 @@ It is the default class for the other types if no specific class is present</p>
 </td>
 <td>
    <p>SnapshotOwnerReference indicates the type of owner reference the snapshot should have</p>
+</td>
+</tr>
+<tr><td><code>online</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-OnlineConfiguration"><i>OnlineConfiguration</i></a>
+</td>
+<td>
+   <p>OnlineConfiguration contains the configuration parameters for the online volume snapshot</p>
 </td>
 </tr>
 </tbody>

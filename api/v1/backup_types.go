@@ -88,6 +88,11 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
+
+	// Online if the elected instance should not be taken offline.
+	// Supports only 'spec.target=Primary' with 'spec.method=volumeSnapshot'.
+	// +optional
+	Online bool `json:"online,omitempty"`
 }
 
 // BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
@@ -185,6 +190,14 @@ type BackupStatus struct {
 	// +optional
 	CommandError string `json:"commandError,omitempty"`
 
+	// LabelFile used in case of Online backups
+	// +optional
+	LabelFile string `json:"labelFile,omitempty"`
+
+	// SpcmapFile used in case of Online backups
+	// +optional
+	SpcmapFile string `json:"spcmapFile,omitempty"`
+
 	// Information to identify the instance where the backup has been taken from
 	// +optional
 	InstanceID *InstanceID `json:"instanceID,omitempty"`
@@ -196,6 +209,9 @@ type BackupStatus struct {
 	// The backup method being used
 	// +optional
 	Method BackupMethod `json:"method,omitempty"`
+
+	// Indicates if the backup was executed in the Online mode
+	Online bool `json:"online,omitempty"`
 }
 
 // InstanceID contains the information to identify an instance

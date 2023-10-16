@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -104,6 +105,20 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 
 	contextLogger.Info("Recovering from volume snapshot",
 		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
+
+	if info.LabelFile != "" {
+		filePath := filepath.Join(info.PgData, constants.BackupLabelFile)
+		if _, err := fileutils.WriteStringToFile(filePath, info.LabelFile); err != nil {
+			return err
+		}
+	}
+
+	if info.SpcmapFile != "" {
+		filePath := filepath.Join(info.PgData, constants.TablespaceMapFile)
+		if _, err := fileutils.WriteStringToFile(filePath, info.SpcmapFile); err != nil {
+			return err
+		}
+	}
 
 	backup, env, err := info.createBackupObjectForSnapshotRestore(ctx, cli, cluster)
 	if err != nil {

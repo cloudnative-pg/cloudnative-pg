@@ -373,7 +373,6 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 
 	executor := volumesnapshot.
 		NewExecutorBuilder(r.Client, r.Recorder).
-		FenceInstance(true).
 		Build()
 
 	res, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
@@ -403,22 +402,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
 	}
 
-	backup.Status.SetAsCompleted()
-	snapshots, err := volumesnapshot.GetBackupVolumeSnapshots(ctx, r.Client, backup.Namespace, backup.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	backup.Status.BackupSnapshotStatus.SetSnapshotElements(snapshots)
-	if err := backupStatusFromSnapshots(snapshots, &backup.Status); err != nil {
-		contextLogger.Error(err, "while enriching the backup status")
-	}
-
-	if err := annotateSnapshotsWithBackupData(ctx, r.Client, snapshots, &backup.Status); err != nil {
-		contextLogger.Error(err, "while enriching the snapshots's status")
-	}
-
-	return nil, postgres.PatchBackupStatusAndRetry(ctx, r.Client, backup)
+	return nil, nil
 }
 
 func (r *BackupReconciler) getSnapshotTargetPod(
@@ -448,49 +432,6 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 	contextLogger.Debug("Found pod for backup", "pod", targetPod.Name)
 
 	return targetPod, nil
-}
-
-// AnnotateSnapshots adds labels and annotations to the snapshots using the backup
-// status to facilitate access
-func annotateSnapshotsWithBackupData(
-	ctx context.Context,
-	cli client.Client,
-	snapshots volumesnapshot.Slice,
-	backupStatus *apiv1.BackupStatus,
-) error {
-	contextLogger := log.FromContext(ctx)
-	for idx := range snapshots {
-		snapshot := &snapshots[idx]
-		oldSnapshot := snapshot.DeepCopy()
-		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
-		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
-		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
-			contextLogger.Error(err, "while updating volume snapshot from backup object",
-				"snapshot", snapshot.Name)
-			return err
-		}
-	}
-	return nil
-}
-
-// backupStatusFromSnapshots adds fields to the backup status based on the snapshots
-func backupStatusFromSnapshots(
-	snapshots volumesnapshot.Slice,
-	backupStatus *apiv1.BackupStatus,
-) error {
-	controldata, err := snapshots.GetControldata()
-	if err != nil {
-		return err
-	}
-	pairs := utils.ParsePgControldataOutput(controldata)
-
-	// the begin/end WAL and LSN are the same, since the instance was fenced
-	// for the snapshot
-	backupStatus.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
-	backupStatus.EndWal = pairs["Latest checkpoint's REDO WAL file"]
-	backupStatus.BeginLSN = pairs["Latest checkpoint's REDO location"]
-	backupStatus.EndLSN = pairs["Latest checkpoint's REDO location"]
-	return nil
 }
 
 // isErrorRetryable detects is an error is retryable or not

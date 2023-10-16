@@ -82,7 +82,7 @@ func (r *Backup) validate() field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.Method == BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
-		return append(result, field.Invalid(
+		result = append(result, field.Invalid(
 			field.NewPath("spec", "method"),
 			r.Spec.Method,
 			"Cannot use volumeSnapshot backup method due to missing "+
@@ -90,6 +90,15 @@ func (r *Backup) validate() field.ErrorList {
 				"started the operator, please restart it to enable "+
 				"VolumeSnapshot support",
 		))
+	}
+
+	if r.Spec.Method == BackupMethodBarmanObjectStore && r.Spec.Online {
+		result = append(result,
+			field.Invalid(
+				field.NewPath("spec", "method"),
+				r.Spec.Method,
+				"The online value can be set only for volumeSnapshot method",
+			))
 	}
 
 	return result

@@ -149,6 +149,33 @@ type VolumeSnapshotConfiguration struct {
 	// +kubebuilder:validation:Enum:=none;cluster;backup
 	// +kubebuilder:default:=none
 	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
+
+	// OnlineConfiguration contains the configuration parameters for the online volume snapshot
+	// +kubebuilder:default:={waitForArchive:true,immediateCheckpoint:false}
+	OnlineConfiguration OnlineConfiguration `json:"online,omitempty"`
+}
+
+// OnlineConfiguration contains the configuration parameters for the online volume snapshot
+type OnlineConfiguration struct {
+	// If false, the function will return immediately after the backup is completed,
+	// without waiting for WAL to be archived.
+	// This behavior is only useful with backup software that independently monitors WAL archiving.
+	// Otherwise, WAL required to make the backup consistent might be missing and make the backup useless.
+	// By default or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is
+	// enabled.
+	// On a standby, this means that it will wait only when archive_mode = always.
+	// If write activity on the primary is low, it may be useful to run pg_switch_wal on the primary in order to trigger
+	// an immediate segment switch.
+	// +kubebuilder:default:=true
+	// +optional
+	WaitForArchive bool `json:"waitForArchive,omitempty"`
+	// Control whether the I/O workload for the backup initial checkpoint will
+	// be limited, according to the `checkpoint_completion_target` setting on
+	// the PostgreSQL server. If set to true, an immediate checkpoint will be
+	// used, meaning PostgreSQL will complete the checkpoint as soon as
+	// possible. `false` by default.
+	// +optional
+	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
 }
 
 // ClusterSpec defines the desired state of Cluster

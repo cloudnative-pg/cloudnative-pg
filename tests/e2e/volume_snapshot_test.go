@@ -24,6 +24,7 @@ import (
 	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -116,7 +117,7 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 		})
 
-		Context("Can restore from a Volume Snapshot", Ordered, func() {
+		Context("Snapshots tests that require an object storage", Ordered, func() {
 			// test env constants
 			const (
 				namespacePrefix       = "volume-snapshot-recovery"
@@ -133,12 +134,7 @@ var _ = Describe("Verify Volume Snapshot",
 			)
 			// file constants
 			const (
-				clusterToSnapshot          = filesDir + "/cluster-pvc-snapshot.yaml.template"
-				clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-snapshot-restore.yaml.template"
-			)
-			// database constants
-			const (
-				tableName = "test"
+				clusterToSnapshot = filesDir + "/cluster-pvc-snapshot.yaml.template"
 			)
 
 			var clusterToSnapshotName string
@@ -198,19 +194,6 @@ var _ = Describe("Verify Volume Snapshot",
 					err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
 					Expect(err).ToNot(HaveOccurred())
 				})
-			})
-
-			It("correctly executes PITR with a cold snapshot", func() {
-				DeferCleanup(func() error {
-					if err := os.Unsetenv(snapshotDataEnv); err != nil {
-						return err
-					}
-					if err := os.Unsetenv(snapshotWalEnv); err != nil {
-						return err
-					}
-					err := os.Unsetenv(recoveryTargetTimeEnv)
-					return err
-				})
 
 				By("creating the cluster to snapshot", func() {
 					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
@@ -227,6 +210,25 @@ var _ = Describe("Verify Volume Snapshot",
 						}
 						return connectionStatus, nil
 					}, 60).Should(BeTrue())
+				})
+			})
+
+			It("correctly executes PITR with a cold snapshot", func() {
+				const (
+					tableName                  = "test"
+					clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-snapshot-restore.yaml.template"
+				)
+
+				DeferCleanup(func() error {
+					if err := os.Unsetenv(snapshotDataEnv); err != nil {
+						return err
+					}
+					if err := os.Unsetenv(snapshotWalEnv); err != nil {
+						return err
+					}
+
+					err := os.Unsetenv(recoveryTargetTimeEnv)
+					return err
 				})
 
 				var backup *apiv1.Backup
@@ -301,9 +303,95 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, restoredPrimary)
 				})
 			})
+
+			It("should execute a backup with online set to true", func() {
+				const (
+					tableName                  = "online_test"
+					clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-hot-restore.yaml.template"
+				)
+
+				DeferCleanup(func() error {
+					if err := os.Unsetenv(snapshotDataEnv); err != nil {
+						return err
+					}
+
+					return os.Unsetenv(snapshotWalEnv)
+				})
+
+				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+					// Create a "test" table with values 1,2
+					AssertCreateTestData(namespace, clusterToSnapshotName, tableName, psqlClientPod)
+
+					// Insert 2 more rows which we expect not to be present at the end of the recovery
+					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 3, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 4, psqlClientPod)
+
+					// Close and archive the current WAL file
+					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+				})
+
+				var backup *apiv1.Backup
+				By("creating a snapshot and waiting until it's completed", func() {
+					var err error
+					backupName := fmt.Sprintf("%s-online", clusterToSnapshotName)
+					backup, err = testUtils.CreatBackup(
+						apiv1.Backup{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: namespace,
+								Name:      backupName,
+							},
+							Spec: apiv1.BackupSpec{
+								Target:  apiv1.BackupTargetPrimary,
+								Method:  apiv1.BackupMethodVolumeSnapshot,
+								Cluster: apiv1.LocalObjectReference{Name: clusterToSnapshotName},
+								Online:  true,
+							},
+						},
+						env,
+					)
+					Expect(err).ToNot(HaveOccurred())
+
+					Eventually(func(g Gomega) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      backupName,
+						}, backup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+						g.Expect(backup.Status.LabelFile).ToNot(BeEmpty())
+					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
+				})
+
+				By("fetching the volume snapshots", func() {
+					snapshotList := volumesnapshot.VolumeSnapshotList{}
+					err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
+						utils.ClusterLabelName: clusterToSnapshotName,
+					})
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterSnapshotRestoreFile)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("creating the cluster to be restored through snapshot and PITR", func() {
+					AssertCreateCluster(namespace, clusterToRestoreName, clusterSnapshotRestoreFile, env)
+					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[testUtils.ClusterIsReadySlow], env)
+				})
+
+				By("verifying the correct data exists in the restored cluster", func() {
+					restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
+					Expect(err).ToNot(HaveOccurred())
+					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 4, restoredPrimary)
+				})
+			})
 		})
 
-		Context("Declarative Volume Snapshot", Ordered, func() {
+		Context("Declarative Cold Volume Snapshot", Ordered, func() {
 			// test env constants
 			const (
 				namespacePrefix = "declarative-snapshot-backup"

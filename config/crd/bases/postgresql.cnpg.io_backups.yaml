@@ -68,6 +68,10 @@ spec:
                 - barmanObjectStore
                 - volumeSnapshot
                 type: string
+              online:
+                description: Online if the elected instance should not be taken offline.
+                  Supports only 'spec.target=Primary' with 'spec.method=volumeSnapshot'.
+                type: boolean
               target:
                 description: The policy to decide which instance should perform this
                   backup. If empty, it defaults to `cluster.spec.backup.target`. Available
@@ -235,9 +239,15 @@ spec:
                     description: The pod name
                     type: string
                 type: object
+              labelFile:
+                description: LabelFile used in case of Online backups
+                type: string
               method:
                 description: The backup method being used
                 type: string
+              online:
+                description: Indicates if the backup was executed in the Online mode
+                type: boolean
               phase:
                 description: The last backup status
                 type: string
@@ -329,6 +339,9 @@ spec:
                       type: object
                     type: array
                 type: object
+              spcmapFile:
+                description: SpcmapFile used in case of Online backups
+                type: string
               startedAt:
                 description: When the backup was started
                 format: date-time

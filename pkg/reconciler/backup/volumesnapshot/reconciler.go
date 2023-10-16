@@ -35,6 +35,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -43,9 +45,9 @@ import (
 // Reconciler is an object capable of executing a volume snapshot on a running cluster
 type Reconciler struct {
 	cli                  client.Client
-	shouldFence          bool
 	recorder             record.EventRecorder
 	instanceStatusClient *instance.StatusClient
+	backupClient         *webserver.BackupClient
 }
 
 // ExecutorBuilder is a struct capable of creating a Reconciler
@@ -63,14 +65,9 @@ func NewExecutorBuilder(
 			cli:                  cli,
 			recorder:             recorder,
 			instanceStatusClient: instance.NewStatusClient(),
+			backupClient:         webserver.NewBackupClient(),
 		},
 	}
-}
-
-// FenceInstance instructs if the Reconciler should fence or not the instance while taking the snapshot
-func (e *ExecutorBuilder) FenceInstance(fence bool) *ExecutorBuilder {
-	e.executor.shouldFence = fence
-	return e
 }
 
 // Build returns the Reconciler instance
@@ -147,14 +144,15 @@ func (se *Reconciler) Execute(
 
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
 
+	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
 	// Step 0: check if the snapshots have been created already
-	volumeSnapshots, err := GetBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
+	volumeSnapshots, err := getBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	// Step 1: fencing
-	if len(volumeSnapshots) == 0 && se.shouldFence {
+	if len(volumeSnapshots) == 0 && !backup.Spec.Online {
 		contextLogger.Debug("Checking pre-requisites")
 		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
 			return nil, err
@@ -162,6 +160,17 @@ func (se *Reconciler) Execute(
 
 		if res, err := se.waitForPodToBeFenced(ctx, targetPod); res != nil || err != nil {
 			return res, err
+		}
+	}
+	if len(volumeSnapshots) == 0 && backup.Spec.Online {
+		req := webserver.StartBackupRequest{
+			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.ImmediateCheckpoint,
+			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.WaitForArchive,
+			BackupName:          backup.Name,
+			Force:               true,
+		}
+		if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
+			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
 	}
 
@@ -187,7 +196,91 @@ func (se *Reconciler) Execute(
 		return nil, err
 	}
 
-	return nil, nil
+	if backup.Spec.Online {
+		res, err := se.backupClient.Stop(ctx, targetPod.Status.PodIP)
+		if err != nil {
+			return nil, fmt.Errorf("while stopping the backup client: %w", err)
+		}
+		backup.Status.BeginLSN = res.BeginLSN
+		backup.Status.EndLSN = res.EndLSN
+		backup.Status.SpcmapFile = res.SpcmapFile
+		backup.Status.LabelFile = res.LabelFile
+	}
+
+	backup.Status.SetAsCompleted()
+	backup.Status.Online = backup.Spec.Online
+	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	backup.Status.BackupSnapshotStatus.SetSnapshotElements(snapshots)
+	if err := backupStatusFromSnapshots(snapshots, &backup.Status); err != nil {
+		contextLogger.Error(err, "while enriching the backup status")
+	}
+
+	if err := annotateSnapshotsWithBackupData(ctx, se.cli, snapshots, &backup.Status); err != nil {
+		contextLogger.Error(err, "while enriching the snapshots's status")
+	}
+
+	return nil, postgres.PatchBackupStatusAndRetry(ctx, se.cli, backup)
+}
+
+// AnnotateSnapshots adds labels and annotations to the snapshots using the backup
+// status to facilitate access
+func annotateSnapshotsWithBackupData(
+	ctx context.Context,
+	cli client.Client,
+	snapshots slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	contextLogger := log.FromContext(ctx)
+	for idx := range snapshots {
+		snapshot := &snapshots[idx]
+		oldSnapshot := snapshot.DeepCopy()
+		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
+		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
+
+		if backupStatus.LabelFile != "" {
+			snapshot.Annotations[utils.BackupLabelFileAnnotationName] = backupStatus.LabelFile
+		}
+
+		if backupStatus.SpcmapFile != "" {
+			snapshot.Annotations[utils.BackupSpcmapFileAnnotationName] = backupStatus.SpcmapFile
+		}
+
+		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+			contextLogger.Error(err, "while updating volume snapshot from backup object",
+				"snapshot", snapshot.Name)
+			return err
+		}
+	}
+	return nil
+}
+
+// backupStatusFromSnapshots adds fields to the backup status based on the snapshots
+func backupStatusFromSnapshots(
+	snapshots slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	controldata, err := snapshots.getControldata()
+	if err != nil {
+		return err
+	}
+	pairs := utils.ParsePgControldataOutput(controldata)
+
+	// TODO: calculate wal in case of online backup
+	// the begin/end WAL and LSN are the same, since the instance was fenced
+	// for the snapshot
+	backupStatus.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
+	backupStatus.EndWal = pairs["Latest checkpoint's REDO WAL file"]
+
+	if !backupStatus.Online {
+		backupStatus.BeginLSN = pairs["Latest checkpoint's REDO location"]
+		backupStatus.EndLSN = pairs["Latest checkpoint's REDO location"]
+	}
+
+	return nil
 }
 
 // ensurePodIsFenced checks if the preconditions for the execution of this step are
