@@ -140,7 +140,7 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
 	sed -e "s@\$${CREATED_AT}@$$(LANG=C date -Iseconds -u)@g" | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
-	docker buildx build --no-cache -f bundle.Dockerfile --push -t ${BUNDLE_IMG} . ;\
+	DOCKER_BUILDKIT=1 docker build --push --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMG} . ;\
 	export BUNDLE_IMG="${BUNDLE_IMG}"
 
 olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
@@ -156,7 +156,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	    - Image: ${BUNDLE_IMG}" | envsubst > cloudnative-pg-operator-template.yaml
 	$(OPM) alpha render-template semver -o yaml < cloudnative-pg-operator-template.yaml > catalog/catalog.yaml ;\
 	$(OPM) validate catalog/ ;\
-	DOCKER_BUILDKIT=1 docker buildx build --push -f catalog.Dockerfile -t ${IMAGE_NAME}:catalog-${VERSION} --push . ;\
+	DOCKER_BUILDKIT=1 docker build --push -f catalog.Dockerfile -t ${IMAGE_NAME}:catalog-${VERSION} . ;\
 	echo -e "apiVersion: operators.coreos.com/v1alpha1\n\
 	kind: CatalogSource\n\
 	metadata:\n\

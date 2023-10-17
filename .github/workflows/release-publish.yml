@@ -9,6 +9,7 @@ on:
 
 env:
   GOLANG_VERSION: "1.21.x"
+  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}"
 
 permissions:
   contents: write
@@ -197,11 +198,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set bundle variables
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          version="${tag#v}"
+          LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
+          echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${version}" >> $GITHUB_ENV
+
       - name: Create bundle
         env:
-          IMAGE_NAME: ghcr.io/cloudnative-pg/cloudnative-pg
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
+          BUNDLE_IMG: ${{ env.BUNDLE_IMG }}
         run: |
-          make olm-bundle
+          make olm-catalog
 
       - name: Archive the bundle manifests
         uses: actions/upload-artifact@v3
