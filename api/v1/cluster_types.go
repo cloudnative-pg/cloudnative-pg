@@ -1300,14 +1300,14 @@ const (
 // Import contains the configuration to init a database from a logic snapshot of an externalCluster
 type Import struct {
 	// The source of the import
-	Source ImportSource `json:"source"`
+	Source ImportSource `json:"source,omitempty"`
 
 	// The import type. Can be `microservice` or `monolith`.
 	// +kubebuilder:validation:Enum=microservice;monolith
-	Type SnapshotType `json:"type"`
+	Type SnapshotType `json:"type,omitempty"`
 
 	// The databases to import
-	Databases []string `json:"databases"`
+	Databases []string `json:"databases,omitempty"`
 
 	// The roles to import
 	// +optional
@@ -1321,7 +1321,6 @@ type Import struct {
 
 	// When set to true, only the `pre-data` and `post-data` sections of
 	// `pg_restore` are invoked, avoiding data import. Default: `false`.
-	// +kubebuilder:default:=false
 	// +optional
 	SchemaOnly bool `json:"schemaOnly,omitempty"`
 }

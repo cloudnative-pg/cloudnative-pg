@@ -1320,7 +1320,6 @@ spec:
                               type: string
                             type: array
                           schemaOnly:
-                            default: false
                             description: 'When set to true, only the `pre-data` and
                               `post-data` sections of `pg_restore` are invoked, avoiding
                               data import. Default: `false`.'
@@ -1342,10 +1341,6 @@ spec:
                             - microservice
                             - monolith
                             type: string
-                        required:
-                        - databases
-                        - source
-                        - type
                         type: object
                       localeCType:
                         description: The value to be passed as option `--lc-ctype`
