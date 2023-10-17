@@ -118,7 +118,6 @@ jobs:
           VERSION: ${{ steps.build-meta.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-
       -
         name: Publish Krew
         if: ${{ env.SKIP_KREW == 'false' }}
