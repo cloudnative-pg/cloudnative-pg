@@ -1252,7 +1252,6 @@ type Import struct {
 
 	// When set to true, only the `pre-data` and `post-data` sections of
 	// `pg_restore` are invoked, avoiding data import. Default: `false`.
-	// +kubebuilder:default:=false
 	// +optional
 	SchemaOnly bool `json:"schemaOnly,omitempty"`
 }
