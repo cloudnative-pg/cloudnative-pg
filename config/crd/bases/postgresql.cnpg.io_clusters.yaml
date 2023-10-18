@@ -1320,7 +1320,6 @@ spec:
                               type: string
                             type: array
                           schemaOnly:
-                            default: false
                             description: 'When set to true, only the `pre-data` and
                               `post-data` sections of `pg_restore` are invoked, avoiding
                               data import. Default: `false`.'
