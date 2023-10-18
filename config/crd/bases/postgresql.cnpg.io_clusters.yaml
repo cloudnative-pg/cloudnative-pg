@@ -1341,6 +1341,10 @@ spec:
                             - microservice
                             - monolith
                             type: string
+                        required:
+                        - databases
+                        - source
+                        - type
                         type: object
                       localeCType:
                         description: The value to be passed as option `--lc-ctype`

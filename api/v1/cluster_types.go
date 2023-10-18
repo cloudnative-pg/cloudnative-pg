@@ -1300,14 +1300,14 @@ const (
 // Import contains the configuration to init a database from a logic snapshot of an externalCluster
 type Import struct {
 	// The source of the import
-	Source ImportSource `json:"source,omitempty"`
+	Source ImportSource `json:"source"`
 
 	// The import type. Can be `microservice` or `monolith`.
 	// +kubebuilder:validation:Enum=microservice;monolith
-	Type SnapshotType `json:"type,omitempty"`
+	Type SnapshotType `json:"type"`
 
 	// The databases to import
-	Databases []string `json:"databases,omitempty"`
+	Databases []string `json:"databases"`
 
 	// The roles to import
 	// +optional
