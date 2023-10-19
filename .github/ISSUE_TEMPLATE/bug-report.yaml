@@ -46,6 +46,22 @@ body:
         - 1.25
         - 1.24 (unsupported)
         - 1.23 (unsupported)
+  - type: dropdown
+    id: k8s_environment
+    attributes:
+      label: What is your Kubernetes environment?
+      options:
+        - Self-managed
+        - Cloud: Amazon EKS
+        - Cloud: Google GKE
+        - Cloud: Azure AKS
+        - Cloud: Other
+  - type: textarea
+    id: spec
+    attributes:
+      label: Cluster definition
+      description: Please copy and paste the CRD of the cluster
+      render: shell
   - type: textarea
     id: logs
     attributes:
