@@ -120,7 +120,7 @@ jobs:
         if: ${{ env.SKIP_KREW == 'false' }}
         uses: rajatjindal/krew-release-bot@v0.0.46
         with:
-          krew_template_file: dist/cnpg.yaml
+          krew_template_file: dist/krew/cnpg.yaml
       -
         name: Docker meta
         id: docker-meta
