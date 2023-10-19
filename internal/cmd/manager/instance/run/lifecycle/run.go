@@ -52,12 +52,12 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 
 		// if the instance is marked as fenced we don't need to start it at all
 		if i.instance.IsFenced() {
-			log.Info("Instance is fenced, won't start postgres right now")
+			contextLogger.Info("Instance is fenced, won't start postgres right now")
 			return
 		}
 
-		i.instance.LogPgControldata("postmaster start up")
-		defer i.instance.LogPgControldata("postmaster has exited")
+		i.instance.LogPgControldata(ctx, "postmaster start up")
+		defer i.instance.LogPgControldata(ctx, "postmaster has exited")
 
 		streamingCmd, err := i.instance.Run()
 		if err != nil {
@@ -67,7 +67,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		}
 
 		// once the database will be up we'll connect and setup everything required
-		err = configureInstancePermissions(i.instance)
+		err = configureInstancePermissions(ctx, i.instance)
 		if err != nil {
 			contextLogger.Error(err, "Unable to update PostgreSQL roles and permissions")
 			errChan <- err
@@ -86,7 +86,8 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 
 // ConfigureInstancePermissions creates the expected users and databases in a new
 // PostgreSQL instance
-func configureInstancePermissions(instance *postgres.Instance) error {
+func configureInstancePermissions(ctx context.Context, instance *postgres.Instance) error {
+	contextLogger := log.FromContext(ctx)
 	var err error
 	isPrimary, err := instance.IsPrimary()
 	if err != nil {
@@ -106,14 +107,14 @@ func configureInstancePermissions(instance *postgres.Instance) error {
 		return fmt.Errorf("while getting a connection to the instance: %w", err)
 	}
 
-	log.Debug("Verifying connection to DB")
+	contextLogger.Debug("Verifying connection to DB")
 	err = instance.WaitForSuperuserConnectionAvailable()
 	if err != nil {
-		log.Error(err, "DB not available")
+		contextLogger.Error(err, "DB not available")
 		os.Exit(1)
 	}
 
-	log.Debug("Validating DB configuration")
+	contextLogger.Debug("Validating DB configuration")
 
 	// A transaction is required to temporarily disable synchronous replication
 	tx, err := db.Begin()
