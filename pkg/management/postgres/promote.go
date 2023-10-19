@@ -17,6 +17,7 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -28,10 +29,12 @@ import (
 
 // PromoteAndWait promotes this instance, and wait DefaultPgCtlTimeoutForPromotion
 // seconds for it to happen
-func (instance *Instance) PromoteAndWait() error {
+func (instance *Instance) PromoteAndWait(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	instance.ShutdownConnections()
 
-	instance.LogPgControldata("promote")
+	instance.LogPgControldata(ctx, "promote")
 
 	options := []string{
 		"-D",
@@ -41,7 +44,7 @@ func (instance *Instance) PromoteAndWait() error {
 		"-t " + strconv.Itoa(int(instance.PgCtlTimeoutForPromotion)),
 	}
 
-	log.Info("Promoting instance", "pgctl_options", options)
+	contextLogger.Info("Promoting instance", "pgctl_options", options)
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
@@ -52,7 +55,7 @@ func (instance *Instance) PromoteAndWait() error {
 	timeLimit := time.Now().Add(1 * time.Minute)
 	for {
 		if time.Now().After(timeLimit) {
-			log.Info("The standby.signal file still exists but timeout reached, " +
+			contextLogger.Info("The standby.signal file still exists but timeout reached, " +
 				"error during PostgreSQL instance promotion")
 			return fmt.Errorf("standby.signal still existent")
 		}
@@ -64,7 +67,7 @@ func (instance *Instance) PromoteAndWait() error {
 		time.Sleep(1 * time.Second)
 	}
 
-	log.Info("Requesting a checkpoint")
+	contextLogger.Info("Requesting a checkpoint")
 
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
@@ -82,7 +85,7 @@ func (instance *Instance) PromoteAndWait() error {
 		return fmt.Errorf("checkpoint after instance promotion: %v", err)
 	}
 
-	log.Info("The PostgreSQL instance has been promoted successfully")
+	contextLogger.Info("The PostgreSQL instance has been promoted successfully")
 
 	return nil
 }
