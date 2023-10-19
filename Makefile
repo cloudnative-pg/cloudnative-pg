@@ -237,7 +237,10 @@ go-mod-check: ## Check if there's any dirty change after `go mod tidy`
 	go mod tidy ;\
 	git diff --exit-code go.mod go.sum
 
-checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint ## Runs all the checks on the project.
+run-govulncheck: govulncheck ## Check if there's any vulnerability with the current Go version
+	govulncheck ./...
+
+checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck ## Runs all the checks on the project.
 
 ##@ Documentation
 
@@ -349,3 +352,7 @@ OPM=$(GOBIN)/opm
 else
 OPM=$(shell which opm)
 endif
+
+.PHONY: govulncheck
+govulncheck: ## Download and install govulncheck
+	go install golang.org/x/vuln/cmd/govulncheck@latest
