@@ -246,21 +246,21 @@ func (instance *Instance) GetSmartShutdownTimeout() int32 {
 type InstanceCommand string
 
 const (
-	// RestartSmartFast means the instance has to be restarted by first issuing
+	// restartSmartFast means the instance has to be restarted by first issuing
 	// a smart shutdown and in case it doesn't work, a fast shutdown
-	RestartSmartFast InstanceCommand = "RestartSmartFast"
+	restartSmartFast InstanceCommand = "RestartSmartFast"
 
-	// FenceOn means the instance has to be restarted by first issuing
+	// fenceOn means the instance has to be restarted by first issuing
 	// a smart shutdown and in case it doesn't work, a fast shutdown
-	FenceOn InstanceCommand = "FenceOn"
+	fenceOn InstanceCommand = "FenceOn"
 
-	// FenceOff means the instance has to be restarted by first issuing
+	// fenceOff means the instance has to be restarted by first issuing
 	// a smart shutdown and in case it doesn't work, a fast shutdown
-	FenceOff InstanceCommand = "FenceOff"
+	fenceOff InstanceCommand = "FenceOff"
 
-	// ShutDownFastImmediate means the instance has to be shut down by first
+	// shutDownFastImmediate means the instance has to be shut down by first
 	// issuing a fast shut down and in case of errors an immediate one
-	ShutDownFastImmediate InstanceCommand = "ShutDownFastImmediate"
+	shutDownFastImmediate InstanceCommand = "ShutDownFastImmediate"
 )
 
 // NewInstance creates a new Instance object setting the defaults
@@ -982,7 +982,7 @@ func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
 // RequestFastImmediateShutdown request the lifecycle manager to shut down
 // PostgreSQL using the fast strategy and then the immediate strategy.
 func (instance *Instance) RequestFastImmediateShutdown() {
-	instance.instanceCommandChan <- ShutDownFastImmediate
+	instance.instanceCommandChan <- shutDownFastImmediate
 }
 
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
@@ -1003,12 +1003,12 @@ func (instance *Instance) RequestAndWaitRestartSmartFast() error {
 // requestRestartSmartFast request the lifecycle manager to restart
 // the postmaster
 func (instance *Instance) requestRestartSmartFast() {
-	instance.instanceCommandChan <- RestartSmartFast
+	instance.instanceCommandChan <- restartSmartFast
 }
 
 // RequestFencingOn request the lifecycle manager to shut down postgres and enable fencing
 func (instance *Instance) RequestFencingOn() {
-	instance.instanceCommandChan <- FenceOn
+	instance.instanceCommandChan <- fenceOn
 }
 
 // RequestAndWaitFencingOff will request to remove the fencing
@@ -1030,7 +1030,7 @@ func (instance *Instance) RequestAndWaitFencingOff() error {
 
 // requestFencingOff request the lifecycle manager to remove the fencing and restart postgres if needed
 func (instance *Instance) requestFencingOff() {
-	instance.instanceCommandChan <- FenceOff
+	instance.instanceCommandChan <- fenceOff
 }
 
 // waitForInstanceRestarted waits until the instance reports being started
@@ -1088,7 +1088,7 @@ func (instance *Instance) HandleInstanceCommandRequests(
 ) (restartNeeded bool, err error) {
 	if instance.IsFenced() {
 		switch req {
-		case FenceOff:
+		case fenceOff:
 			log.Info("Fence lifting request received, will proceed with restarting the instance if needed")
 			instance.SetFencing(false)
 			return true, nil
@@ -1098,16 +1098,16 @@ func (instance *Instance) HandleInstanceCommandRequests(
 		}
 	}
 	switch req {
-	case FenceOn:
+	case fenceOn:
 		log.Info("Fencing request received, will proceed shutting down the instance")
 		instance.SetFencing(true)
 		if err := instance.TryShuttingDownFastImmediate(); err != nil {
 			return false, fmt.Errorf("while shutting down the instance to fence it: %w", err)
 		}
 		return false, nil
-	case RestartSmartFast:
+	case restartSmartFast:
 		return true, instance.TryShuttingDownSmartFast()
-	case ShutDownFastImmediate:
+	case shutDownFastImmediate:
 		if err := instance.TryShuttingDownFastImmediate(); err != nil {
 			log.Error(err, "error shutting down instance, proceeding")
 		}
