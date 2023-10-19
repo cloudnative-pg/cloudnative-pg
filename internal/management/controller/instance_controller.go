@@ -191,7 +191,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	if reloadNeeded && !restarted {
 		contextLogger.Info("reloading the instance")
-		if err = r.instance.Reload(); err != nil {
+		if err = r.instance.Reload(ctx); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
 		}
 		if err = r.processConfigReloadAndManageRestart(ctx, cluster); err != nil {
@@ -1099,7 +1099,7 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 
 	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
 	// I must promote my instance here
-	err := r.instance.PromoteAndWait()
+	err := r.instance.PromoteAndWait(ctx)
 	if err != nil {
 		return fmt.Errorf("error promoting instance: %w", err)
 	}
