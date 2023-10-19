@@ -244,7 +244,13 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
 		return err
 	}
-
+	// we need a migration here, otherwise the server will not start up if
+	// we recover from a base which has postgresql.auto.conf
+	// the override.conf and include statement is present, what we need to do is to
+	// migrate the content
+	if _, err := migratePostgresAutoConfFile(ctx, info.GetInstance(), true); err != nil {
+		return err
+	}
 	if cluster.IsReplica() {
 		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 		if !ok {
@@ -600,7 +606,7 @@ func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) err
 		}
 
 		err = os.WriteFile(
-			path.Join(info.PgData, "postgresql.auto.conf"),
+			path.Join(info.PgData, constants.PostgresqlOverrideConfigurationFile),
 			[]byte(""),
 			0o600)
 		if err != nil {
@@ -708,10 +714,10 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	}
 
 	err = fileutils.CopyFile(
-		path.Join(temporaryInitInfo.PgData, "postgresql.auto.conf"),
-		path.Join(info.PgData, "postgresql.auto.conf"))
+		path.Join(temporaryInitInfo.PgData, constants.PostgresqlOverrideConfigurationFile),
+		path.Join(info.PgData, constants.PostgresqlOverrideConfigurationFile))
 	if err != nil {
-		return fmt.Errorf("while creating postgresql.auto.conf: %w", err)
+		return fmt.Errorf("while creating %v: %w", constants.PostgresqlOverrideConfigurationFile, err)
 	}
 
 	// Disable SSL as we still don't have the required certificates
@@ -783,7 +789,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 	if majorVersion >= 12 {
 		primaryConnInfo := info.GetPrimaryConnInfo()
 		slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-		_, err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo, slotName)
+		_, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName)
 		if err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}
