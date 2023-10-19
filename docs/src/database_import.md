@@ -1,15 +1,15 @@
 # Importing Postgres databases
 
-This section describes how to import one or more existing PostgreSQL
-databases inside a brand new CloudNativePG cluster.
+You can import one or more existing PostgreSQL
+databases inside a new CloudNativePG cluster.
 
-The import operation is based on the concept of online logical backups in PostgreSQL,
-and relies on `pg_dump` via a network connection to the origin host, and `pg_restore`.
+The import operation is based on the concept of online logical backups in PostgreSQL.
+It relies on `pg_dump`, by way of a network connection to the origin host, and `pg_restore`.
 Thanks to native Multi-Version Concurrency Control (MVCC) and snapshots,
 PostgreSQL enables taking consistent backups over the network, in a concurrent
 manner, without stopping any write activity.
 
-Logical backups are also the most common, flexible and reliable technique to
+Logical backups are also the most common, flexible, and reliable technique to
 perform major upgrades of PostgreSQL versions.
 
 As a result, the instructions in this section are suitable for both:

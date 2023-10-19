@@ -1,4 +1,4 @@
-# Appendix A - Common object stores for backups
+# Common object stores for backups
 
 You can store the [backup](../backup.md) files in any service that is supported
 by the Barman Cloud infrastructure. That is:

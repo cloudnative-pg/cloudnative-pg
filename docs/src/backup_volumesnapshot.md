@@ -1,80 +1,80 @@
 # Backup on volume snapshots
 
 !!! Warning
-    The initial release of volume snapshots (version 1.21.0) only supported
+    The initial release of volume snapshots (version 1.21.0) supported only
     cold backups, which required fencing of the instance. This limitation
-    has been waived starting with version 1.21.1. Given the minimal impact of
-    the change on the code, maintainers have decided to backport this feature
-    immediately instead of waiting for version 1.22.0 to be out, and make online
-    backups the default behavior on volume snapshots too. If you are planning
-    to rely instead on cold backups, make sure you follow the instructions below.
+    was waived starting with version 1.21.1. Given the minimal impact of
+    the change on the code, maintainers decided to back port this feature
+    immediately instead of waiting for version 1.22.0, and make online
+    backups the default behavior on volume snapshots, too. If you're planning
+    to rely instead on cold backups, make sure to follow the instructions below.
 
 !!! Warning
-    As noted in the [backup document](backup.md), a cold snapshot explicitly
-    set to target the primary will result in the primary being fenced for
+    As noted in the [Backup](backup.md), a cold snapshot explicitly
+    set to target the primary results in the primary being fenced for
     the duration of the backup, rendering the cluster read-only during that
     For safety, in a cluster already containing fenced instances, a cold
     snapshot is rejected.
 
 CloudNativePG is one of the first known cases of database operators that
-directly leverages the Kubernetes native Volume Snapshot API for both
-backup and recovery operations, in an entirely declarative way.
+directly leverages the Kubernetes native volume snapshot API for both
+backup and recovery operations in an entirely declarative way.
 
-## About standard Volume Snapshots
+## About standard volume snapshots
 
 Volume snapshotting was first introduced in
 [Kubernetes 1.12 (2018) as alpha](https://kubernetes.io/blog/2018/10/09/introducing-volume-snapshot-alpha-for-kubernetes/),
 promoted to [beta in 1.17 (2019)](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/),
 and [moved to GA in 1.20 (2020)](https://kubernetes.io/blog/2020/12/10/kubernetes-1.20-volume-snapshot-moves-to-ga/).
-It’s now stable, widely available, and standard, providing 3 custom resource
-definitions: `VolumeSnapshot`, `VolumeSnapshotContent` and
+It’s now stable, widely available, and standard, providing three custom resource
+definitions: `VolumeSnapshot`, `VolumeSnapshotContent`, and
 `VolumeSnapshotClass`.
 
 This Kubernetes feature defines a generic interface for:
 
-* the creation of a new volume snapshot, starting from a PVC
-* the deletion of an existing snapshot
-* the creation of a new volume from a snapshot
+* Creating a new volume snapshot, starting from a PVC
+* Deleting an existing snapshot
+* Creating a new volume from a snapshot
 
-Kubernetes delegates the actual implementation to the underlying CSI drivers
-(not all of them support volume snapshots). Normally, storage classes that
-provide volume snapshotting support **incremental and differential block level
-backup in a transparent way for the application**, which can delegate the
+Kubernetes delegates the actual implementation to the underlying CSI drivers.
+(Not all of them support volume snapshots.) Normally, storage classes that
+provide volume snapshotting support incremental and differential block-level
+backup in a transparent way for the application. The application can delegate the
 complexity and the independent management down the stack, including
 cross-cluster availability of the snapshots.
 
 ## Requirements
 
-For Volume Snapshots to work with a CloudNativePG cluster, you need to ensure
+For volume snapshots to work with a CloudNativePG cluster, you need to ensure
 that each storage class used to dynamically provision the PostgreSQL volumes
-(namely, `storage` and `walStorage` sections) support volume snapshots.
+(namely, `storage` and `walStorage` sections) supports volume snapshots.
 
-Given that instructions vary from storage class to storage class, please
-refer to the documentation of the specific storage class and related CSI
-drivers you have deployed in your Kubernetes system.
+Given that instructions vary from storage class to storage class,
+see the documentation of the specific storage class and related CSI
+drivers you deployed in your Kubernetes system.
 
-Normally, it is the [`VolumeSnapshotClass`](https://kubernetes.io/docs/concepts/storage/volume-snapshot-classes/)
-that is responsible to ensure that snapshots can be taken from persistent
-volumes of a given storage class, and managed as `VolumeSnapshot` and
+Normally, it's the [`VolumeSnapshotClass`](https://kubernetes.io/docs/concepts/storage/volume-snapshot-classes/)
+that's responsible for ensuring that snapshots can be taken from persistent
+volumes of a given storage class and managed as `VolumeSnapshot` and
 `VolumeSnapshotContent` resources.
 
 !!! Important
-    It is your responsibility to verify with the third party vendor
-    that volume snapshots are supported. CloudNativePG only interacts
-    with the Kubernetes API on this matter and we cannot support issues
+    It's your responsibility to verify with the third-party vendor
+    that volume snapshots are supported. CloudNativePG interacts only
+    with the Kubernetes API on this matter. We can't support issues
     at the storage level for each specific CSI driver.
 
-## How to configure Volume Snapshot backups
+## How to configure volume snapshot backups
 
-CloudNativePG allows you to configure a given Postgres cluster for Volume
-Snapshot backups through the `backup.volumeSnapshot` stanza.
+CloudNativePG allows you to configure a given Postgres cluster for volume
+snapshot backups through the `backup.volumeSnapshot` stanza.
 
 !!! Info
-    Please refer to [`VolumeSnapshotConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
+    See [`VolumeSnapshotConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
     in the API reference for a full list of options.
 
-A generic example with volume snapshots (assuming that PGDATA and WALs share
-the same storage class) is the following:
+This example shows volume snapshots, assuming that PGDATA and WALs share
+the same storage class:
 
 ``` yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -100,24 +100,24 @@ spec:
        # ...
 ```
 
-As you can see, the `backup` section contains both the `volumeSnapshot` stanza
+The `backup` section contains both the `volumeSnapshot` stanza
 (controlling physical base backups on volume snapshots) and the
 `barmanObjectStore` one (controlling the [WAL archive](wal_archiving.md)).
 
 !!! Info
-    Once you have defined the `barmanObjectStore`, you can decide to use
+    After you define the `barmanObjectStore`, you can opt to use
     both volume snapshot and object store backup strategies simultaneously
     to take physical backups.
 
 The `volumeSnapshot.className` option allows you to reference the default
-`VolumeSnapshotClass` object used for all the storage volumes you have
+`VolumeSnapshotClass` object used for all the storage volumes you
 defined in your PostgreSQL cluster.
 
 !!! Info
-    In case you are using a different storage class for `PGDATA` and
+    If you're using a different storage class for `PGDATA` and
     WAL files, you can specify a separate `VolumeSnapshotClass` for
-    that volume through the `walClassName` option (which defaults to
-    the same value as `className`).
+    that volume through the `walClassName` option, which defaults to
+    the same value as `className`.
 
 Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
@@ -217,55 +217,54 @@ spec:
 ## Persistence of volume snapshot objects
 
 By default, `VolumeSnapshot` objects created by CloudNativePG are retained after
-deleting the `Backup` object that originated them, or the `Cluster` they refer to.
+deleting the `Backup` object that originated them, or the cluster they refer to.
 Such behavior is controlled by the `.spec.backup.volumeSnapshot.snapshotOwnerReference`
-option which accepts the following values:
+option, which accepts the following values:
 
-- `none`: no ownership is set, meaning that `VolumeSnapshot` objects persist
-   after the `Backup` and/or the `Cluster` resources are removed
-- `backup`: the `VolumeSnapshot` object is owned by the `Backup` resource that
-   originated it, and when the backup object is removed, the volume snapshot is
-   also removed
-- `cluster`: the `VolumeSnapshot` object is owned by the `Cluster` resource that
-   is backed up, and when the Postgres cluster is removed, the volume snapshot is
-   also removed
+- `none` – No ownership is set, meaning that `VolumeSnapshot` objects persist
+   after the `Backup` or `Cluster` resources are removed.
+- `backup` – The `VolumeSnapshot` object is owned by the `Backup` resource that
+   originated it. When the backup object is removed, the volume snapshot is
+   also removed.
+- `cluster` – The `VolumeSnapshot` object is owned by the `Cluster` resource that's
+   backed up. When the Postgres cluster is removed, the volume snapshot is
+   also removed.
 
-In case a `VolumeSnapshot` is deleted, the `deletionPolicy` specified in the
+If a `VolumeSnapshot` is deleted, the `deletionPolicy` specified in the
 `VolumeSnapshotContent` is evaluated:
 
-- if set to `Retain`, the `VolumeSnapshotContent` object is kept
-- if set to `Delete`, the `VolumeSnapshotContent` object is removed as well
+- If set to `Retain`, the `VolumeSnapshotContent` object is kept.
+- If set to `Delete`, the `VolumeSnapshotContent` object is removed as well.
 
 !!! Warning
-    `VolumeSnapshotContent` objects do not keep all the information regarding the
-    backup and the cluster they refer to (like the annotations and labels that
-    are contained in the `VolumeSnapshot` object). Although possible, restoring
+    Like the annotations and labels that are contained in the `VolumeSnapshot` object, `VolumeSnapshotContent` objects don't keep all the information regarding the
+    backup and the cluster they refer to. Although possible, restoring
     from just this kind of object might not be straightforward. For this reason,
-    our recommendation is to always backup the `VolumeSnapshot` definitions,
-    even using a Kubernetes level data protection solution.
+    we recommend always backing up the `VolumeSnapshot` definitions,
+    even using a Kubernetes-level data-protection solution.
 
 The value in `VolumeSnapshotContent` is determined by the `deletionPolicy` set
 in the corresponding `VolumeSnapshotClass` definition, which is
 referenced in the `.spec.backup.volumeSnapshot.className` option.
 
-Please refer to the [Kubernetes documentation on Volume Snapshot Classes](https://kubernetes.io/docs/concepts/storage/volume-snapshot-classes/)
+See [Volume Snapshot Classes](https://kubernetes.io/docs/concepts/storage/volume-snapshot-classes/) in the Kubernetes documentation 
 for details on this standard behavior.
 
 ## Example
 
-The following example shows how to configure volume snapshot base backups on an
+This example shows how to configure volume snapshot base backups on an
 EKS cluster on AWS using the `ebs-sc` storage class and the `csi-aws-vsc`
 volume snapshot class.
 
 !!! Important
-    If you are interested in testing the example, please read
+    If you're interested in testing the example, see
     ["Volume Snapshots" for the Amazon Elastic Block Store (EBS) CSI driver](https://github.com/kubernetes-sigs/aws-ebs-csi-driver/tree/master/examples/kubernetes/snapshot) <!-- wokeignore:rule=master -->
     for detailed instructions on the installation process for the storage class and the snapshot class.
 
 
-The following manifest creates a `Cluster` that is ready to be used for volume
-snapshots and that stores the WAL archive in a S3 bucket via IAM role for the
-Service Account (IRSA, see [AWS S3](appendixes/object_stores.md#aws-s3)):
+This manifest creates a cluster that's ready to be used for volume
+snapshots and that stores the WAL archive in an S3 bucket via the IAM role for the
+service account (IRSA, see [AWS S3](appendixes/object_stores.md#aws-s3)):
 
 ``` yaml
 apiVersion: postgresql.cnpg.io/v1

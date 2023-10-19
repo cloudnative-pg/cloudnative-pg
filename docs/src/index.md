@@ -1,6 +1,6 @@
 # CloudNativePG
 
-**CloudNativePG** is an open source
+CloudNativePG is an open source
 [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 designed to manage [PostgreSQL](https://www.postgresql.org/) workloads on any
 supported [Kubernetes](https://kubernetes.io) cluster running in private,
