@@ -34,30 +34,29 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	cluster *apiv1.Cluster,
 	cli client.Client,
 ) (changed bool, err error) {
-	// The "archive_mode" setting was used to be overridden in the "postgresql.auto.conf"
-	// if the server was a designated primary. We need make sure to remove it
-	// and fall back on the value defined in "custom.conf".
-	// TODO: Removed this code together the RemoveArchiveModeFromPostgresAutoConf function
-	// TODO: when enough time passed since 1.12 release
-	changed, err = removeArchiveModeFromPostgresAutoConf(instance.PgData)
+	// TODO: Remove this code when enough time has passed since 1.21 release
+	//       This is due to the operator switching from postgresql.auto.conf
+	//       to override.conf for coordinating replication configuration
+	changed, err = migratePostgresAutoConfFile(ctx, instance, false)
 	if err != nil {
 		return changed, err
 	}
 
 	primary, err := instance.IsPrimary()
 	if err != nil {
-		return false, err
+		return changed, err
 	}
 
 	if primary {
-		return false, nil
+		return changed, nil
 	}
 
 	if cluster.IsReplica() && cluster.Status.TargetPrimary == instance.PodName {
-		return instance.writeReplicaConfigurationForDesignatedPrimary(ctx, cli, cluster)
+		result, err := instance.writeReplicaConfigurationForDesignatedPrimary(ctx, cli, cluster)
+		return changed || result, err
 	}
-
-	return instance.writeReplicaConfigurationForReplica(cluster)
+	result, err := instance.writeReplicaConfigurationForReplica(cluster)
+	return changed || result, err
 }
 
 func (instance *Instance) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
