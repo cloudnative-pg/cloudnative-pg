@@ -20,12 +20,10 @@ package configfile
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/lib/pq"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/cnpgerrors"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
@@ -38,98 +36,139 @@ func UpdatePostgresConfigurationFile(
 	options map[string]string,
 	managedOptions ...string,
 ) (changed bool, err error) {
-	rawCurrentContent, err := fileutils.ReadFile(fileName)
+	lines, err := fileutils.ReadFileLines(fileName)
 	if err != nil {
 		return false, fmt.Errorf("error while reading content of %v: %w", fileName, err)
 	}
 
-	updatedContent := string(rawCurrentContent)
-
+	optionsToRemove := make([]string, 0, len(managedOptions))
 	for _, option := range managedOptions {
 		if _, hasOption := options[option]; !hasOption {
-			updatedContent = RemoveOptionFromConfigurationContents(updatedContent, option)
+			optionsToRemove = append(optionsToRemove, option)
 		}
 	}
+	lines = RemoveOptionsFromConfigurationContents(lines, optionsToRemove...)
 
-	updatedContent, err = UpdateConfigurationContents(updatedContent, options)
+	lines, err = UpdateConfigurationContents(lines, options)
 	if err != nil {
 		return false, fmt.Errorf("error while updating configuration from %v: %w", fileName, err)
 	}
-	return fileutils.WriteStringToFile(fileName, updatedContent)
+	return fileutils.WriteLinesToFile(fileName, lines)
 }
 
 // UpdateConfigurationContents search and replace options in a configuration file whose
 // content is passed
-func UpdateConfigurationContents(content string, options map[string]string) (string, error) {
-	lines := splitLines(content)
-	if len(lines) >= math.MaxInt-len(options) {
-		return "", fmt.Errorf("could not updateConfigurationContents: %w",
-			cnpgerrors.ErrMemoryAllocation)
-	}
-	resultLength := len(lines) + len(options)
-	// Change matching existing lines
-	resultContent := make([]string, 0, resultLength)
+func UpdateConfigurationContents(lines []string, options map[string]string) ([]string, error) {
 	foundKeys := stringset.New()
+	index := 0
 	for _, line := range lines {
-		// Keep empty lines and comments
-		trimLine := strings.TrimSpace(line)
-		if len(trimLine) == 0 || trimLine[0] == '#' {
-			resultContent = append(resultContent, line)
-			continue
-		}
-
-		kv := strings.SplitN(trimLine, "=", 2)
+		kv := strings.SplitN(strings.TrimSpace(line), "=", 2)
 		key := strings.TrimSpace(kv[0])
 
 		// If we find a line containing one of the option we have to manage,
 		// we replace it with the provided content
-		if value, ok := options[key]; ok {
+		if value, has := options[key]; has {
 			// We output only the first occurrence of the option,
 			// discarding further occurrences
-			if !foundKeys.Has(key) {
-				foundKeys.Put(key)
-				resultContent = append(resultContent, key+" = "+pq.QuoteLiteral(value))
+			if foundKeys.Has(key) {
+				continue
 			}
+
+			foundKeys.Put(key)
+			lines[index] = key + " = " + pq.QuoteLiteral(value)
+			index++
 			continue
 		}
 
-		resultContent = append(resultContent, line)
+		lines[index] = line
+		index++
 	}
+	lines = lines[:index]
 
 	// Append missing options to the end of the file
 	for key, value := range options {
 		if !foundKeys.Has(key) {
-			resultContent = append(resultContent, key+" = "+pq.QuoteLiteral(value))
+			lines = append(lines, key+" = "+pq.QuoteLiteral(value))
 		}
 	}
 
-	return strings.Join(resultContent, "\n") + "\n", nil
+	return lines, nil
 }
 
-// RemoveOptionFromConfigurationContents deletes the lines containing the given option a configuration file whose
-// content is passed
-func RemoveOptionFromConfigurationContents(content string, option string) string {
-	resultContent := []string{}
+// RemoveOptionsFromConfigurationContents deletes all the lines containing one of the given options
+// from the provided configuration content
+func RemoveOptionsFromConfigurationContents(lines []string, options ...string) []string {
+	optionSet := stringset.From(options)
 
-	for _, line := range splitLines(content) {
-		// Keep empty lines and comments
-		trimLine := strings.TrimSpace(line)
-		if len(trimLine) == 0 || trimLine[0] == '#' {
-			resultContent = append(resultContent, line)
-			continue
-		}
-
-		kv := strings.SplitN(trimLine, "=", 2)
+	index := 0
+	for _, line := range lines {
+		kv := strings.SplitN(strings.TrimSpace(line), "=", 2)
 		key := strings.TrimSpace(kv[0])
 
-		// If we find a line containing the input option,
-		// we skip it
-		if key == option {
+		if optionSet.Has(key) {
 			continue
 		}
+		lines[index] = line
+		index++
+	}
+	lines = lines[:index]
 
-		resultContent = append(resultContent, line)
+	return lines
+}
+
+// ReadLinesFromConfigurationContents read the options from the configuration file as a map
+func ReadLinesFromConfigurationContents(content []string, options ...string) []string {
+	result := make([]string, 0, len(options))
+	for _, line := range content {
+		kv := strings.SplitN(strings.TrimSpace(line), "=", 2)
+		key := strings.TrimSpace(kv[0])
+
+		for _, option := range options {
+			if key == option {
+				result = append(result, line)
+				break
+			}
+		}
 	}
 
-	return strings.Join(resultContent, "\n") + "\n"
+	return result
+}
+
+// EnsureIncludes makes sure the passed PostgreSQL configuration file has an include directive
+// to every filesToInclude.
+func EnsureIncludes(fileName string, filesToInclude ...string) (changed bool, err error) {
+	includeLinesToAdd := make(map[string]string, len(filesToInclude))
+	for _, fileToInclude := range filesToInclude {
+		includeLinesToAdd[fileToInclude] = fmt.Sprintf("include '%v'", fileToInclude)
+	}
+
+	lines, err := fileutils.ReadFileLines(fileName)
+	if err != nil {
+		return false, fmt.Errorf("error while reading lines of %v: %w", fileName, err)
+	}
+
+	for _, line := range lines {
+		trimLine := strings.TrimSpace(line)
+		for targetFile, includeLine := range includeLinesToAdd {
+			if trimLine == includeLine {
+				delete(includeLinesToAdd, targetFile)
+			}
+		}
+	}
+
+	if len(includeLinesToAdd) == 0 {
+		return false, nil
+	}
+
+	for _, fileToInclude := range filesToInclude {
+		if includeLine, present := includeLinesToAdd[fileToInclude]; present {
+			lines = append(lines,
+				"",
+				fmt.Sprintf("# load CloudNativePG %s configuration", fileToInclude),
+				includeLine,
+			)
+		}
+	}
+
+	return fileutils.WriteLinesToFile(fileName, lines)
 }

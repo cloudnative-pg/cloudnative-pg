@@ -39,7 +39,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	}
 
 	signalPath := filepath.Join(instance.PgData, "standby.signal")
-	postgresAutoConf := filepath.Join(instance.PgData, "postgresql.auto.conf")
+	postgresOverrideConf := filepath.Join(instance.PgData, "override.conf")
 	pgControl := filepath.Join(instance.PgData, "global", "pg_control")
 	pgControlOld := pgControl + ".old"
 
@@ -56,7 +56,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 
 	AfterEach(func() {
 		_ = os.Remove(signalPath)
-		_ = os.Remove(postgresAutoConf)
+		_ = os.Remove(postgresOverrideConf)
 		_ = os.Remove(pgControl)
 		_ = os.Remove(pgControlOld)
 	})
@@ -78,7 +78,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		assertFileExists(signalPath, "standby.signal")
-		assertFileExists(postgresAutoConf, "postgresql.auto.conf")
+		assertFileExists(postgresOverrideConf, "override.conf")
 	})
 
 	It("should correctly restore pg_control from the pg_control.old file", func() {
