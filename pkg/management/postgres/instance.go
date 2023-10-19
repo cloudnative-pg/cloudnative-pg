@@ -427,12 +427,14 @@ func (instance *Instance) Shutdown(options ShutdownOptions) error {
 // TryShuttingDownSmartFast first tries to shut down the instance with mode smart,
 // then in case of failure or the given timeout expiration,
 // it will issue a fast shutdown request and wait for it to complete.
-func (instance *Instance) TryShuttingDownSmartFast() error {
+func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	var err error
 
 	smartTimeout := instance.SmartStopDelay
 	if instance.MaxStopDelay <= instance.SmartStopDelay {
-		log.Warning("Ignoring smartStopDelay",
+		contextLogger.Warning("Ignoring smartStopDelay",
 			"smartStopDelay", instance.SmartStopDelay,
 			"maxStopDelay", instance.MaxStopDelay,
 		)
@@ -440,30 +442,30 @@ func (instance *Instance) TryShuttingDownSmartFast() error {
 	}
 
 	if smartTimeout > 0 {
-		log.Info("Requesting smart shutdown of the PostgreSQL instance")
+		contextLogger.Info("Requesting smart shutdown of the PostgreSQL instance")
 		err = instance.Shutdown(ShutdownOptions{
 			Mode:    ShutdownModeSmart,
 			Wait:    true,
 			Timeout: &smartTimeout,
 		})
 		if err != nil {
-			log.Warning("Error while handling the smart shutdown request", "err", err)
+			contextLogger.Warning("Error while handling the smart shutdown request", "err", err)
 		}
 	}
 
 	if err != nil || smartTimeout == 0 {
-		log.Info("Requesting fast shutdown of the PostgreSQL instance")
+		contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
 		err = instance.Shutdown(ShutdownOptions{
 			Mode: ShutdownModeFast,
 			Wait: true,
 		})
 	}
 	if err != nil {
-		log.Error(err, "Error while shutting down the PostgreSQL instance")
+		contextLogger.Error(err, "Error while shutting down the PostgreSQL instance")
 		return err
 	}
 
-	log.Info("PostgreSQL instance shut down")
+	contextLogger.Info("PostgreSQL instance shut down")
 	return nil
 }
 
@@ -471,8 +473,10 @@ func (instance *Instance) TryShuttingDownSmartFast() error {
 // then in case of failure or the given timeout expiration,
 // it will issue an immediate shutdown request and wait for it to complete.
 // N.B. immediate shutdown can cause data loss.
-func (instance *Instance) TryShuttingDownFastImmediate() error {
-	log.Info("Requesting fast shutdown of the PostgreSQL instance")
+func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
 	err := instance.Shutdown(ShutdownOptions{
 		Mode:    ShutdownModeFast,
 		Wait:    true,
@@ -480,7 +484,7 @@ func (instance *Instance) TryShuttingDownFastImmediate() error {
 	})
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) {
-		log.Info("Graceful shutdown failed. Issuing immediate shutdown",
+		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
 		err = instance.Shutdown(ShutdownOptions{
 			Mode: ShutdownModeImmediate,
@@ -504,14 +508,16 @@ func (instance *Instance) isStatusRunning() bool {
 }
 
 // Reload makes a certain active instance reload the configuration
-func (instance *Instance) Reload() error {
+func (instance *Instance) Reload(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	options := []string{
 		"-D",
 		instance.PgData,
 		"reload",
 	}
 
-	log.Info("Requesting configuration reload",
+	contextLogger.Info("Requesting configuration reload",
 		"pgdata", instance.PgData)
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
@@ -686,8 +692,10 @@ func (instance *Instance) IsPrimary() (bool, error) {
 }
 
 // Demote demotes an existing PostgreSQL instance
-func (instance *Instance) Demote(cluster *apiv1.Cluster) error {
-	log.Info("Demoting instance", "pgpdata", instance.PgData)
+func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Demoting instance", "pgpdata", instance.PgData)
 	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
 	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 	return err
@@ -889,14 +897,16 @@ func (instance *Instance) removePgControlFileBackup() error {
 
 // Rewind uses pg_rewind to align this data directory with the contents of the primary node.
 // If postgres major version is >= 13, add "--restore-target-wal" option
-func (instance *Instance) Rewind(postgresMajorVersion int) error {
+func (instance *Instance) Rewind(ctx context.Context, postgresMajorVersion int) error {
+	contextLogger := log.FromContext(ctx)
+
 	// Signal the liveness probe that we are running pg_rewind before starting postgres
 	instance.PgRewindIsRunning = true
 	defer func() {
 		instance.PgRewindIsRunning = false
 	}()
 
-	instance.LogPgControldata("before pg_rewind")
+	instance.LogPgControldata(ctx, "before pg_rewind")
 
 	primaryConnInfo := instance.GetPrimaryConnInfo()
 	options := []string{
@@ -917,7 +927,7 @@ func (instance *Instance) Rewind(postgresMajorVersion int) error {
 		return err
 	}
 
-	log.Info("Starting up pg_rewind",
+	contextLogger.Info("Starting up pg_rewind",
 		"pgdata", instance.PgData,
 		"options", options)
 
@@ -925,7 +935,7 @@ func (instance *Instance) Rewind(postgresMajorVersion int) error {
 	pgRewindCmd.Env = instance.Env
 	err = execlog.RunStreaming(pgRewindCmd, pgRewindName)
 	if err != nil {
-		log.Error(err, "Failed to execute pg_rewind", "options", options)
+		contextLogger.Error(err, "Failed to execute pg_rewind", "options", options)
 		return fmt.Errorf("error executing pg_rewind: %w", err)
 	}
 
@@ -980,15 +990,17 @@ func PgIsReady() error {
 }
 
 // LogPgControldata logs the content of PostgreSQL control data, for debugging and tracing
-func (instance *Instance) LogPgControldata(reason string) {
-	log.Info("Extracting pg_controldata information", "reason", reason)
+func (instance *Instance) LogPgControldata(ctx context.Context, reason string) {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Extracting pg_controldata information", "reason", reason)
 
 	pgControlDataCmd := exec.Command(pgControlDataName)
 	pgControlDataCmd.Env = os.Environ()
 	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
 	err := execlog.RunBuffering(pgControlDataCmd, pgControlDataName)
 	if err != nil {
-		log.Error(err, "Error printing the control information of this PostgreSQL instance")
+		contextLogger.Error(err, "Error printing the control information of this PostgreSQL instance")
 	}
 }
 
@@ -1103,32 +1115,35 @@ func (instance *Instance) GetPrimaryConnInfo() string {
 // HandleInstanceCommandRequests execute a command requested by the reconciliation
 // loop.
 func (instance *Instance) HandleInstanceCommandRequests(
+	ctx context.Context,
 	req InstanceCommand,
 ) (restartNeeded bool, err error) {
+	contextLogger := log.FromContext(ctx)
+
 	if instance.IsFenced() {
 		switch req {
 		case fenceOff:
-			log.Info("Fence lifting request received, will proceed with restarting the instance if needed")
+			contextLogger.Info("Fence lifting request received, will proceed with restarting the instance if needed")
 			instance.SetFencing(false)
 			return true, nil
 		default:
-			log.Warning("Received request while fencing, ignored", "req", req)
+			contextLogger.Warning("Received request while fencing, ignored", "req", req)
 			return false, nil
 		}
 	}
 	switch req {
 	case fenceOn:
-		log.Info("Fencing request received, will proceed shutting down the instance")
+		contextLogger.Info("Fencing request received, will proceed shutting down the instance")
 		instance.SetFencing(true)
-		if err := instance.TryShuttingDownFastImmediate(); err != nil {
+		if err := instance.TryShuttingDownFastImmediate(ctx); err != nil {
 			return false, fmt.Errorf("while shutting down the instance to fence it: %w", err)
 		}
 		return false, nil
 	case restartSmartFast:
-		return true, instance.TryShuttingDownSmartFast()
+		return true, instance.TryShuttingDownSmartFast(ctx)
 	case shutDownFastImmediate:
-		if err := instance.TryShuttingDownFastImmediate(); err != nil {
-			log.Error(err, "error shutting down instance, proceeding")
+		if err := instance.TryShuttingDownFastImmediate(ctx); err != nil {
+			contextLogger.Error(err, "error shutting down instance, proceeding")
 		}
 		return false, nil
 	default:
