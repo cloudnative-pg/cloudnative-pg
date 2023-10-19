@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
+	"github.com/inhies/go-bytesize"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -113,6 +114,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	}
 	status.printCertificatesStatus()
 	status.printBackupStatus()
+	status.printBasebackupStatus()
 	status.printReplicaStatus(verbose)
 	status.printUnmanagedReplicationSlotStatus()
 	status.printInstancesStatus()
@@ -683,6 +685,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if instance.IsPrimary {
 		return "Primary"
 	}
+
 	if fullStatus.isReplicaClusterDesignatedPrimary(instance) {
 		return "Designated primary"
 	}
@@ -799,4 +802,70 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 	fmt.Println(color(headerMessage))
 	status.Print()
 	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
+	fmt.Println(aurora.Green("Progress of physical backups"))
+
+	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
+	if primaryInstanceStatus == nil {
+		fmt.Println(aurora.Yellow("Primary instance not found").String())
+		fmt.Println()
+		return
+	}
+
+	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
+		fmt.Println(aurora.Yellow("Not running physical backup").String())
+		fmt.Println()
+		return
+	}
+
+	status := tabby.New()
+	status.AddHeader(
+		"Name",
+		"Phase",
+		"Started at",
+		"Total",
+		"Transferred",
+		"Progress",
+		"Tablespaces",
+	)
+
+	basebackupsInfo := primaryInstanceStatus.PgStatBasebackupsInfo
+
+	for _, bb := range basebackupsInfo {
+		var (
+			progress       string
+			backupTotal    string
+			backupStreamed string
+		)
+		// the value of backup total is empty before waiting for the start-of-backup checkpoint to finish
+		// reference: https://www.postgresql.org/docs/current/progress-reporting.html#BASEBACKUP-PROGRESS-REPORTING
+		if bb.BackupTotal != 0 {
+			progress = fmt.Sprintf("%.2f", float64(bb.BackupStreamed)/float64(bb.BackupTotal))
+			backupTotal = formatBytes(bb.BackupTotal)
+			backupStreamed = formatBytes(bb.BackupStreamed)
+		}
+
+		columns := []interface{}{
+			bb.ApplicationName,
+			bb.Phase,
+			bb.BackendStart,
+			backupTotal,
+			backupStreamed,
+			progress,
+			fmt.Sprintf("%v/%v", bb.TablespacesStreamed, bb.TablespacesTotal),
+		}
+
+		status.AddLine(columns...)
+	}
+
+	status.Print()
+	fmt.Println()
+}
+
+// formatBytes converts a number of bytes into a human readable string
+func formatBytes(value int64) string {
+	b := bytesize.New(float64(value))
+	return b.Format("%.2f", "", false)
 }

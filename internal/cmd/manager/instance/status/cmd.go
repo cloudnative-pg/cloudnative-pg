@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
@@ -34,15 +35,23 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return statusSubCommand()
+			basebackup, _ := cmd.Flags().GetBool("basebackup")
+			return statusSubCommand(basebackup)
 		},
 	}
+
+	cmd.Flags().BoolP("basebackup", "b", false, "Include basebackup status")
 
 	return cmd
 }
 
-func statusSubCommand() error {
+func statusSubCommand(bacebackup bool) error {
 	statusURL := url.Local(url.PathPgStatus, url.StatusPort)
+
+	if bacebackup {
+		statusURL = fmt.Sprintf("%s?%s=true", statusURL, webserver.StatusBasebackup)
+	}
+
 	resp, err := http.Get(statusURL) // nolint:gosec
 	if err != nil {
 		log.Error(err, "Error while requesting instance status")

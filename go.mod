@@ -12,6 +12,7 @@ require (
 	github.com/go-logr/logr v1.2.4
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.1
+	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/jackc/pgx/v5 v5.4.3
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0

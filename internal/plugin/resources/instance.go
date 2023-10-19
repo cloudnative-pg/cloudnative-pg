@@ -102,7 +102,7 @@ func getReplicaStatusFromPodViaExec(
 		pod,
 		postgresContainerName,
 		&timeout,
-		"/controller/manager", "instance", "status")
+		"/controller/manager", "instance", "status", "--basebackup")
 	if err != nil {
 		result.AddPod(pod)
 		result.Error = fmt.Errorf("pod not available")

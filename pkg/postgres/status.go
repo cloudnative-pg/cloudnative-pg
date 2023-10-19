@@ -72,6 +72,8 @@ type PostgresqlStatus struct {
 	ReplicationInfo PgStatReplicationList `json:"replicationInfo,omitempty"`
 	// contains the PgReplicationSlot rows content.
 	ReplicationSlotsInfo PgReplicationSlotList `json:"replicationSlotsInfo,omitempty"`
+	// contains the PgStatBasebackup rows content.
+	PgStatBasebackupsInfo PgStatBasebackupList `json:"pgStatBasebackupsInfo,omitempty"`
 
 	// Status of the instance manager
 	ExecutableHash             string `json:"executableHash"`
@@ -388,4 +390,19 @@ func (list PostgresqlStatusList) InstancesReportingStatus() int {
 	}
 
 	return n
+}
+
+// PgStatBasebackupList is a list of PgStatBasebackup reported by the primary instance
+type PgStatBasebackupList []PgStatBasebackup
+
+// PgStatBasebackup contains the information for progress of basebackup as reported by the primary instance
+type PgStatBasebackup struct {
+	Usename             string `json:"usename"`
+	ApplicationName     string `json:"application_name"`
+	BackendStart        string `json:"backend_start"`
+	Phase               string `json:"phase"`
+	BackupTotal         int64  `json:"backup_total"`
+	BackupStreamed      int64  `json:"backup_streamed"`
+	TablespacesTotal    int64  `json:"tablespaces_total"`
+	TablespacesStreamed int64  `json:"tablespaces_streamed"`
 }

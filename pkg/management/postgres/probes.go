@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -62,8 +63,17 @@ func (instance *Instance) IsServerReady() error {
 	return superUserDB.Ping()
 }
 
+// StatusOption is as a function to select which information to include in the status
+type StatusOption func(*StatusSelection)
+
+// StatusSelection is used to select which information to include in the status
+type StatusSelection struct {
+	// BasebackupInfo indicates whether to include basebackup information in the status
+	BasebackupInfo bool
+}
+
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
+func (instance *Instance) GetStatus(options ...StatusOption) (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
 		InstanceManagerVersion: versions.Version,
@@ -119,7 +129,12 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		}
 	}
 
-	err = instance.fillStatus(result)
+	statusSelection := &StatusSelection{}
+	for _, option := range options {
+		option(statusSelection)
+	}
+
+	err = instance.fillStatus(result, statusSelection)
 	if err != nil {
 		return result, err
 	}
@@ -246,7 +261,7 @@ WHERE pending_settings.name IN (
 
 // fillStatus extract the current instance information into the PostgresqlStatus
 // structure
-func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
+func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus, selection *StatusSelection) error {
 	var err error
 
 	if result.IsPrimary {
@@ -270,7 +285,96 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 		return err
 	}
 
+	if selection.BasebackupInfo {
+		cluster, err := cache.LoadClusterUnsafe()
+		if err != nil {
+			return err
+		}
+
+		if err := instance.fillBasebackupStats(cluster, superUserDB, result); err != nil {
+			return err
+		}
+	}
+
 	return instance.fillWalStatus(result)
+}
+
+func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
+	superUserDB *sql.DB,
+	result *postgres.PostgresqlStatus,
+) error {
+	// run on 13 or above
+	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
+		return nil
+	}
+
+	// run on the primary or designated primary only
+	if cluster.Status.CurrentPrimary != instance.PodName {
+		return nil
+	}
+
+	var basebackupList postgres.PgStatBasebackupList
+
+	rows, err := superUserDB.Query(`SELECT
+		   usename, 
+		   application_name, 
+		   backend_start, 
+		   phase,
+		   backup_total, 
+		   backup_streamed,
+		   tablespaces_total, 
+		   tablespaces_streamed
+		FROM pg_stat_progress_basebackup b
+		   JOIN pg_stat_activity a USING (pid) 
+		WHERE application_name ~ '-join$'
+		ORDER BY 1, 2`)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	backupTotal := sql.NullInt64{}
+	backupStreamd := sql.NullInt64{}
+	tablespacesTotal := sql.NullInt64{}
+	tablespacesStreamed := sql.NullInt64{}
+	for rows.Next() {
+		pgr := postgres.PgStatBasebackup{}
+		err := rows.Scan(
+			&pgr.Usename,
+			&pgr.ApplicationName,
+			&pgr.BackendStart,
+			&pgr.Phase,
+			&backupTotal,
+			&backupStreamd,
+			&tablespacesTotal,
+			&tablespacesStreamed,
+		)
+		if err != nil {
+			return err
+		}
+
+		if backupTotal.Valid {
+			pgr.BackupTotal = backupTotal.Int64
+		}
+		if backupStreamd.Valid {
+			pgr.BackupStreamed = backupStreamd.Int64
+		}
+		if tablespacesTotal.Valid {
+			pgr.TablespacesTotal = tablespacesTotal.Int64
+		}
+		if tablespacesStreamed.Valid {
+			pgr.TablespacesStreamed = tablespacesStreamed.Int64
+		}
+
+		basebackupList = append(basebackupList, pgr)
+	}
+	result.PgStatBasebackupsInfo = basebackupList
+
+	return rows.Err()
 }
 
 // fillStatusFromPrimary get information for primary servers (including WAL and replication)
@@ -415,8 +519,8 @@ func (instance *Instance) fillWalStatusFromConnection(result *postgres.Postgresq
 			coalesce(sync_state, ''),
 			coalesce(sync_priority, 0)
 		FROM pg_catalog.pg_stat_replication
-		WHERE application_name LIKE $1 AND usename = $2`,
-		fmt.Sprintf("%s-%%", instance.ClusterName),
+		WHERE application_name ~ $1 AND usename = $2`,
+		fmt.Sprintf("%s-[0-9]+$", instance.ClusterName),
 		v1.StreamingReplicationUser,
 	)
 	if err != nil {

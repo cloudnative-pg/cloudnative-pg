@@ -21,7 +21,9 @@ import (
 	"regexp"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/blang/semver"
 
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -54,7 +56,7 @@ var _ = Describe("probes", func() {
 				coalesce(sync_state, ''),
 				coalesce(sync_priority, 0)
 			FROM pg_catalog.pg_stat_replication
-			WHERE application_name LIKE $1 AND usename = $2`)).WillReturnError(errFailedQuery)
+			WHERE application_name ~ $1 AND usename = $2`)).WillReturnError(errFailedQuery)
 
 		err = instance.fillWalStatusFromConnection(status, db)
 		Expect(err).To(Equal(errFailedQuery))
@@ -85,5 +87,85 @@ var _ = Describe("probes", func() {
 		Expect(status.LastFailedWAL).To(Equal(""))
 		Expect(status.LastFailedWALTime).To(Equal("2021-05-05 12:00:00"))
 		Expect(status.IsArchivingWAL).To(BeFalse())
+	})
+
+	Context("Fill basebackup stats", func() {
+		It("does nothing in case of that major version is less than 13 ", func() {
+			instance := &Instance{
+				pgVersion: &semver.Version{Major: 12},
+			}
+			Expect(instance.fillBasebackupStats(nil, nil, nil)).To(Succeed())
+		})
+
+		It("does nothing in case of that the instance is not a primary", func() {
+			instance := &Instance{
+				pgVersion: &semver.Version{Major: 13},
+				PodName:   "test-1",
+			}
+			status := &postgres.PostgresqlStatus{
+				IsPrimary: false,
+			}
+
+			cluster := &v1.Cluster{}
+			Expect(instance.fillBasebackupStats(cluster, nil, status)).To(Succeed())
+		})
+
+		It("does in case of designated primary", func() {
+			instance := &Instance{
+				pgVersion: &semver.Version{Major: 13},
+				PodName:   "test-1",
+			}
+			status := &postgres.PostgresqlStatus{
+				IsPrimary: false,
+			}
+
+			cluster := &v1.Cluster{
+				Spec: v1.ClusterSpec{
+					ReplicaCluster: &v1.ReplicaClusterConfiguration{
+						Enabled: true,
+					},
+				},
+				Status: v1.ClusterStatus{
+					CurrentPrimary: "test-1",
+				},
+			}
+
+			db, mock, err := sqlmock.New()
+			Expect(err).ToNot(HaveOccurred())
+
+			mock.ExpectQuery(`.*`).
+				WillReturnRows(sqlmock.NewRows([]string{
+					"usename",
+					"application_name",
+					"backend_start",
+					"phase",
+					"backup_total",
+					"backup_streamed",
+					"tablespaces_total",
+					"tablespaces_streamed",
+				},
+				).AddRow(
+					"postgres",
+					"pg_basebackup",
+					"2021-05-05 12:00:00",
+					"streaming database files",
+					int64(1000),
+					int64(200),
+					int64(2),
+					int64(1),
+				))
+
+			Expect(instance.fillBasebackupStats(cluster, db, status)).To(Succeed())
+			Expect(status.PgStatBasebackupsInfo).To(HaveLen(1))
+
+			Expect(status.PgStatBasebackupsInfo[0].Usename).To(Equal("postgres"))
+			Expect(status.PgStatBasebackupsInfo[0].ApplicationName).To(Equal("pg_basebackup"))
+			Expect(status.PgStatBasebackupsInfo[0].BackendStart).To(Equal("2021-05-05 12:00:00"))
+			Expect(status.PgStatBasebackupsInfo[0].Phase).To(Equal("streaming database files"))
+			Expect(status.PgStatBasebackupsInfo[0].BackupTotal).To(Equal(int64(1000)))
+			Expect(status.PgStatBasebackupsInfo[0].BackupStreamed).To(Equal(int64(200)))
+			Expect(status.PgStatBasebackupsInfo[0].TablespacesTotal).To(Equal(int64(2)))
+			Expect(status.PgStatBasebackupsInfo[0].TablespacesStreamed).To(Equal(int64(1)))
+		})
 	})
 })
