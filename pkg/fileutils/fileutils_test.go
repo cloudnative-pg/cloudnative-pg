@@ -34,6 +34,12 @@ var _ = Describe("File writing functions", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
+	It("write a new file", func() {
+		changed, err := WriteLinesToFile(path.Join(tempDir1, "test1.txt"), []string{"this", "is", "", "a", "test"})
+		Expect(changed).To(BeTrue())
+		Expect(err).ToNot(HaveOccurred())
+	})
+
 	It("detect if the file has changed or not", func() {
 		changed, err := WriteStringToFile(path.Join(tempDir1, "test2.txt"), "this is a test")
 		Expect(changed).To(BeTrue())

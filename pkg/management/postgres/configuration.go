@@ -17,6 +17,7 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -196,7 +197,7 @@ func quoteHbaLiteral(literal string) string {
 	return fmt.Sprintf(`"%s"`, literal)
 }
 
-// UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
+// UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	major, err := postgresutils.GetMajorVersion(pgData)
@@ -212,7 +213,7 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 		return false, err
 	}
 
-	return configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName)
+	return configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
 }
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
@@ -246,16 +247,16 @@ func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (change
 		return false, err
 	}
 	if changed {
-		log.Info("Updated replication settings in recovery.conf file")
+		log.Info("Updated replication settings", "filename", "recovery.conf")
 	}
 
 	return changed, nil
 }
 
-// configurePostgresAutoConfFile configures replication in the postgresql.auto.conf file
+// configurePostgresOverrideConfFile configures replication in the override.conf file
 // for PostgreSQL 12 and newer
-func configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
-	targetFile := path.Join(pgData, "postgresql.auto.conf")
+func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
 	options := map[string]string{
 		"restore_command": fmt.Sprintf(
@@ -275,7 +276,7 @@ func configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName string) (ch
 	}
 
 	if changed {
-		log.Info("Updated replication settings in postgresql.auto.conf file")
+		log.Info("Updated replication settings", "filename", constants.PostgresqlOverrideConfigurationFile)
 	}
 
 	return changed, nil
@@ -291,16 +292,80 @@ func createStandbySignal(pgData string) error {
 	return err
 }
 
-// removeArchiveModeFromPostgresAutoConf removes the "archive_mode" option from "postgresql.auto.conf"
-func removeArchiveModeFromPostgresAutoConf(pgData string) (changed bool, err error) {
-	targetFile := path.Join(pgData, "postgresql.auto.conf")
-	currentContent, err := fileutils.ReadFile(targetFile)
-	if err != nil {
-		return false, fmt.Errorf("error while reading content of %v: %w", targetFile, err)
+var migrateAutoConfOptions = []string{
+	"archive_mode",
+	"primary_slot_name",
+	"primary_conninfo",
+	"restore_command",
+}
+
+var cleanupAutoConfOptions = []string{
+	"archive_mode",
+	"primary_slot_name",
+	"primary_conninfo",
+	"recovery_target",
+	"recovery_target_xid",
+	"recovery_target_name",
+	"recovery_target_lsn",
+	"recovery_target_time",
+	"recovery_target_timeline",
+	"recovery_target_inclusive",
+	"restore_command",
+}
+
+// migratePostgresAutoConfFile migrates options managed by the operator from `postgresql.auto.conf` file,
+// to `override.conf` file for an upgrade case.
+// forceMigrate: even the override.conf is existed, still do a migration, this is used in the restore case
+func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceMigrate bool) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
+	targetFile := filepath.Join(instance.PgData, constants.PostgresqlOverrideConfigurationFile)
+	targetFileExists, _ := fileutils.FileExists(targetFile)
+	if targetFileExists && !forceMigrate {
+		return false, nil
 	}
 
-	updatedContent := configfile.RemoveOptionFromConfigurationContents(string(currentContent), "archive_mode")
-	return fileutils.WriteStringToFile(targetFile, updatedContent)
+	contextLogger.Info("Start to migrate replication settings",
+		"filename", constants.PostgresqlOverrideConfigurationFile,
+		"targetFileExists", targetFileExists,
+		"forceMigrate", forceMigrate,
+	)
+
+	autoConfFile := filepath.Join(instance.PgData, "postgresql.auto.conf")
+	autoConfContent, err := fileutils.ReadFileLines(autoConfFile)
+	if err != nil {
+		return false, fmt.Errorf("error while reading postgresql.auto.conf file: %w", err)
+	}
+
+	options := configfile.ReadLinesFromConfigurationContents(autoConfContent, migrateAutoConfOptions...)
+	_, err = fileutils.WriteLinesToFile(targetFile, options)
+	if err != nil {
+		return false, fmt.Errorf("migrating replication settings: %w",
+			err)
+	}
+
+	_, err = configfile.EnsureIncludes(
+		path.Join(instance.PgData, "postgresql.conf"),
+		constants.PostgresqlOverrideConfigurationFile,
+	)
+	if err != nil {
+		return false, fmt.Errorf("migrating replication settings: %w",
+			err)
+	}
+
+	_, err = fileutils.WriteLinesToFile(autoConfFile,
+		configfile.RemoveOptionsFromConfigurationContents(
+			autoConfContent, cleanupAutoConfOptions...),
+	)
+	if err != nil {
+		return true, fmt.Errorf("cleaning up postgresql.auto.conf file: %w", err)
+	}
+
+	contextLogger.Info("Migrated replication settings",
+		"filename", constants.PostgresqlOverrideConfigurationFile,
+	)
+
+	return true, nil
 }
 
 // createPostgresqlConfiguration creates the PostgreSQL configuration to be

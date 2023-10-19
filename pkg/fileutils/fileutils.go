@@ -19,12 +19,14 @@ limitations under the License.
 package fileutils
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -143,6 +145,18 @@ func WriteStringToFile(fileName string, contents string) (changed bool, err erro
 	return WriteFileAtomic(fileName, []byte(contents), 0o666)
 }
 
+// WriteLinesToFile replace the contents of a certain file
+// with a slice of lines. If the file doesn't exist, it's created.
+// Returns an error status and a flag telling if the file has been
+// changed or not.
+func WriteLinesToFile(fileName string, lines []string) (changed bool, err error) {
+	var data []byte
+	if len(lines) > 0 {
+		data = []byte(strings.Join(lines, "\n") + "\n")
+	}
+	return WriteFileAtomic(fileName, data, 0o666)
+}
+
 // WriteFileAtomic atomically replace the content of a file.
 // If the file doesn't exist, it's created.
 // Returns an error status and a flag telling if the file has been
@@ -218,6 +232,38 @@ func ReadFile(fileName string) ([]byte, error) {
 	}
 
 	return content, nil
+}
+
+// ReadFileLines reads source file and output the content as a slice of strings.
+// If the file does not exist, it returns an empty slice with no error.
+func ReadFileLines(fileName string) (lines []string, err error) {
+	exists, err := FileExists(fileName)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, nil
+	}
+
+	readFile, err := os.Open(fileName) // #nosec
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		closeErr := readFile.Close()
+		if closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	fileScanner := bufio.NewScanner(readFile)
+	fileScanner.Split(bufio.ScanLines)
+
+	for fileScanner.Scan() {
+		lines = append(lines, fileScanner.Text())
+	}
+
+	return lines, nil
 }
 
 // EnsurePgDataPerms ensure PGDATA has 0700 permissions, which are
