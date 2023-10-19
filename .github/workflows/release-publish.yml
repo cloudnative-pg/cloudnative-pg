@@ -218,6 +218,7 @@ jobs:
           path: |
             bundle.Dockerfile
             bundle/
+            cloudnative-pg-catalog.yaml
 
   operatorhub_pr:
     name: Create remote PR for OperatorHub
@@ -247,7 +248,7 @@ jobs:
         run: |
           mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
           cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
-          rm -fr bundle.Dockerfile *.zip bundle/
+          rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
       - name: Create Remote Pull Request
         uses: peter-evans/create-pull-request@v5
