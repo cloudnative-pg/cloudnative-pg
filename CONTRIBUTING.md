@@ -52,6 +52,9 @@ When raising issues, please specify the following:
 - Errors and log messages that are displayed by the involved software
 - Any other detail that might be useful
 
+If you are trying to report a vulnerability, please refer to the
+[security policy](SECURITY.md).
+
 ## Meetings
 
 Absolutely everyone is welcome to come to any of our meetings. You never need an
