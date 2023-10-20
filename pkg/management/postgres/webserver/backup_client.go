@@ -119,15 +119,16 @@ func executeRequest[T any](ctx context.Context, cli *http.Client, req *http.Requ
 	}
 
 	if resp.StatusCode == 500 {
-		return nil, fmt.Errorf("encountered an internal server error status code: %s", string(body))
+		return nil, fmt.Errorf("encountered an internal server error status code 500 with body: %s", string(body))
 	}
 
 	var result Response[T]
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("while unmarshalling the body: %w", err)
+		return nil, fmt.Errorf("while unmarshalling the body, body: %s err: %w", string(body), err)
 	}
 	if result.Error != nil {
-		return nil, fmt.Errorf("body contained an error code: %s", result.Error.Code)
+		return nil, fmt.Errorf("body contained an error code: %s and message: %s",
+			result.Error.Code, result.Error.Message)
 	}
 
 	return result.Data, nil

@@ -100,10 +100,10 @@ func (bc *backupConnection) stopBackup(ctx context.Context) error {
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
 		row = bc.conn.QueryRowContext(ctx,
-			"SELECT lsn, labelfile, spcmapfile FROM pg_stop_backup(wait_for_archive => $1);", bc.waitForArchive)
+			"SELECT lsn, labelfile, spcmapfile FROM pg_stop_backup(wait_for_archive => $1::BOOLEAN);", bc.waitForArchive)
 	} else {
 		row = bc.conn.QueryRowContext(ctx,
-			"SELECT lsn, labelfile, spcmapfile FROM pg_backup_stop(wait_for_archive => $1);", bc.waitForArchive)
+			"SELECT lsn, labelfile, spcmapfile FROM pg_backup_stop(wait_for_archive => $1::BOOLEAN);", bc.waitForArchive)
 	}
 
 	if err := row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile); err != nil {

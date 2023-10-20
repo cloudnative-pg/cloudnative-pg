@@ -218,7 +218,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		var p StartBackupRequest
 		err := json.NewDecoder(req.Body).Decode(&p)
 		if err != nil {
-			http.Error(w, "Failed to parse request body", http.StatusBadRequest)
+			sendBadRequestJSONResponse(w, "FAILED_TO_PARSE_REQUEST", "Failed to parse request body")
 			return
 		}
 		defer func() {
@@ -246,11 +246,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}
 
 		if err := ws.currentBackup.startBackup(req.Context()); err != nil {
-			sendBadRequestJSONResponse(
-				w,
-				"STARTING_BACKUP",
-				err.Error(),
-			)
+			sendBadRequestJSONResponse(w, "STARTING_BACKUP", err.Error())
 			return
 		}
 		sendDataJSONResponse(w, 200, struct{}{})
@@ -261,6 +257,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}
 		if err := ws.currentBackup.stopBackup(req.Context()); err != nil {
 			sendBadRequestJSONResponse(w, "STOPPING_BACKUP", err.Error())
+			return
 		}
 
 		sendDataJSONResponse(w, 200, ws.currentBackup.data)
