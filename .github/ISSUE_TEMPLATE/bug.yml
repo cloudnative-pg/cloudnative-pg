@@ -3,14 +3,15 @@ description: File a bug report
 title: "[Bug]: "
 labels: ["bug", "triage"]
 projects: ["cloudnative-pg/cloudnative-pg"]
-assignees: ""
+assignees:
+  - gbartolini
 body:
   - type: markdown
     attributes:
       value: |
         Thanks for taking the time to fill out this bug report for CloudNativePg!
   - type: checkboxes
-    id: terms
+    id: search
     attributes:
       label: Is there an existing issue already for this bug?
       description: Before you submit a bug, make sure you have searched if a similar one already exists
@@ -18,7 +19,7 @@ body:
         - label: I have searched for an existing issue, and could not find anything. I believe this is a new bug.
           required: true
   - type: checkboxes
-    id: terms
+    id: troubleshooting
     attributes:
       label: I have read the troubleshooting guide
       description: Before you submit a bug, make sure you have read the ["Common issues" section in the Troubleshooting guide](https://cloudnative-pg.io/documentation/current/troubleshooting/#some-common-issues).
@@ -26,7 +27,7 @@ body:
         - label: I have read the troubleshooting guide and I think this is a new bug.
           required: true
   - type: checkboxes
-    id: terms
+    id: supported
     attributes:
       label: I am running a supported version of CloudNativePG
       description: Before you submit a bug, make sure you have read ["Supported releases"](https://cloudnative-pg.io/documentation/current/supported_releases/) and that you are running a supported version of CloudNativePG with the latest patch/security fixes, or you are working on the current trunk (`main` branch)
@@ -46,7 +47,6 @@ body:
     attributes:
       label: Version
       description: What is the version of CloudNativePG you are running?
-    validations:
       options:
         - 1.21.0 
         - 1.20.3
@@ -56,7 +56,7 @@ body:
         - older in 1.19.x
         - older minor (unsupported)
     validations:
-      required: false
+      required: true
   - type: dropdown
     id: k8s_version
     attributes:
@@ -70,31 +70,47 @@ body:
         - 1.23 (unsupported)
         - other (unsupported)
     validations:
-      required: false
+      required: true
   - type: dropdown
     id: k8s_environment
     attributes:
       label: What is your Kubernetes environment?
       options:
-        - Self-managed
-        - Cloud: Amazon EKS
-        - Cloud: Google GKE
-        - Cloud: Azure AKS
-        - Cloud: Other
+        - "Self-managed: kind (evaluation)"
+        - "Self-managed: k0s"
+        - "Self-managed: k3s"
+        - "Self-managed: RKE"
+        - "Cloud: Amazon EKS"
+        - "Cloud: Google GKE"
+        - "Cloud: Azure AKS"
+        - "Cloud: Other"
+        - "Other"
+    validations:
+      required: true
+  - type: dropdown
+    id: installation_method
+    attributes:
+      label: How did you install the operator?
+      options:
+        - "YAML manifest"
+        - "Helm"
+        - "OLM"
+        - "Other"
+    validations:
+      required: true
   - type: textarea
     id: what-happened
     attributes:
       label: What happened?
       description: Also tell us, what did you expect to happen?
       placeholder: Tell us what you see!
-      value: "A bug happened!"
     validations:
       required: true
   - type: textarea
     id: spec
     attributes:
-      label: Cluster definition
-      description: Please copy and paste the CRD of the cluster
+      label: Cluster resource
+      description: Please copy and paste the CR of the cluster
       render: shell
   - type: textarea
     id: logs
