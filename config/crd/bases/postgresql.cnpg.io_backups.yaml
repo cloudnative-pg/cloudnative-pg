@@ -237,6 +237,7 @@ spec:
                 type: object
               labelFile:
                 description: LabelFile used in case of Online backups
+                format: byte
                 type: string
               method:
                 description: The backup method being used
@@ -337,6 +338,7 @@ spec:
                 type: object
               spcmapFile:
                 description: SpcmapFile used in case of Online backups
+                format: byte
                 type: string
               startedAt:
                 description: When the backup was started

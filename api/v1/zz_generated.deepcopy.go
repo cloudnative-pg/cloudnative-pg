@@ -285,6 +285,16 @@ func (in *BackupStatus) DeepCopyInto(out *BackupStatus) {
 		in, out := &in.StoppedAt, &out.StoppedAt
 		*out = (*in).DeepCopy()
 	}
+	if in.LabelFile != nil {
+		in, out := &in.LabelFile, &out.LabelFile
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
+	if in.SpcmapFile != nil {
+		in, out := &in.SpcmapFile, &out.SpcmapFile
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
 	if in.InstanceID != nil {
 		in, out := &in.InstanceID, &out.InstanceID
 		*out = new(InstanceID)

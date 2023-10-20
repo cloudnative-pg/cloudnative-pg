@@ -29,8 +29,8 @@ import (
 type BackupResultData struct {
 	BeginLSN   string `json:"beginLSN,omitempty"`
 	EndLSN     string `json:"endLSN,omitempty"`
-	LabelFile  string `json:"labelFile,omitempty"`
-	SpcmapFile string `json:"spcmapFile,omitempty"`
+	LabelFile  []byte `json:"labelFile,omitempty"`
+	SpcmapFile []byte `json:"spcmapFile,omitempty"`
 	BackupName string `json:"backupName,omitempty"`
 }
 

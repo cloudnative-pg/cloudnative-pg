@@ -68,7 +68,7 @@ func NewCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				info.SpcmapFile = string(res)
+				info.LabelFile = res
 			}
 
 			if spcmapFile != "" {
@@ -76,7 +76,7 @@ func NewCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				info.SpcmapFile = string(res)
+				info.SpcmapFile = res
 			}
 
 			err := execute(ctx, info, immediate)

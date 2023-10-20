@@ -153,6 +153,7 @@ type VolumeSnapshotConfiguration struct {
 	// Indicates if the backup was executed in the Online mode
 	// +optional
 	Online bool `json:"online,omitempty"`
+
 	// OnlineConfiguration contains the configuration parameters for the online volume snapshot
 	// +kubebuilder:default:={waitForArchive:true,immediateCheckpoint:false}
 	// +optional
@@ -173,6 +174,7 @@ type OnlineConfiguration struct {
 	// +kubebuilder:default:=true
 	// +optional
 	WaitForArchive bool `json:"waitForArchive,omitempty"`
+
 	// Control whether the I/O workload for the backup initial checkpoint will
 	// be limited, according to the `checkpoint_completion_target` setting on
 	// the PostgreSQL server. If set to true, an immediate checkpoint will be

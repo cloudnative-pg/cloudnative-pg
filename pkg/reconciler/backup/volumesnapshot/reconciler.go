@@ -241,12 +241,14 @@ func annotateSnapshotsWithBackupData(
 		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
 		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
 
-		if backupStatus.LabelFile != "" {
-			snapshot.Annotations[utils.BackupLabelFileAnnotationName] = backupStatus.LabelFile
+		if len(backupStatus.LabelFile) > 0 {
+			// TODO LEO: base64?
+			snapshot.Annotations[utils.BackupLabelFileAnnotationName] = string(backupStatus.LabelFile)
 		}
 
-		if backupStatus.SpcmapFile != "" {
-			snapshot.Annotations[utils.BackupSpcmapFileAnnotationName] = backupStatus.SpcmapFile
+		if len(backupStatus.SpcmapFile) > 0 {
+			// TODO LEO: base64?
+			snapshot.Annotations[utils.BackupSpcmapFileAnnotationName] = string(backupStatus.SpcmapFile)
 		}
 
 		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {

@@ -187,11 +187,11 @@ type BackupStatus struct {
 
 	// LabelFile used in case of Online backups
 	// +optional
-	LabelFile string `json:"labelFile,omitempty"`
+	LabelFile []byte `json:"labelFile,omitempty"`
 
 	// SpcmapFile used in case of Online backups
 	// +optional
-	SpcmapFile string `json:"spcmapFile,omitempty"`
+	SpcmapFile []byte `json:"spcmapFile,omitempty"`
 
 	// Information to identify the instance where the backup has been taken from
 	// +optional

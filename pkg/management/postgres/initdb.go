@@ -97,10 +97,10 @@ type InitInfo struct {
 	PostInitApplicationSQLRefsFolder string
 
 	// LabelFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
-	LabelFile string
+	LabelFile []byte
 
 	// SpcmapFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
-	SpcmapFile string
+	SpcmapFile []byte
 }
 
 // VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error
