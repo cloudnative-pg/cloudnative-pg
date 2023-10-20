@@ -90,13 +90,14 @@ func (c *BackupClient) Start(
 }
 
 // Stop runs the pg_stop_backup
-func (c *BackupClient) Stop(ctx context.Context, podIP string) (*BackupResultData, error) {
+func (c *BackupClient) Stop(ctx context.Context, podIP string) error {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "DELETE", httpURL, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return executeRequest[BackupResultData](ctx, c.cli, req)
+	_, err = executeRequest[BackupResultData](ctx, c.cli, req)
+	return err
 }
 
 func executeRequest[T any](ctx context.Context, cli *http.Client, req *http.Request) (*T, error) {

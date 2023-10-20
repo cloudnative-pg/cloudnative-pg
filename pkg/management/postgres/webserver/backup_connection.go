@@ -19,7 +19,6 @@ package webserver
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -27,12 +26,24 @@ import (
 
 // BackupResultData is the result of executing pg_start_backup and pg_stop_backup
 type BackupResultData struct {
-	BeginLSN   string `json:"beginLSN,omitempty"`
-	EndLSN     string `json:"endLSN,omitempty"`
-	LabelFile  []byte `json:"labelFile,omitempty"`
-	SpcmapFile []byte `json:"spcmapFile,omitempty"`
-	BackupName string `json:"backupName,omitempty"`
+	BeginLSN   string                `json:"beginLSN,omitempty"`
+	EndLSN     string                `json:"endLSN,omitempty"`
+	LabelFile  []byte                `json:"labelFile,omitempty"`
+	SpcmapFile []byte                `json:"spcmapFile,omitempty"`
+	BackupName string                `json:"backupName,omitempty"`
+	Phase      BackupConnectionPhase `json:"phase,omitempty"`
 }
+
+// BackupConnectionPhase a connection phase of the backup
+type BackupConnectionPhase string
+
+// A backup phase
+const (
+	Starting  BackupConnectionPhase = "starting"
+	Started   BackupConnectionPhase = "started"
+	Closing   BackupConnectionPhase = "closing"
+	Completed BackupConnectionPhase = "completed"
+)
 
 type backupConnection struct {
 	immediateCheckpoint  bool
@@ -40,6 +51,7 @@ type backupConnection struct {
 	conn                 *sql.Conn
 	postgresMajorVersion uint64
 	data                 BackupResultData
+	err                  error
 }
 
 func newBackupConnection(
@@ -73,10 +85,11 @@ func newBackupConnection(
 	}, nil
 }
 
-func (bc *backupConnection) startBackup(ctx context.Context) error {
+func (bc *backupConnection) startBackup(ctx context.Context) {
 	if bc == nil {
-		return errors.New("backupConnection not initialized")
+		return
 	}
+	bc.data.Phase = Starting
 
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
@@ -87,13 +100,19 @@ func (bc *backupConnection) startBackup(ctx context.Context) error {
 			bc.immediateCheckpoint)
 	}
 
-	return row.Scan(&bc.data.BeginLSN)
+	bc.err = row.Scan(&bc.data.BeginLSN)
+	bc.data.Phase = Started
 }
 
-func (bc *backupConnection) stopBackup(ctx context.Context) error {
+func (bc *backupConnection) stopBackup(ctx context.Context) {
 	if bc == nil {
-		return errors.New("backupConnection not initialized")
+		return
 	}
+
+	if bc.err != nil {
+		return
+	}
+	bc.data.Phase = Closing
 
 	contextLogger := log.FromContext(ctx)
 
@@ -106,13 +125,9 @@ func (bc *backupConnection) stopBackup(ctx context.Context) error {
 			"SELECT lsn, labelfile, spcmapfile FROM pg_backup_stop(wait_for_archive => $1);", bc.waitForArchive)
 	}
 
-	if err := row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile); err != nil {
-		return err
-	}
-
+	bc.err = row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile)
+	bc.data.Phase = Completed
 	if err := bc.conn.Close(); err != nil {
 		contextLogger.Error(err, "while closing backup connection")
 	}
-
-	return nil
 }

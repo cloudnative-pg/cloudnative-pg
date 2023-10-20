@@ -212,7 +212,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendDataJSONResponse(w, 200, struct{}{})
 			return
 		}
-
+		if ws.currentBackup.err != nil {
+			sendBadRequestJSONResponse(w, "ERROR_WHILE_PROCESSING", ws.currentBackup.err.Error())
+			return
+		}
 		sendDataJSONResponse(w, 200, ws.currentBackup.data)
 	case http.MethodPost:
 		var p StartBackupRequest
@@ -231,7 +234,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				sendBadRequestJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
 				return
 			}
-			_ = ws.currentBackup.stopBackup(req.Context())
+			ws.currentBackup.stopBackup(req.Context())
 		}
 		ws.currentBackup, err = newBackupConnection(
 			req.Context(),
@@ -244,23 +247,21 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendBadRequestJSONResponse(w, "INITIALIZING_CONNECTION", err.Error())
 			return
 		}
-
-		if err := ws.currentBackup.startBackup(req.Context()); err != nil {
-			sendBadRequestJSONResponse(w, "STARTING_BACKUP", err.Error())
-			return
-		}
+		go ws.currentBackup.startBackup(context.Background())
 		sendDataJSONResponse(w, 200, struct{}{})
 	case http.MethodDelete:
 		if ws.currentBackup == nil {
 			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "")
 			return
 		}
-		if err := ws.currentBackup.stopBackup(req.Context()); err != nil {
-			sendBadRequestJSONResponse(w, "STOPPING_BACKUP", err.Error())
+
+		if ws.currentBackup.data.Phase != Started {
+			sendBadRequestJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED", "")
 			return
 		}
 
-		sendDataJSONResponse(w, 200, ws.currentBackup.data)
+		go ws.currentBackup.stopBackup(context.Background())
+		sendDataJSONResponse(w, 200, struct{}{})
 	}
 }
 

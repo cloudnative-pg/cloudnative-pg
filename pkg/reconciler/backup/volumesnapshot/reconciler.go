@@ -131,6 +131,7 @@ func (se *Reconciler) enrichSnapshot(
 }
 
 // Execute the volume snapshot of the given cluster instance
+// nolint: gocognit
 func (se *Reconciler) Execute(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -163,14 +164,24 @@ func (se *Reconciler) Execute(
 		}
 	}
 	if len(volumeSnapshots) == 0 && volumeSnapshotConfig.Online {
-		req := webserver.StartBackupRequest{
-			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.ImmediateCheckpoint,
-			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.WaitForArchive,
-			BackupName:          backup.Name,
-			Force:               true,
+		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
+		if err != nil {
+			return nil, fmt.Errorf("while getting status: %w", err)
 		}
-		if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
-			return nil, fmt.Errorf("while trying to start the backup: %w", err)
+
+		switch status.Phase {
+		case webserver.Starting:
+			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		case "":
+			req := webserver.StartBackupRequest{
+				ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.ImmediateCheckpoint,
+				WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.WaitForArchive,
+				BackupName:          backup.Name,
+				Force:               true,
+			}
+			if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
+				return nil, fmt.Errorf("while trying to start the backup: %w", err)
+			}
 		}
 	}
 
@@ -197,14 +208,26 @@ func (se *Reconciler) Execute(
 	}
 
 	if volumeSnapshotConfig.Online {
-		res, err := se.backupClient.Stop(ctx, targetPod.Status.PodIP)
+		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
 		if err != nil {
-			return nil, fmt.Errorf("while stopping the backup client: %w", err)
+			return nil, fmt.Errorf("while getting status: %w", err)
 		}
-		backup.Status.BeginLSN = res.BeginLSN
-		backup.Status.EndLSN = res.EndLSN
-		backup.Status.SpcmapFile = res.SpcmapFile
-		backup.Status.LabelFile = res.LabelFile
+
+		if status.Phase == webserver.Started {
+			if err := se.backupClient.Stop(ctx, targetPod.Status.PodIP); err != nil {
+				return nil, fmt.Errorf("while stopping the backup client: %w", err)
+			}
+			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+
+		if status.Phase != webserver.Completed {
+			return &ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		backup.Status.BeginLSN = status.BeginLSN
+		backup.Status.EndLSN = status.EndLSN
+		backup.Status.SpcmapFile = status.SpcmapFile
+		backup.Status.LabelFile = status.LabelFile
 	}
 
 	backup.Status.SetAsCompleted()
