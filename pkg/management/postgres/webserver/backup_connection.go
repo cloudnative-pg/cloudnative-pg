@@ -80,7 +80,7 @@ func (bc *backupConnection) startBackup(ctx context.Context) error {
 
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
-		row = bc.conn.QueryRowContext(ctx, "SELECT pg_start_backup(label => $1, fast => $2);", bc.data.BackupName,
+		row = bc.conn.QueryRowContext(ctx, "SELECT pg_start_backup($1, $2, false);", bc.data.BackupName,
 			bc.immediateCheckpoint)
 	} else {
 		row = bc.conn.QueryRowContext(ctx, "SELECT pg_backup_start(label => $1, fast => $2);", bc.data.BackupName,
@@ -100,10 +100,10 @@ func (bc *backupConnection) stopBackup(ctx context.Context) error {
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
 		row = bc.conn.QueryRowContext(ctx,
-			"SELECT lsn, labelfile, spcmapfile FROM pg_stop_backup(wait_for_archive => $1::BOOLEAN);", bc.waitForArchive)
+			"SELECT lsn, labelfile, spcmapfile FROM pg_stop_backup(false, $1);", bc.waitForArchive)
 	} else {
 		row = bc.conn.QueryRowContext(ctx,
-			"SELECT lsn, labelfile, spcmapfile FROM pg_backup_stop(wait_for_archive => $1::BOOLEAN);", bc.waitForArchive)
+			"SELECT lsn, labelfile, spcmapfile FROM pg_backup_stop(wait_for_archive => $1);", bc.waitForArchive)
 	}
 
 	if err := row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile); err != nil {
