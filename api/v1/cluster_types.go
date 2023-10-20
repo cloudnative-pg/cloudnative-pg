@@ -150,9 +150,13 @@ type VolumeSnapshotConfiguration struct {
 	// +kubebuilder:default:=none
 	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
 
+	// Indicates if the backup was executed in the Online mode
+	// +optional
+	Online bool `json:"online,omitempty"`
 	// OnlineConfiguration contains the configuration parameters for the online volume snapshot
 	// +kubebuilder:default:={waitForArchive:true,immediateCheckpoint:false}
-	OnlineConfiguration OnlineConfiguration `json:"online,omitempty"`
+	// +optional
+	OnlineConfiguration OnlineConfiguration `json:"onlineConfiguration,omitempty"`
 }
 
 // OnlineConfiguration contains the configuration parameters for the online volume snapshot

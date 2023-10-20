@@ -5,6 +5,7 @@ metadata:
 spec:
   instances: 2
   primaryUpdateStrategy: unsupervised
+  imageName: "${POSTGRES_IMG}"
 
   # Persistent storage configuration
   storage:
@@ -18,7 +19,8 @@ spec:
     recovery:
       source: cluster-pvc-snapshot
       volumeSnapshots:
-        online:
+        online: true
+        onlineConfiguration:
           immediateCheckpoint: true
           waitForArchive: true
         storage:

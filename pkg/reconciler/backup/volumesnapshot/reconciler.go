@@ -152,7 +152,7 @@ func (se *Reconciler) Execute(
 	}
 
 	// Step 1: fencing
-	if len(volumeSnapshots) == 0 && !backup.Spec.Online {
+	if len(volumeSnapshots) == 0 && !volumeSnapshotConfig.Online {
 		contextLogger.Debug("Checking pre-requisites")
 		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
 			return nil, err
@@ -162,7 +162,7 @@ func (se *Reconciler) Execute(
 			return res, err
 		}
 	}
-	if len(volumeSnapshots) == 0 && backup.Spec.Online {
+	if len(volumeSnapshots) == 0 && volumeSnapshotConfig.Online {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.ImmediateCheckpoint,
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.WaitForArchive,
@@ -196,7 +196,7 @@ func (se *Reconciler) Execute(
 		return nil, err
 	}
 
-	if backup.Spec.Online {
+	if volumeSnapshotConfig.Online {
 		res, err := se.backupClient.Stop(ctx, targetPod.Status.PodIP)
 		if err != nil {
 			return nil, fmt.Errorf("while stopping the backup client: %w", err)
@@ -208,7 +208,7 @@ func (se *Reconciler) Execute(
 	}
 
 	backup.Status.SetAsCompleted()
-	backup.Status.Online = backup.Spec.Online
+	backup.Status.Online = volumeSnapshotConfig.Online
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
 	if err != nil {
 		return nil, err

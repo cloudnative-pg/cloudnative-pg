@@ -1264,6 +1264,10 @@ spec:
                           to .metadata.labels snapshot resources.
                         type: object
                       online:
+                        description: Indicates if the backup was executed in the Online
+                          mode
+                        type: boolean
+                      onlineConfiguration:
                         default:
                           immediateCheckpoint: false
                           waitForArchive: true

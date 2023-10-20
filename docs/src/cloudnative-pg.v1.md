@@ -535,14 +535,6 @@ standby, if available.</p>
 and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
 </td>
 </tr>
-<tr><td><code>online</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>Online if the elected instance should not be taken offline.
-Supports only 'spec.target=Primary' with 'spec.method=volumeSnapshot'.</p>
-</td>
-</tr>
 </tbody>
 </table>
 
@@ -2893,7 +2885,8 @@ up again) or not (recreate it elsewhere - when <code>instances</code> &gt;1)</p>
 <i>bool</i>
 </td>
 <td>
-   <p>If false, the function will return immediately after the backup is completed, without waiting for WAL to be archived.
+   <p>If false, the function will return immediately after the backup is completed,
+without waiting for WAL to be archived.
 This behavior is only useful with backup software that independently monitors WAL archiving.
 Otherwise, WAL required to make the backup consistent might be missing and make the backup useless.
 By default or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is
@@ -4388,7 +4381,14 @@ It is the default class for the other types if no specific class is present</p>
    <p>SnapshotOwnerReference indicates the type of owner reference the snapshot should have</p>
 </td>
 </tr>
-<tr><td><code>online</code> <B>[Required]</B><br/>
+<tr><td><code>online</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Indicates if the backup was executed in the Online mode</p>
+</td>
+</tr>
+<tr><td><code>onlineConfiguration</code><br/>
 <a href="#postgresql-cnpg-io-v1-OnlineConfiguration"><i>OnlineConfiguration</i></a>
 </td>
 <td>

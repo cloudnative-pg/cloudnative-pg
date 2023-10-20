@@ -88,11 +88,6 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
-
-	// Online if the elected instance should not be taken offline.
-	// Supports only 'spec.target=Primary' with 'spec.method=volumeSnapshot'.
-	// +optional
-	Online bool `json:"online,omitempty"`
 }
 
 // BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup

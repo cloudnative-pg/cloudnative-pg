@@ -92,14 +92,5 @@ func (r *Backup) validate() field.ErrorList {
 		))
 	}
 
-	if r.Spec.Method == BackupMethodBarmanObjectStore && r.Spec.Online {
-		result = append(result,
-			field.Invalid(
-				field.NewPath("spec", "method"),
-				r.Spec.Method,
-				"The online value can be set only for volumeSnapshot method",
-			))
-	}
-
 	return result
 }

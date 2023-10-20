@@ -842,6 +842,7 @@ oc
 ol
 olm
 ongoingBackups
+onlineConfiguration
 onlineUpdateEnabled
 openldap
 openshift
