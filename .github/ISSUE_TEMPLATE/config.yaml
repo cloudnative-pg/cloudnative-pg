@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Open discussions
+    url: https://github.com/cloudnative-pg/cloudnative-pg/discussions
+    about: Please ask and answer questions here.
+  - name: Slack chat
+    url: https://join.slack.com/t/cloudnativepg/shared_invite/zt-237bhehx3-htDW2kz2hKJxEhn1W4VTnw
+    about: Please join the slack channel and interact with our community
