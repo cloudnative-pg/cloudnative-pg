@@ -1,0 +1,67 @@
+name: Feature request
+description: Suggest an idea or request a new feature for CloudNativePG
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+projects: ["cloudnative-pg/cloudnative-pg"]
+assignees:
+  - gbartolini
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to propose new ideas and feature requests to CloudNativePG
+  - type: checkboxes
+    id: search
+    attributes:
+      label: Is there an existing issue already for this feature request/idea?
+      description: Before you submit a new feature request, make sure you have searched if a similar one already exists
+      options:
+        - label: I have searched for an existing issue, and could not find anything. I believe this is a new feature request to be evaluated.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem is this feature going to solve? Why should it be added?
+      description: A clear and concise description of what the problem is (e.g. I'm always frustrated when [...])
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the solution you'd like
+      description: A clear and concise description of what you want to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Describe alternatives you've considered
+      description: A clear and concise description of any alternative solutions or features you've considered.
+    validations:
+      required: true
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Add any other context or screenshots about the feature request here.
+    validations:
+      required: false
+  - type: dropdown
+    id: backport
+    attributes:
+      label: Backport?
+      description: Do you suggest to backport this feature or not?
+      options:
+        - "Yes"
+        - "No"
+        - "N/A"
+    validations:
+      required: true
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
