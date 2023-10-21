@@ -62,7 +62,7 @@ you can use the following environment variables in your applications:
 The PostgreSQL operator will generate up to two `basic-auth` type secrets for
 every PostgreSQL cluster it deploys:
 
-* `[cluster name]-app` (unless you have provide an existing secret through `.spec.bootstra.initdb.secret.name`)
+* `[cluster name]-app` (unless you have provided an existing secret through `.spec.bootstrap.initdb.secret.name`)
 * `[cluster name]-superuser` (if `.spec.enableSuperuserAccess` is set to `true`
   and you have not specified a different secret using `.spec.superuserSecret`)
 
