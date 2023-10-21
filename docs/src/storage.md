@@ -50,6 +50,11 @@ Since CloudNativePG supports volume snapshots for both backup and recovery,
 we recommend that you also consider this aspect when you choose your storage
 solution, especially if you manage very large databases.
 
+!!! Important
+    Please refer to the official Kubernetes documentation for a list of all
+    the supported [Container Storage Interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
+    that provide snapshotting capabilities.
+
 ## Benchmarking CloudNativePG
 
 We recommend that you benchmark CloudNativePG in a controlled Kubernetes
