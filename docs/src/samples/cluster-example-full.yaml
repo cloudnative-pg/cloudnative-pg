@@ -64,6 +64,7 @@ spec:
     #  backup:
     #    name: backup-example
 
+  enableSuperuserAccess: true
   superuserSecret:
     name: cluster-example-superuser
 

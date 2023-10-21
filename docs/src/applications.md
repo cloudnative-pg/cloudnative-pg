@@ -59,11 +59,12 @@ you can use the following environment variables in your applications:
 
 ### Secrets
 
-The PostgreSQL operator will generate two `basic-auth` type secrets for every
-PostgreSQL cluster it deploys:
+The PostgreSQL operator will generate up to two `basic-auth` type secrets for
+every PostgreSQL cluster it deploys:
 
-* `[cluster name]-superuser`
-* `[cluster name]-app`
+* `[cluster name]-app` (unless you have provide an existing secret through `.spec.bootstra.initdb.secret.name`)
+* `[cluster name]-superuser` (if `.spec.enableSuperuserAccess` is set to `true`
+  and you have not specified a different secret using `.spec.superuserSecret`)
 
 Each secret contain the following:
 
@@ -81,4 +82,5 @@ connecting to the PostgreSQL cluster, and correspond to the user *owning* the
 database.
 
 The `-superuser` ones are supposed to be used only for administrative purposes,
-and correspond to the `postgres` user.
+and correspond to the `postgres` user. Since version 1.21, superuser access
+over the network is disabled by default.
