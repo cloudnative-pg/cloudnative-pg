@@ -19,6 +19,7 @@ package webserver
 import (
 	"context"
 	"database/sql"
+	"regexp"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -45,6 +46,10 @@ const (
 	Closing   BackupConnectionPhase = "closing"
 	Completed BackupConnectionPhase = "completed"
 )
+
+// replicationSlotInvalidCharacters matches every character that is
+// not valid in a replication slot name
+var replicationSlotInvalidCharacters = regexp.MustCompile(`[^a-z0-9_]`)
 
 type backupConnection struct {
 	immediateCheckpoint  bool
@@ -92,10 +97,11 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 	}
 	bc.data.Phase = Starting
 
+	slotName := replicationSlotInvalidCharacters.ReplaceAllString(bc.data.BackupName, "_")
 	if _, bc.err = bc.conn.ExecContext(
 		ctx,
 		"SELECT pg_create_physical_replication_slot(slot_name => $1, immediately_reserve => true, temporary => true)",
-		bc.data.BackupName,
+		slotName,
 	); bc.err != nil {
 		return
 	}
