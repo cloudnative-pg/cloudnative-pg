@@ -103,11 +103,9 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http
 }
 
 // This probe is for the instance status, including replication
-func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, req *http.Request) {
-	includeStatusBaseBackup := req.URL.Query().Get(url.QueryParameterBaseBackup) == "true"
-
+func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
 	// Extract the status of the current instance
-	status, err := ws.instance.GetStatus(postgres.GetStatusOptions{IncludeBaseBackupStatus: includeStatusBaseBackup})
+	status, err := ws.instance.GetStatus()
 	if err != nil {
 		log.Debug(
 			"Instance status probe failing",

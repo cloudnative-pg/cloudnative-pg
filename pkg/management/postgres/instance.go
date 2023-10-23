@@ -803,7 +803,7 @@ func (instance *Instance) WaitForConfigReload() (*postgres.PostgresqlStatus, err
 		return nil, fmt.Errorf("while waiting for new configuration to be reloaded: %w", err)
 	}
 
-	status, err := instance.GetStatus(GetStatusOptions{})
+	status, err := instance.GetStatus()
 	if err != nil {
 		return nil, fmt.Errorf("while applying new configuration: %w", err)
 	}

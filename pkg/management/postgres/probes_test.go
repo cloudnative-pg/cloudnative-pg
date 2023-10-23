@@ -23,7 +23,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/blang/semver"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -106,7 +106,7 @@ var _ = Describe("probes", func() {
 				IsPrimary: false,
 			}
 
-			cluster := &v1.Cluster{}
+			cluster := &apiv1.Cluster{}
 			Expect(instance.fillBasebackupStats(cluster, nil, status)).To(Succeed())
 		})
 
@@ -119,13 +119,13 @@ var _ = Describe("probes", func() {
 				IsPrimary: false,
 			}
 
-			cluster := &v1.Cluster{
-				Spec: v1.ClusterSpec{
-					ReplicaCluster: &v1.ReplicaClusterConfiguration{
+			cluster := &apiv1.Cluster{
+				Spec: apiv1.ClusterSpec{
+					ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
 						Enabled: true,
 					},
 				},
-				Status: v1.ClusterStatus{
+				Status: apiv1.ClusterStatus{
 					CurrentPrimary: "test-1",
 				},
 			}

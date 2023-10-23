@@ -22,7 +22,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -35,25 +34,15 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			basebackup, _ := cmd.Flags().GetBool("basebackup")
-			return statusSubCommand(basebackup)
+			return statusSubCommand()
 		},
 	}
-
-	cmd.Flags().BoolP("basebackup", "b", false, "Include basebackup status")
 
 	return cmd
 }
 
-func statusSubCommand(baseBackup bool) error {
-	queryParams := map[string]string{
-		url.QueryParameterBaseBackup: strconv.FormatBool(baseBackup),
-	}
-	statusURL, err := url.WithQueryParameters(url.Local(url.PathPgStatus, url.StatusPort), queryParams)
-	if err != nil {
-		return err
-	}
-
+func statusSubCommand() error {
+	statusURL := url.Local(url.PathPgStatus, url.StatusPort)
 	resp, err := http.Get(statusURL) // nolint:gosec
 	if err != nil {
 		log.Error(err, "Error while requesting instance status")

@@ -64,13 +64,8 @@ func (instance *Instance) IsServerReady() error {
 	return superUserDB.Ping()
 }
 
-// GetStatusOptions contains a list of parameters capable of altering the postgres.PostgresqlStatus content
-type GetStatusOptions struct {
-	IncludeBaseBackupStatus bool
-}
-
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus(options GetStatusOptions) (result *postgres.PostgresqlStatus, err error) {
+func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
 		InstanceManagerVersion: versions.Version,
@@ -126,7 +121,7 @@ func (instance *Instance) GetStatus(options GetStatusOptions) (result *postgres.
 		}
 	}
 
-	err = instance.fillStatus(result, options)
+	err = instance.fillStatus(result)
 	if err != nil {
 		return result, err
 	}
@@ -253,7 +248,7 @@ WHERE pending_settings.name IN (
 
 // fillStatus extract the current instance information into the PostgresqlStatus
 // structure
-func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus, options GetStatusOptions) error {
+func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 	var err error
 
 	if result.IsPrimary {
@@ -277,15 +272,13 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus, options 
 		return err
 	}
 
-	if options.IncludeBaseBackupStatus {
-		cluster, err := cache.LoadClusterUnsafe()
-		if err != nil {
-			return err
-		}
+	cluster, err := cache.LoadClusterUnsafe()
+	if err != nil {
+		return err
+	}
 
-		if err := instance.fillBasebackupStats(cluster, superUserDB, result); err != nil {
-			return err
-		}
+	if err := instance.fillBasebackupStats(cluster, superUserDB, result); err != nil {
+		return err
 	}
 
 	return instance.fillWalStatus(result)
