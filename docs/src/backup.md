@@ -44,6 +44,11 @@ On the other hand, CloudNativePG supports two ways to store physical base backup
     you take some time to familiarize with some basic concepts, like WAL archive,
     hot and cold backups.
 
+!!! Important
+    Please refer to the official Kubernetes documentation for a list of all
+    the supported [Container Storage Interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
+    that provide snapshotting capabilities.
+
 ## WAL archive
 
 The WAL archive in PostgreSQL is at the heart of **continuous backup**, and it
