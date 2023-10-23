@@ -125,8 +125,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 	// will change no matter what, the next reconciliation cycle we would update the password
 	appendPasswordOption(role, &query)
 
-	_, err := sm.superUserDB.ExecContext(ctx, query.String())
-	if err != nil {
+	if err := executeWithLocalCommit(sm.superUserDB, query.String()); err != nil {
 		return wrapErr(err)
 	}
 	return nil
@@ -151,7 +150,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
+	if err := executeWithLocalCommit(sm.superUserDB, query.String()); err != nil {
 		return wrapErr(err)
 	}
 
@@ -160,7 +159,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
 
-		if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
+		if err := executeWithLocalCommit(sm.superUserDB, query.String()); err != nil {
 			return wrapErr(err)
 		}
 	}
@@ -178,8 +177,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 
 	query := fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize())
 	contextLog.Debug("Dropping", "query", query)
-	_, err := sm.superUserDB.ExecContext(ctx, query)
-	if err != nil {
+	if err := executeWithLocalCommit(sm.superUserDB, query); err != nil {
 		return wrapErr(err)
 	}
 
@@ -220,8 +218,7 @@ func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRo
 	query := fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 		pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment))
 	contextLog.Debug("Updating comment", "query", query)
-	_, err := sm.superUserDB.ExecContext(ctx, query)
-	if err != nil {
+	if err := executeWithLocalCommit(sm.superUserDB, query); err != nil {
 		return wrapErr(err)
 	}
 
@@ -273,6 +270,13 @@ func (sm PostgresRoleManager) UpdateMembership(
 		}
 	}()
 
+	// we don't want to be stuck here if synchronous replicas are still not alive
+	// and kicking
+	_, err = tx.Exec("SET LOCAL synchronous_commit to LOCAL")
+	if err != nil {
+		return err
+	}
+
 	for _, sqlQuery := range queries {
 		contextLog.Debug("Executing query", "sqlQuery", sqlQuery)
 		if _, err := sm.superUserDB.ExecContext(ctx, sqlQuery); err != nil {
@@ -311,6 +315,34 @@ func (sm PostgresRoleManager) GetParentRoles(
 	}
 
 	return parentRoles, nil
+}
+
+// executeWithLocalCommit execute the query with commit ack only when WAL flush to local
+// synchronous_commit=local
+func executeWithLocalCommit(db *sql.DB, statement string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// This has no effect if the transaction
+		// is committed
+		_ = tx.Rollback()
+	}()
+
+	// we don't want to be stuck here if synchronous replicas are still not alive
+	// and kicking
+	_, err = tx.Exec("SET LOCAL synchronous_commit to LOCAL")
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(statement)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
