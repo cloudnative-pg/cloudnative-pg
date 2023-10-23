@@ -63,17 +63,13 @@ func (instance *Instance) IsServerReady() error {
 	return superUserDB.Ping()
 }
 
-// StatusOption is as a function to select which information to include in the status
-type StatusOption func(*StatusSelection)
-
-// StatusSelection is used to select which information to include in the status
-type StatusSelection struct {
-	// BasebackupInfo indicates whether to include basebackup information in the status
-	BasebackupInfo bool
+// GetStatusOptions contains a list of parameters capable of altering the postgres.PostgresqlStatus content
+type GetStatusOptions struct {
+	IncludeBaseBackupStatus bool
 }
 
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus(options ...StatusOption) (result *postgres.PostgresqlStatus, err error) {
+func (instance *Instance) GetStatus(options GetStatusOptions) (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
 		InstanceManagerVersion: versions.Version,
@@ -129,12 +125,7 @@ func (instance *Instance) GetStatus(options ...StatusOption) (result *postgres.P
 		}
 	}
 
-	statusSelection := &StatusSelection{}
-	for _, option := range options {
-		option(statusSelection)
-	}
-
-	err = instance.fillStatus(result, statusSelection)
+	err = instance.fillStatus(result, options)
 	if err != nil {
 		return result, err
 	}
@@ -261,7 +252,7 @@ WHERE pending_settings.name IN (
 
 // fillStatus extract the current instance information into the PostgresqlStatus
 // structure
-func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus, selection *StatusSelection) error {
+func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus, options GetStatusOptions) error {
 	var err error
 
 	if result.IsPrimary {
@@ -285,7 +276,7 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus, selectio
 		return err
 	}
 
-	if selection.BasebackupInfo {
+	if options.IncludeBaseBackupStatus {
 		cluster, err := cache.LoadClusterUnsafe()
 		if err != nil {
 			return err
@@ -303,7 +294,6 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 	superUserDB *sql.DB,
 	result *postgres.PostgresqlStatus,
 ) error {
-	// run on 13 or above
 	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
 		return nil
 	}
@@ -313,7 +303,7 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 		return nil
 	}
 
-	var basebackupList postgres.PgStatBasebackupList
+	var basebackupList []postgres.PgStatBasebackup
 
 	rows, err := superUserDB.Query(`SELECT
 		   usename, 
@@ -337,10 +327,11 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 		}
 	}()
 
-	backupTotal := sql.NullInt64{}
-	backupStreamd := sql.NullInt64{}
-	tablespacesTotal := sql.NullInt64{}
-	tablespacesStreamed := sql.NullInt64{}
+	var backupTotal,
+		backupStreamed,
+		tbsTotal,
+		tbsStreamed sql.NullInt64
+
 	for rows.Next() {
 		pgr := postgres.PgStatBasebackup{}
 		err := rows.Scan(
@@ -349,9 +340,9 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 			&pgr.BackendStart,
 			&pgr.Phase,
 			&backupTotal,
-			&backupStreamd,
-			&tablespacesTotal,
-			&tablespacesStreamed,
+			&backupStreamed,
+			&tbsTotal,
+			&tbsStreamed,
 		)
 		if err != nil {
 			return err
@@ -360,14 +351,14 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 		if backupTotal.Valid {
 			pgr.BackupTotal = backupTotal.Int64
 		}
-		if backupStreamd.Valid {
-			pgr.BackupStreamed = backupStreamd.Int64
+		if backupStreamed.Valid {
+			pgr.BackupStreamed = backupStreamed.Int64
 		}
-		if tablespacesTotal.Valid {
-			pgr.TablespacesTotal = tablespacesTotal.Int64
+		if tbsTotal.Valid {
+			pgr.TablespacesTotal = tbsTotal.Int64
 		}
-		if tablespacesStreamed.Valid {
-			pgr.TablespacesStreamed = tablespacesStreamed.Int64
+		if tbsStreamed.Valid {
+			pgr.TablespacesStreamed = tbsStreamed.Int64
 		}
 
 		basebackupList = append(basebackupList, pgr)

@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
-	"github.com/inhies/go-bytesize"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -685,7 +684,6 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if instance.IsPrimary {
 		return "Primary"
 	}
-
 	if fullStatus.isReplicaClusterDesignatedPrimary(instance) {
 		return "Designated primary"
 	}
@@ -805,20 +803,25 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 }
 
 func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
-	fmt.Println(aurora.Green("Progress of physical backups"))
+	const header = "Progress of physical backups"
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
-		fmt.Println(aurora.Yellow("Primary instance not found").String())
+		fmt.Println(aurora.Red(header))
+		fmt.Println(aurora.Red("Primary instance not found").String())
 		fmt.Println()
 		return
 	}
 
 	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
+		fmt.Println(aurora.Yellow(header))
 		fmt.Println(aurora.Yellow("Not running physical backup").String())
 		fmt.Println()
 		return
 	}
+
+	fmt.Println(aurora.Green(header))
+	fmt.Println()
 
 	status := tabby.New()
 	status.AddHeader(
@@ -864,8 +867,30 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 	fmt.Println()
 }
 
-// formatBytes converts a number of bytes into a human readable string
+// formatBytes takes an integer value representing a number of bytes and returns
+// its human-readable format as a string. The returned string is formatted as a
+// floating-point number with 2 decimal places.
 func formatBytes(value int64) string {
-	b := bytesize.New(float64(value))
-	return b.Format("%.2f", "", false)
+	const (
+		KB = 1 << 10
+		MB = 1 << 20
+		GB = 1 << 30
+		TB = 1 << 40
+		PB = 1 << 50
+	)
+
+	switch {
+	case value < KB:
+		return fmt.Sprintf("%d Bytes", value)
+	case value < MB:
+		return fmt.Sprintf("%.2f KB", float64(value)/KB)
+	case value < GB:
+		return fmt.Sprintf("%.2f MB", float64(value)/MB)
+	case value < TB:
+		return fmt.Sprintf("%.2f GB", float64(value)/GB)
+	case value < PB:
+		return fmt.Sprintf("%.2f TB", float64(value)/TB)
+	default:
+		return fmt.Sprintf("%.2f PB", float64(value)/PB)
+	}
 }

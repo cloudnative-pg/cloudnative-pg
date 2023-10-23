@@ -19,6 +19,7 @@ package url
 
 import (
 	"fmt"
+	"net/url"
 )
 
 const (
@@ -59,9 +60,38 @@ const (
 	StatusPort int = 8000
 )
 
-// Local builds an url for the provided path on localhost, pointing to the status web server
+const (
+	// QueryParameterBaseBackup a queryparameter accepted for the PathPgStatus endpoint
+	QueryParameterBaseBackup = "basebackup"
+)
+
+// Local builds an http request pointing to localhost
 func Local(path string, port int) string {
 	return Build("localhost", path, port)
+}
+
+// WithQueryParameters appends or replaces query parameters to a given URL.
+// The function takes a raw URL string and a map of query parameters to add or update.
+// It returns the updated URL as a string or an error if the URL parsing fails.
+func WithQueryParameters(rawURL string, queryParams map[string]string) (string, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+
+	if queryParams == nil {
+		return parsedURL.String(), nil
+	}
+
+	q := parsedURL.Query()
+	for key, value := range queryParams {
+		q.Add(key, value)
+	}
+
+	// Set the modified query parameters back to the URL
+	parsedURL.RawQuery = q.Encode()
+
+	return parsedURL.String(), nil
 }
 
 // Build builds an url given the hostname and the path, pointing to the status web server

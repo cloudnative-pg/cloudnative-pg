@@ -78,7 +78,7 @@ func ExtractInstancesStatus(
 	var result postgres.PostgresqlStatusList
 
 	for idx := range filteredPods {
-		instanceStatus := getReplicaStatusFromPodViaExec(
+		instanceStatus := getInstanceStatusFromPodViaExec(
 			ctx, config, filteredPods[idx], postgresContainerName)
 		result.Items = append(result.Items, instanceStatus)
 	}
@@ -86,7 +86,7 @@ func ExtractInstancesStatus(
 	return result
 }
 
-func getReplicaStatusFromPodViaExec(
+func getInstanceStatusFromPodViaExec(
 	ctx context.Context,
 	config *rest.Config,
 	pod v1.Pod,

@@ -102,20 +102,12 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http
 	_, _ = fmt.Fprint(w, "OK")
 }
 
-// StatusBasebackup is the query parameter to enable basebackup info
-const StatusBasebackup = "basebackup"
-
-// NewStatusSelectionFromRequest returns a postgres.StatusOption from the request
-func NewStatusSelectionFromRequest(req *http.Request) postgres.StatusOption {
-	return func(selection *postgres.StatusSelection) {
-		selection.BasebackupInfo = req.URL.Query().Get(StatusBasebackup) == "true"
-	}
-}
-
 // This probe is for the instance status, including replication
 func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, req *http.Request) {
+	includeStatusBaseBackup := req.URL.Query().Get(url.QueryParameterBaseBackup) == "true"
+
 	// Extract the status of the current instance
-	status, err := ws.instance.GetStatus(NewStatusSelectionFromRequest(req))
+	status, err := ws.instance.GetStatus(postgres.GetStatusOptions{IncludeBaseBackupStatus: includeStatusBaseBackup})
 	if err != nil {
 		log.Debug(
 			"Instance status probe failing",

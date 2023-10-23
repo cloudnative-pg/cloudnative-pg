@@ -22,11 +22,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
@@ -45,11 +45,13 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func statusSubCommand(bacebackup bool) error {
-	statusURL := url.Local(url.PathPgStatus, url.StatusPort)
-
-	if bacebackup {
-		statusURL = fmt.Sprintf("%s?%s=true", statusURL, webserver.StatusBasebackup)
+func statusSubCommand(baseBackup bool) error {
+	queryParams := map[string]string{
+		url.QueryParameterBaseBackup: strconv.FormatBool(baseBackup),
+	}
+	statusURL, err := url.WithQueryParameters(url.Local(url.PathPgStatus, url.StatusPort), queryParams)
+	if err != nil {
+		return err
 	}
 
 	resp, err := http.Get(statusURL) // nolint:gosec
