@@ -803,7 +803,7 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 }
 
 func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
-	const header = "Progress of physical backups"
+	const header = "Physical backups"
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
@@ -814,14 +814,13 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 	}
 
 	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
-		fmt.Println(aurora.Yellow(header))
-		fmt.Println(aurora.Yellow("Not running physical backup").String())
+		fmt.Println(aurora.Green(header))
+		fmt.Println(aurora.Yellow("No running physical backups found").String())
 		fmt.Println()
 		return
 	}
 
 	fmt.Println(aurora.Green(header))
-	fmt.Println()
 
 	status := tabby.New()
 	status.AddHeader(
@@ -837,25 +836,20 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 	basebackupsInfo := primaryInstanceStatus.PgStatBasebackupsInfo
 
 	for _, bb := range basebackupsInfo {
-		var (
-			progress       string
-			backupTotal    string
-			backupStreamed string
-		)
-		// the value of backup total is empty before waiting for the start-of-backup checkpoint to finish
-		// reference: https://www.postgresql.org/docs/current/progress-reporting.html#BASEBACKUP-PROGRESS-REPORTING
+		// BackupTotal may be empty when PostgreSQL is waiting for a checkpoint or when the estimation
+		// have been disabled by the user (i.e. with the `--no-estimate-size` option).
+		// See: https://www.postgresql.org/docs/current/progress-reporting.html#BASEBACKUP-PROGRESS-REPORTING
+		progress := ""
 		if bb.BackupTotal != 0 {
-			progress = fmt.Sprintf("%.2f", float64(bb.BackupStreamed)/float64(bb.BackupTotal))
-			backupTotal = formatBytes(bb.BackupTotal)
-			backupStreamed = formatBytes(bb.BackupStreamed)
+			progress = fmt.Sprintf("%.2f%%", float64(bb.BackupStreamed)/float64(bb.BackupTotal))
 		}
 
 		columns := []interface{}{
 			bb.ApplicationName,
 			bb.Phase,
 			bb.BackendStart,
-			backupTotal,
-			backupStreamed,
+			bb.BackupTotalPretty,
+			bb.BackupStreamedPretty,
 			progress,
 			fmt.Sprintf("%v/%v", bb.TablespacesStreamed, bb.TablespacesTotal),
 		}
@@ -865,32 +859,4 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 
 	status.Print()
 	fmt.Println()
-}
-
-// formatBytes takes an integer value representing a number of bytes and returns
-// its human-readable format as a string. The returned string is formatted as a
-// floating-point number with 2 decimal places.
-func formatBytes(value int64) string {
-	const (
-		KB = 1 << 10
-		MB = 1 << 20
-		GB = 1 << 30
-		TB = 1 << 40
-		PB = 1 << 50
-	)
-
-	switch {
-	case value < KB:
-		return fmt.Sprintf("%d Bytes", value)
-	case value < MB:
-		return fmt.Sprintf("%.2f KB", float64(value)/KB)
-	case value < GB:
-		return fmt.Sprintf("%.2f MB", float64(value)/MB)
-	case value < TB:
-		return fmt.Sprintf("%.2f GB", float64(value)/GB)
-	case value < PB:
-		return fmt.Sprintf("%.2f TB", float64(value)/TB)
-	default:
-		return fmt.Sprintf("%.2f PB", float64(value)/PB)
-	}
 }

@@ -109,14 +109,16 @@ type PgStatReplication struct {
 
 // PgStatBasebackup contains the information for progress of basebackup as reported by the primary instance
 type PgStatBasebackup struct {
-	Usename             string `json:"usename"`
-	ApplicationName     string `json:"application_name"`
-	BackendStart        string `json:"backend_start"`
-	Phase               string `json:"phase"`
-	BackupTotal         int64  `json:"backup_total"`
-	BackupStreamed      int64  `json:"backup_streamed"`
-	TablespacesTotal    int64  `json:"tablespaces_total"`
-	TablespacesStreamed int64  `json:"tablespaces_streamed"`
+	Usename              string `json:"usename"`
+	ApplicationName      string `json:"application_name"`
+	BackendStart         string `json:"backend_start"`
+	Phase                string `json:"phase"`
+	BackupTotal          int64  `json:"backup_total"`
+	BackupStreamed       int64  `json:"backup_streamed"`
+	BackupTotalPretty    string `json:"backup_total_pretty"`
+	BackupStreamedPretty string `json:"backup_streamed_pretty"`
+	TablespacesTotal     int64  `json:"tablespaces_total"`
+	TablespacesStreamed  int64  `json:"tablespaces_streamed"`
 }
 
 // AddPod store the Pod inside the status

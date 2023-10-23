@@ -304,10 +304,12 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 		   application_name, 
 		   backend_start, 
 		   phase,
-		   backup_total, 
-		   backup_streamed,
-		   tablespaces_total, 
-		   tablespaces_streamed
+		   COALESCE(backup_total, 0),
+		   COALESCE(backup_streamed, 0),
+		   COALESCE(pg_size_pretty(backup_total), ''),
+		   COALESCE(pg_size_pretty(backup_streamed), ''),
+		   COALESCE(tablespaces_total, 0),
+		   COALESCE(tablespaces_streamed, 0)
 		FROM pg_stat_progress_basebackup b
 		   JOIN pg_stat_activity a USING (pid) 
 		WHERE application_name ~ '-join$'
@@ -322,32 +324,20 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 	}()
 
 	for rows.Next() {
-		var backupTotal, backupStreamed, tbsTotal, tbsStreamed sql.NullInt64
 		var pgr postgres.PgStatBasebackup
 		if err := rows.Scan(
 			&pgr.Usename,
 			&pgr.ApplicationName,
 			&pgr.BackendStart,
 			&pgr.Phase,
-			&backupTotal,
-			&backupStreamed,
-			&tbsTotal,
-			&tbsStreamed,
+			&pgr.BackupTotal,
+			&pgr.BackupStreamed,
+			&pgr.BackupTotalPretty,
+			&pgr.BackupStreamedPretty,
+			&pgr.TablespacesTotal,
+			&pgr.TablespacesStreamed,
 		); err != nil {
 			return err
-		}
-
-		if backupTotal.Valid {
-			pgr.BackupTotal = backupTotal.Int64
-		}
-		if backupStreamed.Valid {
-			pgr.BackupStreamed = backupStreamed.Int64
-		}
-		if tbsTotal.Valid {
-			pgr.TablespacesTotal = tbsTotal.Int64
-		}
-		if tbsStreamed.Valid {
-			pgr.TablespacesStreamed = tbsStreamed.Int64
 		}
 
 		basebackupList = append(basebackupList, pgr)
