@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -323,18 +324,14 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
+			log.Error(err, "while closing rows")
 		}
 	}()
 
-	var backupTotal,
-		backupStreamed,
-		tbsTotal,
-		tbsStreamed sql.NullInt64
-
 	for rows.Next() {
-		pgr := postgres.PgStatBasebackup{}
-		err := rows.Scan(
+		var backupTotal, backupStreamed, tbsTotal, tbsStreamed sql.NullInt64
+		var pgr postgres.PgStatBasebackup
+		if err := rows.Scan(
 			&pgr.Usename,
 			&pgr.ApplicationName,
 			&pgr.BackendStart,
@@ -343,8 +340,7 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 			&backupStreamed,
 			&tbsTotal,
 			&tbsStreamed,
-		)
-		if err != nil {
+		); err != nil {
 			return err
 		}
 
