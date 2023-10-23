@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -272,28 +271,18 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 		return err
 	}
 
-	cluster, err := cache.LoadClusterUnsafe()
-	if err != nil {
-		return err
-	}
-
-	if err := instance.fillBasebackupStats(cluster, superUserDB, result); err != nil {
+	if err := instance.fillBasebackupStats(superUserDB, result); err != nil {
 		return err
 	}
 
 	return instance.fillWalStatus(result)
 }
 
-func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
+func (instance *Instance) fillBasebackupStats(
 	superUserDB *sql.DB,
 	result *postgres.PostgresqlStatus,
 ) error {
 	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
-		return nil
-	}
-
-	// run on the primary or designated primary only
-	if cluster.Status.CurrentPrimary != instance.PodName {
 		return nil
 	}
 
@@ -304,12 +293,12 @@ func (instance *Instance) fillBasebackupStats(cluster *v1.Cluster,
 		   application_name, 
 		   backend_start, 
 		   phase,
-		   COALESCE(backup_total, 0),
-		   COALESCE(backup_streamed, 0),
-		   COALESCE(pg_size_pretty(backup_total), ''),
-		   COALESCE(pg_size_pretty(backup_streamed), ''),
-		   COALESCE(tablespaces_total, 0),
-		   COALESCE(tablespaces_streamed, 0)
+		   COALESCE(backup_total, 0) AS backup_total,
+		   COALESCE(backup_streamed, 0) AS backup_streamed,
+		   COALESCE(pg_size_pretty(backup_total), '') AS backup_total_pretty,
+		   COALESCE(pg_size_pretty(backup_streamed), '') AS backup_streamed_pretty,
+		   COALESCE(tablespaces_total, 0) AS tablespaces_total,
+		   COALESCE(tablespaces_streamed, 0) AS tablespaces_streamed
 		FROM pg_stat_progress_basebackup b
 		   JOIN pg_stat_activity a USING (pid) 
 		WHERE application_name ~ '-join$'

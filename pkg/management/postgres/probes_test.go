@@ -23,7 +23,6 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/blang/semver"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -94,40 +93,16 @@ var _ = Describe("probes", func() {
 			instance := &Instance{
 				pgVersion: &semver.Version{Major: 12},
 			}
-			Expect(instance.fillBasebackupStats(nil, nil, nil)).To(Succeed())
+			Expect(instance.fillBasebackupStats(nil, nil)).To(Succeed())
 		})
 
-		It("does nothing in case of that the instance is not a primary", func() {
+		It("set the information", func() {
 			instance := &Instance{
 				pgVersion: &semver.Version{Major: 13},
 				PodName:   "test-1",
 			}
 			status := &postgres.PostgresqlStatus{
 				IsPrimary: false,
-			}
-
-			cluster := &apiv1.Cluster{}
-			Expect(instance.fillBasebackupStats(cluster, nil, status)).To(Succeed())
-		})
-
-		It("does in case of designated primary", func() {
-			instance := &Instance{
-				pgVersion: &semver.Version{Major: 13},
-				PodName:   "test-1",
-			}
-			status := &postgres.PostgresqlStatus{
-				IsPrimary: false,
-			}
-
-			cluster := &apiv1.Cluster{
-				Spec: apiv1.ClusterSpec{
-					ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-						Enabled: true,
-					},
-				},
-				Status: apiv1.ClusterStatus{
-					CurrentPrimary: "test-1",
-				},
 			}
 
 			db, mock, err := sqlmock.New()
@@ -141,6 +116,8 @@ var _ = Describe("probes", func() {
 					"phase",
 					"backup_total",
 					"backup_streamed",
+					"backup_total_pretty",
+					"backup_streamed_pretty",
 					"tablespaces_total",
 					"tablespaces_streamed",
 				},
@@ -151,11 +128,13 @@ var _ = Describe("probes", func() {
 					"streaming database files",
 					int64(1000),
 					int64(200),
+					"1000",
+					"200",
 					int64(2),
 					int64(1),
 				))
 
-			Expect(instance.fillBasebackupStats(cluster, db, status)).To(Succeed())
+			Expect(instance.fillBasebackupStats(db, status)).To(Succeed())
 			Expect(status.PgStatBasebackupsInfo).To(HaveLen(1))
 
 			Expect(status.PgStatBasebackupsInfo[0].Usename).To(Equal("postgres"))
