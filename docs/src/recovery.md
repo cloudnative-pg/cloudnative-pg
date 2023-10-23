@@ -193,9 +193,6 @@ metadata:
 spec:
   instances: 3
 
-  superuserSecret:
-    name: superuser-secret
-
   bootstrap:
     recovery:
       backup:
@@ -219,17 +216,16 @@ Whether you recover from a recovery object store, a volume snapshot, or an
 existing `Backup` resource, the following considerations apply:
 
 - The application database name and the application database user are preserved
-from the backup that is being restored. The operator does not currently attempt
-to back up the underlying secrets, as this is part of the usual maintenance
-activity of the Kubernetes cluster itself.
-- In case you don't supply any `superuserSecret`, a new one is automatically
-generated with a secure and random password. The secret is then used to
-reset the password for the `postgres` user of the cluster.
+  from the backup that is being restored. The operator does not currently attempt
+  to back up the underlying secrets, as this is part of the usual maintenance
+  activity of the Kubernetes cluster itself.
+- To preserve the original `postgres` user password, you need to properly
+  configure `enableSuperuserAccess` and supply a `superuserSecret`.
 - By default, the recovery will continue up to the latest
-available WAL on the default target timeline (`current` for PostgreSQL up to
-11, `latest` for version 12 and above).
-You can optionally specify a `recoveryTarget` to perform a point in time
-recovery (see the ["Point in time recovery" section](#point-in-time-recovery-pitr)).
+  available WAL on the default target timeline (`current` for PostgreSQL up to
+  11, `latest` for version 12 and above).
+  You can optionally specify a `recoveryTarget` to perform a point in time
+  recovery (see the ["Point in time recovery" section](#point-in-time-recovery-pitr)).
 
 !!! Important
     Consider using the `barmanObjectStore.wal.maxParallel` option to speed
