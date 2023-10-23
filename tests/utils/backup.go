@@ -552,8 +552,8 @@ func CreateOnDemandBackup(
 	return backup, nil
 }
 
-// CreatBackup creates a Backup resource for a given cluster name
-func CreatBackup(
+// CreateBackup creates a Backup resource for a given cluster name
+func CreateBackup(
 	targetBackup apiv1.Backup,
 	env *TestingEnvironment,
 ) (*apiv1.Backup, error) {

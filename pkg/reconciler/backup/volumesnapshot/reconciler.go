@@ -224,8 +224,8 @@ func (se *Reconciler) Execute(
 			return &ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
-		backup.Status.BeginLSN = status.BeginLSN
-		backup.Status.EndLSN = status.EndLSN
+		backup.Status.BeginLSN = string(status.BeginLSN)
+		backup.Status.EndLSN = string(status.EndLSN)
 		backup.Status.SpcmapFile = status.SpcmapFile
 		backup.Status.LabelFile = status.LabelFile
 	}

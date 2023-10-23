@@ -40,8 +40,6 @@ func NewBackupClient() *BackupClient {
 	const connectionTimeout = 2 * time.Second
 	const requestTimeout = 30 * time.Second
 
-	// TODO LEO: checkpoint timeout
-
 	// We want a connection timeout to prevent waiting for the default
 	// TCP connection timeout (30 seconds) on lost SYN packets
 	timeoutClient := &http.Client{

@@ -22,12 +22,13 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	postgresUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // BackupResultData is the result of executing pg_start_backup and pg_stop_backup
 type BackupResultData struct {
-	BeginLSN   string                `json:"beginLSN,omitempty"`
-	EndLSN     string                `json:"endLSN,omitempty"`
+	BeginLSN   postgresUtils.LSN     `json:"beginLSN,omitempty"`
+	EndLSN     postgresUtils.LSN     `json:"endLSN,omitempty"`
 	LabelFile  []byte                `json:"labelFile,omitempty"`
 	SpcmapFile []byte                `json:"spcmapFile,omitempty"`
 	BackupName string                `json:"backupName,omitempty"`

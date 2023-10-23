@@ -679,7 +679,7 @@ var _ = Describe("Verify Volume Snapshot",
 				By("creating a snapshot and waiting until it's completed", func() {
 					var err error
 					backupName := fmt.Sprintf("%s-online", clusterToSnapshotName)
-					backup, err = testUtils.CreatBackup(
+					backup, err = testUtils.CreateBackup(
 						apiv1.Backup{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: namespace,
