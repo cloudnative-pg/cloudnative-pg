@@ -17,7 +17,6 @@ limitations under the License.
 package specs
 
 import (
-	"encoding/base64"
 	"fmt"
 
 	"github.com/kballard/go-shellquote"
@@ -151,14 +150,12 @@ func CreatePrimaryJobViaRestoreSnapshot(
 	}
 
 	if snapshot.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		encoded := base64.StdEncoding.EncodeToString([]byte(snapshot.Annotations[utils.BackupLabelFileAnnotationName]))
-		flag := fmt.Sprintf("--labelfile=%s", encoded)
+		flag := fmt.Sprintf("--labelfile=%s", snapshot.Annotations[utils.BackupLabelFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 
 	if snapshot.Annotations[utils.BackupSpcmapFileAnnotationName] != "" {
-		encoded := base64.StdEncoding.EncodeToString([]byte(snapshot.Annotations[utils.BackupSpcmapFileAnnotationName]))
-		flag := fmt.Sprintf("--spcmapfile=%s", encoded)
+		flag := fmt.Sprintf("--spcmapfile=%s", snapshot.Annotations[utils.BackupSpcmapFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 

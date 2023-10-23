@@ -118,9 +118,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				instance.Namespace: {},
-			},
 			ByObject: map[client.Object]cache.ByObject{
 				&apiv1.Cluster{}: {
 					Field: fields.OneTermEqualSelector("metadata.name", instance.ClusterName),

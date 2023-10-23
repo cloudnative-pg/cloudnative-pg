@@ -205,7 +205,8 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 }
 
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
-	log.Info("request method.", "method", req.Method)
+	log.Trace("request method", "method", req.Method)
+
 	switch req.Method {
 	case http.MethodGet:
 		if ws.currentBackup == nil {
@@ -217,6 +218,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 		sendDataJSONResponse(w, 200, ws.currentBackup.data)
+
 	case http.MethodPost:
 		var p StartBackupRequest
 		err := json.NewDecoder(req.Body).Decode(&p)
@@ -249,6 +251,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}
 		go ws.currentBackup.startBackup(context.Background())
 		sendDataJSONResponse(w, 200, struct{}{})
+
 	case http.MethodDelete:
 		if ws.currentBackup == nil {
 			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "")
@@ -267,7 +270,8 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 
 func (ws *remoteWebserverEndpoints) keepBackupAliveConn() {
 	for {
-		if ws.currentBackup != nil && ws.currentBackup.conn != nil {
+		if ws.currentBackup != nil && ws.currentBackup.conn != nil &&
+			ws.currentBackup.err == nil && ws.currentBackup.data.Phase != Completed {
 			log.Trace("keeping current backup connection alive")
 			_ = ws.currentBackup.conn.PingContext(context.Background())
 		}

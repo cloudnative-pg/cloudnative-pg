@@ -18,9 +18,11 @@ package volumesnapshot
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"k8s.io/utils/ptr"
 	"strconv"
 	"time"
 
@@ -152,8 +154,8 @@ func (se *Reconciler) Execute(
 		return nil, err
 	}
 
-	// Step 1: fencing
-	if len(volumeSnapshots) == 0 && !volumeSnapshotConfig.Online {
+	// Step 1: preparation of snapshot backup
+	if len(volumeSnapshots) == 0 && !volumeSnapshotConfig.GetOnline() {
 		contextLogger.Debug("Checking pre-requisites")
 		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
 			return nil, err
@@ -163,7 +165,7 @@ func (se *Reconciler) Execute(
 			return res, err
 		}
 	}
-	if len(volumeSnapshots) == 0 && volumeSnapshotConfig.Online {
+	if len(volumeSnapshots) == 0 && volumeSnapshotConfig.GetOnline() {
 		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
 		if err != nil {
 			return nil, fmt.Errorf("while getting status: %w", err)
@@ -207,7 +209,7 @@ func (se *Reconciler) Execute(
 		return nil, err
 	}
 
-	if volumeSnapshotConfig.Online {
+	if volumeSnapshotConfig.GetOnline() {
 		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
 		if err != nil {
 			return nil, fmt.Errorf("while getting status: %w", err)
@@ -231,7 +233,7 @@ func (se *Reconciler) Execute(
 	}
 
 	backup.Status.SetAsCompleted()
-	backup.Status.Online = volumeSnapshotConfig.Online
+	backup.Status.Online = ptr.To(volumeSnapshotConfig.GetOnline())
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
@@ -265,13 +267,13 @@ func annotateSnapshotsWithBackupData(
 		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
 
 		if len(backupStatus.LabelFile) > 0 {
-			// TODO LEO: base64?
-			snapshot.Annotations[utils.BackupLabelFileAnnotationName] = string(backupStatus.LabelFile)
+			snapshot.Annotations[utils.BackupLabelFileAnnotationName] = base64.StdEncoding.EncodeToString(
+				backupStatus.LabelFile)
 		}
 
 		if len(backupStatus.SpcmapFile) > 0 {
-			// TODO LEO: base64?
-			snapshot.Annotations[utils.BackupSpcmapFileAnnotationName] = string(backupStatus.SpcmapFile)
+			snapshot.Annotations[utils.BackupSpcmapFileAnnotationName] = base64.StdEncoding.EncodeToString(
+				backupStatus.SpcmapFile)
 		}
 
 		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
@@ -300,7 +302,7 @@ func backupStatusFromSnapshots(
 	backupStatus.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
 	backupStatus.EndWal = pairs["Latest checkpoint's REDO WAL file"]
 
-	if !backupStatus.Online {
+	if !backupStatus.GetOnline() {
 		backupStatus.BeginLSN = pairs["Latest checkpoint's REDO location"]
 		backupStatus.EndLSN = pairs["Latest checkpoint's REDO location"]
 	}

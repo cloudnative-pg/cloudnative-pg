@@ -1264,6 +1264,7 @@ spec:
                           to .metadata.labels snapshot resources.
                         type: object
                       online:
+                        default: true
                         description: Indicates if the backup was executed in the Online
                           mode
                         type: boolean

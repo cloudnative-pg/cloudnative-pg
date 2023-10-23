@@ -206,7 +206,17 @@ type BackupStatus struct {
 	Method BackupMethod `json:"method,omitempty"`
 
 	// Indicates if the backup was executed in the Online mode
-	Online bool `json:"online,omitempty"`
+	Online *bool `json:"online,omitempty"`
+}
+
+// GetOnline tells whether this backup was taken while the database
+// was up
+func (status *BackupStatus) GetOnline() bool {
+	if status.Online == nil {
+		return false
+	}
+
+	return *status.Online
 }
 
 // InstanceID contains the information to identify an instance

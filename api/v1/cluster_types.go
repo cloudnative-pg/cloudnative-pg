@@ -152,12 +152,23 @@ type VolumeSnapshotConfiguration struct {
 
 	// Indicates if the backup was executed in the Online mode
 	// +optional
-	Online bool `json:"online,omitempty"`
+	// +kubebuilder:default:=true
+	Online *bool `json:"online,omitempty"`
 
 	// OnlineConfiguration contains the configuration parameters for the online volume snapshot
 	// +kubebuilder:default:={waitForArchive:true,immediateCheckpoint:false}
 	// +optional
 	OnlineConfiguration OnlineConfiguration `json:"onlineConfiguration,omitempty"`
+}
+
+// GetOnline tells whether this volume snapshot configuration allows
+// online backups
+func (configuration *VolumeSnapshotConfiguration) GetOnline() bool {
+	if configuration.Online == nil {
+		return true
+	}
+
+	return *configuration.Online
 }
 
 // OnlineConfiguration contains the configuration parameters for the online volume snapshot
