@@ -649,7 +649,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 			})
 
-			FIt("should execute a backup with online set to true", func() {
+			It("should execute a backup with online set to true", func() {
 				const (
 					tableName                  = "online_test"
 					clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-hot-restore.yaml.template"
