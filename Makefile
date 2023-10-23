@@ -192,7 +192,10 @@ go-mod-check: ## Check if there's any dirty change after `go mod tidy`
 	go mod tidy ;\
 	git diff --exit-code go.mod go.sum
 
-checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint ## Runs all the checks on the project.
+run-govulncheck: govulncheck ## Check if there's any known vulnerabilities with the currently installed Go modules
+	$(GOVULNCHECK) ./...
+
+checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint run-govulncheck ## Runs all the checks on the project.
 
 ##@ Documentation
 
@@ -254,6 +257,11 @@ go-licenses: ## Download go-licenses locally if necessary.
 GO_RELEASER = $(LOCALBIN)/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
 	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@$(GORELEASER_VERSION))
+
+.PHONY: govulncheck
+GOVULNCHECK = $(LOCALBIN)/govulncheck
+govulncheck: ## Download govulncheck locally if necessary.
+	$(call go-install-tool,$(GOVULNCHECK),golang.org/x/vuln/cmd/govulncheck@latest)
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 # go-install-tool will 'go install' any package $2 and install it to $1.

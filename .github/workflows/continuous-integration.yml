@@ -147,6 +147,19 @@ jobs:
         run: |
           make go-mod-check
 
+  go-vulncheck:
+    name: Run govulncheck
+    needs:
+      - duplicate_runs
+      - change-triage
+    if: needs.duplicate_runs.outputs.should_skip != 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ env.GOLANG_VERSION }}
+
   shellcheck:
     name: Run shellcheck linter
     needs:
