@@ -30,6 +30,10 @@ on:
   schedule:
     - cron: '24 0 * * 5'
 
+# set up environment variables to be used across all the jobs
+env:
+  GOLANG_VERSION: "1.21.x"
+
 jobs:
   duplicate_runs:
     runs-on: ubuntu-22.04
@@ -68,6 +72,11 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Install Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GOLANG_VERSION }}
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
