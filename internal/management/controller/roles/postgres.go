@@ -332,13 +332,11 @@ func executeWithLocalCommit(db *sql.DB, statement string) error {
 
 	// we don't want to be stuck here if synchronous replicas are still not alive
 	// and kicking
-	_, err = tx.Exec("SET LOCAL synchronous_commit to LOCAL")
-	if err != nil {
+	if _, err := tx.Exec("SET LOCAL synchronous_commit to LOCAL"); err != nil {
 		return err
 	}
 
-	_, err = tx.Exec(statement)
-	if err != nil {
+	if _, err := tx.Exec(statement); err != nil {
 		return err
 	}
 
