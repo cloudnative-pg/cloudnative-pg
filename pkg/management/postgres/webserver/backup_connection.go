@@ -92,6 +92,14 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 	}
 	bc.data.Phase = Starting
 
+	if _, bc.err = bc.conn.ExecContext(
+		ctx,
+		"SELECT pg_create_physical_replication_slot(slot_name => $1, immediately_reserve => true, temporary => true)",
+		bc.data.BackupName,
+	); bc.err != nil {
+		return
+	}
+
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
 		row = bc.conn.QueryRowContext(ctx, "SELECT pg_start_backup($1, $2, false);", bc.data.BackupName,

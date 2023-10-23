@@ -209,16 +209,6 @@ type BackupStatus struct {
 	Online *bool `json:"online,omitempty"`
 }
 
-// GetOnline tells whether this backup was taken while the database
-// was up
-func (status *BackupStatus) GetOnline() bool {
-	if status.Online == nil {
-		return false
-	}
-
-	return *status.Online
-}
-
 // InstanceID contains the information to identify an instance
 type InstanceID struct {
 	// The pod name
@@ -311,6 +301,16 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volu
 // IsDone check if a backup is completed or still in progress
 func (backupStatus *BackupStatus) IsDone() bool {
 	return backupStatus.Phase == BackupPhaseCompleted || backupStatus.Phase == BackupPhaseFailed
+}
+
+// GetOnline tells whether this backup was taken while the database
+// was up
+func (backupStatus *BackupStatus) GetOnline() bool {
+	if backupStatus.Online == nil {
+		return false
+	}
+
+	return *backupStatus.Online
 }
 
 // IsCompletedVolumeSnapshot checks if a backup is completed using the volume snapshot method.

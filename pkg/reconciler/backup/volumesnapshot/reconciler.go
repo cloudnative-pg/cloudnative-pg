@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"k8s.io/utils/ptr"
 	"strconv"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -209,6 +209,7 @@ func (se *Reconciler) Execute(
 		return nil, err
 	}
 
+	// nolint: nestif
 	if volumeSnapshotConfig.GetOnline() {
 		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
 		if err != nil {

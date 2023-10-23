@@ -685,14 +685,14 @@ parameter is omitted</p>
 </td>
 </tr>
 <tr><td><code>labelFile</code><br/>
-<i>string</i>
+<i>[]byte</i>
 </td>
 <td>
    <p>LabelFile used in case of Online backups</p>
 </td>
 </tr>
 <tr><td><code>spcmapFile</code><br/>
-<i>string</i>
+<i>[]byte</i>
 </td>
 <td>
    <p>SpcmapFile used in case of Online backups</p>
