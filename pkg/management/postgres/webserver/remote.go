@@ -81,7 +81,7 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 
 	err := ws.instance.IsServerHealthy()
 	if err != nil {
-		log.Info("Liveness probe failing", "err", err.Error())
+		log.Debug("Liveness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -93,7 +93,7 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 // This is the readiness probe
 func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http.Request) {
 	if err := ws.instance.IsServerReady(); err != nil {
-		log.Info("Readiness probe failing", "err", err.Error())
+		log.Debug("Readiness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -107,7 +107,7 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 	// Extract the status of the current instance
 	status, err := ws.instance.GetStatus()
 	if err != nil {
-		log.Info(
+		log.Debug(
 			"Instance status probe failing",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -118,7 +118,7 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 	log.Trace("Instance status probe succeeding")
 	js, err := json.Marshal(status)
 	if err != nil {
-		log.Info(
+		log.Warning(
 			"Internal error marshalling instance status",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -136,7 +136,7 @@ func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http
 
 	out, err := ws.instance.GetPgControldata()
 	if err != nil {
-		log.Info(
+		log.Debug(
 			"Instance pg_controldata endpoint failing",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -145,7 +145,7 @@ func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http
 
 	res, err := json.Marshal(Response{Data: out})
 	if err != nil {
-		log.Info(
+		log.Warning(
 			"Internal error marshalling pg_controldata response",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
