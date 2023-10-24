@@ -27,5 +27,5 @@ var conditionReasonRegexp = regexp.MustCompile(`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z
 // IsConditionReasonValid checks if a certain condition reason is valid or not given the
 // Kubernetes API requirements
 func IsConditionReasonValid(conditionReason string) bool {
-	return conditionReasonRegexp.Match([]byte(conditionReason))
+	return conditionReasonRegexp.MatchString(conditionReason)
 }
