@@ -446,5 +446,5 @@ func getConnectionPoolerForExternalCluster(
 		}
 	}
 
-	return pool.NewConnectionPool(sourceDBConnectionString), nil
+	return pool.NewPostgresqlConnectionPool(sourceDBConnectionString), nil
 }

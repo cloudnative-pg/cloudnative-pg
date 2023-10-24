@@ -154,7 +154,7 @@ func (e *Exporter) ConnectionPool() pool.Pooler {
 			config.PgBouncerAdminUser,
 		)
 
-		e.pool = pool.NewConnectionPool(dsn)
+		e.pool = pool.NewPgbouncerConnectionPool(dsn)
 	}
 
 	return e.pool

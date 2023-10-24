@@ -633,7 +633,7 @@ func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 			applicationName,
 		)
 
-		instance.pool = pool.NewConnectionPool(dsn)
+		instance.pool = pool.NewPostgresqlConnectionPool(dsn)
 	}
 
 	return instance.pool
@@ -642,7 +642,7 @@ func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 // PrimaryConnectionPool gets or initializes the primary connection pool for this instance
 func (instance *Instance) PrimaryConnectionPool() *pool.ConnectionPool {
 	if instance.primaryPool == nil {
-		instance.primaryPool = pool.NewConnectionPool(instance.GetPrimaryConnInfo())
+		instance.primaryPool = pool.NewPostgresqlConnectionPool(instance.GetPrimaryConnInfo())
 	}
 
 	return instance.primaryPool

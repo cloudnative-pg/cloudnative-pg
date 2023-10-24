@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package pool
 
 import (
 	"database/sql"
@@ -24,26 +24,19 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
-// NewSimpleDBConnection creates a postgres connection with the simple protocol
-func NewSimpleDBConnection(connectionString string) (*sql.DB, error) {
+// ConnectionProfile represent a predefined set of connection configuration
+type ConnectionProfile interface {
+	// Enrich applies the configuration of the profile to a connection configuration
+	Enrich(config *pgx.ConnConfig)
+}
+
+// NewDBConnection creates a postgres connection with the simple protocol
+func NewDBConnection(connectionString string, profile ConnectionProfile) (*sql.DB, error) {
 	conf, err := pgx.ParseConfig(connectionString)
 	if err != nil {
 		return nil, err
 	}
-
-	// The simple query protocol is needed since we're going to use
-	// this function to connect to the PgBouncer administrative
-	// interface, which doesn't support the extended one.
-	conf.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
-
-	// This is required by pgx when using the simple protocol during
-	// the sanitization of the strings. Do not remove.
-	conf.RuntimeParams["client_encoding"] = "UTF8"
-
-	// Set the default datestyle in the connection helps to keep
-	// a standard date format for the operator to manage the dates
-	// when it's needed
-	conf.RuntimeParams["datestyle"] = "ISO"
+	profile.Enrich(conf)
 
 	return sql.Open("pgx", stdlib.RegisterConnConfig(conf))
 }

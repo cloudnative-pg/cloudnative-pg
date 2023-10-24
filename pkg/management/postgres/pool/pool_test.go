@@ -25,7 +25,7 @@ import (
 
 var _ = Describe("Connection pool test", func() {
 	It("can create a new connection", func() {
-		pool := NewConnectionPool("host=127.0.0.1")
+		pool := NewPostgresqlConnectionPool("host=127.0.0.1")
 
 		conn, err := pool.newConnection("test")
 		Expect(err).ToNot(HaveOccurred())
@@ -34,18 +34,18 @@ var _ = Describe("Connection pool test", func() {
 	})
 
 	It("is initially empty", func() {
-		pool := NewConnectionPool("host=127.0.0.1")
+		pool := NewPostgresqlConnectionPool("host=127.0.0.1")
 		Expect(pool.connectionMap).To(BeEmpty())
 	})
 
 	It("stores created connections", func() {
-		pool := NewConnectionPool("host=127.0.0.1")
+		pool := NewPostgresqlConnectionPool("host=127.0.0.1")
 		Expect(pool.Connection("test")).ToNot(BeNil())
 		Expect(pool.connectionMap).To(HaveLen(1))
 	})
 
 	It("shut down connections on request", func() {
-		pool := NewConnectionPool("host=127.0.0.1")
+		pool := NewPostgresqlConnectionPool("host=127.0.0.1")
 		Expect(pool.Connection("test")).ToNot(BeNil())
 		pool.ShutdownConnections()
 		Expect(pool.connectionMap).To(BeEmpty())
