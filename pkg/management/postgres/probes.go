@@ -308,7 +308,7 @@ func (instance *Instance) fillBasebackupStats(
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			log.Error(err, "while closing rows")
+			log.Error(closeErr, "while closing rows")
 		}
 	}()
 
@@ -413,9 +413,12 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 	coalesce(wal_status::text, ''),
 	safe_wal_size
     FROM pg_replication_slots`)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
+			log.Error(closeErr, "while closing rows")
 		}
 	}()
 	for rows.Next() {
@@ -487,7 +490,7 @@ func (instance *Instance) fillWalStatusFromConnection(result *postgres.Postgresq
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
+			log.Error(closeErr, "while closing rows")
 		}
 	}()
 
