@@ -107,8 +107,8 @@ var (
 	// ErrPgRejectingConnection postgres is alive, but rejecting connections
 	ErrPgRejectingConnection = fmt.Errorf("server is alive but rejecting connections")
 
-	// errNoConnectionEstablished postgres is alive, but rejecting connections
-	errNoConnectionEstablished = fmt.Errorf("could not establish connection")
+	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
+	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -958,7 +958,7 @@ func PgIsReady() error {
 		case pqPingReject:
 			return ErrPgRejectingConnection
 		case pqPingNoResponse:
-			return errNoConnectionEstablished
+			return ErrNoConnectionEstablished
 		case pgPingNoAttempt:
 			return fmt.Errorf("pg_isready usage error: %w", err)
 		default:
