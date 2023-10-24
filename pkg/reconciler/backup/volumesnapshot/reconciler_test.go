@@ -89,6 +89,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Backup: &apiv1.BackupConfiguration{
 					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
 						ClassName: "csi-hostpath-snapclass",
+						Online:    ptr.To(false),
 					},
 				},
 			},

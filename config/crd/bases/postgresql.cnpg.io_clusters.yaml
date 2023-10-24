@@ -1265,15 +1265,16 @@ spec:
                         type: object
                       online:
                         default: true
-                        description: Indicates if the backup will be executed in the
-                          Online mode
+                        description: Whether the default type of backup with volume
+                          snapshots is online/hot (`true`, default) or offline/cold
+                          (`false`)
                         type: boolean
                       onlineConfiguration:
                         default:
                           immediateCheckpoint: false
                           waitForArchive: true
-                        description: OnlineConfiguration contains the configuration
-                          parameters for the online volume snapshot
+                        description: Configuration parameters to control the online/hot
+                          backup with volume snapshots
                         properties:
                           immediateCheckpoint:
                             description: Control whether the I/O workload for the

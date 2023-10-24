@@ -151,7 +151,8 @@ spec:
                 description: The ID of the Barman backup
                 type: string
               backupLabelFile:
-                description: BackupLabelFile used in case of Online backups
+                description: Backup label file content as returned by Postgres in
+                  case of online (hot) backups
                 format: byte
                 type: string
               backupName:
@@ -243,7 +244,8 @@ spec:
                 description: The backup method being used
                 type: string
               online:
-                description: Indicates if the backup was executed in the Online mode
+                description: Whether the backup was online/hot (`true`) or offline/cold
+                  (`false`)
                 type: boolean
               phase:
                 description: The last backup status
@@ -345,7 +347,8 @@ spec:
                 format: date-time
                 type: string
               tablespaceMapFile:
-                description: TablespaceMapFile used in case of Online backups
+                description: Tablespace map file content as returned by Postgres in
+                  case of online (hot) backups
                 format: byte
                 type: string
             type: object

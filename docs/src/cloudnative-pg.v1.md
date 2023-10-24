@@ -688,14 +688,14 @@ parameter is omitted</p>
 <i>[]byte</i>
 </td>
 <td>
-   <p>BackupLabelFile used in case of Online backups</p>
+   <p>Backup label file content as returned by Postgres in case of online (hot) backups</p>
 </td>
 </tr>
 <tr><td><code>tablespaceMapFile</code><br/>
 <i>[]byte</i>
 </td>
 <td>
-   <p>TablespaceMapFile used in case of Online backups</p>
+   <p>Tablespace map file content as returned by Postgres in case of online (hot) backups</p>
 </td>
 </tr>
 <tr><td><code>instanceID</code><br/>
@@ -723,7 +723,7 @@ parameter is omitted</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Indicates if the backup was executed in the Online mode</p>
+   <p>Whether the backup was online/hot (<code>true</code>) or offline/cold (<code>false</code>)</p>
 </td>
 </tr>
 </tbody>
@@ -4385,14 +4385,15 @@ It is the default class for the other types if no specific class is present</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Indicates if the backup will be executed in the Online mode</p>
+   <p>Whether the default type of backup with volume snapshots is
+online/hot (<code>true</code>, default) or offline/cold (<code>false</code>)</p>
 </td>
 </tr>
 <tr><td><code>onlineConfiguration</code><br/>
 <a href="#postgresql-cnpg-io-v1-OnlineConfiguration"><i>OnlineConfiguration</i></a>
 </td>
 <td>
-   <p>OnlineConfiguration contains the configuration parameters for the online volume snapshot</p>
+   <p>Configuration parameters to control the online/hot backup with volume snapshots</p>
 </td>
 </tr>
 </tbody>
