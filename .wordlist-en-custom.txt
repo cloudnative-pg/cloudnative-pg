@@ -182,7 +182,6 @@ LDAPScheme
 LPV
 LSN
 LTS
-LabelFile
 LastBackupFailed
 LastBackupSucceeded
 LastFailedArchiveTime
@@ -360,7 +359,6 @@ Slonik
 SnapshotOwnerReference
 SnapshotType
 Snapshotting
-SpcmapFile
 Stackgres
 StatefulSets
 StorageClass
@@ -740,7 +738,6 @@ kubelet
 kubernetes
 labelColumnName
 labelColumnValue
-labelFile
 labelName
 labelSelector
 labelValue

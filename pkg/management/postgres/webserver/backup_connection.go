@@ -23,6 +23,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	postgresUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -72,16 +73,17 @@ func newBackupConnection(
 		return nil, err
 	}
 
+	vers, err := utils.GetPgVersion(superUserDB)
+	if err != nil {
+		return nil, err
+	}
+
 	// the context is used only while obtaining the connection
 	conn, err := superUserDB.Conn(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	vers, err := instance.GetPgVersion()
-	if err != nil {
-		return nil, err
-	}
 	return &backupConnection{
 		immediateCheckpoint:  immediateCheckpoint,
 		waitForArchive:       waitForArchive,
@@ -97,6 +99,7 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 	}
 	bc.data.Phase = Starting
 
+	// TODO: refactor with the same logic of GetSlotNameFromInstanceName in the api package
 	slotName := replicationSlotInvalidCharacters.ReplaceAllString(bc.data.BackupName, "_")
 	if _, bc.err = bc.conn.ExecContext(
 		ctx,

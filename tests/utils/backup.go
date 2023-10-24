@@ -514,6 +514,7 @@ func CreateOnDemandBackupViaKubectlPlugin(
 
 // CreateOnDemandBackup creates a Backup resource for a given cluster name
 // Deprecated: Use CreateBackup.
+// TODO: eradicate
 func CreateOnDemandBackup(
 	namespace,
 	clusterName,

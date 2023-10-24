@@ -268,6 +268,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 	}
 }
 
+// TODO: no need to active ping, we are connected locally
 func (ws *remoteWebserverEndpoints) keepBackupAliveConn() {
 	for {
 		if ws.currentBackup != nil && ws.currentBackup.conn != nil &&

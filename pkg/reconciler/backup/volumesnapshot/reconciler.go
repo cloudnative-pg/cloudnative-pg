@@ -132,6 +132,7 @@ func (se *Reconciler) enrichSnapshot(
 }
 
 // Execute the volume snapshot of the given cluster instance
+// TODO: remove the nolint
 // nolint: gocognit
 func (se *Reconciler) Execute(
 	ctx context.Context,
@@ -208,6 +209,7 @@ func (se *Reconciler) Execute(
 		return nil, err
 	}
 
+	// TODO: remove the nolint
 	// nolint: nestif
 	if volumeSnapshotConfig.GetOnline() {
 		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
@@ -246,6 +248,7 @@ func (se *Reconciler) Execute(
 
 	if err := annotateSnapshotsWithBackupData(ctx, se.cli, snapshots, &backup.Status); err != nil {
 		contextLogger.Error(err, "while enriching the snapshots's status")
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, se.cli, backup)

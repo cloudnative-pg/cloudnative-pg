@@ -47,9 +47,9 @@ var _ = Describe("Verify Volume Snapshot",
 
 		Context("using the kubectl cnpg plugin", Ordered, func() {
 			const (
+				sampleFile      = fixturesDir + "/volume_snapshot/cluster-volume-snapshot.yaml.template"
 				namespacePrefix = "volume-snapshot"
 				level           = tests.High
-				sampleFile      = fixturesDir + "/volume_snapshot/cluster-volume-snapshot.yaml.template"
 			)
 
 			var clusterName string
