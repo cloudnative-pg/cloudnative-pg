@@ -56,7 +56,7 @@ const (
 	StatusPort int = 8000
 )
 
-// Local builds an url for the provided path on localhost, pointing to the status web server
+// Local builds an http request pointing to localhost
 func Local(path string, port int) string {
 	return Build("localhost", path, port)
 }
