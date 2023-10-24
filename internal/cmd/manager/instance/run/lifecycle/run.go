@@ -122,12 +122,6 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
 	}
 
-	_, err = tx.Exec("SET LOCAL synchronous_commit TO LOCAL")
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-
 	hasSuperuser, err := configureStreamingReplicaUser(tx)
 	if err != nil {
 		_ = tx.Rollback()
