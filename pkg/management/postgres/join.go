@@ -23,8 +23,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -33,16 +33,9 @@ import (
 // ClonePgData clones an existing server, given its connection string,
 // to a certain data directory
 func ClonePgData(connectionString, targetPgData, walDir string) error {
-	// To initiate streaming replication, the frontend sends the replication parameter
-	// in the startup message. A Boolean value of true (or on, yes, 1) tells the backend
-	// to go into physical replication walsender mode, wherein a small set of replication
-	// commands, shown below, can be issued instead of SQL statements.
-	// https://www.postgresql.org/docs/current/protocol-replication.html
-	connectionString += " replication=1"
-
 	log.Info("Waiting for server to be available", "connectionString", connectionString)
 
-	db, err := utils.NewSimpleDBConnection(connectionString)
+	db, err := pool.NewDBConnection(connectionString, pool.ConnectionProfilePostgresqlPhysicalReplication)
 	if err != nil {
 		return err
 	}
