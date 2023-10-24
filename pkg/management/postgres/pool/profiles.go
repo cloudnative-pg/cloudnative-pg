@@ -20,23 +20,25 @@ import "github.com/jackc/pgx/v5"
 
 var (
 	// ConnectionProfilePostgresql is the connection profile to be used for PostgreSQL
-	ConnectionProfilePostgresql ConnectionProfile = connectionProfilePostgresql{}
+	ConnectionProfilePostgresql connectionProfilePostgresql
 
 	// ConnectionProfilePostgresqlPhysicalReplication is the connection profile to be used for PostgreSQL
 	// using the physical replication protocol
-	ConnectionProfilePostgresqlPhysicalReplication ConnectionProfile = connectionProfilePostgresqlPhysicalReplication{}
+	ConnectionProfilePostgresqlPhysicalReplication connectionProfilePostgresqlPhysicalReplication
 
 	// ConnectionProfilePgbouncer is the connection profile to be used for Pgbouncer
-	ConnectionProfilePgbouncer ConnectionProfile = connectionProfilePgbouncer{}
+	ConnectionProfilePgbouncer connectionProfilePgbouncer
 )
 
-type connectionProfilePostgresql struct{}
+type profile struct{}
+
+type connectionProfilePostgresql profile
 
 func (connectionProfilePostgresql) Enrich(config *pgx.ConnConfig) {
 	fillDefaultParameters(config)
 }
 
-type connectionProfilePostgresqlPhysicalReplication struct{}
+type connectionProfilePostgresqlPhysicalReplication profile
 
 func (connectionProfilePostgresqlPhysicalReplication) Enrich(config *pgx.ConnConfig) {
 	fillDefaultParameters(config)
@@ -54,7 +56,7 @@ func (connectionProfilePostgresqlPhysicalReplication) Enrich(config *pgx.ConnCon
 	config.RuntimeParams["replication"] = "1"
 }
 
-type connectionProfilePgbouncer struct{}
+type connectionProfilePgbouncer profile
 
 func (connectionProfilePgbouncer) Enrich(config *pgx.ConnConfig) {
 	fillDefaultParameters(config)
