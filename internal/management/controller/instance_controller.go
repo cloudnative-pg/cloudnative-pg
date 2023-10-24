@@ -560,11 +560,6 @@ func (r *InstanceReconciler) reconcileExtensions(
 		_ = tx.Rollback()
 	}()
 
-	_, err = tx.Exec("SET LOCAL synchronous_commit TO local")
-	if err != nil {
-		return err
-	}
-
 	for _, extension := range postgres.ManagedExtensions {
 		extensionIsUsed := extension.IsUsed(userSettings)
 
@@ -616,11 +611,6 @@ func (r *InstanceReconciler) reconcilePoolers(
 		// This is a no-op when the transaction is committed
 		_ = tx.Rollback()
 	}()
-
-	_, err = tx.Exec("SET LOCAL synchronous_commit TO local")
-	if err != nil {
-		return err
-	}
 
 	var existsRole bool
 	row := tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = '%s'",
