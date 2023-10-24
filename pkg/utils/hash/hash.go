@@ -60,3 +60,16 @@ func ComputeHash(object interface{}) (string, error) {
 
 	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32())), nil
 }
+
+// ComputeVersionedHash follows the same rules of ComputeHash with the exception that accepts also a epoc value.
+// The epoc value is used to generate a new hash from a same object.
+// This is useful to force a new hash even if the original object is not changed.
+// A practical use is to force a reconciliation loop of the object.
+func ComputeVersionedHash(object interface{}, epoc int) (string, error) {
+	type versionedHash struct {
+		object interface{}
+		epoc   int
+	}
+
+	return ComputeHash(versionedHash{object: object, epoc: epoc})
+}

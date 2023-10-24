@@ -42,16 +42,15 @@ const (
 
 // Deployment create the deployment of pgbouncer, given
 // the configurations we have in the pooler specifications
-func Deployment(pooler *apiv1.Pooler,
-	cluster *apiv1.Cluster,
-) (*appsv1.Deployment, error) {
-	poolerHash, err := hash.ComputeHash(pooler.Spec)
+func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
+	poolerHash, err := hash.ComputeVersionedHash(pooler.Spec, 1)
 	if err != nil {
 		return nil, err
 	}
 
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
+		WithLabel(utils.ClusterLabelName, cluster.Name).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
@@ -124,6 +123,7 @@ func Deployment(pooler *apiv1.Pooler,
 			Namespace: pooler.Namespace,
 			Annotations: map[string]string{
 				utils.PoolerSpecHashAnnotationName: poolerHash,
+				utils.ClusterLabelName:             cluster.Name,
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
