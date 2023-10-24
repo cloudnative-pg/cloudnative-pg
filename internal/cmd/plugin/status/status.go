@@ -113,6 +113,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	}
 	status.printCertificatesStatus()
 	status.printBackupStatus()
+	status.printBasebackupStatus()
 	status.printReplicaStatus(verbose)
 	status.printUnmanagedReplicationSlotStatus()
 	status.printInstancesStatus()
@@ -797,6 +798,65 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 	}
 
 	fmt.Println(color(headerMessage))
+	status.Print()
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
+	const header = "Physical backups"
+
+	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
+	if primaryInstanceStatus == nil {
+		fmt.Println(aurora.Red(header))
+		fmt.Println(aurora.Red("Primary instance not found").String())
+		fmt.Println()
+		return
+	}
+
+	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
+		fmt.Println(aurora.Green(header))
+		fmt.Println(aurora.Yellow("No running physical backups found").String())
+		fmt.Println()
+		return
+	}
+
+	fmt.Println(aurora.Green(header))
+
+	status := tabby.New()
+	status.AddHeader(
+		"Name",
+		"Phase",
+		"Started at",
+		"Total",
+		"Transferred",
+		"Progress",
+		"Tablespaces",
+	)
+
+	basebackupsInfo := primaryInstanceStatus.PgStatBasebackupsInfo
+
+	for _, bb := range basebackupsInfo {
+		// BackupTotal may be empty when PostgreSQL is waiting for a checkpoint or when the estimation
+		// have been disabled by the user (i.e. with the `--no-estimate-size` option).
+		// See: https://www.postgresql.org/docs/current/progress-reporting.html#BASEBACKUP-PROGRESS-REPORTING
+		progress := ""
+		if bb.BackupTotal != 0 {
+			progress = fmt.Sprintf("%.2f%%", float64(bb.BackupStreamed)/float64(bb.BackupTotal))
+		}
+
+		columns := []interface{}{
+			bb.ApplicationName,
+			bb.Phase,
+			bb.BackendStart,
+			bb.BackupTotalPretty,
+			bb.BackupStreamedPretty,
+			progress,
+			fmt.Sprintf("%v/%v", bb.TablespacesStreamed, bb.TablespacesTotal),
+		}
+
+		status.AddLine(columns...)
+	}
+
 	status.Print()
 	fmt.Println()
 }
