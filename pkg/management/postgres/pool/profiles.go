@@ -36,6 +36,11 @@ type connectionProfilePostgresql profile
 
 func (connectionProfilePostgresql) Enrich(config *pgx.ConnConfig) {
 	fillDefaultParameters(config)
+
+	// We don't want to be stuck on queries if synchronous replicas
+	// are still not alive and kicking. The next reconciliation loop
+	// can keep track of them if needed.
+	config.RuntimeParams["synchronous_commit"] = "local"
 }
 
 type connectionProfilePostgresqlPhysicalReplication profile
