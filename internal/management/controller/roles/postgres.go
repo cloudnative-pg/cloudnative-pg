@@ -27,7 +27,6 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 // PostgresRoleManager is a RoleManager for a database instance
@@ -126,7 +125,8 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 	// will change no matter what, the next reconciliation cycle we would update the password
 	appendPasswordOption(role, &query)
 
-	if err := utils.ExecuteStatementWithLocalCommit(sm.superUserDB, query.String()); err != nil {
+	_, err := sm.superUserDB.ExecContext(ctx, query.String())
+	if err != nil {
 		return wrapErr(err)
 	}
 	return nil
@@ -151,7 +151,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	if err := utils.ExecuteStatementWithLocalCommit(sm.superUserDB, query.String()); err != nil {
+	if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
 		return wrapErr(err)
 	}
 
@@ -160,7 +160,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
 
-		if err := utils.ExecuteStatementWithLocalCommit(sm.superUserDB, query.String()); err != nil {
+		if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
 			return wrapErr(err)
 		}
 	}
@@ -178,7 +178,8 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 
 	query := fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize())
 	contextLog.Debug("Dropping", "query", query)
-	if err := utils.ExecuteStatementWithLocalCommit(sm.superUserDB, query); err != nil {
+	_, err := sm.superUserDB.ExecContext(ctx, query)
+	if err != nil {
 		return wrapErr(err)
 	}
 
@@ -219,7 +220,8 @@ func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRo
 	query := fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 		pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment))
 	contextLog.Debug("Updating comment", "query", query)
-	if err := utils.ExecuteStatementWithLocalCommit(sm.superUserDB, query); err != nil {
+	_, err := sm.superUserDB.ExecContext(ctx, query)
+	if err != nil {
 		return wrapErr(err)
 	}
 
@@ -260,17 +262,25 @@ func (sm PostgresRoleManager) UpdateMembership(
 		)
 	}
 
-	return utils.ExecuteWithLocalCommit(sm.superUserDB, func(tx *sql.Tx) error {
-		for _, sqlQuery := range queries {
-			contextLog.Debug("Executing query", "sqlQuery", sqlQuery)
-			if _, err := sm.superUserDB.ExecContext(ctx, sqlQuery); err != nil {
-				contextLog.Error(err, "executing query", "sqlQuery", sqlQuery, "err", err)
-				return wrapErr(err)
-			}
+	tx, err := sm.superUserDB.BeginTx(ctx, nil)
+	if err != nil {
+		return wrapErr(err)
+	}
+	defer func() {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil && rollbackErr != sql.ErrTxDone {
+			contextLog.Error(rollbackErr, "rolling back transaction")
 		}
+	}()
 
-		return nil
-	})
+	for _, sqlQuery := range queries {
+		contextLog.Debug("Executing query", "sqlQuery", sqlQuery)
+		if _, err := sm.superUserDB.ExecContext(ctx, sqlQuery); err != nil {
+			contextLog.Error(err, "executing query", "sqlQuery", sqlQuery, "err", err)
+			return wrapErr(err)
+		}
+	}
+	return tx.Commit()
 }
 
 // GetParentRoles get the in roles of this role
