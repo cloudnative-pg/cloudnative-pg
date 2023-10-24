@@ -150,12 +150,13 @@ type VolumeSnapshotConfiguration struct {
 	// +kubebuilder:default:=none
 	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
 
-	// Indicates if the backup will be executed in the Online mode
+	// Whether the default type of backup with volume snapshots is
+	// online/hot (`true`, default) or offline/cold (`false`)
 	// +optional
 	// +kubebuilder:default:=true
 	Online *bool `json:"online,omitempty"`
 
-	// OnlineConfiguration contains the configuration parameters for the online volume snapshot
+	// Configuration parameters to control the online/hot backup with volume snapshots
 	// +kubebuilder:default:={waitForArchive:true,immediateCheckpoint:false}
 	// +optional
 	OnlineConfiguration OnlineConfiguration `json:"onlineConfiguration,omitempty"`

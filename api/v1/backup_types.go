@@ -185,11 +185,11 @@ type BackupStatus struct {
 	// +optional
 	CommandError string `json:"commandError,omitempty"`
 
-	// BackupLabelFile used in case of Online backups
+	// Backup label file content as returned by Postgres in case of online (hot) backups
 	// +optional
 	BackupLabelFile []byte `json:"backupLabelFile,omitempty"`
 
-	// TablespaceMapFile used in case of Online backups
+	// Tablespace map file content as returned by Postgres in case of online (hot) backups
 	// +optional
 	TablespaceMapFile []byte `json:"tablespaceMapFile,omitempty"`
 
@@ -205,7 +205,7 @@ type BackupStatus struct {
 	// +optional
 	Method BackupMethod `json:"method,omitempty"`
 
-	// Indicates if the backup was executed in the Online mode
+	// Whether the backup was online/hot (`true`) or offline/cold (`false`)
 	Online *bool `json:"online,omitempty"`
 }
 
