@@ -108,7 +108,8 @@ through the PostgreSQL's `restore_command`, or any of the two.
 The `initdb` bootstrap method is used to create a new PostgreSQL cluster from
 scratch. It is the default one unless specified differently.
 
-The following example contains the full structure of the `initdb` configuration:
+The following example contains the full structure of the `initdb`
+configuration:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -117,9 +118,6 @@ metadata:
   name: cluster-example-initdb
 spec:
   instances: 3
-
-  superuserSecret:
-    name: superuser-secret
 
   bootstrap:
     initdb:
@@ -135,11 +133,10 @@ spec:
 The above example of bootstrap will:
 
 1. create a new `PGDATA` folder using PostgreSQL's native `initdb` command
-2. set a password for the `postgres` *superuser* from the secret named `superuser-secret`
-3. create an *unprivileged* user named `app`
-4. set the password of the latter (`app`) using the one in the `app-secret`
+2. create an *unprivileged* user named `app`
+3. set the password of the latter (`app`) using the one in the `app-secret`
    secret (make sure that `username` matches the same name of the `owner`)
-5. create a database called `app` owned by the `app` user.
+4. create a database called `app` owned by the `app` user.
 
 Thanks to the *convention over configuration paradigm*, you can let the
 operator choose a default database name (`app`) and a default application
@@ -147,10 +144,10 @@ user name (same as the database name), as well as randomly generate a
 secure password for both the superuser and the application user in
 PostgreSQL.
 
-Alternatively, you can generate your passwords, store them as secrets,
-and use them in the PostgreSQL cluster - as described in the above example.
+Alternatively, you can generate your password, store it as a secret,
+and use it in the PostgreSQL cluster - as described in the above example.
 
-The supplied secrets must comply with the specifications of the
+The supplied secret must comply with the specifications of the
 [`kubernetes.io/basic-auth` type](https://kubernetes.io/docs/concepts/configuration/secret/#basic-authentication-secret).
 As a result, the `username` in the secret must match the one of the `owner`
 (for the application secret) and `postgres` for the superuser one.
@@ -173,11 +170,8 @@ data. Applications should connect to the cluster with the user that owns
 the application database.
 
 !!! Important
-    Future implementations of the operator might allow you to create
-    additional users in a declarative configuration fashion.
-
-The `postgres` superuser and the `postgres` database are supposed to be used
-only by the operator to configure the cluster.
+    If you need to create additional users, please refer to
+    ["Declarative database role management"](declarative_role_management.md).
 
 In case you don't supply any database name, the operator will proceed
 by convention and create the `app` database, and adds it to the cluster
@@ -187,9 +181,7 @@ The user that owns the database defaults to the database name instead.
 The application user is not used internally by the operator, which instead
 relies on the superuser to reconcile the cluster with the desired status.
 
-!!! Important
-    For now, changes to the name of the superuser secret are not applied
-    to the cluster.
+### Passing options to `initdb`
 
 The actual PostgreSQL data directory is created via an invocation of the
 `initdb` PostgreSQL command. If you need to add custom options to that command
@@ -249,11 +241,12 @@ spec:
     size: 1Gi
 ```
 
-CloudNativePG supports another way to customize the behavior of the
-`initdb` invocation, using the `options` subsection. However, given that there
-are options that can break the behavior of the operator (such as `--auth` or
-`-d`), this technique is deprecated and will be removed from future versions of
-the API.
+!!! Warning
+    CloudNativePG supports another way to customize the behavior of the
+    `initdb` invocation, using the `options` subsection. However, given that there
+    are options that can break the behavior of the operator (such as `--auth` or
+    `-d`), this technique is deprecated and will be removed from future versions of
+    the API.
 
 You can also specify a custom list of queries that will be executed
 once, just after the database is created and configured. These queries will
@@ -276,18 +269,23 @@ spec:
       localeCollate: 'en_US'
       localeCType: 'en_US'
       postInitSQL:
-        - CREATE ROLE angus
-        - CREATE ROLE malcolm
+        - CREATE DATABASE angus
   storage:
     size: 1Gi
 ```
 
 !!! Warning
-    Please use the `postInitSQL`, `postInitApplicationSQL` and `postInitTemplateSQL` options with extreme care,
-    as queries are run as a superuser and can disrupt the entire cluster.
-    An error in any of those queries interrupts the bootstrap phase, leaving the cluster incomplete.
+    Please use the `postInitSQL`, `postInitApplicationSQL` and
+    `postInitTemplateSQL` options with extreme care, as queries are run as a
+    superuser and can disrupt the entire cluster.  An error in any of those queries
+    interrupts the bootstrap phase, leaving the cluster incomplete.
 
-Moreover, you can specify a list of Secrets and/or ConfigMaps which contains SQL script that will be executed after the database is created and configured. These SQL script will be executed using the **superuser** role (`postgres`), connected to the database specified in the `initdb` section:
+### Executing queries after initialization
+
+Moreover, you can specify a list of Secrets and/or ConfigMaps which contains
+SQL script that will be executed after the database is created and configured.
+These SQL script will be executed using the **superuser** role (`postgres`),
+connected to the database specified in the `initdb` section:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -313,12 +311,18 @@ spec:
 ```
 
 !!! Note
-    The SQL scripts referenced in `secretRefs` will be executed before the ones referenced in `configMapRefs`. For both sections the SQL scripts will be executed respecting the order in the list.
-    Inside SQL scripts, each SQL statement is executed in a single exec on the server according to the [PostgreSQL semantics](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-MULTI-STATEMENT), comments can be included, but internal command like `psql` cannot.
+    The SQL scripts referenced in `secretRefs` will be executed before the ones
+    referenced in `configMapRefs`. For both sections the SQL scripts will be
+    executed respecting the order in the list.  Inside SQL scripts, each SQL
+    statement is executed in a single exec on the server according to the
+    [PostgreSQL semantics](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-MULTI-STATEMENT),
+    comments can be included, but internal command like `psql` cannot.
 
 !!! Warning
-    Please make sure the existence of the entries inside the ConfigMaps or Secrets specified in `postInitApplicationSQLRefs`, otherwise the bootstrap will fail.
-    Errors in any of those SQL files will prevent the bootstrap phase to complete successfully.
+    Please make sure the existence of the entries inside the ConfigMaps or
+    Secrets specified in `postInitApplicationSQLRefs`, otherwise the bootstrap will
+    fail. Errors in any of those SQL files will prevent the bootstrap phase to
+    complete successfully.
 
 ## Bootstrap from another cluster
 
