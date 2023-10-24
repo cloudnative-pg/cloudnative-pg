@@ -22,8 +22,6 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -46,16 +44,32 @@ type ConnectionPool struct {
 	// This is the base connection string (without the "dbname" parameter)
 	baseConnectionString string
 
+	// The configuration to be used
+	connectionProfile ConnectionProfile
+
 	// A map of connection for every used database
 	connectionMap map[string]*sql.DB
 }
 
-// NewConnectionPool creates a new connectionMap of connections given
+// NewPostgresqlConnectionPool creates a new connectionMap of connections given
+// the base connection string, targeting a PostgreSQL server
+func NewPostgresqlConnectionPool(baseConnectionString string) *ConnectionPool {
+	return newConnectionPool(baseConnectionString, ConnectionProfilePostgresql)
+}
+
+// NewPgbouncerConnectionPool creates a new connectionMap of connections given
 // the base connection string
-func NewConnectionPool(baseConnectionString string) *ConnectionPool {
+func NewPgbouncerConnectionPool(baseConnectionString string) *ConnectionPool {
+	return newConnectionPool(baseConnectionString, ConnectionProfilePgbouncer)
+}
+
+// newConnectionPool creates a new connectionMap of connections given
+// the base connection string
+func newConnectionPool(baseConnectionString string, connectionProfile ConnectionProfile) *ConnectionPool {
 	return &ConnectionPool{
 		baseConnectionString: baseConnectionString,
 		connectionMap:        make(map[string]*sql.DB),
+		connectionProfile:    connectionProfile,
 	}
 }
 
@@ -87,7 +101,7 @@ func (pool *ConnectionPool) ShutdownConnections() {
 // Unix domain socket to a database with a certain name
 func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 	dsn := pool.GetDsn(dbname)
-	db, err := utils.NewSimpleDBConnection(dsn)
+	db, err := NewDBConnection(dsn, pool.connectionProfile)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create connection connectionMap: %w", err)
 	}

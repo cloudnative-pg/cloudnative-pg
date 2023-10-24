@@ -23,8 +23,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -42,7 +42,7 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 
 	log.Info("Waiting for server to be available", "connectionString", connectionString)
 
-	db, err := utils.NewSimpleDBConnection(connectionString)
+	db, err := pool.NewDBConnection(connectionString, pool.ConnectionProfilePostgresql)
 	if err != nil {
 		return err
 	}
