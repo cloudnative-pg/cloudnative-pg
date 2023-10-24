@@ -49,7 +49,7 @@ func NewPgBouncerInstance() PgBouncerInstanceInterface {
 	return &pgBouncerInstance{
 		mu:     &sync.RWMutex{},
 		paused: false,
-		pool:   pool.NewConnectionPool(dsn),
+		pool:   pool.NewPgbouncerConnectionPool(dsn),
 	}
 }
 
