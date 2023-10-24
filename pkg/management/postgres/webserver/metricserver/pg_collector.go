@@ -547,7 +547,7 @@ func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
 	if err != nil || syncReplicasFromConfig == "" {
 		return 0, err
 	}
-	if !synchronousStandbyNamesRegex.Match([]byte(syncReplicasFromConfig)) {
+	if !synchronousStandbyNamesRegex.MatchString(syncReplicasFromConfig) {
 		return 0, fmt.Errorf("not matching synchronous standby names regex: %s", syncReplicasFromConfig)
 	}
 	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[1])
