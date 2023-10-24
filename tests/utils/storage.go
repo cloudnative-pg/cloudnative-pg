@@ -101,7 +101,7 @@ func SetSnapshotNameAsEnv(
 	}
 
 	for _, item := range snapshotList.Items {
-		switch utils.PVCRole(item.Labels[utils.PvcRoleLabelName]) {
+		switch utils.PVCRole(item.Annotations[utils.PvcRoleLabelName]) {
 		case utils.PVCRolePgData:
 			err := os.Setenv(dataSnapshotName, item.Name)
 			if err != nil {
@@ -114,7 +114,7 @@ func SetSnapshotNameAsEnv(
 			}
 		default:
 			return fmt.Errorf("unrecognized PVC snapshot role: %s, name: %s",
-				item.Labels[utils.PvcRoleLabelName],
+				item.Annotations[utils.PvcRoleLabelName],
 				item.Name,
 			)
 		}
