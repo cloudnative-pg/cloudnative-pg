@@ -272,12 +272,13 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 }
 
 // GetClusterPrimary gets the primary pod of a cluster
-// Deprecated: Use utils.ClusterInstanceRoleLabelName instead of "role"
-// TODO: for backward compatibility, we are fetching the primary using the old "role" label.
 // Once the release of 1.20.3 and 1.19.5 places the new role label into the public images,
 // we should use utils.ClusterInstanceRoleLabelName instead of "role"
 func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
+
+	// Deprecated: Use utils.ClusterInstanceRoleLabelName instead of "role"
+	// TODO: for backward compatibility, we are fetching the primary using the old "role" label.
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
 		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "primary"},
 	)
