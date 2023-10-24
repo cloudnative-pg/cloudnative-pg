@@ -275,3 +275,67 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		Expect(data.Len()).To(Equal(0))
 	})
 })
+
+var _ = Describe("transferLabelsToAnnotations", func() {
+	const (
+		exampleValueOne = "value1"
+		exampleValueTwo = "value2"
+	)
+
+	var (
+		labels      map[string]string
+		annotations map[string]string
+	)
+
+	BeforeEach(func() {
+		labels = make(map[string]string)
+		annotations = make(map[string]string)
+	})
+
+	It("should not panic if labels or annotations are nil", func() {
+		Expect(func() { transferLabelsToAnnotations(nil, annotations) }).ToNot(Panic())
+		Expect(func() { transferLabelsToAnnotations(labels, nil) }).ToNot(Panic())
+		Expect(func() { transferLabelsToAnnotations(nil, nil) }).ToNot(Panic())
+	})
+
+	It("should transfer specified labels to annotations", func() {
+		labels[utils.ClusterInstanceRoleLabelName] = exampleValueOne
+		labels[utils.InstanceNameLabelName] = exampleValueTwo
+		labels[utils.ClusterRoleLabelName] = "value3"
+		labels["extraLabel"] = "value4" // This should not be transferred
+
+		transferLabelsToAnnotations(labels, annotations)
+
+		Expect(annotations[utils.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
+		Expect(annotations[utils.InstanceNameLabelName]).To(Equal(exampleValueTwo))
+		Expect(annotations[utils.ClusterRoleLabelName]).To(Equal("value3"))
+		Expect(annotations).ToNot(HaveKey("extraLabel"))
+
+		Expect(labels).ToNot(HaveKey(utils.ClusterInstanceRoleLabelName))
+		Expect(labels).ToNot(HaveKey(utils.InstanceNameLabelName))
+		Expect(labels).ToNot(HaveKey("role"))
+		Expect(labels["extraLabel"]).To(Equal("value4"))
+	})
+
+	It("should not modify annotations if label is not present", func() {
+		labels[utils.ClusterInstanceRoleLabelName] = exampleValueOne
+		labels[utils.ClusterRoleLabelName] = "value3"
+
+		transferLabelsToAnnotations(labels, annotations)
+
+		Expect(annotations[utils.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
+		Expect(annotations).ToNot(HaveKey(utils.InstanceNameLabelName))
+		Expect(annotations[utils.ClusterRoleLabelName]).To(Equal("value3"))
+	})
+
+	It("should leave annotations unchanged if no matching labels are found", func() {
+		labels["nonMatchingLabel1"] = exampleValueOne
+		labels["nonMatchingLabel2"] = exampleValueTwo
+
+		transferLabelsToAnnotations(labels, annotations)
+
+		Expect(annotations).To(BeEmpty())
+		Expect(labels).To(HaveKeyWithValue("nonMatchingLabel1", exampleValueOne))
+		Expect(labels).To(HaveKeyWithValue("nonMatchingLabel2", exampleValueTwo))
+	})
+})

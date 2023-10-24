@@ -109,9 +109,9 @@ func (se *Reconciler) enrichSnapshot(
 		}
 		startWal, ok := pgControlData["Latest checkpoint's REDO WAL file"]
 		if ok {
-			vs.Labels[utils.BackupStartWALAnnotationName] = startWal
+			vs.Annotations[utils.BackupStartWALAnnotationName] = startWal
 			// TODO: once we have online volumesnapshot backups, this should change
-			vs.Labels[utils.BackupEndWALAnnotationName] = startWal
+			vs.Annotations[utils.BackupEndWALAnnotationName] = startWal
 		}
 	} else {
 		contextLogger.Error(err, "while querying for pg_controldata")
@@ -121,7 +121,7 @@ func (se *Reconciler) enrichSnapshot(
 	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
 	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
 	// TODO: once we have online volumesnapshot backups, this should change
-	vs.Labels[utils.IsOnlineBackupLabelName] = "false"
+	vs.Annotations[utils.IsOnlineBackupLabelName] = "false"
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
@@ -364,6 +364,7 @@ func (se *Reconciler) createSnapshot(
 	utils.MergeMap(labels, snapshotConfig.Labels)
 	annotations := pvc.Annotations
 	utils.MergeMap(annotations, snapshotConfig.Annotations)
+	transferLabelsToAnnotations(labels, annotations)
 
 	snapshot := storagesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
@@ -395,6 +396,30 @@ func (se *Reconciler) createSnapshot(
 	}
 
 	return nil
+}
+
+// transferLabelsToAnnotations transfers specified labels to annotations.
+// This ensures non-required labels are removed from the upcoming PersistentVolumeClaim.
+func transferLabelsToAnnotations(labels map[string]string, annotations map[string]string) {
+	if labels == nil || annotations == nil {
+		return
+	}
+
+	labelsToBeTransferred := []string{
+		utils.InstanceNameLabelName,
+		utils.ClusterInstanceRoleLabelName,
+		utils.ClusterRoleLabelName,
+		utils.PvcRoleLabelName,
+	}
+
+	for _, key := range labelsToBeTransferred {
+		value, ok := labels[key]
+		if !ok {
+			continue
+		}
+		annotations[key] = value
+		delete(labels, key)
+	}
 }
 
 // waitSnapshotAndAnnotate waits for a certain snapshot to be ready to use. Once ready it annotates the snapshot with
