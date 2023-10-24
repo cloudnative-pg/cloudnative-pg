@@ -106,16 +106,16 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 	contextLogger.Info("Recovering from volume snapshot",
 		"sourceName", cluster.Spec.Bootstrap.Recovery.Source)
 
-	if len(info.LabelFile) > 0 {
+	if len(info.BackupLabelFile) > 0 {
 		filePath := filepath.Join(info.PgData, constants.BackupLabelFile)
-		if _, err := fileutils.WriteFileAtomic(filePath, info.LabelFile, 0o666); err != nil {
+		if _, err := fileutils.WriteFileAtomic(filePath, info.BackupLabelFile, 0o666); err != nil {
 			return err
 		}
 	}
 
-	if len(info.SpcmapFile) > 0 {
+	if len(info.TablespaceMapFile) > 0 {
 		filePath := filepath.Join(info.PgData, constants.TablespaceMapFile)
-		if _, err := fileutils.WriteFileAtomic(filePath, info.SpcmapFile, 0o666); err != nil {
+		if _, err := fileutils.WriteFileAtomic(filePath, info.TablespaceMapFile, 0o666); err != nil {
 			return err
 		}
 	}

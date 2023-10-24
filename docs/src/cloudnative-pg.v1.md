@@ -684,18 +684,18 @@ parameter is omitted</p>
    <p>The backup command output in case of error</p>
 </td>
 </tr>
-<tr><td><code>labelFile</code><br/>
+<tr><td><code>backupLabelFile</code><br/>
 <i>[]byte</i>
 </td>
 <td>
-   <p>LabelFile used in case of Online backups</p>
+   <p>BackupLabelFile used in case of Online backups</p>
 </td>
 </tr>
-<tr><td><code>spcmapFile</code><br/>
+<tr><td><code>tablespaceMapFile</code><br/>
 <i>[]byte</i>
 </td>
 <td>
-   <p>SpcmapFile used in case of Online backups</p>
+   <p>TablespaceMapFile used in case of Online backups</p>
 </td>
 </tr>
 <tr><td><code>instanceID</code><br/>
@@ -2889,7 +2889,7 @@ up again) or not (recreate it elsewhere - when <code>instances</code> &gt;1)</p>
 without waiting for WAL to be archived.
 This behavior is only useful with backup software that independently monitors WAL archiving.
 Otherwise, WAL required to make the backup consistent might be missing and make the backup useless.
-By default or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is
+By default, or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is
 enabled.
 On a standby, this means that it will wait only when archive_mode = always.
 If write activity on the primary is low, it may be useful to run pg_switch_wal on the primary in order to trigger
@@ -4385,7 +4385,7 @@ It is the default class for the other types if no specific class is present</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Indicates if the backup was executed in the Online mode</p>
+   <p>Indicates if the backup will be executed in the Online mode</p>
 </td>
 </tr>
 <tr><td><code>onlineConfiguration</code><br/>

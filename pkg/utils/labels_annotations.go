@@ -180,11 +180,11 @@ const (
 	// BackupEndTimeAnnotationName is the name of the annotation where a backup's end time is kept
 	BackupEndTimeAnnotationName = MetadataNamespace + "/backupEndTime"
 
-	// BackupLabelFileAnnotationName is the name of the annotation where the backup label file is kept
+	// BackupLabelFileAnnotationName is the name of the annotation where the `backup_label` file is kept
 	BackupLabelFileAnnotationName = MetadataNamespace + "/backupLabelFile"
 
-	// BackupSpcmapFileAnnotationName is the name of the annotation where the spcmap file is kept
-	BackupSpcmapFileAnnotationName = MetadataNamespace + "/backupSpcmapFile"
+	// BackupTablespaceMapFileAnnotationName is the name of the annotation where the `tablespace_map` file is kept
+	BackupTablespaceMapFileAnnotationName = MetadataNamespace + "/backupTablespaceMapFile"
 
 	// SnapshotStartTimeAnnotationName is the name of the annotation where a snapshot's start time is kept
 	SnapshotStartTimeAnnotationName = MetadataNamespace + "/snapshotStartTime"

@@ -150,7 +150,7 @@ type VolumeSnapshotConfiguration struct {
 	// +kubebuilder:default:=none
 	SnapshotOwnerReference SnapshotOwnerReference `json:"snapshotOwnerReference,omitempty"`
 
-	// Indicates if the backup was executed in the Online mode
+	// Indicates if the backup will be executed in the Online mode
 	// +optional
 	// +kubebuilder:default:=true
 	Online *bool `json:"online,omitempty"`
@@ -177,7 +177,7 @@ type OnlineConfiguration struct {
 	// without waiting for WAL to be archived.
 	// This behavior is only useful with backup software that independently monitors WAL archiving.
 	// Otherwise, WAL required to make the backup consistent might be missing and make the backup useless.
-	// By default or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is
+	// By default, or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is
 	// enabled.
 	// On a standby, this means that it will wait only when archive_mode = always.
 	// If write activity on the primary is low, it may be useful to run pg_switch_wal on the primary in order to trigger

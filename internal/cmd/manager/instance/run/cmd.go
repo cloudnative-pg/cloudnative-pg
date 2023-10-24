@@ -155,9 +155,10 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	exitedConditions := concurrency.MultipleExecuted{}
 
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsServer)
-	if err := ctrl.NewControllerManagedBy(mgr).
+	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
-		Complete(reconciler); err != nil {
+		Complete(reconciler)
+	if err != nil {
 		setupLog.Error(err, "unable to create controller")
 		return err
 	}

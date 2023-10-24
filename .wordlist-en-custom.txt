@@ -19,6 +19,7 @@ Azurite
 BDR
 BackupConfiguration
 BackupFrom
+BackupLabelFile
 BackupList
 BackupMethod
 BackupPhase
@@ -372,6 +373,7 @@ TCP
 TLS
 TOC
 TODO
+TablespaceMapFile
 TemporaryData
 TimelineId
 TopologyKey
@@ -458,6 +460,7 @@ backport
 backported
 backupID
 backupId
+backupLabelFile
 backupName
 backupOwnerReference
 backupRetentionPolicy
@@ -1026,7 +1029,6 @@ snapshotOwnerReference
 snapshotted
 snapshotting
 sourceNamespace
-spcmapFile
 specificities
 sql
 src
@@ -1078,6 +1080,7 @@ systemd
 sysv
 tAc
 tablespace
+tablespaceMapFile
 tablespaces
 targetImmediate
 targetLSN

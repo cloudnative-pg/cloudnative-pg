@@ -150,12 +150,12 @@ func CreatePrimaryJobViaRestoreSnapshot(
 	}
 
 	if snapshot.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--labelfile=%s", snapshot.Annotations[utils.BackupLabelFileAnnotationName])
+		flag := fmt.Sprintf("--backuplabel=%s", snapshot.Annotations[utils.BackupLabelFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 
-	if snapshot.Annotations[utils.BackupSpcmapFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--spcmapfile=%s", snapshot.Annotations[utils.BackupSpcmapFileAnnotationName])
+	if snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--tablespacemap=%s", snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 

@@ -185,13 +185,13 @@ type BackupStatus struct {
 	// +optional
 	CommandError string `json:"commandError,omitempty"`
 
-	// LabelFile used in case of Online backups
+	// BackupLabelFile used in case of Online backups
 	// +optional
-	LabelFile []byte `json:"labelFile,omitempty"`
+	BackupLabelFile []byte `json:"backupLabelFile,omitempty"`
 
-	// SpcmapFile used in case of Online backups
+	// TablespaceMapFile used in case of Online backups
 	// +optional
-	SpcmapFile []byte `json:"spcmapFile,omitempty"`
+	TablespaceMapFile []byte `json:"tablespaceMapFile,omitempty"`
 
 	// Information to identify the instance where the backup has been taken from
 	// +optional

@@ -703,7 +703,7 @@ var _ = Describe("Verify Volume Snapshot",
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
 						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
-						g.Expect(backup.Status.LabelFile).ToNot(BeEmpty())
+						g.Expect(backup.Status.BackupLabelFile).ToNot(BeEmpty())
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 				})
 

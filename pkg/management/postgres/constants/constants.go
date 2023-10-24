@@ -37,10 +37,10 @@ const (
 	// the user name maps
 	PostgresqlIdentFile = "pg_ident.conf"
 
-	// BackupLabelFile holds the content of LabelFile. Used during a restore from a hot backup.
+	// BackupLabelFile holds the content of BackupLabelFile. Used during a restore from a hot backup.
 	BackupLabelFile = "backup_label"
 
-	// TablespaceMapFile holds the content of SpcmapFile. Used during a restore from a hot backup.
+	// TablespaceMapFile holds the content of TablespaceMapFile. Used during a restore from a hot backup.
 	TablespaceMapFile = "tablespace_map"
 
 	// InitdbName is the name of the command to initialize a PostgreSQL database

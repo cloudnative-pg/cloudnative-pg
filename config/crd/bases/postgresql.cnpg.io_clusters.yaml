@@ -1265,8 +1265,8 @@ spec:
                         type: object
                       online:
                         default: true
-                        description: Indicates if the backup was executed in the Online
-                          mode
+                        description: Indicates if the backup will be executed in the
+                          Online mode
                         type: boolean
                       onlineConfiguration:
                         default:
@@ -1290,7 +1290,7 @@ spec:
                               to be archived. This behavior is only useful with backup
                               software that independently monitors WAL archiving.
                               Otherwise, WAL required to make the backup consistent
-                              might be missing and make the backup useless. By default
+                              might be missing and make the backup useless. By default,
                               or when this parameter is true, pg_backup_stop will
                               wait for WAL to be archived when archiving is enabled.
                               On a standby, this means that it will wait only when

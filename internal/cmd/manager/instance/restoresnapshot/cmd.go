@@ -35,13 +35,13 @@ import (
 // NewCmd creates the "restoresnapshot" subcommand
 func NewCmd() *cobra.Command {
 	var (
-		clusterName string
-		namespace   string
-		pgData      string
-		pgWal       string
-		labelFile   string
-		spcmapFile  string
-		immediate   bool
+		clusterName   string
+		namespace     string
+		pgData        string
+		pgWal         string
+		backupLabel   string
+		tablespaceMap string
+		immediate     bool
 	)
 
 	cmd := &cobra.Command{
@@ -63,20 +63,20 @@ func NewCmd() *cobra.Command {
 				PgWal:       pgWal,
 			}
 
-			if labelFile != "" {
-				res, err := base64.StdEncoding.DecodeString(labelFile)
+			if backupLabel != "" {
+				res, err := base64.StdEncoding.DecodeString(backupLabel)
 				if err != nil {
 					return err
 				}
-				info.LabelFile = res
+				info.BackupLabelFile = res
 			}
 
-			if spcmapFile != "" {
-				res, err := base64.StdEncoding.DecodeString(spcmapFile)
+			if tablespaceMap != "" {
+				res, err := base64.StdEncoding.DecodeString(tablespaceMap)
 				if err != nil {
 					return err
 				}
-				info.SpcmapFile = res
+				info.TablespaceMapFile = res
 			}
 
 			err := execute(ctx, info, immediate)
@@ -100,8 +100,8 @@ func NewCmd() *cobra.Command {
 		"the cluster")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be restored")
 	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "The PGWAL to be restored")
-	cmd.Flags().StringVar(&labelFile, "labelfile", "", "The labelfile to be created before the restore")
-	cmd.Flags().StringVar(&spcmapFile, "spcmapfile", "", "The spcmapfile to be created before the restore")
+	cmd.Flags().StringVar(&backupLabel, "backuplabel", "", "The restore backup_label file content")
+	cmd.Flags().StringVar(&tablespaceMap, "tablespacemap", "", "The restore tablespace_map file content")
 	cmd.Flags().BoolVar(&immediate, "immediate", false, "Do not start PostgreSQL but just recover the snapshot")
 
 	return cmd

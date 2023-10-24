@@ -228,8 +228,8 @@ func (se *Reconciler) Execute(
 
 		backup.Status.BeginLSN = string(status.BeginLSN)
 		backup.Status.EndLSN = string(status.EndLSN)
-		backup.Status.SpcmapFile = status.SpcmapFile
-		backup.Status.LabelFile = status.LabelFile
+		backup.Status.TablespaceMapFile = status.SpcmapFile
+		backup.Status.BackupLabelFile = status.LabelFile
 	}
 
 	backup.Status.SetAsCompleted()
@@ -266,14 +266,14 @@ func annotateSnapshotsWithBackupData(
 		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
 		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
 
-		if len(backupStatus.LabelFile) > 0 {
+		if len(backupStatus.BackupLabelFile) > 0 {
 			snapshot.Annotations[utils.BackupLabelFileAnnotationName] = base64.StdEncoding.EncodeToString(
-				backupStatus.LabelFile)
+				backupStatus.BackupLabelFile)
 		}
 
-		if len(backupStatus.SpcmapFile) > 0 {
-			snapshot.Annotations[utils.BackupSpcmapFileAnnotationName] = base64.StdEncoding.EncodeToString(
-				backupStatus.SpcmapFile)
+		if len(backupStatus.TablespaceMapFile) > 0 {
+			snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName] = base64.StdEncoding.EncodeToString(
+				backupStatus.TablespaceMapFile)
 		}
 
 		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {

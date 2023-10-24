@@ -150,6 +150,10 @@ spec:
               backupId:
                 description: The ID of the Barman backup
                 type: string
+              backupLabelFile:
+                description: BackupLabelFile used in case of Online backups
+                format: byte
+                type: string
               backupName:
                 description: The Name of the Barman backup
                 type: string
@@ -235,10 +239,6 @@ spec:
                     description: The pod name
                     type: string
                 type: object
-              labelFile:
-                description: LabelFile used in case of Online backups
-                format: byte
-                type: string
               method:
                 description: The backup method being used
                 type: string
@@ -336,10 +336,6 @@ spec:
                       type: object
                     type: array
                 type: object
-              spcmapFile:
-                description: SpcmapFile used in case of Online backups
-                format: byte
-                type: string
               startedAt:
                 description: When the backup was started
                 format: date-time
@@ -347,6 +343,10 @@ spec:
               stoppedAt:
                 description: When the backup was terminated
                 format: date-time
+                type: string
+              tablespaceMapFile:
+                description: TablespaceMapFile used in case of Online backups
+                format: byte
                 type: string
             type: object
         required:
