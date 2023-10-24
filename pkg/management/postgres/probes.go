@@ -30,6 +30,7 @@ import (
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -270,7 +271,69 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 		return err
 	}
 
+	if err := instance.fillBasebackupStats(superUserDB, result); err != nil {
+		return err
+	}
+
 	return instance.fillWalStatus(result)
+}
+
+func (instance *Instance) fillBasebackupStats(
+	superUserDB *sql.DB,
+	result *postgres.PostgresqlStatus,
+) error {
+	if ver, _ := instance.GetPgVersion(); ver.Major < 13 {
+		return nil
+	}
+
+	var basebackupList []postgres.PgStatBasebackup
+
+	rows, err := superUserDB.Query(`SELECT
+		   usename, 
+		   application_name, 
+		   backend_start, 
+		   phase,
+		   COALESCE(backup_total, 0) AS backup_total,
+		   COALESCE(backup_streamed, 0) AS backup_streamed,
+		   COALESCE(pg_size_pretty(backup_total), '') AS backup_total_pretty,
+		   COALESCE(pg_size_pretty(backup_streamed), '') AS backup_streamed_pretty,
+		   COALESCE(tablespaces_total, 0) AS tablespaces_total,
+		   COALESCE(tablespaces_streamed, 0) AS tablespaces_streamed
+		FROM pg_stat_progress_basebackup b
+		   JOIN pg_stat_activity a USING (pid) 
+		WHERE application_name ~ '-join$'
+		ORDER BY 1, 2`)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			log.Error(closeErr, "while closing rows")
+		}
+	}()
+
+	for rows.Next() {
+		var pgr postgres.PgStatBasebackup
+		if err := rows.Scan(
+			&pgr.Usename,
+			&pgr.ApplicationName,
+			&pgr.BackendStart,
+			&pgr.Phase,
+			&pgr.BackupTotal,
+			&pgr.BackupStreamed,
+			&pgr.BackupTotalPretty,
+			&pgr.BackupStreamedPretty,
+			&pgr.TablespacesTotal,
+			&pgr.TablespacesStreamed,
+		); err != nil {
+			return err
+		}
+
+		basebackupList = append(basebackupList, pgr)
+	}
+	result.PgStatBasebackupsInfo = basebackupList
+
+	return rows.Err()
 }
 
 // fillStatusFromPrimary get information for primary servers (including WAL and replication)
@@ -350,9 +413,12 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 	coalesce(wal_status::text, ''),
 	safe_wal_size
     FROM pg_replication_slots`)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
+			log.Error(closeErr, "while closing rows")
 		}
 	}()
 	for rows.Next() {
@@ -415,8 +481,8 @@ func (instance *Instance) fillWalStatusFromConnection(result *postgres.Postgresq
 			coalesce(sync_state, ''),
 			coalesce(sync_priority, 0)
 		FROM pg_catalog.pg_stat_replication
-		WHERE application_name LIKE $1 AND usename = $2`,
-		fmt.Sprintf("%s-%%", instance.ClusterName),
+		WHERE application_name ~ $1 AND usename = $2`,
+		fmt.Sprintf("%s-[0-9]+$", instance.ClusterName),
 		v1.StreamingReplicationUser,
 	)
 	if err != nil {
@@ -424,7 +490,7 @@ func (instance *Instance) fillWalStatusFromConnection(result *postgres.Postgresq
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
+			log.Error(closeErr, "while closing rows")
 		}
 	}()
 
