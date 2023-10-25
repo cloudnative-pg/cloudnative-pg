@@ -92,7 +92,6 @@ func (r *PoolerReconciler) updateDeployment(
 	case resources.Deployment != nil:
 		currentVersion := resources.Deployment.Annotations[utils.PoolerSpecHashAnnotationName]
 		updatedVersion := generatedDeployment.Annotations[utils.PoolerSpecHashAnnotationName]
-
 		if currentVersion == updatedVersion {
 			// Everything fine, the two deployments are using the
 			// same specifications
@@ -101,9 +100,6 @@ func (r *PoolerReconciler) updateDeployment(
 
 		deployment := resources.Deployment.DeepCopy()
 		deployment.Spec = generatedDeployment.Spec
-		if deployment.Annotations == nil {
-			deployment.Annotations = make(map[string]string)
-		}
 
 		utils.MergeMap(deployment.Labels, generatedDeployment.Labels)
 		utils.MergeMap(deployment.Annotations, generatedDeployment.Annotations)
