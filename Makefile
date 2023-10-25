@@ -328,7 +328,7 @@ kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
 
 .PHONY: operator-sdk
 operator-sdk: ## Install the operator-sdk app
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
+ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version | awk -F '"' '{print $$2}' 2>/dev/null), $(OPERATOR_SDK_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
