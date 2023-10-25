@@ -297,9 +297,9 @@ ones directly set by PgBouncer:
   export as described in the ["Monitoring"](#monitoring) section below
 - [`max_client_conn`](https://www.pgbouncer.org/config.html#max_client_conn)
 - [`max_db_connections`](https://www.pgbouncer.org/config.html#max_db_connections)
+- [`max_prepared_statements`](https://www.pgbouncer.org/config.html#max_prepared_statements)
 - [`max_user_connections`](https://www.pgbouncer.org/config.html#max_user_connections)
 - [`min_pool_size`](https://www.pgbouncer.org/config.html#min_pool_size)
-- [`min_prepared_statements`](https://www.pgbouncer.org/config.html#max_prepared_statements)
 - [`query_timeout`](https://www.pgbouncer.org/config.html#query_timeout)
 - [`query_wait_timeout`](https://www.pgbouncer.org/config.html#query_wait_timeout)
 - [`reserve_pool_size`](https://www.pgbouncer.org/config.html#reserve_pool_size)
