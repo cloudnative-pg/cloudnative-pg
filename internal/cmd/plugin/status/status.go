@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package status implements the kubectl-cnpg status command
 package status
 
 import (
