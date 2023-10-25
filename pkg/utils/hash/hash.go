@@ -14,14 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package hash allows the user to get a hash number for a given Kubernetes
-// object. This is useful to detect when a derived resource need to be
-// changed too.
-//
-// The code in this package is adapted from:
-//
-// https://github.com/kubernetes/kubernetes/blob/master/pkg/util/hash/hash.go   // wokeignore:rule=master
-// https://github.com/kubernetes/kubernetes/blob/ea07644/pkg/controller/controller_utils.go#L1189
 package hash
 
 import (
