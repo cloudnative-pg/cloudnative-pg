@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package status implements the kubectl-cnpg status command
 package status
 
 import (
@@ -198,24 +197,13 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)
 	} else {
 		summary.AddLine("Primary instance:", primaryInstance)
-		primaryInstanceTimestamp, err := time.Parse(
-			metav1.RFC3339Micro,
-			cluster.Status.CurrentPrimaryTimestamp,
-		)
-		if err == nil {
-			uptime := time.Since(primaryInstanceTimestamp)
-			summary.AddLine(
-				"Primary start time:",
-				fmt.Sprintf(
-					"%s (uptime %s)",
-					primaryInstanceTimestamp.Round(time.Second),
-					uptime.Round(time.Second),
-				),
-			)
-		} else {
-			summary.AddLine("Primary start time:", aurora.Red("error: "+err.Error()))
-		}
 	}
+
+	primaryStartTime := getPrimaryStartTime(cluster)
+	if len(primaryStartTime) > 0 {
+		summary.AddLine("Primary start time:", primaryStartTime)
+	}
+
 	summary.AddLine("Status:", fullStatus.getStatus(isPrimaryFenced, cluster))
 	if cluster.Spec.Instances == cluster.Status.Instances {
 		summary.AddLine("Instances:", aurora.Green(cluster.Spec.Instances))
@@ -859,4 +847,25 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 
 	status.Print()
 	fmt.Println()
+}
+
+func getPrimaryStartTime(cluster *apiv1.Cluster) string {
+	if len(cluster.Status.CurrentPrimaryTimestamp) == 0 {
+		return ""
+	}
+
+	primaryInstanceTimestamp, err := time.Parse(
+		metav1.RFC3339Micro,
+		cluster.Status.CurrentPrimaryTimestamp,
+	)
+	if err != nil {
+		return aurora.Red("error: " + err.Error()).String()
+	}
+
+	uptime := time.Since(primaryInstanceTimestamp)
+	return fmt.Sprintf(
+		"%s (uptime %s)",
+		primaryInstanceTimestamp.Round(time.Second),
+		uptime.Round(time.Second),
+	)
 }
