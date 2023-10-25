@@ -198,7 +198,11 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)
 	} else {
 		summary.AddLine("Primary instance:", primaryInstance)
-		summary.AddLine("Primary start time:", getPrimaryStartTime(cluster))
+	}
+
+	primaryStartTime := getPrimaryStartTime(cluster)
+	if len(primaryStartTime) > 0 {
+		summary.AddLine("Primary start time:", primaryStartTime)
 	}
 
 	summary.AddLine("Status:", fullStatus.getStatus(isPrimaryFenced, cluster))
@@ -847,7 +851,7 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 }
 
 func getPrimaryStartTime(cluster *apiv1.Cluster) string {
-	if cluster.Status.CurrentPrimaryTimestamp != "" {
+	if len(cluster.Status.CurrentPrimaryTimestamp) == 0 {
 		return ""
 	}
 
