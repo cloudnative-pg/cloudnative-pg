@@ -328,32 +328,32 @@ kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
 
 .PHONY: operator-sdk
 operator-sdk: ## Install the operator-sdk app
-ifneq ($(shell PATH="$(GOBIN):$${PATH}" operator-sdk version | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
+ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version | awk -F '"' '{print $$2}' 2>/dev/null), $(OPERATOR_SDK_VERSION))
 	@{ \
 	set -e ;\
-	mkdir -p $(GOBIN) ;\
+	mkdir -p $(LOCALBIN) ;\
 	GO_ARCH=$(shell go env GOARCH) ;\
 	SDK_OS="linux" ;\
 	if [ $$(uname) = "Darwin" ]; then SDK_OS="darwin"; fi ;\
-	curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${SDK_OS}_$${GO_ARCH}" -o "$(GOBIN)/operator-sdk" ;\
-	chmod +x "$(GOBIN)/operator-sdk" ;\
+	curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${SDK_OS}_$${GO_ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
+	chmod +x "$(LOCALBIN)/operator-sdk" ;\
 	}
-OPERATOR_SDK=$(GOBIN)/operator-sdk
+OPERATOR_SDK=$(LOCALBINB)/operator-sdk
 else
 OPERATOR_SDK=$(shell which operator-sdk)
 endif
 
 .PHONY: opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(shell which opm 2>/dev/null))
+ifeq (,$(shell PATH="$(LOCALBIN):$${PATH}" which opm 2>/dev/null))
 	@{ \
 	set -e ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	OPM_VERSION=$$(curl -s -LH "Accept:application/json" https://github.com/operator-framework/operator-registry/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/') ;\
-	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/$${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(GOBIN)/opm";\
-	chmod +x $(GOBIN)/opm ;\
+	OPM_VERSION=$$(curl -s -LH "Accept:application/json" -w "%(http_code)" https://github.com/operator-framework/operator-registry/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/') ;\
+	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/$${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(LOCALBIN)/opm";\
+	chmod +x $(LOCALBIN)/opm ;\
 	}
-OPM=$(GOBIN)/opm
+OPM=$(LOCALBIN)/opm
 else
 OPM=$(shell which opm)
 endif
