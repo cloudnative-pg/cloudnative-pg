@@ -127,15 +127,15 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "the PGWAL to be created")
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The pod name to "+
 		"be checked against the cluster state")
-	cmd.Flags().StringVar(&postInitSQLStr, "post-init-sql", "", "The list of SQL queries to be "+
-		"executed to configure the new instance")
-	cmd.Flags().StringVar(&postInitApplicationSQLStr, "post-init-application-sql", "", "The list of SQL queries to be "+
-		"executed inside application database right after the database is created")
-	cmd.Flags().StringVar(&postInitTemplateSQLStr, "post-init-template-sql", "", "The list of SQL queries to be "+
-		"executed inside template1 database to configure the new instance")
+	cmd.Flags().StringVar(&postInitSQLStr, "post-init-sql", "",
+		"The list of SQL queries to be executed to configure the new instance")
+	cmd.Flags().StringVar(&postInitApplicationSQLStr, "post-init-application-sql", "",
+		"The list of SQL queries to be executed inside application database right after the database is created")
+	cmd.Flags().StringVar(&postInitTemplateSQLStr, "post-init-template-sql", "",
+		"The list of SQL queries to be executed inside template1 database to configure the new instance")
 	cmd.Flags().StringVar(&postInitApplicationSQLRefsFolder, "post-init-application-sql-refs-folder",
 		"", "The folder contains a set of SQL files to be executed in alphabetical order "+
-			"against the application database immediately after its creationd")
+			"against the application database immediately after its creation")
 
 	return cmd
 }
