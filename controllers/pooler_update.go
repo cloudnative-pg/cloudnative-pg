@@ -32,7 +32,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
 // updateOwnedObjects ensure that we have the required objects
@@ -70,7 +69,7 @@ func (r *PoolerReconciler) updateDeployment(
 ) error {
 	contextLog := log.FromContext(ctx)
 
-	deployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
+	generatedDeployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
 	if err != nil {
 		return err
 	}
@@ -78,24 +77,21 @@ func (r *PoolerReconciler) updateDeployment(
 	switch {
 	case resources.Deployment == nil:
 		// Create a new deployment
-		if err := ctrl.SetControllerReference(pooler, deployment, r.Scheme); err != nil {
+		if err := ctrl.SetControllerReference(pooler, generatedDeployment, r.Scheme); err != nil {
 			return err
 		}
 
 		contextLog.Info("Creating deployment")
-		err := r.Create(ctx, deployment)
+		err := r.Create(ctx, generatedDeployment)
 		if err != nil && !apierrs.IsAlreadyExists(err) {
 			return err
 		}
-		resources.Deployment = deployment
+		resources.Deployment = generatedDeployment
 		return nil
 
 	case resources.Deployment != nil:
 		currentVersion := resources.Deployment.Annotations[utils.PoolerSpecHashAnnotationName]
-		updatedVersion, err := hash.ComputeHash(pooler.Spec)
-		if err != nil {
-			return err
-		}
+		updatedVersion := generatedDeployment.Annotations[utils.PoolerSpecHashAnnotationName]
 
 		if currentVersion == updatedVersion {
 			// Everything fine, the two deployments are using the
@@ -103,20 +99,22 @@ func (r *PoolerReconciler) updateDeployment(
 			return nil
 		}
 
-		updatedDeployment := resources.Deployment.DeepCopy()
-		updatedDeployment.Spec = deployment.Spec
-		if updatedDeployment.Annotations == nil {
-			updatedDeployment.Annotations = make(map[string]string)
+		deployment := resources.Deployment.DeepCopy()
+		deployment.Spec = generatedDeployment.Spec
+		if deployment.Annotations == nil {
+			deployment.Annotations = make(map[string]string)
 		}
-		updatedDeployment.Annotations[utils.PoolerSpecHashAnnotationName] = updatedVersion
+
+		utils.MergeMap(deployment.Labels, generatedDeployment.Labels)
+		utils.MergeMap(deployment.Annotations, generatedDeployment.Annotations)
 
 		contextLog.Info("Updating deployment")
-		err = r.Patch(ctx, updatedDeployment, client.MergeFrom(resources.Deployment))
+		err = r.Patch(ctx, deployment, client.MergeFrom(resources.Deployment))
 		if err != nil {
 			return err
 		}
 
-		resources.Deployment = updatedDeployment
+		resources.Deployment = deployment
 	}
 
 	return nil
