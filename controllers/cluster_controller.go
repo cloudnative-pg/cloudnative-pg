@@ -372,17 +372,18 @@ func (r *ClusterReconciler) handleSwitchover(
 	// This means issuing a failover or switchover when needed.
 	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
 	if err != nil {
-		if err == ErrWaitingOnFailOverDelay {
+		if errors.Is(err, ErrWaitingOnFailOverDelay) {
 			contextLogger.Info("Waiting for the failover delay to expire")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
-		if err == ErrWalReceiversRunning {
+		if errors.Is(err, ErrWalReceiversRunning) {
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
 			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
-			"cluster", cluster.Name)
+			"cluster", cluster.Name,
+			"error", err)
 		return &ctrl.Result{Requeue: true}, nil
 	}
 	if selectedPrimary != "" {
