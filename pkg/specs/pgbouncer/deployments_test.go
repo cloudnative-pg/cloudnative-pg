@@ -75,7 +75,7 @@ var _ = Describe("Deployment", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
 
-		expectedHash, err := hash.ComputeHash(pooler.Spec)
+		expectedHash, err := hash.ComputeVersionedHash(pooler.Spec, 1)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		// Check the computed hash
