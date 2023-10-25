@@ -49,6 +49,7 @@ var (
 		"log_stats",
 		"max_client_conn",
 		"max_db_connections",
+		"max_prepared_statements",
 		"max_user_connections",
 		"min_pool_size",
 		"query_timeout",
