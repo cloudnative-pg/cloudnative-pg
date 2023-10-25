@@ -1343,7 +1343,7 @@ func AssertCreateSASTokenCredentials(namespace string, id string, key string) {
 }
 
 func AssertROSASTokenUnableToWrite(containerName string, id string, key string) {
-	_, _, err := testsUtils.Run(fmt.Sprintf("az storage container create "+
+	_, _, err := testsUtils.RunUnchecked(fmt.Sprintf("az storage container create "+
 		"--name %v --account-name %v "+
 		"--sas-token %v", containerName, id, key))
 	Expect(err).To(HaveOccurred())
