@@ -80,6 +80,9 @@ const (
 	shutdownModeImmediate = "immediate"
 )
 
+// pgControlFileBackupExtension is the extension used to back up the pg_control file
+const pgControlFileBackupExtension = ".old"
+
 // shutdownOptions is the configuration of a shutdown request to PostgreSQL
 type shutdownOptions struct {
 	// Mode is the method we require for the shutdown
@@ -828,7 +831,7 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 // in global/pg_control been replaced with a zero length file.
 func (instance *Instance) managePgControlFileBackup() error {
 	pgControlFilePath := filepath.Join(instance.PgData, "global", "pg_control")
-	pgControlBackupFilePath := pgControlFilePath + ".old"
+	pgControlBackupFilePath := pgControlFilePath + pgControlFileBackupExtension
 
 	pgControlSize, err := fileutils.GetFileSize(pgControlFilePath)
 	if err != nil {
@@ -866,7 +869,7 @@ func (instance *Instance) managePgControlFileBackup() error {
 // removePgControlFileBackup cleans up the pg_control backup after pg_rewind has successfully completed.
 func (instance *Instance) removePgControlFileBackup() error {
 	pgControlFilePath := filepath.Join(instance.PgData, "global", "pg_control")
-	pgControlBackupFilePath := pgControlFilePath + ".old"
+	pgControlBackupFilePath := pgControlFilePath + pgControlFileBackupExtension
 
 	err := os.Remove(pgControlBackupFilePath)
 	if err != nil && !os.IsNotExist(err) {

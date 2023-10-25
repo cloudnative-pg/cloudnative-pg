@@ -41,7 +41,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	signalPath := filepath.Join(instance.PgData, "standby.signal")
 	postgresOverrideConf := filepath.Join(instance.PgData, "override.conf")
 	pgControl := filepath.Join(instance.PgData, "global", "pg_control")
-	pgControlOld := pgControl + ".old"
+	pgControlOld := pgControl + pgControlFileBackupExtension
 
 	BeforeEach(func() {
 		_, err := fileutils.WriteStringToFile(instance.PgData+"/PG_VERSION", "14")

@@ -106,6 +106,15 @@ run:
 
 issues:
   exclude-rules:
+    # Allow dot imports for ginkgo and gomega
+    - source: ginkgo|gomega
+      linters:
+      - revive
+      text: "should not use dot imports"
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - goconst
     # Exclude lll issues for lines with long annotations
     - linters:
       - lll
