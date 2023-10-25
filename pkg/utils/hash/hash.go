@@ -14,14 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package hash allows the user to get a hash number for a given Kubernetes
-// object. This is useful to detect when a derived resource need to be
-// changed too.
-//
-// The code in this package is adapted from:
-//
-// https://github.com/kubernetes/kubernetes/blob/master/pkg/util/hash/hash.go   // wokeignore:rule=master
-// https://github.com/kubernetes/kubernetes/blob/ea07644/pkg/controller/controller_utils.go#L1189
 package hash
 
 import (
@@ -59,4 +51,17 @@ func ComputeHash(object interface{}) (string, error) {
 	}
 
 	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32())), nil
+}
+
+// ComputeVersionedHash follows the same rules of ComputeHash with the exception that accepts also a epoc value.
+// The epoc value is used to generate a new hash from a same object.
+// This is useful to force a new hash even if the original object is not changed.
+// A practical use is to force a reconciliation loop of the object.
+func ComputeVersionedHash(object interface{}, epoc int) (string, error) {
+	type versionedHash struct {
+		object interface{}
+		epoc   int
+	}
+
+	return ComputeHash(versionedHash{object: object, epoc: epoc})
 }
