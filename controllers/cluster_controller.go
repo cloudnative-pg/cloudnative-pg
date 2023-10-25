@@ -382,7 +382,6 @@ func (r *ClusterReconciler) handleSwitchover(
 		}
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
-			"cluster", cluster.Name,
 			"error", err)
 		return &ctrl.Result{Requeue: true}, nil
 	}
