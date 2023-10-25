@@ -338,7 +338,7 @@ ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version | awk -F '"' '{p
 	curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${SDK_OS}_$${GO_ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
 	chmod +x "$(LOCALBIN)/operator-sdk" ;\
 	}
-OPERATOR_SDK=$(LOCALBINB)/operator-sdk
+OPERATOR_SDK=$(LOCALBIN)/operator-sdk
 else
 OPERATOR_SDK=$(shell which operator-sdk)
 endif
