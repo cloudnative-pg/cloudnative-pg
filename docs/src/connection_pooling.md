@@ -299,6 +299,7 @@ ones directly set by PgBouncer:
 - [`max_db_connections`](https://www.pgbouncer.org/config.html#max_db_connections)
 - [`max_user_connections`](https://www.pgbouncer.org/config.html#max_user_connections)
 - [`min_pool_size`](https://www.pgbouncer.org/config.html#min_pool_size)
+- [`min_prepared_statements`](https://www.pgbouncer.org/config.html#max_prepared_statements)
 - [`query_timeout`](https://www.pgbouncer.org/config.html#query_timeout)
 - [`query_wait_timeout`](https://www.pgbouncer.org/config.html#query_wait_timeout)
 - [`reserve_pool_size`](https://www.pgbouncer.org/config.html#reserve_pool_size)

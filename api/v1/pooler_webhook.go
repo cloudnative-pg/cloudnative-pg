@@ -51,6 +51,7 @@ var (
 		"max_db_connections",
 		"max_user_connections",
 		"min_pool_size",
+		"max_prepared_statements",
 		"query_timeout",
 		"query_wait_timeout",
 		"reserve_pool_size",
