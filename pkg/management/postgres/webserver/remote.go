@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,8 +34,17 @@ import (
 )
 
 type remoteWebserverEndpoints struct {
-	typedClient client.Client
-	instance    *postgres.Instance
+	typedClient   client.Client
+	instance      *postgres.Instance
+	currentBackup *backupConnection
+}
+
+// StartBackupRequest the required data to execute the pg_start_backup
+type StartBackupRequest struct {
+	ImmediateCheckpoint bool   `json:"immediateCheckpoint"`
+	WaitForArchive      bool   `json:"waitForArchive"`
+	BackupName          string `json:"backupName"`
+	Force               bool   `json:"force,omitempty"`
 }
 
 // NewRemoteWebServer returns a webserver that allows connection from external clients
@@ -52,7 +62,10 @@ func NewRemoteWebServer(
 		typedClient: typedClient,
 		instance:    instance,
 	}
+	go endpoints.keepBackupAliveConn()
+
 	serveMux := http.NewServeMux()
+	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.backup)
 	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
@@ -188,5 +201,81 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
 		_, _ = fmt.Fprint(w, "OK")
+	}
+}
+
+func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
+	log.Trace("request method", "method", req.Method)
+
+	switch req.Method {
+	case http.MethodGet:
+		if ws.currentBackup == nil {
+			sendDataJSONResponse(w, 200, struct{}{})
+			return
+		}
+		if ws.currentBackup.err != nil {
+			sendBadRequestJSONResponse(w, "ERROR_WHILE_PROCESSING", ws.currentBackup.err.Error())
+			return
+		}
+		sendDataJSONResponse(w, 200, ws.currentBackup.data)
+
+	case http.MethodPost:
+		var p StartBackupRequest
+		err := json.NewDecoder(req.Body).Decode(&p)
+		if err != nil {
+			sendBadRequestJSONResponse(w, "FAILED_TO_PARSE_REQUEST", "Failed to parse request body")
+			return
+		}
+		defer func() {
+			if err := req.Body.Close(); err != nil {
+				log.Error(err, "while closing the body")
+			}
+		}()
+		if ws.currentBackup != nil {
+			if !p.Force {
+				sendBadRequestJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
+				return
+			}
+			ws.currentBackup.stopBackup(req.Context())
+		}
+		ws.currentBackup, err = newBackupConnection(
+			req.Context(),
+			ws.instance,
+			p.BackupName,
+			p.ImmediateCheckpoint,
+			p.WaitForArchive,
+		)
+		if err != nil {
+			sendBadRequestJSONResponse(w, "INITIALIZING_CONNECTION", err.Error())
+			return
+		}
+		go ws.currentBackup.startBackup(context.Background())
+		sendDataJSONResponse(w, 200, struct{}{})
+
+	case http.MethodDelete:
+		if ws.currentBackup == nil {
+			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "")
+			return
+		}
+
+		if ws.currentBackup.data.Phase != Started {
+			sendBadRequestJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED", "")
+			return
+		}
+
+		go ws.currentBackup.stopBackup(context.Background())
+		sendDataJSONResponse(w, 200, struct{}{})
+	}
+}
+
+// TODO: no need to active ping, we are connected locally
+func (ws *remoteWebserverEndpoints) keepBackupAliveConn() {
+	for {
+		if ws.currentBackup != nil && ws.currentBackup.conn != nil &&
+			ws.currentBackup.err == nil && ws.currentBackup.data.Phase != Completed {
+			log.Trace("keeping current backup connection alive")
+			_ = ws.currentBackup.conn.PingContext(context.Background())
+		}
+		time.Sleep(3 * time.Second)
 	}
 }

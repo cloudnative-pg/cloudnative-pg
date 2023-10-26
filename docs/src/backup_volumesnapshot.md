@@ -1,24 +1,20 @@
 # Backup on volume snapshots
 
-!!! Important
-    The current implementation of volume snapshots in CloudNativePG
-    supports [cold backup](backup.md#cold-and-hot-backups) only.
-    Hot backup with direct support of
-    [PostgreSQL's low level API for base backups](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-LOWLEVEL-BASE-BACKUP)
-    will be added in version 1.22. Having said this, the current implementation
-    is suitable for production HA environments, as it will by default work on
-    the most aligned standby without impacting the primary.
+!!! Warning
+    The initial release of volume snapshots (version 1.21.0) only supported
+    cold backups, which required fencing of the instance. This limitation
+    has been waived starting with version 1.21.1. Given the minimal impact of
+    the change on the code, maintainers have decided to backport this feature
+    immediately instead of waiting for version 1.22.0 to be out, and make online
+    backups the default behavior on volume snapshots too. If you are planning
+    to rely instead on cold backups, make sure you follow the instructions below.
 
 !!! Warning
     As noted in the [backup document](backup.md), a cold snapshot explicitly
     set to target the primary will result in the primary being fenced for
     the duration of the backup, rendering the cluster read-only during that
-    time.
-
-!!! Warning
-    A volume snapshot backup requires fencing the target instance. For safety,
-    in a cluster already containing fenced instances, a cold snapshot would be
-    rejected.
+    For safety, in a cluster already containing fenced instances, a cold
+    snapshot is rejected.
 
 CloudNativePG is one of the first known cases of database operators that
 directly leverages the Kubernetes native Volume Snapshot API for both
@@ -125,6 +121,62 @@ defined in your PostgreSQL cluster.
 
 Once a cluster is defined for volume snapshot backups, you need to define
 a `ScheduledBackup` resource that requests such backups on a periodic basis.
+
+## Hot and cold backups
+
+By default, CloudNativePG requests an online/hot backup on volume snapshots, using the
+[PostgreSQL defaults of the low-level API for base backups](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-LOWLEVEL-BASE-BACKUP):
+
+- it doesn't request an immediate checkpoint when starting the backup procedure
+- it waits for the WAL archiver to archive the last segment of the backup when
+  terminating the backup procedure
+
+!!! Important
+    The default values are suitable for most production environments. Hot
+    backups are consistent and can be used to perform snapshot recovery, as we
+    ensure WAL retention from the start of the backup through a temporary
+    replication slot. However, our recommendation is to rely on cold backups for
+    that purpose.
+
+You can explicitly change the default behavior through the following options in
+the `.spec.backup.volumeSnapshot` stanza of the `Cluster` resource:
+
+- `online`: accepting `true` (default) or `false` as a value
+- `onlineConfiguration.immediateCheckpoint`: whether you want to request an
+  immediate checkpoint before you start the backup procedure or not;
+  technically, it corresponds to the `fast` argument you pass to the
+  `pg_backup_start`/`pg_start_backup()` function in PostgreSQL, accepting
+  `true` (default) or `false`
+- `onlineConfiguration.waitForArchive`: whether you want to wait for the
+  archiver to process the last segment of the backup or not; technically, it
+  corresponds to the `wait_for_archive` argument you pass to the
+  `pg_backup_stop`/`pg_stop_backup()` function in PostgreSQL, accepting `true`
+  (default) or `false`
+
+If you want to change the default behavior of your Postgres cluster to take
+cold backups by default, all you need to do is add the `online: false` option
+to your manifest, as follows:
+
+```yaml
+  # ...
+  backup:
+    volumeSnapshot:
+       online: false
+       # ...
+```
+
+If you are instead requesting an immediate checkpoint as the default behavior,
+you can add this section:
+
+```yaml
+  # ...
+  backup:
+    volumeSnapshot:
+       online: true
+       onlineConfiguration:
+         immediateCheckpoint: true
+       # ...
+```
 
 ## Persistence of volume snapshot objects
 

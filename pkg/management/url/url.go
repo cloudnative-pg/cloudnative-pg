@@ -46,6 +46,9 @@ const (
 	// PathPgBackup is the URL path for PostgreSQL Backup
 	PathPgBackup string = "/pg/backup"
 
+	// PathPgModeBackup is the URL path to interact with pg_start_backup and pg_stop_backup
+	PathPgModeBackup string = "/pg/mode/backup"
+
 	// PathMetrics is the URL path for Metrics
 	PathMetrics string = "/metrics"
 

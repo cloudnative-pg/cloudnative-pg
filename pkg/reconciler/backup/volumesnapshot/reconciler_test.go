@@ -17,8 +17,9 @@ limitations under the License.
 package volumesnapshot
 
 import (
+	"context"
 	"fmt"
-	"strconv"
+	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -66,14 +68,13 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 	const (
 		namespace   = "test-namespace"
 		clusterName = "clusterName"
-		backupName  = "theBakcup"
+		backupName  = "theBackup"
 	)
 	var (
-		cluster       *apiv1.Cluster
-		targetPod     *v1.Pod
-		pvcs          []v1.PersistentVolumeClaim
-		backup        *apiv1.Backup
-		backupCounter = 1
+		cluster   *apiv1.Cluster
+		targetPod *v1.Pod
+		pvcs      []v1.PersistentVolumeClaim
+		backup    *apiv1.Backup
 	)
 
 	BeforeEach(func() {
@@ -88,6 +89,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				Backup: &apiv1.BackupConfiguration{
 					VolumeSnapshot: &apiv1.VolumeSnapshotConfiguration{
 						ClassName: "csi-hostpath-snapclass",
+						Online:    ptr.To(false),
 					},
 				},
 			},
@@ -118,24 +120,30 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				},
 			},
 		}
+		startedAt := metav1.Now()
+		stoppedAt := metav1.NewTime(time.Now().Add(time.Hour))
+
 		backup = &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
-				Name:      backupName + strconv.Itoa(backupCounter),
+				Name:      backupName,
+			},
+			Status: apiv1.BackupStatus{
+				StartedAt: ptr.To(startedAt),
+				StoppedAt: ptr.To(stoppedAt),
 			},
 		}
-		backupCounter++
 	})
 
 	It("should fence the target pod when there are no volumesnapshots", func(ctx SpecContext) {
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
-			WithObjects(cluster, targetPod).
+			WithObjects(backup, cluster, targetPod).
 			Build()
+
 		fakeRecorder := record.NewFakeRecorder(3)
 
 		executor := NewExecutorBuilder(mockClient, fakeRecorder).
-			FenceInstance(true).
 			Build()
 
 		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
@@ -162,8 +170,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Items: []storagesnapshotv1.VolumeSnapshot{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name,
+						Namespace:   namespace,
+						Name:        backup.Name,
+						Annotations: map[string]string{},
 						Labels: map[string]string{
 							utils.BackupNameLabelName: backup.Name,
 						},
@@ -171,8 +180,9 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
-						Name:      backup.Name + "-wal",
+						Namespace:   namespace,
+						Name:        backup.Name + "-wal",
+						Annotations: map[string]string{},
 						Labels: map[string]string{
 							utils.BackupNameLabelName: backup.Name,
 						},
@@ -184,12 +194,12 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithObjects(cluster, targetPod).
+			WithStatusSubresource(backup).
 			WithLists(&snapshots).
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
 		executor := NewExecutorBuilder(mockClient, fakeRecorder).
-			FenceInstance(true).
 			Build()
 
 		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
@@ -251,13 +261,13 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
-			WithObjects(cluster, targetPod).
+			WithObjects(cluster, targetPod, backup).
+			WithStatusSubresource(backup).
 			WithLists(&snapshots).
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
 		executor := NewExecutorBuilder(mockClient, fakeRecorder).
-			FenceInstance(true).
 			Build()
 
 		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
@@ -337,5 +347,42 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 		Expect(annotations).To(BeEmpty())
 		Expect(labels).To(HaveKeyWithValue("nonMatchingLabel1", exampleValueOne))
 		Expect(labels).To(HaveKeyWithValue("nonMatchingLabel2", exampleValueTwo))
+	})
+})
+
+var _ = Describe("annotateSnapshotsWithBackupData", func() {
+	var (
+		fakeClient   k8client.Client
+		snapshots    storagesnapshotv1.VolumeSnapshotList
+		backupStatus *apiv1.BackupStatus
+		startedAt    metav1.Time
+		stoppedAt    metav1.Time
+	)
+
+	BeforeEach(func() {
+		snapshots = storagesnapshotv1.VolumeSnapshotList{
+			Items: slice{
+				{ObjectMeta: metav1.ObjectMeta{Name: "snapshot-1", Annotations: map[string]string{"avoid": "nil"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "snapshot-2", Annotations: map[string]string{"avoid": "nil"}}},
+			},
+		}
+		startedAt = metav1.Now()
+		stoppedAt = metav1.NewTime(time.Now().Add(time.Hour))
+		backupStatus = &apiv1.BackupStatus{
+			StartedAt: ptr.To(startedAt),
+			StoppedAt: ptr.To(stoppedAt),
+		}
+		fakeClient = fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithLists(&snapshots).Build()
+	})
+
+	It("should update all snapshots with backup time annotations", func(ctx context.Context) {
+		err := annotateSnapshotsWithBackupData(ctx, fakeClient, snapshots.Items, backupStatus)
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, snapshot := range snapshots.Items {
+			Expect(snapshot.Annotations[utils.BackupStartTimeAnnotationName]).To(BeEquivalentTo(startedAt.Format(time.RFC3339)))
+			Expect(snapshot.Annotations[utils.BackupEndTimeAnnotationName]).To(BeEquivalentTo(stoppedAt.Format(time.RFC3339)))
+		}
 	})
 })

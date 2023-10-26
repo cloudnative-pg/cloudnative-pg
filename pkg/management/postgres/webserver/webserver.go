@@ -18,6 +18,7 @@ package webserver
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -31,6 +32,22 @@ const (
 	// DefaultReadHeaderTimeout is the default value to be used by the webservers
 	DefaultReadHeaderTimeout = 3 * time.Second
 )
+
+// Error an error response from http webserver
+type Error struct {
+	// One of a server-defined set of error codes
+	Code string `json:"code"`
+	// A human-readable representation of the error.
+	Message string `json:"message"`
+	// An array of details about specific errors that led to this reported error.
+	Details []Error `json:"details,omitempty"`
+}
+
+// Response a response from the http webserver
+type Response[T interface{}] struct {
+	Data  *T     `json:"data,omitempty"`
+	Error *Error `json:"error,omitempty"`
+}
 
 // Webserver contains a server that interacts with postgres instance
 type Webserver struct {
@@ -75,4 +92,29 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	log.Info("Webserver exited", "address", ws.server.Addr)
 
 	return nil
+}
+
+// sendJSONResponse sends a generic JSON response.
+func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, data Response[T]) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+	}
+}
+
+func sendBadRequestJSONResponse(w http.ResponseWriter, errorCode string, message string) {
+	sendJSONResponse(w, http.StatusBadRequest, Response[any]{
+		Error: &Error{
+			Code:    errorCode,
+			Message: message,
+		},
+	})
+}
+
+func sendDataJSONResponse[T interface{}](w http.ResponseWriter, statusCode int, data T) {
+	sendJSONResponse(w, statusCode, Response[T]{
+		Data: &data,
+	})
 }
