@@ -370,6 +370,7 @@ jobs:
       image_name: ${{ env.IMAGE_NAME }}
       controller_img: ${{ env.CONTROLLER_IMG }}
       bundle_img: ${{ env.BUNDLE_IMG }}
+      push: ${{ env.PUSH }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -398,6 +399,23 @@ jobs:
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "COMMIT_SHA=${commit_sha}" >> $GITHUB_ENV
+
+          # By default the container image is being pushed to the registry
+          echo "PUSH=true" >> $GITHUB_ENV
+
+      # GITHUB_TOKEN has restricted permissions if the pull_request has been opened
+      # from a forked repository, so we avoid pushing to the container registry if
+      # that's the case.
+      - name: Evaluate container image push
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [[ "${{ env.HEAD_REPO }}" != "${{ env.BASE_REPO }}" ]]
+          then
+            echo "PUSH=false" >> $GITHUB_ENV
+          fi
 
       - name: Set GoReleaser environment
         run: |
@@ -491,11 +509,10 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
-          push: true
+          push: ${{ env.PUSH }}
           build-args: |
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
-          secrets: GIT_AUTH_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
       - name: Output images
         env:
@@ -517,7 +534,8 @@ jobs:
       - buildx
     if: |
       (always() && !cancelled()) &&
-      needs.buildx.result == 'success'
+      needs.buildx.result == 'success' &&
+      needs.buildx.outputs.push == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -613,10 +631,10 @@ jobs:
     runs-on: ubuntu-22.04
     needs:
       - buildx
-      - olm-scorecard
+      - olm-bundle
     if: |
       (always() && !cancelled()) &&
-      needs.olm-scorecard.result == 'success' &&
+      needs.olm-bundle.result == 'success' &&
       github.repository_owner == 'cloudnative-pg'
     env:
       VERSION: ${{ needs.buildx.outputs.commit_version }}
