@@ -217,7 +217,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		Expect(data.Len()).To(Equal(0))
 	})
 
-	It("should unfence the target pod when the snapshots are ready", func(ctx SpecContext) {
+	It("should unfence the target pod when the snapshots have been provisioned", func(ctx SpecContext) {
 		snapshots := storagesnapshotv1.VolumeSnapshotList{
 			Items: []storagesnapshotv1.VolumeSnapshot{
 				{
@@ -232,9 +232,10 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 						},
 					},
 					Status: &storagesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse:   ptr.To(true),
-						Error:        nil,
-						CreationTime: ptr.To(metav1.Now()),
+						ReadyToUse:                     ptr.To(false),
+						Error:                          nil,
+						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
+						CreationTime:                   ptr.To(metav1.Now()),
 					},
 				},
 				{
@@ -249,9 +250,86 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 						},
 					},
 					Status: &storagesnapshotv1.VolumeSnapshotStatus{
-						ReadyToUse:   ptr.To(true),
-						Error:        nil,
-						CreationTime: ptr.To(metav1.Now()),
+						ReadyToUse:                     ptr.To(false),
+						Error:                          nil,
+						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
+						CreationTime:                   ptr.To(metav1.Now()),
+					},
+				},
+			},
+		}
+
+		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster, targetPod, backup).
+			WithStatusSubresource(backup).
+			WithLists(&snapshots).
+			Build()
+		fakeRecorder := record.NewFakeRecorder(3)
+
+		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+			Build()
+
+		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
+		Expect(err).ToNot(HaveOccurred())
+		// we should have found snapshots that have been privisioned, so we need to
+		// wait until they are ready in a next reconciliation loop
+		Expect(result).ToNot(BeNil())
+
+		var latestCluster apiv1.Cluster
+		err = mockClient.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &latestCluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		data, err := utils.GetFencedInstances(latestCluster.Annotations)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(data.Len()).To(Equal(0))
+
+		var latestBackup apiv1.Backup
+		err = mockClient.Get(ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &latestBackup)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(latestBackup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFinalizing))
+	})
+
+	It("should mark the backup as completed when the snapshots are ready", func(ctx SpecContext) {
+		snapshots := storagesnapshotv1.VolumeSnapshotList{
+			Items: []storagesnapshotv1.VolumeSnapshot{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      backup.Name,
+						Labels: map[string]string{
+							utils.BackupNameLabelName: backup.Name,
+						},
+						Annotations: map[string]string{
+							"avoid": "nil",
+						},
+					},
+					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-content", backup.Name)),
+						ReadyToUse:                     ptr.To(true),
+						Error:                          nil,
+						CreationTime:                   ptr.To(metav1.Now()),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      backup.Name + "-wal",
+						Labels: map[string]string{
+							utils.BackupNameLabelName: backup.Name,
+						},
+						Annotations: map[string]string{
+							"avoid": "nil",
+						},
+					},
+					Status: &storagesnapshotv1.VolumeSnapshotStatus{
+						BoundVolumeSnapshotContentName: ptr.To(fmt.Sprintf("%s-wal-content", backup.Name)),
+						ReadyToUse:                     ptr.To(true),
+						Error:                          nil,
+						CreationTime:                   ptr.To(metav1.Now()),
 					},
 				},
 			},

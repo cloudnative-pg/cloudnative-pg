@@ -200,8 +200,8 @@ func (se *Reconciler) Execute(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	// Step 3: wait for snapshots to be ready
-	if res, err := se.waitSnapshotToBeReadyStep(ctx, volumeSnapshots); res != nil || err != nil {
+	// Step 3: wait for snapshots to be cut
+	if res, err := se.waitSnapshotToBeProvisionedStep(ctx, volumeSnapshots); res != nil || err != nil {
 		return res, err
 	}
 
@@ -234,7 +234,8 @@ func (se *Reconciler) Execute(
 		backup.Status.BackupLabelFile = status.LabelFile
 	}
 
-	backup.Status.SetAsCompleted()
+	// Step 5: wait for snapshots to be ready to use
+	backup.Status.SetAsFinalizing()
 	backup.Status.Online = ptr.To(volumeSnapshotConfig.GetOnline())
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
 	if err != nil {
@@ -246,11 +247,21 @@ func (se *Reconciler) Execute(
 		contextLogger.Error(err, "while enriching the backup status")
 	}
 
+	if err := postgres.PatchBackupStatusAndRetry(ctx, se.cli, backup); err != nil {
+		contextLogger.Error(err, "while patching the backup status (finalized backup)")
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, err
+	}
+
+	// Step 6: set backups as done
+	if res, err := se.waitSnapshotToBeReadyStep(ctx, volumeSnapshots); res != nil || err != nil {
+		return res, err
+	}
+
+	backup.Status.SetAsCompleted()
 	if err := annotateSnapshotsWithBackupData(ctx, se.cli, snapshots, &backup.Status); err != nil {
 		contextLogger.Error(err, "while enriching the snapshots's status")
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
-
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, se.cli, backup)
 }
 
@@ -443,13 +454,27 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 	return nil
 }
 
+// waitSnapshotToBeProvisionedStep waits for every PVC snapshot to be claimed
+func (se *Reconciler) waitSnapshotToBeProvisionedStep(
+	ctx context.Context,
+	snapshots []storagesnapshotv1.VolumeSnapshot,
+) (*ctrl.Result, error) {
+	for i := range snapshots {
+		if res, err := se.waitSnapshotToBeProvisionedAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
+			return res, err
+		}
+	}
+
+	return nil, nil
+}
+
 // waitSnapshotToBeReadyStep waits for every PVC snapshot to be ready to use
 func (se *Reconciler) waitSnapshotToBeReadyStep(
 	ctx context.Context,
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshotAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotToBeReady(ctx, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -545,9 +570,10 @@ func transferLabelsToAnnotations(labels map[string]string, annotations map[strin
 	}
 }
 
-// waitSnapshotAndAnnotate waits for a certain snapshot to be ready to use. Once ready it annotates the snapshot with
+// waitSnapshotToBeProvisionedAndAnnotate waits for a certain snapshot to be claimed.
+// Once the snapshot have been cut, it annotates the snapshot with
 // SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
-func (se *Reconciler) waitSnapshotAndAnnotate(
+func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 	ctx context.Context,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
@@ -557,9 +583,9 @@ func (se *Reconciler) waitSnapshotAndAnnotate(
 	if info.Error != nil {
 		return nil, info.Error
 	}
-	if info.Running {
+	if !info.Provisioned {
 		contextLogger.Info(
-			"Waiting for VolumeSnapshot to be ready to use",
+			"Waiting for VolumeSnapshot to be provisioned",
 			"volumeSnapshotName", snapshot.Name)
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
@@ -576,6 +602,30 @@ func (se *Reconciler) waitSnapshotAndAnnotate(
 				"snapshot", snapshot.Name)
 			return nil, err
 		}
+	}
+
+	return nil, nil
+}
+
+// waitSnapshotToBeReady waits for a certain snapshot to be ready to use. Once ready it annotates the snapshot with
+// SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
+func (se *Reconciler) waitSnapshotToBeReady(
+	ctx context.Context,
+	snapshot *storagesnapshotv1.VolumeSnapshot,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	info := parseVolumeSnapshotInfo(snapshot)
+	if info.Error != nil {
+		return nil, info.Error
+	}
+	if !info.Ready {
+		contextLogger.Info(
+			"Waiting for VolumeSnapshot to be ready to use",
+			"volumeSnapshotName", snapshot.Name,
+			"boundVolumeSnapshotContentName", snapshot.Status.BoundVolumeSnapshotContentName,
+			"readyToUse", snapshot.Status.ReadyToUse)
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	return nil, nil
