@@ -68,6 +68,42 @@ spec:
                 - barmanObjectStore
                 - volumeSnapshot
                 type: string
+              online:
+                default: true
+                description: Whether the default type of backup with volume snapshots
+                  is online/hot (`true`, default) or offline/cold (`false`) Overrides
+                  the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'
+                type: boolean
+              onlineConfiguration:
+                default:
+                  immediateCheckpoint: false
+                  waitForArchive: true
+                description: Configuration parameters to control the online/hot backup
+                  with volume snapshots Overrides the default settings specified in
+                  the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
+                properties:
+                  immediateCheckpoint:
+                    description: Control whether the I/O workload for the backup initial
+                      checkpoint will be limited, according to the `checkpoint_completion_target`
+                      setting on the PostgreSQL server. If set to true, an immediate
+                      checkpoint will be used, meaning PostgreSQL will complete the
+                      checkpoint as soon as possible. `false` by default.
+                    type: boolean
+                  waitForArchive:
+                    default: true
+                    description: If false, the function will return immediately after
+                      the backup is completed, without waiting for WAL to be archived.
+                      This behavior is only useful with backup software that independently
+                      monitors WAL archiving. Otherwise, WAL required to make the
+                      backup consistent might be missing and make the backup useless.
+                      By default, or when this parameter is true, pg_backup_stop will
+                      wait for WAL to be archived when archiving is enabled. On a
+                      standby, this means that it will wait only when archive_mode
+                      = always. If write activity on the primary is low, it may be
+                      useful to run pg_switch_wal on the primary in order to trigger
+                      an immediate segment switch.
+                    type: boolean
+                type: object
               target:
                 description: The policy to decide which instance should perform this
                   backup. If empty, it defaults to `cluster.spec.backup.target`. Available

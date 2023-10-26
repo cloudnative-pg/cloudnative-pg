@@ -85,7 +85,7 @@ func (se *Reconciler) enrichSnapshot(
 	targetPod *corev1.Pod,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
+	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	vs.Labels[utils.BackupNameLabelName] = backup.Name
 
@@ -147,7 +147,7 @@ func (se *Reconciler) Execute(
 
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
 
-	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
+	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 	// Step 0: check if the snapshots have been created already
 	volumeSnapshots, err := getBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
 	if err != nil {
@@ -472,7 +472,7 @@ func (se *Reconciler) createSnapshot(
 		return err
 	}
 
-	snapshotConfig := *cluster.Spec.Backup.VolumeSnapshot
+	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 	var snapshotClassName *string
 	if role == utils.PVCRolePgWal && snapshotConfig.WalClassName != "" {
 		snapshotClassName = &snapshotConfig.WalClassName
