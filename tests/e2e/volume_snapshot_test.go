@@ -42,15 +42,22 @@ import (
 // with different storage providers in different k8s environments
 var _ = Describe("Verify Volume Snapshot",
 	Label(tests.LabelBackupRestore, tests.LabelStorage, tests.LabelSnapshot), func() {
-		assertSnapshotArePresent := func(snapshots volumesnapshot.VolumeSnapshotList, backup apiv1.Backup) {
-			snapshotNames := make([]string, len(snapshots.Items))
-			for idx := range snapshots.Items {
-				snapshotNames[idx] = snapshots.Items[idx].Name
+		getSnapshots := func(
+			backupName string,
+			clusterName string,
+			namespace string,
+		) (volumesnapshot.VolumeSnapshotList, error) {
+			var snapshotList volumesnapshot.VolumeSnapshotList
+			err := env.Client.List(env.Ctx, &snapshotList, k8client.InNamespace(namespace),
+				k8client.MatchingLabels{
+					utils.ClusterLabelName:    clusterName,
+					utils.BackupNameLabelName: backupName,
+				})
+			if err != nil {
+				return snapshotList, err
 			}
 
-			for _, element := range backup.Status.BackupSnapshotStatus.Elements {
-				Expect(snapshotNames).To(ContainElement(element.Name))
-			}
+			return snapshotList, nil
 		}
 
 		// Initializing a global namespace variable to be used in each test case
@@ -265,12 +272,9 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("fetching the volume snapshots", func() {
-					snapshotList := volumesnapshot.VolumeSnapshotList{}
-					err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
-						utils.ClusterLabelName: clusterToSnapshotName,
-					})
+					snapshotList, err := getSnapshots(backup.Name, clusterToSnapshotName, namespace)
 					Expect(err).ToNot(HaveOccurred())
-					assertSnapshotArePresent(snapshotList, *backup)
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
 					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv)
 					Expect(err).ToNot(HaveOccurred())
@@ -339,18 +343,15 @@ var _ = Describe("Verify Volume Snapshot",
 			var clusterToBackupName string
 
 			getAndVerifySnapshots := func(
-				backupName string,
 				clusterToBackup *apiv1.Cluster,
 				backup apiv1.Backup,
 			) volumesnapshot.VolumeSnapshotList {
 				snapshotList := volumesnapshot.VolumeSnapshotList{}
 				By("fetching the volume snapshots", func() {
-					err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
-						utils.ClusterLabelName:    clusterToBackupName,
-						utils.BackupNameLabelName: backupName,
-					})
+					var err error
+					snapshotList, err = getSnapshots(backup.Name, clusterToBackup.Name, backup.Namespace)
 					Expect(err).ToNot(HaveOccurred())
-					assertSnapshotArePresent(snapshotList, backup)
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 				})
 
 				By("ensuring that the additional labels and annotations are present", func() {
@@ -443,7 +444,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				snapshotList := getAndVerifySnapshots(backupName, clusterToBackup, backup)
+				snapshotList := getAndVerifySnapshots(clusterToBackup, backup)
 				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, &backup, snapshotDataEnv, snapshotWalEnv)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -493,7 +494,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				_ = getAndVerifySnapshots(backupName, clusterToBackup, backup)
+				_ = getAndVerifySnapshots(clusterToBackup, backup)
 
 				By("ensuring cluster resumes after snapshot", func() {
 					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[testUtils.ClusterIsReadyQuick], env)
@@ -557,7 +558,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				_ = getAndVerifySnapshots(backupName, clusterToBackup, backup)
+				_ = getAndVerifySnapshots(clusterToBackup, backup)
 
 				By("ensuring cluster resumes after snapshot", func() {
 					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[testUtils.ClusterIsReadyQuick], env)
@@ -719,12 +720,9 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("fetching the volume snapshots", func() {
-					snapshotList := volumesnapshot.VolumeSnapshotList{}
-					err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
-						utils.ClusterLabelName: clusterToSnapshotName,
-					})
+					snapshotList, err := getSnapshots(backup.Name, clusterToSnapshotName, namespace)
 					Expect(err).ToNot(HaveOccurred())
-					assertSnapshotArePresent(snapshotList, *backup)
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
 					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv)
 					Expect(err).ToNot(HaveOccurred())

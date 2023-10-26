@@ -98,22 +98,11 @@ func SetSnapshotNameAsEnv(
 	dataSnapshotName,
 	walSnapshotName string,
 ) error {
-	var snapshots []volumesnapshot.VolumeSnapshot
-
-	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
-		for _, item := range snapshotList.Items {
-			if item.Name != element.Name {
-				continue
-			}
-			snapshots = append(snapshots, item)
-		}
-	}
-
-	if len(snapshots) != len(backup.Status.BackupSnapshotStatus.Elements) {
+	if len(snapshotList.Items) != len(backup.Status.BackupSnapshotStatus.Elements) {
 		return fmt.Errorf("could not find the expected number of snapshots")
 	}
 
-	for _, item := range snapshots {
+	for _, item := range snapshotList.Items {
 		switch utils.PVCRole(item.Annotations[utils.PvcRoleLabelName]) {
 		case utils.PVCRolePgData:
 			err := os.Setenv(dataSnapshotName, item.Name)
