@@ -416,8 +416,14 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 
 		// Set the first recoverability point
 		if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
-			firstRecoverabilityPoint := ts.Format(time.RFC3339)
-			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
+			_, err := b.Cluster.TryUpdatingOldestBackupTime(*ts, apiv1.BackupMethodBarmanObjectStore)
+			if err != nil {
+				b.Log.Error(err, "while setting the recoverability point for barman backups")
+			}
+			_, err = b.Cluster.TryUpdatingFirstRecoverabilityPoint()
+			if err != nil {
+				b.Log.Error(err, "while setting the FirstRecoverabilityPoint")
+			}
 			lastBackup := backupList.LatestBackupInfo()
 			if lastBackup != nil {
 				b.Cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
