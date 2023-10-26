@@ -276,6 +276,6 @@ func (ws *remoteWebserverEndpoints) keepBackupAliveConn() {
 			log.Trace("keeping current backup connection alive")
 			_ = ws.currentBackup.conn.PingContext(context.Background())
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
