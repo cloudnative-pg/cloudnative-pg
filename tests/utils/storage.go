@@ -25,6 +25,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -93,14 +94,26 @@ func ObjectMatchesAnnotations(
 // as env variables
 func SetSnapshotNameAsEnv(
 	snapshotList *volumesnapshot.VolumeSnapshotList,
+	backup *apiv1.Backup,
 	dataSnapshotName,
 	walSnapshotName string,
 ) error {
-	if len(snapshotList.Items) > 2 {
-		return fmt.Errorf("cannot handle a snapshotList with more than 2 snapshots")
+	var snapshots []volumesnapshot.VolumeSnapshot
+
+	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
+		for _, item := range snapshotList.Items {
+			if item.Name != element.Name {
+				continue
+			}
+			snapshots = append(snapshots, item)
+		}
 	}
 
-	for _, item := range snapshotList.Items {
+	if len(snapshots) != len(backup.Status.BackupSnapshotStatus.Elements) {
+		return fmt.Errorf("could not find the expected number of snapshots")
+	}
+
+	for _, item := range snapshots {
 		switch utils.PVCRole(item.Annotations[utils.PvcRoleLabelName]) {
 		case utils.PVCRolePgData:
 			err := os.Setenv(dataSnapshotName, item.Name)

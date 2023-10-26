@@ -42,6 +42,17 @@ import (
 // with different storage providers in different k8s environments
 var _ = Describe("Verify Volume Snapshot",
 	Label(tests.LabelBackupRestore, tests.LabelStorage, tests.LabelSnapshot), func() {
+		assertSnapshotArePresent := func(snapshots volumesnapshot.VolumeSnapshotList, backup apiv1.Backup) {
+			snapshotNames := make([]string, len(snapshots.Items))
+			for idx := range snapshots.Items {
+				snapshotNames[idx] = snapshots.Items[idx].Name
+			}
+
+			for _, element := range backup.Status.BackupSnapshotStatus.Elements {
+				Expect(snapshotNames).To(ContainElement(element.Name))
+			}
+		}
+
 		// Initializing a global namespace variable to be used in each test case
 		var namespace string
 
@@ -259,9 +270,9 @@ var _ = Describe("Verify Volume Snapshot",
 						utils.ClusterLabelName: clusterToSnapshotName,
 					})
 					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+					assertSnapshotArePresent(snapshotList, *backup)
 
-					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -339,7 +350,7 @@ var _ = Describe("Verify Volume Snapshot",
 						utils.BackupNameLabelName: backupName,
 					})
 					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+					assertSnapshotArePresent(snapshotList, backup)
 				})
 
 				By("ensuring that the additional labels and annotations are present", func() {
@@ -433,7 +444,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				snapshotList := getAndVerifySnapshots(backupName, clusterToBackup, backup)
-				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
+				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, &backup, snapshotDataEnv, snapshotWalEnv)
 				Expect(err).ToNot(HaveOccurred())
 
 				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterToRestoreFilePath)
@@ -713,9 +724,9 @@ var _ = Describe("Verify Volume Snapshot",
 						utils.ClusterLabelName: clusterToSnapshotName,
 					})
 					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+					assertSnapshotArePresent(snapshotList, *backup)
 
-					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, snapshotDataEnv, snapshotWalEnv)
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
