@@ -375,6 +375,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
 
       - name: Build meta
+        id: build-meta
         run: |
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
@@ -388,21 +389,24 @@ jobs:
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
-          if [[ "${GITHUB_REF#refs/heads/}" =~ ^(main|release-) ]]
-          then
-            echo "PUSH=true" >> $GITHUB_ENV
-          else
-            echo "PUSH=false" >> $GITHUB_ENV
-          fi
+          echo "COMMIT_SHA=${commit_sha}" >> $GITHUB_ENV
 
-      - name: Check PR label conditions
+          # By default the container image is being pushed to the registry
+          echo "PUSH=true" >> $GITHUB_ENV
+
+      # GITHUB_TOKEN has restricted permissions if the pull_request has been opened
+      # from a forked repository, so we avoid pushing to the container registry if
+      # that's the case.
+      - name: Evaluate container image push
         if: github.event_name == 'pull_request'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          build_label=$(gh pr view "${{ github.event.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "always push images" || :)
-          if [ -n "${build_label}" ]; then PUSH=true; fi
-          echo "PUSH=${PUSH}" >> $GITHUB_ENV
+          if [[ "${{ env.HEAD_REPO }}" != "${{ env.BASE_REPO }}" ]]
+          then
+            echo "PUSH=false" >> $GITHUB_ENV
+          fi
 
       - name: Set GoReleaser environment
         run: |
@@ -479,7 +483,6 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: ${{ env.PLATFORMS }}
 
       - name: Set up Docker Buildx
@@ -492,7 +495,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and eventually push
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           platforms: ${{ env.PLATFORMS }}
@@ -501,4 +504,3 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
-          secrets: GIT_AUTH_TOKEN=${{ secrets.GITHUB_TOKEN }}
