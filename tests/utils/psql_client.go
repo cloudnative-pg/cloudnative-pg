@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -29,6 +30,7 @@ import (
 // GetPsqlClient gets a psql client pod for service connectivity
 func GetPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, error) {
 	_ = corev1.AddToScheme(env.Scheme)
+	_ = appsv1.AddToScheme(env.Scheme)
 	pod := &corev1.Pod{}
 	err := env.CreateNamespace(namespace)
 	if err != nil {
@@ -57,8 +59,9 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 	psqlPod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
-			Name:      "psql-client",
-			Labels:    map[string]string{"run": "psql"},
+			// The pod name follows a convention: "psql-client-0", derived from the StatefulSet name.
+			Name:   "psql-client-0",
+			Labels: map[string]string{"run": "psql"},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -84,7 +87,28 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 		},
 	}
 
-	err := env.Client.Create(env.Ctx, psqlPod)
+	// As the psql pod might be deleted by cases of Drain Node, we need to make use of the StatefulSet or
+	// Deployment to keep the pod running.
+	// To avoid the code that references the psql pod breaking due to a random name created by Deployment,
+	// we choose to use the StatefulSet
+	psqlStatefulSet := appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "psql-client",
+			Labels:    map[string]string{"run": "psql"},
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"run": "psql"},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: psqlPod.ObjectMeta,
+				Spec:       psqlPod.Spec,
+			},
+		},
+	}
+
+	err := env.Client.Create(env.Ctx, &psqlStatefulSet)
 	if err != nil {
 		return &corev1.Pod{}, err
 	}
