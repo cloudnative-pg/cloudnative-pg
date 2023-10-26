@@ -176,8 +176,8 @@ func (se *Reconciler) Execute(
 			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		case "":
 			req := webserver.StartBackupRequest{
-				ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.ImmediateCheckpoint,
-				WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.WaitForArchive,
+				ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
+				WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
 				BackupName:          backup.Name,
 				Force:               true,
 			}

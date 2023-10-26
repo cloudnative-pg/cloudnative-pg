@@ -98,7 +98,6 @@ type BackupSpec struct {
 
 	// Configuration parameters to control the online/hot backup with volume snapshots
 	// Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
-	// +kubebuilder:default:={waitForArchive:true,immediateCheckpoint:false}
 	// +optional
 	OnlineConfiguration *OnlineConfiguration `json:"onlineConfiguration,omitempty"`
 }
