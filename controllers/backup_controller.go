@@ -219,11 +219,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if res != nil {
 			return *res, nil
 		}
-		err = updateFirstRecoverabilityPoint(ctx, r.Client, &cluster)
-		if err != nil {
-			contextLogger.Error(err, "could not update cluster's first recoverability point")
-			return ctrl.Result{}, err
-		}
 	default:
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
 	}
@@ -407,6 +402,10 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 
 	if err := conditions.Patch(ctx, r.Client, cluster, apiv1.BackupSucceededCondition); err != nil {
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
+	}
+
+	if err := updateFirstRecoverabilityPoint(ctx, r.Client, cluster); err != nil {
+		contextLogger.Error(err, "could not update cluster's first recoverability point")
 	}
 
 	return nil, nil
