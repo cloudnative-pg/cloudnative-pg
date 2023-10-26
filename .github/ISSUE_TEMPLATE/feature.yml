@@ -1,7 +1,7 @@
 name: Feature request
 description: Suggest an idea or request a new feature for CloudNativePG
 title: "[Feature]: "
-labels: ["enhancement", "triage"]
+labels: ["triage", "enhancement"]
 projects: ["cloudnative-pg/cloudnative-pg"]
 assignees:
   - gbartolini

@@ -1,0 +1,74 @@
+name: Documentation
+description: Issues or improvement ideas for CloudNativePG documentation
+title: "[Docs]: "
+labels: ["triage", "documentation"]
+projects: ["cloudnative-pg/cloudnative-pg"]
+assignees:
+  - gbartolini
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time improve the documentation of CloudNativePG
+  - type: checkboxes
+    id: search
+    attributes:
+      label: Is there an existing issue already for your request/idea?
+      description: Before you submit a new issue, make sure you have searched if a similar one already exists
+      options:
+        - label: I have searched for an existing issue, and could not find anything. I believe this is a new documentation enhancement to be evaluated.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem in the existing documentation this issue aims to solve?
+      description: A clear and concise description of what the problem is (e.g. I'm always frustrated when [...])
+    validations:
+      required: true
+  - type: textarea
+    id: doc_add
+    attributes:
+      label: Describe what additions need to be done to the documentation
+      description: A clear and concise description of what sections/pages you want to add to the current documentation.
+    validations:
+      required: false
+  - type: textarea
+    id: doc_change
+    attributes:
+      label: Describe what pages need to change in the documentation, if any
+      description: Please provide links to the pages in the current documentation
+    validations:
+      required: false
+  - type: textarea
+    id: doc_remove
+    attributes:
+      label: Describe what pages need to be removed from the documentation, if any
+      description: Please provide links to the pages in the current documentation that you want to be removed
+    validations:
+      required: false
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Add any other context about this issue.
+    validations:
+      required: false
+  - type: dropdown
+    id: backport
+    attributes:
+      label: Backport?
+      description: Do you suggest to backport this feature or not?
+      options:
+        - "Yes"
+        - "No"
+        - "N/A"
+    validations:
+      required: true
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
