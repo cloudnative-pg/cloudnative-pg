@@ -166,11 +166,13 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 	sourceClusterName,
 	targetTime,
 	storageCredentialsSecretName,
-	azStorageAccount string,
+	azStorageAccount,
+	azBlobContainer string,
 	env *TestingEnvironment,
 ) (*apiv1.Cluster, error) {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/", azStorageAccount, sourceClusterName)
+	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/",
+		azStorageAccount, azBlobContainer)
 
 	restoreCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -416,28 +418,37 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 }
 
 // ComposeAzBlobListAzuriteCmd builds the Azure storage blob list command for Azurite
-func ComposeAzBlobListAzuriteCmd(clusterName string, path string) string {
+func ComposeAzBlobListAzuriteCmd(clusterName, path string) string {
 	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
 		"--connection-string $AZURE_CONNECTION_STRING",
 		clusterName, path)
 }
 
 // ComposeAzBlobListCmd builds the Azure storage blob list command
-func ComposeAzBlobListCmd(azStorageAccount, azStorageKey, clusterName string, path string) string {
+func ComposeAzBlobListCmd(
+	azStorageAccount,
+	azStorageKey,
+	azBlobContainer,
+	clusterName,
+	path string,
+) string {
 	return fmt.Sprintf("az storage blob list --account-name %v  "+
 		"--account-key %v  "+
-		"--container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\"",
-		azStorageAccount, azStorageKey, clusterName, path)
+		"--container-name %v  "+
+		"--prefix %v/  "+
+		"--query \"[?contains(@.name, \\`%v\\`)].name\"",
+		azStorageAccount, azStorageKey, azBlobContainer, clusterName, path)
 }
 
 // CountFilesOnAzureBlobStorage counts files on Azure Blob storage
 func CountFilesOnAzureBlobStorage(
-	azStorageAccount string,
-	azStorageKey string,
-	clusterName string,
+	azStorageAccount,
+	azStorageKey,
+	azBlobContainer,
+	clusterName,
 	path string,
 ) (int, error) {
-	azBlobListCmd := ComposeAzBlobListCmd(azStorageAccount, azStorageKey, clusterName, path)
+	azBlobListCmd := ComposeAzBlobListCmd(azStorageAccount, azStorageKey, azBlobContainer, clusterName, path)
 	out, _, err := RunUnchecked(azBlobListCmd)
 	if err != nil {
 		return -1, err
@@ -450,7 +461,7 @@ func CountFilesOnAzureBlobStorage(
 // CountFilesOnAzuriteBlobStorage counts files on Azure Blob storage. using Azurite
 func CountFilesOnAzuriteBlobStorage(
 	namespace,
-	clusterName string,
+	clusterName,
 	path string,
 ) (int, error) {
 	azBlobListCmd := ComposeAzBlobListAzuriteCmd(clusterName, path)

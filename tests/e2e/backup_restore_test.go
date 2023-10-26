@@ -44,7 +44,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		tableName = "to_restore"
 	)
 
-	var namespace, clusterName, curlPodName, azStorageAccount, azStorageKey string
+	var namespace, clusterName, curlPodName, azStorageAccount, azStorageKey, azBlobContainer string
 	currentTimestamp := new(string)
 
 	BeforeEach(func() {
@@ -541,6 +541,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			}
 			azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 			azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
+			azBlobContainer = os.Getenv("AZURE_BLOB_CONTAINER")
 			const namespacePrefix = "cluster-backup-azure-blob"
 			var err error
 			clusterName, err = env.GetResourceNameFromYAML(azureBlobSampleFile)
@@ -569,7 +570,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		It("backs up and restore a cluster", func() {
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
-			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey, azBlobContainer)
 			By("uploading a backup", func() {
 				// We create a backup
 				testUtils.ExecuteBackup(namespace, backupFile, false, testTimeouts[testUtils.BackupIsReady], env)
@@ -577,7 +578,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 				// Verifying file called data.tar should be available on Azure blob storage
 				Eventually(func() (int, error) {
-					return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+					return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, azBlobContainer,
+						clusterName, "data.tar")
 				}, 30).Should(BeNumerically(">=", 1))
 				Eventually(func() (string, error) {
 					cluster, err := env.GetCluster(namespace, clusterName)
@@ -603,7 +605,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// Only one data.tar files should be present
 			Eventually(func() (int, error) {
-				return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+				return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, azBlobContainer,
+					clusterName, "data.tar")
 			}, 30).Should(BeNumerically("==", 2))
 		})
 
@@ -616,11 +619,12 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				backupFile,
 				azStorageAccount,
 				azStorageKey,
+				azBlobContainer,
 				2,
 				currentTimestamp,
 				psqlClientPod)
 
-			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey, azBlobContainer)
 
 			cluster, err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName,
 				backupFile, *currentTimestamp, env)
@@ -649,7 +653,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				// AssertScheduledBackupsImmediate creates at least two backups, we should find
 				// their base backups
 				Eventually(func() (int, error) {
-					return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+					return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, azBlobContainer,
+						clusterName, "data.tar")
 				}, 60).Should(BeNumerically(">=", 2))
 			})
 			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
@@ -790,7 +795,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		azuriteTLSSecName               = "azurite-tls-secret"
 	)
 
-	var namespace, clusterName, azStorageAccount, azStorageKey string
+	var namespace, clusterName, azStorageAccount, azStorageKey, azBlobContainer string
 	currentTimestamp := new(string)
 
 	BeforeEach(func() {
@@ -991,6 +996,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				}
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
+				azBlobContainer = os.Getenv("AZURE_BLOB_CONTAINER")
 				const namespacePrefix = "recovery-barman-object-azure"
 				var err error
 				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzure)
@@ -1018,7 +1024,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
-				AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+				AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey, azBlobContainer)
 
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
 					// Create the backup
@@ -1026,7 +1032,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					AssertBackupConditionInClusterStatus(namespace, clusterName)
 					// Verifying file called data.tar should be available on Azure blob storage
 					Eventually(func() (int, error) {
-						return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+						return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, azBlobContainer,
+							clusterName, "data.tar")
 					}, 30).Should(BeNumerically(">=", 1))
 				})
 
@@ -1045,12 +1052,20 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					sourceBackupFileAzurePITR,
 					azStorageAccount,
 					azStorageKey,
+					azBlobContainer,
 					1,
 					currentTimestamp,
 					psqlClientPod)
 
-				restoredCluster, err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace,
-					externalClusterName, clusterName, *currentTimestamp, "backup-storage-creds", azStorageAccount, env)
+				restoredCluster, err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(
+					namespace,
+					externalClusterName,
+					clusterName,
+					*currentTimestamp,
+					"backup-storage-creds",
+					azStorageAccount,
+					azBlobContainer,
+					env)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Restoring cluster using a recovery barman object store, which is defined
@@ -1071,6 +1086,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				}
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
+				azBlobContainer = os.Getenv("AZURE_BLOB_CONTAINER")
 				const namespacePrefix = "cluster-backup-azure-blob-sas"
 				var err error
 				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzureSAS)
@@ -1098,9 +1114,9 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
 
-				// Create a WAL on the primary and check if it arrives on
+				// Create a WAL on the primary and check if it arrives in the
 				// Azure Blob Storage within a short time
-				AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+				AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey, azBlobContainer)
 
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
 					// We create a Backup
@@ -1108,7 +1124,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					AssertBackupConditionInClusterStatus(namespace, clusterName)
 					// Verifying file called data.tar should be available on Azure blob storage
 					Eventually(func() (int, error) {
-						return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey,
+						return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, azBlobContainer,
 							clusterName, "data.tar")
 					}, 30).Should(BeNumerically(">=", 1))
 				})
@@ -1127,12 +1143,20 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					sourceBackupFileAzurePITRSAS,
 					azStorageAccount,
 					azStorageKey,
+					azBlobContainer,
 					1,
 					currentTimestamp,
 					psqlClientPod)
 
-				restoredCluster, err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace,
-					externalClusterName, clusterName, *currentTimestamp, "backup-storage-creds-sas", azStorageAccount, env)
+				restoredCluster, err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(
+					namespace,
+					externalClusterName,
+					clusterName,
+					*currentTimestamp,
+					"backup-storage-creds-sas",
+					azStorageAccount,
+					azBlobContainer,
+					env)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Restoring cluster using a recovery barman object store, which is defined
@@ -1243,7 +1267,6 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 		// in case user configures the same destination path for more backups
 
 		const (
-			clusterRestoreSampleFile  = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio.yaml.template"
 			clusterRestoreSampleFile2 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-2.yaml.template"
 			clusterRestoreSampleFile3 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-3.yaml.template"
 			clusterRestoreSampleFile4 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-4.yaml.template"

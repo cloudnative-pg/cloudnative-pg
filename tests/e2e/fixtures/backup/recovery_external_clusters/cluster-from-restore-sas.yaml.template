@@ -17,7 +17,7 @@ spec:
     - name: clusterBackupSas
       barmanObjectStore:
         serverName: pg-backup-azure-blob-sas
-        destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/pg-backup-azure-blob-sas/
+        destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/${AZURE_BLOB_CONTAINER}/
         azureCredentials:
           storageAccount:
             name: restore-storage-creds-sas

@@ -1735,7 +1735,7 @@ func AssertArchiveWalOnAzurite(namespace, clusterName string) {
 	})
 }
 
-func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey string) {
+func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey, azBlobContainer string) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
 	By("archiving WALs and verifying they exist", func() {
 		primary, err := env.GetClusterPrimary(namespace, clusterName)
@@ -1743,10 +1743,10 @@ func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azSto
 		latestWAL := switchWalAndGetLatestArchive(primary.Namespace, primary.Name)
 		// Define what file we are looking for in Azure.
 		// Escapes are required since az expects forward slashes to be escaped
-		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
+		path := fmt.Sprintf("wals\\/0000000100000000\\/%v.gz", latestWAL)
 		// Verifying on blob storage using az
 		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
+			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, azBlobContainer, clusterName, path)
 		}, 60).Should(BeEquivalentTo(1))
 	})
 }
@@ -1821,7 +1821,8 @@ func prepareClusterForPITROnAzureBlob(
 	clusterName,
 	backupSampleFile,
 	azStorageAccount,
-	azStorageKey string,
+	azStorageKey,
+	azBlobContainer string,
 	expectedVal int,
 	currentTimestamp *string,
 	pod *corev1.Pod,
@@ -1831,7 +1832,8 @@ func prepareClusterForPITROnAzureBlob(
 		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
 
 		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, azBlobContainer,
+				clusterName, "data.tar")
 		}, 30).Should(BeEquivalentTo(expectedVal))
 		Eventually(func() (string, error) {
 			cluster, err := env.GetCluster(namespace, clusterName)
@@ -1852,7 +1854,7 @@ func prepareClusterForPITROnAzureBlob(
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableNamePitr), func() {
 		insertRecordIntoTable(namespace, clusterName, tableNamePitr, 3, pod)
 	})
-	AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+	AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey, azBlobContainer)
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
 	AssertBackupConditionInClusterStatus(namespace, clusterName)
 }
