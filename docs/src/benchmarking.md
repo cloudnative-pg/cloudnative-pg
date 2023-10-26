@@ -1,27 +1,27 @@
 # Benchmarking
 
-The CNPG kubectl plugin provides an easy way for benchmarking a PostgreSQL deployment in Kubernetes using CloudNativePG.
+The CNPG kubectl plugin provides an easy way to benchmark a PostgreSQL deployment in Kubernetes using CloudNativePG.
 
-Benchmarking is focused on two aspects:
+Benchmarking focuses on two aspects:
 
-- the **database**, by relying on [pgbench](https://www.postgresql.org/docs/current/pgbench.html)
-- the **storage**, by relying on [fio](https://fio.readthedocs.io/en/latest/fio_doc.html)
+- The **database**, by relying on [pgbench](https://www.postgresql.org/docs/current/pgbench.html)
+- The **storage**, by relying on [fio](https://fio.readthedocs.io/en/latest/fio_doc.html)
 
 !!! IMPORTANT
-    `pgbench` and `fio` must be run in a staging or pre-production environment.
-    Do not use these plugins in a production environment, as it might have
+    Run `pgbench` and `fio` in a staging or preproduction environment.
+    Don't use these plugins in a production environment, as it might have
     catastrophic consequences on your databases and the other
     workloads/applications that run in the same shared environment.
 
 ### pgbench
 
 The `kubectl` CNPG plugin command `pgbench` executes a user-defined `pgbench` job
-against an existing Postgres Cluster.
+against an existing Postgres cluster.
 
-Through the `--dry-run` flag you can generate the manifest of the job for later
-modification/execution.
+Using the `--dry-run` flag, you can generate the manifest of the job for later
+modification or execution.
 
-A common command structure with `pgbench` is the following:
+A common command structure with `pgbench` is:
 
 ```shell
 kubectl cnpg pgbench \
@@ -32,12 +32,11 @@ kubectl cnpg pgbench \
 ```
 
 !!! IMPORTANT
-    Please refer to the [`pgbench` documentation](https://www.postgresql.org/docs/current/pgbench.html)
-    for information about the specific options to be used in your jobs.
+    See the [`pgbench` documentation](https://www.postgresql.org/docs/current/pgbench.html)
+    for information about the specific options to use in your jobs.
 
-This example creates a job called `pgbench-init` that initializes for `pgbench`
-OLTP-like purposes the `app` database in a `Cluster` named `cluster-example`,
-using a scale factor of 1000:
+This example creates a job called `pgbench-init`. It initializes the `app` database in a cluster named `cluster-example` for `pgbench`
+OLTP-like purposes. Th scale factor is 1000.
 
 ```shell
 kubectl cnpg pgbench \
@@ -47,18 +46,18 @@ kubectl cnpg pgbench \
 ```
 
 !!! Note
-    This will generate a database with 100000000 records, taking approximately 13GB
+    This example generates a database with 100000000 records, which uses approximately 13GB
     of space on disk.
 
-You can see the progress of the job with:
+To see the progress of the job:
 
 ```shell
 kubectl logs jobs/pgbench-run
 ```
 
-The following example creates a job called `pgbench-run` executing `pgbench`
-against the previously initialized database for 30 seconds, using a single
-connection:
+This example creates a job called `pgbench-run` that executes `pgbench`
+against the previously initialized database for 30 seconds. It uses a single
+connection.
 
 ```shell
 kubectl cnpg pgbench \
@@ -67,7 +66,7 @@ kubectl cnpg pgbench \
   -- --time 30 --client 1 --jobs 1
 ```
 
-The next example runs `pgbench` against an existing database by using the
+This example runs `pgbench` against an existing database by using the
 `--db-name` flag and the `pgbench` namespace:
 
 ```shell
@@ -80,7 +79,7 @@ kubectl cnpg pgbench \
 
 If you want to run a `pgbench` job on a specific worker node, you can use
 the `--node-selector` option. Suppose you want to run the previous
-initialization job on a node having the `workload=pgbench` label, you can run:
+initialization job on a node having the `workload=pgbench` label. You can run:
 
 ```shell
 kubectl cnpg pgbench \
@@ -91,7 +90,8 @@ kubectl cnpg pgbench \
   -- --initialize --scale 1000
 ```
 
-The job status can be fetched by running:
+You can fetch the job status by running:
+
 ```
 kubectl get job/pgbench-job -n <namespace>
 
@@ -99,7 +99,8 @@ NAME       COMPLETIONS   DURATION   AGE
 job-name   1/1           15s        41s
 ```
 
-Once the job is completed the results can be gathered by executing:
+After the job is complete, you can gather the results:
+
 ```
 kubectl logs job/pgbench-job -n <namespace>
 ```
@@ -108,21 +109,22 @@ kubectl logs job/pgbench-job -n <namespace>
 
 The kubectl CNPG plugin command `fio` executes a fio job with default values
 and read operations.
-Through the `--dry-run` flag you can generate the manifest of the job for later
-modification/execution.
+Using the `--dry-run` flag, you can generate the manifest of the job for later
+modification or execution.
 
 !!! Note
-    The kubectl plugin command `fio` will create a deployment with predefined
+    The kubectl plugin command `fio` creates a deployment with predefined
     fio job values using a ConfigMap. If you want to provide custom job values, we
     recommend generating a manifest using the `--dry-run` flag and providing your
     custom job values in the generated ConfigMap.
 
-Example of default usage:
+This example shows the default usage:
 
 ```shell
 kubectl cnpg fio <fio-name>
 ```
-Example with custom values:
+
+This example uses custom values:
 
 ```shell
 kubectl cnpg fio <fio-name> \
@@ -131,7 +133,7 @@ kubectl cnpg fio <fio-name> \
   --pvcSize <size>
 ```
 
-Example of how to run the `fio` command against a `StorageClass` named
+This example runs the `fio` command against a `StorageClass` named
 `standard` and `pvcSize: 2Gi` in the `fio` namespace:
 
 ```shell
@@ -141,7 +143,8 @@ kubectl cnpg fio fio-job \
   --pvcSize 2Gi
 ```
 
-The deployment status can be fetched by running:
+To fetch the deployment status:
+
 ```shell
 kubectl get deployment/fio-job -n fio
 
@@ -150,38 +153,38 @@ fio-job        1/1     1            1           14s
 
 ```
 
-After running kubectl plugin command `fio`.
+After running the kubectl plugin command `fio`, it:
 
-It will:
-
-1. Create a PVC
-1. Create a ConfigMap representing the configuration of a fio job
-1. Create a fio deployment composed by a single Pod, which will run fio on
-   the PVC, create graphs after completing the benchmark and start serving the
-   generated files with a webserver. We use the
+1. Creates a PVC.
+1. Creates a ConfigMap representing the configuration of a fio job.
+1. Creates a fio deployment composed of a single pod. The pod runs fio on
+   the PVC, creates graphs after completing the benchmark, and starts serving the
+   generated files with a web server. We use the
    [`fio-tools`](https://github.com/wallnerryan/fio-tools`) image for that.
 
-The Pod created by the deployment will be ready when it starts serving the
-results. You can forward the port of the pod created by the deployment
+The pod created by the deployment is ready when it starts serving the
+results. You can forward the port of the pod created by the deployment:
 
 ```
 kubectl port-forward -n <namespace> deployment/<fio-name> 8000
 ```
 
-and then use a browser and connect to `http://localhost:8000/` to get the data.
+You can then use a browser and connect to [http://localhost:8000/](http://localhost:8000/) to get the data.
 
-The default 8k block size has been chosen to emulate a PostgreSQL workload.
+The default 8k block size was chosen to emulate a PostgreSQL workload.
 Disks that cap the amount of available IOPS can show very different throughput
-values when changing this parameter.
+values when you change this parameter.
 
-Below is an example diagram of sequential writes on a local disk
+The diagram shows an example of sequential writes on a local disk
 mounted on a dedicated Kubernetes node
-(1 hour benchmark):
+(1-hour benchmark):
 
 ![Sequential writes bandwidth](images/write_bw.1-2Draw.png)
 
-After all testing is done, fio deployment and resources can be deleted by:
+After all testing is done, you can delete fio deployment and resources:
+
 ```shell
 kubectl cnpg fio <fio-job-name> --dry-run | kubectl delete -f -
 ```
-make sure use the same name which was used to create the fio deployment and add namespace if applicable.
+
+Make sure to use the same name that was used to create the fio deployment and add a namespace, if applicable.
