@@ -140,6 +140,8 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
 	sed -e "s@\$${CREATED_AT}@$$(LANG=C date -Iseconds -u)@g" | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
+	echo -e "\n  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
+	echo -e "  com.redhat.openshift.versions: v4.11-v4.13" >> bundle/metadata/annotations.yaml ;\
 	DOCKER_BUILDKIT=1 docker build --push --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMG} . ;\
 	export BUNDLE_IMG="${BUNDLE_IMG}"
 
