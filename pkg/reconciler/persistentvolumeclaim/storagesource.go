@@ -59,7 +59,11 @@ func (source *StorageSource) ForRole(role utils.PVCRole) (*corev1.TypedLocalObje
 // to be used to create a primary PVC
 func GetCandidateStorageSourceForPrimary(
 	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
 ) *StorageSource {
+	if backup.IsCompletedVolumeSnapshot() {
+		return getCandidateSourceFromBackup(backup)
+	}
 	return getCandidateSourceFromClusterDefinition(cluster)
 }
 
@@ -115,8 +119,6 @@ func GetCandidateStorageSourceForReplica(
 // getCandidateSourceFromBackupList gets a candidate storage source
 // given a backup list
 func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.BackupList) *StorageSource {
-	// TODO: support recovering from Barman Object Store
-
 	contextLogger := log.FromContext(ctx)
 
 	backupList.SortByReverseCreationTime()
@@ -131,33 +133,36 @@ func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.Back
 		contextLogger.Debug("found a backup that is a valid storage source candidate",
 			"backupName", backup.Name)
 
-		result := &StorageSource{
-			DataSource: corev1.TypedLocalObjectReference{
-				APIGroup: ptr.To(volumesnapshot.GroupName),
-				Kind:     "VolumeSnapshot",
-				Name:     GetName(backup.Name, utils.PVCRolePgData),
-			},
-		}
-		if len(backup.Status.BackupSnapshotStatus.Elements) > 1 {
-			result.WALSource = &corev1.TypedLocalObjectReference{
-				APIGroup: ptr.To(volumesnapshot.GroupName),
-				Kind:     "VolumeSnapshot",
-				Name:     GetName(backup.Name, utils.PVCRolePgWal),
-			}
-		}
-
-		return result
+		return getCandidateSourceFromBackup(backup)
 	}
 
 	return nil
+}
+
+func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
+	result := &StorageSource{
+		DataSource: corev1.TypedLocalObjectReference{
+			APIGroup: ptr.To(volumesnapshot.GroupName),
+			Kind:     "VolumeSnapshot",
+			Name:     GetName(backup.Name, utils.PVCRolePgData),
+		},
+	}
+
+	if len(backup.Status.BackupSnapshotStatus.Elements) > 1 {
+		result.WALSource = &corev1.TypedLocalObjectReference{
+			APIGroup: ptr.To(volumesnapshot.GroupName),
+			Kind:     "VolumeSnapshot",
+			Name:     GetName(backup.Name, utils.PVCRolePgWal),
+		}
+	}
+
+	return result
 }
 
 // getCandidateSourceFromClusterDefinition gets a candidate storage source
 // from a Cluster definition, taking into consideration the backup that the
 // cluster has been bootstrapped from
 func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSource {
-	// TODO: support recovering from Barman Object Store
-
 	if cluster.Spec.Bootstrap == nil {
 		return nil
 	}

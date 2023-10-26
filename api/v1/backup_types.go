@@ -342,7 +342,9 @@ func (backupStatus *BackupStatus) GetOnline() bool {
 // It returns true if the backup's method is BackupMethodVolumeSnapshot and its status phase is BackupPhaseCompleted.
 // Otherwise, it returns false.
 func (backup *Backup) IsCompletedVolumeSnapshot() bool {
-	return backup.Spec.Method == BackupMethodVolumeSnapshot && backup.Status.Phase == BackupPhaseCompleted
+	return backup != nil &&
+		backup.Spec.Method == BackupMethodVolumeSnapshot &&
+		backup.Status.Phase == BackupPhaseCompleted
 }
 
 // IsInProgress check if a certain backup is in progress or not
