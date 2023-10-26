@@ -833,6 +833,13 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	in.SecretsResourceVersion.DeepCopyInto(&out.SecretsResourceVersion)
 	in.ConfigMapResourceVersion.DeepCopyInto(&out.ConfigMapResourceVersion)
 	in.Certificates.DeepCopyInto(&out.Certificates)
+	if in.FirstRecoverabilityByMethod != nil {
+		in, out := &in.FirstRecoverabilityByMethod, &out.FirstRecoverabilityByMethod
+		*out = make(map[BackupMethod]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.PoolerIntegrations != nil {
 		in, out := &in.PoolerIntegrations, &out.PoolerIntegrations
 		*out = new(PoolerIntegrations)

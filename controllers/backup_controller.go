@@ -448,7 +448,6 @@ func updateFirstRecoverabilityPoint(
 	cli client.Client,
 	cluster *apiv1.Cluster,
 ) error {
-	contextLogger := log.FromContext(ctx)
 	wrapErr := func(msg string, err error) error {
 		return fmt.Errorf("in updateFirstRecoverabilityPont, %s: %w", msg, err)
 	}
@@ -473,25 +472,35 @@ func updateFirstRecoverabilityPoint(
 		return wrapErr("could not get oldest snapshot", err)
 	}
 
-	var firstRecoverabilityTime time.Time
-	if clusterNow.Status.FirstRecoverabilityPoint != "" {
-		ts, err := time.Parse(time.RFC3339, clusterNow.Status.FirstRecoverabilityPoint)
-		if err != nil {
-			contextLogger.Error(err, "while getting Cluster FirstRecoverabilityPoint")
-			return wrapErr("could not get cluster FRP", err)
-		}
-		firstRecoverabilityTime = ts
+	oldCluster := clusterNow.DeepCopy()
+	var statusHasUpdates bool
+	const method = apiv1.BackupMethodVolumeSnapshot
+
+	// first update the oldest snapshot recorded
+	updated, err := clusterNow.TryUpdatingOldestBackupTime(oldestSnapshot, method)
+	if err != nil {
+		return wrapErr("could not update oldest snapshot time", err)
 	}
-	if clusterNow.Status.FirstRecoverabilityPoint == "" ||
-		oldestSnapshot.Before(firstRecoverabilityTime) {
-		oldCluster := clusterNow.DeepCopy()
-		clusterNow.Status.FirstRecoverabilityPoint = oldestSnapshot.Format(time.RFC3339)
+	statusHasUpdates = statusHasUpdates || updated
+
+	// update the overall FRP with the oldest backup on any method
+	updated, err = clusterNow.TryUpdatingFirstRecoverabilityPoint()
+	if err != nil {
+		return wrapErr("could not update oldest snapshot time", err)
+	}
+	statusHasUpdates = statusHasUpdates || updated
+
+	if statusHasUpdates {
 		err = cli.Status().Patch(ctx, &clusterNow, client.MergeFrom(oldCluster))
 		if err != nil {
 			return wrapErr("could not patch cluster status", err)
 		}
 		// updating the input argument makes this function testable with the fake client
-		cluster.Status.FirstRecoverabilityPoint = oldestSnapshot.Format(time.RFC3339)
+		cluster.Status.FirstRecoverabilityPoint = clusterNow.Status.FirstRecoverabilityPoint
+		if cluster.Status.FirstRecoverabilityByMethod == nil {
+			cluster.Status.FirstRecoverabilityByMethod = make(map[apiv1.BackupMethod]string)
+		}
+		cluster.Status.FirstRecoverabilityByMethod[method] = clusterNow.Status.FirstRecoverabilityByMethod[method]
 	}
 	return nil
 }

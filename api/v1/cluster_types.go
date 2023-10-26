@@ -736,6 +736,10 @@ type ClusterStatus struct {
 	// +optional
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
+	// The oldest time of backup available, per backup method type
+	// +optional
+	FirstRecoverabilityByMethod map[BackupMethod]string `json:"firstRecoverabilityByMethod,omitempty"`
+
 	// Stored as a date in RFC3339 format
 	// +optional
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
@@ -2989,6 +2993,76 @@ func (backupConfiguration *BackupConfiguration) IsBarmanEndpointCASet() bool {
 		backupConfiguration.BarmanObjectStore.EndpointCA != nil &&
 		backupConfiguration.BarmanObjectStore.EndpointCA.Name != "" &&
 		backupConfiguration.BarmanObjectStore.EndpointCA.Key != ""
+}
+
+// getOldestOverallBackup returns the time of the oldest backup, regardless of backup method
+func (cluster *Cluster) getOldestOverallBackup() (time.Time, error) {
+	var oldest time.Time
+	for method, timestr := range cluster.Status.FirstRecoverabilityByMethod {
+		ts, err := time.Parse(time.RFC3339, timestr)
+		if err != nil {
+			return oldest, fmt.Errorf("could not parse recoverability time for %s: %s", method, timestr)
+		}
+		if oldest.IsZero() || ts.Before(oldest) {
+			oldest = ts
+		}
+	}
+	return oldest, nil
+}
+
+// TryUpdatingFirstRecoverabilityPoint will update the FirstRecoverabilityPoint
+// if there are older backups available.
+// Returns true if it changes the existing FRP.
+// IMPORTANT: this function should be called after the FirstRecoverabilityByMethod has
+// been updated
+func (cluster *Cluster) TryUpdatingFirstRecoverabilityPoint() (bool, error) {
+	var hasUpdates bool
+	oldestAvailableBackup, err := cluster.getOldestOverallBackup()
+	if err != nil {
+		return false, err
+	}
+	if oldestAvailableBackup.IsZero() {
+		return false, fmt.Errorf("could not find FirstRecoverabilityByMethod times")
+	}
+	if cluster.Status.FirstRecoverabilityPoint == "" {
+		cluster.Status.FirstRecoverabilityPoint = oldestAvailableBackup.Format(time.RFC3339)
+		hasUpdates = true
+	} else {
+		ts, err := time.Parse(time.RFC3339, cluster.Status.FirstRecoverabilityPoint)
+		if err != nil {
+			return false, fmt.Errorf("could not parse FirstRecoverabilityPont: %s", cluster.Status.FirstRecoverabilityPoint)
+		}
+		if oldestAvailableBackup.Before(ts) {
+			cluster.Status.FirstRecoverabilityPoint = oldestAvailableBackup.Format(time.RFC3339)
+			hasUpdates = true
+		}
+	}
+	return hasUpdates, nil
+}
+
+// TryUpdatingOldestBackupTime will set time `t` as the oldest backup for `method` if
+// the existing recorded time is not the oldest.
+// Returns true if the value was updated
+func (cluster *Cluster) TryUpdatingOldestBackupTime(t time.Time, method BackupMethod) (bool, error) {
+	var hasUpdates bool
+	if cluster.Status.FirstRecoverabilityByMethod == nil {
+		cluster.Status.FirstRecoverabilityByMethod = make(map[BackupMethod]string)
+	}
+	oldestRecordedTime, found := cluster.Status.FirstRecoverabilityByMethod[method]
+	if !found {
+		cluster.Status.FirstRecoverabilityByMethod[method] = t.Format(time.RFC3339)
+		hasUpdates = true
+	} else {
+		ts, err := time.Parse(time.RFC3339, oldestRecordedTime)
+		if err != nil {
+			return false, fmt.Errorf("could not parse recoverability time for %s: %s", method, oldestRecordedTime)
+		}
+		if t.Before(ts) {
+			cluster.Status.FirstRecoverabilityByMethod[method] = t.Format(time.RFC3339)
+			hasUpdates = true
+		}
+	}
+	return hasUpdates, nil
 }
 
 // BuildPostgresOptions create the list of options that

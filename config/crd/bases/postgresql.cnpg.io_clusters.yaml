@@ -3905,6 +3905,12 @@ spec:
                 items:
                   type: string
                 type: array
+              firstRecoverabilityByMethod:
+                additionalProperties:
+                  type: string
+                description: The oldest time of backup available, per backup method
+                  type
+                type: object
               firstRecoverabilityPoint:
                 description: The first recoverability point, stored as a date in RFC3339
                   format
