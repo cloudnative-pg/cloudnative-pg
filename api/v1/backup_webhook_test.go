@@ -17,13 +17,15 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/utils/ptr"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("", func() {
+var _ = Describe("Backup webhook validate", func() {
 	It("doesn't complain if VolumeSnapshot CRD is present", func() {
 		backup := &Backup{
 			Spec: BackupSpec{
@@ -45,5 +47,29 @@ var _ = Describe("", func() {
 		result := backup.validate()
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.method"))
+	})
+
+	It("complains if online is set on a barman backup", func() {
+		backup := &Backup{
+			Spec: BackupSpec{
+				Method: BackupMethodBarmanObjectStore,
+				Online: ptr.To(true),
+			},
+		}
+		result := backup.validate()
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.online"))
+	})
+
+	It("complains if onlineConfiguration is set on a barman backup", func() {
+		backup := &Backup{
+			Spec: BackupSpec{
+				Method:              BackupMethodBarmanObjectStore,
+				OnlineConfiguration: &OnlineConfiguration{},
+			},
+		}
+		result := backup.validate()
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.onlineConfiguration"))
 	})
 })
