@@ -18,13 +18,16 @@ package controllers
 
 import (
 	"context"
-	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"time"
 
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -250,7 +253,6 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 	})
 })
 
-
 var _ = Describe("update first recoverability point", func() {
 	var (
 		snapshots          volumesnapshot.VolumeSnapshotList
@@ -272,7 +274,7 @@ var _ = Describe("update first recoverability point", func() {
 			},
 		}
 		snapshots = volumesnapshot.VolumeSnapshotList{
-			Items: volumesnapshotbackup.Slice{
+			Items: []volumesnapshot.VolumeSnapshot{
 				{ObjectMeta: metav1.ObjectMeta{
 					Name:      "snapshot-0",
 					Namespace: namespace,

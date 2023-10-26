@@ -462,12 +462,8 @@ func updateFirstRecoverabilityPoint(
 		return wrapErr("could not refresh cluster", err)
 	}
 
-	snapshots, err := volumesnapshot.GetClusterVolumeSnapshots(ctx, cli,
+	oldestSnapshot, err := volumesnapshot.GetOldestSnapshot(ctx, cli,
 		cluster.Namespace, cluster.Name)
-	if err != nil {
-		return wrapErr("could not get cluster snapshots", err)
-	}
-	oldestSnapshot, err := snapshots.GetOldestSnapshot()
 	if err != nil {
 		return wrapErr("could not get oldest snapshot", err)
 	}

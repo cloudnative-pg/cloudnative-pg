@@ -27,16 +27,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// GetClusterVolumeSnapshots extracts the list of volume snapshots of PG_DATA
-// volumes taken for a cluster
-func GetClusterVolumeSnapshots(
+// GetOldestSnapshot gets the time of the oldest snapshot for the cluster
+func GetOldestSnapshot(
 	ctx context.Context,
 	cli client.Client,
 	namespace string,
 	clusterName string,
-) (Slice, error) {
-	var list storagesnapshotv1.VolumeSnapshotList
+) (time.Time, error) {
+	var oldestSnaphsot time.Time
 
+	var list storagesnapshotv1.VolumeSnapshotList
 	if err := cli.List(
 		ctx,
 		&list,
@@ -46,19 +46,13 @@ func GetClusterVolumeSnapshots(
 			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 		},
 	); err != nil {
-		return nil, err
+		return oldestSnaphsot, err
 	}
 
-	return list.Items, nil
-}
-
-// GetOldestSnapshot gets the time the oldest snapshot was completed, or error
-func (s Slice) GetOldestSnapshot() (time.Time, error) {
-	var oldestSnaphsot time.Time
-	if len(s) == 0 {
+	if len(list.Items) == 0 {
 		return oldestSnaphsot, fmt.Errorf("there were no snapshots")
 	}
-	for _, volumeSnapshot := range s {
+	for _, volumeSnapshot := range list.Items {
 		endTimeStr, hasTime := volumeSnapshot.Annotations[utils.BackupEndTimeAnnotationName]
 		if hasTime {
 			endTime, err := time.Parse(time.RFC3339, endTimeStr)
