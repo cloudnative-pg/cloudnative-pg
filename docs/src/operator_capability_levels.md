@@ -360,10 +360,9 @@ alongside WAL files.
 Both `barman-cloud-wal-restore` and `barman-cloud-backup` are distributed in
 the application container image under GNU GPL 3 terms.
 
-Object store backups are taken while PostgreSQL is up and running (hot
-backups). Volume Snapshot backups are currently taken after PostgreSQL has
-been shut down (cold backups). This will change in the future with support
-for online Volume Snapshot backups.
+Object store backups and Volume Snapshot backups are taken while PostgreSQL is
+up and running (hot backups). Volume snapshots also support taking consistent
+database snapshots with cold backups.
 
 ### Backups from a standby
 

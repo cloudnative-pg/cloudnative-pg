@@ -432,6 +432,7 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 
 // PatchBackupStatusAndRetry updates a certain backup's status in the k8s database,
 // retries when error occurs
+// TODO: this method does not belong here, it should be moved to api/v1/backup_types.go
 func PatchBackupStatusAndRetry(
 	ctx context.Context,
 	cli client.Client,

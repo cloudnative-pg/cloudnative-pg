@@ -513,6 +513,8 @@ func CreateOnDemandBackupViaKubectlPlugin(
 }
 
 // CreateOnDemandBackup creates a Backup resource for a given cluster name
+// Deprecated: Use CreateBackup.
+// TODO: eradicate
 func CreateOnDemandBackup(
 	namespace,
 	clusterName,
@@ -541,6 +543,22 @@ func CreateOnDemandBackup(
 	}
 
 	obj, err := CreateObject(env, targetBackup)
+	if err != nil {
+		return nil, err
+	}
+	backup, ok := obj.(*apiv1.Backup)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of Backup type: %T %v", obj, obj)
+	}
+	return backup, nil
+}
+
+// CreateBackup creates a Backup resource for a given cluster name
+func CreateBackup(
+	targetBackup apiv1.Backup,
+	env *TestingEnvironment,
+) (*apiv1.Backup, error) {
+	obj, err := CreateObject(env, &targetBackup)
 	if err != nil {
 		return nil, err
 	}

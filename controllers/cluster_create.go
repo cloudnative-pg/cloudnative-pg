@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
@@ -989,9 +990,16 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			}
 		}
 
-		if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots != nil {
+		volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
+		if volumeSnapshotsRecovery != nil {
+			var snapshot volumesnapshot.VolumeSnapshot
+			if err := r.Client.Get(ctx,
+				types.NamespacedName{Name: volumeSnapshotsRecovery.Storage.Name, Namespace: cluster.Namespace},
+				&snapshot); err != nil {
+				return ctrl.Result{}, err
+			}
 			r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-			job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, backup)
+			job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, snapshot, backup)
 			break
 		}
 

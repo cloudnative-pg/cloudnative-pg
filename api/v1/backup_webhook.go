@@ -82,7 +82,7 @@ func (r *Backup) validate() field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.Method == BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
-		return append(result, field.Invalid(
+		result = append(result, field.Invalid(
 			field.NewPath("spec", "method"),
 			r.Spec.Method,
 			"Cannot use volumeSnapshot backup method due to missing "+

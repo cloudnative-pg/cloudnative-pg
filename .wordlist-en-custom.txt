@@ -19,6 +19,7 @@ Azurite
 BDR
 BackupConfiguration
 BackupFrom
+BackupLabelFile
 BackupList
 BackupMethod
 BackupPhase
@@ -226,6 +227,7 @@ ObjectMeta
 OngoingBackupStatus
 OngoingBackups
 OngoingSnapshotBackups
+OnlineConfiguration
 OnlineUpdateEnabled
 OnlineUpgrading
 OpenShift
@@ -369,6 +371,7 @@ TCP
 TLS
 TOC
 TODO
+TablespaceMapFile
 TemporaryData
 TimelineId
 TopologyKey
@@ -455,6 +458,7 @@ backport
 backported
 backupID
 backupId
+backupLabelFile
 backupName
 backupOwnerReference
 backupRetentionPolicy
@@ -838,6 +842,7 @@ oc
 ol
 olm
 ongoingBackups
+onlineConfiguration
 onlineUpdateEnabled
 openldap
 openshift
@@ -1072,6 +1077,7 @@ systemd
 sysv
 tAc
 tablespace
+tablespaceMapFile
 tablespaces
 targetImmediate
 targetLSN
@@ -1131,6 +1137,7 @@ volumeMounts
 volumeSnapshot
 volumeSnapshots
 volumesnapshot
+waitForArchive
 wal
 walClassName
 walSegmentSize

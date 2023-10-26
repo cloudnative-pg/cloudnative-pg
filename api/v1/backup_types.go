@@ -185,6 +185,14 @@ type BackupStatus struct {
 	// +optional
 	CommandError string `json:"commandError,omitempty"`
 
+	// Backup label file content as returned by Postgres in case of online (hot) backups
+	// +optional
+	BackupLabelFile []byte `json:"backupLabelFile,omitempty"`
+
+	// Tablespace map file content as returned by Postgres in case of online (hot) backups
+	// +optional
+	TablespaceMapFile []byte `json:"tablespaceMapFile,omitempty"`
+
 	// Information to identify the instance where the backup has been taken from
 	// +optional
 	InstanceID *InstanceID `json:"instanceID,omitempty"`
@@ -196,6 +204,9 @@ type BackupStatus struct {
 	// The backup method being used
 	// +optional
 	Method BackupMethod `json:"method,omitempty"`
+
+	// Whether the backup was online/hot (`true`) or offline/cold (`false`)
+	Online *bool `json:"online,omitempty"`
 }
 
 // InstanceID contains the information to identify an instance
@@ -290,6 +301,16 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volu
 // IsDone check if a backup is completed or still in progress
 func (backupStatus *BackupStatus) IsDone() bool {
 	return backupStatus.Phase == BackupPhaseCompleted || backupStatus.Phase == BackupPhaseFailed
+}
+
+// GetOnline tells whether this backup was taken while the database
+// was up
+func (backupStatus *BackupStatus) GetOnline() bool {
+	if backupStatus.Online == nil {
+		return false
+	}
+
+	return *backupStatus.Online
 }
 
 // IsCompletedVolumeSnapshot checks if a backup is completed using the volume snapshot method.

@@ -48,14 +48,11 @@ compatible, from a physical replication standpoint, with the original one.
 
 For recovery using volume snapshots:
 
-- take a consistent cold backup of the Postgres cluster from a standby through
-  the `kubectl cnpg backup` command (see the [plugin document](kubectl-plugin.md#requesting-a-new-base-backup)
-  for reference), which creates the necessary `VolumeSnapshot` objects (two if
-  you have a separate volume for WALs, one if you don't) - recover from the above
-  *VolumeSnapshot* objects through the `volumeSnapshots` option in the
-  `.spec.bootstrap.recovery` stanza, as described in
-  ["Recovery from `VolumeSnapshot` objects"](#recovery-from-volumesnapshot-objects)
-  below
+- using a consistent set of `VolumeSnapshot` objects that all belong to the
+  same backup, and identified by the same `cnpg.io/cluster` and
+  `cnpg.io/backupName` labels, then recovering through the `volumeSnapshots`
+  option in the `.spec.bootstrap.recovery` stanza, as described in
+  ["Recovery from `VolumeSnapshot` objects"](#recovery-from-volumesnapshot-objects) below
 
 ## Recovery from an object store
 
@@ -118,6 +115,7 @@ spec:
     to synchronize them, resulting in a slower process depending on the size
     of the database. This limitation will be lifted in the future when support
     for online backups will be introduced.
+
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
 existing `Cluster` that's been taken using the declarative API for
 [volume snapshot backups](backup_volumesnapshot.md).

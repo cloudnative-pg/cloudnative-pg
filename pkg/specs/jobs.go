@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/kballard/go-shellquote"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,11 +137,26 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 }
 
 // CreatePrimaryJobViaRestoreSnapshot creates a new primary instance in a Pod, restoring from a volumeSnapshot
-func CreatePrimaryJobViaRestoreSnapshot(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
+func CreatePrimaryJobViaRestoreSnapshot(
+	cluster apiv1.Cluster,
+	nodeSerial int,
+	snapshot storagesnapshotv1.VolumeSnapshot,
+	backup *apiv1.Backup,
+) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
 		"restoresnapshot",
+	}
+
+	if snapshot.Annotations[utils.BackupLabelFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--backuplabel=%s", snapshot.Annotations[utils.BackupLabelFileAnnotationName])
+		initCommand = append(initCommand, flag)
+	}
+
+	if snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--tablespacemap=%s", snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName])
+		initCommand = append(initCommand, flag)
 	}
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)

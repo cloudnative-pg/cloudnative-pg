@@ -115,9 +115,9 @@ In CloudNativePG, object store based backups:
 VolumeSnapshots instead:
 
 - don't require the WAL archive, although in production it is always recommended
-- support cold backup only (currently)
 - support incremental copy, depending on the underlying storage classes
 - support differential copy, depending on the underlying storage classes
+- also support cold backup
 
 Which one to use depends on your specific requirements and environment,
 including:
@@ -141,24 +141,21 @@ available methods for storing physical base backups.
 |-----------------------------------|:------------:|:--------------------:|
 | **WAL archiving**                 |   Required   |    Recommended (1)   |
 | **Cold backup**                   |      𐄂       |           ✓          |
-| **Hot backup**                    |       ✓      |        𐄂  (2)        |
-| **Incremental copy**              |      𐄂       |         ✓  (3)       |
-| **Differential copy**             |      𐄂       |         ✓  (3)       |
+| **Hot backup**                    |       ✓      |           ✓          |
+| **Incremental copy**              |      𐄂       |         ✓  (2)       |
+| **Differential copy**             |      𐄂       |         ✓  (2)       |
 | **Backup from a standby**         |       ✓      |           ✓          |
-| **Snapshot recovery**             |    𐄂 (4)     |           ✓          |
+| **Snapshot recovery**             |    𐄂 (3)     |           ✓          |
 | **Point In Time Recovery (PITR)** |       ✓      | Requires WAL archive |
 | **Underlying technology**         | Barman Cloud |   Kubernetes API     |
 
 
 > See the explanation below for the notes in the above table:
 >
-> 1. WAL archive must be on an object store
-> 2. Hot backup is not available yet for volume snapshots, and it is planned
-> for version 1.22; however, considering that cold backup is taken by fencing
-> temporarily a standby, the operation does not induce any downtime for your
-> write applications
-> 3. If supported by the underlying storage classes of the PostgreSQL volumes
-> 4. Snapshot recovery can be emulated using the `bootstrap.recovery.recoveryTarget.targetImmediate` option
+> 1. WAL archive must be on an object store at the moment
+> 2. If supported by the underlying storage classes of the PostgreSQL volumes
+> 3. Snapshot recovery can be emulated using the
+>    `bootstrap.recovery.recoveryTarget.targetImmediate` option
 
 ## Scheduled backups
 

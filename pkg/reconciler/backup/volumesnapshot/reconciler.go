@@ -18,6 +18,7 @@ package volumesnapshot
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,12 +30,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -43,9 +47,9 @@ import (
 // Reconciler is an object capable of executing a volume snapshot on a running cluster
 type Reconciler struct {
 	cli                  client.Client
-	shouldFence          bool
 	recorder             record.EventRecorder
 	instanceStatusClient *instance.StatusClient
+	backupClient         *webserver.BackupClient
 }
 
 // ExecutorBuilder is a struct capable of creating a Reconciler
@@ -63,14 +67,9 @@ func NewExecutorBuilder(
 			cli:                  cli,
 			recorder:             recorder,
 			instanceStatusClient: instance.NewStatusClient(),
+			backupClient:         webserver.NewBackupClient(),
 		},
 	}
-}
-
-// FenceInstance instructs if the Reconciler should fence or not the instance while taking the snapshot
-func (e *ExecutorBuilder) FenceInstance(fence bool) *ExecutorBuilder {
-	e.executor.shouldFence = fence
-	return e
 }
 
 // Build returns the Reconciler instance
@@ -120,8 +119,7 @@ func (se *Reconciler) enrichSnapshot(
 	vs.Labels[utils.BackupDateLabelName] = time.Now().Format("20060102")
 	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
 	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
-	// TODO: once we have online volumesnapshot backups, this should change
-	vs.Annotations[utils.IsOnlineBackupLabelName] = "false"
+	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
@@ -134,6 +132,8 @@ func (se *Reconciler) enrichSnapshot(
 }
 
 // Execute the volume snapshot of the given cluster instance
+// TODO: remove the nolint
+// nolint: gocognit
 func (se *Reconciler) Execute(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -147,14 +147,15 @@ func (se *Reconciler) Execute(
 
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
 
+	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
 	// Step 0: check if the snapshots have been created already
-	volumeSnapshots, err := GetBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
+	volumeSnapshots, err := getBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 1: fencing
-	if len(volumeSnapshots) == 0 && se.shouldFence {
+	// Step 1: preparation of snapshot backup
+	if len(volumeSnapshots) == 0 && !volumeSnapshotConfig.GetOnline() {
 		contextLogger.Debug("Checking pre-requisites")
 		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
 			return nil, err
@@ -162,6 +163,27 @@ func (se *Reconciler) Execute(
 
 		if res, err := se.waitForPodToBeFenced(ctx, targetPod); res != nil || err != nil {
 			return res, err
+		}
+	}
+	if len(volumeSnapshots) == 0 && volumeSnapshotConfig.GetOnline() {
+		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
+		if err != nil {
+			return nil, fmt.Errorf("while getting status: %w", err)
+		}
+
+		switch status.Phase {
+		case webserver.Starting:
+			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		case "":
+			req := webserver.StartBackupRequest{
+				ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.ImmediateCheckpoint,
+				WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.WaitForArchive,
+				BackupName:          backup.Name,
+				Force:               true,
+			}
+			if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
+				return nil, fmt.Errorf("while trying to start the backup: %w", err)
+			}
 		}
 	}
 
@@ -187,7 +209,108 @@ func (se *Reconciler) Execute(
 		return nil, err
 	}
 
-	return nil, nil
+	// TODO: remove the nolint
+	// nolint: nestif
+	if volumeSnapshotConfig.GetOnline() {
+		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
+		if err != nil {
+			return nil, fmt.Errorf("while getting status: %w", err)
+		}
+
+		if status.Phase == webserver.Started {
+			if err := se.backupClient.Stop(ctx, targetPod.Status.PodIP); err != nil {
+				return nil, fmt.Errorf("while stopping the backup client: %w", err)
+			}
+			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+
+		if status.Phase != webserver.Completed {
+			return &ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		backup.Status.BeginLSN = string(status.BeginLSN)
+		backup.Status.EndLSN = string(status.EndLSN)
+		backup.Status.TablespaceMapFile = status.SpcmapFile
+		backup.Status.BackupLabelFile = status.LabelFile
+	}
+
+	backup.Status.SetAsCompleted()
+	backup.Status.Online = ptr.To(volumeSnapshotConfig.GetOnline())
+	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	backup.Status.BackupSnapshotStatus.SetSnapshotElements(snapshots)
+	if err := backupStatusFromSnapshots(snapshots, &backup.Status); err != nil {
+		contextLogger.Error(err, "while enriching the backup status")
+	}
+
+	if err := annotateSnapshotsWithBackupData(ctx, se.cli, snapshots, &backup.Status); err != nil {
+		contextLogger.Error(err, "while enriching the snapshots's status")
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	return nil, postgres.PatchBackupStatusAndRetry(ctx, se.cli, backup)
+}
+
+// AnnotateSnapshots adds labels and annotations to the snapshots using the backup
+// status to facilitate access
+func annotateSnapshotsWithBackupData(
+	ctx context.Context,
+	cli client.Client,
+	snapshots slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	contextLogger := log.FromContext(ctx)
+	for idx := range snapshots {
+		snapshot := &snapshots[idx]
+		oldSnapshot := snapshot.DeepCopy()
+		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
+		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
+
+		if len(backupStatus.BackupLabelFile) > 0 {
+			snapshot.Annotations[utils.BackupLabelFileAnnotationName] = base64.StdEncoding.EncodeToString(
+				backupStatus.BackupLabelFile)
+		}
+
+		if len(backupStatus.TablespaceMapFile) > 0 {
+			snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName] = base64.StdEncoding.EncodeToString(
+				backupStatus.TablespaceMapFile)
+		}
+
+		if err := cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+			contextLogger.Error(err, "while updating volume snapshot from backup object",
+				"snapshot", snapshot.Name)
+			return err
+		}
+	}
+	return nil
+}
+
+// backupStatusFromSnapshots adds fields to the backup status based on the snapshots
+func backupStatusFromSnapshots(
+	snapshots slice,
+	backupStatus *apiv1.BackupStatus,
+) error {
+	controldata, err := snapshots.getControldata()
+	if err != nil {
+		return err
+	}
+	pairs := utils.ParsePgControldataOutput(controldata)
+
+	// TODO: calculate wal in case of online backup
+	// the begin/end WAL and LSN are the same, since the instance was fenced
+	// for the snapshot
+	backupStatus.BeginWal = pairs["Latest checkpoint's REDO WAL file"]
+	backupStatus.EndWal = pairs["Latest checkpoint's REDO WAL file"]
+
+	if !backupStatus.GetOnline() {
+		backupStatus.BeginLSN = pairs["Latest checkpoint's REDO location"]
+		backupStatus.EndLSN = pairs["Latest checkpoint's REDO location"]
+	}
+
+	return nil
 }
 
 // ensurePodIsFenced checks if the preconditions for the execution of this step are
