@@ -141,50 +141,25 @@ func (se *Reconciler) Execute(
 	targetPod *corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (*ctrl.Result, error) {
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
-		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
-	}
-
-	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
-
-	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-	// Step 0: check if the snapshots have been created already
 	volumeSnapshots, err := getBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 1: preparation of snapshot backup
-	if len(volumeSnapshots) == 0 && !volumeSnapshotConfig.GetOnline() {
-		contextLogger.Debug("Checking pre-requisites")
-		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
-			return nil, err
-		}
-
-		if res, err := se.waitForPodToBeFenced(ctx, targetPod); res != nil || err != nil {
-			return res, err
-		}
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
 	}
-	if len(volumeSnapshots) == 0 && volumeSnapshotConfig.GetOnline() {
-		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
-		if err != nil {
-			return nil, fmt.Errorf("while getting status: %w", err)
-		}
 
-		switch status.Phase {
-		case webserver.Starting:
-			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-		case "":
-			req := webserver.StartBackupRequest{
-				ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
-				WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
-				BackupName:          backup.Name,
-				Force:               true,
-			}
-			if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
-				return nil, fmt.Errorf("while trying to start the backup: %w", err)
-			}
-		}
+	// Step 1: backup preparation.
+	// This will set PostgreSQL in backup mode for hot snapshots, or fence the Pods for cold snapshots.
+	if res, err := se.prepareSnapshotBackupStep(
+		ctx,
+		cluster,
+		backup,
+		targetPod,
+		volumeSnapshots,
+	); res != nil || err != nil {
+		return res, err
 	}
 
 	// Step 2: create snapshot
@@ -200,10 +175,101 @@ func (se *Reconciler) Execute(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	// Step 3: wait for snapshots to be cut
+	// Step 3: wait for snapshots to be provisioned
 	if res, err := se.waitSnapshotToBeProvisionedStep(ctx, volumeSnapshots); res != nil || err != nil {
 		return res, err
 	}
+
+	// Step 4: backup finalization.
+	// This will unset the PostgreSQL backup mode, and unfence the Pod
+	if res, err := se.finalizeSnapshotBackupStep(
+		ctx,
+		cluster,
+		backup,
+		targetPod,
+	); res != nil || err != nil {
+		return res, err
+	}
+
+	// Step 5: wait for snapshots to be ready to use
+	if res, err := se.waitSnapshotToBeReadyStep(ctx, volumeSnapshots); res != nil || err != nil {
+		return res, err
+	}
+
+	// Step 6: set backup as completed, adds remaining metadata
+	return se.completeSnapshotBackupStep(
+		ctx,
+		backup,
+	)
+}
+
+// prepareSnapshotBackupStep will set PostgreSQL in backup mode for hot snapshots
+// or fence the Pod for cold snapshots. At the end of this function, PostgreSQL
+// will be ready to be backed up
+func (se *Reconciler) prepareSnapshotBackupStep(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	targetPod *corev1.Pod,
+	volumeSnapshots slice,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
+	if len(volumeSnapshots) != 0 {
+		// There's no need for this step, the snapshots
+		// have already been created.
+		return nil, nil
+	}
+
+	// Handle cold snapshots
+	if !volumeSnapshotConfig.GetOnline() {
+		contextLogger.Debug("Checking pre-requisites")
+		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
+			return nil, err
+		}
+
+		if res, err := se.waitForPodToBeFenced(ctx, targetPod); res != nil || err != nil {
+			return res, err
+		}
+
+		return nil, nil
+	}
+
+	// Handle hot snapshots
+	status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
+	if err != nil {
+		return nil, fmt.Errorf("while getting status: %w", err)
+	}
+
+	switch status.Phase {
+	case webserver.Starting:
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case "":
+		req := webserver.StartBackupRequest{
+			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
+			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
+			BackupName:          backup.Name,
+			Force:               true,
+		}
+		if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
+			return nil, fmt.Errorf("while trying to start the backup: %w", err)
+		}
+	}
+
+	return nil, nil
+}
+
+// finalizeSnapshotBackupStep is called once the snapshots have been provisioned
+// and will unfence the Pod for cold snapshots, or unset PostgreSQL backup mode
+func (se *Reconciler) finalizeSnapshotBackupStep(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	targetPod *corev1.Pod,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
+	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
 
 	if err := se.EnsurePodIsUnfenced(ctx, cluster, backup, targetPod); err != nil {
 		return nil, err
@@ -234,7 +300,6 @@ func (se *Reconciler) Execute(
 		backup.Status.BackupLabelFile = status.LabelFile
 	}
 
-	// Step 5: wait for snapshots to be ready to use
 	backup.Status.SetAsFinalizing()
 	backup.Status.Online = ptr.To(volumeSnapshotConfig.GetOnline())
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
@@ -252,12 +317,22 @@ func (se *Reconciler) Execute(
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, err
 	}
 
-	// Step 6: set backups as done
-	if res, err := se.waitSnapshotToBeReadyStep(ctx, volumeSnapshots); res != nil || err != nil {
-		return res, err
+	return nil, nil
+}
+
+// completeSnapshotBackupStep sets a backup as completed, and set the remaining metadata
+// on it
+func (se *Reconciler) completeSnapshotBackupStep(
+	ctx context.Context,
+	backup *apiv1.Backup,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+	backup.Status.SetAsCompleted()
+	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
+	if err != nil {
+		return nil, err
 	}
 
-	backup.Status.SetAsCompleted()
 	if err := annotateSnapshotsWithBackupData(ctx, se.cli, snapshots, &backup.Status); err != nil {
 		contextLogger.Error(err, "while enriching the snapshots's status")
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
