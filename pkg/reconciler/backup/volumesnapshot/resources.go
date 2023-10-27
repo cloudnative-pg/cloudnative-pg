@@ -28,13 +28,19 @@ import (
 
 // volumeSnapshotInfo host information about a volume snapshot
 type volumeSnapshotInfo struct {
-	// Error contains the raised error when the volume snapshot terminated
+	// error contains the raised error when the volume snapshot terminated
 	// with a failure
-	Error error
+	error error
 
-	// Running is true when the volume snapshot is running or when we are
-	// waiting for the external snapshotter operator to reconcile it
-	Running bool
+	// provisioned is true when the volume snapshot have been cut and
+	// provisioned. When this is true, the volume snapshot may not still
+	// be ready to be used as a source.
+	// Some implementations copy the snapshot in a different storage area.
+	provisioned bool
+
+	// ready is true when the volume snapshot is complete and ready to
+	// be used as a source for a PVC.
+	ready bool
 }
 
 // volumeSnapshotError is raised when a volume snapshot failed with
@@ -54,7 +60,7 @@ type volumeSnapshotError struct {
 // Error implements the error interface
 func (err volumeSnapshotError) Error() string {
 	if err.InternalError.Message == nil {
-		return "non specified volume snapshot error"
+		return "non-specified volume snapshot error"
 	}
 	return *err.InternalError.Message
 }
@@ -100,32 +106,49 @@ func getBackupVolumeSnapshots(
 func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeSnapshotInfo {
 	if snapshot.Status == nil {
 		return volumeSnapshotInfo{
-			Error:   nil,
-			Running: true,
+			error:       nil,
+			provisioned: false,
+			ready:       false,
 		}
 	}
 
 	if snapshot.Status.Error != nil {
 		return volumeSnapshotInfo{
-			Error: &volumeSnapshotError{
+			provisioned: false,
+			ready:       false,
+			error: &volumeSnapshotError{
 				InternalError: *snapshot.Status.Error,
 				Name:          snapshot.Name,
 				Namespace:     snapshot.Namespace,
 			},
-			Running: false,
+		}
+	}
+
+	if snapshot.Status.BoundVolumeSnapshotContentName == nil ||
+		len(*snapshot.Status.BoundVolumeSnapshotContentName) == 0 ||
+		snapshot.Status.CreationTime == nil {
+		// The snapshot have not yet been provisioned
+		return volumeSnapshotInfo{
+			provisioned: false,
+			ready:       false,
+			error:       nil,
 		}
 	}
 
 	if snapshot.Status.ReadyToUse == nil || !*snapshot.Status.ReadyToUse {
-		// This volume snapshot completed correctly
+		// This volume snapshot have been provisioned but it
+		// still not be ready to be used as a source
 		return volumeSnapshotInfo{
-			Error:   nil,
-			Running: true,
+			error:       nil,
+			provisioned: true,
+			ready:       false,
 		}
 	}
 
+	// We're done!
 	return volumeSnapshotInfo{
-		Error:   nil,
-		Running: false,
+		error:       nil,
+		provisioned: true,
+		ready:       true,
 	}
 }
