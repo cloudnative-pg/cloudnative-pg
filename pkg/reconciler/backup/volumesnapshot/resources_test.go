@@ -31,9 +31,9 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 	It("should not fail when the VolumeSnapshot CR have not been handled by the External Snapshotter operator", func() {
 		info := parseVolumeSnapshotInfo(&storagesnapshotv1.VolumeSnapshot{})
 		Expect(info).To(BeEquivalentTo(volumeSnapshotInfo{
-			Error:       nil,
-			Provisioned: false,
-			Ready:       false,
+			error:       nil,
+			provisioned: false,
+			ready:       false,
 		}))
 	})
 
@@ -52,12 +52,12 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		}
 		info := parseVolumeSnapshotInfo(volumeSnapshot)
 
-		Expect(info.Error).To(HaveOccurred())
-		Expect(info.Ready).To(BeFalse())
-		Expect(info.Provisioned).To(BeFalse())
+		Expect(info.error).To(HaveOccurred())
+		Expect(info.ready).To(BeFalse())
+		Expect(info.provisioned).To(BeFalse())
 
 		var err *volumeSnapshotError
-		Expect(errors.As(info.Error, &err)).To(BeTrue())
+		Expect(errors.As(info.error, &err)).To(BeTrue())
 		Expect(err.InternalError).To(BeEquivalentTo(*volumeSnapshot.Status.Error))
 		Expect(err.Name).To(BeEquivalentTo("snapshot"))
 		Expect(err.Namespace).To(BeEquivalentTo("default"))
@@ -72,7 +72,7 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
-			Expect(info.Provisioned).To(BeFalse())
+			Expect(info.provisioned).To(BeFalse())
 		})
 	})
 
@@ -86,8 +86,8 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
-			Expect(info.Provisioned).To(BeFalse())
-			Expect(info.Ready).To(BeFalse())
+			Expect(info.provisioned).To(BeFalse())
+			Expect(info.ready).To(BeFalse())
 		})
 
 		It("should detect that a VolumeSnapshot is not provisioned", func() {
@@ -99,8 +99,8 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
-			Expect(info.Provisioned).To(BeFalse())
-			Expect(info.Ready).To(BeFalse())
+			Expect(info.provisioned).To(BeFalse())
+			Expect(info.ready).To(BeFalse())
 		})
 
 		It("should detect that a VolumeSnapshot is provisioned", func() {
@@ -113,8 +113,8 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
-			Expect(info.Provisioned).To(BeTrue())
-			Expect(info.Ready).To(BeFalse())
+			Expect(info.provisioned).To(BeTrue())
+			Expect(info.ready).To(BeFalse())
 		})
 	})
 
@@ -129,8 +129,8 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
-			Expect(info.Provisioned).To(BeTrue())
-			Expect(info.Ready).To(BeFalse())
+			Expect(info.provisioned).To(BeTrue())
+			Expect(info.ready).To(BeFalse())
 		})
 	})
 
@@ -145,8 +145,8 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
-			Expect(info.Provisioned).To(BeTrue())
-			Expect(info.Ready).To(BeFalse())
+			Expect(info.provisioned).To(BeTrue())
+			Expect(info.ready).To(BeFalse())
 		})
 
 		It("should detect that a VolumeSnapshot is ready to use", func() {
@@ -159,8 +159,8 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 				},
 			}
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
-			Expect(info.Provisioned).To(BeTrue())
-			Expect(info.Ready).To(BeTrue())
+			Expect(info.provisioned).To(BeTrue())
+			Expect(info.ready).To(BeTrue())
 		})
 	})
 })

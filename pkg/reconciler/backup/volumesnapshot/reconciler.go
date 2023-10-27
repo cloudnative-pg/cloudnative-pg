@@ -132,7 +132,7 @@ func (se *Reconciler) enrichSnapshot(
 }
 
 // Execute the volume snapshot of the given cluster instance
-// TODO: remove the nolint
+// TODO: remove the nolint, make two implementations: cold and hot that implement the same execute interface
 // nolint: gocognit
 func (se *Reconciler) Execute(
 	ctx context.Context,
@@ -316,7 +316,7 @@ func (se *Reconciler) finalizeSnapshotBackupStep(
 
 	if err := postgres.PatchBackupStatusAndRetry(ctx, se.cli, backup); err != nil {
 		contextLogger.Error(err, "while patching the backup status (finalized backup)")
-		return &ctrl.Result{RequeueAfter: 1 * time.Second}, err
+		return nil, err
 	}
 
 	return nil, nil
@@ -657,10 +657,10 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 	contextLogger := log.FromContext(ctx)
 
 	info := parseVolumeSnapshotInfo(snapshot)
-	if info.Error != nil {
-		return nil, info.Error
+	if info.error != nil {
+		return nil, info.error
 	}
-	if !info.Provisioned {
+	if !info.provisioned {
 		contextLogger.Info(
 			"Waiting for VolumeSnapshot to be provisioned",
 			"volumeSnapshotName", snapshot.Name)
@@ -693,10 +693,10 @@ func (se *Reconciler) waitSnapshotToBeReady(
 	contextLogger := log.FromContext(ctx)
 
 	info := parseVolumeSnapshotInfo(snapshot)
-	if info.Error != nil {
-		return nil, info.Error
+	if info.error != nil {
+		return nil, info.error
 	}
-	if !info.Ready {
+	if !info.ready {
 		contextLogger.Info(
 			"Waiting for VolumeSnapshot to be ready to use",
 			"volumeSnapshotName", snapshot.Name,

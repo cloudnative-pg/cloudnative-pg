@@ -28,19 +28,19 @@ import (
 
 // volumeSnapshotInfo host information about a volume snapshot
 type volumeSnapshotInfo struct {
-	// Error contains the raised error when the volume snapshot terminated
+	// error contains the raised error when the volume snapshot terminated
 	// with a failure
-	Error error
+	error error
 
-	// Provisioned is true when the volume snapshot have been cut and
+	// provisioned is true when the volume snapshot have been cut and
 	// provisioned. When this is true, the volume snapshot may not still
 	// be ready to be used as a source.
 	// Some implementations copy the snapshot in a different storage area.
-	Provisioned bool
+	provisioned bool
 
-	// Ready is true when the volume snapshot is complete and ready to
+	// ready is true when the volume snapshot is complete and ready to
 	// be used as a source for a PVC.
-	Ready bool
+	ready bool
 }
 
 // volumeSnapshotError is raised when a volume snapshot failed with
@@ -106,17 +106,17 @@ func getBackupVolumeSnapshots(
 func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeSnapshotInfo {
 	if snapshot.Status == nil {
 		return volumeSnapshotInfo{
-			Error:       nil,
-			Provisioned: false,
-			Ready:       false,
+			error:       nil,
+			provisioned: false,
+			ready:       false,
 		}
 	}
 
 	if snapshot.Status.Error != nil {
 		return volumeSnapshotInfo{
-			Provisioned: false,
-			Ready:       false,
-			Error: &volumeSnapshotError{
+			provisioned: false,
+			ready:       false,
+			error: &volumeSnapshotError{
 				InternalError: *snapshot.Status.Error,
 				Name:          snapshot.Name,
 				Namespace:     snapshot.Namespace,
@@ -129,9 +129,9 @@ func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeS
 		snapshot.Status.CreationTime == nil {
 		// The snapshot have not yet been provisioned
 		return volumeSnapshotInfo{
-			Provisioned: false,
-			Ready:       false,
-			Error:       nil,
+			provisioned: false,
+			ready:       false,
+			error:       nil,
 		}
 	}
 
@@ -139,16 +139,16 @@ func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeS
 		// This volume snapshot have been provisioned but it
 		// still not be ready to be used as a source
 		return volumeSnapshotInfo{
-			Error:       nil,
-			Provisioned: true,
-			Ready:       false,
+			error:       nil,
+			provisioned: true,
+			ready:       false,
 		}
 	}
 
 	// We're done!
 	return volumeSnapshotInfo{
-		Error:       nil,
-		Provisioned: true,
-		Ready:       true,
+		error:       nil,
+		provisioned: true,
+		ready:       true,
 	}
 }
