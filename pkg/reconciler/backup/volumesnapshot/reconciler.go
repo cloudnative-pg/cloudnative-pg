@@ -256,8 +256,9 @@ func (se *Reconciler) prepareSnapshotBackupStep(
 		}
 	case status.Phase == webserver.Starting:
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-		// TODO: the other phases should return error
 	}
+
+	// TODO: make only webserver.started return nil,nil. The other phases should return error
 
 	return nil, nil
 }
