@@ -215,12 +215,13 @@ func (se *Reconciler) prepareSnapshotBackupStep(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 	if len(volumeSnapshots) != 0 {
 		// There's no need for this step, the snapshots
 		// have already been created.
 		return nil, nil
 	}
+
+	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle cold snapshots
 	if !volumeSnapshotConfig.GetOnline() {
@@ -241,11 +242,9 @@ func (se *Reconciler) prepareSnapshotBackupStep(
 	if err != nil {
 		return nil, fmt.Errorf("while getting status: %w", err)
 	}
-
-	switch status.Phase {
-	case webserver.Starting:
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	case "":
+	switch {
+	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
+	case status.Phase == "", backup.Name != status.BackupName:
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
@@ -255,6 +254,9 @@ func (se *Reconciler) prepareSnapshotBackupStep(
 		if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
+	case status.Phase == webserver.Starting:
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		// TODO: the other phases should return error
 	}
 
 	return nil, nil
