@@ -50,9 +50,9 @@ const (
 	SpoolDirectory = postgres.ScratchDataDirectory + "/wal-archive-spool"
 )
 
-// ErrSwitchoverInProgress is raised when there is a switchover in progress
+// errSwitchoverInProgress is raised when there is a switchover in progress
 // and the new primary have not completed the promotion
-var ErrSwitchoverInProgress = fmt.Errorf("switchover in progress, refusing archiving")
+var errSwitchoverInProgress = fmt.Errorf("switchover in progress, refusing archiving")
 
 // NewCmd creates the new cobra command
 func NewCmd() *cobra.Command {
@@ -88,7 +88,7 @@ func NewCmd() *cobra.Command {
 
 			err = run(ctx, podName, pgData, cluster, args)
 			if err != nil {
-				if errors.Is(err, ErrSwitchoverInProgress) {
+				if errors.Is(err, errSwitchoverInProgress) {
 					contextLog.Warning("Refusing to archive WALs until the switchover is not completed",
 						"err", err)
 				} else {
@@ -166,7 +166,7 @@ func run(
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
 			"podName", podName)
-		return ErrSwitchoverInProgress
+		return errSwitchoverInProgress
 	}
 
 	maxParallel := 1
