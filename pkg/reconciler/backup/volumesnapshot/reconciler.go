@@ -132,7 +132,7 @@ func (se *Reconciler) enrichSnapshot(
 }
 
 // Execute the volume snapshot of the given cluster instance
-// TODO: remove the nolint
+// TODO: remove the nolint, make two implementations: cold and hot that implement the same execute interface
 // nolint: gocognit
 func (se *Reconciler) Execute(
 	ctx context.Context,
@@ -145,46 +145,21 @@ func (se *Reconciler) Execute(
 		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
 	}
 
-	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
-
-	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-	// Step 0: check if the snapshots have been created already
 	volumeSnapshots, err := getBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 1: preparation of snapshot backup
-	if len(volumeSnapshots) == 0 && !volumeSnapshotConfig.GetOnline() {
-		contextLogger.Debug("Checking pre-requisites")
-		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
-			return nil, err
-		}
-
-		if res, err := se.waitForPodToBeFenced(ctx, targetPod); res != nil || err != nil {
-			return res, err
-		}
-	}
-	if len(volumeSnapshots) == 0 && volumeSnapshotConfig.GetOnline() {
-		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
-		if err != nil {
-			return nil, fmt.Errorf("while getting status: %w", err)
-		}
-
-		switch status.Phase {
-		case webserver.Starting:
-			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-		case "":
-			req := webserver.StartBackupRequest{
-				ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
-				WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
-				BackupName:          backup.Name,
-				Force:               true,
-			}
-			if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
-				return nil, fmt.Errorf("while trying to start the backup: %w", err)
-			}
-		}
+	// Step 1: backup preparation.
+	// This will set PostgreSQL in backup mode for hot snapshots, or fence the Pods for cold snapshots.
+	if res, err := se.prepareSnapshotBackupStep(
+		ctx,
+		cluster,
+		backup,
+		targetPod,
+		volumeSnapshots,
+	); res != nil || err != nil {
+		return res, err
 	}
 
 	// Step 2: create snapshot
@@ -200,10 +175,104 @@ func (se *Reconciler) Execute(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	// Step 3: wait for snapshots to be ready
+	// Step 3: wait for snapshots to be provisioned
+	if res, err := se.waitSnapshotToBeProvisionedStep(ctx, volumeSnapshots); res != nil || err != nil {
+		return res, err
+	}
+
+	// Step 4: backup finalization.
+	// This will unset the PostgreSQL backup mode, and unfence the Pod
+	if res, err := se.finalizeSnapshotBackupStep(
+		ctx,
+		cluster,
+		backup,
+		targetPod,
+	); res != nil || err != nil {
+		return res, err
+	}
+
+	// Step 5: wait for snapshots to be ready to use
 	if res, err := se.waitSnapshotToBeReadyStep(ctx, volumeSnapshots); res != nil || err != nil {
 		return res, err
 	}
+
+	// Step 6: set backup as completed, adds remaining metadata
+	return se.completeSnapshotBackupStep(
+		ctx,
+		backup,
+	)
+}
+
+// prepareSnapshotBackupStep will set PostgreSQL in backup mode for hot snapshots
+// or fence the Pod for cold snapshots. At the end of this function, PostgreSQL
+// will be ready to be backed up
+func (se *Reconciler) prepareSnapshotBackupStep(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	targetPod *corev1.Pod,
+	volumeSnapshots slice,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if len(volumeSnapshots) != 0 {
+		// There's no need for this step, the snapshots
+		// have already been created.
+		return nil, nil
+	}
+
+	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
+
+	// Handle cold snapshots
+	if !volumeSnapshotConfig.GetOnline() {
+		contextLogger.Debug("Checking pre-requisites")
+		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
+			return nil, err
+		}
+
+		if res, err := se.waitForPodToBeFenced(ctx, targetPod); res != nil || err != nil {
+			return res, err
+		}
+
+		return nil, nil
+	}
+
+	// Handle hot snapshots
+	status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
+	if err != nil {
+		return nil, fmt.Errorf("while getting status: %w", err)
+	}
+	switch {
+	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
+	case status.Phase == "", backup.Name != status.BackupName:
+		req := webserver.StartBackupRequest{
+			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
+			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
+			BackupName:          backup.Name,
+			Force:               true,
+		}
+		if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
+			return nil, fmt.Errorf("while trying to start the backup: %w", err)
+		}
+	case status.Phase == webserver.Starting:
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// TODO: make only webserver.started return nil,nil. The other phases should return error
+
+	return nil, nil
+}
+
+// finalizeSnapshotBackupStep is called once the snapshots have been provisioned
+// and will unfence the Pod for cold snapshots, or unset PostgreSQL backup mode
+func (se *Reconciler) finalizeSnapshotBackupStep(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	targetPod *corev1.Pod,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
+	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
 
 	if err := se.EnsurePodIsUnfenced(ctx, cluster, backup, targetPod); err != nil {
 		return nil, err
@@ -234,7 +303,7 @@ func (se *Reconciler) Execute(
 		backup.Status.BackupLabelFile = status.LabelFile
 	}
 
-	backup.Status.SetAsCompleted()
+	backup.Status.SetAsFinalizing()
 	backup.Status.Online = ptr.To(volumeSnapshotConfig.GetOnline())
 	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
 	if err != nil {
@@ -246,11 +315,31 @@ func (se *Reconciler) Execute(
 		contextLogger.Error(err, "while enriching the backup status")
 	}
 
+	if err := postgres.PatchBackupStatusAndRetry(ctx, se.cli, backup); err != nil {
+		contextLogger.Error(err, "while patching the backup status (finalized backup)")
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+// completeSnapshotBackupStep sets a backup as completed, and set the remaining metadata
+// on it
+func (se *Reconciler) completeSnapshotBackupStep(
+	ctx context.Context,
+	backup *apiv1.Backup,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+	backup.Status.SetAsCompleted()
+	snapshots, err := getBackupVolumeSnapshots(ctx, se.cli, backup.Namespace, backup.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := annotateSnapshotsWithBackupData(ctx, se.cli, snapshots, &backup.Status); err != nil {
 		contextLogger.Error(err, "while enriching the snapshots's status")
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
-
 	return nil, postgres.PatchBackupStatusAndRetry(ctx, se.cli, backup)
 }
 
@@ -443,13 +532,27 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 	return nil
 }
 
+// waitSnapshotToBeProvisionedStep waits for every PVC snapshot to be claimed
+func (se *Reconciler) waitSnapshotToBeProvisionedStep(
+	ctx context.Context,
+	snapshots []storagesnapshotv1.VolumeSnapshot,
+) (*ctrl.Result, error) {
+	for i := range snapshots {
+		if res, err := se.waitSnapshotToBeProvisionedAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
+			return res, err
+		}
+	}
+
+	return nil, nil
+}
+
 // waitSnapshotToBeReadyStep waits for every PVC snapshot to be ready to use
 func (se *Reconciler) waitSnapshotToBeReadyStep(
 	ctx context.Context,
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshotAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotToBeReady(ctx, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -545,21 +648,22 @@ func transferLabelsToAnnotations(labels map[string]string, annotations map[strin
 	}
 }
 
-// waitSnapshotAndAnnotate waits for a certain snapshot to be ready to use. Once ready it annotates the snapshot with
+// waitSnapshotToBeProvisionedAndAnnotate waits for a certain snapshot to be claimed.
+// Once the snapshot have been cut, it annotates the snapshot with
 // SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
-func (se *Reconciler) waitSnapshotAndAnnotate(
+func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 	ctx context.Context,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	info := parseVolumeSnapshotInfo(snapshot)
-	if info.Error != nil {
-		return nil, info.Error
+	if info.error != nil {
+		return nil, info.error
 	}
-	if info.Running {
+	if !info.provisioned {
 		contextLogger.Info(
-			"Waiting for VolumeSnapshot to be ready to use",
+			"Waiting for VolumeSnapshot to be provisioned",
 			"volumeSnapshotName", snapshot.Name)
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
@@ -576,6 +680,30 @@ func (se *Reconciler) waitSnapshotAndAnnotate(
 				"snapshot", snapshot.Name)
 			return nil, err
 		}
+	}
+
+	return nil, nil
+}
+
+// waitSnapshotToBeReady waits for a certain snapshot to be ready to use. Once ready it annotates the snapshot with
+// SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
+func (se *Reconciler) waitSnapshotToBeReady(
+	ctx context.Context,
+	snapshot *storagesnapshotv1.VolumeSnapshot,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	info := parseVolumeSnapshotInfo(snapshot)
+	if info.error != nil {
+		return nil, info.error
+	}
+	if !info.ready {
+		contextLogger.Info(
+			"Waiting for VolumeSnapshot to be ready to use",
+			"volumeSnapshotName", snapshot.Name,
+			"boundVolumeSnapshotContentName", snapshot.Status.BoundVolumeSnapshotContentName,
+			"readyToUse", snapshot.Status.ReadyToUse)
+		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	return nil, nil

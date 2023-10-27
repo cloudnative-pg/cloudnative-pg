@@ -43,6 +43,14 @@ const (
 	// BackupPhaseRunning means that the backup is now running
 	BackupPhaseRunning = "running"
 
+	// BackupPhaseFinalizing means that a consistent backup have been
+	// taken and the operator is waiting for it to be ready to be
+	// used to restore a cluster.
+	// This phase is used for VolumeSnapshot backups, when a
+	// VolumeSnapshotContent have already been provisioned, but it is
+	// still now waiting for the `readyToUse` flag to be true.
+	BackupPhaseFinalizing = "finalizing"
+
 	// BackupPhaseCompleted means that the backup is now completed
 	BackupPhaseCompleted = "completed"
 
@@ -278,6 +286,12 @@ func (backupStatus *BackupStatus) SetAsFailed(
 	} else {
 		backupStatus.Error = ""
 	}
+}
+
+// SetAsFinalizing marks a certain backup as finalizing
+func (backupStatus *BackupStatus) SetAsFinalizing() {
+	backupStatus.Phase = BackupPhaseFinalizing
+	backupStatus.Error = ""
 }
 
 // SetAsCompleted marks a certain backup as completed
