@@ -76,7 +76,7 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 		Namespace: cluster.GetNamespace(),
 		Name:      cluster.GetReplicationSecretName(),
 	}
-	err = r.ensureLeafCertificate(
+	err = r.ensureReplicationClientLeafCertificate(
 		ctx,
 		cluster,
 		replicationSecretName,
@@ -84,8 +84,12 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 		clientCaSecret,
 		certs.CertTypeClient,
 		nil,
-		nil)
+		&x509.VerifyOptions{KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("missing specified streaming replication client TLS secret %s: %w",
+				cluster.Status.Certificates.ReplicationTLSSecret, err)
+		}
 		return fmt.Errorf("generating streaming replication client certificate: %w", err)
 	}
 
@@ -268,6 +272,32 @@ func (r *ClusterReconciler) ensureServerLeafCertificate(
 	}
 
 	return validateLeafCertificate(caSecret, &serverSecret, opts)
+}
+
+// ensureServerLeafCertificate checks if we have a client certificate for the
+// streaming_replica user and generate/renew it
+func (r *ClusterReconciler) ensureReplicationClientLeafCertificate(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	secretName client.ObjectKey,
+	commonName string,
+	caSecret *v1.Secret,
+	usage certs.CertType,
+	altDNSNames []string,
+	opts *x509.VerifyOptions,
+) error {
+	// If not specified generate/renew
+	if cluster.Spec.Certificates == nil || cluster.Spec.Certificates.ReplicationTLSSecret == "" {
+		return r.ensureLeafCertificate(ctx, cluster, secretName, commonName, caSecret, usage, altDNSNames, nil)
+	}
+
+	var replicationClientSecret v1.Secret
+	err := r.Get(ctx, secretName, &replicationClientSecret)
+	if err != nil {
+		return err
+	}
+
+	return validateLeafCertificate(caSecret, &replicationClientSecret, opts)
 }
 
 func validateLeafCertificate(caSecret *v1.Secret, serverSecret *v1.Secret, opts *x509.VerifyOptions) error {
