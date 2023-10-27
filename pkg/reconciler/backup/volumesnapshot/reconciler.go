@@ -141,13 +141,13 @@ func (se *Reconciler) Execute(
 	targetPod *corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (*ctrl.Result, error) {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
+		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
+	}
+
 	volumeSnapshots, err := getBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
-	}
-
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
-		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
 	}
 
 	// Step 1: backup preparation.
