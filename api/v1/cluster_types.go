@@ -185,7 +185,7 @@ type OnlineConfiguration struct {
 	// an immediate segment switch.
 	// +kubebuilder:default:=true
 	// +optional
-	WaitForArchive bool `json:"waitForArchive,omitempty"`
+	WaitForArchive *bool `json:"waitForArchive,omitempty"`
 
 	// Control whether the I/O workload for the backup initial checkpoint will
 	// be limited, according to the `checkpoint_completion_target` setting on
@@ -193,7 +193,25 @@ type OnlineConfiguration struct {
 	// used, meaning PostgreSQL will complete the checkpoint as soon as
 	// possible. `false` by default.
 	// +optional
-	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
+	ImmediateCheckpoint *bool `json:"immediateCheckpoint,omitempty"`
+}
+
+// GetWaitForArchive tells whether to wait for archive or not
+func (o OnlineConfiguration) GetWaitForArchive() bool {
+	if o.WaitForArchive == nil {
+		return true
+	}
+
+	return *o.WaitForArchive
+}
+
+// GetImmediateCheckpoint tells whether to execute an immediate checkpoint
+func (o OnlineConfiguration) GetImmediateCheckpoint() bool {
+	if o.ImmediateCheckpoint == nil {
+		return false
+	}
+
+	return *o.ImmediateCheckpoint
 }
 
 // ClusterSpec defines the desired state of Cluster
