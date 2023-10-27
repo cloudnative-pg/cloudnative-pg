@@ -907,10 +907,12 @@ kubectl cnpg backup cluster-example
 backup/cluster-example-20230121002300 created
 ```
 
-By default, a newly created backup will use the backup target policy defined
-in the cluster to choose which instance to run on. You can also use `--backup-target`
-option to override this policy. please refer to the ["Backup" section](backup.md)
-for more information about backup target.
+By default, a newly created backup will utilize the backup target policy defined in the cluster to determine which instance
+to run on.
+However, you can override this policy with the `--backup-target` option.
+Additionally, you can use options such as `--online`, `--immediate-checkpoint`, and `--wait-for-archive` to further customize
+the backup process. For a detailed understanding of these options and the relationship between the backup target and
+`--backup-target, please refer to the "Backup" section.
 
 ### Launching psql
 
