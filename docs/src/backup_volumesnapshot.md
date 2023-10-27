@@ -181,8 +181,7 @@ you can add this section:
 ### Overriding the default behavior
 
 You can change the default behavior defined in the cluster resource by setting
-different values for `online` and, if needed, `onlineConfiguration` in `Backup`
-objects.
+different values for `online` and, if needed, `onlineConfiguration` in the `Backup` or `ScheduledBackup` objects.
 
 For example, in case you want to issue an on-demand cold backup, you can
 create a `Backup` object with `.spec.online: false`:
@@ -199,6 +198,21 @@ spec:
   online: false
 ```
 
+Similarly, for the ScheduledBackup:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: snapshot-cluster-cold-backup-example
+spec:
+  schedule: "0 0 0 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: snapshot-cluster
+  method: volumeSnapshot
+  online: false
+```
 
 ## Persistence of volume snapshot objects
 
