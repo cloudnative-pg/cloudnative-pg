@@ -172,27 +172,25 @@ func NewCmd() *cobra.Command {
 			"valid values are volumeSnapshot and barmanObjectStore.",
 	)
 
+	const optionalAcceptedValues = "Optional. Accepted values: true|false|\"\"."
 	backupSubcommand.Flags().StringVar(&online, "online",
 		"",
 		"Configures the Online field of the volumeSnapshot backup. "+
 			"When not specified the backup will use the value specified in the cluster '.spec.backup.volumeSnapshot' stanza. "+
-			"Optional. "+
-			"Accepted values: true|false|\"\".")
+			optionalAcceptedValues)
 
 	backupSubcommand.Flags().StringVar(&immediateCheckpoint, "immediate-checkpoint", "",
 		"Configures the immediateCheckpoint field of the volumeSnapshot backup. "+
 			"When not specified the backup will use the value specified in the cluster "+
 			"'.spec.backup.volumeSnapshot.onlineConfiguration' stanza. "+
-			"Optional. "+
-			"Accepted values: true|false|\"\".",
+			optionalAcceptedValues,
 	)
 
 	backupSubcommand.Flags().StringVar(&waitForArchive, "wait-for-archive", "",
 		"Configures the wait-for-archive field of the volumeSnapshot backup. "+
 			"When not specified the backup will use the value specified in the cluster "+
 			"'.spec.backup.volumeSnapshot.onlineConfiguration' stanza. "+
-			"Optional. "+
-			"Accepted values: true|false|\"\".",
+			optionalAcceptedValues,
 	)
 
 	return backupSubcommand
