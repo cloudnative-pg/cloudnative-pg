@@ -88,6 +88,17 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
+
+	// Whether the default type of backup with volume snapshots is
+	// online/hot (`true`, default) or offline/cold (`false`)
+	// Overrides the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'
+	// +optional
+	Online *bool `json:"online,omitempty"`
+
+	// Configuration parameters to control the online/hot backup with volume snapshots
+	// Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
+	// +optional
+	OnlineConfiguration *OnlineConfiguration `json:"onlineConfiguration,omitempty"`
 }
 
 // BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
@@ -428,6 +439,23 @@ func (backup *Backup) GetAssignedInstance(ctx context.Context, cli client.Client
 	}
 
 	return &previouslyElectedPod, nil
+}
+
+// GetVolumeSnapshotConfiguration overrides the  configuration value with the ones specified
+// in the backup, if present.
+func (backup *Backup) GetVolumeSnapshotConfiguration(
+	clusterConfig VolumeSnapshotConfiguration,
+) VolumeSnapshotConfiguration {
+	config := clusterConfig
+	if backup.Spec.Online != nil {
+		config.Online = backup.Spec.Online
+	}
+
+	if backup.Spec.OnlineConfiguration != nil {
+		config.OnlineConfiguration = *backup.Spec.OnlineConfiguration
+	}
+
+	return config
 }
 
 func init() {

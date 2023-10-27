@@ -22,6 +22,7 @@ import (
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -411,5 +412,68 @@ var _ = Describe("IsCompletedVolumeSnapshot", func() {
 
 	It("should return false for an incomplete volume snapshot", func() {
 		Expect(nonCompletedBackup.IsCompletedVolumeSnapshot()).To(BeFalse())
+	})
+})
+
+var _ = Describe("GetVolumeSnapshotConfiguration", func() {
+	var (
+		backup          *Backup
+		clusterConfig   VolumeSnapshotConfiguration
+		resultConfig    VolumeSnapshotConfiguration
+		onlineValue     = true
+		onlineConfigVal = OnlineConfiguration{
+			WaitForArchive:      ptr.To(true),
+			ImmediateCheckpoint: ptr.To(false),
+		}
+	)
+
+	BeforeEach(func() {
+		backup = &Backup{}
+		clusterConfig = VolumeSnapshotConfiguration{
+			Online:              nil,
+			OnlineConfiguration: OnlineConfiguration{},
+		}
+	})
+
+	JustBeforeEach(func() {
+		resultConfig = backup.GetVolumeSnapshotConfiguration(clusterConfig)
+	})
+
+	Context("when backup spec has no overrides", func() {
+		It("should return clusterConfig as is", func() {
+			Expect(resultConfig).To(Equal(clusterConfig))
+		})
+	})
+
+	Context("when backup spec has Online override", func() {
+		BeforeEach(func() {
+			backup.Spec.Online = &onlineValue
+		})
+
+		It("should override the Online value in clusterConfig", func() {
+			Expect(*resultConfig.Online).To(Equal(onlineValue))
+		})
+	})
+
+	Context("when backup spec has OnlineConfiguration override", func() {
+		BeforeEach(func() {
+			backup.Spec.OnlineConfiguration = &onlineConfigVal
+		})
+
+		It("should override the OnlineConfiguration value in clusterConfig", func() {
+			Expect(resultConfig.OnlineConfiguration).To(Equal(onlineConfigVal))
+		})
+	})
+
+	Context("when backup spec has both Online and OnlineConfiguration override", func() {
+		BeforeEach(func() {
+			backup.Spec.Online = &onlineValue
+			backup.Spec.OnlineConfiguration = &onlineConfigVal
+		})
+
+		It("should override both Online and OnlineConfiguration values in clusterConfig", func() {
+			Expect(*resultConfig.Online).To(Equal(onlineValue))
+			Expect(resultConfig.OnlineConfiguration).To(Equal(onlineConfigVal))
+		})
 	})
 })

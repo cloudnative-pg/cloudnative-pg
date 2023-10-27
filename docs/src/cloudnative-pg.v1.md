@@ -535,6 +535,23 @@ standby, if available.</p>
 and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
 </td>
 </tr>
+<tr><td><code>online</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether the default type of backup with volume snapshots is
+online/hot (<code>true</code>, default) or offline/cold (<code>false</code>)
+Overrides the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'</p>
+</td>
+</tr>
+<tr><td><code>onlineConfiguration</code><br/>
+<a href="#postgresql-cnpg-io-v1-OnlineConfiguration"><i>OnlineConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration parameters to control the online/hot backup with volume snapshots
+Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2871,6 +2888,8 @@ up again) or not (recreate it elsewhere - when <code>instances</code> &gt;1)</p>
 
 
 **Appears in:**
+
+- [BackupSpec](#postgresql-cnpg-io-v1-BackupSpec)
 
 - [VolumeSnapshotConfiguration](#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
 
