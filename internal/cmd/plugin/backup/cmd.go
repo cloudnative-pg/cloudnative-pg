@@ -33,18 +33,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-func parseBooleanString(rawBool string) (*bool, error) {
-	if rawBool == "" {
-		return nil, nil
-	}
-
-	value, err := strconv.ParseBool(rawBool)
-	if err != nil {
-		return nil, err
-	}
-	return ptr.To(value), nil
-}
-
 // backupCommandOptions are the options that are provider to the backup
 // cnpg command
 type backupCommandOptions struct {
@@ -121,15 +109,15 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("while getting cluster %s: %w", clusterName, err)
 			}
 
-			parsedOnline, err := parseBooleanString(online)
+			parsedOnline, err := parseOptionalBooleanString(online)
 			if err != nil {
 				return fmt.Errorf("while parsing the online value: %w", err)
 			}
-			parsedImmediateCheckpoint, err := parseBooleanString(online)
+			parsedImmediateCheckpoint, err := parseOptionalBooleanString(online)
 			if err != nil {
 				return fmt.Errorf("while parsing the immediate-checkpoint value: %w", err)
 			}
-			parsedWaitForArchive, err := parseBooleanString(online)
+			parsedWaitForArchive, err := parseOptionalBooleanString(online)
 			if err != nil {
 				return fmt.Errorf("while parsing the wait-for-archive value: %w", err)
 			}
@@ -175,21 +163,23 @@ func NewCmd() *cobra.Command {
 	const optionalAcceptedValues = "Optional. Accepted values: true|false|\"\"."
 	backupSubcommand.Flags().StringVar(&online, "online",
 		"",
-		"Configures the Online field of the volumeSnapshot backup. "+
-			"When not specified the backup will use the value specified in the cluster '.spec.backup.volumeSnapshot' stanza. "+
+		"Set the `.spec.online` field of the Backup resource. If not specified, "+
+			"the value in the '.spec.backup.volumeSnapshot' field of the Cluster "+
+			"resource will be used. "+
 			optionalAcceptedValues)
 
 	backupSubcommand.Flags().StringVar(&immediateCheckpoint, "immediate-checkpoint", "",
-		"Configures the immediateCheckpoint field of the volumeSnapshot backup. "+
-			"When not specified the backup will use the value specified in the cluster "+
-			"'.spec.backup.volumeSnapshot.onlineConfiguration' stanza. "+
+		"Set the `.spec.onlineConfiguration.immediateCheckpoint` field of the "+
+			"Backup resource. If not specified, the value in the "+
+			"'.spec.backup.volumeSnapshot.onlineConfiguration' field "+
+			"of the Cluster resource will be used. "+
 			optionalAcceptedValues,
 	)
 
 	backupSubcommand.Flags().StringVar(&waitForArchive, "wait-for-archive", "",
-		"Configures the wait-for-archive field of the volumeSnapshot backup. "+
-			"When not specified the backup will use the value specified in the cluster "+
-			"'.spec.backup.volumeSnapshot.onlineConfiguration' stanza. "+
+		"Set the `.spec.onlineConfiguratoin.waitForArchive` field of the "+
+			"Backup resource. If not specified, the value in the "+
+			"'.spec.backup.volumeSnapshot.onlineConfiguration' field will be used. "+
 			optionalAcceptedValues,
 	)
 
@@ -219,4 +209,16 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 		fmt.Printf("backup/%v created\n", backup.Name)
 	}
 	return err
+}
+
+func parseOptionalBooleanString(rawBool string) (*bool, error) {
+	if rawBool == "" {
+		return nil, nil
+	}
+
+	value, err := strconv.ParseBool(rawBool)
+	if err != nil {
+		return nil, err
+	}
+	return ptr.To(value), nil
 }
