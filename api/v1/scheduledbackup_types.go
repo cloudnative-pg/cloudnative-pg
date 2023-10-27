@@ -66,6 +66,17 @@ type ScheduledBackupSpec struct {
 	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
+
+	// Whether the default type of backup with volume snapshots is
+	// online/hot (`true`, default) or offline/cold (`false`)
+	// Overrides the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'
+	// +optional
+	Online *bool `json:"online,omitempty"`
+
+	// Configuration parameters to control the online/hot backup with volume snapshots
+	// Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
+	// +optional
+	OnlineConfiguration *OnlineConfiguration `json:"onlineConfiguration,omitempty"`
 }
 
 // ScheduledBackupStatus defines the observed state of ScheduledBackup
@@ -164,9 +175,11 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 			Namespace: scheduledBackup.Namespace,
 		},
 		Spec: BackupSpec{
-			Cluster: scheduledBackup.Spec.Cluster,
-			Target:  scheduledBackup.Spec.Target,
-			Method:  scheduledBackup.Spec.Method,
+			Cluster:             scheduledBackup.Spec.Cluster,
+			Target:              scheduledBackup.Spec.Target,
+			Method:              scheduledBackup.Spec.Method,
+			Online:              scheduledBackup.Spec.Online,
+			OnlineConfiguration: scheduledBackup.Spec.OnlineConfiguration,
 		},
 	}
 	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, configuration.Current)
