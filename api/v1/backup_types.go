@@ -93,7 +93,6 @@ type BackupSpec struct {
 	// online/hot (`true`, default) or offline/cold (`false`)
 	// Overrides the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'
 	// +optional
-	// +kubebuilder:default:=true
 	Online *bool `json:"online,omitempty"`
 
 	// Configuration parameters to control the online/hot backup with volume snapshots

@@ -69,7 +69,6 @@ spec:
                 - volumeSnapshot
                 type: string
               online:
-                default: true
                 description: Whether the default type of backup with volume snapshots
                   is online/hot (`true`, default) or offline/cold (`false`) Overrides
                   the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'
