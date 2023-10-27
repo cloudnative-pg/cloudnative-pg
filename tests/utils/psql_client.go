@@ -87,10 +87,10 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 		},
 	}
 
-	// As the psql pod might be deleted by cases of Drain Node, we need to make use of the StatefulSet or
-	// Deployment to keep the pod running.
-	// To avoid the code that references the psql pod breaking due to a random name created by Deployment,
-	// we choose to use the StatefulSet
+	// The psql pod might be deleted by, for example, a node drain. As such we need to use
+	// either a StatefulSet or a Deployment to make sure the pod is always getting recreated.
+	// To avoid having to reference a new random name created by the Deployment each time the
+	// pod gets recreated, we choose to use a StatefulSet.
 	psqlStatefulSet := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
