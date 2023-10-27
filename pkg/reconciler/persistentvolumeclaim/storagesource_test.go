@@ -111,6 +111,14 @@ var _ = Describe("Storage source", func() {
 				},
 				Status: apiv1.BackupStatus{
 					Phase: apiv1.BackupPhaseCompleted,
+					BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
+						Elements: []apiv1.BackupSnapshotElementStatus{
+							{
+								Name: "completed-backup",
+								Type: string(utils.PVCRolePgData),
+							},
+						},
+					},
 				},
 			},
 		},
@@ -223,6 +231,14 @@ var _ = Describe("candidate backups", func() {
 		},
 		Status: apiv1.BackupStatus{
 			Phase: apiv1.BackupPhaseCompleted,
+			BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
+				Elements: []apiv1.BackupSnapshotElementStatus{
+					{
+						Name: "completed-backup",
+						Type: string(utils.PVCRolePgData),
+					},
+				},
+			},
 		},
 	}
 
@@ -236,6 +252,14 @@ var _ = Describe("candidate backups", func() {
 		},
 		Status: apiv1.BackupStatus{
 			Phase: apiv1.BackupPhaseCompleted,
+			BackupSnapshotStatus: apiv1.BackupSnapshotStatus{
+				Elements: []apiv1.BackupSnapshotElementStatus{
+					{
+						Name: "bad-name",
+						Type: string(utils.PVCRolePgData),
+					},
+				},
+			},
 		},
 	}
 

@@ -140,23 +140,22 @@ func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.Back
 }
 
 func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
-	result := &StorageSource{
-		DataSource: corev1.TypedLocalObjectReference{
+	var result StorageSource
+	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
+		reference := corev1.TypedLocalObjectReference{
 			APIGroup: ptr.To(volumesnapshot.GroupName),
 			Kind:     apiv1.VolumeSnapshotKind,
-			Name:     GetName(backup.Name, utils.PVCRolePgData),
-		},
-	}
-
-	if len(backup.Status.BackupSnapshotStatus.Elements) > 1 {
-		result.WALSource = &corev1.TypedLocalObjectReference{
-			APIGroup: ptr.To(volumesnapshot.GroupName),
-			Kind:     apiv1.VolumeSnapshotKind,
-			Name:     GetName(backup.Name, utils.PVCRolePgWal),
+			Name:     element.Name,
+		}
+		switch utils.PVCRole(element.Type) {
+		case utils.PVCRolePgData:
+			result.DataSource = reference
+		case utils.PVCRolePgWal:
+			result.WALSource = &reference
 		}
 	}
 
-	return result
+	return &result
 }
 
 // getCandidateSourceFromClusterDefinition gets a candidate storage source
