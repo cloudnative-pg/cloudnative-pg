@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/utils/ptr"
+
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -61,5 +63,31 @@ var _ = Describe("Scheduled backup", func() {
 		Expect(backup).ToNot(BeNil())
 		Expect(backup.ObjectMeta.Name).To(BeEquivalentTo(backupName))
 		Expect(backup.Spec.Target).To(BeEquivalentTo(BackupTargetPrimary))
+	})
+
+	It("complains if online is set on a barman backup", func() {
+		scheduledBackup := &ScheduledBackup{
+			Spec: ScheduledBackupSpec{
+				Method:   BackupMethodBarmanObjectStore,
+				Online:   ptr.To(true),
+				Schedule: "* * * * * *",
+			},
+		}
+		result := scheduledBackup.validate()
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.online"))
+	})
+
+	It("complains if onlineConfiguration is set on a barman backup", func() {
+		scheduledBackup := &ScheduledBackup{
+			Spec: ScheduledBackupSpec{
+				Method:              BackupMethodBarmanObjectStore,
+				OnlineConfiguration: &OnlineConfiguration{},
+				Schedule:            "* * * * * *",
+			},
+		}
+		result := scheduledBackup.validate()
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Field).To(Equal("spec.onlineConfiguration"))
 	})
 })
