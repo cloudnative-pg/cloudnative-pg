@@ -348,5 +348,24 @@ var _ = Describe("update first recoverability point", func() {
 
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(earlierTime))
 	})
+
+	It("should set the first overall FRP correctly if there is an earlier barman backup", func(ctx context.Context) {
+		cluster.Status.FirstRecoverabilityByMethod = map[apiv1.BackupMethod]string{
+			apiv1.BackupMethodBarmanObjectStore: earlierTime,
+			apiv1.BackupMethodVolumeSnapshot:    secondSnapshotTime,
+		}
+		cluster.Status.FirstRecoverabilityPoint = secondSnapshotTime
+		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			WithStatusSubresource(cluster).
+			WithLists(&snapshots).Build()
+
+		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(earlierTime))
+		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).To(Equal(earlierTime))
+		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodVolumeSnapshot]).To(Equal(firstSnapshotTime))
+	})
 })
 

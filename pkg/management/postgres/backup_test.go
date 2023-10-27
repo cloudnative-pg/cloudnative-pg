@@ -19,6 +19,7 @@ package postgres
 import (
 	"context"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -141,5 +143,94 @@ var _ = Describe("testing backup command", func() {
 		Expect(clusterCond.Reason).To(Equal(string(apiv1.ConditionReasonLastBackupFailed)))
 
 		Expect(backup.Status.Error).To(Equal(clusterCond.Message))
+	})
+})
+
+var _ = Describe("testing FirstRecoverabilityPoint updating", func() {
+	const namespace = "test"
+
+	var cluster *apiv1.Cluster
+	var barmanBackups *catalog.Catalog
+
+	var (
+		now      = time.Now()
+		older    = now.Add(-1 * time.Hour)
+		oldest   = older.Add(-1 * time.Hour)
+		superOld = oldest.Add(-1 * time.Hour)
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{},
+			},
+		}
+
+		barmanBackups = &catalog.Catalog{
+			List: []catalog.BarmanBackup{
+				{
+					BackupName: "oldest",
+					BeginTime:  superOld,
+					EndTime:    oldest,
+				},
+				{
+					BackupName: "youngest",
+					BeginTime:  oldest,
+					EndTime:    older,
+				},
+			},
+		}
+	})
+
+	It("will not update the FRP and the barman method FRP if they matched the oldest backup", func() {
+		cluster.Status = apiv1.ClusterStatus{
+			FirstRecoverabilityPoint: oldest.Format(time.RFC3339),
+			FirstRecoverabilityByMethod: map[apiv1.BackupMethod]string{
+				apiv1.BackupMethodBarmanObjectStore: oldest.Format(time.RFC3339),
+			},
+		}
+
+		err := updateClusterWithRecoverabilityTimes(cluster, barmanBackups)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(oldest.Format(time.RFC3339)))
+		Expect(cluster.Status.FirstRecoverabilityByMethod).ToNot(BeNil())
+		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(oldest.Format(time.RFC3339)))
+	})
+
+	It("will update the FRP and the barman method FRP if there are older backups", func() {
+		cluster.Status = apiv1.ClusterStatus{
+			FirstRecoverabilityPoint: now.Format(time.RFC3339),
+			FirstRecoverabilityByMethod: map[apiv1.BackupMethod]string{
+				apiv1.BackupMethodBarmanObjectStore: now.Format(time.RFC3339),
+			},
+		}
+
+		err := updateClusterWithRecoverabilityTimes(cluster, barmanBackups)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(oldest.Format(time.RFC3339)))
+		Expect(cluster.Status.FirstRecoverabilityByMethod).ToNot(BeNil())
+		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(oldest.Format(time.RFC3339)))
+	})
+
+	It("will keep the oldest volume snapshot as FRP if it is older than barman backups", func() {
+		cluster.Status = apiv1.ClusterStatus{
+			FirstRecoverabilityPoint: now.Format(time.RFC3339),
+			FirstRecoverabilityByMethod: map[apiv1.BackupMethod]string{
+				apiv1.BackupMethodBarmanObjectStore: now.Format(time.RFC3339),
+				apiv1.BackupMethodVolumeSnapshot:    superOld.Format(time.RFC3339),
+			},
+		}
+
+		err := updateClusterWithRecoverabilityTimes(cluster, barmanBackups)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(superOld.Format(time.RFC3339)))
+		Expect(cluster.Status.FirstRecoverabilityByMethod).ToNot(BeNil())
+		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(oldest.Format(time.RFC3339)))
+		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodVolumeSnapshot]).
+			To(Equal(superOld.Format(time.RFC3339)))
 	})
 })

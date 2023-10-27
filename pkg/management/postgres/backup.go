@@ -415,25 +415,33 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 		origCluster := b.Cluster.DeepCopy()
 
 		// Set the first recoverability point
-		if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
-			_, err := b.Cluster.TryUpdatingOldestBackupTime(*ts, apiv1.BackupMethodBarmanObjectStore)
-			if err != nil {
-				b.Log.Error(err, "while setting the recoverability point for barman backups")
-			}
-			_, err = b.Cluster.TryUpdatingFirstRecoverabilityPoint()
-			if err != nil {
-				b.Log.Error(err, "while setting the FirstRecoverabilityPoint")
-			}
-			lastBackup := backupList.LatestBackupInfo()
-			if lastBackup != nil {
-				b.Cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
-			}
+		err = updateClusterWithRecoverabilityTimes(b.Cluster, backupList)
+		if err != nil {
+			b.Log.Error(err, "while setting the FirstRecoverabilityPoint")
 		}
 
 		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 	}); err != nil {
 		b.Log.Error(err, "while setting the firstRecoverabilityPoint and latestSuccessfulBackup")
 	}
+}
+
+func updateClusterWithRecoverabilityTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) error {
+	if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
+		_, err := cluster.TryUpdatingOldestBackupTime(*ts, apiv1.BackupMethodBarmanObjectStore)
+		if err != nil {
+			return fmt.Errorf("while setting the recoverability point for barman backups: %w", err)
+		}
+		_, err = cluster.TryUpdatingFirstRecoverabilityPoint()
+		if err != nil {
+			return fmt.Errorf("while setting the FirstRecoverabilityPoint: %w", err)
+		}
+		lastBackup := backupList.LatestBackupInfo()
+		if lastBackup != nil {
+			cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
+		}
+	}
+	return nil
 }
 
 // PatchBackupStatusAndRetry updates a certain backup's status in the k8s database,
