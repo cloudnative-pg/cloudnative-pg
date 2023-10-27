@@ -43,16 +43,22 @@ func GetOldestSnapshot(
 		client.InNamespace(namespace),
 		client.MatchingLabels{
 			utils.ClusterLabelName: clusterName,
-			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 		},
 	); err != nil {
 		return oldestSnaphsot, err
 	}
 
-	if len(list.Items) == 0 {
+	dataVolSnapshots := make([]storagesnapshotv1.VolumeSnapshot, 0, len(list.Items))
+	for _, snapshot := range list.Items {
+		if snapshot.Annotations[utils.PvcRoleLabelName] == string(utils.PVCRolePgData) {
+			dataVolSnapshots = append(dataVolSnapshots, snapshot)
+		}
+	}
+
+	if len(dataVolSnapshots) == 0 {
 		return oldestSnaphsot, fmt.Errorf("there were no snapshots")
 	}
-	for _, volumeSnapshot := range list.Items {
+	for _, volumeSnapshot := range dataVolSnapshots {
 		endTimeStr, hasTime := volumeSnapshot.Annotations[utils.BackupEndTimeAnnotationName]
 		if hasTime {
 			endTime, err := time.Parse(time.RFC3339, endTimeStr)

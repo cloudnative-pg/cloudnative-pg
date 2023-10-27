@@ -280,10 +280,10 @@ var _ = Describe("update first recoverability point", func() {
 					Namespace: namespace,
 					Annotations: map[string]string{
 						utils.BackupEndTimeAnnotationName: earlierTime,
+						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
 						utils.ClusterLabelName: "DIFFERENT-CLUSTER",
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				}},
 				{ObjectMeta: metav1.ObjectMeta{
@@ -291,10 +291,10 @@ var _ = Describe("update first recoverability point", func() {
 					Namespace: namespace,
 					Annotations: map[string]string{
 						utils.BackupEndTimeAnnotationName: earlierTime,
+						utils.PvcRoleLabelName:            string(utils.PVCRolePgWal),
 					},
 					Labels: map[string]string{
 						utils.ClusterLabelName: cluster.Name,
-						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
 					},
 				}},
 				{ObjectMeta: metav1.ObjectMeta{
@@ -302,10 +302,10 @@ var _ = Describe("update first recoverability point", func() {
 					Namespace: namespace,
 					Annotations: map[string]string{
 						utils.BackupEndTimeAnnotationName: firstSnapshotTime,
+						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
 						utils.ClusterLabelName: cluster.Name,
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				}},
 				{ObjectMeta: metav1.ObjectMeta{
@@ -313,10 +313,10 @@ var _ = Describe("update first recoverability point", func() {
 					Namespace: namespace,
 					Annotations: map[string]string{
 						utils.BackupEndTimeAnnotationName: secondSnapshotTime,
+						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
 						utils.ClusterLabelName: cluster.Name,
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				}},
 			},
