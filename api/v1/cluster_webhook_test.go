@@ -3114,12 +3114,12 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			VolumeSnapshots: &DataSource{
 				Storage: corev1.TypedLocalObjectReference{
 					APIGroup: ptr.To(storagesnapshotv1.GroupName),
-					Kind:     "VolumeSnapshot",
+					Kind:     VolumeSnapshotKind,
 					Name:     "pgdata",
 				},
 				WalStorage: &corev1.TypedLocalObjectReference{
 					APIGroup: ptr.To(storagesnapshotv1.GroupName),
-					Kind:     "VolumeSnapshot",
+					Kind:     VolumeSnapshotKind,
 					Name:     "pgwal",
 				},
 			},
@@ -3132,7 +3132,7 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			VolumeSnapshots: &DataSource{
 				Storage: corev1.TypedLocalObjectReference{
 					APIGroup: ptr.To(storagesnapshotv1.GroupName),
-					Kind:     "VolumeSnapshot",
+					Kind:     VolumeSnapshotKind,
 					Name:     "pgdata",
 				},
 			},

@@ -68,12 +68,12 @@ var _ = Describe("Storage source", func() {
 					VolumeSnapshots: &apiv1.DataSource{
 						Storage: corev1.TypedLocalObjectReference{
 							Name:     pgDataSnapshotVolumeName,
-							Kind:     "VolumeSnapshot",
+							Kind:     apiv1.VolumeSnapshotKind,
 							APIGroup: ptr.To("snapshot.storage.k8s.io"),
 						},
 						WalStorage: &corev1.TypedLocalObjectReference{
 							Name:     pgWalSnapshotVolumeName,
-							Kind:     "VolumeSnapshot",
+							Kind:     apiv1.VolumeSnapshotKind,
 							APIGroup: ptr.To("snapshot.storage.k8s.io"),
 						},
 					},

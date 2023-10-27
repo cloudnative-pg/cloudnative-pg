@@ -16,6 +16,9 @@ limitations under the License.
 
 package v1
 
+// VolumeSnapshotKind this is a strongly typed reference to the kind used by the volumesnapshot package
+const VolumeSnapshotKind = "VolumeSnapshot"
+
 // Metadata is a structure similar to the metav1.ObjectMeta, but still
 // parseable by controller-gen to create a suitable CRD for the user.
 // The comment of PodTemplateSpec has an explanation of why we are

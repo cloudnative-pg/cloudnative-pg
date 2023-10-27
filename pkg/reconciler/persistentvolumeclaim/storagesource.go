@@ -143,7 +143,7 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 	result := &StorageSource{
 		DataSource: corev1.TypedLocalObjectReference{
 			APIGroup: ptr.To(volumesnapshot.GroupName),
-			Kind:     "VolumeSnapshot",
+			Kind:     apiv1.VolumeSnapshotKind,
 			Name:     GetName(backup.Name, utils.PVCRolePgData),
 		},
 	}
@@ -151,7 +151,7 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 	if len(backup.Status.BackupSnapshotStatus.Elements) > 1 {
 		result.WALSource = &corev1.TypedLocalObjectReference{
 			APIGroup: ptr.To(volumesnapshot.GroupName),
-			Kind:     "VolumeSnapshot",
+			Kind:     apiv1.VolumeSnapshotKind,
 			Name:     GetName(backup.Name, utils.PVCRolePgWal),
 		}
 	}
