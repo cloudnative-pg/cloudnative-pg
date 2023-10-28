@@ -189,10 +189,12 @@ var _ = Describe("testing FirstRecoverabilityPoint updating", func() {
 			FirstRecoverabilityByMethod: map[apiv1.BackupMethod]string{
 				apiv1.BackupMethodBarmanObjectStore: oldest.Format(time.RFC3339),
 			},
+			LastSuccessfulBackup: older.Format(time.RFC3339),
 		}
 
-		err := updateClusterWithRecoverabilityTimes(cluster, barmanBackups)
+		hasChanges, err := updateClusterStatusWithBackupTimes(cluster, barmanBackups)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(hasChanges).To(BeFalse())
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(oldest.Format(time.RFC3339)))
 		Expect(cluster.Status.FirstRecoverabilityByMethod).ToNot(BeNil())
 		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).
@@ -207,8 +209,9 @@ var _ = Describe("testing FirstRecoverabilityPoint updating", func() {
 			},
 		}
 
-		err := updateClusterWithRecoverabilityTimes(cluster, barmanBackups)
+		hasChanges, err := updateClusterStatusWithBackupTimes(cluster, barmanBackups)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(hasChanges).To(BeTrue())
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(oldest.Format(time.RFC3339)))
 		Expect(cluster.Status.FirstRecoverabilityByMethod).ToNot(BeNil())
 		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).
@@ -224,8 +227,9 @@ var _ = Describe("testing FirstRecoverabilityPoint updating", func() {
 			},
 		}
 
-		err := updateClusterWithRecoverabilityTimes(cluster, barmanBackups)
+		hasChanges, err := updateClusterStatusWithBackupTimes(cluster, barmanBackups)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(hasChanges).To(BeTrue())
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(superOld.Format(time.RFC3339)))
 		Expect(cluster.Status.FirstRecoverabilityByMethod).ToNot(BeNil())
 		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).

@@ -336,8 +336,11 @@ var _ = Describe("update first recoverability point", func() {
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(firstSnapshotTime))
 	})
 
-	It("should not update cluster FRP if it is older than oldest snapshot", func(ctx context.Context) {
+	It("should not update cluster FRP if there is an older backup from another method", func(ctx context.Context) {
 		cluster.Status.FirstRecoverabilityPoint = earlierTime
+		cluster.Status.FirstRecoverabilityByMethod = map[apiv1.BackupMethod]string{
+			apiv1.BackupMethodBarmanObjectStore: earlierTime,
+		}
 		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster).
 			WithStatusSubresource(cluster).
@@ -368,4 +371,3 @@ var _ = Describe("update first recoverability point", func() {
 		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodVolumeSnapshot]).To(Equal(firstSnapshotTime))
 	})
 })
-

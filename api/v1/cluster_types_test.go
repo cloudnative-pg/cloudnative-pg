@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -969,5 +971,64 @@ var _ = Describe("Ephemeral volume size limits", func() {
 
 		Expect(spec.GetShmLimit().String()).To(Equal("10Mi"))
 		Expect(spec.GetTemporaryDataLimit().String()).To(Equal("20Mi"))
+	})
+})
+
+var _ = Describe("Test updating the FirstRecoverabilityPonts", func() {
+	var cluster Cluster
+	var (
+		now    = time.Now()
+		older  = now.Add(-1 * time.Hour)
+		oldest = older.Add(-1 * time.Hour)
+	)
+	BeforeEach(func() {
+		cluster = Cluster{
+			Spec: ClusterSpec{
+				NodeMaintenanceWindow: &NodeMaintenanceWindow{
+					InProgress: true,
+				},
+			},
+		}
+	})
+
+	It("doesn't update the FRPs if they are not changed", func() {
+		olderTime := older.Format(time.RFC3339)
+		cluster.Status.FirstRecoverabilityPoint = olderTime
+		cluster.Status.FirstRecoverabilityByMethod = map[BackupMethod]string{
+			BackupMethodBarmanObjectStore: olderTime,
+			BackupMethodVolumeSnapshot:    olderTime,
+		}
+
+		updated, err := cluster.TryUpdatingOldestBackupTime(older, BackupMethodBarmanObjectStore)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(updated).To(BeFalse())
+
+		updated, err = cluster.TryUpdatingOldestBackupTime(older, BackupMethodVolumeSnapshot)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(updated).To(BeFalse())
+
+		updated, err = cluster.TryUpdatingFirstRecoverabilityPoint()
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(updated).To(BeFalse())
+	})
+
+	It("updates the FRPs if there are older available backups", func() {
+		olderTime := older.Format(time.RFC3339)
+		oldestTime := oldest.Format(time.RFC3339)
+		cluster.Status.FirstRecoverabilityPoint = olderTime
+		cluster.Status.FirstRecoverabilityByMethod = map[BackupMethod]string{
+			BackupMethodBarmanObjectStore: olderTime,
+			BackupMethodVolumeSnapshot:    olderTime,
+		}
+
+		updated, err := cluster.TryUpdatingOldestBackupTime(oldest, BackupMethodBarmanObjectStore)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(updated).To(BeTrue())
+		Expect(cluster.Status.FirstRecoverabilityByMethod[BackupMethodBarmanObjectStore]).To(Equal(oldestTime))
+
+		updated, err = cluster.TryUpdatingFirstRecoverabilityPoint()
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(updated).To(BeTrue())
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(oldestTime))
 	})
 })

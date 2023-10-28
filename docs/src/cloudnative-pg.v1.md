@@ -1727,14 +1727,14 @@ Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
 <tr><td><code>instancesStatus</code><br/>
-<i>map[PodStatus][]string</i>
+<i>map[github.com/cloudnative-pg/cloudnative-pg/pkg/utils.PodStatus][]string</i>
 </td>
 <td>
    <p>InstancesStatus indicates in which status the instances are</p>
 </td>
 </tr>
 <tr><td><code>instancesReportedState</code><br/>
-<a href="#postgresql-cnpg-io-v1-InstanceReportedState"><i>map[PodName]InstanceReportedState</i></a>
+<a href="#postgresql-cnpg-io-v1-InstanceReportedState"><i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.PodName]github.com/cloudnative-pg/cloudnative-pg/api/v1.InstanceReportedState</i></a>
 </td>
 <td>
    <p>The reported state of the instances during the last reconciliation loop</p>
@@ -1893,6 +1893,13 @@ configmap data</p>
 </td>
 <td>
    <p>The first recoverability point, stored as a date in RFC3339 format</p>
+</td>
+</tr>
+<tr><td><code>firstRecoverabilityByMethod</code><br/>
+<i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.BackupMethod]string</i>
+</td>
+<td>
+   <p>The oldest time of backup available, per backup method type</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackup</code><br/>
@@ -2735,7 +2742,7 @@ by the instance manager</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>byStatus</code><br/>
-<i>map[RoleStatus][]string</i>
+<i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.RoleStatus][]string</i>
 </td>
 <td>
    <p>ByStatus gives the list of roles in each state</p>
@@ -2750,7 +2757,7 @@ with an explanation of the cause</p>
 </td>
 </tr>
 <tr><td><code>passwordStatus</code><br/>
-<a href="#postgresql-cnpg-io-v1-PasswordState"><i>map[string]PasswordState</i></a>
+<a href="#postgresql-cnpg-io-v1-PasswordState"><i>map[string]github.com/cloudnative-pg/cloudnative-pg/api/v1.PasswordState</i></a>
 </td>
 <td>
    <p>PasswordStatus gives the last transaction id and password secret version for each managed role</p>
@@ -4341,7 +4348,7 @@ if all the labels values match.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>instances</code><br/>
-<a href="#postgresql-cnpg-io-v1-PodTopologyLabels"><i>map[PodName]PodTopologyLabels</i></a>
+<a href="#postgresql-cnpg-io-v1-PodTopologyLabels"><i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.PodName]github.com/cloudnative-pg/cloudnative-pg/api/v1.PodTopologyLabels</i></a>
 </td>
 <td>
    <p>Instances contains the pod topology of the instances</p>

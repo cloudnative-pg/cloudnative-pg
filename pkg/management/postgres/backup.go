@@ -414,34 +414,42 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
 		origCluster := b.Cluster.DeepCopy()
 
-		// Set the first recoverability point
-		err = updateClusterWithRecoverabilityTimes(b.Cluster, backupList)
+		// Set the first recoverability point and the last successful backup
+		hasUpdates, err := updateClusterStatusWithBackupTimes(b.Cluster, backupList)
 		if err != nil {
 			b.Log.Error(err, "while setting the FirstRecoverabilityPoint")
 		}
 
+		if !hasUpdates {
+			return nil
+		}
 		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 	}); err != nil {
 		b.Log.Error(err, "while setting the firstRecoverabilityPoint and latestSuccessfulBackup")
 	}
 }
 
-func updateClusterWithRecoverabilityTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) error {
+// updateClusterStatusWithBackupTimes returns true if it changes the backup times in Status
+func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) (bool, error) {
+	var hasChanges bool
 	if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
-		_, err := cluster.TryUpdatingOldestBackupTime(*ts, apiv1.BackupMethodBarmanObjectStore)
+		updated, err := cluster.TryUpdatingOldestBackupTime(*ts, apiv1.BackupMethodBarmanObjectStore)
 		if err != nil {
-			return fmt.Errorf("while setting the recoverability point for barman backups: %w", err)
+			return false, fmt.Errorf("while setting the recoverability point for barman backups: %w", err)
 		}
-		_, err = cluster.TryUpdatingFirstRecoverabilityPoint()
+		hasChanges = updated || hasChanges
+		updated, err = cluster.TryUpdatingFirstRecoverabilityPoint()
 		if err != nil {
-			return fmt.Errorf("while setting the FirstRecoverabilityPoint: %w", err)
+			return false, fmt.Errorf("while setting the FirstRecoverabilityPoint: %w", err)
 		}
+		hasChanges = updated || hasChanges
 		lastBackup := backupList.LatestBackupInfo()
-		if lastBackup != nil {
+		if lastBackup != nil && cluster.Status.LastSuccessfulBackup != lastBackup.EndTime.Format(time.RFC3339) {
 			cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
+			hasChanges = true
 		}
 	}
-	return nil
+	return hasChanges, nil
 }
 
 // PatchBackupStatusAndRetry updates a certain backup's status in the k8s database,

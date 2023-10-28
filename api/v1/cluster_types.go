@@ -3012,9 +3012,8 @@ func (cluster *Cluster) getOldestOverallBackup() (time.Time, error) {
 
 // TryUpdatingFirstRecoverabilityPoint will update the FirstRecoverabilityPoint
 // if there are older backups available.
-// Returns true if it changes the existing FRP.
-// IMPORTANT: this function should be called after the FirstRecoverabilityByMethod has
-// been updated
+// Returns true if it alters the FRP.
+// IMPORTANT: this function assumes the FirstRecoverabilityByMethod is up-to-date
 func (cluster *Cluster) TryUpdatingFirstRecoverabilityPoint() (bool, error) {
 	var hasUpdates bool
 	oldestAvailableBackup, err := cluster.getOldestOverallBackup()
@@ -3024,43 +3023,28 @@ func (cluster *Cluster) TryUpdatingFirstRecoverabilityPoint() (bool, error) {
 	if oldestAvailableBackup.IsZero() {
 		return false, fmt.Errorf("could not find FirstRecoverabilityByMethod times")
 	}
-	if cluster.Status.FirstRecoverabilityPoint == "" {
+	if cluster.Status.FirstRecoverabilityPoint == "" ||
+		cluster.Status.FirstRecoverabilityPoint != oldestAvailableBackup.Format(time.RFC3339) {
 		cluster.Status.FirstRecoverabilityPoint = oldestAvailableBackup.Format(time.RFC3339)
 		hasUpdates = true
-	} else {
-		ts, err := time.Parse(time.RFC3339, cluster.Status.FirstRecoverabilityPoint)
-		if err != nil {
-			return false, fmt.Errorf("could not parse FirstRecoverabilityPont: %s", cluster.Status.FirstRecoverabilityPoint)
-		}
-		if oldestAvailableBackup.Before(ts) {
-			cluster.Status.FirstRecoverabilityPoint = oldestAvailableBackup.Format(time.RFC3339)
-			hasUpdates = true
-		}
 	}
 	return hasUpdates, nil
 }
 
-// TryUpdatingOldestBackupTime will set time `t` as the oldest backup for `method` if
-// the existing recorded time is not the oldest.
-// Returns true if the value was updated
-func (cluster *Cluster) TryUpdatingOldestBackupTime(t time.Time, method BackupMethod) (bool, error) {
+// TryUpdatingOldestBackupTime will set the oldest backup for `method`,
+// and return true if the value is altered
+func (cluster *Cluster) TryUpdatingOldestBackupTime(
+	oldestInCatalog time.Time,
+	method BackupMethod,
+) (bool, error) {
 	var hasUpdates bool
 	if cluster.Status.FirstRecoverabilityByMethod == nil {
 		cluster.Status.FirstRecoverabilityByMethod = make(map[BackupMethod]string)
 	}
 	oldestRecordedTime, found := cluster.Status.FirstRecoverabilityByMethod[method]
-	if !found {
-		cluster.Status.FirstRecoverabilityByMethod[method] = t.Format(time.RFC3339)
+	if !found || oldestRecordedTime != oldestInCatalog.Format(time.RFC3339) {
+		cluster.Status.FirstRecoverabilityByMethod[method] = oldestInCatalog.Format(time.RFC3339)
 		hasUpdates = true
-	} else {
-		ts, err := time.Parse(time.RFC3339, oldestRecordedTime)
-		if err != nil {
-			return false, fmt.Errorf("could not parse recoverability time for %s: %s", method, oldestRecordedTime)
-		}
-		if t.Before(ts) {
-			cluster.Status.FirstRecoverabilityByMethod[method] = t.Format(time.RFC3339)
-			hasUpdates = true
-		}
 	}
 	return hasUpdates, nil
 }
