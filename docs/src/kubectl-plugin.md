@@ -910,8 +910,11 @@ backup/cluster-example-20230121002300 created
 By default, a newly created backup will use the backup target policy defined
 in the cluster to choose which instance to run on.
 However, you can override this policy with the `--backup-target` option.
-Additionally, you can use options such as `--online`, `--immediate-checkpoint`,
-and `--wait-for-archive` to further customize the backup process.
+
+In the case of volume snapshot backups, you can also use the `--online` option
+to request an online/hot backup or an offline/cold one: additionally, you can
+also tune online backups by explicitly setting the `--immediate-checkpoint` and
+`--wait-for-archive` options.
 
 The ["Backup" section](./backup.md#backup) contains more information about
 the configuration settings.
