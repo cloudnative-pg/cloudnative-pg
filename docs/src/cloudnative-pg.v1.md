@@ -1624,14 +1624,14 @@ Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
 <tr><td><code>instancesStatus</code><br/>
-<i>map[github.com/cloudnative-pg/cloudnative-pg/pkg/utils.PodStatus][]string</i>
+<i>map[PodStatus][]string</i>
 </td>
 <td>
    <p>InstancesStatus indicates in which status the instances are</p>
 </td>
 </tr>
 <tr><td><code>instancesReportedState</code><br/>
-<a href="#postgresql-cnpg-io-v1-InstanceReportedState"><i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.PodName]github.com/cloudnative-pg/cloudnative-pg/api/v1.InstanceReportedState</i></a>
+<a href="#postgresql-cnpg-io-v1-InstanceReportedState"><i>map[PodName]InstanceReportedState</i></a>
 </td>
 <td>
    <p>The reported state of the instances during the last reconciliation loop</p>
@@ -3966,7 +3966,7 @@ if all the labels values match.</p>
     
   
 <tr><td><code>instances</code><br/>
-<a href="#postgresql-cnpg-io-v1-PodTopologyLabels"><i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.PodName]github.com/cloudnative-pg/cloudnative-pg/api/v1.PodTopologyLabels</i></a>
+<a href="#postgresql-cnpg-io-v1-PodTopologyLabels"><i>map[PodName]PodTopologyLabels</i></a>
 </td>
 <td>
    <p>Instances contains the pod topology of the instances</p>
