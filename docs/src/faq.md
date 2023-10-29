@@ -330,7 +330,7 @@ TODO
 
 We believe that PostgreSQL is the equivalent in the database area of
 what Linux represents in the operating system space. The current latest
-major version of Postgres is version 14, which ships out of the box:
+major version of Postgres is version 15, which ships out of the box:
 
 -   native streaming replication, both physical and logical
 -   continuous hot backup and point in time recovery
