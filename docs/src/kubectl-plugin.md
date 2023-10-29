@@ -908,9 +908,16 @@ backup/cluster-example-20230121002300 created
 ```
 
 By default, a newly created backup will use the backup target policy defined
-in the cluster to choose which instance to run on. You can also use `--backup-target`
-option to override this policy. please refer to the ["Backup" section](backup.md)
-for more information about backup target.
+in the cluster to choose which instance to run on.
+However, you can override this policy with the `--backup-target` option.
+
+In the case of volume snapshot backups, you can also use the `--online` option
+to request an online/hot backup or an offline/cold one: additionally, you can
+also tune online backups by explicitly setting the `--immediate-checkpoint` and
+`--wait-for-archive` options.
+
+The ["Backup" section](./backup.md#backup) contains more information about
+the configuration settings.
 
 ### Launching psql
 

@@ -14,18 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package backup implements a command to request an on-demand backup
-// for a PostgreSQL cluster
 package backup
 
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -36,18 +36,29 @@ import (
 // backupCommandOptions are the options that are provider to the backup
 // cnpg command
 type backupCommandOptions struct {
-	backupName  string
-	clusterName string
-	target      apiv1.BackupTarget
-	method      apiv1.BackupMethod
+	backupName          string
+	clusterName         string
+	target              apiv1.BackupTarget
+	method              apiv1.BackupMethod
+	online              *bool
+	immediateCheckpoint *bool
+	waitForArchive      *bool
+}
+
+func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfiguration {
+	var onlineConfiguration *apiv1.OnlineConfiguration
+	if options.immediateCheckpoint != nil || options.waitForArchive != nil {
+		onlineConfiguration = &apiv1.OnlineConfiguration{
+			WaitForArchive:      options.waitForArchive,
+			ImmediateCheckpoint: options.immediateCheckpoint,
+		}
+	}
+	return onlineConfiguration
 }
 
 // NewCmd creates the new "backup" subcommand
 func NewCmd() *cobra.Command {
-	var backupName string
-	var backupTarget string
-	var backupMethod string
-	var cluster apiv1.Cluster
+	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive string
 
 	backupSubcommand := &cobra.Command{
 		Use:   "backup [cluster]",
@@ -84,6 +95,7 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("backup-method: %s is not supported by the backup command", backupMethod)
 			}
 
+			var cluster apiv1.Cluster
 			// check if the cluster exists
 			err := plugin.Client.Get(
 				cmd.Context(),
@@ -97,13 +109,29 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("while getting cluster %s: %w", clusterName, err)
 			}
 
+			parsedOnline, err := parseOptionalBooleanString(online)
+			if err != nil {
+				return fmt.Errorf("while parsing the online value: %w", err)
+			}
+			parsedImmediateCheckpoint, err := parseOptionalBooleanString(online)
+			if err != nil {
+				return fmt.Errorf("while parsing the immediate-checkpoint value: %w", err)
+			}
+			parsedWaitForArchive, err := parseOptionalBooleanString(online)
+			if err != nil {
+				return fmt.Errorf("while parsing the wait-for-archive value: %w", err)
+			}
+
 			return createBackup(
 				cmd.Context(),
 				backupCommandOptions{
-					backupName:  backupName,
-					clusterName: clusterName,
-					target:      apiv1.BackupTarget(backupTarget),
-					method:      apiv1.BackupMethod(backupMethod),
+					backupName:          backupName,
+					clusterName:         clusterName,
+					target:              apiv1.BackupTarget(backupTarget),
+					method:              apiv1.BackupMethod(backupMethod),
+					online:              parsedOnline,
+					immediateCheckpoint: parsedImmediateCheckpoint,
+					waitForArchive:      parsedWaitForArchive,
 				})
 		},
 	}
@@ -132,6 +160,29 @@ func NewCmd() *cobra.Command {
 			"valid values are volumeSnapshot and barmanObjectStore.",
 	)
 
+	const optionalAcceptedValues = "Optional. Accepted values: true|false|\"\"."
+	backupSubcommand.Flags().StringVar(&online, "online",
+		"",
+		"Set the `.spec.online` field of the Backup resource. If not specified, "+
+			"the value in the '.spec.backup.volumeSnapshot' field of the Cluster "+
+			"resource will be used. "+
+			optionalAcceptedValues)
+
+	backupSubcommand.Flags().StringVar(&immediateCheckpoint, "immediate-checkpoint", "",
+		"Set the `.spec.onlineConfiguration.immediateCheckpoint` field of the "+
+			"Backup resource. If not specified, the value in the "+
+			"'.spec.backup.volumeSnapshot.onlineConfiguration' field "+
+			"of the Cluster resource will be used. "+
+			optionalAcceptedValues,
+	)
+
+	backupSubcommand.Flags().StringVar(&waitForArchive, "wait-for-archive", "",
+		"Set the `.spec.onlineConfiguratoin.waitForArchive` field of the "+
+			"Backup resource. If not specified, the value in the "+
+			"'.spec.backup.volumeSnapshot.onlineConfiguration' field will be used. "+
+			optionalAcceptedValues,
+	)
+
 	return backupSubcommand
 }
 
@@ -146,8 +197,10 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 			Cluster: apiv1.LocalObjectReference{
 				Name: options.clusterName,
 			},
-			Target: options.target,
-			Method: options.method,
+			Target:              options.target,
+			Method:              options.method,
+			Online:              options.online,
+			OnlineConfiguration: options.getOnlineConfiguration(),
 		},
 	}
 
@@ -156,4 +209,16 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 		fmt.Printf("backup/%v created\n", backup.Name)
 	}
 	return err
+}
+
+func parseOptionalBooleanString(rawBool string) (*bool, error) {
+	if rawBool == "" {
+		return nil, nil
+	}
+
+	value, err := strconv.ParseBool(rawBool)
+	if err != nil {
+		return nil, err
+	}
+	return ptr.To(value), nil
 }
