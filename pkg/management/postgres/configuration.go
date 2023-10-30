@@ -294,22 +294,23 @@ func createStandbySignal(pgData string) error {
 
 var migrateAutoConfOptions = []string{
 	"archive_mode",
-	"primary_slot_name",
 	"primary_conninfo",
+	"primary_slot_name",
+	"recovery_target_timeline",
 	"restore_command",
 }
 
 var cleanupAutoConfOptions = []string{
 	"archive_mode",
-	"primary_slot_name",
 	"primary_conninfo",
+	"primary_slot_name",
 	"recovery_target",
-	"recovery_target_xid",
-	"recovery_target_name",
+	"recovery_target_inclusive",
 	"recovery_target_lsn",
+	"recovery_target_name",
 	"recovery_target_time",
 	"recovery_target_timeline",
-	"recovery_target_inclusive",
+	"recovery_target_xid",
 	"restore_command",
 }
 
