@@ -52,7 +52,8 @@ var _ = Describe("Volume Snapshot validation", func() {
 				},
 			},
 		}))
-		Expect(status.IsOk()).To(BeTrue())
+		Expect(status.ContainsErrors()).To(BeFalse())
+		Expect(status.ContainsWarnings()).To(BeTrue())
 	})
 
 	It("Fails when the snapshot doesn't exist", func() {
@@ -66,7 +67,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 				},
 			},
 		}))
-		Expect(status.IsOk()).To(BeFalse())
+		Expect(status.ContainsErrors()).To(BeTrue())
 	})
 
 	It("Fails when the snapshot have the pvcRole annotation, but the value is not correct", func() {
@@ -94,7 +95,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 				},
 			},
 		}))
-		Expect(status.IsOk()).To(BeFalse())
+		Expect(status.ContainsErrors()).To(BeTrue())
 	})
 
 	It("Verifies the coherence of multiple volumeSnapshot backups", func(ctx SpecContext) {
@@ -195,7 +196,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 
 		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(status.IsOk()).To(BeTrue())
+		Expect(status.ContainsErrors()).To(BeFalse())
 	})
 
 	It("doesn't complain if we only have the pgdata snapshot", func(ctx SpecContext) {
@@ -227,7 +228,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 
 		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(status.IsOk()).To(BeTrue())
+		Expect(status.ContainsErrors()).To(BeFalse())
 	})
 
 	It("complains if we referenced a snapshot which we don't have", func(ctx SpecContext) {
@@ -262,7 +263,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 
 		status, err := VerifyDataSourceCoherence(ctx, mockClient, "default", &dataSource)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(status.IsOk()).To(BeFalse())
+		Expect(status.ContainsErrors()).To(BeTrue())
 		Expect(status).To(Equal(ValidationStatus{
 			Errors: []ValidationMessage{
 				{

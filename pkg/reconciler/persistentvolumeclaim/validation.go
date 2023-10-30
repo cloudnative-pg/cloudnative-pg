@@ -44,37 +44,29 @@ type ValidationMessage struct {
 	Message    string `json:"message"`
 }
 
-// IsOk returns true if the validation result
-// have no blocking errors
-func (status *ValidationStatus) IsOk() bool {
-	return len(status.Errors) == 0
+func newValidationMessage(objectName string, message string) ValidationMessage {
+	return ValidationMessage{ObjectName: objectName, Message: message}
 }
 
-// IsEmpty returns true when there are no validation messages
-func (status *ValidationStatus) IsEmpty() bool {
-	return len(status.Errors) == 0 && len(status.Warnings) == 0
+// ContainsErrors returns true if the validation result
+// has any blocking errors.
+func (status *ValidationStatus) ContainsErrors() bool {
+	return len(status.Errors) > 0
+}
+
+// ContainsWarnings returns true if there are any validation warnings.
+func (status *ValidationStatus) ContainsWarnings() bool {
+	return len(status.Warnings) > 0
 }
 
 // AddError adds an error message to the validation status
 func (status *ValidationStatus) addErrorf(name string, format string, args ...interface{}) {
-	status.Errors = append(
-		status.Errors,
-		ValidationMessage{
-			ObjectName: name,
-			Message:    fmt.Sprintf(format, args...),
-		},
-	)
+	status.Errors = append(status.Errors, newValidationMessage(name, fmt.Sprintf(format, args...)))
 }
 
 // AddWarning adds an error message to the validation status
 func (status *ValidationStatus) addWarningf(name string, format string, args ...interface{}) {
-	status.Warnings = append(
-		status.Warnings,
-		ValidationMessage{
-			ObjectName: name,
-			Message:    fmt.Sprintf(format, args...),
-		},
-	)
+	status.Warnings = append(status.Warnings, newValidationMessage(name, fmt.Sprintf(format, args...)))
 }
 
 // validateVolumeSnapshot validates the label of a volume snapshot,

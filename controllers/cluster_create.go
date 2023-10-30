@@ -998,7 +998,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			if !status.IsOk() {
+			if status.ContainsErrors() {
 				contextLogger.Warning(
 					"Volume snapshots verification failed, retrying",
 					"status", status)
@@ -1007,7 +1007,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 					RequeueAfter: 5 * time.Second,
 				}, nil
 			}
-			if !status.IsEmpty() {
+			if status.ContainsWarnings() {
 				contextLogger.Warning("Volume snapshots verification warnings",
 					"status", status)
 			}
