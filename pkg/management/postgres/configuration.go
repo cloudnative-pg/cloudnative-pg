@@ -297,6 +297,7 @@ var migrateAutoConfOptions = []string{
 	"primary_slot_name",
 	"primary_conninfo",
 	"restore_command",
+	"recovery_target_timeline",
 }
 
 var cleanupAutoConfOptions = []string{
