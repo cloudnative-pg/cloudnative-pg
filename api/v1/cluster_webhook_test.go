@@ -3067,13 +3067,13 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &BootstrapRecovery{
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(""),
-								Kind:     "PersistentVolumeClaim",
+								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								Kind:     "VolumeSnapshot",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(""),
-								Kind:     "PersistentVolumeClaim",
+								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								Kind:     "VolumeSnapshot",
 								Name:     "pgwal",
 							},
 						},
@@ -3091,13 +3091,13 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 					Recovery: &BootstrapRecovery{
 						VolumeSnapshots: &DataSource{
 							Storage: corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(""),
-								Kind:     "PersistentVolumeClaim",
+								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								Kind:     "VolumeSnapshot",
 								Name:     "pgdata",
 							},
 							WalStorage: &corev1.TypedLocalObjectReference{
-								APIGroup: ptr.To(""),
-								Kind:     "PersistentVolumeClaim",
+								APIGroup: ptr.To(storagesnapshotv1.GroupName),
+								Kind:     "VolumeSnapshot",
 								Name:     "pgwal",
 							},
 						},
@@ -3147,13 +3147,13 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			cluster := clusterFromRecovery(&BootstrapRecovery{
 				VolumeSnapshots: &DataSource{
 					Storage: corev1.TypedLocalObjectReference{
-						APIGroup: nil,
-						Kind:     "PersistentVolumeClaim",
+						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						Kind:     "VolumeSnapshot",
 						Name:     "pgdata",
 					},
 					WalStorage: &corev1.TypedLocalObjectReference{
-						APIGroup: nil,
-						Kind:     "PersistentVolumeClaim",
+						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						Kind:     "VolumeSnapshot",
 						Name:     "pgwal",
 					},
 				},
@@ -3167,13 +3167,13 @@ var _ = Describe("Recovery from volume snapshot validation", func() {
 			cluster := clusterFromRecovery(&BootstrapRecovery{
 				VolumeSnapshots: &DataSource{
 					Storage: corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(""),
-						Kind:     "PersistentVolumeClaim",
+						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						Kind:     "VolumeSnapshot",
 						Name:     "pgdata",
 					},
 					WalStorage: &corev1.TypedLocalObjectReference{
-						APIGroup: ptr.To(""),
-						Kind:     "PersistentVolumeClaim",
+						APIGroup: ptr.To(storagesnapshotv1.GroupName),
+						Kind:     "VolumeSnapshot",
 						Name:     "pgwal",
 					},
 				},
