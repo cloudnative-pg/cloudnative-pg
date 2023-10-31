@@ -349,10 +349,10 @@ deploy_fluentd() {
 deploy_csi_host_path() {
   echo "${bright}Starting deployment of CSI driver plugin... ${reset}"
   CSI_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi
-  EXTERNAL_SNAPSHOTTER_VERSION="v6.2.2"
-  EXTERNAL_PROVISIONER_VERSION="v3.3.0"
-  EXTERNAL_RESIZER_VERSION="v1.6.0"
-  EXTERNAL_ATTACHER_VERSION="v4.0.0"
+  EXTERNAL_SNAPSHOTTER_VERSION="v6.3.1"
+  EXTERNAL_PROVISIONER_VERSION="v3.6.1"
+  EXTERNAL_RESIZER_VERSION="v1.9.1"
+  EXTERNAL_ATTACHER_VERSION="v4.4.1"
 
   ## Install external snapshotter CRD
   kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
