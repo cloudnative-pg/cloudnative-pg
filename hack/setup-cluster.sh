@@ -59,7 +59,7 @@ esac
 if [ "${ARCH}" = "arm64" ]  && [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
   DOCKER_DEFAULT_PLATFORM=linux/arm64
 fi
-
+export DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM}
 
 # Constants
 registry_volume=registry_dev_data
