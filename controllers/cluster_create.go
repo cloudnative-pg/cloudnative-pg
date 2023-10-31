@@ -923,6 +923,7 @@ func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *api
 	return cluster.Status.LatestGeneratedNode, nil
 }
 
+// nolint: gocognit
 func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -992,6 +993,25 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 		volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
 		if volumeSnapshotsRecovery != nil {
+			status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
+				ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if status.ContainsErrors() {
+				contextLogger.Warning(
+					"Volume snapshots verification failed, retrying",
+					"status", status)
+				return ctrl.Result{
+					Requeue:      true,
+					RequeueAfter: 5 * time.Second,
+				}, nil
+			}
+			if status.ContainsWarnings() {
+				contextLogger.Warning("Volume snapshots verification warnings",
+					"status", status)
+			}
+
 			var snapshot volumesnapshot.VolumeSnapshot
 			if err := r.Client.Get(ctx,
 				types.NamespacedName{Name: volumeSnapshotsRecovery.Storage.Name, Namespace: cluster.Namespace},
