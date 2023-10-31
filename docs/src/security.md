@@ -126,6 +126,11 @@ namespaced resources.
   manages. For more details, please see the
   [Kubernetes documentation](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/).
 
+`volumesnapshots`
+: The operator needs to generate `VolumeSnapshots` objects in order to take
+  backups of a PostgreSQL server. VolumeSnapshots are read too in order to
+  validate them before starting the restore process.
+
 `nodes`
 : The operator needs to get the labels for Affinity and AntiAffinity, so it can
   decide in which nodes a pod can be scheduled preventing the replicas to be

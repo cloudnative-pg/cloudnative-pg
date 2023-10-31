@@ -876,10 +876,9 @@ func validateVolumeSnapshotSource(
 
 	switch {
 	case apiGroup == storagesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
-	case apiGroup == "" && value.Kind == "PersistentVolumeClaim":
 	default:
 		return field.ErrorList{
-			field.Invalid(path, value, "Only VolumeSnapshots and PersistentVolumeClaims are supported"),
+			field.Invalid(path, value, "Only VolumeSnapshots are supported"),
 		}
 	}
 
