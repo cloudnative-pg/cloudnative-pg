@@ -1,29 +1,29 @@
-# Connection Pooling
+# Connection pooling
 
 CloudNativePG provides native support for connection pooling with
 [PgBouncer](https://www.pgbouncer.org/), one of the most popular open source
-connection poolers for PostgreSQL, through the `Pooler` CRD.
+connection poolers for PostgreSQL, through the `Pooler` custom resource definition (CRD).
 
-In a nutshell, a `Pooler` in CloudNativePG is a deployment of
-PgBouncer pods that sits between your applications and a PostgreSQL service
-(for example the `rw` service), creating a separate, scalable, configurable,
-and highly available **database access layer**.
+In brief, a pooler in CloudNativePG is a deployment of
+PgBouncer pods that sits between your applications and a PostgreSQL service,
+for example, the `rw` service. It creates a separate, scalable, configurable,
+and highly available database access layer.
 
 ## Architecture
 
-The following diagram highlights how the introduction of a database access
-layer based on PgBouncer changes the architecture of CloudNativePG,
-like an additional blade in a Swiss Army knife. Instead of directly connecting
-to the PostgreSQL primary service, applications can now connect to the
-equivalent service for PgBouncer, enabling reuse of existing connections for
+The following diagram highlights how introducing a database access
+layer based on PgBouncer changes the architecture of CloudNativePG.
+Instead of directly connecting
+to the PostgreSQL primary service, applications can connect to the
+equivalent service for PgBouncer. This ability enables reuse of existing connections for
 faster performance and better resource management on the PostgreSQL side.
 
 ![Applications writing to the single primary via PgBouncer](./images/pgbouncer-architecture-rw.png)
 
-## Quickstart
+## Quick start
 
-The easiest way to explain how CloudNativePG implements a PgBouncer
-pooler is through an example:
+This example helps to show how CloudNativePG implements a PgBouncer
+pooler:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -44,102 +44,101 @@ spec:
 ```
 
 !!! Important
-    Pooler name should never match with any Cluster name within the same namespace.
+    The pooler name can't be the same as any cluster name in the same namespace.
 
-This creates a new `Pooler` resource called `pooler-example-rw` (the name is
-arbitrary) that is strictly associated with the Postgres `Cluster` resource called
-`cluster-example` and pointing to the primary, identified by the read/write
+This example creates a `Pooler` resource called `pooler-example-rw` 
+that's strictly associated with the Postgres `Cluster` resource called
+`cluster-example`. It points to the primary, identified by the read/write
 service (`rw`, therefore `cluster-example-rw`).
 
-The `Pooler` must live in the same namespace of the Postgres cluster.
+The `Pooler` resource must live in the same namespace as the Postgres cluster.
 It consists of a Kubernetes deployment of 3 pods running the
 [latest stable image of PgBouncer](https://ghcr.io/cloudnative-pg/pgbouncer),
 configured with the [`session` pooling mode](https://www.pgbouncer.org/config.html#pool-mode)
-and accepting up to 1000 connections each - with a default pool size of 10
-user/database pairs towards PostgreSQL.
+and accepting up to 1000 connections each. The default pool size is 10
+user/database pairs toward PostgreSQL.
 
 !!! Important
-    The `Pooler` only sets the `*` fallback database in PgBouncer, meaning
+    The `Pooler` resource sets only the `*` fallback database in PgBouncer. This setting means that
     that all parameters in the connection strings passed from the client are
-    relayed to the PostgreSQL server (please refer to ["Section [databases]"
-    in PgBouncer's documentation](https://www.pgbouncer.org/config.html#section-databases)).
+    relayed to the PostgreSQL server. For details, see ["Section [databases]"
+    in the PgBouncer documentation](https://www.pgbouncer.org/config.html#section-databases).
 
-Additionally, CloudNativePG automatically creates a secret with the
-same name of the pooler containing the configuration files used with PgBouncer.
+CloudNativePG also creates a secret with the
+same name as the pooler containing the configuration files used with PgBouncer.
 
 !!! Seealso "API reference"
-    For details, please refer to [`PgBouncerSpec` section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PgBouncerSpec)
+    For details, see [`PgBouncerSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PgBouncerSpec)
     in the API reference.
 
 
 ## Pooler resource lifecycle
 
-`Pooler` resources are not `Cluster`-managed resources. You are supposed to
-create poolers manually when they are needed. Additionally, you can deploy
-multiple poolers per PostgreSQL Cluster.
+`Pooler` resources aren't cluster-managed resources. 
+You create poolers manually when they're needed. You can also deploy
+multiple poolers per PostgreSQL cluster.
 
-What is important to note is that the lifecycles of the `Cluster` and the
-`Pooler` resources are currently independent: the deletion of the `Cluster`
-doesn't imply the automatic deletion of the `Pooler`, and viceversa.
+What's important is that the life cycles of the `Cluster` and the
+`Pooler` resources are currently independent. Deleting the cluster
+doesn't imply the deletion of the pooler, and vice versa.
 
 !!! Important
-    Now that you know how a `Pooler` works, you have full freedom in terms of
-    possible architectures: you can have clusters without poolers, clusters with
-    a single pooler, or clusters with several poolers (i.e. one per application).
+    Once you know how a pooler works, you have full freedom in terms of
+    possible architectures. You can have clusters without poolers, clusters with
+    a single pooler, or clusters with several poolers, that is, one per application.
 
 ## Security
 
 Any PgBouncer pooler is transparently integrated with CloudNativePG
-support for in-transit encryption via **TLS connections**, both on the client
+support for in-transit encryption by way of TLS connections, both on the client
 (application) and server (PostgreSQL) side of the pool.
 
-Specifically, PgBouncer automatically reuses the certificates of the PostgreSQL
-server. Moreover, it uses TLS client certificate authentication to connect
+Specifically, PgBouncer reuses the certificates of the PostgreSQL
+server. It also uses TLS client certificate authentication to connect
 to the PostgreSQL server to run the `auth_query` for clients' password
-authentication (see the ["Authentication" section](#authentication) below).
+authentication (see [Authentication](#authentication)).
 
-Containers run as the `pgbouncer` system user, and access to the `pgbouncer`
-database is only allowed via local connections, through `peer` authentication.
+Containers run as the pgbouncer system user, and access to the `pgbouncer`
+database is allowed only by way of local connections, through peer authentication.
 
 ### Certificates
 
-By default, PgBouncer pooler will use the same certificates that are used by the
-cluster itself, but if the user provides those certificates the pooler will accept
-secrets with the following format:
+By default, a PgBouncer pooler uses the same certificates that are used by the
+cluster. However, if you provide those certificates, the pooler accepts
+secrets with the following formats:
 
 1. Basic Auth
 2. TLS
 3. Opaque
 
-In the Opaque case, it will look for specific keys that needs to be used, those keys
-are the following:
+In the Opaque case, it looks for the following specific keys that need to be used:
 
 * tls.crt
 * tls.key
 
-So we can treat this secret as a TLS secret, and start from there.
+So you can treat this secret as a TLS secret, and start from there.
 
 ## Authentication
 
-**Password based authentication** is the only supported method for clients of
+Password-based authentication is the only supported method for clients of
 PgBouncer in CloudNativePG.
 
-Internally, our implementation relies on PgBouncer's `auth_user` and `auth_query` options. Specifically, the operator:
+Internally, the implementation relies on PgBouncer's `auth_user` and `auth_query` options. Specifically, the operator:
 
-- creates a standard user called `cnpg_pooler_pgbouncer` in the PostgreSQL server
-- creates the lookup function in the `postgres` database and grants execution
-  privileges to the `cnpg_pooler_pgbouncer` user (PoLA)
-- issues a TLS certificate for this user
-- sets `cnpg_pooler_pgbouncer` as the `auth_user`
-- configures PgBouncer to use the TLS certificate to authenticate
+- Creates a standard user called `cnpg_pooler_pgbouncer` in the PostgreSQL server
+- Creates the lookup function in the `postgres` database and grants execution
+  privileges to the cnpg_pooler_pgbouncer user (PoLA)
+- Issues a TLS certificate for this user
+- Sets `cnpg_pooler_pgbouncer` as the `auth_user`
+- Configures PgBouncer to use the TLS certificate to authenticate
   `cnpg_pooler_pgbouncer` against the PostgreSQL server
-- removes all the above when it detects that a cluster does not have
+- Removes all the above when it detects that a cluster doesn't have
   any pooler associated to it
 
 !!! Important
-    If you specify your own secrets the operator will not automatically integrate the Pooler.
+    If you specify your own secrets, the operator doesn't automatically integrate the pooler.
 
-To manually integrate the Pooler, in the case that you have specified your own
+To manually integrate the pooler, if you specified your own
 secrets, you must run the following queries from inside your cluster.
 
 First, you must create the role:
@@ -156,7 +155,7 @@ Then, for each application database, grant the permission for
 GRANT CONNECT ON DATABASE { database name here } TO cnpg_pooler_pgbouncer;
 ```
 
-Finally, connect in each application database, then create the authentication
+Finally, connect in each application database, and then create the authentication
 function inside each of the application databases:
 
 ```sql
@@ -173,17 +172,17 @@ GRANT EXECUTE ON FUNCTION user_search(text)
 ```
 
 
-## PodTemplates
+## Pod templates
 
 You can take advantage of pod templates specification in the `template`
-section of a `Pooler` resource. For details, please refer to [`PoolerSpec`
-section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PoolerSpec) in the API reference.
+section of a `Pooler` resource. For details, see 
+[`PoolerSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PoolerSpec) in the API reference.
 
-Through templates you can configure pods as you like, including fine
+Using templates, you can configure pods as you like, including fine
 control over affinity and anti-affinity rules for pods and nodes.
 By default, containers use images from `ghcr.io/cloudnative-pg/pgbouncer`.
 
-Here an example of Pooler specifying PodAntiAffinity:
+This example shows `Pooler` specifying `PodAntiAffinity``:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -215,13 +214,13 @@ spec:
 ```
 
 !!! Note
-    `.spec.template.spec.containers` has to be explicitly set to `[]` when not modified, as it's a required field for a `PodSpec`.
-    If `.spec.template.spec.containers` is not set the kubernetes api-server will return the following error when trying to apply the manifest:
+    Explicitly set `.spec.template.spec.containers` to `[]` when not modified, as it's a required field for a `PodSpec`.
+    If `.spec.template.spec.containers` isn't set, the Kubernetes api-server returns the following error when trying to apply the manifest:
     `error validating "pooler.yaml": error validating data: ValidationError(Pooler.spec.template.spec): missing required field "containers"`
 
 
 
-Here an example setting resources and changing the used image:
+This example sets resources and changes the used image:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -251,20 +250,20 @@ spec:
               memory: 500Mi
 ```
 
-## High Availability (HA)
+## High availability (HA)
 
-Thanks to Kubernetes' deployments, you can configure your pooler to run
-on a single instance or over multiple pods. The exposed service will
-make sure that your clients are randomly distributed over the available
-pods running PgBouncer - which will then automatically manage and reuse
-connections towards the underlying server (if using the `rw` service)
+Because of Kubernetes' deployments, you can configure your pooler to run
+on a single instance or over multiple pods. The exposed service
+makes sure that your clients are randomly distributed over the available
+pods running PgBouncer, which then manages and reuses
+connections toward the underlying server (if using the `rw` service)
 or servers (if using the `ro` service with multiple replicas).
 
 !!! Warning
-    Please be aware of network hops in case your infrastructure spans
-    multiple availability zones with high latency across them. Consider
-    for example the case of your application running in zone 2,
-    connecting to PgBouncer running in zone 3, pointing to the PostgreSQL
+    If your infrastructure spans
+    multiple availability zones with high latency across them, be aware of network hops. Consider,
+    for example, the case of your application running in zone 2,
+    connecting to PgBouncer running in zone 3, and pointing to the PostgreSQL
     primary in zone 1. 
 
 ## PgBouncer configuration options
@@ -272,13 +271,13 @@ or servers (if using the `ro` service with multiple replicas).
 The operator manages most of the [configuration options for PgBouncer](https://www.pgbouncer.org/config.html), allowing you to modify only a subset of them.
 
 !!! Warning
-    You are responsible to correctly set the value of each option, as the operator
-    does not validate them.
+    You are responsible for correctly setting the value of each option, as the operator
+    doesn't validate them.
 
-Below you can find a list of the PgBouncer options you are allowed to
-customize. Each of them contains a link to the PgBouncer documentation for that
-specific parameter. Unless differently stated here, the default values are the
-ones directly set by PgBouncer:
+These are the PgBouncer options you can
+customize, with links to the PgBouncer documentation for each
+parameter. Unless stated otherwise, the default values are the
+ones directly set by PgBouncer.
 
 - [`application_name_add_host`](https://www.pgbouncer.org/config.html#application_name_add_host)
 - [`autodb_idle_timeout`](https://www.pgbouncer.org/config.html#autodb_idle_timeout)
@@ -325,37 +324,36 @@ ones directly set by PgBouncer:
 Customizations of the PgBouncer configuration are written
 declaratively in the `.spec.pgbouncer.parameters` map.
 
-The operator reacts to the changes in the Pooler specification,
+The operator reacts to the changes in the pooler specification,
 and every PgBouncer instance reloads the updated configuration
 without disrupting the service.
 
 !!! Warning
-    Every PgBouncer pod will have the same configuration, aligned
+    Every PgBouncer pod has the same configuration, aligned
     with the parameters in the specification. A mistake in these
-    parameters could disrupt the operability of the **whole Pooler**.
-    The operator **does not** validate the value of any option.
+    parameters might disrupt the operability of the whole pooler.
+    The operator doesn't validate the value of any option.
 
 ## Monitoring
 
 The PgBouncer implementation of the `Pooler` comes with a default
-Prometheus exporter that automatically makes available several
-metrics having the `cnpg_pgbouncer_` prefix, by running:
+Prometheus exporter. It makes available several
+metrics having the `cnpg_pgbouncer_` prefix by running:
 
 - `SHOW LISTS` (prefix: `cnpg_pgbouncer_lists`)
 - `SHOW POOLS` (prefix: `cnpg_pgbouncer_pools`)
 - `SHOW STATS` (prefix: `cnpg_pgbouncer_stats`)
 
-Similarly to the CloudNativePG instance, the exporter runs on port
-`9127` of each pod running PgBouncer, and also provides metrics related to the
-Go runtime (with prefix `go_*`).
+Like the CloudNativePG instance, the exporter runs on port
+`9127` of each pod running PgBouncer and also provides metrics related to the
+Go runtime (with the prefix `go_*`).
 
 !!! Info
-    You can inspect the exported metrics on a pod running PgBouncer, by following
-    the instructions provided in the
-    ["How to inspect the exported metrics" section from the "Monitoring" page](monitoring.md/#how-to-inspect-the-exported-metrics),
-    making sure that you use the correct IP and the `9127` port.
+    You can inspect the exported metrics on a pod running PgBouncer. For instructions, see
+    [How to inspect the exported metrics](monitoring.md/#how-to-inspect-the-exported-metrics).
+    Make sure that you use the correct IP and the `9127` port.
 
-An example of the output for `cnpg_pgbouncer` metrics:
+This example shows the output for `cnpg_pgbouncer` metrics:
 
 ```text
 # HELP cnpg_pgbouncer_collection_duration_seconds Collection time duration in seconds
@@ -519,17 +517,18 @@ cnpg_pgbouncer_stats_total_xact_count{database="pgbouncer"} 3
 cnpg_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
 ```
 
-Like for `Clusters`, a specific `Pooler` can be monitored using the
-[Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource
+As for clusters, a specific pooler can be monitored using the
+[Prometheus operator's](https://github.com/prometheus-operator/prometheus-operator) resource
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
-A `PodMonitor` correctly pointing to a `Pooler` can be automatically created by the operator by setting
-`.spec.monitoring.enablePodMonitor` to `true` in the `Pooler` resource itself (default: false).
+A `PodMonitor` correctly pointing to a pooler can be created by the operator by setting
+`.spec.monitoring.enablePodMonitor` to `true` in the `Pooler` resource. The default is `false``.
 
 !!! Important
-    Any change to the `PodMonitor` created automatically will be overridden by the Operator at the next reconciliation
-    cycle, in case you need to customize it, you can do so as described below.
+    Any change to `PodMonitor` created automatically is overridden by the operator at the next reconciliation
+    cycle. If you need to customize it, you can do so as shown in the following example.
 
-To deploy a `PodMonitor` for a specific Pooler manually, you can just define it as follows, changing it as needed:
+To deploy a `PodMonitor` for a specific pooler manually, you can define it as follows and change it as needed:
+
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
@@ -566,28 +565,28 @@ following example:
 ## Pausing connections
 
 The `Pooler` specification allows you to take advantage of PgBouncer's `PAUSE`
-and `RESUME` commands, using only declarative configuration - via the `paused`
-option, by default set to `false`. When set to `true`, the operator internally
+and `RESUME` commands, using only declarative configuration. You can ado this using the `paused`
+option, which by default is set to `false`. When set to `true`, the operator internally
 invokes the `PAUSE` command in PgBouncer, which:
 
-1. closes all active connections towards the PostgreSQL server, after waiting for the queries to complete
-2. pauses any new connection coming from the client
+1. Closes all active connections toward the PostgreSQL server, after waiting for the queries to complete
+2. Pauses any new connection coming from the client
 
-When the `paused` option is set back to `false`, the operator will invoke the
-`RESUME` command in PgBouncer, re-opening the taps towards the PostgreSQL
-service defined in the `Pooler`.
+When the `paused` option is reset to `false`, the operator invokes the
+`RESUME` command in PgBouncer, reopening the taps toward the PostgreSQL
+service defined in the `Pooler` resource.
 
 !!! Seealso "PAUSE"
-    For further information, please refer to the
-    [`PAUSE` section in the PgBouncer documentation](https://www.pgbouncer.org/usage.html#pause-db).
+    For more information, see
+    [`PAUSE` in the PgBouncer documentation](https://www.pgbouncer.org/usage.html#pause-db).
 
 !!! Important
     In future versions, the switchover operation will be fully integrated
-    with the PgBouncer pooler, and take advantage of the `PAUSE`/`RESUME`
+    with the PgBouncer pooler and take advantage of the `PAUSE`/`RESUME`
     features to reduce the perceived downtime by client applications.
-    At the moment, you can achieve the same results by setting the `paused`
-    attribute to `true`, then issuing the switchover command through the
-    [`cnpg` plugin](kubectl-plugin.md#promote), and finally restoring the `paused`
+    Currently, you can achieve the same results by setting the `paused`
+    attribute to `true`, issuing the switchover command through the
+    [`cnpg` plugin](kubectl-plugin.md#promote), and then restoring the `paused`
     attribute to `false`.
 
 ## Limitations
@@ -595,22 +594,21 @@ service defined in the `Pooler`.
 ### Single PostgreSQL cluster
 
 The current implementation of the pooler is designed to work as part of a
-specific CloudNativePG cluster (a service, to be precise). It is not
-possible at the moment to create a pooler that spans over multiple clusters.
+specific CloudNativePG cluster (a service). It isn't
+currently possible to create a pooler that spans multiple clusters.
 
 ### Controlled configurability
 
 CloudNativePG transparently manages several configuration options
 that are used for the PgBouncer layer to communicate with PostgreSQL. Such
-options are not configurable from outside and include TLS certificates,
-authentication settings, `databases` section, and `users` section. Also,
+options aren't configurable from outside and include TLS certificates,
+authentication settings, the `databases` section, and the `users` section. Also,
 considering the specific use case for the single PostgreSQL cluster, the
 adopted criteria is to explicitly list the options that can be configured by
 users.
 
 !!! Note
-    We have reasons to believe that the adopted solution addresses the majority of
-    use cases, while leaving room for the future implementation of a separate
+    The adopted solution likely addresses the majority of
+    use cases. It leaves room for the future implementation of a separate
     operator for PgBouncer to complete the gamma with more advanced and customized
     scenarios.
-
