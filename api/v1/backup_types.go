@@ -317,7 +317,7 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volu
 	for idx, volumeSnapshot := range snapshots {
 		snapshotNames[idx] = BackupSnapshotElementStatus{
 			Name: volumeSnapshot.Name,
-			Type: volumeSnapshot.Labels[utils.PvcRoleLabelName],
+			Type: volumeSnapshot.Annotations[utils.PvcRoleLabelName],
 		}
 	}
 	snapshotStatus.Elements = snapshotNames
