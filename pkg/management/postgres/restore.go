@@ -585,10 +585,12 @@ func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) err
 	}
 
 	log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
-	// Disable archiving
+	// Temporarily suspend WAL archiving. We set it to `false` (which means failure
+	// of the archiver) in order to defer the decision about archiving to PostgreSQL
+	// itself once the recovery job is completed and the instance is regularly started.
 	err = fileutils.AppendStringToFile(
 		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
-		"archive_command = 'cd .'\n")
+		"archive_command = 'false'\n")
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
