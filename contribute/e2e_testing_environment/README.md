@@ -66,12 +66,14 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 > sure that they are consistent through all invocations either via command line
 > options or by defining the respective environment variables
 
-> **NOTE:** on arm64 architecture like Mac M1/M2. kind/k3d provides different 
-> images for amd64 and arm64 nodes. If the `x86/amd64 emulation` is not enabled, 
-> run `setup-cluster.sh -r create` will correctly detect the architecture and 
-> export `DOCKER_DEFAULT_PLATFORM=linux/arm64` to docker to get the arm64 node image.
-> If you want to use `x86/amd64 emulation` for kind node, you need set 
-> `DOCKER_DEFAULT_PLATFORM=linux/amd64` explicitly before call `setup-cluster.sh -r create`.
+> **NOTE:** on ARM64 architecture like Apple M1/M2/M3, `kind` and `k3d` provide different 
+> images for AMD64 and ARM64 nodes. If the **x86/amd64 emulation** is not enabled, 
+> the `./hack/setup-cluster.sh` script will correctly detect the architecture
+> and pass the `DOCKER_DEFAULT_PLATFORM=linux/arm64` environment variable to Docker
+> to use the ARM64 node image.
+> If you want to explicitly use the **x86/amd64 emulation**, you need to set 
+> the `DOCKER_DEFAULT_PLATFORM=linux/amd64` environment variable before
+> calling the `./hack/setup-cluster.sh` script.
 
 
 ## Profiling tools
