@@ -4,19 +4,19 @@ CloudNativePG provides native support for connection pooling with
 [PgBouncer](https://www.pgbouncer.org/), one of the most popular open source
 connection poolers for PostgreSQL, through the `Pooler` custom resource definition (CRD).
 
-In brief, a pooler in CloudNativePG is a deployment of
-PgBouncer pods that sits between your applications and a PostgreSQL service,
-for example, the `rw` service. It creates a separate, scalable, configurable,
-and highly available database access layer.
+In brief, a pooler in CloudNativePG is a deployment of PgBouncer pods that sits
+between your applications and a PostgreSQL service, for example, the `rw`
+service. It creates a separate, scalable, configurable, and highly available
+database access layer.
 
 ## Architecture
 
-The following diagram highlights how introducing a database access
-layer based on PgBouncer changes the architecture of CloudNativePG.
-Instead of directly connecting
-to the PostgreSQL primary service, applications can connect to the
-equivalent service for PgBouncer. This ability enables reuse of existing connections for
-faster performance and better resource management on the PostgreSQL side.
+The following diagram highlights how introducing a database access layer based
+on PgBouncer changes the architecture of CloudNativePG. Instead of directly
+connecting to the PostgreSQL primary service, applications can connect to the
+equivalent service for PgBouncer. This ability enables reuse of existing
+connections for faster performance and better resource management on the
+PostgreSQL side.
 
 ![Applications writing to the single primary via PgBouncer](./images/pgbouncer-architecture-rw.png)
 
@@ -64,8 +64,8 @@ user/database pairs toward PostgreSQL.
     relayed to the PostgreSQL server. For details, see ["Section [databases]"
     in the PgBouncer documentation](https://www.pgbouncer.org/config.html#section-databases).
 
-CloudNativePG also creates a secret with the
-same name as the pooler containing the configuration files used with PgBouncer.
+CloudNativePG also creates a secret with the same name as the pooler containing
+the configuration files used with PgBouncer.
 
 !!! Seealso "API reference"
     For details, see [`PgBouncerSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PgBouncerSpec)
@@ -74,13 +74,13 @@ same name as the pooler containing the configuration files used with PgBouncer.
 
 ## Pooler resource lifecycle
 
-`Pooler` resources aren't cluster-managed resources. 
-You create poolers manually when they're needed. You can also deploy
-multiple poolers per PostgreSQL cluster.
+`Pooler` resources aren't cluster-managed resources. You create poolers
+manually when they're needed. You can also deploy multiple poolers per
+PostgreSQL cluster.
 
-What's important is that the life cycles of the `Cluster` and the
-`Pooler` resources are currently independent. Deleting the cluster
-doesn't imply the deletion of the pooler, and vice versa.
+What's important is that the life cycles of the `Cluster` and the `Pooler`
+resources are currently independent. Deleting the cluster doesn't imply the
+deletion of the pooler, and vice versa.
 
 !!! Important
     Once you know how a pooler works, you have full freedom in terms of
@@ -89,14 +89,14 @@ doesn't imply the deletion of the pooler, and vice versa.
 
 ## Security
 
-Any PgBouncer pooler is transparently integrated with CloudNativePG
-support for in-transit encryption by way of TLS connections, both on the client
+Any PgBouncer pooler is transparently integrated with CloudNativePG support for
+in-transit encryption by way of TLS connections, both on the client
 (application) and server (PostgreSQL) side of the pool.
 
-Specifically, PgBouncer reuses the certificates of the PostgreSQL
-server. It also uses TLS client certificate authentication to connect
-to the PostgreSQL server to run the `auth_query` for clients' password
-authentication (see [Authentication](#authentication)).
+Specifically, PgBouncer reuses the certificates of the PostgreSQL server. It
+also uses TLS client certificate authentication to connect to the PostgreSQL
+server to run the `auth_query` for clients' password authentication (see
+[Authentication](#authentication)).
 
 Containers run as the pgbouncer system user, and access to the `pgbouncer`
 database is allowed only by way of local connections, through peer authentication.
@@ -104,8 +104,8 @@ database is allowed only by way of local connections, through peer authenticatio
 ### Certificates
 
 By default, a PgBouncer pooler uses the same certificates that are used by the
-cluster. However, if you provide those certificates, the pooler accepts
-secrets with the following formats:
+cluster. However, if you provide those certificates, the pooler accepts secrets
+with the following formats:
 
 1. Basic Auth
 2. TLS
@@ -123,7 +123,8 @@ So you can treat this secret as a TLS secret, and start from there.
 Password-based authentication is the only supported method for clients of
 PgBouncer in CloudNativePG.
 
-Internally, the implementation relies on PgBouncer's `auth_user` and `auth_query` options. Specifically, the operator:
+Internally, the implementation relies on PgBouncer's `auth_user` and
+`auth_query` options. Specifically, the operator:
 
 - Creates a standard user called `cnpg_pooler_pgbouncer` in the PostgreSQL server
 - Creates the lookup function in the `postgres` database and grants execution
@@ -136,13 +137,13 @@ Internally, the implementation relies on PgBouncer's `auth_user` and `auth_query
   any pooler associated to it
 
 !!! Important
-    If you specify your own secrets, the operator doesn't automatically integrate the pooler.
+    If you specify your own secrets, the operator doesn't automatically
+    integrate the pooler.
 
 To manually integrate the pooler, if you specified your own
 secrets, you must run the following queries from inside your cluster.
 
 First, you must create the role:
-
 
 ```sql
 CREATE ROLE cnpg_pooler_pgbouncer WITH LOGIN;
@@ -171,16 +172,15 @@ GRANT EXECUTE ON FUNCTION user_search(text)
   TO cnpg_pooler_pgbouncer;
 ```
 
-
 ## Pod templates
 
 You can take advantage of pod templates specification in the `template`
 section of a `Pooler` resource. For details, see 
 [`PoolerSpec`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PoolerSpec) in the API reference.
 
-Using templates, you can configure pods as you like, including fine
-control over affinity and anti-affinity rules for pods and nodes.
-By default, containers use images from `ghcr.io/cloudnative-pg/pgbouncer`.
+Using templates, you can configure pods as you like, including fine control
+over affinity and anti-affinity rules for pods and nodes. By default,
+containers use images from `ghcr.io/cloudnative-pg/pgbouncer`.
 
 This example shows `Pooler` specifying `PodAntiAffinity``:
 
@@ -214,11 +214,12 @@ spec:
 ```
 
 !!! Note
-    Explicitly set `.spec.template.spec.containers` to `[]` when not modified, as it's a required field for a `PodSpec`.
-    If `.spec.template.spec.containers` isn't set, the Kubernetes api-server returns the following error when trying to apply the manifest:
-    `error validating "pooler.yaml": error validating data: ValidationError(Pooler.spec.template.spec): missing required field "containers"`
-
-
+    Explicitly set `.spec.template.spec.containers` to `[]` when not modified,
+    as it's a required field for a `PodSpec`. If `.spec.template.spec.containers`
+    isn't set, the Kubernetes api-server returns the following error when trying to
+    apply the manifest:`error validating "pooler.yaml": error validating data:
+    ValidationError(Pooler.spec.template.spec): missing required field
+    "containers"`
 
 This example sets resources and changes the used image:
 
@@ -252,32 +253,31 @@ spec:
 
 ## High availability (HA)
 
-Because of Kubernetes' deployments, you can configure your pooler to run
-on a single instance or over multiple pods. The exposed service
-makes sure that your clients are randomly distributed over the available
-pods running PgBouncer, which then manages and reuses
-connections toward the underlying server (if using the `rw` service)
-or servers (if using the `ro` service with multiple replicas).
+Because of Kubernetes' deployments, you can configure your pooler to run on a
+single instance or over multiple pods. The exposed service makes sure that your
+clients are randomly distributed over the available pods running PgBouncer,
+which then manages and reuses connections toward the underlying server (if
+using the `rw` service) or servers (if using the `ro` service with multiple
+replicas).
 
 !!! Warning
-    If your infrastructure spans
-    multiple availability zones with high latency across them, be aware of network hops. Consider,
-    for example, the case of your application running in zone 2,
-    connecting to PgBouncer running in zone 3, and pointing to the PostgreSQL
-    primary in zone 1. 
+    If your infrastructure spans multiple availability zones with high latency
+    across them, be aware of network hops. Consider, for example, the case of your
+    application running in zone 2, connecting to PgBouncer running in zone 3, and
+    pointing to the PostgreSQL primary in zone 1. 
 
 ## PgBouncer configuration options
 
-The operator manages most of the [configuration options for PgBouncer](https://www.pgbouncer.org/config.html), allowing you to modify only a subset of them.
+The operator manages most of the [configuration options for PgBouncer](https://www.pgbouncer.org/config.html),
+allowing you to modify only a subset of them.
 
 !!! Warning
-    You are responsible for correctly setting the value of each option, as the operator
-    doesn't validate them.
+    You are responsible for correctly setting the value of each option, as the
+    operator doesn't validate them.
 
-These are the PgBouncer options you can
-customize, with links to the PgBouncer documentation for each
-parameter. Unless stated otherwise, the default values are the
-ones directly set by PgBouncer.
+These are the PgBouncer options you can customize, with links to the PgBouncer
+documentation for each parameter. Unless stated otherwise, the default values
+are the ones directly set by PgBouncer.
 
 - [`application_name_add_host`](https://www.pgbouncer.org/config.html#application_name_add_host)
 - [`autodb_idle_timeout`](https://www.pgbouncer.org/config.html#autodb_idle_timeout)
@@ -321,12 +321,12 @@ ones directly set by PgBouncer.
 - [`tcp_user_timeout`](https://www.pgbouncer.org/config.html#tcp_user_timeout)
 - [`verbose`](https://www.pgbouncer.org/config.html#verbose)
 
-Customizations of the PgBouncer configuration are written
-declaratively in the `.spec.pgbouncer.parameters` map.
+Customizations of the PgBouncer configuration are written declaratively in the
+`.spec.pgbouncer.parameters` map.
 
-The operator reacts to the changes in the pooler specification,
-and every PgBouncer instance reloads the updated configuration
-without disrupting the service.
+The operator reacts to the changes in the pooler specification, and every
+PgBouncer instance reloads the updated configuration without disrupting the
+service.
 
 !!! Warning
     Every PgBouncer pod has the same configuration, aligned
@@ -524,10 +524,12 @@ A `PodMonitor` correctly pointing to a pooler can be created by the operator by 
 `.spec.monitoring.enablePodMonitor` to `true` in the `Pooler` resource. The default is `false`.
 
 !!! Important
-    Any change to `PodMonitor` created automatically is overridden by the operator at the next reconciliation
-    cycle. If you need to customize it, you can do so as shown in the following example.
+    Any change to `PodMonitor` created automatically is overridden by the
+    operator at the next reconciliation cycle. If you need to customize it, you can
+    do so as shown in the following example.
 
-To deploy a `PodMonitor` for a specific pooler manually, you can define it as follows and change it as needed:
+To deploy a `PodMonitor` for a specific pooler manually, you can define it as
+follows and change it as needed:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -565,11 +567,13 @@ following example:
 ## Pausing connections
 
 The `Pooler` specification allows you to take advantage of PgBouncer's `PAUSE`
-and `RESUME` commands, using only declarative configuration. You can ado this using the `paused`
-option, which by default is set to `false`. When set to `true`, the operator internally
-invokes the `PAUSE` command in PgBouncer, which:
+and `RESUME` commands, using only declarative configuration. You can ado this
+using the `paused` option, which by default is set to `false`. When set to
+`true`, the operator internally invokes the `PAUSE` command in PgBouncer,
+which:
 
-1. Closes all active connections toward the PostgreSQL server, after waiting for the queries to complete
+1. Closes all active connections toward the PostgreSQL server, after waiting
+   for the queries to complete
 2. Pauses any new connection coming from the client
 
 When the `paused` option is reset to `false`, the operator invokes the
@@ -594,18 +598,17 @@ service defined in the `Pooler` resource.
 ### Single PostgreSQL cluster
 
 The current implementation of the pooler is designed to work as part of a
-specific CloudNativePG cluster (a service). It isn't
-currently possible to create a pooler that spans multiple clusters.
+specific CloudNativePG cluster (a service). It isn't currently possible to
+create a pooler that spans multiple clusters.
 
 ### Controlled configurability
 
-CloudNativePG transparently manages several configuration options
-that are used for the PgBouncer layer to communicate with PostgreSQL. Such
-options aren't configurable from outside and include TLS certificates,
-authentication settings, the `databases` section, and the `users` section. Also,
-considering the specific use case for the single PostgreSQL cluster, the
-adopted criteria is to explicitly list the options that can be configured by
-users.
+CloudNativePG transparently manages several configuration options that are used
+for the PgBouncer layer to communicate with PostgreSQL. Such options aren't
+configurable from outside and include TLS certificates, authentication
+settings, the `databases` section, and the `users` section. Also, considering
+the specific use case for the single PostgreSQL cluster, the adopted criteria
+is to explicitly list the options that can be configured by users.
 
 !!! Note
     The adopted solution likely addresses the majority of
