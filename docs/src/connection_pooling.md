@@ -521,7 +521,7 @@ As for clusters, a specific pooler can be monitored using the
 [Prometheus operator's](https://github.com/prometheus-operator/prometheus-operator) resource
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
 A `PodMonitor` correctly pointing to a pooler can be created by the operator by setting
-`.spec.monitoring.enablePodMonitor` to `true` in the `Pooler` resource. The default is `false``.
+`.spec.monitoring.enablePodMonitor` to `true` in the `Pooler` resource. The default is `false`.
 
 !!! Important
     Any change to `PodMonitor` created automatically is overridden by the operator at the next reconciliation
