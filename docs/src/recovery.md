@@ -175,10 +175,6 @@ bootstrap:
 
 ## Recovery from a `Backup` object
 
-!!! Important
-    Recovery from `Backup` objects works only on object store backups,
-    not on volume snapshots.
-
 In case a `Backup` resource is already available in the namespace in which the
 cluster should be created, you can specify its name through
 `.spec.bootstrap.recovery.backup.name`, as in the following example:
