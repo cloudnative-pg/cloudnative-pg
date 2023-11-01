@@ -19,6 +19,7 @@ package volumesnapshot
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,8 +30,8 @@ import (
 // volumeSnapshotInfo host information about a volume snapshot
 type volumeSnapshotInfo struct {
 	// error contains the raised error when the volume snapshot terminated
-	// with a failure
-	error error
+	// with a failure. The external snapshotter controller will retry
+	error *volumeSnapshotError
 
 	// provisioned is true when the volume snapshot have been cut and
 	// provisioned. When this is true, the volume snapshot may not still
@@ -63,6 +64,23 @@ func (err volumeSnapshotError) Error() string {
 		return "non-specified volume snapshot error"
 	}
 	return *err.InternalError.Message
+}
+
+// IsRetryable returns true if the external snapshotter controller
+// will retry taking the snapshot
+func (err volumeSnapshotError) isRetryable() bool {
+	if err.InternalError.Message == nil {
+		return false
+	}
+
+	// Obviously this is a heuristic, but unfortunately we don't have
+	// the information we need.
+	// We're trying to handle the cases where the external-snapshotter
+	// controller failed on a conflict with the following error:
+	//
+	// the object has been modified; please apply your changes to the latest version and try again
+
+	return strings.Contains(*err.InternalError.Message, "try again")
 }
 
 // slice represents a slice of []storagesnapshotv1.VolumeSnapshot
