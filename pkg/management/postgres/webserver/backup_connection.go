@@ -94,10 +94,24 @@ func newBackupConnection(
 }
 
 func (bc *backupConnection) startBackup(ctx context.Context) {
+	contextLogger := log.FromContext(ctx).WithValues("step", "start")
+
 	if bc == nil {
 		return
 	}
 	bc.data.Phase = Starting
+
+	defer func() {
+		if bc.err == nil {
+			return
+		}
+
+		contextLogger.Error(bc.err, "encountered error while starting backup")
+
+		if err := bc.conn.Close(); err != nil {
+			contextLogger.Error(err, "while closing backup connection")
+		}
+	}()
 
 	// TODO: refactor with the same logic of GetSlotNameFromInstanceName in the api package
 	slotName := replicationSlotInvalidCharacters.ReplaceAllString(bc.data.BackupName, "_")
@@ -123,16 +137,22 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 }
 
 func (bc *backupConnection) stopBackup(ctx context.Context) {
+	contextLogger := log.FromContext(ctx).WithValues("step", "stop")
+
 	if bc == nil {
 		return
 	}
+
+	defer func() {
+		if err := bc.conn.Close(); err != nil {
+			contextLogger.Error(err, "while closing backup connection")
+		}
+	}()
 
 	if bc.err != nil {
 		return
 	}
 	bc.data.Phase = Closing
-
-	contextLogger := log.FromContext(ctx)
 
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
@@ -144,8 +164,8 @@ func (bc *backupConnection) stopBackup(ctx context.Context) {
 	}
 
 	bc.err = row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile)
-	bc.data.Phase = Completed
-	if err := bc.conn.Close(); err != nil {
-		contextLogger.Error(err, "while closing backup connection")
+	if bc.err != nil {
+		contextLogger.Error(bc.err, "while stopping PostgreSQL physical backup")
 	}
+	bc.data.Phase = Completed
 }
