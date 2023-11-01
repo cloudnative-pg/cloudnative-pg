@@ -60,7 +60,7 @@ var _ = Describe("BackupStatus structure", func() {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-1",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				},
@@ -68,7 +68,7 @@ var _ = Describe("BackupStatus structure", func() {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-2",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
 					},
 				},
