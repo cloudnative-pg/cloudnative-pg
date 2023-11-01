@@ -1,16 +1,12 @@
 # Commercial support
 
-CloudNativePG is an independent open source project which doesn't endorse any
+CloudNativePG is an independent open source project that doesn't endorse any
 company.
 
-This is a list of third-party companies and individuals who provide products or
-services related to CloudNativePG.
+The ["Support" page](https://cloudnative-pg.io/support/) website lists
+third-party companies and individuals that provide products or services related
+to CloudNativePG.
 
-If you are providing commercial support for CloudNativePG, please edit this
-page to add yourself, or your organization to the list.
+If you're providing commercial support for CloudNativePG, add yourself or your
+organization to that list.
 
-The list is provided in alphabetical order:
-
-| Company                         | URL              |  Regions/Countries |
-| ------------------------------- | ---------------- | ------------------ |
-| [EDB](https://enterprisedb.com) | enterprisedb.com | Global             |
