@@ -114,7 +114,9 @@ var _ = Describe("Verify Volume Snapshot",
 								continue
 							}
 							backupObject = backup
-							g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+							g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+								"Backup should be completed correctly, error message is '%s'",
+								backup.Status.Error)
 							g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
 						}
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
@@ -266,8 +268,11 @@ var _ = Describe("Verify Volume Snapshot",
 							Name:      backupName,
 						}, backup)
 						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.Phase).To(
+							BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
 						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
-						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 				})
 
@@ -424,7 +429,9 @@ var _ = Describe("Verify Volume Snapshot",
 					Eventually(func(g Gomega) {
 						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
 						g.Expect(err).ToNot(HaveOccurred())
-						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
 				})
@@ -474,7 +481,10 @@ var _ = Describe("Verify Volume Snapshot",
 					Eventually(func(g Gomega) {
 						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
 						g.Expect(err).ToNot(HaveOccurred())
-						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+						g.Expect(backup.Status.Phase).To(
+							BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
 				})
@@ -538,7 +548,9 @@ var _ = Describe("Verify Volume Snapshot",
 					Eventually(func(g Gomega) {
 						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
 						g.Expect(err).ToNot(HaveOccurred())
-						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
 				})
@@ -715,7 +727,9 @@ var _ = Describe("Verify Volume Snapshot",
 						}, backup)
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
-						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
 						g.Expect(backup.Status.BackupLabelFile).ToNot(BeEmpty())
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
 				})
