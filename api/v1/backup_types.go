@@ -317,7 +317,7 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volu
 	for idx, volumeSnapshot := range snapshots {
 		snapshotNames[idx] = BackupSnapshotElementStatus{
 			Name: volumeSnapshot.Name,
-			Type: volumeSnapshot.Labels[utils.PvcRoleLabelName],
+			Type: volumeSnapshot.Annotations[utils.PvcRoleLabelName],
 		}
 	}
 	snapshotStatus.Elements = snapshotNames
@@ -342,7 +342,9 @@ func (backupStatus *BackupStatus) GetOnline() bool {
 // It returns true if the backup's method is BackupMethodVolumeSnapshot and its status phase is BackupPhaseCompleted.
 // Otherwise, it returns false.
 func (backup *Backup) IsCompletedVolumeSnapshot() bool {
-	return backup.Spec.Method == BackupMethodVolumeSnapshot && backup.Status.Phase == BackupPhaseCompleted
+	return backup != nil &&
+		backup.Spec.Method == BackupMethodVolumeSnapshot &&
+		backup.Status.Phase == BackupPhaseCompleted
 }
 
 // IsInProgress check if a certain backup is in progress or not
