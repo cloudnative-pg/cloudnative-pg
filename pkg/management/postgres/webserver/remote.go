@@ -259,7 +259,8 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}
 
 		if ws.currentBackup.data.Phase != Started {
-			sendBadRequestJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED", "")
+			sendBadRequestJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED",
+				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
 			return
 		}
 
