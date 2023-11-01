@@ -387,6 +387,7 @@ VM
 VMs
 VOLNAME
 Valerio
+ValidationError
 VirtualBox
 VolumeSnapshot
 VolumeSnapshotClass
