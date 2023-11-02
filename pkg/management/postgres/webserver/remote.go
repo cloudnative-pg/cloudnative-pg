@@ -269,9 +269,17 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
-		if ws.currentBackup.err == nil {
-			ws.currentBackup.data.Phase = Closing
+		if ws.currentBackup.err != nil {
+			if err := ws.currentBackup.conn.Close(); err != nil {
+				log.Error(err, "Error while closing backup connection")
+			}
+
+			ws.currentBackup.data.Phase = Failed
+			sendDataJSONResponse(w, 200, struct{}{})
+			return
 		}
+
+		ws.currentBackup.data.Phase = Closing
 		go ws.currentBackup.stopBackup(context.Background())
 		sendDataJSONResponse(w, 200, struct{}{})
 	}

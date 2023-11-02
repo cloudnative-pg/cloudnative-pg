@@ -45,6 +45,7 @@ const (
 	Starting  BackupConnectionPhase = "starting"
 	Started   BackupConnectionPhase = "started"
 	Closing   BackupConnectionPhase = "closing"
+	Failed    BackupConnectionPhase = "failed"
 	Completed BackupConnectionPhase = "completed"
 )
 
