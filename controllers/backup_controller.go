@@ -578,7 +578,9 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 			builder.WithPredicates(volumeSnapshotsPredicate),
 		)
 	}
-	controllerBuilder = controllerBuilder.WithOptions(controller.Options{MaxConcurrentReconciles: 5})
+	// TODO: allow concurrent reconciliations when the hot snapshot backup reconciler
+	// will allow that
+	controllerBuilder = controllerBuilder.WithOptions(controller.Options{MaxConcurrentReconciles: 1})
 	return controllerBuilder.Complete(r)
 }
 

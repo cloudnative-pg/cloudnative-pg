@@ -19,6 +19,9 @@ package webserver
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"regexp"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -45,8 +48,37 @@ const (
 	Starting  BackupConnectionPhase = "starting"
 	Started   BackupConnectionPhase = "started"
 	Closing   BackupConnectionPhase = "closing"
+	Failed    BackupConnectionPhase = "failed"
 	Completed BackupConnectionPhase = "completed"
 )
+
+type backupError struct {
+	err   error
+	phase BackupConnectionPhase
+}
+
+func (b backupError) Error() string {
+	return fmt.Sprintf("encountered an error while executing phase: %s: %s", b.phase, b.err.Error())
+}
+
+// MarshalJSON implements the json.Marshaler interface for backupError.
+func (b backupError) MarshalJSON() ([]byte, error) {
+	type Serialize struct {
+		Error string `json:"error"`
+	}
+	// Create a wrapper struct for JSON serialization that includes the error message.
+	return json.Marshal(&Serialize{
+		Error: b.Error(),
+	})
+}
+
+func newBackupError(phase BackupConnectionPhase, err error) *backupError {
+	if err == nil {
+		return nil
+	}
+
+	return &backupError{phase: phase, err: err}
+}
 
 // replicationSlotInvalidCharacters matches every character that is
 // not valid in a replication slot name
@@ -58,7 +90,7 @@ type backupConnection struct {
 	conn                 *sql.Conn
 	postgresMajorVersion uint64
 	data                 BackupResultData
-	err                  error
+	err                  *backupError
 }
 
 func newBackupConnection(
@@ -89,7 +121,10 @@ func newBackupConnection(
 		waitForArchive:       waitForArchive,
 		conn:                 conn,
 		postgresMajorVersion: vers.Major,
-		data:                 BackupResultData{BackupName: backupName},
+		data: BackupResultData{
+			BackupName: backupName,
+			Phase:      Starting,
+		},
 	}, nil
 }
 
@@ -99,27 +134,30 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 	if bc == nil {
 		return
 	}
-	bc.data.Phase = Starting
 
 	defer func() {
 		if bc.err == nil {
 			return
 		}
+		bc.data.Phase = Failed
 
 		contextLogger.Error(bc.err, "encountered error while starting backup")
 
 		if err := bc.conn.Close(); err != nil {
-			contextLogger.Error(err, "while closing backup connection")
+			if !errors.Is(err, sql.ErrConnDone) {
+				contextLogger.Error(err, "while closing backup connection")
+			}
 		}
 	}()
 
 	// TODO: refactor with the same logic of GetSlotNameFromInstanceName in the api package
 	slotName := replicationSlotInvalidCharacters.ReplaceAllString(bc.data.BackupName, "_")
-	if _, bc.err = bc.conn.ExecContext(
+	if _, err := bc.conn.ExecContext(
 		ctx,
 		"SELECT pg_create_physical_replication_slot(slot_name => $1, immediately_reserve => true, temporary => true)",
 		slotName,
-	); bc.err != nil {
+	); err != nil {
+		bc.err = newBackupError(bc.data.Phase, bc.err)
 		return
 	}
 
@@ -132,7 +170,9 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 			bc.immediateCheckpoint)
 	}
 
-	bc.err = row.Scan(&bc.data.BeginLSN)
+	if err := row.Scan(&bc.data.BeginLSN); err != nil {
+		bc.err = newBackupError(bc.data.Phase, err)
+	}
 	bc.data.Phase = Started
 }
 
@@ -145,14 +185,19 @@ func (bc *backupConnection) stopBackup(ctx context.Context) {
 
 	defer func() {
 		if err := bc.conn.Close(); err != nil {
-			contextLogger.Error(err, "while closing backup connection")
+			if !errors.Is(err, sql.ErrConnDone) {
+				contextLogger.Error(err, "while closing backup connection")
+			}
+		}
+
+		if bc.err != nil {
+			bc.data.Phase = Failed
 		}
 	}()
 
 	if bc.err != nil {
 		return
 	}
-	bc.data.Phase = Closing
 
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
@@ -163,9 +208,11 @@ func (bc *backupConnection) stopBackup(ctx context.Context) {
 			"SELECT lsn, labelfile, spcmapfile FROM pg_backup_stop(wait_for_archive => $1);", bc.waitForArchive)
 	}
 
-	bc.err = row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile)
-	if bc.err != nil {
-		contextLogger.Error(bc.err, "while stopping PostgreSQL physical backup")
+	if err := row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile); err != nil {
+		bc.err = newBackupError(bc.data.Phase, err)
+		contextLogger.Error(err, "while stopping PostgreSQL physical backup")
+		return
 	}
+
 	bc.data.Phase = Completed
 }
