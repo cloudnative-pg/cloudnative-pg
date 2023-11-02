@@ -17,6 +17,8 @@ limitations under the License.
 package controllers
 
 import (
+	"encoding/json"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -571,6 +573,44 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			rollout := isPodNeedingRollout(ctx, status, cluster)
 			Expect(rollout.reason).To(BeEmpty())
 			Expect(rollout.required).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("hasValidPodSpec", func() {
+	var status postgres.PostgresqlStatus
+
+	BeforeEach(func() {
+		status = postgres.PostgresqlStatus{
+			Pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			},
+		}
+	})
+
+	Context("when the PodSpecAnnotation is absent", func() {
+		It("should return false", func() {
+			Expect(hasValidPodSpec(status)).To(BeFalse())
+		})
+	})
+
+	Context("when the PodSpecAnnotation is present", func() {
+		Context("and the PodSpecAnnotation is valid", func() {
+			It("should return true", func() {
+				podSpec := &corev1.PodSpec{}
+				podSpecBytes, _ := json.Marshal(podSpec)
+				status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName] = string(podSpecBytes)
+				Expect(hasValidPodSpec(status)).To(BeTrue())
+			})
+		})
+
+		Context("and the PodSpecAnnotation is invalid", func() {
+			It("should return false", func() {
+				status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName] = "invalid JSON"
+				Expect(hasValidPodSpec(status)).To(BeFalse())
+			})
 		})
 	})
 })
