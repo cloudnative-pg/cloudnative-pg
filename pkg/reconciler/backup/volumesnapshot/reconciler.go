@@ -659,6 +659,13 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 
 	info := parseVolumeSnapshotInfo(snapshot)
 	if info.error != nil {
+		if info.error.isRetryable() {
+			contextLogger.Error(info.error,
+				"Retryable snapshot provisioning error, trying again",
+				"volumeSnapshotName", snapshot.Name)
+			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+
 		return nil, info.error
 	}
 	if !info.provisioned {
@@ -695,6 +702,13 @@ func (se *Reconciler) waitSnapshotToBeReady(
 
 	info := parseVolumeSnapshotInfo(snapshot)
 	if info.error != nil {
+		if info.error.isRetryable() {
+			contextLogger.Error(info.error,
+				"Retryable snapshot provisioning error, trying again",
+				"volumeSnapshotName", snapshot.Name)
+			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+
 		return nil, info.error
 	}
 	if !info.ready {
