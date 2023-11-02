@@ -18,7 +18,9 @@ package webserver
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -204,6 +206,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 	}
 }
 
+// nolint: gocognit
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
 	log.Trace("request method", "method", req.Method)
 
@@ -236,7 +239,12 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				sendBadRequestJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
 				return
 			}
-			ws.currentBackup.stopBackup(req.Context())
+			ws.currentBackup.data.Phase = Failed
+			if err := ws.currentBackup.conn.Close(); err != nil {
+				if !errors.Is(err, sql.ErrConnDone) {
+					log.Error(err, "Error while closing backup connection (start)")
+				}
+			}
 		}
 		ws.currentBackup, err = newBackupConnection(
 			req.Context(),
@@ -258,12 +266,30 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
+		if ws.currentBackup.data.Phase == Closing {
+			sendDataJSONResponse(w, 200, struct{}{})
+			return
+		}
+
 		if ws.currentBackup.data.Phase != Started {
 			sendBadRequestJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED",
 				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
 			return
 		}
 
+		if ws.currentBackup.err != nil {
+			if err := ws.currentBackup.conn.Close(); err != nil {
+				if !errors.Is(err, sql.ErrConnDone) {
+					log.Error(err, "Error while closing backup connection (stop)")
+				}
+			}
+
+			ws.currentBackup.data.Phase = Failed
+			sendDataJSONResponse(w, 200, struct{}{})
+			return
+		}
+
+		ws.currentBackup.data.Phase = Closing
 		go ws.currentBackup.stopBackup(context.Background())
 		sendDataJSONResponse(w, 200, struct{}{})
 	}
