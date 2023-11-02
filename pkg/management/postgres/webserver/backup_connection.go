@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -138,11 +139,14 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 		if bc.err == nil {
 			return
 		}
+		bc.data.Phase = Failed
 
 		contextLogger.Error(bc.err, "encountered error while starting backup")
 
 		if err := bc.conn.Close(); err != nil {
-			contextLogger.Error(err, "while closing backup connection")
+			if !errors.Is(err, sql.ErrConnDone) {
+				contextLogger.Error(err, "while closing backup connection")
+			}
 		}
 	}()
 
@@ -181,7 +185,9 @@ func (bc *backupConnection) stopBackup(ctx context.Context) {
 
 	defer func() {
 		if err := bc.conn.Close(); err != nil {
-			contextLogger.Error(err, "while closing backup connection")
+			if !errors.Is(err, sql.ErrConnDone) {
+				contextLogger.Error(err, "while closing backup connection")
+			}
 		}
 
 		if bc.err != nil {

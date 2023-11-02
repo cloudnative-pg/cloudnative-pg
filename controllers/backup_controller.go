@@ -578,7 +578,7 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 			builder.WithPredicates(volumeSnapshotsPredicate),
 		)
 	}
-	controllerBuilder = controllerBuilder.WithOptions(controller.Options{MaxConcurrentReconciles: 5})
+	controllerBuilder = controllerBuilder.WithOptions(controller.Options{MaxConcurrentReconciles: 1})
 	return controllerBuilder.Complete(r)
 }
 

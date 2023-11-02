@@ -18,7 +18,9 @@ package webserver
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -236,7 +238,13 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				sendBadRequestJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
 				return
 			}
-			ws.currentBackup.stopBackup(req.Context())
+			ws.currentBackup.data.Phase = Failed
+			if err := ws.currentBackup.conn.Close(); err != nil {
+				if !errors.Is(err, sql.ErrConnDone) {
+					log.Error(err, "Error while closing backup connection (start)")
+				}
+
+			}
 		}
 		ws.currentBackup, err = newBackupConnection(
 			req.Context(),
@@ -271,7 +279,9 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 
 		if ws.currentBackup.err != nil {
 			if err := ws.currentBackup.conn.Close(); err != nil {
-				log.Error(err, "Error while closing backup connection")
+				if !errors.Is(err, sql.ErrConnDone) {
+					log.Error(err, "Error while closing backup connection (stop)")
+				}
 			}
 
 			ws.currentBackup.data.Phase = Failed
