@@ -78,9 +78,17 @@ func (err volumeSnapshotError) isRetryable() bool {
 	// We're trying to handle the cases where the external-snapshotter
 	// controller failed on a conflict with the following error:
 	//
-	// the object has been modified; please apply your changes to the latest version and try again
+	// > the object has been modified; please apply your changes to the
+	// > latest version and try again
 
-	return strings.Contains(*err.InternalError.Message, "try again")
+	// TODO: instead of blindingly retry on matching errors, we
+	// should enhance our CRD with a configurable deadline. After
+	// the deadline have been met on err.InternalError.CreatedAt
+	// the backup can be marked as failed
+
+	return strings.Contains(
+		*err.InternalError.Message,
+		"the object has been modified")
 }
 
 // slice represents a slice of []storagesnapshotv1.VolumeSnapshot
