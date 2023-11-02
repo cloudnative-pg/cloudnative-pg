@@ -140,6 +140,7 @@ GoogleCredentials
 Grafana
 HH
 Hai
+HashiCorp
 HistoryTags
 Huß
 IAM
