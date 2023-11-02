@@ -166,7 +166,9 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 			bc.immediateCheckpoint)
 	}
 
-	bc.err = newBackupError(bc.data.Phase, row.Scan(&bc.data.BeginLSN))
+	if err := row.Scan(&bc.data.BeginLSN); err != nil {
+		bc.err = newBackupError(bc.data.Phase, err)
+	}
 	bc.data.Phase = Started
 }
 
@@ -180,6 +182,10 @@ func (bc *backupConnection) stopBackup(ctx context.Context) {
 	defer func() {
 		if err := bc.conn.Close(); err != nil {
 			contextLogger.Error(err, "while closing backup connection")
+		}
+
+		if bc.err != nil {
+			bc.data.Phase = Failed
 		}
 	}()
 
@@ -196,9 +202,11 @@ func (bc *backupConnection) stopBackup(ctx context.Context) {
 			"SELECT lsn, labelfile, spcmapfile FROM pg_backup_stop(wait_for_archive => $1);", bc.waitForArchive)
 	}
 
-	bc.err = newBackupError(bc.data.Phase, row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile))
-	if bc.err != nil {
-		contextLogger.Error(bc.err, "while stopping PostgreSQL physical backup")
+	if err := row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile); err != nil {
+		bc.err = newBackupError(bc.data.Phase, err)
+		contextLogger.Error(err, "while stopping PostgreSQL physical backup")
+		return
 	}
+
 	bc.data.Phase = Completed
 }
