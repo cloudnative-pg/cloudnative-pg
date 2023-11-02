@@ -206,6 +206,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 	}
 }
 
+// nolint: gocognit
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
 	log.Trace("request method", "method", req.Method)
 
@@ -243,7 +244,6 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				if !errors.Is(err, sql.ErrConnDone) {
 					log.Error(err, "Error while closing backup connection (start)")
 				}
-
 			}
 		}
 		ws.currentBackup, err = newBackupConnection(
