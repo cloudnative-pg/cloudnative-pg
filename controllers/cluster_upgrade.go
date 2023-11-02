@@ -279,8 +279,8 @@ func isPodNeedingRollout(
 
 	// If the pod has a stored PodSpec annotation, that's the final check.
 	// If not, we should perform additional checks
-	_, hasStoredPodSpec := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
-	if hasStoredPodSpec {
+	podSpecValid := hasValidPodSpec(status)
+	if podSpecValid {
 		return applyCheckers(map[string]rolloutChecker{
 			"PodSpec is outdated": checkPodSpecIsOutdated,
 		})
@@ -299,6 +299,17 @@ func isPodNeedingRollout(
 	}
 
 	return rollout{}
+}
+
+// check if the pod has valid podSpec
+func hasValidPodSpec(status postgres.PostgresqlStatus) bool {
+	podSpecAnnotation, hasStoredPodSpec := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
+	if !hasStoredPodSpec {
+		return false
+	}
+	var storedPodSpec corev1.PodSpec
+	err := json.Unmarshal([]byte(podSpecAnnotation), &storedPodSpec)
+	return err == nil
 }
 
 func checkHasExecutableHash(
