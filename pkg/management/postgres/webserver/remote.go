@@ -249,6 +249,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendBadRequestJSONResponse(w, "INITIALIZING_CONNECTION", err.Error())
 			return
 		}
+		ws.currentBackup.data.Phase = Starting
 		go ws.currentBackup.startBackup(context.Background())
 		sendDataJSONResponse(w, 200, struct{}{})
 
@@ -264,6 +265,9 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
+		if ws.currentBackup.err == nil {
+			ws.currentBackup.data.Phase = Closing
+		}
 		go ws.currentBackup.stopBackup(context.Background())
 		sendDataJSONResponse(w, 200, struct{}{})
 	}
