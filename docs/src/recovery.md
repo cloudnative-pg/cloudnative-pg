@@ -114,7 +114,7 @@ spec:
     the volume snapshot, the operator might end up using `pg_basebackup`
     to synchronize them, resulting in a slower process depending on the size
     of the database. This limitation will be lifted in the future when support
-    for online backups will be introduced.
+    for online backups and PVC cloning will be introduced.
 
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
 existing `Cluster` that's been taken using the declarative API for
