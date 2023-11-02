@@ -106,7 +106,18 @@ func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 		return nil, fmt.Errorf("cannot create connection connectionMap: %w", err)
 	}
 
-	db.SetMaxOpenConns(2)
+	// This is the list of long-running processes of the instance manager
+	// that need a PostgreSQL connection:
+	//
+	// * Declarative Role Management
+	// * Probes
+	// * Replication slots reconciler
+	// * Online VolumeSnapshot backup connection
+	//
+	// The latter will use an exclusive connection, that is required
+	// for the PostgreSQL Physical backup APIs
+
+	db.SetMaxOpenConns(3)
 	db.SetMaxIdleConns(0)
 
 	return db, nil
