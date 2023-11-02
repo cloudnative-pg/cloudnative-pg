@@ -89,7 +89,10 @@ func newBackupConnection(
 		waitForArchive:       waitForArchive,
 		conn:                 conn,
 		postgresMajorVersion: vers.Major,
-		data:                 BackupResultData{BackupName: backupName},
+		data: BackupResultData{
+			BackupName: backupName,
+			Phase:      Starting,
+		},
 	}, nil
 }
 
@@ -99,7 +102,6 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 	if bc == nil {
 		return
 	}
-	bc.data.Phase = Starting
 
 	defer func() {
 		if bc.err == nil {
@@ -152,7 +154,6 @@ func (bc *backupConnection) stopBackup(ctx context.Context) {
 	if bc.err != nil {
 		return
 	}
-	bc.data.Phase = Closing
 
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
