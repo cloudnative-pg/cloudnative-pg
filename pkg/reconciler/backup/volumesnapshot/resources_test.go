@@ -61,6 +61,35 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		Expect(err.InternalError).To(BeEquivalentTo(*volumeSnapshot.Status.Error))
 		Expect(err.Name).To(BeEquivalentTo("snapshot"))
 		Expect(err.Namespace).To(BeEquivalentTo("default"))
+		Expect(err.isRetryable()).To(BeFalse())
+	})
+
+	It("should detect retryable errors", func() {
+		volumeSnapshot := &storagesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "snapshot",
+				Namespace: "default",
+			},
+			Status: &storagesnapshotv1.VolumeSnapshotStatus{
+				Error: &storagesnapshotv1.VolumeSnapshotError{
+					Time: ptr.To(metav1.Now()),
+					Message: ptr.To(
+						"the object has been modified; please apply your changes to the latest version and try again"),
+				},
+			},
+		}
+		info := parseVolumeSnapshotInfo(volumeSnapshot)
+
+		Expect(info.error).To(HaveOccurred())
+		Expect(info.error.isRetryable()).To(BeTrue())
+		Expect(info.ready).To(BeFalse())
+		Expect(info.provisioned).To(BeFalse())
+
+		var err *volumeSnapshotError
+		Expect(errors.As(info.error, &err)).To(BeTrue())
+		Expect(err.InternalError).To(BeEquivalentTo(*volumeSnapshot.Status.Error))
+		Expect(err.Name).To(BeEquivalentTo("snapshot"))
+		Expect(err.Namespace).To(BeEquivalentTo("default"))
 	})
 
 	When("BoundVolumeSnapshotContentName is nil", func() {
