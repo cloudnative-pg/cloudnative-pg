@@ -161,7 +161,8 @@ never expires, mirroring the behavior of PostgreSQL. Specifically:
 
 ### Password hashed
 
-You can also provide pre-encrypted passwords by specifiy the password in MD5/SCRAM-SHA-256 hash format:
+You can also provide pre-encrypted passwords by specifying the password
+in MD5/SCRAM-SHA-256 hash format:
 
 ``` yaml
 kind: Secret
