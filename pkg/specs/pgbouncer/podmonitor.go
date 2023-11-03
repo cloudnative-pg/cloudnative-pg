@@ -57,7 +57,9 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		},
 		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
 			{
-				Port: "metrics",
+				Port:                 "metrics",
+				MetricRelabelConfigs: c.pooler.Spec.Monitoring.PodMonitorMetricRelabelConfigs,
+				RelabelConfigs:       c.pooler.Spec.Monitoring.PodMonitorRelabelConfigs,
 			},
 		},
 	}
