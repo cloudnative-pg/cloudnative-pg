@@ -7,12 +7,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.3.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.4.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.3.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.4.yaml
 ```
 
 You can verify that with:
@@ -63,7 +63,7 @@ For example, you can install the latest snapshot of the operator with:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.20/manifests/operator-manifest.yaml | \
   kubectl apply -f -
 ```
 
