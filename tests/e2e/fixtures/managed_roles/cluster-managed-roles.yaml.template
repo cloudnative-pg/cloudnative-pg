@@ -44,6 +44,10 @@ spec:
     - name: app
       createdb: true
       login: true
+    - name: cavalcanti
+      login: true
+      passwordSecret:
+        name: cluster-example-cavalcanti
 
 ---
 apiVersion: v1
@@ -53,6 +57,18 @@ data:
 kind: Secret
 metadata:
   name: cluster-example-dante
+  labels:
+    cnpg.io/reload: "true"
+type: kubernetes.io/basic-auth
+
+---
+apiVersion: v1
+data:
+  username: Y2F2YWxjYW50aQo=
+  password: U0NSQU0tU0hBLTI1NiQ0MDk2OlkyRjJZV3hqWVc1MGFRPT0kZUNJeW8yUUVadndsY01UaG0xendRRFBudzBqT0hsQ2FwQ0UrUUZwSHNHcz06WUtoU0VjZDRRaVgzU0J6bXRUT0hIQS85eWFUQkdKV0FNTXc3KzkyT3lITT0K
+kind: Secret
+metadata:
+  name: cluster-example-cavalcanti
   labels:
     cnpg.io/reload: "true"
 type: kubernetes.io/basic-auth
