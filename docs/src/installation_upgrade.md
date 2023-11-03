@@ -63,7 +63,7 @@ For example, you can install the latest snapshot of the operator with:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.21/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
   kubectl apply -f -
 ```
 
