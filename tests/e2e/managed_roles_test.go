@@ -55,13 +55,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
-			namespacePrefix       = "managed-roles"
-			username              = "dante"
-			appUsername           = "app"
-			password              = "dante"
-			newUserName           = "new_role"
-			unrealizableUser      = "petrarca"
-			userWithPerpetualPass = "boccaccio"
+			namespacePrefix        = "managed-roles"
+			username               = "dante"
+			appUsername            = "app"
+			password               = "dante"
+			newUserName            = "new_role"
+			unrealizableUser       = "petrarca"
+			userWithPerpetualPass  = "boccaccio"
+			userWithHashedPassword = "cavalcanti"
 		)
 		var clusterName, secretName, namespace string
 		var secretNameSpacedName *types.NamespacedName
@@ -155,6 +156,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 				assertUserExists(namespace, primaryPodInfo.Name, username, true)
 				assertUserExists(namespace, primaryPodInfo.Name, userWithPerpetualPass, true)
+				assertUserExists(namespace, primaryPodInfo.Name, userWithHashedPassword, true)
 				assertUserExists(namespace, primaryPodInfo.Name, unrealizableUser, false)
 
 				query := fmt.Sprintf("SELECT true FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
@@ -180,6 +182,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 				// assert connectable use username and password defined in secrets
 				AssertConnection(rwService, username, "postgres", password, *psqlClientPod, 30, env)
+
+				AssertConnection(rwService, userWithHashedPassword, "postgres", userWithHashedPassword, *psqlClientPod, 30, env)
 			})
 
 			By("ensuring the app role has been granted createdb in the managed stanza", func() {

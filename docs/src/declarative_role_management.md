@@ -159,6 +159,24 @@ never expires, mirroring the behavior of PostgreSQL. Specifically:
     had been previously created. In 1.20.0, doing this might inadvertently
     result in setting existing passwords to `NULL`.
 
+### Password hashed
+
+You can also provide pre-encrypted passwords by specifying the password
+in MD5/SCRAM-SHA-256 hash format:
+
+``` yaml
+kind: Secret
+type: kubernetes.io/basic-auth
+metadata:
+  name: cluster-example-cavalcanti
+  labels:
+    cnpg.io/reload: "true"
+apiVersion: v1
+stringData:
+  username: cavalcanti
+  password: SCRAM-SHA-256$<iteration count>:<salt>$<StoredKey>:<ServerKey>
+```
+
 ## Unrealizable role configurations
 
 In PostgreSQL, in some cases, commands cannot be honored by the database and
