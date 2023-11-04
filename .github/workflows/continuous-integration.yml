@@ -503,6 +503,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build
+        uses: docker/build-push-action@v5
+        with:
+          platforms: "linux/amd64"
+          context: .
+          push: false
+          load: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
+          tags: ${{ steps.docker-meta.outputs.tags }}
+
+      - name: Dockle scan
+        uses: erzz/dockle-action@v1
+        with:
+          image: ${{ steps.docker-meta.outputs.tags }}
+          exit-code: '1'
+          failure-threshold: WARN
+          accept-keywords: key
+
+      - name: Run Snyk to check Docker image for vulnerabilities
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ steps.docker-meta.outputs.tags }}
+          args: --severity-threshold=high --file=${{ matrix.file }}
+
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: snyk.sarif
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
