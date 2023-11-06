@@ -34,7 +34,7 @@ spec:
   backup:
     target: primary
     barmanObjectStore:
-      destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/pg-backup-azure-blob/
+      destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/${AZURE_BLOB_CONTAINER}/
       azureCredentials:
         storageAccount:
           name: backup-storage-creds
