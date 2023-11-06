@@ -125,7 +125,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic),
 			}
 		})
 
-		clusterManifest := fixturesDir + "/base/cluster-basic.yaml"
+		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			clusterSetup(clusterManifest)
 		})
