@@ -83,6 +83,7 @@ type TestingEnvironment struct {
 	Log                logr.Logger
 	PostgresVersion    int
 	createdNamespaces  *uniqueStringSlice
+	AzureConfiguration AzureConfiguration
 }
 
 type uniqueStringSlice struct {
@@ -163,6 +164,8 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not detect SeccompProfile support: %w", err)
 	}
+
+	env.AzureConfiguration = newAzureConfigurationFromEnv()
 
 	return &env, nil
 }
