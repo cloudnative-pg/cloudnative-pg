@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"os"
+
 	apiv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +34,21 @@ const (
 	azuriteImage       = "mcr.microsoft.com/azure-storage/azurite"
 	azuriteClientImage = "mcr.microsoft.com/azure-cli"
 )
+
+// AzureConfiguration contains the variables needed to run the azure test environment correctly
+type AzureConfiguration struct {
+	StorageAccount string
+	StorageKey     string
+	BlobContainer  string
+}
+
+func newAzureConfigurationFromEnv() AzureConfiguration {
+	return AzureConfiguration{
+		StorageAccount: os.Getenv("AZURE_STORAGE_ACCOUNT"),
+		StorageKey:     os.Getenv("AZURE_STORAGE_KEY"),
+		BlobContainer:  os.Getenv("AZURE_BLOB_CONTAINER"),
+	}
+}
 
 // CreateCertificateSecretsOnAzurite will create secrets for Azurite deployment
 func CreateCertificateSecretsOnAzurite(

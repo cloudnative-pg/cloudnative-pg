@@ -426,9 +426,7 @@ func ComposeAzBlobListAzuriteCmd(clusterName, path string) string {
 
 // ComposeAzBlobListCmd builds the Azure storage blob list command
 func ComposeAzBlobListCmd(
-	azStorageAccount,
-	azStorageKey,
-	azBlobContainer,
+	configuration AzureConfiguration,
 	clusterName,
 	path string,
 ) string {
@@ -437,18 +435,16 @@ func ComposeAzBlobListCmd(
 		"--container-name %v  "+
 		"--prefix %v/  "+
 		"--query \"[?contains(@.name, \\`%v\\`)].name\"",
-		azStorageAccount, azStorageKey, azBlobContainer, clusterName, path)
+		configuration.StorageAccount, configuration.StorageKey, configuration.BlobContainer, clusterName, path)
 }
 
 // CountFilesOnAzureBlobStorage counts files on Azure Blob storage
 func CountFilesOnAzureBlobStorage(
-	azStorageAccount,
-	azStorageKey,
-	azBlobContainer,
+	configuration AzureConfiguration,
 	clusterName,
 	path string,
 ) (int, error) {
-	azBlobListCmd := ComposeAzBlobListCmd(azStorageAccount, azStorageKey, azBlobContainer, clusterName, path)
+	azBlobListCmd := ComposeAzBlobListCmd(configuration, clusterName, path)
 	out, _, err := RunUnchecked(azBlobListCmd)
 	if err != nil {
 		return -1, err
