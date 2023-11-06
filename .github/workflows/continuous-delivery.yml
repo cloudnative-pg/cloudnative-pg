@@ -702,7 +702,6 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       azure_storage_account: ${{ steps.setup.outputs.azure_storage_account }}
-      azure_storage_key: ${{ steps.setup.outputs.azure_storage_key }}
     steps:
       -
         name: Azure Login
@@ -726,10 +725,8 @@ jobs:
               --name ${AZURE_STORAGE_ACCOUNT} \
               --sku Standard_LRS -o none
 
-            # get Storage Account credentials
+            # Output storage account name
             echo "azure_storage_account=${AZURE_STORAGE_ACCOUNT}" >> $GITHUB_OUTPUT
-            AZURE_STORAGE_KEY=$(az storage account keys list -g "${{ secrets.AZURE_RESOURCEGROUP }}" -n "${AZURE_STORAGE_ACCOUNT}" --query "[0].value" -o tsv)
-            echo "azure_storage_key=${AZURE_STORAGE_KEY}" >> $GITHUB_OUTPUT
 
   e2e-aks:
     name: Run E2E on Microsoft AKS
@@ -770,7 +767,7 @@ jobs:
       DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
-      AZURE_STORAGE_KEY: ${{ needs.e2e-aks-setup.outputs.azure_storage_key }}
+      # AZURE_STORAGE_KEY: this one is gathered during a subsequent step
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -830,6 +827,11 @@ jobs:
             # name of the AKS cluster
             AZURE_AKS="${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )"
             echo "AZURE_AKS=${AZURE_AKS}" >> $GITHUB_ENV
+
+            # gather the storage account Key
+            AZURE_STORAGE_KEY=$(az storage account keys list -g "${{ secrets.AZURE_RESOURCEGROUP }}" -n "${{ env.AZURE_STORAGE_ACCOUNT }}" --query "[0].value" -o tsv)
+            echo "::add-mask::$AZURE_STORAGE_KEY"
+            echo "AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}" >> $GITHUB_ENV
 
             # name of the cluster's blob container in the storage account
             AZURE_BLOB_CONTAINER="$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]' )"
