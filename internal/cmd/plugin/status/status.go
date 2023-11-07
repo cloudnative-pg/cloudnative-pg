@@ -115,6 +115,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printBasebackupStatus()
 	status.printReplicaStatus(verbose)
 	status.printUnmanagedReplicationSlotStatus()
+	status.printRoleManagerStatus()
 	status.printInstancesStatus()
 
 	if nonFatalError != nil {
@@ -846,6 +847,66 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 	}
 
 	status.Print()
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
+	const header = "RoleManager Status"
+
+	managedRolesStatus := fullStatus.Cluster.Status.ManagedRolesStatus
+	containsErrors := len(managedRolesStatus.CannotReconcile) > 0
+	containsWarnings := func() bool {
+		for status, elements := range managedRolesStatus.ByStatus {
+			if len(elements) == 0 || status == apiv1.RoleStatusReconciled {
+				continue
+			}
+
+			return true
+		}
+
+		return false
+	}
+
+	if len(managedRolesStatus.ByStatus) == 0 && len(managedRolesStatus.CannotReconcile) == 0 {
+		fmt.Println(aurora.Green(fmt.Sprintf("%s: no roles managed", header)))
+		return
+	}
+
+	headerColor := aurora.Green
+	if containsErrors {
+		headerColor = aurora.Red
+	} else if containsWarnings() {
+		headerColor = aurora.Yellow
+	}
+
+	fmt.Println(headerColor(header))
+
+	if containsErrors {
+		fmt.Println(aurora.Red("Irreconcilable Errors encountered:"))
+		errorStatus := tabby.New()
+		errorStatus.AddHeader("Role", "Errors")
+		for role, errors := range managedRolesStatus.CannotReconcile {
+			errorStatus.AddLine(role, strings.Join(errors, ","))
+		}
+		errorStatus.Print()
+		fmt.Println()
+	} else {
+		fmt.Println(aurora.Green("No Errors found"))
+	}
+
+	color := aurora.Green
+	if containsWarnings() {
+		color = aurora.Yellow
+	}
+	fmt.Println(color("Role Reconciliation Status:"))
+
+	roleStatus := tabby.New()
+	roleStatus.AddHeader("status", "roles")
+
+	for status, roles := range managedRolesStatus.ByStatus {
+		roleStatus.AddLine(status, strings.Join(roles, ","))
+	}
+	roleStatus.Print()
 	fmt.Println()
 }
 
