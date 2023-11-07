@@ -890,8 +890,6 @@ func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
 		}
 		errorStatus.Print()
 		fmt.Println()
-	} else {
-		fmt.Println(aurora.Green("No Errors found"))
 	}
 
 	color := aurora.Green
