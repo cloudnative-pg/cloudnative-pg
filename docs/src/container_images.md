@@ -1,4 +1,4 @@
-# Container Image Requirements
+# Container image requirements
 
 The CloudNativePG operator for Kubernetes is designed to
 work with any compatible container image of PostgreSQL that complies
@@ -18,25 +18,23 @@ with the following requirements:
     - `barman-cloud-restore`
     - `barman-cloud-wal-archive`
     - `barman-cloud-wal-restore`
-- PGAudit extension installed (optional - only if PGAudit is required
-  in the deployed clusters)
+- If PGAudit is required in the deployed clusters, PGAudit extension installed 
 - Appropriate locale settings
 
 !!! Important
-    Only [PostgreSQL versions supported by the PGDG](https://postgresql.org/) are allowed.
+    Only [PostgreSQL versions supported by the PostgreSQL Global Development Group (PGDG)](https://postgresql.org/) are allowed.
 
-No entry point and/or command is required in the image definition, as
+No entry point or command is required in the image definition, as
 CloudNativePG overrides it with its instance manager.
 
 !!! Warning
-    Application Container Images will be used by CloudNativePG
-    in a **Primary with multiple/optional Hot Standby Servers Architecture**
-    only.
+    Application container images are used by CloudNativePG
+    only in a "primary with multiple/optional hot standby servers" architecture.
 
 The CloudNativePG community provides and supports
 [public PostgreSQL container images](https://github.com/cloudnative-pg/postgres-containers)
-that work with CloudNativePG, and publishes them on
-[ghcr.io](https://ghcr.io/cloudnative-pg/postgresql).
+that work with CloudNativePG and publishes them on
+[`ghcr.io`](https://ghcr.io/cloudnative-pg/postgresql).
 
 ## Image tag requirements
 
@@ -44,11 +42,10 @@ While the image name can be anything valid for Docker, the CloudNativePG
 operator relies on the *image tag* to detect the Postgres major
 version contained in the image.
 
-The image tag must start with a valid PostgreSQL major version number (e.g.
+The image tag must start with a valid PostgreSQL major version number (for example, 
 14.5 or 15) optionally followed by a dot and the patch level.
 
-This can be followed by any character combination that is valid and
-accepted in a Docker tag, preceded by a dot, an underscore, or a minus sign.
+The version number can be followed by a dot, an underscore, or a minus sign and any character combination that's valid and accepted in a Docker tag.
 
 Examples of accepted image tags:
 
@@ -60,4 +57,4 @@ Examples of accepted image tags:
 - `15.0`
 
 !!! Warning
-    `latest` is not considered a valid tag for the image.
+    `latest` isn't a valid tag for the image.

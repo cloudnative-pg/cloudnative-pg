@@ -1,94 +1,97 @@
 # Importing Postgres databases
 
-This section describes how to import one or more existing PostgreSQL
-databases inside a brand new CloudNativePG cluster.
+You can import one or more existing PostgreSQL
+databases to a new CloudNativePG cluster.
 
-The import operation is based on the concept of online logical backups in PostgreSQL,
-and relies on `pg_dump` via a network connection to the origin host, and `pg_restore`.
-Thanks to native Multi-Version Concurrency Control (MVCC) and snapshots,
+The import operation is based on the concept of online logical backups in PostgreSQL.
+It relies on pg_dump, by way of a network connection to the origin host, and pg_restore.
+Because of native multi-version concurrency control (MVCC) and snapshots,
 PostgreSQL enables taking consistent backups over the network, in a concurrent
 manner, without stopping any write activity.
 
-Logical backups are also the most common, flexible and reliable technique to
+Logical backups are also the most common, flexible, and reliable technique to
 perform major upgrades of PostgreSQL versions.
 
-As a result, the instructions in this section are suitable for both:
+As a result, the instructions that follow are suitable for both:
 
-- importing one or more databases from an existing PostgreSQL instance, even
+- Importing one or more databases from an existing PostgreSQL instance, even
   outside Kubernetes
-- importing the database from any PostgreSQL version to one that is either the
-  same or newer, enabling *major upgrades* of PostgreSQL (e.g. from version 11.x
+- Importing the database from any PostgreSQL version to one that's either the
+  same or newer, enabling major upgrades of PostgreSQL (for example, from version 11.x
   to version 15.x)
 
 !!! Warning
-    When performing major upgrades of PostgreSQL you are responsible for making
+    When performing major upgrades of PostgreSQL, you're responsible for making
     sure that applications are compatible with the new version and that the
     upgrade path of the objects contained in the database (including extensions) is
     feasible.
 
-In both cases, the operation is performed on a consistent **snapshot** of the
+In both cases, the operation is performed on a consistent snapshot of the
 origin database.
 
 !!! Important
-    For this reason we suggest to stop write operations on the source before
-    the final import in the `Cluster` resource, as changes done to the source
-    database after the start of the backup will not be in the destination cluster -
-    hence why this feature is referred to as "offline import" or "offline major
-    upgrade".
+    Because the import is performed on a consistent snapshot of the origin database, 
+    we suggest that you stop write operations on the source before
+    the final import in the `Cluster` resource. Changes done to the source
+    database after the start of the backup won't be in the destination cluster,
+    which is why this feature is referred to as *offline import* or *offline major
+    upgrade*.
 
 ## How it works
 
-Conceptually, the import requires you to create a new cluster from scratch
-(*destination cluster*), using the [`initdb` bootstrap method](bootstrap.md),
-and then complete the `initdb.import` subsection to import objects from an
-existing Postgres cluster (*source cluster*). As per PostgreSQL recommendation,
-we suggest that the PostgreSQL major version of the *destination cluster* is
-greater or equal than the one of the *source cluster*.
+Conceptually, the import requires you to create a new cluster 
+(the *destination cluster*) from scratch, using the [`initdb` bootstrap method](bootstrap.md).
+Then you complete the `initdb.import` subsection to import objects from an
+existing Postgres cluster (the *source cluster*). As per the PostgreSQL recommendation,
+we suggest that the PostgreSQL major version of the destination cluster be
+greater than or equal to the source cluster's.
 
 CloudNativePG provides two main ways to import objects from the source cluster
-into the destination cluster:
+to the destination cluster:
 
-- **microservice approach**: the destination cluster is designed to host a
+- **Microservice approach** - The destination cluster is designed to host a
   single application database owned by the specified application user, as
-  recommended by the CloudNativePG project
+  recommended by the CloudNativePG project. This method is available by way 
+  of the `microservice` type.
 
-- **monolith approach**: the destination cluster is designed to host multiple
-  databases and different users, imported from the source cluster
-
-The first import method is available via the `microservice` type, while the
-latter by the `monolith` type.
+- **Monolith approach** - The destination cluster is designed to host multiple
+  databases and different users, imported from the source cluster. This method
+  is available by way of the `monolith` type.
 
 !!! Warning
-    It is your responsibility to ensure that the destination cluster can
+    It's your responsibility to ensure that the destination cluster can
     access the source cluster with a superuser or a user having enough
-    privileges to take a logical backup with `pg_dump`. Please refer to the
-    [PostgreSQL documentation on "SQL Dump"](https://www.postgresql.org/docs/current/app-pgdump.html)
-    for further information.
+    privileges to take a logical backup using pg_dump. See the
+    [PostgreSQL documentation on pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html)
+    for more information.
 
 ## The `microservice` type
 
 With the microservice approach, you can specify a single database you want to
-import from the source cluster into the destination cluster. The operation is
-performed in 4 steps:
+import from the source cluster to the destination cluster. The operation is
+performed in four (optionally five) steps:
 
 - `initdb` bootstrap of the new cluster
-- export of the selected database (in `initdb.import.databases`) using
+- Export of the selected database (in `initdb.import.databases`) using
   `pg_dump -Fc`
-- import of the database using `pg_restore --no-acl --no-owner` into the
+- Import of the database using `pg_restore --no-acl --no-owner` into the
   `initdb.database` (application database) owned by the `initdb.owner` user
-- cleanup of the database dump file
-- optional execution of the user defined SQL queries in the application
-  database via the `postImportApplicationSQL` parameter
-- execution of `ANALYZE VERBOSE` on the imported database
+- Cleanup of the database dump file
+- Optional execution of the user-defined SQL queries in the application
+  database by way of the `postImportApplicationSQL` parameter
+- Execution of `ANALYZE VERBOSE` on the imported database
 
 ![Example of microservice import type](./images/microservice-import.png)
 
-For example, the YAML below creates a new 3 instance PostgreSQL cluster (latest
+For example, the YAML that follows:
+
+- Creates a three-instance PostgreSQL cluster (latest
 available major version at the time the operator was released) called
-`cluster-microservice` that imports the `angus` database from the
-`cluster-pg96` cluster (with the unsupported PostgreSQL 9.6), by connecting to
-the `postgres` database using the `postgres` user, via the password stored in
-the `cluster-pg96-superuser` secret.
+`cluster-microservice`
+- Imports the `angus` database from the
+`cluster-pg96` cluster (with the unsupported PostgreSQL 9.6) by connecting to
+the `postgres` database using the postgres user 
+- Uses the password stored in the `cluster-pg96-superuser` secret to connect to the `postges` database
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -124,57 +127,57 @@ spec:
 ```
 
 !!! Warning
-    The example above deliberately uses a source database running a version of
-    PostgreSQL that is not supported anymore by the Community, and consequently by
+    The example deliberately uses a source database running a version of
+    PostgreSQL that isn't supported anymore by the community and, consequently, by
     CloudNativePG.
     Data export from the source instance is performed using the version of
-    `pg_dump` in the destination cluster, which must be a supported one, and
-    equal or greater than the source one.
-    Based on our experience, this way of exporting data should work on older
+    pg_dump in the destination cluster, which must be a supported one and
+    equal to or greater than the source one.
+    Based on our experience, this way of exporting data works on older
     and unsupported versions of Postgres too, giving you the chance to move your
     legacy data to a better system, inside Kubernetes.
-    This is the main reason why we used 9.6 in the examples of this section.
-    We'd be interested to hear from you should you experience any issues in this area.
+    This is the main reason why we used 9.6 in the examples.
+    Contact us if you experience any issues in this area.
 
-There are a few things you need to be aware of when using the `microservice` type:
+Be aware of the following when using the `microservice` type:
 
 - It requires an `externalCluster` that points to an existing PostgreSQL
-  instance containing the data to import (for more information, please refer to
-  ["The `externalClusters` section"](bootstrap.md#the-externalclusters-section))
+  instance containing the data to import. (For more information, see
+  [`externalClusters`](bootstrap.md#the-externalclusters-section).)
 - Traffic must be allowed between the Kubernetes cluster and the
-  `externalCluster` during the operation
+  `externalCluster` during the operation.
 - Connection to the source database must be granted with the specified user
-  that needs to run `pg_dump` and read roles information (*superuser* is OK)
-- Currently, the `pg_dump -Fc` result is stored temporarily inside the `dumps`
+  that needs to run pg_dump and read roles information (superuser is OK).
+- Currently, the `pg_dump -Fc` result is stored temporarily in the `dumps`
   folder in the `PGDATA` volume, so there should be enough available space to
   temporarily contain the dump result on the assigned node, as well as the
-  restored data and indexes. Once the import operation is completed, this
-  folder is automatically deleted by the operator.
-- Only one database can be specified inside the `initdb.import.databases` array
-- Roles are not imported - and as such they cannot be specified inside `initdb.import.roles`
+  restored data and indexes. Once the import operation is complete,
+  the operator deletes the folder.
+- You can specify only one database in the `initdb.import.databases` array.
+- Roles aren't imported. As such, you can't specify them in `initdb.import.roles`.
 
 ## The `monolith` type
 
 With the monolith approach, you can specify a set of roles and databases you
-want to import from the source cluster into the destination cluster.
+want to import from the source cluster to the destination cluster.
 The operation is performed in the following steps:
 
 - `initdb` bootstrap of the new cluster
-- export and import of the selected roles
-- export of the selected databases (in `initdb.import.databases`), one at a time,
+- Export and import of the selected roles
+- Export of the selected databases (in `initdb.import.databases`), one at a time,
   using `pg_dump -Fc`
-- create each of the selected databases and import data using `pg_restore`
-- run `ANALYZE` on each imported database
-- cleanup of the database dump files
+- Creation of each of the selected databases and importing of data using `pg_restore`
+- Running `ANALYZE` on each imported database
+- Cleanup of the database dump files
 
 ![Example of monolith import type](./images/monolith-import.png)
 
-For example, the YAML below creates a new 3 instance PostgreSQL cluster (latest
+For example, the following YAML creates a new three-instance PostgreSQL cluster (latest
 available major version at the time the operator was released) called
-`cluster-monolith` that imports the `accountant` and the `bank_user` roles,
+`cluster-monolith`. It imports the accountant and the bank_user roles
 as well as the `accounting`, `banking`, `resort` databases from the
-`cluster-pg96` cluster (with the unsupported PostgreSQL 9.6), by connecting to
-the `postgres` database using the `postgres` user, via the password stored in
+`cluster-pg96` cluster (with the unsupported PostgreSQL 9.6) by connecting to
+the `postgres` database using the postgres user. It uses the password stored in
 the `cluster-pg96-superuser` secret.
 
 ```yaml
@@ -212,31 +215,31 @@ spec:
         key: password
 ```
 
-There are a few things you need to be aware of when using the `monolith` type:
+Be aware of the following when using the `monolith` type:
 
 - It requires an `externalCluster` that points to an existing PostgreSQL
-  instance containing the data to import (for more information, please refer to
-  ["The `externalClusters` section"](bootstrap.md#the-externalclusters-section))
+  instance containing the data to import. (For more information, see
+  [`externalClusters`](bootstrap.md#the-externalclusters-section).)
 - Traffic must be allowed between the Kubernetes cluster and the
-  `externalCluster` during the operation
+  `externalCluster` during the operation.
 - Connection to the source database must be granted with the specified user
-  that needs to run `pg_dump` and retrieve roles information (*superuser* is
-  OK)
-- Currently, the `pg_dump -Fc` result is stored temporarily inside the `dumps`
+  that needs to run pg_dump and retrieve roles information (superuser is
+  OK).
+- Currently, the `pg_dump -Fc` result is stored temporarily in the `dumps`
   folder in the `PGDATA` volume, so there should be enough available space to
-  temporarily contain the dump result on the assigned node, as well as the
-  restored data and indexes. Once the import operation is completed, this
-  folder is automatically deleted by the operator.
-- At least one database to be specified in the `initdb.import.databases` array
-- Any role that is required by the imported databases must be specified inside
-  `initdb.import.roles`, with the limitations below:
-    - The following roles, if present, are not imported:
-      `postgres`, `streaming_replica`, `cnp_pooler_pgbouncer`
-    - The `SUPERUSER` option is removed from any imported role
-- Wildcard `"*"` can be used as the only element in the `databases` and/or
-  `roles` arrays to import every object of the kind; When matching databases
-  the wildcard will ignore the `postgres` database, template databases,
-  and those databases not allowing connections
+  temporarily contain the dump result on the assigned node as well as the
+  restored data and indexes. Once the import operation is complete, the
+  operator deletes the folder.
+- At least one database must be specified in the `initdb.import.databases` array.
+- Any role that's required by the imported databases must be specified in
+  `initdb.import.roles`, with these limitations:
+    - The following roles, if present, aren't imported:
+      postgres, streaming_replica, cnp_pooler_pgbouncer.
+    - The `SUPERUSER` option is removed from any imported role.
+- Wildcard `"*"` can be used as the only element in the `databases` or
+  `roles` arrays to import every object of the kind. When matching databases,
+  the wildcard ignores the `postgres` database, template databases,
+  and those databases not allowing connections.
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
-- `postImportApplicationSQL` field is not supported
+- `postImportApplicationSQL` field isn't supported.
