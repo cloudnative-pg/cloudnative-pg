@@ -44,7 +44,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -175,7 +174,6 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 		if err != nil {
 			return err
 		}
-
 		postgresSecret := specs.CreateSecret(
 			cluster.GetSuperuserSecretName(),
 			cluster.Namespace,
@@ -185,11 +183,7 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			postgresPassword)
 		cluster.SetInheritedDataAndOwnership(&postgresSecret.ObjectMeta)
 
-		if err := resources.CreateIfNotFound(ctx, r.Client, postgresSecret); err != nil {
-			if !apierrs.IsAlreadyExists(err) {
-				return err
-			}
-		}
+		return createOrPatchClusterCredentialSecret(ctx, r.Client, postgresSecret)
 	}
 
 	// If we don't have Superuser enabled we make sure the automatically generated secret doesn't exist
@@ -229,13 +223,49 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 			appPassword)
 
 		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta)
-		if err := resources.CreateIfNotFound(ctx, r.Client, appSecret); err != nil {
-			if !apierrs.IsAlreadyExists(err) {
-				return err
-			}
-		}
+		return createOrPatchClusterCredentialSecret(ctx, r.Client, appSecret)
 	}
 	return nil
+}
+
+func createOrPatchClusterCredentialSecret(
+	ctx context.Context,
+	cli client.Client,
+	proposed *corev1.Secret,
+) error {
+	var currentSecret corev1.Secret
+	if err := cli.Get(
+		ctx,
+		client.ObjectKey{Namespace: proposed.Namespace, Name: proposed.Name},
+		&currentSecret); apierrs.IsNotFound(err) {
+		return cli.Create(ctx, proposed)
+	} else if err != nil {
+		return err
+	}
+
+	// we can patch only secrets that are owned by us
+	if _, owned := IsOwnedByCluster(&currentSecret); !owned {
+		return nil
+	}
+
+	patchedSecret := currentSecret.DeepCopy()
+	if patchedSecret.Annotations == nil {
+		patchedSecret.Annotations = map[string]string{}
+	}
+	if patchedSecret.Labels == nil {
+		patchedSecret.Labels = map[string]string{}
+	}
+
+	utils.MergeMap(patchedSecret.Annotations, proposed.Annotations)
+	utils.MergeMap(patchedSecret.Labels, proposed.Labels)
+
+	// we cannot compare the data due to the password being randomly generated everytime
+	if reflect.DeepEqual(patchedSecret.Labels, currentSecret.Labels) &&
+		reflect.DeepEqual(patchedSecret.Annotations, currentSecret.Annotations) {
+		return nil
+	}
+
+	return cli.Patch(ctx, patchedSecret, client.MergeFrom(&currentSecret))
 }
 
 func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
