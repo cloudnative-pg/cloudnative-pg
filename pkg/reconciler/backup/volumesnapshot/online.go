@@ -102,12 +102,13 @@ func (o *onlineExecutor) prepare(
 		if _, err := o.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	case status.Phase == webserver.Starting:
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	case status.Phase == webserver.Started:
 		return nil, nil
+	default:
+		return nil, fmt.Errorf("found the instance is an unexpected phase while preparing the snapshot: %s",
+			status.Phase)
 	}
-
-	return nil, fmt.Errorf("found the instance is an unexpected phase while preparing the snapshot: %s",
-		status.Phase)
 }
