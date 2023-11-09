@@ -53,8 +53,8 @@ type ExecutorBuilder struct {
 	executor Reconciler
 }
 
-// NewExecutorBuilder instantiates a new ExecutorBuilder with the minimum required data
-func NewExecutorBuilder(
+// NewReconcilerBuilder instantiates a new ExecutorBuilder with the minimum required data
+func NewReconcilerBuilder(
 	cli client.Client,
 	recorder record.EventRecorder,
 ) *ExecutorBuilder {

@@ -143,7 +143,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
 			Build()
 
 		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
@@ -199,7 +199,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
 			Build()
 
 		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
@@ -269,7 +269,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
 			Build()
 
 		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
@@ -345,7 +345,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
 			Build()
 
 		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)

@@ -373,11 +373,11 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return nil, fmt.Errorf("cannot get PVCs: %w", err)
 	}
 
-	executor := volumesnapshot.
-		NewExecutorBuilder(r.Client, r.Recorder).
+	reconciler := volumesnapshot.
+		NewReconcilerBuilder(r.Client, r.Recorder).
 		Build()
 
-	res, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
+	res, err := reconciler.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 	if isErrorRetryable(err) {
 		contextLogger.Error(err, "detected retryable error while executing snapshot backup, retrying...")
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
