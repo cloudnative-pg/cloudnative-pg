@@ -377,7 +377,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		NewExecutorBuilder(r.Client, r.Recorder).
 		Build()
 
-	res, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
+	res, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 	if isErrorRetryable(err) {
 		contextLogger.Error(err, "detected retryable error while executing snapshot backup, retrying...")
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -393,7 +393,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 
 		r.Recorder.Eventf(backup, "Warning", "Error", "snapshot backup failed: %v", err)
 		tryFlagBackupAsFailed(ctx, r.Client, backup, fmt.Errorf("can't execute snapshot backup: %w", err))
-		return nil, executor.EnsurePodIsUnfenced(ctx, cluster, backup, targetPod)
+		return nil, volumesnapshot.EnsurePodIsUnfenced(ctx, r.Client, r.Recorder, cluster, backup, targetPod)
 	}
 
 	if res != nil {

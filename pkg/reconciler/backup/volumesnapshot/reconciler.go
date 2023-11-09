@@ -28,17 +28,14 @@ import (
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
-	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -49,7 +46,6 @@ type Reconciler struct {
 	cli                  client.Client
 	recorder             record.EventRecorder
 	instanceStatusClient *instance.StatusClient
-	backupClient         *webserver.BackupClient
 }
 
 // ExecutorBuilder is a struct capable of creating a Reconciler
@@ -67,7 +63,6 @@ func NewExecutorBuilder(
 			cli:                  cli,
 			recorder:             recorder,
 			instanceStatusClient: instance.NewStatusClient(),
-			backupClient:         webserver.NewBackupClient(),
 		},
 	}
 }
@@ -131,10 +126,33 @@ func (se *Reconciler) enrichSnapshot(
 	return nil
 }
 
-// Execute the volume snapshot of the given cluster instance
+type executor interface {
+	prepare(
+		ctx context.Context,
+		cluster *apiv1.Cluster,
+		backup *apiv1.Backup,
+		targetPod *corev1.Pod,
+	) (*ctrl.Result, error)
+
+	finalize(ctx context.Context,
+		cluster *apiv1.Cluster,
+		backup *apiv1.Backup,
+		targetPod *corev1.Pod,
+	) (*ctrl.Result, error)
+}
+
+func (se *Reconciler) newExecutor(online bool) executor {
+	if online {
+		return newOnlineExecutor()
+	}
+
+	return newOfflineExecutor(se.cli, se.recorder)
+}
+
+// Reconcile the volume snapshot of the given cluster instance
 // TODO: remove the nolint, make two implementations: cold and hot that implement the same execute interface
 // nolint: gocognit
-func (se *Reconciler) Execute(
+func (se *Reconciler) Reconcile(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
@@ -149,17 +167,16 @@ func (se *Reconciler) Execute(
 	if err != nil {
 		return nil, err
 	}
+	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
+
+	exec := se.newExecutor(volumeSnapshotConfig.GetOnline())
 
 	// Step 1: backup preparation.
 	// This will set PostgreSQL in backup mode for hot snapshots, or fence the Pods for cold snapshots.
-	if res, err := se.prepareSnapshotBackupStep(
-		ctx,
-		cluster,
-		backup,
-		targetPod,
-		volumeSnapshots,
-	); res != nil || err != nil {
-		return res, err
+	if len(volumeSnapshots) == 0 {
+		if res, err := exec.prepare(ctx, cluster, backup, targetPod); res != nil || err != nil {
+			return res, err
+		}
 	}
 
 	// Step 2: create snapshot
@@ -184,6 +201,7 @@ func (se *Reconciler) Execute(
 	// This will unset the PostgreSQL backup mode, and unfence the Pod
 	if res, err := se.finalizeSnapshotBackupStep(
 		ctx,
+		exec,
 		cluster,
 		backup,
 		targetPod,
@@ -203,70 +221,11 @@ func (se *Reconciler) Execute(
 	)
 }
 
-// prepareSnapshotBackupStep will set PostgreSQL in backup mode for hot snapshots
-// or fence the Pod for cold snapshots. At the end of this function, PostgreSQL
-// will be ready to be backed up
-func (se *Reconciler) prepareSnapshotBackupStep(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	backup *apiv1.Backup,
-	targetPod *corev1.Pod,
-	volumeSnapshots slice,
-) (*ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	if len(volumeSnapshots) != 0 {
-		// There's no need for this step, the snapshots
-		// have already been created.
-		return nil, nil
-	}
-
-	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-
-	// Handle cold snapshots
-	if !volumeSnapshotConfig.GetOnline() {
-		contextLogger.Debug("Checking pre-requisites")
-		if err := se.ensurePodIsFenced(ctx, cluster, backup, targetPod.Name); err != nil {
-			return nil, err
-		}
-
-		if res, err := se.waitForPodToBeFenced(ctx, targetPod); res != nil || err != nil {
-			return res, err
-		}
-
-		return nil, nil
-	}
-
-	// Handle hot snapshots
-	status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
-	if err != nil {
-		return nil, fmt.Errorf("while getting status: %w", err)
-	}
-	switch {
-	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
-	case status.Phase == "", backup.Name != status.BackupName:
-		req := webserver.StartBackupRequest{
-			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
-			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
-			BackupName:          backup.Name,
-			Force:               true,
-		}
-		if _, err := se.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
-			return nil, fmt.Errorf("while trying to start the backup: %w", err)
-		}
-	case status.Phase == webserver.Starting:
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
-
-	// TODO: make only webserver.started return nil,nil. The other phases should return error
-
-	return nil, nil
-}
-
 // finalizeSnapshotBackupStep is called once the snapshots have been provisioned
 // and will unfence the Pod for cold snapshots, or unset PostgreSQL backup mode
 func (se *Reconciler) finalizeSnapshotBackupStep(
 	ctx context.Context,
+	exec executor,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
@@ -274,33 +233,8 @@ func (se *Reconciler) finalizeSnapshotBackupStep(
 	contextLogger := log.FromContext(ctx).WithValues("podName", targetPod.Name)
 	volumeSnapshotConfig := cluster.Spec.Backup.VolumeSnapshot
 
-	if err := se.EnsurePodIsUnfenced(ctx, cluster, backup, targetPod); err != nil {
-		return nil, err
-	}
-
-	// TODO: remove the nolint
-	// nolint: nestif
-	if volumeSnapshotConfig.GetOnline() {
-		status, err := se.backupClient.Status(ctx, targetPod.Status.PodIP)
-		if err != nil {
-			return nil, fmt.Errorf("while getting status: %w", err)
-		}
-
-		if status.Phase == webserver.Started {
-			if err := se.backupClient.Stop(ctx, targetPod.Status.PodIP); err != nil {
-				return nil, fmt.Errorf("while stopping the backup client: %w", err)
-			}
-			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
-		}
-
-		if status.Phase != webserver.Completed {
-			return &ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-
-		backup.Status.BeginLSN = string(status.BeginLSN)
-		backup.Status.EndLSN = string(status.EndLSN)
-		backup.Status.TablespaceMapFile = status.SpcmapFile
-		backup.Status.BackupLabelFile = status.LabelFile
+	if res, err := exec.finalize(ctx, cluster, backup, targetPod); res != nil || err != nil {
+		return res, err
 	}
 
 	backup.Status.SetAsFinalizing()
@@ -402,64 +336,11 @@ func backupStatusFromSnapshots(
 	return nil
 }
 
-// ensurePodIsFenced checks if the preconditions for the execution of this step are
-// met or not. If they are not met, it will return an error
-func (se *Reconciler) ensurePodIsFenced(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	backup *apiv1.Backup,
-	targetPodName string,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
-	if err != nil {
-		return fmt.Errorf("could not check if cluster is fenced: %v", err)
-	}
-
-	if slices.Equal(fencedInstances.ToList(), []string{targetPodName}) {
-		// We already requested the target Pod to be fenced
-		return nil
-	}
-
-	if fencedInstances.Len() != 0 {
-		return errors.New("cannot execute volume snapshot on a cluster that has fenced instances")
-	}
-
-	if targetPodName == cluster.Status.CurrentPrimary || targetPodName == cluster.Status.TargetPrimary {
-		contextLogger.Warning(
-			"Cold Snapshot Backup targets the primary. Primary will be fenced",
-			"targetBackup", backup.Name, "targetPod", targetPodName,
-		)
-	}
-
-	err = resources.ApplyFenceFunc(
-		ctx,
-		se.cli,
-		cluster.Name,
-		cluster.Namespace,
-		targetPodName,
-		utils.AddFencedInstance,
-	)
-	if errors.Is(err, utils.ErrorServerAlreadyFenced) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	// The list of fenced instances is empty, so we need to request
-	// fencing for the target pod
-	contextLogger.Info("Fencing Pod", "podName", targetPodName)
-	se.recorder.Eventf(backup, "Normal", "FencePod",
-		"Fencing Pod %v", targetPodName)
-
-	return nil
-}
-
 // EnsurePodIsUnfenced removes the fencing status from the cluster
-func (se *Reconciler) EnsurePodIsUnfenced(
+func EnsurePodIsUnfenced(
 	ctx context.Context,
+	cli client.Client,
+	recorder record.EventRecorder,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
@@ -468,7 +349,7 @@ func (se *Reconciler) EnsurePodIsUnfenced(
 
 	err := resources.ApplyFenceFunc(
 		ctx,
-		se.cli,
+		cli,
 		cluster.Name,
 		cluster.Namespace,
 		targetPod.Name,
@@ -484,30 +365,10 @@ func (se *Reconciler) EnsurePodIsUnfenced(
 	// The list of fenced instances is empty, so we need to request
 	// fencing for the target pod
 	contextLogger.Info("Unfencing Pod", "podName", targetPod.Name)
-	se.recorder.Eventf(backup, "Normal", "UnfencePod",
+	recorder.Eventf(backup, "Normal", "UnfencePod",
 		"Unfencing Pod %v", targetPod.Name)
 
 	return nil
-}
-
-// waitForPodToBeFenced waits for the target Pod to be shut down
-func (se *Reconciler) waitForPodToBeFenced(
-	ctx context.Context,
-	targetPod *corev1.Pod,
-) (*ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	var pod corev1.Pod
-	err := se.cli.Get(ctx, types.NamespacedName{Name: targetPod.Name, Namespace: targetPod.Namespace}, &pod)
-	if err != nil {
-		return nil, err
-	}
-	ready := utils.IsPodReady(pod)
-	if ready {
-		contextLogger.Info("Waiting for target Pod to not be ready, retrying", "podName", targetPod.Name)
-		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-	}
-	return nil, nil
 }
 
 // snapshotPVCGroup creates a volumeSnapshot resource for every PVC
