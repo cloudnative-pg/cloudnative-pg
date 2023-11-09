@@ -47,6 +47,13 @@ func (o *onlineExecutor) finalize(
 		return nil, fmt.Errorf("while getting status: %w", err)
 	}
 
+	if status.BackupName != backup.Name {
+		return nil, fmt.Errorf("trying to stop backup with name: %s, while reconciling backup with name: %s",
+			status.BackupName,
+			backup.Name,
+		)
+	}
+
 	switch status.Phase {
 	case webserver.Started:
 		if err := o.backupClient.Stop(ctx, targetPod.Status.PodIP); err != nil {
