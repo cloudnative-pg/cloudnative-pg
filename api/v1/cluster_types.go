@@ -3279,12 +3279,15 @@ func (cluster *Cluster) GetClusterAltDNSNames() []string {
 		cluster.GetServiceReadWriteName(),
 		fmt.Sprintf("%v.%v", cluster.GetServiceReadWriteName(), cluster.Namespace),
 		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadWriteName(), cluster.Namespace),
+		fmt.Sprintf("%v.%v.svc.cluster.local", cluster.GetServiceReadWriteName(), cluster.Namespace),
 		cluster.GetServiceReadName(),
 		fmt.Sprintf("%v.%v", cluster.GetServiceReadName(), cluster.Namespace),
 		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadName(), cluster.Namespace),
+		fmt.Sprintf("%v.%v.svc.cluster.local", cluster.GetServiceReadName(), cluster.Namespace),
 		cluster.GetServiceReadOnlyName(),
 		fmt.Sprintf("%v.%v", cluster.GetServiceReadOnlyName(), cluster.Namespace),
 		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadOnlyName(), cluster.Namespace),
+		fmt.Sprintf("%v.%v.svc.cluster.local", cluster.GetServiceReadOnlyName(), cluster.Namespace),
 	}
 
 	if cluster.Spec.Certificates == nil {

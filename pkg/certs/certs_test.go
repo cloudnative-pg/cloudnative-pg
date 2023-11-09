@@ -74,7 +74,7 @@ var _ = Describe("Keypair generation", func() {
 		oldCert, err := ca.ParseCertificate()
 		Expect(err).ToNot(HaveOccurred())
 
-		err = ca.RenewCertificate(privateKey, nil)
+		err = ca.RenewCertificate(privateKey, nil, []string{})
 		Expect(err).ToNot(HaveOccurred())
 
 		newCert, err := ca.ParseCertificate()
@@ -108,6 +108,20 @@ var _ = Describe("Keypair generation", func() {
 		Expect(isExpiring, err).To(BeFalse())
 	})
 
+	It("marks alt dns names as matching", func() {
+		ca, err := CreateRootCA("test", "namespace")
+		Expect(err).ToNot(HaveOccurred())
+		doAltDNSNamesMatch, err := ca.DoAltDNSNamesMatch([]string{})
+		Expect(doAltDNSNamesMatch, err).To(BeTrue())
+	})
+
+	It("doesn't mark alt dns names as matching", func() {
+		ca, err := CreateRootCA("test", "namespace")
+		Expect(err).ToNot(HaveOccurred())
+		doAltDNSNamesMatch, err := ca.DoAltDNSNamesMatch([]string{"foo.bar"})
+		Expect(doAltDNSNamesMatch, err).To(BeFalse())
+	})
+
 	When("we have a CA generated", func() {
 		It("should successfully generate a leaf certificate", func() {
 			rootCA, err := CreateRootCA("test", "namespace")
@@ -131,6 +145,7 @@ var _ = Describe("Keypair generation", func() {
 			Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
 			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
 			Expect(cert.VerifyHostname("this.host.name.com")).To(Succeed())
+			Expect(cert.DNSNames).To(Equal([]string{"this.host.name.com"}))
 
 			caCert, err := rootCA.ParseCertificate()
 			Expect(err).ToNot(HaveOccurred())
@@ -171,7 +186,7 @@ var _ = Describe("Keypair generation", func() {
 			oldCert, err := pair.ParseCertificate()
 			Expect(err).ToNot(HaveOccurred())
 
-			err = pair.RenewCertificate(privateKey, caCert)
+			err = pair.RenewCertificate(privateKey, caCert, []string{})
 			Expect(err).ToNot(HaveOccurred())
 
 			newCert, err := pair.ParseCertificate()
