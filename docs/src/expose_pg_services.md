@@ -1,47 +1,47 @@
-# Exposing Postgres Services
+# Exposing Postgres services
 
-This section explains how to expose a PostgreSQL service externally, allowing access
-to your PostgreSQL database **from outside your Kubernetes cluster** using
+You can expose a PostgreSQL service externally, allowing access
+to your PostgreSQL database from outside your Kubernetes cluster using
 NGINX Ingress Controller.
 
-If you followed the [QuickStart](./quickstart.md), you should have by now
-a database that can be accessed inside the cluster via the
+If you followed the [Quick start](./quickstart.md), you have
+a database that can be accessed inside the cluster by way of the
 `cluster-example-rw` (primary) and `cluster-example-r` (read-only)
-services in the `default` namespace. Both services use port `5432`.
+services in the `default` namespace. Both services use port 5432.
 
-Let's assume that you want to make the primary instance accessible from external
-accesses on port `5432`. A typical use case, when moving to a Kubernetes
-infrastructure, is indeed the one represented by **legacy applications**
-that cannot be easily or sustainably "containerized". A sensible workaround
+Suppose that you want to make the primary instance accessible from external
+accesses on port 5432. When moving to a Kubernetes
+infrastructure, a typical use case is the one represented by legacy applications
+that can't be easily or sustainably "containerized." A sensible workaround
 is to allow those applications that most likely reside in a virtual machine
-or a physical server, to access a PostgreSQL database inside a Kubernetes cluster
+or a physical server to access a PostgreSQL database inside a Kubernetes cluster
 in the same network.
 
 !!! Warning
-    Allowing access to a database from the public network could expose
-    your database to potential attacks from malicious users. Ensure you
+    Allowing access to a database from the public network can expose
+    your database to potential attacks from malicious users. Make sure that you
     secure your database before granting external access or that your
-    Kubernetes cluster is only reachable from a private network.
+    Kubernetes cluster is reachable only from a private network.
 
-For this example, you will use [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/),
-since it is maintained directly by the Kubernetes project and can be set up
-on every Kubernetes cluster. Many other controllers are available (see the
+For this example, because it's maintained directly by the Kubernetes project and can be set up
+on every Kubernetes cluster, you use [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/). 
+Many other controllers are available. (See the
 [Kubernetes documentation](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/)
-for a comprehensive list).
+for a comprehensive list.)
 
-We assume that:
+The example assumes that:
 
-* the NGINX Ingress controller has been deployed and works correctly
-* it is possible to create a service of type `LoadBalancer` in your cluster
+* NGINX Ingress Controller was deployed and works correctly.
+* It's possible to create a service of type `LoadBalancer` in your cluster.
 
 
 !!! Important
     Ingresses are only required to expose HTTP and HTTPS traffic. While the NGINX
-    Ingress controller can, not all Ingress objects can expose arbitrary ports or
+    Ingress Controller can, not all Ingress objects can expose arbitrary ports or
     protocols.
 
-The first step is to create a `tcp-services` `ConfigMap` whose data field
-contains info on the externally exposed port and the namespace, service and
+First, create a `tcp-services` ConfigMap whose data field
+contains info on the externally exposed port and the namespace, service, and
 port to point to internally.
 
 ```yaml
@@ -54,10 +54,10 @@ data:
   5432: default/cluster-example-rw:5432
 ```
 
-Then, if you've installed NGINX Ingress Controller as suggested in their
-documentation, you should have an `ingress-nginx` service. You'll have to add
-the 5432 port to the `ingress-nginx` service to expose it.
-The ingress will redirect incoming connections on port 5432 to your database.
+If you installed NGINX Ingress Controller as suggested in their
+documentation, you have an `ingress-nginx` service. To expose the 5432 port, you must add
+it to the `ingress-nginx` service.
+The Ingress redirects incoming connections on port 5432 to your database.
 
 ```yaml
 apiVersion: v1
@@ -88,21 +88,21 @@ spec:
     app.kubernetes.io/part-of: ingress-nginx
 ```
 
-You can use [`cluster-expose-service.yaml`](samples/cluster-expose-service.yaml)  and apply it
+You can use [`cluster-expose-service.yaml`](samples/cluster-expose-service.yaml) and apply it
 using `kubectl`.
 
 !!! Warning
-    If you apply this file directly, you will overwrite any previous change
-    in your `ConfigMap` and `Service` of the Ingress
+    Applying this file directly overwrites any previous change
+    in your `ConfigMap` and `Service` of the Ingress.
 
-Now you will be able to reach the PostgreSQL Cluster from outside your Kubernetes cluster.
+You can now reach the PostgreSQL cluster from outside your Kubernetes cluster.
 
 !!! Important
     Make sure you configure `pg_hba` to allow connections from the Ingress.
 
 ## Testing on Minikube
 
-On Minikube you can setup the ingress controller running:
+On Minikube, you can set up the Ingress Controller by running:
 
 ```sh
 minikube addons enable ingress
@@ -122,13 +122,13 @@ spec:
            hostPort: 5432
 ```
 
-and apply it to the `ingress-nginx-controller` deployment:
+Apply it to the `ingress-nginx-controller` deployment:
 
 ```sh
 kubectl patch deployment ingress-nginx-controller --patch "$(cat patch.yaml)" -n ingress-nginx
 ```
 
-You can access the primary from your machine running:
+You can access the primary from your machine by running:
 
 ```sh
 psql -h $(minikube ip) -p 5432 -U postgres

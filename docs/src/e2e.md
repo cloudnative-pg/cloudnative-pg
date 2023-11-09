@@ -1,11 +1,11 @@
-# End-to-End Tests
+# End-to-end tests
 
-CloudNativePG is automatically tested after each
-commit via a suite of **End-to-end (E2E) tests**, which ensures that
+A suite of end-to-end (E2E) tests run on CloudNativePG after each
+commit. These tests ensure that
 the operator correctly deploys and manages PostgreSQL clusters.
 
-Moreover, the following Kubernetes versions are tested for each commit,
-helping detect bugs at an early stage of the development process:
+Also, the following Kubernetes versions are tested for each commit.
+This testing helps to detect bugs at an early stage of the development process:
 
 * 1.27
 * 1.26
@@ -26,65 +26,65 @@ cluster is created using [kind](https://kind.sigs.k8s.io/),
 and the following suite of E2E tests are performed on that cluster:
 
 - **Basic:**
-    * Installation of the operator;
-    * Creation of a Cluster;
-    * Usage of a persistent volume for data storage;
+    * Installation of the operator
+    * Creation of a cluster
+    * Usage of a persistent volume for data storage
 - **Service connectivity:**
-    * Connection via services, including read-only;
-    * Connection via user-provided server and/or client certificates;
-    * PgBouncer;
+    * Connection by way of services, including read-only
+    * Connection by way of user-provided server or client certificates
+    * PgBouncer
 - **Self-healing:**
-    * Failover;
-    * Switchover;
-    * Primary endpoint switch in case of failover in less than 10 seconds;
-    * Primary endpoint switch in case of switchover in less than 20 seconds;
-    * Recover from a degraded state in less than 60 seconds;
-    * PVC Deletion;
-- **Backup and Restore:**
-    * Backup and ScheduledBackups execution using Barman Cloud on S3;
+    * Failover
+    * Switchover
+    * Primary endpoint switch in case of failover in less than 10 seconds
+    * Primary endpoint switch in case of switchover in less than 20 seconds
+    * Recover from a degraded state in less than 60 seconds
+    * PVC deletion
+- **Backup and restore:**
+    * Backup and ScheduledBackups execution using Barman Cloud on S3
     * Backup and ScheduledBackups execution using Barman Cloud on Azure
-    blob storage;
-    * Restore from backup using Barman Cloud on S3;
-    * Restore from backup using Barman Cloud on Azure blob storage;
-    * Wal-Restore;
+    blob storage
+    * Restore from backup using Barman Cloud on S3
+    * Restore from backup using Barman Cloud on Azure blob storage
+    * Wal-Restore
 - **Operator:**
-    * Operator Deployment;
-    * Operator configuration via ConfigMap;
-    * Operator pod deletion;
-    * Operator pod eviction;
-    * Operator upgrade;
-    * Operator High Availability;
+    * Operator deployment
+    * Operator configuration using ConfigMap
+    * Operator pod deletion
+    * Operator pod eviction
+    * Operator upgrade
+    * Operator high availability
 - **Observability:**
-    * Metrics collection;
-    * PgBouncer Metrics;
-    * JSON log format;
+    * Metrics collection
+    * PgBouncer metrics
+    * JSON log format
 - **Replication:**
-    * Physical replica clusters;
-    * Replication Slots;
-    * Synchronous replication;
-    * Scale-up and scale-down of a Cluster;
+    * Physical replica clusters
+    * Replication slots
+    * Synchronous replication
+    * Scale-up and scale-down of a cluster
 - **Plugin:**
-    * Cluster Hibernation using CNPG plugin;
-    * Fencing;
-    * Creation of a connection certificate;
-- **Postgres Configuration:**
-    * Manage PostgreSQL configuration changes;
-    * Rolling updates when changing PostgreSQL images;
-- **Pod Scheduling:**
-    * Tolerations and taints;
-    * Pod affinity using `NodeSelector`;
-- **Cluster Metadata:**
-    * ConfigMap for Cluster Labels and Annotations;
-    * Object metadata;
+    * Cluster hibernation using CNPG plugin
+    * Fencing
+    * Creation of a connection certificate
+- **Postgres configuration:
+    * Manage PostgreSQL configuration changes
+    * Rolling updates when changing PostgreSQL images
+- **Pod scheduling:**
+    * Tolerations and taints
+    * Pod affinity using `NodeSelector`
+- **Cluster metadata:**
+    * ConfigMap for cluster labels and annotations
+    * Object metadata
 - **Recovery:**
-    * Data corruption;
-    * pg_basebackup;
-- **Importing Databases:**
-    * Microservice approach;
-    * Monolith approach;
+    * Data corruption
+    * pg_basebackup
+- **Importing databases:**
+    * Microservice approach
+    * Monolith approach
 - **Storage:**
-    * Storage expansion;
+    * Storage expansion
 - **Security:**
-    * AppArmor annotation propagation. Executed only on Azure environment;
+    * AppArmor annotation propagation executed only on Azure environment
 - **Maintenance:**
-    * Node Drain;
+    * Node drain
