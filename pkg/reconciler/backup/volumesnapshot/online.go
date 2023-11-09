@@ -108,5 +108,6 @@ func (o *onlineExecutor) prepare(
 		return nil, nil
 	}
 
-	return nil, fmt.Errorf("found zero snapshot but the instance is in phase: %s", status.Phase)
+	return nil, fmt.Errorf("found the instance is an unexpected phase while preparing the snapshot: %s",
+		status.Phase)
 }
