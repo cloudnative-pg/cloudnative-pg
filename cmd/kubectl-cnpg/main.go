@@ -36,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgdump"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/psql"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
