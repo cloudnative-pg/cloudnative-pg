@@ -163,6 +163,7 @@ func CreateClusterPodSpec(
 	return corev1.PodSpec{
 		Hostname: podName,
 		InitContainers: []corev1.Container{
+			createInitDBUserContainer(cluster),
 			createBootstrapContainer(cluster),
 		},
 		SchedulerName: cluster.Spec.SchedulerName,
