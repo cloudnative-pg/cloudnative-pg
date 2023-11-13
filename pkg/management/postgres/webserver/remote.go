@@ -49,6 +49,16 @@ type StartBackupRequest struct {
 	Force               bool   `json:"force,omitempty"`
 }
 
+// StopBackupRequest the required data to execute the pg_stop_backup
+type StopBackupRequest struct {
+	BackupName string `json:"backupName"`
+}
+
+// NewStopBackupRequest constructor
+func NewStopBackupRequest(backupName string) *StopBackupRequest {
+	return &StopBackupRequest{BackupName: backupName}
+}
+
 // NewRemoteWebServer returns a webserver that allows connection from external clients
 func NewRemoteWebServer(
 	instance *postgres.Instance,
@@ -264,13 +274,30 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
-		go ws.currentBackup.startBackup(context.Background())
+		go ws.currentBackup.startBackup(context.Background(), p.BackupName)
 		sendDataJSONData(w, 200, struct{}{})
 		return
 
-	case http.MethodDelete:
+	case http.MethodPut:
+		var p StopBackupRequest
+		err := json.NewDecoder(req.Body).Decode(&p)
+		if err != nil {
+			sendBadRequestJSONResponse(w, "FAILED_TO_PARSE_REQUEST", "Failed to parse request body")
+			return
+		}
+		defer func() {
+			if err := req.Body.Close(); err != nil {
+				log.Error(err, "while closing the body")
+			}
+		}()
 		if ws.currentBackup == nil {
 			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "")
+			return
+		}
+
+		if ws.currentBackup.data.BackupName != p.BackupName {
+			sendUnprocessableEntityJSONResponse(w, "NOT_CURRENT_RUNNING_BACKUP",
+				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
 			return
 		}
 
@@ -295,9 +322,8 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendDataJSONData(w, 200, struct{}{})
 			return
 		}
-
-		ws.currentBackup.data.Phase = Closing
-		go ws.currentBackup.stopBackup(context.Background())
+		ws.currentBackup.setPhase(Closing, p.BackupName)
+		go ws.currentBackup.stopBackup(context.Background(), p.BackupName)
 		sendDataJSONData(w, 200, struct{}{})
 		return
 	}

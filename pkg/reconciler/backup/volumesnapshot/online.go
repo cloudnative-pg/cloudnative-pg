@@ -77,7 +77,9 @@ func (o *onlineExecutor) finalize(
 
 	switch status.Phase {
 	case webserver.Started:
-		if err := o.backupClient.Stop(ctx, targetPod.Status.PodIP); err != nil {
+		if err := o.backupClient.Stop(ctx,
+			targetPod.Status.PodIP,
+			*webserver.NewStopBackupRequest(backup.Name)); err != nil {
 			return nil, fmt.Errorf("while stopping the backup client: %w", err)
 		}
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
@@ -118,7 +120,7 @@ func (o *onlineExecutor) prepare(
 			BackupName:          backup.Name,
 			Force:               true,
 		}
-		if _, err := o.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
+		if err := o.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil

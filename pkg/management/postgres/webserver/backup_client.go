@@ -84,29 +84,35 @@ func (c *BackupClient) Start(
 	ctx context.Context,
 	podIP string,
 	sbq StartBackupRequest,
-) (*struct{}, error) {
+) error {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		return fmt.Errorf("failed to marshal start payload: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	_, err = executeRequestWithError[struct{}](ctx, c.cli, req, false)
-	return nil, err
+	return err
 }
 
 // Stop runs the pg_stop_backup
-func (c *BackupClient) Stop(ctx context.Context, podIP string) error {
+func (c *BackupClient) Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, "DELETE", httpURL, nil)
+	// Marshalling the payload to JSON
+	jsonBody, err := json.Marshal(sbq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stop payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
 		return err
 	}
