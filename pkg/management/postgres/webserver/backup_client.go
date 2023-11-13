@@ -54,14 +54,14 @@ func NewBackupClient() *BackupClient {
 }
 
 // StatusWithBodyErrors the current status of the backup..
-func (c *BackupClient) StatusWithBodyErrors(ctx context.Context, podIP string) (*BackupResultData, error) {
+func (c *BackupClient) StatusWithBodyErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error) {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return executeRequest[BackupResultData](ctx, c.cli, req, true)
+	return executeRequestWithError[BackupResultData](ctx, c.cli, req, true)
 }
 
 // Status the current status of the backup. Returns empty BackupResultData struct if it is not running.
@@ -72,7 +72,8 @@ func (c *BackupClient) Status(ctx context.Context, podIP string) (*BackupResultD
 		return nil, err
 	}
 
-	return executeRequest[BackupResultData](ctx, c.cli, req, false)
+	_, err = executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
+	return nil, err
 }
 
 // Start runs the pg_start_backup
@@ -95,7 +96,8 @@ func (c *BackupClient) Start(
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	return executeRequest[struct{}](ctx, c.cli, req, false)
+	_, err = executeRequestWithError[struct{}](ctx, c.cli, req, false)
+	return nil, err
 }
 
 // Stop runs the pg_stop_backup
@@ -105,16 +107,16 @@ func (c *BackupClient) Stop(ctx context.Context, podIP string) error {
 	if err != nil {
 		return err
 	}
-	_, err = executeRequest[BackupResultData](ctx, c.cli, req, false)
+	_, err = executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
 	return err
 }
 
-func executeRequest[T any](
+func executeRequestWithError[T any](
 	ctx context.Context,
 	cli *http.Client,
 	req *http.Request,
 	ignoreBodyErrors bool,
-) (*T, error) {
+) (*Response[T], error) {
 	contextLogger := log.FromContext(ctx)
 
 	resp, err := cli.Do(req)
@@ -146,5 +148,5 @@ func executeRequest[T any](
 			result.Error.Code, result.Error.Message)
 	}
 
-	return result.Data, nil
+	return &result, nil
 }

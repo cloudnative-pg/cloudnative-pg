@@ -87,13 +87,23 @@ func (o *onlineExecutor) prepare(
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle hot snapshots
-	status, err := o.backupClient.StatusWithBodyErrors(ctx, targetPod.Status.PodIP)
+	body, err := o.backupClient.StatusWithBodyErrors(ctx, targetPod.Status.PodIP)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
-	switch {
+
+	status := body.Data
+
+	if status == nil {
+		if body.Error != nil {
+			return nil, fmt.Errorf("encountered a body error while preparing, code: '%s', message: %s",
+				body.Error.Code, body.Error.Message)
+		}
+		return nil, fmt.Errorf("encounteered a unspecified error while preparing, body: %v", body)
+	}
+
 	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
-	case status.Phase == "", backup.Name != status.BackupName:
+	if backup.Name != status.BackupName || status.Phase == "" {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
@@ -104,9 +114,17 @@ func (o *onlineExecutor) prepare(
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	case status.Phase == webserver.Starting:
+	}
+
+	if body.Error != nil {
+		return nil, fmt.Errorf("starting of the current backup failed, with code: '%s' and message: '%s'",
+			body.Error.Code, body.Error.Message)
+	}
+
+	switch status.Phase {
+	case webserver.Starting:
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	case status.Phase == webserver.Started:
+	case webserver.Started:
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("found the instance is an unexpected phase while preparing the snapshot: %s",
