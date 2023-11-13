@@ -42,16 +42,37 @@ func (o *onlineExecutor) finalize(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
-	status, err := o.backupClient.Status(ctx, targetPod.Status.PodIP)
+	body, err := o.backupClient.StatusWithBodyErrors(ctx, targetPod.Status.PodIP)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while finalizing: %w", err)
 	}
 
+	if err := body.EnsureDataIsPresent(); err != nil {
+		return nil, err
+	}
+
+	status := body.Data
 	if status.BackupName != backup.Name {
 		return nil, fmt.Errorf("trying to stop backup with name: %s, while reconciling backup with name: %s",
 			status.BackupName,
 			backup.Name,
 		)
+	}
+
+	if status.Phase == webserver.Completed {
+		// TODO: eventually move it inside an enrich backup method
+		backup.Status.BeginLSN = string(status.BeginLSN)
+		backup.Status.EndLSN = string(status.EndLSN)
+		backup.Status.TablespaceMapFile = status.SpcmapFile
+		backup.Status.BackupLabelFile = status.LabelFile
+
+		return nil, nil
+	}
+
+	if body.Error != nil {
+		return nil, fmt.Errorf(
+			"while processing the finalizing request, phase: %s, "+
+				"error message: %s, error code: %s", body.Data.Phase, body.Error.Message, body.Error.Code)
 	}
 
 	switch status.Phase {
@@ -62,14 +83,6 @@ func (o *onlineExecutor) finalize(
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	case webserver.Closing:
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
-	case webserver.Completed:
-		// TODO: eventually move it inside an enrich backup method
-		backup.Status.BeginLSN = string(status.BeginLSN)
-		backup.Status.EndLSN = string(status.EndLSN)
-		backup.Status.TablespaceMapFile = status.SpcmapFile
-		backup.Status.BackupLabelFile = status.LabelFile
-
-		return nil, nil
 	default:
 		return nil, fmt.Errorf(
 			"found the instance in an unexpected state while finalizing the backup, phase: %s",
@@ -92,16 +105,11 @@ func (o *onlineExecutor) prepare(
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
 
-	status := body.Data
-
-	if status == nil {
-		if body.Error != nil {
-			return nil, fmt.Errorf("encountered a body error while preparing, code: '%s', message: %s",
-				body.Error.Code, body.Error.Message)
-		}
-		return nil, fmt.Errorf("encounteered a unspecified error while preparing, body: %v", body)
+	if err := body.EnsureDataIsPresent(); err != nil {
+		return nil, err
 	}
 
+	status := body.Data
 	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
 	if backup.Name != status.BackupName || status.Phase == "" {
 		req := webserver.StartBackupRequest{

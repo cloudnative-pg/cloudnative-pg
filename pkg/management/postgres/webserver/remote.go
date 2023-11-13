@@ -247,7 +247,6 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
 				return
 			}
-			ws.currentBackup.data.Phase = Failed
 			if err := ws.currentBackup.conn.Close(); err != nil {
 				if !errors.Is(err, sql.ErrConnDone) {
 					log.Error(err, "Error while closing backup connection (start)")
@@ -293,7 +292,6 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				}
 			}
 
-			ws.currentBackup.data.Phase = Failed
 			sendDataJSONData(w, 200, struct{}{})
 			return
 		}

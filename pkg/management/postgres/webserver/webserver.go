@@ -19,6 +19,7 @@ package webserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -47,6 +48,21 @@ type Error struct {
 type Response[T interface{}] struct {
 	Data  *T     `json:"data,omitempty"`
 	Error *Error `json:"error,omitempty"`
+}
+
+// EnsureDataIsPresent returns an error if the data is field is nil
+func (body Response[T]) EnsureDataIsPresent() error {
+	status := body.Data
+	if status != nil {
+		return nil
+	}
+
+	if body.Error != nil {
+		return fmt.Errorf("encountered a body error while preparing, code: '%s', message: %s",
+			body.Error.Code, body.Error.Message)
+	}
+
+	return fmt.Errorf("encounteered a unspecified error while preparing, body: %v", body)
 }
 
 // Webserver contains a server that interacts with postgres instance

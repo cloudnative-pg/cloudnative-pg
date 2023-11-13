@@ -48,7 +48,6 @@ const (
 	Starting  BackupConnectionPhase = "starting"
 	Started   BackupConnectionPhase = "started"
 	Closing   BackupConnectionPhase = "closing"
-	Failed    BackupConnectionPhase = "failed"
 	Completed BackupConnectionPhase = "completed"
 )
 
@@ -139,8 +138,6 @@ func (bc *backupConnection) startBackup(ctx context.Context) {
 		if bc.err == nil {
 			return
 		}
-		bc.data.Phase = Failed
-
 		contextLogger.Error(bc.err, "encountered error while starting backup")
 
 		if err := bc.conn.Close(); err != nil {
@@ -190,9 +187,6 @@ func (bc *backupConnection) stopBackup(ctx context.Context) {
 			}
 		}
 
-		if bc.err != nil {
-			bc.data.Phase = Failed
-		}
 	}()
 
 	if bc.err != nil {
