@@ -1,7 +1,7 @@
 # Running E2E tests on your environment
 
 [Continuous Integration](https://cloud.google.com/architecture/devops/devops-tech-continuous-integration)
-and [Continous Testing](https://cloud.google.com/architecture/devops/devops-tech-test-automation)
+and [Continuous Testing](https://cloud.google.com/architecture/devops/devops-tech-test-automation)
 are two fundamental capabilities and cultural principles on which CloudNativePG
 has been built.
 
