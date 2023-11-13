@@ -118,7 +118,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic),
 		})
 	})
 
-	Context("plain cluster", Ordered, func() {
+	Context("existing cluster with primaryUpdateMethod=restart", Ordered, func() {
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
@@ -131,6 +131,72 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelBasic),
 		})
 
 		It("can update cluster adding tablespaces", func() {
+			By("adding tablespaces to the spec and patching", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.ShouldCreateTablespaces()).To(BeFalse())
+
+				updated := cluster.DeepCopy()
+				updated.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
+					"atablespace": {
+						Storage: apiv1.StorageConfiguration{
+							Size: "1Gi",
+						},
+					},
+					"anothertablespace": {
+						Storage: apiv1.StorageConfiguration{
+							Size: "1Gi",
+						},
+					},
+				}
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+
+				cluster, err = env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+			})
+			By("waiting for the cluster to be ready", func() {
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testUtils.ClusterIsReady], env)
+			})
+		})
+
+		It("can verify tablespaces and PVC were created", func() {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+
+			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
+			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
+			AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.PodRollout])
+		})
+	})
+
+	Context("existing cluster with primaryUpdateMethod=switchover", Ordered, func() {
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
+
+		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
+		BeforeAll(func() {
+			clusterSetup(clusterManifest)
+		})
+		It("can update cluster adding tablespaces", func() {
+			By("patch cluster with primaryUpdateMethod=switchover", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.ShouldCreateTablespaces()).To(BeFalse())
+
+				updated := cluster.DeepCopy()
+				updated.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
+				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By("waiting for the cluster to be ready", func() {
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testUtils.ClusterIsReady], env)
+			})
 			By("adding tablespaces to the spec and patching", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
