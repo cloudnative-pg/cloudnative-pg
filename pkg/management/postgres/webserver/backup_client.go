@@ -72,8 +72,11 @@ func (c *BackupClient) Status(ctx context.Context, podIP string) (*BackupResultD
 		return nil, err
 	}
 
-	_, err = executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
-	return nil, err
+	res, err := executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
+	if err != nil {
+		return nil, err
+	}
+	return res.Data, err
 }
 
 // Start runs the pg_start_backup
