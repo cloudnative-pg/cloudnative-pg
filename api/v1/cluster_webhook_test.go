@@ -3390,7 +3390,7 @@ var _ = Describe("Tablespaces validation", func() {
 					Size: "10Gi",
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
-					"my-tablespace": {
+					"my_tablespace": {
 						Storage: StorageConfiguration{
 							Size: "10Gi",
 						},
@@ -3414,7 +3414,89 @@ var _ = Describe("Tablespaces validation", func() {
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
 					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
-					"my-tablespace1my-tablespace2my-tablespace3my-tablespace4my-tablespace5": {
+					"my_tablespace1my_tablespace2my_tablespace3my_tablespace4my_tablespace5": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.Validate()).To(HaveLen(1))
+	})
+
+	It("should produce an error if the tablespace name is reserved by Postgres", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					"pg_foo": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.Validate()).To(HaveLen(1))
+	})
+
+	It("should produce an error if the tablespace name is not valid", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
+					"my-^&sdf;": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+				},
+			},
+		}
+		Expect(cluster.Validate()).To(HaveLen(1))
+	})
+
+	It("should produce an error if there are duplicate tablespaces", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]*TablespaceConfiguration{
+					"my_tablespace": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+					"my_TAblespace": {
+						Storage: StorageConfiguration{
+							Size: "10Gi",
+						},
+						Temporary: true,
+					},
+					"another": {
 						Storage: StorageConfiguration{
 							Size: "10Gi",
 						},
@@ -3438,7 +3520,7 @@ var _ = Describe("Tablespaces validation", func() {
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
 					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
-					"my-tablespace1": {
+					"my_tablespace1": {
 						Storage: StorageConfiguration{
 							Size: "10Gibberish",
 						},
@@ -3462,14 +3544,14 @@ var _ = Describe("Tablespaces validation", func() {
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
 					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
-					"my-tablespace1": {
+					"my_tablespace1": {
 						Storage: StorageConfiguration{
 							Size: "10Gibberish",
 						},
 						Temporary: true,
 					},
 					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
-					"my-tablespace1my-tablespace2my-tablespace3my-tablespace4my-tablespace5": {
+					"my_tablespace1my_tablespace2my_tablespace3my_tablespace4my_tablespace5": {
 						Storage: StorageConfiguration{
 							Size: "10Gi",
 						},

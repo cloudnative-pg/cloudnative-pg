@@ -254,7 +254,7 @@ func getStorageConfiguration(
 
 	if storageConfiguration == nil {
 		return apiv1.StorageConfiguration{},
-			fmt.Errorf("storage configuration doesn't exist for the given PVC role: %s", role)
+			fmt.Errorf("storage configuration doesn't exist for the given PVC role: %s and label %s", role, tablespaceLabel)
 	}
 
 	return *storageConfiguration, nil
