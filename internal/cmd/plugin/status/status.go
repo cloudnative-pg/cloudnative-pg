@@ -851,7 +851,7 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 }
 
 func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
-	const header = "RoleManager Status"
+	const header = "Managed roles status"
 
 	managedRolesStatus := fullStatus.Cluster.Status.ManagedRolesStatus
 	containsErrors := len(managedRolesStatus.CannotReconcile) > 0
@@ -896,7 +896,7 @@ func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
 	if containsWarnings() {
 		color = aurora.Yellow
 	}
-	fmt.Println(color("Role Reconciliation Status:"))
+	fmt.Println(color("Roles by status:"))
 
 	roleStatus := tabby.New()
 	roleStatus.AddHeader("status", "roles")
