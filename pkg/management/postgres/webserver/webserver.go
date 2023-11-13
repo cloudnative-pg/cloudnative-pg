@@ -62,7 +62,7 @@ func (body Response[T]) EnsureDataIsPresent() error {
 			body.Error.Code, body.Error.Message)
 	}
 
-	return fmt.Errorf("encounteered a unspecified error while preparing, body: %v", body)
+	return fmt.Errorf("encounteered an empty body while expecting it to not be empty")
 }
 
 // Webserver contains a server that interacts with postgres instance

@@ -64,21 +64,6 @@ func (c *BackupClient) StatusWithBodyErrors(ctx context.Context, podIP string) (
 	return executeRequestWithError[BackupResultData](ctx, c.cli, req, true)
 }
 
-// Status the current status of the backup. Returns empty BackupResultData struct if it is not running.
-func (c *BackupClient) Status(ctx context.Context, podIP string) (*BackupResultData, error) {
-	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
-	if err != nil {
-		return nil, err
-	}
-	return res.Data, err
-}
-
 // Start runs the pg_start_backup
 func (c *BackupClient) Start(
 	ctx context.Context,
