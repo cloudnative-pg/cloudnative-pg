@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+   http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -69,7 +69,7 @@ func (mst mockTablespaceStorageManager) storageExists(_ string) (bool, error) {
 }
 
 var _ = Describe("Tablespace synchronizer tests", func() {
-	tablespaceSynchronizer := TablespaceSynchronizer{
+	tablespaceReconciler := TablespaceReconciler{
 		instance: &postgres.Instance{
 			Namespace: "myPod",
 		},
@@ -91,9 +91,11 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
-
-			err := tablespaceSynchronizer.synchronizeTablespaces(ctx, &tbsManager,
-				mockTablespaceStorageManager{}, tablespacesSpec)
+			tbsInDatabase, err := tbsManager.List(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
+			err = tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+				mockTablespaceStorageManager{}, tbsByAction)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(tbsManager.callHistory).To(HaveLen(1))
 			Expect(tbsManager.callHistory).To(ConsistOf("list"))
@@ -119,9 +121,11 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
-
-			err := tablespaceSynchronizer.synchronizeTablespaces(ctx, &tbsManager,
-				mockTablespaceStorageManager{}, tablespacesSpec)
+			tbsInDatabase, err := tbsManager.List(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
+			err = tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+				mockTablespaceStorageManager{}, tbsByAction)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(tbsManager.callHistory).To(HaveLen(2))
 			Expect(tbsManager.callHistory).To(ConsistOf("list", "create"))

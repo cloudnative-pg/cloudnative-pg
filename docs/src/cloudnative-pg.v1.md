@@ -1696,7 +1696,7 @@ Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
 <tr><td><code>tablespaces</code><br/>
-<a href="#postgresql-cnpg-io-v1-*github-com-cloudnative-pg-cloudnative-pg-api-v1-TablespaceConfiguration"><i>map[string]*github.com/cloudnative-pg/cloudnative-pg/api/v1.TablespaceConfiguration</i></a>
+<a href="#postgresql-cnpg-io-v1-*github-com-cloudnative-pg-cloudnative-pg-api-v1-TablespaceConfiguration"><i>map[string]TablespaceConfiguration</i></a>
 </td>
 <td>
    <p>The tablespaces configuration</p>
@@ -2159,7 +2159,7 @@ PostgreSQL cluster from an existing storage</p>
 </td>
 </tr>
 <tr><td><code>tablespaceStorage</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#typedlocalobjectreference-v1-core"><i>map[string]k8s.io/api/core/v1.TypedLocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#typedlocalobjectreference-v1-core"><i>map[string]core/v1.TypedLocalObjectReference</i></a>
 </td>
 <td>
    <p>Configuration of the storage for PostgreSQL tablespaces</p>
@@ -4365,7 +4365,7 @@ if all the labels values match.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>byStatus</code><br/>
-<i>map[github.com/cloudnative-pg/cloudnative-pg/api/v1.TablespaceStatus][]string</i>
+<i>map[TablespaceStatus][]string</i>
 </td>
 <td>
    <p>ByStatus gives the list of tablespaces in each state</p>

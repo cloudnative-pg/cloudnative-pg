@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -64,6 +65,14 @@ const (
 const (
 	sharedBuffersParameter = "shared_buffers"
 )
+
+// prefix denoting tablespaces managed by the Postgres system
+// see https://www.postgresql.org/docs/current/sql-createtablespace.html
+var systemTablespacesPrefix = "pg_"
+
+// regex to verify a Postgres-compliant identifier
+// see https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
+var postgresIdentifierRegex = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_$]*$")
 
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
@@ -1620,7 +1629,35 @@ func (r *Cluster) validateTablespacesNames() field.ErrorList {
 		return nil
 	}
 
+	hasTablespace := make(map[string]bool)
 	for name := range r.Spec.Tablespaces {
+		// NOTE: postgres identifiers are case-insensitive, so we could have
+		// different map keys (names) which are identical for PG
+		_, found := hasTablespace[strings.ToLower(name)]
+		if found {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "tablespaces"),
+				name,
+				"tablespace is duplicate: "+name))
+			continue
+		}
+		hasTablespace[strings.ToLower(name)] = true
+
+		if strings.HasPrefix(name, systemTablespacesPrefix) {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "tablespaces"),
+				name,
+				"tablespace names beginning 'pg_' are reserved for Postgres"))
+		}
+
+		if !postgresIdentifierRegex.MatchString(name) {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "tablespaces"),
+				name,
+				"tablespace names must be valid Postgres identifiers: alphanumeric characters, '_', '$', "+
+					"and must start with a letter or an underscore"))
+		}
+
 		if len(name) > PostgresIdentifierMaxLen {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "tablespaces"),

@@ -18,52 +18,145 @@ package tablespaces
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// Reconcile triggers reconciliation of declarative tablespaces, gets their status, and
-// updates it into the cluster Status
-func Reconcile(
+// Reconcile is the main reconciliation loop for the instance
+func (r *TablespaceReconciler) Reconcile(
 	ctx context.Context,
-	instance *postgres.Instance,
-	cluster *apiv1.Cluster,
-	c client.Client,
+	_ reconcile.Request,
 ) (reconcile.Result, error) {
-	if instance.PodName != cluster.Status.CurrentPrimary ||
-		cluster.Spec.Tablespaces == nil ||
-		len(cluster.Spec.Tablespaces) == 0 {
+	contextLogger := log.FromContext(ctx).WithName("tbs_reconciler")
+	// if the context has already been cancelled,
+	// trying to reconcile would just lead to misleading errors being reported
+	if err := ctx.Err(); err != nil {
+		contextLogger.Warning("Context cancelled, will not start tablespace reconcile", "err", err)
 		return reconcile.Result{}, nil
 	}
 
-	contextLogger := log.FromContext(ctx)
-	contextLogger.Debug("Updating declarative tablespace information")
-
-	db, err := instance.GetSuperUserDB()
+	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+	if !isPrimary {
+		contextLogger.Info("skipping the Tablespace reconciler in replicas")
+		return reconcile.Result{}, nil
+	}
 
-	tbsMgr := infrastructure.NewPostgresTablespaceManager(db)
-	tbsInDatabase, err := tbsMgr.List(ctx)
+	// Fetch the Cluster from the cache
+	cluster, err := r.GetCluster(ctx)
 	if err != nil {
-		return reconcile.Result{}, err
-	}
-	tbsNameByStatus := evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces).
-		convertToTablespaceNameByStatus()
-	if len(tbsNameByStatus[apiv1.TablespaceStatusPendingReconciliation]) != 0 {
-		// forces runnable to run
-		instance.TriggerTablespaceSynchronizer(cluster.Spec.Tablespaces)
-		contextLogger.Info("Triggered a tablespace reconciliation")
+		if apierrors.IsNotFound(err) {
+			// The cluster has been deleted.
+			// We just need to wait for this instance manager to be terminated
+			contextLogger.Debug("Could not find Cluster")
+			return reconcile.Result{}, nil
+		}
+		return reconcile.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
+	if !cluster.ShouldCreateTablespaces() {
+		contextLogger.Info("no tablespaces to create")
+		return reconcile.Result{}, nil
+	}
+
+	if r.instance.IsServerReady() != nil {
+		contextLogger.Debug("database not ready, skipping tablespace reconciling")
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
+	contextLogger.Info("starting up the tablespace reconciler")
+	return r.reconcile(ctx, cluster)
+}
+
+func (r *TablespaceReconciler) reconcile(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (reconcile.Result, error) {
+	superUserDB, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("while reconcile tablespaces: %w", err)
+	}
+
+	tbsManager := infrastructure.NewPostgresTablespaceManager(superUserDB)
+	tbsStorageManager := instanceTablespaceStorageManager{}
+	tbsInDatabase, err := tbsManager.List(ctx)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("could not fetch tablespaces from database: %w", err)
+	}
+
+	tbsByAction := evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
+	if len(tbsByAction.convertToTablespaceNameByStatus()[apiv1.TablespaceStatusPendingReconciliation]) == 0 {
+		return reconcile.Result{}, nil
+	}
+
+	if err := r.applyTablespaceActions(
+		ctx,
+		tbsManager,
+		tbsStorageManager,
+		tbsByAction,
+	); err != nil {
+		return reconcile.Result{}, fmt.Errorf("while applying tablespace change to database: %w", err)
+	}
+
+	tbsInDatabase, err = tbsManager.List(ctx)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("could not fetch tablespaces from database: %w", err)
+	}
+	tbsByAction = evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Status.TablespaceStatus.ByStatus = tbsNameByStatus
-	return reconcile.Result{}, c.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
+	updatedCluster.Status.TablespaceStatus.ByStatus = tbsByAction.convertToTablespaceNameByStatus()
+	return reconcile.Result{}, r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
+}
+
+// applyTablespaceActions applies the actions to reconcile tablespace in the DB with the Spec
+func (r *TablespaceReconciler) applyTablespaceActions(
+	ctx context.Context,
+	tbsManager infrastructure.TablespaceManager,
+	tbsStorageManager tablespaceStorageManager,
+	tbsByAction TablespaceByAction,
+) error {
+	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
+
+	for action, tbsAdapters := range tbsByAction {
+		if action == TbsIsReconciled {
+			contextLog.Debug("no action required", "action", action)
+			continue
+		}
+
+		contextLog.Info("tablespaces in database out of sync with in Spec, evaluating action",
+			"tablespaces", getTablespaceNames(tbsAdapters), "action", action)
+
+		if action != TbsToCreate {
+			contextLog.Error(fmt.Errorf("only tablespace creation is supported"), "action", action)
+			continue
+		}
+
+		for _, tbs := range tbsAdapters {
+			contextLog.Trace("creating tablespace ", "tablespace", tbs.Name)
+			tbs := tbs
+			tablespace := infrastructure.Tablespace{
+				Name:      tbs.Name,
+				Temporary: tbs.Temporary,
+			}
+			if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
+				return fmt.Errorf("cannot create tablespace before data directory is created")
+			}
+			err := tbsManager.Create(ctx, tablespace)
+			if err != nil {
+				contextLog.Error(err, "while performing "+string(action), "tablespace", tbs.Name)
+				return err
+			}
+		}
+	}
+	return nil
 }

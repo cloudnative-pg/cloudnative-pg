@@ -41,7 +41,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/reconciler"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -222,12 +221,6 @@ func (r *InstanceReconciler) Reconcile(
 			return result, err
 		}
 	}
-
-	result, err := tablespaces.Reconcile(ctx, r.instance, cluster, r.client)
-	if err != nil || !result.IsZero() {
-		return result, err
-	}
-
 	if err = r.refreshCredentialsFromSecret(ctx, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("while updating database owner password: %w", err)
 	}

@@ -105,7 +105,7 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
-		podRollout.canBeInPlace, podRollout.reason)
+		podRollout.canBeInPlace, podRollout.primaryForceRestart, podRollout.reason)
 }
 
 func (r *ClusterReconciler) updatePrimaryPod(
@@ -114,6 +114,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	podList *postgres.PostgresqlStatusList,
 	primaryPod corev1.Pod,
 	inPlacePossible bool,
+	forceRestart bool,
 	reason rolloutReason,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
@@ -131,7 +132,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		return true, nil
 	}
 
-	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart {
+	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart || forceRestart {
 		if inPlacePossible {
 			// In-place restart is possible
 			if err := r.updateRestartAnnotation(ctx, cluster, primaryPod); err != nil {
@@ -213,9 +214,10 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 // rollout describes whether a rollout should happen, and if so whether it can
 // be done in-place, and what the reason for the rollout is
 type rollout struct {
-	required     bool
-	canBeInPlace bool
-	reason       string
+	required            bool
+	canBeInPlace        bool
+	primaryForceRestart bool
+	reason              string
 }
 
 type rolloutChecker func(
@@ -479,7 +481,7 @@ func checkHasMissingPVCs(
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
-		return rollout{required: true, reason: "attaching a new PVC to the instance Pod"}, nil
+		return rollout{required: true, primaryForceRestart: true, reason: "attaching a new PVC to the instance Pod"}, nil
 	}
 	return rollout{}, nil
 }
