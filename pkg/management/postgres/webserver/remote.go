@@ -213,14 +213,22 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 	switch req.Method {
 	case http.MethodGet:
 		if ws.currentBackup == nil {
-			sendDataJSONResponse(w, 200, struct{}{})
+			sendDataJSONData(w, 200, struct{}{})
 			return
+		}
+
+		res := Response[BackupResultData]{
+			Data: &ws.currentBackup.data,
 		}
 		if ws.currentBackup.err != nil {
-			sendBadRequestJSONResponse(w, "ERROR_WHILE_PROCESSING", ws.currentBackup.err.Error())
-			return
+			res.Error = &Error{
+				Code:    "BACKUP_STATUS_CONTAINS_ERROR",
+				Message: ws.currentBackup.err.Error(),
+			}
 		}
-		sendDataJSONResponse(w, 200, ws.currentBackup.data)
+
+		sendJSONResponse(w, 200, res)
+		return
 
 	case http.MethodPost:
 		var p StartBackupRequest
@@ -236,7 +244,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}()
 		if ws.currentBackup != nil {
 			if !p.Force {
-				sendBadRequestJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
+				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
 				return
 			}
 			ws.currentBackup.data.Phase = Failed
@@ -254,11 +262,12 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			p.WaitForArchive,
 		)
 		if err != nil {
-			sendBadRequestJSONResponse(w, "INITIALIZING_CONNECTION", err.Error())
+			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
 		go ws.currentBackup.startBackup(context.Background())
-		sendDataJSONResponse(w, 200, struct{}{})
+		sendDataJSONData(w, 200, struct{}{})
+		return
 
 	case http.MethodDelete:
 		if ws.currentBackup == nil {
@@ -267,12 +276,12 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}
 
 		if ws.currentBackup.data.Phase == Closing {
-			sendDataJSONResponse(w, 200, struct{}{})
+			sendDataJSONData(w, 200, struct{}{})
 			return
 		}
 
 		if ws.currentBackup.data.Phase != Started {
-			sendBadRequestJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED",
+			sendUnprocessableEntityJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED",
 				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
 			return
 		}
@@ -285,13 +294,14 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			}
 
 			ws.currentBackup.data.Phase = Failed
-			sendDataJSONResponse(w, 200, struct{}{})
+			sendDataJSONData(w, 200, struct{}{})
 			return
 		}
 
 		ws.currentBackup.data.Phase = Closing
 		go ws.currentBackup.stopBackup(context.Background())
-		sendDataJSONResponse(w, 200, struct{}{})
+		sendDataJSONData(w, 200, struct{}{})
+		return
 	}
 }
 

@@ -44,7 +44,7 @@ func (o *onlineExecutor) finalize(
 ) (*ctrl.Result, error) {
 	status, err := o.backupClient.Status(ctx, targetPod.Status.PodIP)
 	if err != nil {
-		return nil, fmt.Errorf("while getting status: %w", err)
+		return nil, fmt.Errorf("while getting status while finalizing: %w", err)
 	}
 
 	if status.BackupName != backup.Name {
@@ -63,6 +63,7 @@ func (o *onlineExecutor) finalize(
 	case webserver.Closing:
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	case webserver.Completed:
+		// TODO: eventually move it inside an enrich backup method
 		backup.Status.BeginLSN = string(status.BeginLSN)
 		backup.Status.EndLSN = string(status.EndLSN)
 		backup.Status.TablespaceMapFile = status.SpcmapFile
@@ -86,9 +87,9 @@ func (o *onlineExecutor) prepare(
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle hot snapshots
-	status, err := o.backupClient.Status(ctx, targetPod.Status.PodIP)
+	status, err := o.backupClient.StatusWithBodyErrors(ctx, targetPod.Status.PodIP)
 	if err != nil {
-		return nil, fmt.Errorf("while getting status: %w", err)
+		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
 	switch {
 	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.

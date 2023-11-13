@@ -113,7 +113,16 @@ func sendBadRequestJSONResponse(w http.ResponseWriter, errorCode string, message
 	})
 }
 
-func sendDataJSONResponse[T interface{}](w http.ResponseWriter, statusCode int, data T) {
+func sendUnprocessableEntityJSONResponse(w http.ResponseWriter, errorCode string, message string) {
+	sendJSONResponse(w, http.StatusUnprocessableEntity, Response[any]{
+		Error: &Error{
+			Code:    errorCode,
+			Message: message,
+		},
+	})
+}
+
+func sendDataJSONData[T interface{}](w http.ResponseWriter, statusCode int, data T) {
 	sendJSONResponse(w, statusCode, Response[T]{
 		Data: &data,
 	})

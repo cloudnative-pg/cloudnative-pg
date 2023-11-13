@@ -53,6 +53,17 @@ func NewBackupClient() *BackupClient {
 	return &BackupClient{cli: timeoutClient}
 }
 
+// StatusWithBodyErrors the current status of the backup..
+func (c *BackupClient) StatusWithBodyErrors(ctx context.Context, podIP string) (*BackupResultData, error) {
+	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
+	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return executeRequest[BackupResultData](ctx, c.cli, req, true)
+}
+
 // Status the current status of the backup. Returns empty BackupResultData struct if it is not running.
 func (c *BackupClient) Status(ctx context.Context, podIP string) (*BackupResultData, error) {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
@@ -61,7 +72,7 @@ func (c *BackupClient) Status(ctx context.Context, podIP string) (*BackupResultD
 		return nil, err
 	}
 
-	return executeRequest[BackupResultData](ctx, c.cli, req)
+	return executeRequest[BackupResultData](ctx, c.cli, req, false)
 }
 
 // Start runs the pg_start_backup
@@ -84,7 +95,7 @@ func (c *BackupClient) Start(
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	return executeRequest[struct{}](ctx, c.cli, req)
+	return executeRequest[struct{}](ctx, c.cli, req, false)
 }
 
 // Stop runs the pg_stop_backup
@@ -94,11 +105,16 @@ func (c *BackupClient) Stop(ctx context.Context, podIP string) error {
 	if err != nil {
 		return err
 	}
-	_, err = executeRequest[BackupResultData](ctx, c.cli, req)
+	_, err = executeRequest[BackupResultData](ctx, c.cli, req, false)
 	return err
 }
 
-func executeRequest[T any](ctx context.Context, cli *http.Client, req *http.Request) (*T, error) {
+func executeRequest[T any](
+	ctx context.Context,
+	cli *http.Client,
+	req *http.Request,
+	ignoreBodyErrors bool,
+) (*T, error) {
 	contextLogger := log.FromContext(ctx)
 
 	resp, err := cli.Do(req)
@@ -117,7 +133,7 @@ func executeRequest[T any](ctx context.Context, cli *http.Client, req *http.Requ
 		return nil, fmt.Errorf("while reading the body: %w", err)
 	}
 
-	if resp.StatusCode == 500 {
+	if resp.StatusCode == http.StatusInternalServerError {
 		return nil, fmt.Errorf("encountered an internal server error status code 500 with body: %s", string(body))
 	}
 
@@ -125,7 +141,7 @@ func executeRequest[T any](ctx context.Context, cli *http.Client, req *http.Requ
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("while unmarshalling the body, body: %s err: %w", string(body), err)
 	}
-	if result.Error != nil {
+	if result.Error != nil && !ignoreBodyErrors {
 		return nil, fmt.Errorf("body contained an error code: %s and message: %s",
 			result.Error.Code, result.Error.Message)
 	}
