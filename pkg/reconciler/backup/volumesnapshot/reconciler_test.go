@@ -143,10 +143,10 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
 			Build()
 
-		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).ToNot(BeNil())
 
@@ -199,10 +199,10 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
 			Build()
 
-		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 		// we should have found snapshots that are not ready, and so we'd return to
 		// wait for them to be ready
@@ -269,10 +269,10 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
 			Build()
 
-		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 		// we should have found snapshots that have been privisioned, so we need to
 		// wait until they are ready in a next reconciliation loop
@@ -345,10 +345,10 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewExecutorBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
 			Build()
 
-		result, err := executor.Execute(ctx, cluster, backup, targetPod, pvcs)
+		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
 		Expect(err).ToNot(HaveOccurred())
 		// we should have found snapshots that are ready, and so the result
 		// should be nil
