@@ -1,11 +1,14 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-example-with-tablespaces
+  name: cluster-tablespaces
 spec:
   instances: 2
 
   storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  walStorage:
     size: 1Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
@@ -18,3 +21,27 @@ spec:
       storage:
         size: 2Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  backup:
+    barmanObjectStore:
+        destinationPath: s3://cluster-backups/
+        endpointURL: https://minio-service:9000
+        endpointCA:
+          key: ca.crt
+          name: minio-server-ca-secret
+        s3Credentials:
+          accessKeyId:
+            name: backup-storage-creds
+            key: ID
+          secretAccessKey:
+            name: backup-storage-creds
+            key: KEY
+        wal:
+          compression: gzip
+        data:
+          immediateCheckpoint: true
+        tags:
+          retention: "30days"
+        historyTags:
+          retention: "30days"
+    retentionPolicy: "30d"

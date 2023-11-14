@@ -105,7 +105,7 @@ func (r *TablespaceReconciler) reconcile(
 		tbsStorageManager,
 		tbsByAction,
 	); err != nil {
-		return reconcile.Result{}, fmt.Errorf("while applying tablespace change to database: %w", err)
+		return reconcile.Result{}, fmt.Errorf("while reconciling tablespaces in the database: %w", err)
 	}
 
 	tbsInDatabase, err = tbsManager.List(ctx)

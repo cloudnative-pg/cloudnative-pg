@@ -456,6 +456,26 @@ func CountFilesOnMinio(namespace string, minioClientName string, path string) (v
 	return value, err
 }
 
+// ListFilesOnMinio uses the minioClient in the given `namespace` to list the
+// paths matching the given `path`
+func ListFilesOnMinio(namespace string, minioClientName string, path string) (string, error) {
+	var stdout string
+	stdout, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		namespace,
+		minioClientName,
+		composeListFilesMinio(path, "minio")))
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(stdout, "\n"), nil
+}
+
+// composeListFilesMinio builds the Minio command to list the filenames matching a given path
+func composeListFilesMinio(path string, serviceName string) string {
+	return fmt.Sprintf("sh -c 'mc find %v --path %v'", serviceName, path)
+}
+
 // composeFindMinioCmd builds the Minio find command
 func composeFindMinioCmd(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --path %v | wc -l'", serviceName, path)
