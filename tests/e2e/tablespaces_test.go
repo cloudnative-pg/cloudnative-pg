@@ -206,9 +206,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
 			})
-			By("waiting for the cluster to be ready", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testUtils.ClusterIsReady], env)
-			})
 
 			By("verifying there are 3 tablespaces and PVCs were created", func() {
 				cluster, err = env.GetCluster(namespace, clusterName)
@@ -218,6 +215,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 3, testTimeouts[testUtils.PodRollout])
 				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
 				AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.PodRollout])
+			})
+
+			By("waiting for the cluster to be ready", func() {
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testUtils.ClusterIsReady], env)
 			})
 
 			By("verifying expected number of PVCs for tablespaces", func() {
@@ -376,10 +377,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 				}, 120, 5).Should(BeTrue())
 			})
 
-			By("waiting for the cluster to be ready", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testUtils.ClusterIsReady], env)
-			})
-
 			By("verify tablespaces and PVC are there", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
@@ -388,6 +385,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[testUtils.PodRollout])
 				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
 				AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.PodRollout])
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testUtils.ClusterIsReady], env)
 			})
 
 			By("verifying all PVCs for tablespaces are recreated", func() {
