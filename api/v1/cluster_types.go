@@ -1276,21 +1276,21 @@ type CertificatesConfiguration struct {
 	// <br />
 	// - `ca.crt`: CA that should be used to validate the server certificate,
 	// used as `sslrootcert` in client connection strings.<br />
-	// - `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
+	// - `tls.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
 	// this can be omitted.<br />
 	// +optional
 	ServerCASecret string `json:"serverCASecret,omitempty"`
 
 	// The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as
 	// `ssl_cert_file` and `ssl_key_file` so that clients can connect to postgres securely.
-	// If not defined, ServerCASecret must provide also `ca.key` and a new secret will be
+	// If not defined, ServerCASecret must provide also `tls.key` and a new secret will be
 	// created using the provided CA.
 	// +optional
 	ServerTLSSecret string `json:"serverTLSSecret,omitempty"`
 
 	// The secret of type kubernetes.io/tls containing the client certificate to authenticate as
 	// the `streaming_replica` user.
-	// If not defined, ClientCASecret must provide also `ca.key`, and a new secret will be
+	// If not defined, ClientCASecret must provide also `tls.key`, and a new secret will be
 	// created using the provided CA.
 	// +optional
 	ReplicationTLSSecret string `json:"replicationTLSSecret,omitempty"`
@@ -1302,7 +1302,7 @@ type CertificatesConfiguration struct {
 	// <br />
 	// - `ca.crt`: CA that should be used to validate the client certificates,
 	// used as `ssl_ca_file` of all the instances.<br />
-	// - `ca.key`: key used to generate client certificates, if ReplicationTLSSecret is provided,
+	// - `tls.key`: key used to generate client certificates, if ReplicationTLSSecret is provided,
 	// this can be omitted.<br />
 	// +optional
 	ClientCASecret string `json:"clientCASecret,omitempty"`

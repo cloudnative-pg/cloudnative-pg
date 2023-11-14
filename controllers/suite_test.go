@@ -430,8 +430,8 @@ func generateFakeCASecret(c client.Client, name, namespace, domain string) (*cor
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			certs.CAPrivateKeyKey: keyPair.Private,
-			certs.CACertKey:       keyPair.Certificate,
+			certs.TLSPrivateKeyKey: keyPair.Private,
+			certs.CACertKey:        keyPair.Certificate,
 		},
 	}
 

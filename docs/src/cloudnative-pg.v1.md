@@ -1260,7 +1260,7 @@ Contains:<!-- raw HTML omitted -->
 <ul>
 <li><code>ca.crt</code>: CA that should be used to validate the server certificate,
 used as <code>sslrootcert</code> in client connection strings.<!-- raw HTML omitted --></li>
-<li><code>ca.key</code>: key used to generate Server SSL certs, if ServerTLSSecret is provided,
+<li><code>tls.key</code>: key used to generate Server SSL certs, if ServerTLSSecret is provided,
 this can be omitted.<!-- raw HTML omitted --></li>
 </ul>
 </td>
@@ -1271,7 +1271,7 @@ this can be omitted.<!-- raw HTML omitted --></li>
 <td>
    <p>The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as
 <code>ssl_cert_file</code> and <code>ssl_key_file</code> so that clients can connect to postgres securely.
-If not defined, ServerCASecret must provide also <code>ca.key</code> and a new secret will be
+If not defined, ServerCASecret must provide also <code>tls.key</code> and a new secret will be
 created using the provided CA.</p>
 </td>
 </tr>
@@ -1281,7 +1281,7 @@ created using the provided CA.</p>
 <td>
    <p>The secret of type kubernetes.io/tls containing the client certificate to authenticate as
 the <code>streaming_replica</code> user.
-If not defined, ClientCASecret must provide also <code>ca.key</code>, and a new secret will be
+If not defined, ClientCASecret must provide also <code>tls.key</code>, and a new secret will be
 created using the provided CA.</p>
 </td>
 </tr>
@@ -1297,7 +1297,7 @@ Contains:<!-- raw HTML omitted -->
 <ul>
 <li><code>ca.crt</code>: CA that should be used to validate the client certificates,
 used as <code>ssl_ca_file</code> of all the instances.<!-- raw HTML omitted --></li>
-<li><code>ca.key</code>: key used to generate client certificates, if ReplicationTLSSecret is provided,
+<li><code>tls.key</code>: key used to generate client certificates, if ReplicationTLSSecret is provided,
 this can be omitted.<!-- raw HTML omitted --></li>
 </ul>
 </td>

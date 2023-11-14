@@ -234,8 +234,8 @@ func (pair KeyPair) GenerateCASecret(namespace, name string) *v1.Secret {
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			CAPrivateKeyKey: pair.Private,
-			CACertKey:       pair.Certificate,
+			TLSPrivateKeyKey: pair.Private,
+			CACertKey:        pair.Certificate,
 		},
 		Type: v1.SecretTypeOpaque,
 	}
@@ -349,9 +349,14 @@ func CreateRootCA(commonName string, organizationalUnit string) (*KeyPair, error
 
 // ParseCASecret parse a CA secret to a key pair
 func ParseCASecret(secret *v1.Secret) (*KeyPair, error) {
-	privateKey, ok := secret.Data[CAPrivateKeyKey]
+	privateKey, ok := secret.Data[TLSPrivateKeyKey]
 	if !ok {
-		return nil, fmt.Errorf("missing %s secret data", CAPrivateKeyKey)
+		// check for backwards compatibility
+		privateKey, ok = secret.Data[CAPrivateKeyKey]
+		if !ok {
+			return nil, fmt.Errorf("found neither %s nor %s secret data", TLSPrivateKeyKey, CAPrivateKeyKey)
+
+		}
 	}
 
 	publicKey, ok := secret.Data[CACertKey]

@@ -572,7 +572,7 @@ head cnpg-ca-secret.yaml
 ```yaml
 data:
   ca.crt: ""
-  ca.key: ""
+  tls.key: ""
 metadata:
   creationTimestamp: "2022-03-22T10:42:28Z"
   managedFields:
@@ -602,7 +602,7 @@ head cnpg-ca-secret.yaml
 ```yaml
 data:
   ca.crt: LS0tLS1CRUdJTiBD…
-  ca.key: LS0tLS1CRUdJTiBF…
+  tls.key: LS0tLS1CRUdJTiBF…
 metadata:
   creationTimestamp: "2022-03-22T10:42:28Z"
   managedFields:

@@ -1720,14 +1720,14 @@ spec:
                       CA and will be used to generate all the client certificates.<br
                       /> <br /> Contains:<br /> <br /> - `ca.crt`: CA that should
                       be used to validate the client certificates, used as `ssl_ca_file`
-                      of all the instances.<br /> - `ca.key`: key used to generate
+                      of all the instances.<br /> - `tls.key`: key used to generate
                       client certificates, if ReplicationTLSSecret is provided, this
                       can be omitted.<br />'
                     type: string
                   replicationTLSSecret:
                     description: The secret of type kubernetes.io/tls containing the
                       client certificate to authenticate as the `streaming_replica`
-                      user. If not defined, ClientCASecret must provide also `ca.key`,
+                      user. If not defined, ClientCASecret must provide also `tls.key`,
                       and a new secret will be created using the provided CA.
                     type: string
                   serverAltDNSNames:
@@ -1742,7 +1742,7 @@ spec:
                       CA and will be used to generate the TLS certificate ServerTLSSecret.<br
                       /> <br /> Contains:<br /> <br /> - `ca.crt`: CA that should
                       be used to validate the server certificate, used as `sslrootcert`
-                      in client connection strings.<br /> - `ca.key`: key used to
+                      in client connection strings.<br /> - `tls.key`: key used to
                       generate Server SSL certs, if ServerTLSSecret is provided, this
                       can be omitted.<br />'
                     type: string
@@ -1750,7 +1750,7 @@ spec:
                     description: The secret of type kubernetes.io/tls containing the
                       server TLS certificate and key that will be set as `ssl_cert_file`
                       and `ssl_key_file` so that clients can connect to postgres securely.
-                      If not defined, ServerCASecret must provide also `ca.key` and
+                      If not defined, ServerCASecret must provide also `tls.key` and
                       a new secret will be created using the provided CA.
                     type: string
                 type: object
@@ -4210,7 +4210,7 @@ spec:
                       CA and will be used to generate all the client certificates.<br
                       /> <br /> Contains:<br /> <br /> - `ca.crt`: CA that should
                       be used to validate the client certificates, used as `ssl_ca_file`
-                      of all the instances.<br /> - `ca.key`: key used to generate
+                      of all the instances.<br /> - `tls.key`: key used to generate
                       client certificates, if ReplicationTLSSecret is provided, this
                       can be omitted.<br />'
                     type: string
@@ -4222,7 +4222,7 @@ spec:
                   replicationTLSSecret:
                     description: The secret of type kubernetes.io/tls containing the
                       client certificate to authenticate as the `streaming_replica`
-                      user. If not defined, ClientCASecret must provide also `ca.key`,
+                      user. If not defined, ClientCASecret must provide also `tls.key`,
                       and a new secret will be created using the provided CA.
                     type: string
                   serverAltDNSNames:
@@ -4237,7 +4237,7 @@ spec:
                       CA and will be used to generate the TLS certificate ServerTLSSecret.<br
                       /> <br /> Contains:<br /> <br /> - `ca.crt`: CA that should
                       be used to validate the server certificate, used as `sslrootcert`
-                      in client connection strings.<br /> - `ca.key`: key used to
+                      in client connection strings.<br /> - `tls.key`: key used to
                       generate Server SSL certs, if ServerTLSSecret is provided, this
                       can be omitted.<br />'
                     type: string
@@ -4245,7 +4245,7 @@ spec:
                     description: The secret of type kubernetes.io/tls containing the
                       server TLS certificate and key that will be set as `ssl_cert_file`
                       and `ssl_key_file` so that clients can connect to postgres securely.
-                      If not defined, ServerCASecret must provide also `ca.key` and
+                      If not defined, ServerCASecret must provide also `tls.key` and
                       a new secret will be created using the provided CA.
                     type: string
                 type: object
