@@ -36,6 +36,9 @@ func GetName(instanceName string, role utils.PVCRole) string {
 	if role == utils.PVCRolePgWal {
 		pvcName += apiv1.WalArchiveVolumeSuffix
 	}
+
+	// TODO: integrate tablespaces
+
 	return pvcName
 }
 

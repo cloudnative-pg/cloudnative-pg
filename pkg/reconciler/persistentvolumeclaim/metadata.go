@@ -186,6 +186,8 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 					}
 				}
 
+				// TODO: HANDLE TABLESPACE
+
 				if found && pvc.Labels[utils.InstanceNameLabelName] != instanceName {
 					return false
 				}
