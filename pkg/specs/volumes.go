@@ -157,7 +157,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 
 	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
 	// later it will be  retrieved to do deepEquals
-	if cluster.ShouldCreateTablespaces() {
+	if cluster.ContainsTablespaces() {
 		// Try to get a fix order of name
 		tbsNames := make([]string, len(cluster.Spec.Tablespaces))
 		i := 0
@@ -305,7 +305,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 
 	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
 	// later it will be  retrieved to do deepEquals
-	if cluster.ShouldCreateTablespaces() {
+	if cluster.ContainsTablespaces() {
 		// Try to get a fix order of name
 		tbsNames := make([]string, len(cluster.Spec.Tablespaces))
 		i := 0

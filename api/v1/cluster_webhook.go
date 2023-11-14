@@ -46,8 +46,6 @@ import (
 )
 
 const (
-	// PostgresIdentifierMaxLen is the maximum length PostgreSQL allows for identifiers
-	PostgresIdentifierMaxLen int = 63
 	// DefaultMonitoringKey is the key that should be used in the default metrics configmap to store the queries
 	DefaultMonitoringKey = "queries"
 	// DefaultMonitoringConfigMapName is the name of the target configmap with the default monitoring queries,
@@ -63,12 +61,13 @@ const (
 )
 
 const (
-	sharedBuffersParameter = "shared_buffers"
+	// postgresIdentifierMaxLen is the maximum length PostgreSQL allows for identifiers
+	postgresIdentifierMaxLen int = 63
+	sharedBuffersParameter       = "shared_buffers"
+	// prefix denoting tablespaces managed by the Postgres system
+	// see https://www.postgresql.org/docs/current/sql-createtablespace.html
+	systemTablespacesPrefix = "pg_"
 )
-
-// prefix denoting tablespaces managed by the Postgres system
-// see https://www.postgresql.org/docs/current/sql-createtablespace.html
-var systemTablespacesPrefix = "pg_"
 
 // regex to verify a Postgres-compliant identifier
 // see https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
@@ -1467,11 +1466,12 @@ func (r *Cluster) validateWalStorageSize() field.ErrorList {
 }
 
 func (r *Cluster) validateTablespacesStorageSize() field.ErrorList {
-	var result field.ErrorList
-
 	if r.Spec.Tablespaces == nil {
 		return nil
 	}
+
+	var result field.ErrorList
+
 	for tablespaceName, tablespaceConf := range r.Spec.Tablespaces {
 		result = append(result,
 			validateStorageConfigurationSize("tablespaces."+tablespaceName, tablespaceConf.Storage)...)
@@ -1658,7 +1658,7 @@ func (r *Cluster) validateTablespacesNames() field.ErrorList {
 					"and must start with a letter or an underscore"))
 		}
 
-		if len(name) > PostgresIdentifierMaxLen {
+		if len(name) > postgresIdentifierMaxLen {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "tablespaces"),
 				name,

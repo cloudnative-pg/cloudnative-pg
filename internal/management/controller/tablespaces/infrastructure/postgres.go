@@ -29,25 +29,30 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-// PostgresTablespaceManager is a TablespaceManager for a database instance
-type PostgresTablespaceManager struct {
+// TODO: check capitalization
+const sysVarTmpTbs = "TEMP_TABLESPACES"
+
+// postgresTablespaceManager is a TablespaceManager for a database instance
+type postgresTablespaceManager struct {
 	superUserDB *sql.DB
 }
 
 // NewPostgresTablespaceManager returns an implementation of TablespaceManager for postgres
-func NewPostgresTablespaceManager(superDB *sql.DB) PostgresTablespaceManager {
-	return PostgresTablespaceManager{
+func NewPostgresTablespaceManager(superDB *sql.DB) TablespaceManager {
+	return newPostgresTablespaceManager(superDB)
+}
+
+// NewPostgresTablespaceManager returns an implementation of TablespaceManager for postgres
+func newPostgresTablespaceManager(superDB *sql.DB) postgresTablespaceManager {
+	return postgresTablespaceManager{
 		superUserDB: superDB,
 	}
 }
 
-// TODO: check capitalization
-const sysVarTmpTbs = "TEMP_TABLESPACES"
-
 // List the tablespaces in the database
 // The content exclude pg_default and pg_global database
-func (tbsMgr PostgresTablespaceManager) List(ctx context.Context) ([]Tablespace, error) {
-	logger := log.FromContext(ctx).WithName("tbs_reconciler")
+func (tbsMgr postgresTablespaceManager) List(ctx context.Context) ([]Tablespace, error) {
+	logger := log.FromContext(ctx).WithName("tbs_reconciler_list")
 	logger.Trace("Invoked list")
 	wrapErr := func(err error) error { return fmt.Errorf("while listing DB tablespaces: %w", err) }
 
@@ -63,8 +68,8 @@ func (tbsMgr PostgresTablespaceManager) List(ctx context.Context) ([]Tablespace,
 		return nil, wrapErr(err)
 	}
 	defer func() {
-		if err := rows.Close(); err != nil {
-			logger.Info("Ignorable error while querying pg_catalog.pg_tablespace", "err", err)
+		if closeErr := rows.Close(); closeErr != nil {
+			logger.Info("Ignorable error while closing pg_catalog.pg_tablespace", "err", closeErr)
 		}
 	}()
 
@@ -89,21 +94,21 @@ func (tbsMgr PostgresTablespaceManager) List(ctx context.Context) ([]Tablespace,
 
 // Update the tablespace in the database
 // we only allow the tablespace update the temporary attribute for tablespace right now
-func (tbsMgr PostgresTablespaceManager) Update(ctx context.Context, tbs Tablespace) error {
-	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
+func (tbsMgr postgresTablespaceManager) Update(ctx context.Context, tbs Tablespace) error {
+	contextLog := log.FromContext(ctx).WithName("tbs_reconciler_update")
 	contextLog.Trace("Invoked Update", "tbs", tbs)
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while update tablespace %s: %w", tbs.Name, err)
 	}
 
-	var err error
-	var tempTbs []string
-	var needUpdate bool
-	if tempTbs, err = tbsMgr.getCurrentTemporaryTablespaces(ctx); err != nil {
+	tempTbs, err := tbsMgr.getCurrentTemporaryTablespaces(ctx)
+	if err != nil {
 		return wrapErr(err)
 	}
+
 	idx := slices.Index(tempTbs, tbs.Name)
 
+	var needUpdate bool
 	if tbs.Temporary && idx < 0 {
 		tempTbs = append(tempTbs, tbs.Name)
 		needUpdate = true
@@ -131,8 +136,8 @@ func (tbsMgr PostgresTablespaceManager) Update(ctx context.Context, tbs Tablespa
 }
 
 // Create the tablespace in the database, if tablespace is temporary tablespace, need reload configure
-func (tbsMgr PostgresTablespaceManager) Create(ctx context.Context, tbs Tablespace) error {
-	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
+func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespace) error {
+	contextLog := log.FromContext(ctx).WithName("tbs_reconciler_create")
 	contextLog.Trace("Invoked Create", "tbs", tbs)
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while creating tablespace %s: %w", tbs.Name, err)
@@ -176,7 +181,7 @@ func (tbsMgr PostgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 
 // getCurrentTemporaryTablespaces retrieve the current temporary tablespace in slice,
 // if there is no temporary tablespace return nil
-func (tbsMgr PostgresTablespaceManager) getCurrentTemporaryTablespaces(ctx context.Context) ([]string, error) {
+func (tbsMgr postgresTablespaceManager) getCurrentTemporaryTablespaces(ctx context.Context) ([]string, error) {
 	var tempTbs string
 	if err := tbsMgr.superUserDB.QueryRowContext(ctx, fmt.Sprintf("show %s", sysVarTmpTbs)).Scan(&tempTbs); err != nil {
 		return nil, err

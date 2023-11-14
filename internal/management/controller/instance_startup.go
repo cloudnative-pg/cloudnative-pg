@@ -310,7 +310,7 @@ func (r *InstanceReconciler) ReconcileTablespaces(
 	const dataDir = "data"
 	contextLogger := log.FromContext(ctx)
 
-	if !cluster.ShouldCreateTablespaces() {
+	if !cluster.ContainsTablespaces() {
 		return nil
 	}
 

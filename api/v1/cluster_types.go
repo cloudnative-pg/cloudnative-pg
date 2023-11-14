@@ -638,9 +638,6 @@ const (
 	TablespaceStatusReconciled TablespaceStatus = "reconciled"
 	// TablespaceStatusPendingReconciliation indicates the tablespace in Spec requires creation in the DB
 	TablespaceStatusPendingReconciliation TablespaceStatus = "pending"
-	// TablespaceStatusReserved indicates this tablespace is reserved by the operator. E.g. `pg_global`
-	// TODO: remove this status
-	TablespaceStatusReserved TablespaceStatus = "reserved"
 )
 
 // TablespacesState tracks the status of a cluster's declarative tablespaces
@@ -1645,7 +1642,16 @@ type TablespaceConfiguration struct {
 	// This flag indicates if the tablespace is a temporary tablespace or not (default false)
 	// +optional
 	// +kubebuilder:default:=false
-	Temporary bool `json:"temporary,omitempty"`
+	Temporary *bool `json:"temporary,omitempty"`
+}
+
+// GetTemporary returns the Temporary value. Defaults to false.
+func (t TablespaceConfiguration) GetTemporary() bool {
+	if t.Temporary == nil {
+		return false
+	}
+
+	return *t.Temporary
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.
@@ -2758,8 +2764,8 @@ func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
 }
 
-// ShouldCreateTablespaces returns true if for this cluster, we need to create tablespaces
-func (cluster *Cluster) ShouldCreateTablespaces() bool {
+// ContainsTablespaces returns true if for this cluster, we need to create tablespaces
+func (cluster *Cluster) ContainsTablespaces() bool {
 	return len(cluster.Spec.Tablespaces) != 0
 }
 

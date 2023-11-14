@@ -64,7 +64,7 @@ func (r *TablespaceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
-	if !cluster.ShouldCreateTablespaces() {
+	if !cluster.ContainsTablespaces() {
 		contextLogger.Info("no tablespaces to create")
 		return reconcile.Result{}, nil
 	}
@@ -146,7 +146,7 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 			tbs := tbs
 			tablespace := infrastructure.Tablespace{
 				Name:      tbs.Name,
-				Temporary: tbs.Temporary,
+				Temporary: tbs.GetTemporary(),
 			}
 			if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
 				return fmt.Errorf("cannot create tablespace before data directory is created")

@@ -204,7 +204,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 
 				cluster, err = env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			})
 
 			By("verifying there are 3 tablespaces and PVCs were created", func() {
@@ -281,7 +281,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 			By("adding tablespaces to the spec and patching", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ShouldCreateTablespaces()).To(BeFalse())
+				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
 				addTablespaces(cluster, map[string]*apiv1.TablespaceConfiguration{
 					"atablespace": {
@@ -298,12 +298,12 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 
 				cluster, err = env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			})
 			By("verify tablespaces and PVC were created", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
 				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[testUtils.PodRollout])
 				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
@@ -380,7 +380,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 			By("verify tablespaces and PVC are there", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
 				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[testUtils.PodRollout])
 				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
@@ -415,7 +415,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 			By("patch cluster with primaryUpdateMethod=switchover", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ShouldCreateTablespaces()).To(BeFalse())
+				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
 				updated := cluster.DeepCopy()
 				updated.Spec.PrimaryUpdateMethod = apiv1.PrimaryUpdateMethodSwitchover
@@ -428,7 +428,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 			By("adding tablespaces to the spec and patching", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ShouldCreateTablespaces()).To(BeFalse())
+				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
 				updated := cluster.DeepCopy()
 				updated.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
@@ -448,14 +448,14 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 
 				cluster, err = env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			})
 		})
 
 		It("can verify tablespaces and PVC were created", func() {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+			Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
 			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[testUtils.PodRollout])
 			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
@@ -501,7 +501,7 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 
 	By("checking the mount points and volumes in the pods", func() {
 		Eventually(func(g Gomega) {
-			g.Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+			g.Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			g.Expect(cluster.Spec.Tablespaces).To(HaveLen(numTablespaces))
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
@@ -655,7 +655,7 @@ func assertCanHibernateClusterWithTablespaces(
 	By("verify tablespaces and PVC are there", func() {
 		cluster, err := env.GetCluster(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(cluster.ShouldCreateTablespaces()).To(BeTrue())
+		Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
 		AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[testUtils.PodRollout])
 		AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])

@@ -3364,6 +3364,15 @@ var _ = Describe("validateResources", func() {
 })
 
 var _ = Describe("Tablespaces validation", func() {
+	createFakeTemporaryTbsConf := func() *TablespaceConfiguration {
+		return &TablespaceConfiguration{
+			Storage: StorageConfiguration{
+				Size: "10Gi",
+			},
+			Temporary: ptr.To(true),
+		}
+	}
+
 	It("should succeed if there is no tablespaces section", func() {
 		cluster := Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -3390,12 +3399,7 @@ var _ = Describe("Tablespaces validation", func() {
 					Size: "10Gi",
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
-					"my_tablespace": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my_tablespace": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3414,12 +3418,7 @@ var _ = Describe("Tablespaces validation", func() {
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
 					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
-					"my_tablespace1my_tablespace2my_tablespace3my_tablespace4my_tablespace5": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my_tablespace1my_tablespace2my_tablespace3my_tablespace4my_tablespace5": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3437,12 +3436,7 @@ var _ = Describe("Tablespaces validation", func() {
 					Size: "10Gi",
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
-					"pg_foo": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"pg_foo": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3461,12 +3455,7 @@ var _ = Describe("Tablespaces validation", func() {
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
 					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
-					"my-^&sdf;": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my-^&sdf;": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3484,24 +3473,9 @@ var _ = Describe("Tablespaces validation", func() {
 					Size: "10Gi",
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
-					"my_tablespace": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
-					"my_TAblespace": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
-					"another": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my_tablespace": createFakeTemporaryTbsConf(),
+					"my_TAblespace": createFakeTemporaryTbsConf(),
+					"another":       createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3524,7 +3498,7 @@ var _ = Describe("Tablespaces validation", func() {
 						Storage: StorageConfiguration{
 							Size: "10Gibberish",
 						},
-						Temporary: true,
+						Temporary: ptr.To(true),
 					},
 				},
 			},
@@ -3548,15 +3522,10 @@ var _ = Describe("Tablespaces validation", func() {
 						Storage: StorageConfiguration{
 							Size: "10Gibberish",
 						},
-						Temporary: true,
+						Temporary: ptr.To(true),
 					},
 					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
-					"my_tablespace1my_tablespace2my_tablespace3my_tablespace4my_tablespace5": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my_tablespace1my_tablespace2my_tablespace3my_tablespace4my_tablespace5": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3574,12 +3543,7 @@ var _ = Describe("Tablespaces validation", func() {
 					Size: "10Gi",
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
-					"my-tablespace1": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my-tablespace1": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3605,18 +3569,8 @@ var _ = Describe("Tablespaces validation", func() {
 					Size: "10Gi",
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
-					"my-tablespace1": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
-					"my-tablespace2": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my-tablespace1": createFakeTemporaryTbsConf(),
+					"my-tablespace2": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3630,12 +3584,7 @@ var _ = Describe("Tablespaces validation", func() {
 					Size: "10Gi",
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
-					"my-tablespace1": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my-tablespace1": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3653,12 +3602,7 @@ var _ = Describe("Tablespaces validation", func() {
 					Size: "10Gi",
 				},
 				Tablespaces: map[string]*TablespaceConfiguration{
-					"my-tablespace1": {
-						Storage: StorageConfiguration{
-							Size: "10Gi",
-						},
-						Temporary: true,
-					},
+					"my-tablespace1": createFakeTemporaryTbsConf(),
 				},
 			},
 		}
@@ -3676,7 +3620,7 @@ var _ = Describe("Tablespaces validation", func() {
 						Storage: StorageConfiguration{
 							Size: "9Gi",
 						},
-						Temporary: true,
+						Temporary: ptr.To(true),
 					},
 				},
 			},
