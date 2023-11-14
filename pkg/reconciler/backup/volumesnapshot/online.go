@@ -42,7 +42,7 @@ func (o *onlineExecutor) finalize(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
-	body, err := o.backupClient.StatusWithBodyErrors(ctx, targetPod.Status.PodIP)
+	body, err := o.backupClient.StatusWithErrors(ctx, targetPod.Status.PodIP)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while finalizing: %w", err)
 	}
@@ -102,7 +102,7 @@ func (o *onlineExecutor) prepare(
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle hot snapshots
-	body, err := o.backupClient.StatusWithBodyErrors(ctx, targetPod.Status.PodIP)
+	body, err := o.backupClient.StatusWithErrors(ctx, targetPod.Status.PodIP)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}

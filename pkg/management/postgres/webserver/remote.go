@@ -223,7 +223,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 	switch req.Method {
 	case http.MethodGet:
 		if ws.currentBackup == nil {
-			sendDataJSONData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{})
 			return
 		}
 
@@ -275,7 +275,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 		go ws.currentBackup.startBackup(context.Background(), p.BackupName)
-		sendDataJSONData(w, 200, struct{}{})
+		sendJSONResponseWithData(w, 200, struct{}{})
 		return
 
 	case http.MethodPut:
@@ -302,7 +302,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}
 
 		if ws.currentBackup.data.Phase == Closing {
-			sendDataJSONData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{})
 			return
 		}
 
@@ -319,12 +319,12 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				}
 			}
 
-			sendDataJSONData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{})
 			return
 		}
 		ws.currentBackup.setPhase(Closing, p.BackupName)
 		go ws.currentBackup.stopBackup(context.Background(), p.BackupName)
-		sendDataJSONData(w, 200, struct{}{})
+		sendJSONResponseWithData(w, 200, struct{}{})
 		return
 	}
 }

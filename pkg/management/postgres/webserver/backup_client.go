@@ -53,8 +53,9 @@ func NewBackupClient() *BackupClient {
 	return &BackupClient{cli: timeoutClient}
 }
 
-// StatusWithBodyErrors the current status of the backup..
-func (c *BackupClient) StatusWithBodyErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error) {
+// StatusWithErrors retrieves the current status of the backup.
+// Returns the response body in case there is an error in the request
+func (c *BackupClient) StatusWithErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error) {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
@@ -88,7 +89,7 @@ func (c *BackupClient) Start(
 	return err
 }
 
-// Stop runs the pg_stop_backup
+// Stop runs the command pg_stop_backup
 func (c *BackupClient) Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
@@ -115,18 +116,18 @@ func executeRequestWithError[T any](
 
 	resp, err := cli.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("while execution a request: %w", err)
+		return nil, fmt.Errorf("while executing http request: %w", err)
 	}
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			contextLogger.Error(err, "while closing body")
+			contextLogger.Error(err, "while closing response body")
 		}
 	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("while reading the body: %w", err)
+		return nil, fmt.Errorf("while reading the response body: %w", err)
 	}
 
 	if resp.StatusCode == http.StatusInternalServerError {
