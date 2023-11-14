@@ -2,3 +2,4 @@ licenses
 testdata
 releases/
 .github/workflows/release-publish.yml
+.github/workflows/continuous-integration.yml
