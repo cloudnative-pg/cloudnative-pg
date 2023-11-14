@@ -53,15 +53,16 @@ func NewBackupClient() *BackupClient {
 	return &BackupClient{cli: timeoutClient}
 }
 
-// Status the current status of the backup. Returns empty BackupResultData struct if it is not running.
-func (c *BackupClient) Status(ctx context.Context, podIP string) (*BackupResultData, error) {
+// StatusWithErrors retrieves the current status of the backup.
+// Returns the response body in case there is an error in the request
+func (c *BackupClient) StatusWithErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error) {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return executeRequest[BackupResultData](ctx, c.cli, req)
+	return executeRequestWithError[BackupResultData](ctx, c.cli, req, true)
 }
 
 // Start runs the pg_start_backup
@@ -69,55 +70,67 @@ func (c *BackupClient) Start(
 	ctx context.Context,
 	podIP string,
 	sbq StartBackupRequest,
-) (*struct{}, error) {
+) error {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		return fmt.Errorf("failed to marshal start payload: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	return executeRequest[struct{}](ctx, c.cli, req)
-}
-
-// Stop runs the pg_stop_backup
-func (c *BackupClient) Stop(ctx context.Context, podIP string) error {
-	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, "DELETE", httpURL, nil)
-	if err != nil {
-		return err
-	}
-	_, err = executeRequest[BackupResultData](ctx, c.cli, req)
+	_, err = executeRequestWithError[struct{}](ctx, c.cli, req, false)
 	return err
 }
 
-func executeRequest[T any](ctx context.Context, cli *http.Client, req *http.Request) (*T, error) {
+// Stop runs the command pg_stop_backup
+func (c *BackupClient) Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error {
+	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
+	// Marshalling the payload to JSON
+	jsonBody, err := json.Marshal(sbq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stop payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", httpURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return err
+	}
+	_, err = executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
+	return err
+}
+
+func executeRequestWithError[T any](
+	ctx context.Context,
+	cli *http.Client,
+	req *http.Request,
+	ignoreBodyErrors bool,
+) (*Response[T], error) {
 	contextLogger := log.FromContext(ctx)
 
 	resp, err := cli.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("while execution a request: %w", err)
+		return nil, fmt.Errorf("while executing http request: %w", err)
 	}
 
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			contextLogger.Error(err, "while closing body")
+			contextLogger.Error(err, "while closing response body")
 		}
 	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("while reading the body: %w", err)
+		return nil, fmt.Errorf("while reading the response body: %w", err)
 	}
 
-	if resp.StatusCode == 500 {
+	if resp.StatusCode == http.StatusInternalServerError {
 		return nil, fmt.Errorf("encountered an internal server error status code 500 with body: %s", string(body))
 	}
 
@@ -125,10 +138,10 @@ func executeRequest[T any](ctx context.Context, cli *http.Client, req *http.Requ
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("while unmarshalling the body, body: %s err: %w", string(body), err)
 	}
-	if result.Error != nil {
+	if result.Error != nil && !ignoreBodyErrors {
 		return nil, fmt.Errorf("body contained an error code: %s and message: %s",
 			result.Error.Code, result.Error.Message)
 	}
 
-	return result.Data, nil
+	return &result, nil
 }

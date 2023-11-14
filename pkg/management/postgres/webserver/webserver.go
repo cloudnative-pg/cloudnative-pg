@@ -19,6 +19,7 @@ package webserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -47,6 +48,21 @@ type Error struct {
 type Response[T interface{}] struct {
 	Data  *T     `json:"data,omitempty"`
 	Error *Error `json:"error,omitempty"`
+}
+
+// EnsureDataIsPresent returns an error if the data is field is nil
+func (body Response[T]) EnsureDataIsPresent() error {
+	status := body.Data
+	if status != nil {
+		return nil
+	}
+
+	if body.Error != nil {
+		return fmt.Errorf("encountered a body error while preparing, code: '%s', message: %s",
+			body.Error.Code, body.Error.Message)
+	}
+
+	return fmt.Errorf("encounteered an empty body while expecting it to not be empty")
 }
 
 // Webserver contains a server that interacts with postgres instance
@@ -113,7 +129,16 @@ func sendBadRequestJSONResponse(w http.ResponseWriter, errorCode string, message
 	})
 }
 
-func sendDataJSONResponse[T interface{}](w http.ResponseWriter, statusCode int, data T) {
+func sendUnprocessableEntityJSONResponse(w http.ResponseWriter, errorCode string, message string) {
+	sendJSONResponse(w, http.StatusUnprocessableEntity, Response[any]{
+		Error: &Error{
+			Code:    errorCode,
+			Message: message,
+		},
+	})
+}
+
+func sendJSONResponseWithData[T interface{}](w http.ResponseWriter, statusCode int, data T) {
 	sendJSONResponse(w, statusCode, Response[T]{
 		Data: &data,
 	})

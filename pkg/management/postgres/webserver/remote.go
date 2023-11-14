@@ -49,6 +49,16 @@ type StartBackupRequest struct {
 	Force               bool   `json:"force,omitempty"`
 }
 
+// StopBackupRequest the required data to execute the pg_stop_backup
+type StopBackupRequest struct {
+	BackupName string `json:"backupName"`
+}
+
+// NewStopBackupRequest constructor
+func NewStopBackupRequest(backupName string) *StopBackupRequest {
+	return &StopBackupRequest{BackupName: backupName}
+}
+
 // NewRemoteWebServer returns a webserver that allows connection from external clients
 func NewRemoteWebServer(
 	instance *postgres.Instance,
@@ -213,14 +223,22 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 	switch req.Method {
 	case http.MethodGet:
 		if ws.currentBackup == nil {
-			sendDataJSONResponse(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{})
 			return
+		}
+
+		res := Response[BackupResultData]{
+			Data: &ws.currentBackup.data,
 		}
 		if ws.currentBackup.err != nil {
-			sendBadRequestJSONResponse(w, "ERROR_WHILE_PROCESSING", ws.currentBackup.err.Error())
-			return
+			res.Error = &Error{
+				Code:    "BACKUP_STATUS_CONTAINS_ERROR",
+				Message: ws.currentBackup.err.Error(),
+			}
 		}
-		sendDataJSONResponse(w, 200, ws.currentBackup.data)
+
+		sendJSONResponse(w, 200, res)
+		return
 
 	case http.MethodPost:
 		var p StartBackupRequest
@@ -236,11 +254,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}()
 		if ws.currentBackup != nil {
 			if !p.Force {
-				sendBadRequestJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
+				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
 				return
 			}
-			ws.currentBackup.data.Phase = Failed
-			if err := ws.currentBackup.conn.Close(); err != nil {
+			if err := ws.currentBackup.closeConnection(p.BackupName); err != nil {
 				if !errors.Is(err, sql.ErrConnDone) {
 					log.Error(err, "Error while closing backup connection (start)")
 				}
@@ -254,44 +271,61 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			p.WaitForArchive,
 		)
 		if err != nil {
-			sendBadRequestJSONResponse(w, "INITIALIZING_CONNECTION", err.Error())
+			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
-		go ws.currentBackup.startBackup(context.Background())
-		sendDataJSONResponse(w, 200, struct{}{})
+		go ws.currentBackup.startBackup(context.Background(), p.BackupName)
+		sendJSONResponseWithData(w, 200, struct{}{})
+		return
 
-	case http.MethodDelete:
+	case http.MethodPut:
+		var p StopBackupRequest
+		err := json.NewDecoder(req.Body).Decode(&p)
+		if err != nil {
+			sendBadRequestJSONResponse(w, "FAILED_TO_PARSE_REQUEST", "Failed to parse request body")
+			return
+		}
+		defer func() {
+			if err := req.Body.Close(); err != nil {
+				log.Error(err, "while closing the body")
+			}
+		}()
 		if ws.currentBackup == nil {
 			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "")
 			return
 		}
 
+		if ws.currentBackup.data.BackupName != p.BackupName {
+			sendUnprocessableEntityJSONResponse(w, "NOT_CURRENT_RUNNING_BACKUP",
+				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
+			return
+		}
+
 		if ws.currentBackup.data.Phase == Closing {
-			sendDataJSONResponse(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{})
 			return
 		}
 
 		if ws.currentBackup.data.Phase != Started {
-			sendBadRequestJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED",
+			sendUnprocessableEntityJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED",
 				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
 			return
 		}
 
 		if ws.currentBackup.err != nil {
-			if err := ws.currentBackup.conn.Close(); err != nil {
+			if err := ws.currentBackup.closeConnection(p.BackupName); err != nil {
 				if !errors.Is(err, sql.ErrConnDone) {
 					log.Error(err, "Error while closing backup connection (stop)")
 				}
 			}
 
-			ws.currentBackup.data.Phase = Failed
-			sendDataJSONResponse(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{})
 			return
 		}
-
-		ws.currentBackup.data.Phase = Closing
-		go ws.currentBackup.stopBackup(context.Background())
-		sendDataJSONResponse(w, 200, struct{}{})
+		ws.currentBackup.setPhase(Closing, p.BackupName)
+		go ws.currentBackup.stopBackup(context.Background(), p.BackupName)
+		sendJSONResponseWithData(w, 200, struct{}{})
+		return
 	}
 }
 
