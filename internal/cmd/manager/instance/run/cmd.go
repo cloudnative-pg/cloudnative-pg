@@ -21,6 +21,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -115,6 +116,8 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		"version", versions.Version,
 		"build", versions.Info)
 
+	gracefulShutdownTimeout := time.Duration(int64(instance.MaxStopDelay) * int64(time.Second))
+
 	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Cache: cache.Options{
@@ -127,6 +130,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 				},
 			},
 		},
+		GracefulShutdownTimeout: &gracefulShutdownTimeout,
 		// We don't need a cache for secrets and configmap, as all reloads
 		// should be driven by changes in the Cluster we are watching
 		Client: client.Options{
