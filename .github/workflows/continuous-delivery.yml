@@ -257,6 +257,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
       -
         name: Build meta
         id: build-meta
@@ -577,6 +578,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
       -
         # 'Retry' preparing the E2E test ENV
         name: Prepare the environment
@@ -785,6 +787,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
@@ -1120,6 +1123,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
@@ -1492,6 +1496,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
