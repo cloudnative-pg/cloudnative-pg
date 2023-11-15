@@ -561,3 +561,126 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(podMonitor.Annotations).To(Equal(updatedAnnotations))
 	})
 })
+
+var _ = Describe("createOrPatchClusterCredentialSecret", func() {
+	const (
+		secretName = "test-secret"
+		namespace  = "test-namespace"
+	)
+	var (
+		ctx      context.Context
+		proposed *corev1.Secret
+		cli      k8client.Client
+	)
+
+	BeforeEach(func() {
+		cli = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
+		ctx = context.TODO()
+		const secretName = "test-secret"
+		proposed = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        secretName,
+				Namespace:   namespace,
+				Labels:      map[string]string{"test": "label"},
+				Annotations: map[string]string{"test": "annotation"},
+			},
+			Data: map[string][]byte{"key": []byte("value")},
+		}
+	})
+
+	Context("when the secret does not exist", func() {
+		It("should create the secret", func() {
+			err := createOrPatchClusterCredentialSecret(ctx, cli, proposed)
+			Expect(err).NotTo(HaveOccurred())
+
+			var createdSecret corev1.Secret
+			err = cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &createdSecret)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createdSecret.Data).To(Equal(proposed.Data))
+			Expect(createdSecret.Labels).To(Equal(proposed.Labels))
+			Expect(createdSecret.Annotations).To(Equal(proposed.Annotations))
+		})
+	})
+
+	Context("when the secret exists and is owned by the cluster", func() {
+		BeforeEach(func() {
+			existingSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        secretName,
+					Namespace:   namespace,
+					Labels:      map[string]string{"old": "label"},
+					Annotations: map[string]string{"old": "annotation"},
+				},
+				Data: map[string][]byte{"oldkey": []byte("oldvalue")},
+			}
+			cluster := apiv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       apiv1.ClusterKind,
+					APIVersion: apiGVString,
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+			}
+			cluster.SetInheritedDataAndOwnership(&existingSecret.ObjectMeta)
+			Expect(cli.Create(ctx, existingSecret)).To(Succeed())
+		})
+
+		It("should patch the secret if metadata differs", func() {
+			Expect(proposed.Labels).To(HaveKeyWithValue("test", "label"))
+			Expect(proposed.Annotations).To(HaveKeyWithValue("test", "annotation"))
+
+			err := createOrPatchClusterCredentialSecret(ctx, cli, proposed)
+			Expect(err).NotTo(HaveOccurred())
+
+			var patchedSecret corev1.Secret
+			err = cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &patchedSecret)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(patchedSecret.Labels).To(HaveKeyWithValue("test", "label"))
+			Expect(patchedSecret.Annotations).To(HaveKeyWithValue("test", "annotation"))
+		})
+
+		It("should not patch the secret if metadata is the same", func() {
+			var originalSecret corev1.Secret
+			err := cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &originalSecret)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assuming secretName is the name of the existing secret
+			proposed.ObjectMeta.Name = secretName
+			proposed.ObjectMeta.Labels = map[string]string{"old": "label"}
+			proposed.ObjectMeta.Annotations = map[string]string{"old": "annotation"}
+
+			err = createOrPatchClusterCredentialSecret(ctx, cli, proposed)
+			Expect(err).NotTo(HaveOccurred())
+
+			var patchedSecret corev1.Secret
+			err = cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &patchedSecret)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(originalSecret.Generation).To(Equal(originalSecret.Generation))
+		})
+	})
+
+	Context("when the secret exists but is not owned by the cluster", func() {
+		BeforeEach(func() {
+			existingSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: namespace,
+				},
+			}
+			Expect(cli.Create(ctx, existingSecret)).To(Succeed())
+		})
+
+		It("should not modify the secret", func() {
+			var originalSecret corev1.Secret
+			err := cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &originalSecret)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = createOrPatchClusterCredentialSecret(ctx, cli, proposed)
+			Expect(err).NotTo(HaveOccurred())
+
+			var patchedSecret corev1.Secret
+			err = cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &patchedSecret)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(originalSecret.Generation).To(Equal(originalSecret.Generation))
+		})
+	})
+})
