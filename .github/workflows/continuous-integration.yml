@@ -136,6 +136,7 @@ jobs:
           # Disable setup-go caching. Cache is better handled by the golangci-lint action
           cache: false
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -159,6 +160,7 @@ jobs:
         uses: golang/govulncheck-action@v1
         with:
           go-version-input: ${{ env.GOLANG_VERSION }}
+          check-latest: true
 
   shellcheck:
     name: Run shellcheck linter
@@ -243,6 +245,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
 
       - name: Run unit tests
         env:
@@ -281,6 +284,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
 
       - name: Run make apidoc
         run: |
@@ -315,6 +319,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
 
       - name: Run make manifests
         run: |
@@ -381,6 +386,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
 
       - name: Build meta
         id: build-meta
@@ -647,6 +653,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
 
       - name: "Running Scorecard tests"
         env:

@@ -77,6 +77,7 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GOLANG_VERSION }}
+        check-latest: true
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL

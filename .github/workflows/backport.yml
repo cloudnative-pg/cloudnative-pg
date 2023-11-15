@@ -91,6 +91,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
       -
         name: Check commits
         if: contains( github.event.pull_request.labels.*.name, matrix.branch )
