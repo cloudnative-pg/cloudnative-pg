@@ -32,7 +32,8 @@ running in those nodes.
 This is technically known as **inter-pod affinity/anti-affinity**.
 
 CloudNativePG by default will configure the cluster's instances
-preferably on different nodes, resulting in the following `affinity` definition:
+preferably on different nodes, while pgBouncer may still run on the same nodes,
+resulting in the following `affinity` definition:
 
 ```yaml
 affinity:
@@ -41,10 +42,14 @@ affinity:
       - podAffinityTerm:
           labelSelector:
             matchExpressions:
-              - key: postgresql
+              - key: cnpg.io/cluster
                 operator: In
                 values:
                   - cluster-example
+              - key: cnpg.io/podRole
+                operator: In
+                values:
+                  - instance
           topologyKey: kubernetes.io/hostname
         weight: 100
 ```
