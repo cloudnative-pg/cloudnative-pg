@@ -19,7 +19,21 @@ env:
   GOLANG_VERSION: "1.21.x"
   GOLANGCI_LINT_VERSION: "v1.55"
   KUBEBUILDER_VERSION: "2.3.1"
-  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
+  OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
+  API_DOC_NAME: "cloudnative-pg.v1.md"
+  SLACK_USERNAME: "cnpg-bot"
+  # Keep in mind that adding more platforms (architectures) will increase the building
+  # time even if we use the ghcache for the building process.
+  PLATFORM: "linux/amd64,linux/arm64"
+  BUILD_PUSH_PROVENANCE: ""
+  BUILD_PUSH_CACHE_FROM: ""
+  BUILD_PUSH_CACHE_TO: ""
+  BUILD_PLUGIN_RELEASE_ARGS: "build  --skip-validate --rm-dist --id kubectl-cnpg --timeout 60m"
+  BUILD_MANAGER_RELEASE_ARGS: "build --skip-validate --rm-dist --id manager"
+  REPOSITORY_OWNER: "cloudnative-pg"
+  DOCKER_REGISTRY: "ghcr.io"
+  DOCKER_REGISTRY_USER: ${{ github.actor }}
+  DOCKER_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   OPP_SCRIPT_URL: "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/ci/latest/ci/scripts/opp.sh"
 
 defaults:
@@ -37,9 +51,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch:
-          - release-1.20
-          - release-1.21
+        branch: [release-1.20, release-1.21]
+
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@v1
@@ -104,12 +117,14 @@ jobs:
               - 'pkg/**'
               - '.github/workflows/continuous-delivery.yml'
               - '.github/workflows/continuous-integration.yml'
-              - '.goreleaser.yml'
+              - '.goreleaser*.yml'
               - 'Dockerfile'
               - 'Makefile'
               - 'go.mod'
               - 'go.sum'
             test-changed:
+              - '.github/e2e-matrix-generator.py'
+              - '.github/generate-test-artifacts.py'
               - 'tests/**'
               - 'hack/**'
             shell-script-changed:
@@ -292,7 +307,7 @@ jobs:
 
       - name: Verify apidoc changes
         run: |
-          apidoc_file_path='docs/src/cloudnative-pg.v1.md'
+          apidoc_file_path='docs/src/${{ env.API_DOC_NAME }}'
           if git status --porcelain $apidoc_file_path | grep '^ M'; then
             echo "The API documentation doesn't reflect the current API. Please run make apidoc."
             exit 1
@@ -430,7 +445,7 @@ jobs:
           echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV
           echo PWD=$(pwd) >> $GITHUB_ENV
 
-      - name: Run GoReleaser to build kubectl-cnpg plugin
+      - name: Run GoReleaser to build kubectl plugin
         uses: goreleaser/goreleaser-action@v5
         if: |
           github.event_name == 'schedule' ||
@@ -442,19 +457,19 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build --skip-validate --rm-dist --id kubectl-cnpg --timeout 60m
+          args: ${{ env.BUILD_PLUGIN_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
           VERSION: ${{ env.VERSION }}
 
-      # Send Slack notification if the kubectl-cnpg build fails.
+      # Send Slack notification if the kubectl plugin build fails.
       # To avoid message overflow, we only report runs scheduled on main or release branches
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@v2
         if: |
           failure() &&
-          github.repository_owner == 'cloudnative-pg' &&
+          github.repository_owner == env.REPOSITORY_OWNER &&
           (
             github.event_name == 'schedule' ||
             (
@@ -466,16 +481,16 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
-          SLACK_USERNAME: cnpg-bot
+          SLACK_USERNAME: ${{ env.SLACK_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_MESSAGE: Building plugin `kubectl-cnpg` failed!
+          SLACK_MESSAGE: Building kubernetes plugin failed!
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: latest
-          args: build --skip-validate --rm-dist --id manager
+          args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
@@ -485,7 +500,7 @@ jobs:
         id: docker-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.CNPG_IMAGE_NAME }}
+          images: ${{ env.OPERATOR_IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -516,12 +531,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to ghcr.io
+      - name: Login into docker registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_REGISTRY_USER }}
+          password:  ${{ env.DOCKER_REGISTRY_PASSWORD }}
 
       - name: Build for scan
         uses: docker/build-push-action@v5
@@ -553,6 +568,8 @@ jobs:
 
       - name: Upload result to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v2
+        if: |
+          github.repository_owner == 'cloudnative-pg'
         with:
           sarif_file: snyk.sarif
 
@@ -565,6 +582,9 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
+          provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
+          cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
+          cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
 
       - name: Build and push UBI
         uses: docker/build-push-action@v5
@@ -582,7 +602,7 @@ jobs:
           TAGS: ${{ steps.docker-meta.outputs.tags }}
           TAGS_UBI: ${{ steps.docker-meta-ubi.outputs.tags }}
         run: |
-          LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
+          LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
           TAG_UBI=${TAGS_UBI#*:}
           echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
