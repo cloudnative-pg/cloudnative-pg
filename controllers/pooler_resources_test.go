@@ -120,7 +120,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 
 		By("creating the service", func() {
-			service := pgbouncer.Service(pooler)
+			service := pgbouncer.Service(pooler, cluster)
 			err := poolerReconciler.Create(ctx, service)
 			Expect(err).ToNot(HaveOccurred())
 		})
