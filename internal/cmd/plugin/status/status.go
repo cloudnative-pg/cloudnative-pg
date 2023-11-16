@@ -115,6 +115,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printBasebackupStatus()
 	status.printReplicaStatus(verbose)
 	status.printUnmanagedReplicationSlotStatus()
+	status.printRoleManagerStatus()
 	status.printInstancesStatus()
 
 	if nonFatalError != nil {
@@ -847,6 +848,64 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 
 	status.Print()
 	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
+	const header = "Managed roles status"
+
+	managedRolesStatus := fullStatus.Cluster.Status.ManagedRolesStatus
+	containsErrors := len(managedRolesStatus.CannotReconcile) > 0
+	containsWarnings := func() bool {
+		for status, elements := range managedRolesStatus.ByStatus {
+			if len(elements) == 0 {
+				continue
+			}
+
+			switch status {
+			case apiv1.RoleStatusReconciled, apiv1.RoleStatusReserved:
+				continue
+			default:
+				return true
+			}
+		}
+
+		return false
+	}
+
+	headerColor := aurora.Green
+	if containsErrors {
+		headerColor = aurora.Red
+	} else if containsWarnings() {
+		headerColor = aurora.Yellow
+	}
+
+	fmt.Println(headerColor(header))
+
+	if len(managedRolesStatus.ByStatus) == 0 && len(managedRolesStatus.CannotReconcile) == 0 {
+		fmt.Println("No roles managed")
+		fmt.Println()
+		return
+	}
+
+	roleStatus := tabby.New()
+	roleStatus.AddHeader("Status", "Roles")
+
+	for status, roles := range managedRolesStatus.ByStatus {
+		roleStatus.AddLine(status, strings.Join(roles, ","))
+	}
+	roleStatus.Print()
+	fmt.Println()
+
+	if containsErrors {
+		fmt.Println(aurora.Red("Irreconcilable roles"))
+		errorStatus := tabby.New()
+		errorStatus.AddHeader("Role", "Errors")
+		for role, errors := range managedRolesStatus.CannotReconcile {
+			errorStatus.AddLine(role, strings.Join(errors, ","))
+		}
+		errorStatus.Print()
+		fmt.Println()
+	}
 }
 
 func getPrimaryStartTime(cluster *apiv1.Cluster) string {

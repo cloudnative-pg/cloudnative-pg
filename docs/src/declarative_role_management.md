@@ -203,7 +203,8 @@ them in the cluster Status. Which segues into…
 
 ## Status of managed roles
 
-The CRD status includes a section for the managed roles' status, as shown below:
+The Cluster status includes a section for the managed roles' status, as shown
+below:
 
 ```yaml
 status:
@@ -233,6 +234,23 @@ CloudNativePG) cannot honor, and which require human intervention.
 This section covers roles reserved for operator use and those that are **not**
 under declarative management, providing a comprehensive view of the roles in
 the database instances.
+
+The [kubectl plugin](kubectl-plugin.md) also shows the status of managed roles
+in its `status` sub-command:
+
+``` txt
+Managed roles status
+Status                  Roles
+------                  -----
+pending-reconciliation  petrarca
+reconciled              app,dante
+reserved                postgres,streaming_replica
+
+Irreconcilable roles
+Role      Errors
+----      ------
+petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist
+```
 
 !!! Important
     In terms of backward compatibility, declarative role management is designed
