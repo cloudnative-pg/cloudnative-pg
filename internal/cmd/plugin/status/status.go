@@ -857,19 +857,19 @@ func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
 	containsErrors := len(managedRolesStatus.CannotReconcile) > 0
 	containsWarnings := func() bool {
 		for status, elements := range managedRolesStatus.ByStatus {
-			if len(elements) == 0 || status == apiv1.RoleStatusReconciled {
+			if len(elements) == 0 {
 				continue
 			}
 
-			return true
+			switch status {
+			case apiv1.RoleStatusReconciled, apiv1.RoleStatusReserved:
+				continue
+			default:
+				return true
+			}
 		}
 
 		return false
-	}
-
-	if len(managedRolesStatus.ByStatus) == 0 && len(managedRolesStatus.CannotReconcile) == 0 {
-		fmt.Println(aurora.Green(fmt.Sprintf("%s: no roles managed", header)))
-		return
 	}
 
 	headerColor := aurora.Green
@@ -881,8 +881,23 @@ func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
 
 	fmt.Println(headerColor(header))
 
+	if len(managedRolesStatus.ByStatus) == 0 && len(managedRolesStatus.CannotReconcile) == 0 {
+		fmt.Println("No roles managed")
+		fmt.Println()
+		return
+	}
+
+	roleStatus := tabby.New()
+	roleStatus.AddHeader("Status", "Roles")
+
+	for status, roles := range managedRolesStatus.ByStatus {
+		roleStatus.AddLine(status, strings.Join(roles, ","))
+	}
+	roleStatus.Print()
+	fmt.Println()
+
 	if containsErrors {
-		fmt.Println(aurora.Red("Irreconcilable Errors encountered:"))
+		fmt.Println(aurora.Red("Irreconcilable roles"))
 		errorStatus := tabby.New()
 		errorStatus.AddHeader("Role", "Errors")
 		for role, errors := range managedRolesStatus.CannotReconcile {
@@ -891,21 +906,6 @@ func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
 		errorStatus.Print()
 		fmt.Println()
 	}
-
-	color := aurora.Green
-	if containsWarnings() {
-		color = aurora.Yellow
-	}
-	fmt.Println(color("Roles by status:"))
-
-	roleStatus := tabby.New()
-	roleStatus.AddHeader("status", "roles")
-
-	for status, roles := range managedRolesStatus.ByStatus {
-		roleStatus.AddLine(status, strings.Join(roles, ","))
-	}
-	roleStatus.Print()
-	fmt.Println()
 }
 
 func getPrimaryStartTime(cluster *apiv1.Cluster) string {

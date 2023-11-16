@@ -240,17 +240,16 @@ in its `status` sub-command:
 
 ``` txt
 Managed roles status
-Irreconcilable Errors encountered:
-Role      Errors
-----      ------
-petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist
-
-Roles by status:
-status                  roles
+Status                  Roles
 ------                  -----
 pending-reconciliation  petrarca
 reconciled              app,dante
 reserved                postgres,streaming_replica
+
+Irreconcilable roles
+Role      Errors
+----      ------
+petrarca  could not perform UPDATE_MEMBERSHIPS on role petrarca: role "poets" does not exist
 ```
 
 !!! Important
