@@ -395,7 +395,6 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("while getting PodDisruptionBudget: %w", err)
 		}
-		cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
 
 		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBudget",
 			fmt.Sprintf("Creating PodDisruptionBudget %s", pdb.Name))
@@ -405,7 +404,12 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 		return nil
 	}
 
-	if reflect.DeepEqual(pdb.Spec, oldPdb.Spec) {
+	patchedPdb := oldPdb.DeepCopy()
+	patchedPdb.Spec = pdb.Spec
+	utils.MergeMap(patchedPdb.Annotations, pdb.Annotations)
+	utils.MergeMap(patchedPdb.Labels, pdb.Labels)
+
+	if reflect.DeepEqual(patchedPdb.Spec, oldPdb.Spec) && reflect.DeepEqual(patchedPdb.ObjectMeta, oldPdb.ObjectMeta) {
 		// Everything fine, the two pdbs are the same for us
 		return nil
 	}
@@ -413,10 +417,7 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 	r.Recorder.Event(cluster, "Normal", "UpdatingPodDisruptionBudget",
 		fmt.Sprintf("Updating PodDisruptionBudget %s", pdb.Name))
 
-	patchedPdb := oldPdb
-	patchedPdb.Spec = pdb.Spec
-
-	if err := r.Patch(ctx, &patchedPdb, client.MergeFrom(&oldPdb)); err != nil {
+	if err := r.Patch(ctx, patchedPdb, client.MergeFrom(&oldPdb)); err != nil {
 		return fmt.Errorf("while patching PodDisruptionBudget: %w", err)
 	}
 

@@ -25,9 +25,11 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -681,6 +683,109 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 			err = cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &patchedSecret)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(originalSecret.Generation).To(Equal(originalSecret.Generation))
+		})
+	})
+})
+
+var _ = Describe("createOrPatchOwnedPodDisruptionBudget", func() {
+	var (
+		ctx        context.Context
+		fakeClient k8client.Client
+		reconciler *ClusterReconciler
+		cluster    *apiv1.Cluster
+		pdb        *policyv1.PodDisruptionBudget
+		err        error
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+
+		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
+		reconciler = &ClusterReconciler{
+			Client:   fakeClient,
+			Recorder: record.NewFakeRecorder(10000),
+			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
+		}
+
+		cluster = &apiv1.Cluster{}
+		pdb = &policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pdb",
+				Namespace: "default",
+				Labels: map[string]string{
+					"test": "value",
+				},
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "example"},
+				},
+				MinAvailable: &intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 1,
+				},
+			},
+		}
+	})
+
+	Context("when PodDisruptionBudget is nil", func() {
+		It("should return nil without error", func() {
+			pdb = nil
+			err = reconciler.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+	})
+
+	Context("when creating a new PodDisruptionBudget", func() {
+		It("should successfully create the PodDisruptionBudget", func() {
+			err = reconciler.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			fetchedPdb := &policyv1.PodDisruptionBudget{}
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: pdb.Name, Namespace: pdb.Namespace}, fetchedPdb)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(fetchedPdb.Name).To(Equal(pdb.Name))
+		})
+	})
+
+	Context("when the PodDisruptionBudget already exists", func() {
+		BeforeEach(func() {
+			_ = fakeClient.Create(ctx, pdb)
+		})
+
+		It("should update the existing PodDisruptionBudget if the metadata is different", func() {
+			pdb.ObjectMeta.Labels["newlabel"] = "newvalue"
+			err = reconciler.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			fetchedPdb := &policyv1.PodDisruptionBudget{}
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: pdb.Name, Namespace: pdb.Namespace}, fetchedPdb)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(fetchedPdb.Spec).To(Equal(pdb.Spec))
+			Expect(fetchedPdb.Labels).To(Equal(pdb.Labels))
+		})
+
+		It("should update the existing PodDisruptionBudget if the spec is different", func() {
+			pdb.Spec.MinAvailable = ptr.To(intstr.FromInt32(3))
+			err = reconciler.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			fetchedPdb := &policyv1.PodDisruptionBudget{}
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: pdb.Name, Namespace: pdb.Namespace}, fetchedPdb)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(fetchedPdb.Spec).To(Equal(pdb.Spec))
+			Expect(fetchedPdb.Labels).To(Equal(pdb.Labels))
+		})
+
+		It("should not update the PodDisruptionBudget if it is the same", func() {
+			err = reconciler.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			fetchedPdb := &policyv1.PodDisruptionBudget{}
+			err = fakeClient.Get(ctx, types.NamespacedName{Name: pdb.Name, Namespace: pdb.Namespace}, fetchedPdb)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(fetchedPdb.Spec).To(Equal(pdb.Spec))
+			Expect(fetchedPdb.Labels).To(Equal(pdb.Labels))
 		})
 	})
 })
