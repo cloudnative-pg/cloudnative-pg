@@ -140,7 +140,7 @@ jobs:
         with:
           images: ${{ env.IMAGES }}
           flavor: |
-            suffix=-ubi
+            suffix=-ubi8
           tags: |
             type=semver,pattern={{version}}
       -

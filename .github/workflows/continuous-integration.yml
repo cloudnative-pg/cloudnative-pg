@@ -496,7 +496,7 @@ jobs:
         with:
           images: ${{ env.CNPG_IMAGE_NAME }}
           flavor: |
-            suffix=-ubi
+            suffix=-ubi8
           tags: |
             type=ref,event=branch
             type=ref,event=pr
