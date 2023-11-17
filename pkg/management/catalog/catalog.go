@@ -64,6 +64,9 @@ func (catalog *Catalog) LatestBackupInfo() *BarmanBackup {
 		return nil
 	}
 
+	// the code below assumes the catalog to be sorted, therefore, we enforce it first
+	sort.Sort(catalog)
+
 	// Skip errored backups and return the latest valid one
 	for i := len(catalog.List) - 1; i >= 0; i-- {
 		if catalog.List[i].isBackupDone() {
@@ -81,7 +84,7 @@ func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
 		return nil
 	}
 
-	// the code below assumes the catalog to be sorted, therefore we enforce it first
+	// the code below assumes the catalog to be sorted, therefore, we enforce it first
 	sort.Sort(catalog)
 
 	// Skip errored backups and return the first valid one

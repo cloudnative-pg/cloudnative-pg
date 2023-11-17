@@ -405,8 +405,8 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
 	}
 
-	if err := updateFirstRecoverabilityPoint(ctx, r.Client, cluster.Namespace, cluster.Name); err != nil {
-		contextLogger.Error(err, "could not update cluster's first recoverability point")
+	if err := updateClusterWithSnapshotBackupsMetadata(ctx, r.Client, cluster.Namespace, cluster.Name); err != nil {
+		contextLogger.Error(err, "could not update cluster's backups metadata")
 	}
 
 	return nil, nil
@@ -441,9 +441,9 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 	return targetPod, nil
 }
 
-// updateFirstRecoverabilityPoint updates a cluster's FirstRecoverabilityPoint
-// based on the oldest completed snapshot available
-func updateFirstRecoverabilityPoint(
+// updateClusterWithSnapshotBackupsMetadata updates a cluster's FirstRecoverabilityPoint
+// and LastSuccessfulBackup based on the available snapshots
+func updateClusterWithSnapshotBackupsMetadata(
 	ctx context.Context,
 	cli client.Client,
 	namespace string,
@@ -463,16 +463,16 @@ func updateFirstRecoverabilityPoint(
 		return wrapErr("could not refresh cluster", err)
 	}
 
-	oldestSnapshot, err := volumesnapshot.GetSnapshotFirstRecoverabilityPoint(ctx, cli,
+	oldestSnapshot, newestSnapshot, err := volumesnapshot.GetSnapshotSnapshotBackupsMetadata(ctx, cli,
 		namespace, name)
 	if err != nil {
-		return wrapErr("could not get oldest snapshot", err)
+		return wrapErr("could not get snapshots metadata", err)
 	}
 
 	origCluster := cluster.DeepCopy()
 
-	// first update the oldest snapshot recorded
 	cluster.SetFirstRecoverabilityByMethod(apiv1.BackupMethodVolumeSnapshot, oldestSnapshot)
+	cluster.SetLastSuccessfulBackupByMethod(apiv1.BackupMethodVolumeSnapshot, newestSnapshot)
 
 	if !reflect.DeepEqual(origCluster.Status, cluster.Status) {
 		err = cli.Status().Patch(ctx, &cluster, client.MergeFrom(origCluster))

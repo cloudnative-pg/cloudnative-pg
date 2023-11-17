@@ -736,13 +736,17 @@ type ClusterStatus struct {
 	// +optional
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
-	// The oldest time of backup available, per backup method type
+	// The first recoverability point, stored as a date in RFC3339 format, per backup method type
 	// +optional
-	FirstRecoverabilityByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityByMethod,omitempty"`
+	FirstRecoverabilityPointByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityPointByMethod,omitempty"`
 
-	// Stored as a date in RFC3339 format
+	// Last successful backup, stored as a date in RFC3339 format
 	// +optional
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
+
+	// Last successful backup, stored as a date in RFC3339 format, per backup method type
+	// +optional
+	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
 
 	// Stored as a date in RFC3339 format
 	// +optional
@@ -3003,23 +3007,52 @@ func (cluster *Cluster) SetFirstRecoverabilityByMethod(
 	oldest *time.Time,
 ) {
 	if oldest == nil {
-		delete(cluster.Status.FirstRecoverabilityByMethod, method)
+		delete(cluster.Status.FirstRecoverabilityPointByMethod, method)
 	} else {
-		if cluster.Status.FirstRecoverabilityByMethod == nil {
-			cluster.Status.FirstRecoverabilityByMethod = make(map[BackupMethod]metav1.Time)
+		if cluster.Status.FirstRecoverabilityPointByMethod == nil {
+			cluster.Status.FirstRecoverabilityPointByMethod = make(map[BackupMethod]metav1.Time)
 		}
-		cluster.Status.FirstRecoverabilityByMethod[method] = metav1.NewTime(*oldest)
+		cluster.Status.FirstRecoverabilityPointByMethod[method] = metav1.NewTime(*oldest)
 	}
 
 	var first metav1.Time
-	for method, ts := range cluster.Status.FirstRecoverabilityByMethod {
+	for method, ts := range cluster.Status.FirstRecoverabilityPointByMethod {
 		if first.IsZero() || ts.Before(&first) {
-			first = cluster.Status.FirstRecoverabilityByMethod[method]
+			first = cluster.Status.FirstRecoverabilityPointByMethod[method]
 		}
 	}
 	cluster.Status.FirstRecoverabilityPoint = ""
 	if !first.IsZero() {
 		cluster.Status.FirstRecoverabilityPoint = first.Format(time.RFC3339)
+	}
+}
+
+// SetLastSuccessfulBackupByMethod set the newest successful backup time
+// for the provided method.
+// It also maintains the LastSuccessfulBackup up-to-date.
+func (cluster *Cluster) SetLastSuccessfulBackupByMethod(
+	method BackupMethod,
+	oldest *time.Time,
+) {
+	if oldest == nil {
+		delete(cluster.Status.LastSuccessfulBackupByMethod, method)
+	} else {
+		if cluster.Status.LastSuccessfulBackupByMethod == nil {
+			cluster.Status.LastSuccessfulBackupByMethod = make(map[BackupMethod]metav1.Time)
+		}
+		cluster.Status.LastSuccessfulBackupByMethod[method] = metav1.NewTime(*oldest)
+	}
+
+	var last metav1.Time
+	for method, ts := range cluster.Status.LastSuccessfulBackupByMethod {
+		ts := ts
+		if last.IsZero() || last.Before(&ts) {
+			last = cluster.Status.LastSuccessfulBackupByMethod[method]
+		}
+	}
+	cluster.Status.LastSuccessfulBackup = ""
+	if !last.IsZero() {
+		cluster.Status.LastSuccessfulBackup = last.Format(time.RFC3339)
 	}
 }
 

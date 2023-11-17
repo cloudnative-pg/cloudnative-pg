@@ -657,8 +657,8 @@ fieldref
 filesystem
 findstr
 fio
-firstRecoverabilityByMethod
 firstRecoverabilityPoint
+firstRecoverabilityPointByMethod
 freddie
 fuzzystrmatch
 gapped
@@ -751,6 +751,7 @@ lastCheckTime
 lastFailedBackup
 lastScheduleTime
 lastSuccessfulBackup
+lastSuccessfulBackupByMethod
 latestGeneratedNode
 latn
 lc

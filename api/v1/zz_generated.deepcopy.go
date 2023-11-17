@@ -833,8 +833,15 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	in.SecretsResourceVersion.DeepCopyInto(&out.SecretsResourceVersion)
 	in.ConfigMapResourceVersion.DeepCopyInto(&out.ConfigMapResourceVersion)
 	in.Certificates.DeepCopyInto(&out.Certificates)
-	if in.FirstRecoverabilityByMethod != nil {
-		in, out := &in.FirstRecoverabilityByMethod, &out.FirstRecoverabilityByMethod
+	if in.FirstRecoverabilityPointByMethod != nil {
+		in, out := &in.FirstRecoverabilityPointByMethod, &out.FirstRecoverabilityPointByMethod
+		*out = make(map[BackupMethod]metav1.Time, len(*in))
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
+		}
+	}
+	if in.LastSuccessfulBackupByMethod != nil {
+		in, out := &in.LastSuccessfulBackupByMethod, &out.LastSuccessfulBackupByMethod
 		*out = make(map[BackupMethod]metav1.Time, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()

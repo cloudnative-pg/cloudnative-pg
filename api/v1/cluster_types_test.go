@@ -974,36 +974,46 @@ var _ = Describe("Ephemeral volume size limits", func() {
 	})
 })
 
-var _ = Describe("Test updating the FirstRecoverabilityPonts", func() {
+var _ = Describe("Test updating the FirstRecoverabilityPoint and LastSuccessfulBackup", func() {
 	var cluster Cluster
 	var (
 		now         = metav1.Now()
 		oneHourAgo  = metav1.NewTime(now.Add(-1 * time.Hour))
-		twoHoursAgo = metav1.NewTime(oneHourAgo.Add(-1 * time.Hour))
+		twoHoursAgo = metav1.NewTime(now.Add(-2 * time.Hour))
 	)
 	BeforeEach(func() {
-		cluster = Cluster{
-			Spec: ClusterSpec{
-				NodeMaintenanceWindow: &NodeMaintenanceWindow{
-					InProgress: true,
-				},
-			},
-		}
+		cluster = Cluster{}
 	})
 
 	It("updates the FirstRecoverabilityPoint", func() {
 		cluster.Status.FirstRecoverabilityPoint = oneHourAgo.Format(time.RFC3339)
-		cluster.Status.FirstRecoverabilityByMethod = map[BackupMethod]metav1.Time{
+		cluster.Status.FirstRecoverabilityPointByMethod = map[BackupMethod]metav1.Time{
 			BackupMethodBarmanObjectStore: now,
 			BackupMethodVolumeSnapshot:    oneHourAgo,
 		}
 
-		cluster.SetFirstRecoverabilityByMethod(BackupMethodBarmanObjectStore, oneHourAgo.Time)
-		Expect(cluster.Status.FirstRecoverabilityByMethod[BackupMethodBarmanObjectStore]).To(Equal(oneHourAgo))
+		cluster.SetFirstRecoverabilityByMethod(BackupMethodBarmanObjectStore, &oneHourAgo.Time)
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod[BackupMethodBarmanObjectStore]).To(Equal(oneHourAgo))
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(oneHourAgo.Format(time.RFC3339)))
 
-		cluster.SetFirstRecoverabilityByMethod(BackupMethodVolumeSnapshot, twoHoursAgo.Time)
-		Expect(cluster.Status.FirstRecoverabilityByMethod[BackupMethodVolumeSnapshot]).To(Equal(twoHoursAgo))
+		cluster.SetFirstRecoverabilityByMethod(BackupMethodVolumeSnapshot, &twoHoursAgo.Time)
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod[BackupMethodVolumeSnapshot]).To(Equal(twoHoursAgo))
 		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
+	})
+
+	It("updates the LastSuccessfulBackup", func() {
+		cluster.Status.LastSuccessfulBackup = oneHourAgo.Format(time.RFC3339)
+		cluster.Status.LastSuccessfulBackupByMethod = map[BackupMethod]metav1.Time{
+			BackupMethodBarmanObjectStore: oneHourAgo,
+			BackupMethodVolumeSnapshot:    twoHoursAgo,
+		}
+
+		cluster.SetLastSuccessfulBackupByMethod(BackupMethodVolumeSnapshot, &oneHourAgo.Time)
+		Expect(cluster.Status.LastSuccessfulBackupByMethod[BackupMethodVolumeSnapshot]).To(Equal(oneHourAgo))
+		Expect(cluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
+
+		cluster.SetLastSuccessfulBackupByMethod(BackupMethodBarmanObjectStore, &now.Time)
+		Expect(cluster.Status.LastSuccessfulBackupByMethod[BackupMethodBarmanObjectStore]).To(Equal(now))
+		Expect(cluster.Status.LastSuccessfulBackup).To(Equal(now.Format(time.RFC3339)))
 	})
 })

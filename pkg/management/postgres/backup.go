@@ -429,10 +429,11 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 
 // updateClusterStatusWithBackupTimes returns true if it changes the backup times in Status
 func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) {
-	if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
-		cluster.SetFirstRecoverabilityByMethod(apiv1.BackupMethodBarmanObjectStore, ts)
-		lastBackup := backupList.LatestBackupInfo()
-		cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
+	if recoverabilityPoint := backupList.FirstRecoverabilityPoint(); recoverabilityPoint != nil {
+		cluster.SetFirstRecoverabilityByMethod(apiv1.BackupMethodBarmanObjectStore, recoverabilityPoint)
+	}
+	if lastBackup := backupList.LatestBackupInfo(); lastBackup != nil {
+		cluster.SetLastSuccessfulBackupByMethod(apiv1.BackupMethodBarmanObjectStore, &lastBackup.EndTime)
 	}
 }
 

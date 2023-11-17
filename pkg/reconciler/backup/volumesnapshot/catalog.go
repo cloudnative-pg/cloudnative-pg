@@ -26,14 +26,15 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// GetSnapshotFirstRecoverabilityPoint gets the time of the oldest snapshot for the cluster
-func GetSnapshotFirstRecoverabilityPoint(
+// GetSnapshotSnapshotBackupsMetadata gets the time of the oldest snapshot for the cluster
+func GetSnapshotSnapshotBackupsMetadata(
 	ctx context.Context,
 	cli client.Client,
 	namespace string,
 	clusterName string,
-) (*time.Time, error) {
+) (*time.Time, *time.Time, error) {
 	var oldestSnaphsot time.Time
+	var newestSnaphsot time.Time
 
 	var list storagesnapshotv1.VolumeSnapshotList
 	if err := cli.List(
@@ -44,7 +45,7 @@ func GetSnapshotFirstRecoverabilityPoint(
 			utils.ClusterLabelName: clusterName,
 		},
 	); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	dataVolSnapshots := make([]storagesnapshotv1.VolumeSnapshot, 0, len(list.Items))
@@ -55,7 +56,7 @@ func GetSnapshotFirstRecoverabilityPoint(
 	}
 
 	if len(dataVolSnapshots) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	for _, volumeSnapshot := range dataVolSnapshots {
@@ -63,12 +64,15 @@ func GetSnapshotFirstRecoverabilityPoint(
 		if hasTime {
 			endTime, err := time.Parse(time.RFC3339, endTimeStr)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if oldestSnaphsot.IsZero() || endTime.Before(oldestSnaphsot) {
 				oldestSnaphsot = endTime
 			}
+			if newestSnaphsot.IsZero() || newestSnaphsot.Before(endTime) {
+				newestSnaphsot = endTime
+			}
 		}
 	}
-	return &oldestSnaphsot, nil
+	return &oldestSnaphsot, &newestSnaphsot, nil
 }
