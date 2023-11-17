@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -404,7 +405,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
 	}
 
-	if err := updateFirstRecoverabilityPoint(ctx, r.Client, cluster); err != nil {
+	if err := updateFirstRecoverabilityPoint(ctx, r.Client, cluster.Namespace, cluster.Name); err != nil {
 		contextLogger.Error(err, "could not update cluster's first recoverability point")
 	}
 
@@ -445,7 +446,8 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 func updateFirstRecoverabilityPoint(
 	ctx context.Context,
 	cli client.Client,
-	cluster *apiv1.Cluster,
+	namespace string,
+	name string,
 ) error {
 	wrapErr := func(msg string, err error) error {
 		return fmt.Errorf("in updateFirstRecoverabilityPont, %s: %w", msg, err)
@@ -453,49 +455,30 @@ func updateFirstRecoverabilityPoint(
 
 	// refresh the cluster, as this function will get called after the backup
 	// has finished, potentially a long time
-	var clusterNow apiv1.Cluster
+	var cluster apiv1.Cluster
 	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: cluster.Namespace,
-		Name:      cluster.Name,
-	}, &clusterNow); err != nil {
+		Namespace: namespace,
+		Name:      name,
+	}, &cluster); err != nil {
 		return wrapErr("could not refresh cluster", err)
 	}
 
-	oldestSnapshot, err := volumesnapshot.GetOldestSnapshot(ctx, cli,
-		cluster.Namespace, cluster.Name)
+	oldestSnapshot, err := volumesnapshot.GetSnapshotFirstRecoverabilityPoint(ctx, cli,
+		namespace, name)
 	if err != nil {
 		return wrapErr("could not get oldest snapshot", err)
 	}
 
-	oldCluster := clusterNow.DeepCopy()
-	var statusHasUpdates bool
-	const method = apiv1.BackupMethodVolumeSnapshot
+	origCluster := cluster.DeepCopy()
 
 	// first update the oldest snapshot recorded
-	updated, err := clusterNow.TryUpdatingOldestBackupTime(oldestSnapshot, method)
-	if err != nil {
-		return wrapErr("could not update oldest snapshot time", err)
-	}
-	statusHasUpdates = statusHasUpdates || updated
+	cluster.SetFirstRecoverabilityByMethod(apiv1.BackupMethodVolumeSnapshot, oldestSnapshot)
 
-	// update the overall FRP with the oldest backup on any method
-	updated, err = clusterNow.TryUpdatingFirstRecoverabilityPoint()
-	if err != nil {
-		return wrapErr("could not update oldest snapshot time", err)
-	}
-	statusHasUpdates = statusHasUpdates || updated
-
-	if statusHasUpdates {
-		err = cli.Status().Patch(ctx, &clusterNow, client.MergeFrom(oldCluster))
+	if !reflect.DeepEqual(origCluster.Status, cluster.Status) {
+		err = cli.Status().Patch(ctx, &cluster, client.MergeFrom(origCluster))
 		if err != nil {
 			return wrapErr("could not patch cluster status", err)
 		}
-		// updating the input argument makes this function testable with the fake client
-		cluster.Status.FirstRecoverabilityPoint = clusterNow.Status.FirstRecoverabilityPoint
-		if cluster.Status.FirstRecoverabilityByMethod == nil {
-			cluster.Status.FirstRecoverabilityByMethod = make(map[apiv1.BackupMethod]string)
-		}
-		cluster.Status.FirstRecoverabilityByMethod[method] = clusterNow.Status.FirstRecoverabilityByMethod[method]
 	}
 	return nil
 }

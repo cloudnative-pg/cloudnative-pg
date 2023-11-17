@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -415,12 +416,9 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 		origCluster := b.Cluster.DeepCopy()
 
 		// Set the first recoverability point and the last successful backup
-		hasUpdates, err := updateClusterStatusWithBackupTimes(b.Cluster, backupList)
-		if err != nil {
-			b.Log.Error(err, "while setting the FirstRecoverabilityPoint")
-		}
+		updateClusterStatusWithBackupTimes(b.Cluster, backupList)
 
-		if !hasUpdates {
+		if reflect.DeepEqual(origCluster.Status, b.Cluster.Status) {
 			return nil
 		}
 		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
@@ -430,26 +428,12 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 }
 
 // updateClusterStatusWithBackupTimes returns true if it changes the backup times in Status
-func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) (bool, error) {
-	var hasChanges bool
+func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) {
 	if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
-		updated, err := cluster.TryUpdatingOldestBackupTime(*ts, apiv1.BackupMethodBarmanObjectStore)
-		if err != nil {
-			return false, fmt.Errorf("while setting the recoverability point for barman backups: %w", err)
-		}
-		hasChanges = updated || hasChanges
-		updated, err = cluster.TryUpdatingFirstRecoverabilityPoint()
-		if err != nil {
-			return false, fmt.Errorf("while setting the FirstRecoverabilityPoint: %w", err)
-		}
-		hasChanges = updated || hasChanges
+		cluster.SetFirstRecoverabilityByMethod(apiv1.BackupMethodBarmanObjectStore, ts)
 		lastBackup := backupList.LatestBackupInfo()
-		if lastBackup != nil && cluster.Status.LastSuccessfulBackup != lastBackup.EndTime.Format(time.RFC3339) {
-			cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
-			hasChanges = true
-		}
+		cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
 	}
-	return hasChanges, nil
 }
 
 // PatchBackupStatusAndRetry updates a certain backup's status in the k8s database,

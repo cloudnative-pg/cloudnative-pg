@@ -3907,6 +3907,7 @@ spec:
                 type: array
               firstRecoverabilityByMethod:
                 additionalProperties:
+                  format: date-time
                   type: string
                 description: The oldest time of backup available, per backup method
                   type

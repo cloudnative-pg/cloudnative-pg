@@ -835,9 +835,9 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	in.Certificates.DeepCopyInto(&out.Certificates)
 	if in.FirstRecoverabilityByMethod != nil {
 		in, out := &in.FirstRecoverabilityByMethod, &out.FirstRecoverabilityByMethod
-		*out = make(map[BackupMethod]string, len(*in))
+		*out = make(map[BackupMethod]metav1.Time, len(*in))
 		for key, val := range *in {
-			(*out)[key] = val
+			(*out)[key] = *val.DeepCopy()
 		}
 	}
 	if in.PoolerIntegrations != nil {

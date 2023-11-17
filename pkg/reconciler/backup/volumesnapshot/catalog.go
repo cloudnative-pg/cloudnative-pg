@@ -18,7 +18,6 @@ package volumesnapshot
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -27,13 +26,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// GetOldestSnapshot gets the time of the oldest snapshot for the cluster
-func GetOldestSnapshot(
+// GetSnapshotFirstRecoverabilityPoint gets the time of the oldest snapshot for the cluster
+func GetSnapshotFirstRecoverabilityPoint(
 	ctx context.Context,
 	cli client.Client,
 	namespace string,
 	clusterName string,
-) (time.Time, error) {
+) (*time.Time, error) {
 	var oldestSnaphsot time.Time
 
 	var list storagesnapshotv1.VolumeSnapshotList
@@ -45,7 +44,7 @@ func GetOldestSnapshot(
 			utils.ClusterLabelName: clusterName,
 		},
 	); err != nil {
-		return oldestSnaphsot, err
+		return nil, err
 	}
 
 	dataVolSnapshots := make([]storagesnapshotv1.VolumeSnapshot, 0, len(list.Items))
@@ -56,22 +55,20 @@ func GetOldestSnapshot(
 	}
 
 	if len(dataVolSnapshots) == 0 {
-		return oldestSnaphsot, fmt.Errorf("there were no snapshots")
+		return nil, nil
 	}
+
 	for _, volumeSnapshot := range dataVolSnapshots {
 		endTimeStr, hasTime := volumeSnapshot.Annotations[utils.BackupEndTimeAnnotationName]
 		if hasTime {
 			endTime, err := time.Parse(time.RFC3339, endTimeStr)
 			if err != nil {
-				return oldestSnaphsot, err
+				return nil, err
 			}
 			if oldestSnaphsot.IsZero() || endTime.Before(oldestSnaphsot) {
 				oldestSnaphsot = endTime
 			}
 		}
 	}
-	if oldestSnaphsot.IsZero() {
-		return oldestSnaphsot, fmt.Errorf("no backup end time annotations found")
-	}
-	return oldestSnaphsot, nil
+	return &oldestSnaphsot, nil
 }

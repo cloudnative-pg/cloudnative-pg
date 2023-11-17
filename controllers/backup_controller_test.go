@@ -23,6 +23,7 @@ import (
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -255,11 +256,12 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 
 var _ = Describe("update first recoverability point", func() {
 	var (
-		snapshots          volumesnapshot.VolumeSnapshotList
-		cluster            *apiv1.Cluster
-		earlierTime        = time.Now().Add(-3 * time.Hour).Format(time.RFC3339)
-		firstSnapshotTime  = time.Now().Add(-2 * time.Hour).Format(time.RFC3339)
-		secondSnapshotTime = time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
+		snapshots     volumesnapshot.VolumeSnapshotList
+		cluster       *apiv1.Cluster
+		now           = metav1.Now().Rfc3339Copy()
+		oneHourAgo    = metav1.NewTime(now.Add(-1 * time.Hour))
+		twoHoursAgo   = metav1.NewTime(now.Add(-2 * time.Hour))
+		threeHoursAgo = metav1.NewTime(now.Add(-3 * time.Hour))
 	)
 
 	BeforeEach(func() {
@@ -279,7 +281,7 @@ var _ = Describe("update first recoverability point", func() {
 					Name:      "snapshot-0",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						utils.BackupEndTimeAnnotationName: earlierTime,
+						utils.BackupEndTimeAnnotationName: threeHoursAgo.Format(time.RFC3339),
 						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
@@ -290,7 +292,7 @@ var _ = Describe("update first recoverability point", func() {
 					Name:      "snapshot-01",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						utils.BackupEndTimeAnnotationName: earlierTime,
+						utils.BackupEndTimeAnnotationName: threeHoursAgo.Format(time.RFC3339),
 						utils.PvcRoleLabelName:            string(utils.PVCRolePgWal),
 					},
 					Labels: map[string]string{
@@ -301,7 +303,7 @@ var _ = Describe("update first recoverability point", func() {
 					Name:      "snapshot-1",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						utils.BackupEndTimeAnnotationName: firstSnapshotTime,
+						utils.BackupEndTimeAnnotationName: twoHoursAgo.Format(time.RFC3339),
 						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
@@ -312,7 +314,7 @@ var _ = Describe("update first recoverability point", func() {
 					Name:      "snapshot-2",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						utils.BackupEndTimeAnnotationName: secondSnapshotTime,
+						utils.BackupEndTimeAnnotationName: oneHourAgo.Format(time.RFC3339),
 						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
@@ -330,44 +332,55 @@ var _ = Describe("update first recoverability point", func() {
 			WithStatusSubresource(cluster).
 			WithLists(&snapshots).Build()
 
-		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster)
+		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(firstSnapshotTime))
+		var updatedCluster apiv1.Cluster
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name,
+		}, &updatedCluster)
+		Expect(updatedCluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
 	})
 
 	It("should not update cluster FRP if there is an older backup from another method", func(ctx context.Context) {
-		cluster.Status.FirstRecoverabilityPoint = earlierTime
-		cluster.Status.FirstRecoverabilityByMethod = map[apiv1.BackupMethod]string{
-			apiv1.BackupMethodBarmanObjectStore: earlierTime,
+		cluster.Status.FirstRecoverabilityPoint = threeHoursAgo.Format(time.RFC3339)
+		cluster.Status.FirstRecoverabilityByMethod = map[apiv1.BackupMethod]metav1.Time{
+			apiv1.BackupMethodBarmanObjectStore: threeHoursAgo,
 		}
 		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster).
 			WithStatusSubresource(cluster).
 			WithLists(&snapshots).Build()
 
-		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster)
+		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(earlierTime))
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(threeHoursAgo.Format(time.RFC3339)))
 	})
 
 	It("should set the first overall FRP correctly if there is an earlier barman backup", func(ctx context.Context) {
-		cluster.Status.FirstRecoverabilityByMethod = map[apiv1.BackupMethod]string{
-			apiv1.BackupMethodBarmanObjectStore: earlierTime,
-			apiv1.BackupMethodVolumeSnapshot:    secondSnapshotTime,
+		cluster.Status.FirstRecoverabilityByMethod = map[apiv1.BackupMethod]metav1.Time{
+			apiv1.BackupMethodBarmanObjectStore: oneHourAgo,
+			apiv1.BackupMethodVolumeSnapshot:    now,
 		}
-		cluster.Status.FirstRecoverabilityPoint = secondSnapshotTime
+		cluster.Status.FirstRecoverabilityPoint = oneHourAgo.Format(time.RFC3339)
 		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster).
 			WithStatusSubresource(cluster).
 			WithLists(&snapshots).Build()
 
-		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster)
+		err := updateFirstRecoverabilityPoint(ctx, fakeClient, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(earlierTime))
-		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).To(Equal(earlierTime))
-		Expect(cluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodVolumeSnapshot]).To(Equal(firstSnapshotTime))
+		var updatedCluster apiv1.Cluster
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name,
+		}, &updatedCluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedCluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
+		Expect(updatedCluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodBarmanObjectStore]).To(Equal(oneHourAgo))
+		Expect(updatedCluster.Status.FirstRecoverabilityByMethod[apiv1.BackupMethodVolumeSnapshot]).To(Equal(twoHoursAgo))
 	})
 })
