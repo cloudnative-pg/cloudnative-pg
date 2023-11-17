@@ -119,6 +119,7 @@ jobs:
               - '.github/workflows/continuous-integration.yml'
               - '.goreleaser*.yml'
               - 'Dockerfile'
+              - 'Dockerfile-ubi'
               - 'Makefile'
               - 'go.mod'
               - 'go.sum'
@@ -509,7 +510,7 @@ jobs:
         id: docker-meta-ubi
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.CNPG_IMAGE_NAME }}
+          images: ${{ env.OPERATOR_IMAGE_NAME }}
           flavor: |
             suffix=-ubi8
           tags: |
@@ -605,10 +606,10 @@ jobs:
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
           TAG_UBI=${TAGS_UBI#*:}
-          echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI=${LOWERCASE_CNPG_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
-          echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${LOWERCASE_OPERATOR_IMAGE_NAME}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
 
   olm-bundle:
     name: Create OLM bundle and catalog

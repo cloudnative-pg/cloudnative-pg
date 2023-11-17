@@ -38,8 +38,20 @@ env:
   KIND_VERSION: "v0.20.0"
   ROOK_VERSION: "v1.12.0"
   EXTERNAL_SNAPSHOTTER_VERSION: "v6.2.2"
-  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
-
+  OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
+  BUILD_PUSH_PROVENANCE: ""
+  BUILD_PUSH_CACHE_FROM: ""
+  BUILD_PUSH_CACHE_TO: ""
+  DOCKER_REGISTRY: "ghcr.io"
+  DOCKER_REGISTRY_USER: ${{ github.actor }}
+  DOCKER_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+  REPOSITORY_OWNER: "cloudnative-pg"
+  SLACK_USERNAME: "cnpg-bot"
+  BUILD_MANAGER_RELEASE_ARGS: "build --skip-validate --rm-dist --id manager"
+  # Keep in mind that adding more platforms (architectures) will increase the building
+  # time even if we use the ghcache for the building process.
+  PLATFORM: "linux/amd64,linux/arm64"
+  E2E_SUFFIX: "cnpge2e"
 
 defaults:
   run:
@@ -56,9 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch:
-          - release-1.20
-          - release-1.21
+        branch: [release-1.20, release-1.21]
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@v1
@@ -264,7 +274,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          images='${{ env.CNPG_IMAGE_NAME }}'
+          images='${{ env.OPERATOR_IMAGE_NAME }}'
           tags=''
           labels=''
           commit_sha=${{ needs.evaluate_options.outputs.git_ref }}
@@ -327,7 +337,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build --skip-validate --rm-dist --id manager
+          args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
@@ -341,13 +351,6 @@ jobs:
           tags: |
             type=raw,value=${{ steps.build-meta.outputs.tag_name }}
       -
-        name: Detect platforms
-        run: |
-          # Keep in mind that adding more platforms (architectures) will increase the building
-          # time even if we use the ghcache for the building process.
-          platforms="linux/amd64,linux/arm64"
-          echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
-      -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -359,9 +362,9 @@ jobs:
         name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_REGISTRY_USER }}
+          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
       -
         name: Build and push
         uses: docker/build-push-action@v5
@@ -373,7 +376,10 @@ jobs:
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
           labels: ${{ env.LABELS }}
-          secrets: GIT_AUTH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
+          cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
+          cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
+
       -
         name: Image Meta
         id: image-meta
@@ -398,7 +404,7 @@ jobs:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
           retention-days: 7
-
+  # this will only execute in cloudnative-pg org
   publish-artifacts:
     name: Publish artifacts
     needs:
@@ -467,7 +473,7 @@ jobs:
       - evaluate_options
     # We try to avoid running the E2E Test Suite in general, to reduce load on
     # GitHub resources.
-    # Currently it's executed in the following cases:
+    # Currently, it's executed in the following cases:
     # - When dispatched via chatops commands
     # - On a push in main and release branches
     # - On scheduled executions
@@ -497,6 +503,8 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         id: generate-jobs
+        # Generates the jobs that will become different matrix branches,
+        # according to the event, or to the "depth" parameter if set manually
         name: Generate Jobs
         shell: bash
         run: |
@@ -534,9 +542,9 @@ jobs:
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.localTimeout }}
       BRANCH_NAME:  ${{ needs.buildx.outputs.branch_name }}
 
-      DOCKER_SERVER: ghcr.io
-      DOCKER_USERNAME: ${{ github.actor }}
-      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      DOCKER_SERVER: ${DOCKER_REGISTRY}
+      DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
+      DOCKER_PASSWORD: $DOCKER_REGISTRY_PASSWORD}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -547,6 +555,8 @@ jobs:
       LOG_DIR: ${{ github.workspace }}/kind-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "local"
+      TESTING_LICENSE: ""
+      E2E_ENABLE_REDWOOD: false
     steps:
       -
         name: Cleanup Disk
@@ -580,6 +590,14 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
       -
+        ## In case hack/setup-cluster.sh need pull operand image from registry
+        name: Login into docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_REGISTRY_USER }}
+          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
+      -
         # 'Retry' preparing the E2E test ENV
         name: Prepare the environment
         uses: nick-fields/retry@v2
@@ -597,6 +615,7 @@ jobs:
         name: Prepare patch for customization
         env:
           ## the following variable all need be set if we use env_override_customized.yaml.template
+          ## this is customization for local kind
           LEADER_ELECTION: "true"
           LEADER_LEASE_DURATION: 15
           LEADER_RENEW_DEADLINE: 10
@@ -625,16 +644,16 @@ jobs:
         if: (always() && !cancelled())
         run: |
           set +x
-          echo '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+          echo '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           python .github/generate-test-artifacts.py \
             -o testartifacts-${{ env.MATRIX }} \
             -f tests/e2e/out/report.json \
-            -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+            -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           if [ -f tests/e2e/out/upgrade_report.json ]; then
             python .github/generate-test-artifacts.py \
               -o testartifacts-${{ env.MATRIX }} \
               -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+              -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           fi
       -
         name: Archive test artifacts
@@ -719,7 +738,7 @@ jobs:
             az extension add --name aks-preview
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
-            AZURE_STORAGE_ACCOUNT="${{ github.run_number }}cnpge2e"
+            AZURE_STORAGE_ACCOUNT="${{ github.run_number }}${{ env.E2E_SUFFIX }}"
             az storage account create \
               --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_STORAGE_ACCOUNT} \
@@ -762,12 +781,15 @@ jobs:
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.aksTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
-      DOCKER_SERVER: ghcr.io
-      DOCKER_USERNAME: ${{ github.actor }}
-      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      DOCKER_SERVER: ${DOCKER_REGISTRY}
+      DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
+      DOCKER_PASSWORD: $DOCKER_REGISTRY_PASSWORD}
 
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
       # AZURE_STORAGE_KEY: this one is gathered during a subsequent step
+
+      E2E_ENABLE_REDWOOD: "false"
+      TESTING_LICENSE: ""
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -776,6 +798,7 @@ jobs:
       E2E_CSI_STORAGE_CLASS: rook-ceph-block
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-rbdplugin-snapclass
       TEST_CLOUD_VENDOR: "aks"
+
     steps:
       -
         name: Checkout code
@@ -805,6 +828,14 @@ jobs:
           max_attempts: 3
           command: |
             go install github.com/onsi/ginkgo/v2/ginkgo
+      -
+        ## In case hack/setup-cluster.sh need pull operand image from registry
+        name: Login into docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_REGISTRY_USER }}
+          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
       -
         name: Azure Login
         uses: azure/login@v1.5.0
@@ -922,16 +953,16 @@ jobs:
         if: (always() && !cancelled())
         run: |
           set +x
-          echo '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+          echo '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           python .github/generate-test-artifacts.py \
             -o testartifacts-${{ env.MATRIX }} \
             -f tests/e2e/out/report.json \
-            -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+            -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           if [ -f tests/e2e/out/upgrade_report.json ]; then
             python .github/generate-test-artifacts.py \
               -o testartifacts-${{ env.MATRIX }} \
               -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+              -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           fi
       -
         name: Archive test artifacts
@@ -1094,9 +1125,9 @@ jobs:
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.eksTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
-      DOCKER_SERVER: ghcr.io
-      DOCKER_USERNAME: ${{ github.actor }}
-      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      DOCKER_SERVER: ${DOCKER_REGISTRY}
+      DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
+      DOCKER_PASSWORD: $DOCKER_REGISTRY_PASSWORD}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -1108,11 +1139,14 @@ jobs:
       AWS_REGION: eu-central-1
       AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES }}
       TEST_CLOUD_VENDOR: "eks"
+
+      E2E_ENABLE_REDWOOD: "false"
+      TESTING_LICENSE: ""
     steps:
       -
         name: Set cluster name
         run: |
-          echo "CLUSTER_NAME=cnpg-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
         uses: actions/checkout@v4
@@ -1124,6 +1158,14 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
+      -
+        ## In case hack/setup-cluster.sh need pull operand image from registry
+        name: Login into docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_REGISTRY_USER }}
+          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
@@ -1472,9 +1514,9 @@ jobs:
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.gkeTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
-      DOCKER_SERVER: ghcr.io
-      DOCKER_USERNAME: ${{ github.actor }}
-      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      DOCKER_SERVER: ${DOCKER_REGISTRY}
+      DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
+      DOCKER_PASSWORD: $DOCKER_REGISTRY_PASSWORD}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -1485,6 +1527,9 @@ jobs:
 
       ZONE: europe-west3-a
       TEST_CLOUD_VENDOR: "gke"
+
+      E2E_ENABLE_REDWOOD: "false"
+      TESTING_LICENSE: ""
     steps:
       -
         name: Checkout code
@@ -1497,6 +1542,14 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
+      -
+        ## In case hack/setup-cluster.sh need pull operand image from registry
+        name: Login into docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_REGISTRY_USER }}
+          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
@@ -1522,7 +1575,7 @@ jobs:
           # and must be no longer than 40 characters
           # We need to shorten the name and lower the case
           SHORT_ID=$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
-          echo "CLUSTER_NAME=cnpg-test-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-test-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
       -
         name: Authenticate to Google Cloud
         id: 'auth'
@@ -1749,8 +1802,8 @@ jobs:
         # downloads all artifacts and creates a new folder for each.
         # In this step we bring all the JSONs to a single folder
         run: |
-            mkdir test-artifacts/data
-            mv test-artifacts/*/*.json test-artifacts/data
+          mkdir test-artifacts/data
+          mv test-artifacts/*/*.json test-artifacts/data || true
 
       - name: Display the structure of the artifact folder
         run: ls -R test-artifacts/data
@@ -1773,14 +1826,14 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         if: |
           steps.generate-summary.outputs.alerts &&
-          github.repository_owner == 'cloudnative-pg' &&
+          github.repository_owner == env.REPOSITORY_OWNER &&
           github.ref == 'refs/heads/main'
         env:
           SLACK_COLOR: "danger"
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
-          SLACK_USERNAME: cnpg-bot
+          SLACK_USERNAME: ${{ env.SLACK_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_TITLE: CIclops found systematic failures in the E2E tests in CNPG repository
+          SLACK_TITLE: CIclops found systematic failures in the E2E tests in ${{github.repository}} repository
           SLACK_MESSAGE: |
             :warning: ${{steps.generate-summary.outputs.alerts}}
             <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|See full CI run>
