@@ -36,7 +36,7 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 	minAvailableReplicas := cluster.Spec.Instances - 2
 	allReplicasButOne := intstr.FromInt(minAvailableReplicas)
 
-	return &policyv1.PodDisruptionBudget{
+	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
@@ -51,6 +51,10 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 			MinAvailable: &allReplicasButOne,
 		},
 	}
+
+	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+
+	return pdb
 }
 
 // BuildPrimaryPodDisruptionBudget creates a pod disruption budget, telling
@@ -61,7 +65,7 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 	}
 	one := intstr.FromInt(1)
 
-	return &policyv1.PodDisruptionBudget{
+	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix,
 			Namespace: cluster.Namespace,
@@ -76,4 +80,8 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 			MinAvailable: &one,
 		},
 	}
+
+	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+
+	return pdb
 }
