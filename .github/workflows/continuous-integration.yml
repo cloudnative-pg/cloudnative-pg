@@ -364,8 +364,10 @@ jobs:
       (needs.crd.result == 'success' || needs.crd.result == 'skipped')
     runs-on: ubuntu-22.04
     permissions:
+      actions: read
       contents: read
       packages: write
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
