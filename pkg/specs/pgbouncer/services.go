@@ -28,11 +28,15 @@ import (
 
 // Service create the specification for the service of
 // pgbouncer
-func Service(pooler *apiv1.Pooler) *corev1.Service {
+func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
+			Labels: map[string]string{
+				utils.PgbouncerNameLabel: pooler.Name,
+				utils.ClusterLabelName:   cluster.Name,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Type: corev1.ServiceTypeClusterIP,
