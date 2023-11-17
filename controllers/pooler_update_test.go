@@ -214,7 +214,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		})
 	})
 
-	It("should test the Service update logic", func() {
+	It("should reconcileService works correctly", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
@@ -223,20 +223,22 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure the service doesn't exist", func() {
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler)
+			expectedSVC := pgbouncer.Service(pooler, cluster)
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 
-		By("making sure it updateService creates the service", func() {
-			err := poolerReconciler.updateService(ctx, pooler, res)
+		By("making sure it creates the service", func() {
+			err := poolerReconciler.reconcileService(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler)
+			expectedSVC := pgbouncer.Service(pooler, cluster)
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 
+			Expect(expectedSVC.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
+			Expect(expectedSVC.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
 			Expect(expectedSVC.Spec.Selector).To(Equal(svc.Spec.Selector))
 			Expect(expectedSVC.Spec.Ports).To(Equal(svc.Spec.Ports))
 			Expect(expectedSVC.Spec.Type).To(Equal(svc.Spec.Type))
@@ -245,15 +247,32 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure the svc doesn't get updated if there are not changes", func() {
 			previousResourceVersion := res.Service.ResourceVersion
-			err := poolerReconciler.updateService(ctx, pooler, res)
+			err := poolerReconciler.reconcileService(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler)
+			expectedSVC := pgbouncer.Service(pooler, cluster)
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(previousResourceVersion).To(Equal(svc.ResourceVersion))
+		})
+
+		By("making sure it reconciles if differences from the living and expected service are present", func() {
+			previousName := cluster.Name
+			previousResourceVersion := res.Service.ResourceVersion
+			cluster.Name = "new-name"
+
+			err := poolerReconciler.reconcileService(ctx, pooler, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			svc := &corev1.Service{}
+			expectedSVC := pgbouncer.Service(pooler, cluster)
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(previousResourceVersion).ToNot(Equal(svc.ResourceVersion))
+			Expect(expectedSVC.Labels[utils.ClusterLabelName]).ToNot(Equal(previousName))
+			Expect(expectedSVC.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
 		})
 	})
 })

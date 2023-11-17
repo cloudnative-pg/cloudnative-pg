@@ -30,7 +30,10 @@ import (
 )
 
 var _ = Describe("Pooler Service", func() {
-	var pooler *apiv1.Pooler
+	var (
+		pooler  *apiv1.Pooler
+		cluster *apiv1.Cluster
+	)
 
 	BeforeEach(func() {
 		pooler = &apiv1.Pooler{
@@ -39,13 +42,21 @@ var _ = Describe("Pooler Service", func() {
 				Namespace: "test-namespace",
 			},
 		}
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "test-namespace",
+			},
+		}
 	})
 
 	Context("when creating a Service", func() {
 		It("returns the correct Service", func() {
-			service := Service(pooler)
+			service := Service(pooler, cluster)
 			Expect(service.Name).To(Equal(pooler.Name))
 			Expect(service.Namespace).To(Equal(pooler.Namespace))
+			Expect(service.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
+			Expect(service.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
 			Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
 			Expect(service.Spec.Ports).To(ConsistOf(corev1.ServicePort{
 				Name:       "pgbouncer",

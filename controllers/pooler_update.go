@@ -52,7 +52,7 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
-	if err := r.updateService(ctx, pooler, resources); err != nil {
+	if err := r.reconcileService(ctx, pooler, resources); err != nil {
 		return err
 	}
 
@@ -116,32 +116,43 @@ func (r *PoolerReconciler) updateDeployment(
 	return nil
 }
 
-// updateService update or create the pgbouncer service as needed
-//
-//nolint:dupl
-func (r *PoolerReconciler) updateService(
+// reconcileService update or create the pgbouncer service as needed
+func (r *PoolerReconciler) reconcileService(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
+	expectedService := pgbouncer.Service(pooler, resources.Cluster)
+	if err := ctrl.SetControllerReference(pooler, expectedService, r.Scheme); err != nil {
+		return err
+	}
 
 	if resources.Service == nil {
-		service := pgbouncer.Service(pooler)
-		if err := ctrl.SetControllerReference(pooler, service, r.Scheme); err != nil {
-			return err
-		}
-
-		contextLog.Info("Creating service")
-		err := r.Create(ctx, service)
+		contextLog.Info("Creating the service")
+		err := r.Create(ctx, expectedService)
 		if err != nil && !apierrs.IsAlreadyExists(err) {
 			return err
 		}
-		resources.Service = service
+		resources.Service = expectedService
 		return nil
 	}
 
-	return nil
+	patchedService := resources.Service.DeepCopy()
+	patchedService.Spec = expectedService.Spec
+	if patchedService.Labels == nil {
+		patchedService.Labels = make(map[string]string)
+	}
+	utils.MergeMap(patchedService.Labels, expectedService.Labels)
+
+	if reflect.DeepEqual(patchedService.ObjectMeta, resources.Service.ObjectMeta) &&
+		reflect.DeepEqual(patchedService.Spec, resources.Service.Spec) {
+		return nil
+	}
+
+	contextLog.Info("Updating the service metadata")
+
+	return r.Patch(ctx, patchedService, client.MergeFrom(resources.Service))
 }
 
 // updateRBAC update or create the pgbouncer RBAC
