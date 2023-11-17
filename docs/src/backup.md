@@ -140,13 +140,13 @@ available methods for storing physical base backups.
 |                                   | Object store |   Volume Snapshots   |
 |-----------------------------------|:------------:|:--------------------:|
 | **WAL archiving**                 |   Required   |    Recommended (1)   |
-| **Cold backup**                   |      𐄂       |           ✓          |
-| **Hot backup**                    |       ✓      |           ✓          |
-| **Incremental copy**              |      𐄂       |         ✓  (2)       |
-| **Differential copy**             |      𐄂       |         ✓  (2)       |
-| **Backup from a standby**         |       ✓      |           ✓          |
-| **Snapshot recovery**             |    𐄂 (3)     |           ✓          |
-| **Point In Time Recovery (PITR)** |       ✓      | Requires WAL archive |
+| **Cold backup**                   |      ✗       |           ✓          |
+| **Hot backup**                    |      ✓       |           ✓          |
+| **Incremental copy**              |      ✗       |         ✓  (2)       |
+| **Differential copy**             |      ✗       |         ✓  (2)       |
+| **Backup from a standby**         |      ✓       |           ✓          |
+| **Snapshot recovery**             |    ✗ (3)     |           ✓          |
+| **Point In Time Recovery (PITR)** |      ✓       | Requires WAL archive |
 | **Underlying technology**         | Barman Cloud |   Kubernetes API     |
 
 
