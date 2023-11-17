@@ -75,7 +75,7 @@ var _ = Describe("Deployment", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
 
-		expectedHash, err := hash.ComputeVersionedHash(pooler.Spec, 1)
+		expectedHash, err := hash.ComputeVersionedHash(pooler.Spec, 2)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		// Check the computed hash
@@ -84,6 +84,8 @@ var _ = Describe("Deployment", func() {
 		// Check the metadata
 		Expect(deployment.ObjectMeta.Name).To(Equal(pooler.Name))
 		Expect(deployment.ObjectMeta.Namespace).To(Equal(pooler.Namespace))
+		Expect(deployment.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
+		Expect(deployment.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
 
 		// Check the DeploymentSpec
 		Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))

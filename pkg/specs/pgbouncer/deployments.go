@@ -43,7 +43,7 @@ const (
 // Deployment create the deployment of pgbouncer, given
 // the configurations we have in the pooler specifications
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
-	poolerHash, err := hash.ComputeVersionedHash(pooler.Spec, 1)
+	poolerHash, err := hash.ComputeVersionedHash(pooler.Spec, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -121,9 +121,12 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
+			Labels: map[string]string{
+				utils.ClusterLabelName:   cluster.Name,
+				utils.PgbouncerNameLabel: pooler.Name,
+			},
 			Annotations: map[string]string{
 				utils.PoolerSpecHashAnnotationName: poolerHash,
-				utils.ClusterLabelName:             cluster.Name,
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
