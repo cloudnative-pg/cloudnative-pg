@@ -365,8 +365,10 @@ jobs:
       (needs.crd.result == 'success' || needs.crd.result == 'skipped')
     runs-on: ubuntu-22.04
     permissions:
+      actions: read
       contents: read
       packages: write
+      security-events: write
     outputs:
       commit_version: ${{ env.VERSION }}
       commit: ${{ env.COMMIT_SHA }}
