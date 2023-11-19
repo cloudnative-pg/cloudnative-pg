@@ -81,6 +81,10 @@ type PoolerSpec struct {
 	// The configuration of the monitoring infrastructure of this pooler.
 	// +optional
 	Monitoring *PoolerMonitoringConfiguration `json:"monitoring,omitempty"`
+
+	// Template for the Service to be created
+	// +optional
+	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
 }
 
 // PoolerMonitoringConfiguration is the type containing all the monitoring
@@ -124,6 +128,18 @@ type PodTemplateSpec struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec corev1.PodSpec `json:"spec,omitempty"`
+}
+
+type ServiceTemplateSpec struct {
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	ObjectMeta Metadata `json:"metadata,omitempty"`
+
+	// Specification of the desired behavior of the pod.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec corev1.ServiceSpec `json:"spec,omitempty"`
 }
 
 // PgBouncerSpec defines how to configure PgBouncer

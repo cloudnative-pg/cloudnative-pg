@@ -23,23 +23,28 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Service create the specification for the service of
 // pgbouncer
 func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) *corev1.Service {
+	serviceTemplate := servicespec.NewFrom(pooler.Spec.ServiceTemplate).
+		WithServiceType(pooler.Spec.ServiceTemplate.Spec.Type).
+		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
+		WithLabel(utils.ClusterLabelName, cluster.Name).
+		Build()
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pooler.Name,
-			Namespace: pooler.Namespace,
-			Labels: map[string]string{
-				utils.PgbouncerNameLabel: pooler.Name,
-				utils.ClusterLabelName:   cluster.Name,
-			},
+			Name:        pooler.Name,
+			Namespace:   pooler.Namespace,
+			Labels:      serviceTemplate.ObjectMeta.Labels,
+			Annotations: serviceTemplate.ObjectMeta.Annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
+			Type: serviceTemplate.Spec.Type,
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "pgbouncer",
