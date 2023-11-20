@@ -45,9 +45,9 @@ def convert_ginkgo_test(t, matrix):
         "postgres": , # version of PostgreSQL eg. 13.5
         "kubernetes": , # version of K8s eg. v1.22.2
         "runid": , # the GH Action run-id -> ${{ github.run_id }}
-        "repo": , # cloudnative-pg/cloudnative-pg -> you get this from GH with ${{github.repository}}
-        "branch": , # dev/cnpg-1666 -> you get this with "${{github.head_ref}}" ... EXCEPT
+        "branch": , # dev/xxxx-1666 -> you get this with "${{github.head_ref}}" ... EXCEPT
         "refname": , # depending on how the job was triggered, the above may be blank, and then we want: "${{github.ref_name}}"
+        "repo": , # cloudnative-pg/cloudnative-pg -> you get this from GH with ${{github.repository}}
     }
     """
     err = ""
