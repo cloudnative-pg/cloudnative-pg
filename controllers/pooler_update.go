@@ -214,7 +214,7 @@ func (r *PoolerReconciler) updateServiceAccount(
 ) error {
 	contextLog := log.FromContext(ctx)
 
-	pullSecretName, err := r.ensureServiceAccountPullSecret(ctx, pooler)
+	pullSecretName, err := r.ensureServiceAccountPullSecret(ctx, pooler, configuration.Current)
 	if err != nil {
 		return err
 	}
@@ -250,23 +250,24 @@ func (r *PoolerReconciler) updateServiceAccount(
 func (r *PoolerReconciler) ensureServiceAccountPullSecret(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
-) (pullSecretName string, err error) {
+	conf *configuration.Data,
+) (string, error) {
 	contextLog := log.FromContext(ctx)
-	if configuration.Current.OperatorNamespace == "" {
+	if conf.OperatorNamespace == "" {
 		// We are not getting started via a k8s deployment. Perhaps we are running in our development environment
 		return "", nil
 	}
 
 	// no pull secret name, there is nothing to do
-	if configuration.Current.OperatorPullSecretName == "" {
+	if conf.OperatorPullSecretName == "" {
 		return "", nil
 	}
 
 	// Let's find the operator secret
 	var operatorSecret corev1.Secret
-	if err = r.Get(ctx, client.ObjectKey{
-		Name:      configuration.Current.OperatorPullSecretName,
-		Namespace: configuration.Current.OperatorNamespace,
+	if err := r.Get(ctx, client.ObjectKey{
+		Name:      conf.OperatorPullSecretName,
+		Namespace: conf.OperatorNamespace,
 	}, &operatorSecret); err != nil {
 		if apierrs.IsNotFound(err) {
 			// There is no secret like that, probably because we are running in our development environment
@@ -275,10 +276,9 @@ func (r *PoolerReconciler) ensureServiceAccountPullSecret(
 		return "", err
 	}
 
-	pullSecretName = fmt.Sprintf("%s-pull", pooler.Name)
+	pullSecretName := fmt.Sprintf("%s-pull", pooler.Name)
 
-	// Let's create the secret with the required info
-	secret := corev1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pooler.Namespace,
 			// we change name to avoid ownership conflicts with the managed secret from cnpg cluster
@@ -288,17 +288,31 @@ func (r *PoolerReconciler) ensureServiceAccountPullSecret(
 		Type: operatorSecret.Type,
 	}
 
-	if err = ctrl.SetControllerReference(pooler, &secret, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(pooler, secret, r.Scheme); err != nil {
 		return "", err
 	}
 
-	contextLog.Debug("creating image pull secret for service account")
-	// Another sync loop may have already created the service. Let's check that
-	if err = r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
-		return "", err
+	var remoteSecret corev1.Secret
+
+	err := r.Get(ctx, client.ObjectKeyFromObject(secret), &remoteSecret)
+	if apierrs.IsNotFound(err) {
+		contextLog.Debug("creating image pull secret for service account")
+		return pullSecretName, r.Create(ctx, secret)
+	}
+	if err != nil {
+		return "", fmt.Errorf("while fetching remote pull secret: %w", err)
 	}
 
-	return pullSecretName, nil
+	// we reconcile only if the secret is owned by us
+	if _, isOwned := isOwnedByPooler(&remoteSecret); !isOwned {
+		return pullSecretName, nil
+	}
+
+	if reflect.DeepEqual(remoteSecret.Data, secret.Data) && reflect.DeepEqual(remoteSecret.Type, secret.Type) {
+		return pullSecretName, nil
+	}
+
+	return pullSecretName, r.Patch(ctx, secret, client.MergeFrom(&remoteSecret))
 }
 
 func ensureServiceAccountHaveImagePullSecret(serviceAccount *corev1.ServiceAccount, pullSecretName string) {
