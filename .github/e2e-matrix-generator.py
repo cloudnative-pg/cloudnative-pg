@@ -33,7 +33,6 @@ VERSION_SCOPE_FILE = ".github/k8s_versions_scope.json"
 E2E_TEST_TIMEOUT = ".github/e2e_test_timeout.json"
 
 
-
 class VersionList(list):
     """List of versions"""
 
@@ -81,6 +80,7 @@ def filter_version(versions_list, version_range):
         )
     )
 
+
 # Default timeout for the e2e test
 with open(E2E_TEST_TIMEOUT) as json_file:
     timeout_list = json.load(json_file)
@@ -125,7 +125,6 @@ GKE_K8S = VersionList(gke_versions)
 with open(PG_VERSIONS_FILE, "r") as json_file:
     postgres_versions = json.load(json_file)
 POSTGRES = MajorVersionList(postgres_versions)
-
 
 
 class E2EJob(dict):
