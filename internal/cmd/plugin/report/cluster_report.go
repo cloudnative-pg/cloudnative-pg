@@ -38,6 +38,7 @@ type clusterReport struct {
 	cluster     cnpgv1.Cluster
 	clusterPods corev1.PodList
 	clusterJobs batchv1.JobList
+	clusterPVCs corev1.PersistentVolumeClaimList
 	events      corev1.EventList
 }
 
@@ -52,6 +53,7 @@ func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputForma
 		{content: cr.clusterPods, name: "cluster-pods"},
 		{content: cr.clusterJobs, name: "cluster-jobs"},
 		{content: cr.events, name: "events"},
+		{content: cr.clusterPVCs, name: "cluster-pvcs"},
 	}
 
 	newFolder := filepath.Join(folder, "manifests")
@@ -110,11 +112,18 @@ func cluster(ctx context.Context, clusterName, namespace string, format plugin.O
 		return fmt.Errorf("could not get cluster jobs: %w", err)
 	}
 
+	var pvcs corev1.PersistentVolumeClaimList
+	err = plugin.Client.List(ctx, &pvcs, matchClusterName, client.InNamespace(namespace))
+	if err != nil {
+		return fmt.Errorf("could not get cluster pvcs: %w", err)
+	}
+
 	rep := clusterReport{
 		events:      events,
 		cluster:     cluster,
 		clusterPods: pods,
 		clusterJobs: jobs,
+		clusterPVCs: pvcs,
 	}
 
 	reportZipper := func(zipper *zip.Writer, dirname string) error {
