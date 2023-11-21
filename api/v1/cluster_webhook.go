@@ -19,7 +19,6 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -60,18 +59,7 @@ const (
 	DefaultApplicationUserName = DefaultApplicationDatabaseName
 )
 
-const (
-	// postgresIdentifierMaxLen is the maximum length PostgreSQL allows for identifiers
-	postgresIdentifierMaxLen int = 63
-	sharedBuffersParameter       = "shared_buffers"
-	// prefix denoting tablespaces managed by the Postgres system
-	// see https://www.postgresql.org/docs/current/sql-createtablespace.html
-	systemTablespacesPrefix = "pg_"
-)
-
-// regex to verify a Postgres-compliant identifier
-// see https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
-var postgresIdentifierRegex = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_$]*$")
+const sharedBuffersParameter = "shared_buffers"
 
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
@@ -1452,14 +1440,15 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 }
 
 func (r *Cluster) validateStorageSize() field.ErrorList {
-	return validateStorageConfigurationSize("Storage", r.Spec.StorageConfiguration)
+	return validateStorageConfigurationSize(*field.NewPath("Storage"), r.Spec.StorageConfiguration)
 }
 
 func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	var result field.ErrorList
 
 	if r.ShouldCreateWalArchiveVolume() {
-		result = append(result, validateStorageConfigurationSize("walStorage", *r.Spec.WalStorage)...)
+		result = append(result,
+			validateStorageConfigurationSize(*field.NewPath("walStorage"), *r.Spec.WalStorage)...)
 	}
 
 	return result
@@ -1474,18 +1463,23 @@ func (r *Cluster) validateTablespacesStorageSize() field.ErrorList {
 
 	for tablespaceName, tablespaceConf := range r.Spec.Tablespaces {
 		result = append(result,
-			validateStorageConfigurationSize("tablespaces."+tablespaceName, tablespaceConf.Storage)...)
+			validateStorageConfigurationSize(
+				*field.NewPath("tablespaces", tablespaceName), tablespaceConf.Storage)...,
+		)
 	}
 	return result
 }
 
-func validateStorageConfigurationSize(structPath string, storageConfiguration StorageConfiguration) field.ErrorList {
+func validateStorageConfigurationSize(
+	structPath field.Path,
+	storageConfiguration StorageConfiguration,
+) field.ErrorList {
 	var result field.ErrorList
 
 	if storageConfiguration.Size != "" {
 		if _, err := resource.ParseQuantity(storageConfiguration.Size); err != nil {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", structPath, "size"),
+				field.NewPath("spec", structPath.String(), "size"),
 				storageConfiguration.Size,
 				"Size value isn't valid"))
 		}
@@ -1495,7 +1489,7 @@ func validateStorageConfigurationSize(structPath string, storageConfiguration St
 		(storageConfiguration.PersistentVolumeClaimTemplate == nil ||
 			storageConfiguration.PersistentVolumeClaimTemplate.Resources.Requests.Storage().IsZero()) {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", structPath, "size"),
+			field.NewPath("spec", structPath.String(), "size"),
 			storageConfiguration.Size,
 			"Size not configured. Please add it, or a storage request in the pvcTemplate."))
 	}
@@ -1643,26 +1637,11 @@ func (r *Cluster) validateTablespacesNames() field.ErrorList {
 		}
 		hasTablespace[strings.ToLower(name)] = true
 
-		if strings.HasPrefix(name, systemTablespacesPrefix) {
+		if _, err := postgres.IsTablespaceNameValid(name); err != nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "tablespaces"),
 				name,
-				"tablespace names beginning 'pg_' are reserved for Postgres"))
-		}
-
-		if !postgresIdentifierRegex.MatchString(name) {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "tablespaces"),
-				name,
-				"tablespace names must be valid Postgres identifiers: alphanumeric characters, '_', '$', "+
-					"and must start with a letter or an underscore"))
-		}
-
-		if len(name) > postgresIdentifierMaxLen {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "tablespaces"),
-				name,
-				"the maximum length of an identifier is 63 characters"))
+				err.Error()))
 		}
 	}
 	return result
