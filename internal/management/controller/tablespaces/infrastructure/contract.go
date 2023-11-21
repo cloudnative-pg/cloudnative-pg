@@ -20,16 +20,14 @@ import "context"
 
 // Tablespace represents the tablespace information read from / written to the Database
 type Tablespace struct {
-	Name      string `json:"name"`
-	Temporary bool   `json:"temporary"`
+	Name string `json:"name"`
 }
 
 // TablespaceManager abstracts the functionality of reconciling with PostgreSQL tablespaces
 type TablespaceManager interface {
 	// List the tablespace in the database
 	List(ctx context.Context) ([]Tablespace, error)
-	// Update the tablespace in the database
-	Update(ctx context.Context, tablespace Tablespace) error
+
 	// Create the tablespace in the database
 	Create(ctx context.Context, tablespace Tablespace) error
 }

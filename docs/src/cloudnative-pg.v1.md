@@ -4360,8 +4360,7 @@ if all the labels values match.</p>
 
 
 <p>TablespaceConfiguration is the configuration of a tablespace, and includes
-the storage specification, and whether it is temporary (defaults to false
-if not specified)</p>
+the storage specification for the tablespace</p>
 
 
 <table class="table">
@@ -4372,13 +4371,6 @@ if not specified)</p>
 </td>
 <td>
    <p>The storage configuration for the tablespace</p>
-</td>
-</tr>
-<tr><td><code>temporary</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>This flag indicates if the tablespace is a temporary tablespace or not (default false)</p>
 </td>
 </tr>
 </tbody>

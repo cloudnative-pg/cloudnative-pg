@@ -52,8 +52,6 @@ const (
 	TbsIsReconciled TablespaceAction = "RECONCILED"
 	// TbsToCreate tablespaces action represent tablespace going to create
 	TbsToCreate TablespaceAction = "CREATE"
-	// TbsToUpdate tablespaces action represent tablespace going to update
-	TbsToUpdate TablespaceAction = "UPDATE"
 	// TbsPending tablespaces action represent tablespace can not be created now, waiting for pending pvc ready
 	TbsPending TablespaceAction = "PENDING"
 )
@@ -104,7 +102,6 @@ func (r TablespaceByAction) convertToTablespaceNameByStatus() TablespaceNameBySt
 	statusByAction := map[TablespaceAction]apiv1.TablespaceStatus{
 		TbsIsReconciled: apiv1.TablespaceStatusReconciled,
 		TbsToCreate:     apiv1.TablespaceStatusPendingReconciliation,
-		TbsToUpdate:     apiv1.TablespaceStatusPendingReconciliation,
 		TbsPending:      apiv1.TablespaceStatusPendingReconciliation,
 	}
 

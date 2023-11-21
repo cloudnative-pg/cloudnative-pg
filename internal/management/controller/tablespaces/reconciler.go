@@ -145,8 +145,7 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 			contextLog.Trace("creating tablespace ", "tablespace", tbs.Name)
 			tbs := tbs
 			tablespace := infrastructure.Tablespace{
-				Name:      tbs.Name,
-				Temporary: tbs.GetTemporary(),
+				Name: tbs.Name,
 			}
 			if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
 				return fmt.Errorf("cannot create tablespace before data directory is created")

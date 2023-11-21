@@ -3369,7 +3369,6 @@ var _ = Describe("Tablespaces validation", func() {
 			Storage: StorageConfiguration{
 				Size: "10Gi",
 			},
-			Temporary: ptr.To(true),
 		}
 	}
 
@@ -3498,7 +3497,6 @@ var _ = Describe("Tablespaces validation", func() {
 						Storage: StorageConfiguration{
 							Size: "10Gibberish",
 						},
-						Temporary: ptr.To(true),
 					},
 				},
 			},
@@ -3522,7 +3520,6 @@ var _ = Describe("Tablespaces validation", func() {
 						Storage: StorageConfiguration{
 							Size: "10Gibberish",
 						},
-						Temporary: ptr.To(true),
 					},
 					// each repetition is 14 char long, so 5x14 = 70 char > postgres limit
 					"my_tablespace1my_tablespace2my_tablespace3my_tablespace4my_tablespace5": createFakeTemporaryTbsConf(),
@@ -3620,7 +3617,6 @@ var _ = Describe("Tablespaces validation", func() {
 						Storage: StorageConfiguration{
 							Size: "9Gi",
 						},
-						Temporary: ptr.To(true),
 					},
 				},
 			},

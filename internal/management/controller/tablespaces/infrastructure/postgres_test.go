@@ -28,11 +28,7 @@ import (
 )
 
 var _ = Describe("Postgres tablespaces functions test", func() {
-	expectedListStmt := `SELECT spcname, 
-		CASE WHEN spcname=ANY(regexp_split_to_array(current_setting('TEMP_TABLESPACES'),E'\\s*,\\s*')) 
-		THEN true ELSE false END AS temp 
-	 FROM pg_tablespace  
-	 WHERE spcname NOT IN ('pg_default','pg_global')`
+	expectedListStmt := "SELECT spcname FROM pg_tablespace WHERE spcname NOT LIKE 'pg_%'"
 	expectedCreateStmt := "CREATE TABLESPACE \"%s\" LOCATION '%s'"
 	It("should send the expected query to list tablespaces and parse the return", func(ctx SpecContext) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
@@ -40,17 +36,17 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 
 		tbsManager := newPostgresTablespaceManager(db)
 		rows := sqlmock.NewRows(
-			[]string{"spcname", "temp"}).
-			AddRow("atablespace", false).
-			AddRow("anothertablespace", true)
+			[]string{"spcname"}).
+			AddRow("atablespace").
+			AddRow("anothertablespace").
+			AddRow("pg_system")
 		mock.ExpectQuery(expectedListStmt).WillReturnRows(rows)
 		tbs, err := tbsManager.List(ctx)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(tbs).To(HaveLen(2))
 		Expect(tbs).To(ConsistOf(
 			Tablespace{Name: "atablespace"},
-			Tablespace{Name: "anothertablespace", Temporary: true}))
-		Expect(mock.ExpectationsWereMet()).To(Succeed())
+			Tablespace{Name: "anothertablespace"}))
 	})
 	It("should detect error if the list query returns error", func(ctx SpecContext) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))

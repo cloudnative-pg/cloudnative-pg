@@ -3367,8 +3367,7 @@ spec:
               tablespaces:
                 additionalProperties:
                   description: TablespaceConfiguration is the configuration of a tablespace,
-                    and includes the storage specification, and whether it is temporary
-                    (defaults to false if not specified)
+                    and includes the storage specification for the tablespace
                   properties:
                     storage:
                       description: The storage configuration for the tablespace
@@ -3610,11 +3609,6 @@ spec:
                             the default storage class TODO: update the comment'
                           type: string
                       type: object
-                    temporary:
-                      default: false
-                      description: This flag indicates if the tablespace is a temporary
-                        tablespace or not (default false)
-                      type: boolean
                   required:
                   - storage
                   type: object

@@ -1632,25 +1632,10 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 }
 
 // TablespaceConfiguration is the configuration of a tablespace, and includes
-// the storage specification, and whether it is temporary (defaults to false
-// if not specified)
+// the storage specification for the tablespace
 type TablespaceConfiguration struct {
 	// The storage configuration for the tablespace
 	Storage StorageConfiguration `json:"storage"`
-
-	// This flag indicates if the tablespace is a temporary tablespace or not (default false)
-	// +optional
-	// +kubebuilder:default:=false
-	Temporary *bool `json:"temporary,omitempty"`
-}
-
-// GetTemporary returns the Temporary value. Defaults to false.
-func (t TablespaceConfiguration) GetTemporary() bool {
-	if t.Temporary == nil {
-		return false
-	}
-
-	return *t.Temporary
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.
