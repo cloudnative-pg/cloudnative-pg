@@ -38,8 +38,7 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		rows := sqlmock.NewRows(
 			[]string{"spcname"}).
 			AddRow("atablespace").
-			AddRow("anothertablespace").
-			AddRow("pg_system")
+			AddRow("anothertablespace")
 		mock.ExpectQuery(expectedListStmt).WillReturnRows(rows)
 		tbs, err := tbsManager.List(ctx)
 		Expect(err).ShouldNot(HaveOccurred())

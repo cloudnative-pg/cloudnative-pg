@@ -18,6 +18,7 @@ package specs
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -39,12 +40,12 @@ const PgTableSpaceVolumePath = "/var/lib/postgresql/tablespaces"
 // MountForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func MountForTablespace(tablespaceName string) string {
-	return fmt.Sprintf("%s/%s", PgTableSpaceVolumePath, tablespaceName)
+	return path.Join(PgTableSpaceVolumePath, tablespaceName)
 }
 
 // LocationForTablespace returns the data location for tablespace on a cluster pod
 func LocationForTablespace(tablespaceName string) string {
-	return fmt.Sprintf("%s/%s/data", PgTableSpaceVolumePath, tablespaceName)
+	return path.Join(MountForTablespace(tablespaceName), "data")
 }
 
 // convertPostgresIDToK8sName returns a postgres identifier without the characters
@@ -68,12 +69,6 @@ func convertPostgresIDToK8s(tablespaceName string) string {
 	}
 	name := strings.ReplaceAll(tablespaceName, "$", "-")
 	return name
-}
-
-// LabelForTablespace returns the normalized tablespace volume name for a given
-// tablespace, on a cluster pod
-func LabelForTablespace(tablespaceName string) string {
-	return convertPostgresIDToK8s(tablespaceName)
 }
 
 // PvcNameForTablespace returns the normalized tablespace volume name for a given
@@ -159,14 +154,8 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 	// later it will be  retrieved to do deepEquals
 	if cluster.ContainsTablespaces() {
 		// Try to get a fix order of name
-		tbsNames := make([]string, len(cluster.Spec.Tablespaces))
-		i := 0
-		for name := range cluster.Spec.Tablespaces {
-			tbsNames[i] = name
-			i++
-		}
-		sort.Strings(tbsNames)
-		for i = range tbsNames {
+		tbsNames := getSortedTableSpaceName(cluster)
+		for i := range tbsNames {
 			result = append(result,
 				corev1.Volume{
 					Name: VolumeMountNameForTablespace(tbsNames[i]),
@@ -306,15 +295,8 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
 	// later it will be  retrieved to do deepEquals
 	if cluster.ContainsTablespaces() {
-		// Try to get a fix order of name
-		tbsNames := make([]string, len(cluster.Spec.Tablespaces))
-		i := 0
-		for name := range cluster.Spec.Tablespaces {
-			tbsNames[i] = name
-			i++
-		}
-		sort.Strings(tbsNames)
-		for i = range tbsNames {
+		tbsNames := getSortedTableSpaceName(cluster)
+		for i := range tbsNames {
 			volumeMounts = append(volumeMounts,
 				corev1.VolumeMount{
 					Name:      VolumeMountNameForTablespace(tbsNames[i]),
@@ -324,6 +306,18 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		}
 	}
 	return volumeMounts
+}
+
+func getSortedTableSpaceName(cluster apiv1.Cluster) []string {
+	// Try to get a fix order of name
+	tbsNames := make([]string, len(cluster.Spec.Tablespaces))
+	i := 0
+	for name := range cluster.Spec.Tablespaces {
+		tbsNames[i] = name
+		i++
+	}
+	sort.Strings(tbsNames)
+	return tbsNames
 }
 
 func createProjectedVolume(cluster apiv1.Cluster) corev1.Volume {
