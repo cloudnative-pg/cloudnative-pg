@@ -379,7 +379,6 @@ jobs:
           provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
-
       -
         name: Image Meta
         id: image-meta
@@ -404,7 +403,8 @@ jobs:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
           retention-days: 7
-  # this will only execute in cloudnative-pg org
+
+  # This will only execute in cloudnative-pg org
   publish-artifacts:
     name: Publish artifacts
     needs:
@@ -540,11 +540,11 @@ jobs:
       # The version of operator to upgrade FROM, in the rolling upgrade E2E test
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.localTimeout }}
-      BRANCH_NAME:  ${{ needs.buildx.outputs.branch_name }}
+      BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
       DOCKER_SERVER: ${DOCKER_REGISTRY}
       DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
-      DOCKER_PASSWORD: $DOCKER_REGISTRY_PASSWORD}
+      DOCKER_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -783,7 +783,7 @@ jobs:
 
       DOCKER_SERVER: ${DOCKER_REGISTRY}
       DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
-      DOCKER_PASSWORD: $DOCKER_REGISTRY_PASSWORD}
+      DOCKER_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
 
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
       # AZURE_STORAGE_KEY: this one is gathered during a subsequent step
@@ -1127,7 +1127,7 @@ jobs:
 
       DOCKER_SERVER: ${DOCKER_REGISTRY}
       DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
-      DOCKER_PASSWORD: $DOCKER_REGISTRY_PASSWORD}
+      DOCKER_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -1516,7 +1516,7 @@ jobs:
 
       DOCKER_SERVER: ${DOCKER_REGISTRY}
       DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
-      DOCKER_PASSWORD: $DOCKER_REGISTRY_PASSWORD}
+      DOCKER_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
