@@ -1440,7 +1440,7 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 }
 
 func (r *Cluster) validateStorageSize() field.ErrorList {
-	return validateStorageConfigurationSize(*field.NewPath("Storage"), r.Spec.StorageConfiguration)
+	return validateStorageConfigurationSize(*field.NewPath("spec", "storage"), r.Spec.StorageConfiguration)
 }
 
 func (r *Cluster) validateWalStorageSize() field.ErrorList {
@@ -1448,7 +1448,7 @@ func (r *Cluster) validateWalStorageSize() field.ErrorList {
 
 	if r.ShouldCreateWalArchiveVolume() {
 		result = append(result,
-			validateStorageConfigurationSize(*field.NewPath("walStorage"), *r.Spec.WalStorage)...)
+			validateStorageConfigurationSize(*field.NewPath("spec", "walStorage"), *r.Spec.WalStorage)...)
 	}
 
 	return result
@@ -1479,7 +1479,7 @@ func validateStorageConfigurationSize(
 	if storageConfiguration.Size != "" {
 		if _, err := resource.ParseQuantity(storageConfiguration.Size); err != nil {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", structPath.String(), "size"),
+				structPath.Child("size"),
 				storageConfiguration.Size,
 				"Size value isn't valid"))
 		}
@@ -1489,7 +1489,7 @@ func validateStorageConfigurationSize(
 		(storageConfiguration.PersistentVolumeClaimTemplate == nil ||
 			storageConfiguration.PersistentVolumeClaimTemplate.Resources.Requests.Storage().IsZero()) {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", structPath.String(), "size"),
+			structPath.Child("size"),
 			storageConfiguration.Size,
 			"Size not configured. Please add it, or a storage request in the pvcTemplate."))
 	}

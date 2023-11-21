@@ -1582,14 +1582,13 @@ type RecoveryTarget struct {
 	Exclusive *bool `json:"exclusive,omitempty"`
 }
 
-// StorageConfiguration is the configuration of the storage of the PostgreSQL instances
-// TODO: update the comment
+// StorageConfiguration is the configuration used to create and reconcile PVCs,
+// usable for WAL volumnes, PGDATA volumes, or tablespaces
 type StorageConfiguration struct {
-	// StorageClass to use for database data (`PGDATA`). Applied after
+	// StorageClass to use for PVCs. Applied after
 	// evaluating the PVC template, if available.
-	// If not specified, generated PVCs will be satisfied by the
+	// If not specified, the generated PVCs will use the
 	// default storage class
-	// TODO: update the comment
 	// +optional
 	StorageClass *string `json:"storageClass,omitempty"`
 
