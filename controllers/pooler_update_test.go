@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -25,8 +26,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -274,5 +280,124 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(expectedSVC.Labels[utils.ClusterLabelName]).ToNot(Equal(previousName))
 			Expect(expectedSVC.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
 		})
+	})
+})
+
+var _ = Describe("ensureServiceAccountPullSecret", func() {
+	var (
+		ctx              context.Context
+		r                *PoolerReconciler
+		pooler           *apiv1.Pooler
+		conf             *configuration.Data
+		pullSecret       *corev1.Secret
+		poolerSecretName string
+	)
+
+	generateOperatorPullSecret := func() *corev1.Secret {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test",
+				Name:      "pull-secret",
+			},
+			Type: corev1.SecretTypeBasicAuth,
+			Data: map[string][]byte{
+				corev1.BasicAuthUsernameKey: []byte("some-username"),
+				corev1.BasicAuthPasswordKey: []byte("some-password"),
+			},
+		}
+	}
+
+	BeforeEach(func() {
+		ctx = context.TODO()
+
+		pullSecret = generateOperatorPullSecret()
+
+		conf = &configuration.Data{
+			OperatorNamespace:      pullSecret.Namespace,
+			OperatorPullSecretName: pullSecret.Name,
+		}
+
+		pooler = &apiv1.Pooler{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "Pooler",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "some-pooler",
+				Namespace: "pooler-namespace",
+			},
+		}
+
+		poolerSecretName = fmt.Sprintf("%s-pull", pooler.Name)
+
+		knownScheme := schemeBuilder.BuildWithAllKnownScheme()
+		r = &PoolerReconciler{
+			Client: fake.NewClientBuilder().
+				WithScheme(knownScheme).
+				WithObjects(pullSecret, pooler).
+				Build(),
+			Scheme: knownScheme,
+		}
+	})
+
+	It("should create the pull secret", func() {
+		name, err := r.ensureServiceAccountPullSecret(ctx, pooler, conf)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(name).To(Equal(poolerSecretName))
+	})
+
+	It("should not change the pull secret if it matches", func() {
+		By("creating the secret before triggering the reconcile")
+		secret := generateOperatorPullSecret()
+		secret.Name = poolerSecretName
+		secret.Namespace = pooler.Namespace
+		err := ctrl.SetControllerReference(pooler, secret, r.Scheme)
+		Expect(err).ToNot(HaveOccurred())
+		err = r.Create(ctx, secret)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("fetching the remote secret")
+		var remoteSecret corev1.Secret
+		err = r.Get(ctx, k8client.ObjectKeyFromObject(secret), &remoteSecret)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("triggering the reconciliation")
+		name, err := r.ensureServiceAccountPullSecret(ctx, pooler, conf)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(name).To(Equal(poolerSecretName))
+
+		By("ensuring the resource is the same")
+		var remoteSecretAfter corev1.Secret
+		err = r.Get(ctx, k8client.ObjectKeyFromObject(secret), &remoteSecretAfter)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(remoteSecret).To(BeEquivalentTo(remoteSecret))
+	})
+
+	It("should reconcile the secret if it doesn't match", func() {
+		By("creating the secret before triggering the reconcile")
+		secret := generateOperatorPullSecret()
+		secret.Name = poolerSecretName
+		secret.Namespace = pooler.Namespace
+		secret.Data[corev1.BasicAuthUsernameKey] = []byte("bad-name")
+		err := ctrl.SetControllerReference(pooler, secret, r.Scheme)
+		Expect(err).ToNot(HaveOccurred())
+		err = r.Create(ctx, secret)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("fetching the remote secret")
+		var remoteSecret corev1.Secret
+		err = r.Get(ctx, k8client.ObjectKeyFromObject(secret), &remoteSecret)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("triggering the reconciliation")
+		name, err := r.ensureServiceAccountPullSecret(ctx, pooler, conf)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(name).To(Equal(poolerSecretName))
+
+		By("ensuring the resource is not the same")
+		var remoteSecretAfter corev1.Secret
+		err = r.Get(ctx, k8client.ObjectKeyFromObject(secret), &remoteSecretAfter)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(remoteSecret).ToNot(BeEquivalentTo(remoteSecretAfter))
 	})
 })
