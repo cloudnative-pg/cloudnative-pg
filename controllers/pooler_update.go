@@ -183,18 +183,24 @@ func (r *PoolerReconciler) updateRBAC(
 		}
 	}
 
+	roleBinding := pgbouncer.RoleBinding(pooler)
 	if resources.RoleBinding == nil {
-		roleBinding := pgbouncer.RoleBinding(pooler)
 		if err := ctrl.SetControllerReference(pooler, &roleBinding, r.Scheme); err != nil {
 			return err
 		}
 
 		contextLog.Info("Creating role binding")
-		err := r.Create(ctx, &roleBinding)
-		if err != nil && !apierrs.IsAlreadyExists(err) {
+		if err := r.Create(ctx, &roleBinding); err != nil && !apierrs.IsAlreadyExists(err) {
 			return err
 		}
 		resources.RoleBinding = &roleBinding
+	} else if !reflect.DeepEqual(roleBinding.Subjects, resources.RoleBinding.Subjects) ||
+		!reflect.DeepEqual(roleBinding.RoleRef, resources.RoleBinding.RoleRef) {
+		resources.RoleBinding.RoleRef = roleBinding.RoleRef
+		resources.RoleBinding.Subjects = roleBinding.Subjects
+		if err := r.Update(ctx, resources.RoleBinding); err != nil {
+			return err
+		}
 	}
 
 	return nil
