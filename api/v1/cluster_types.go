@@ -18,6 +18,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -732,7 +733,8 @@ type ClusterStatus struct {
 	// +optional
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
 
-	// The first recoverability point, stored as a date in RFC3339 format
+	// The first recoverability point, stored as a date in RFC3339 format.
+	// This field is calculated from the content of FirstRecoverabilityPointByMethod
 	// +optional
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
@@ -745,6 +747,7 @@ type ClusterStatus struct {
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
 
 	// Last successful backup, stored as a date in RFC3339 format, per backup method type
+	// This field is calculated from the content of LastSuccessfulBackupByMethod
 	// +optional
 	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
 
@@ -792,6 +795,45 @@ type ClusterStatus struct {
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
 	// +optional
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
+}
+
+// MarshalJSON implements json.Marshaler interface and is
+// used to render the two virtual fields FirstRecoverabilityPoint and LastSuccessfulBackup
+func (cs ClusterStatus) MarshalJSON() ([]byte, error) {
+	cs.calculateFields()
+
+	// Encode without calling MarshalJSON again
+	type ClusterStatusAlias ClusterStatus
+	return json.Marshal(&struct {
+		*ClusterStatusAlias
+	}{
+		ClusterStatusAlias: (*ClusterStatusAlias)(&cs),
+	})
+}
+
+func (cs *ClusterStatus) calculateFields() {
+	var first metav1.Time
+	for _, ts := range cs.FirstRecoverabilityPointByMethod {
+		if first.IsZero() || ts.Before(&first) {
+			first = ts
+		}
+	}
+	cs.FirstRecoverabilityPoint = ""
+	if !first.IsZero() {
+		cs.FirstRecoverabilityPoint = first.Format(time.RFC3339)
+	}
+
+	var last metav1.Time
+	for _, ts := range cs.LastSuccessfulBackupByMethod {
+		ts := ts
+		if last.IsZero() || last.Before(&ts) {
+			last = ts
+		}
+	}
+	cs.LastSuccessfulBackup = ""
+	if !last.IsZero() {
+		cs.LastSuccessfulBackup = last.Format(time.RFC3339)
+	}
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -2999,61 +3041,32 @@ func (backupConfiguration *BackupConfiguration) IsBarmanEndpointCASet() bool {
 		backupConfiguration.BarmanObjectStore.EndpointCA.Key != ""
 }
 
-// SetFirstRecoverabilityByMethod set the oldest backup time
+// UpdateBackupTimes sets the firstRecoverabilityPoint and lastSuccessfulBackup
 // for the provided method.
-// It also maintains the FirstRecoverabilityPoint up-to-date.
-func (cluster *Cluster) SetFirstRecoverabilityByMethod(
-	method BackupMethod,
-	oldest *time.Time,
+func (cluster *Cluster) UpdateBackupTimes(
+	backupMethod BackupMethod,
+	firstRecoverabilityPoint *time.Time,
+	lastSuccessfulBackup *time.Time,
 ) {
-	if oldest == nil {
-		delete(cluster.Status.FirstRecoverabilityPointByMethod, method)
-	} else {
+	if firstRecoverabilityPoint != nil {
 		if cluster.Status.FirstRecoverabilityPointByMethod == nil {
 			cluster.Status.FirstRecoverabilityPointByMethod = make(map[BackupMethod]metav1.Time)
 		}
-		cluster.Status.FirstRecoverabilityPointByMethod[method] = metav1.NewTime(*oldest)
-	}
-
-	var first metav1.Time
-	for method, ts := range cluster.Status.FirstRecoverabilityPointByMethod {
-		if first.IsZero() || ts.Before(&first) {
-			first = cluster.Status.FirstRecoverabilityPointByMethod[method]
-		}
-	}
-	cluster.Status.FirstRecoverabilityPoint = ""
-	if !first.IsZero() {
-		cluster.Status.FirstRecoverabilityPoint = first.Format(time.RFC3339)
-	}
-}
-
-// SetLastSuccessfulBackupByMethod set the newest successful backup time
-// for the provided method.
-// It also maintains the LastSuccessfulBackup up-to-date.
-func (cluster *Cluster) SetLastSuccessfulBackupByMethod(
-	method BackupMethod,
-	oldest *time.Time,
-) {
-	if oldest == nil {
-		delete(cluster.Status.LastSuccessfulBackupByMethod, method)
+		cluster.Status.FirstRecoverabilityPointByMethod[backupMethod] = metav1.NewTime(*firstRecoverabilityPoint)
 	} else {
+		delete(cluster.Status.FirstRecoverabilityPointByMethod, backupMethod)
+	}
+
+	if lastSuccessfulBackup != nil {
 		if cluster.Status.LastSuccessfulBackupByMethod == nil {
 			cluster.Status.LastSuccessfulBackupByMethod = make(map[BackupMethod]metav1.Time)
 		}
-		cluster.Status.LastSuccessfulBackupByMethod[method] = metav1.NewTime(*oldest)
+		cluster.Status.LastSuccessfulBackupByMethod[backupMethod] = metav1.NewTime(*lastSuccessfulBackup)
+	} else {
+		delete(cluster.Status.LastSuccessfulBackupByMethod, backupMethod)
 	}
 
-	var last metav1.Time
-	for method, ts := range cluster.Status.LastSuccessfulBackupByMethod {
-		ts := ts
-		if last.IsZero() || last.Before(&ts) {
-			last = cluster.Status.LastSuccessfulBackupByMethod[method]
-		}
-	}
-	cluster.Status.LastSuccessfulBackup = ""
-	if !last.IsZero() {
-		cluster.Status.LastSuccessfulBackup = last.Format(time.RFC3339)
-	}
+	cluster.Status.calculateFields()
 }
 
 // BuildPostgresOptions create the list of options that

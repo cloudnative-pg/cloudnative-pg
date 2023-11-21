@@ -429,12 +429,13 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 
 // updateClusterStatusWithBackupTimes returns true if it changes the backup times in Status
 func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) {
-	if recoverabilityPoint := backupList.FirstRecoverabilityPoint(); recoverabilityPoint != nil {
-		cluster.SetFirstRecoverabilityByMethod(apiv1.BackupMethodBarmanObjectStore, recoverabilityPoint)
+	firstRecoverabilityPoint := backupList.FirstRecoverabilityPoint()
+	var lastSuccessfulBackup *time.Time
+	if lastSuccessfulBackupInfo := backupList.LatestBackupInfo(); lastSuccessfulBackupInfo != nil {
+		lastSuccessfulBackup = &lastSuccessfulBackupInfo.EndTime
 	}
-	if lastBackup := backupList.LatestBackupInfo(); lastBackup != nil {
-		cluster.SetLastSuccessfulBackupByMethod(apiv1.BackupMethodBarmanObjectStore, &lastBackup.EndTime)
-	}
+
+	cluster.UpdateBackupTimes(apiv1.BackupMethodBarmanObjectStore, firstRecoverabilityPoint, lastSuccessfulBackup)
 }
 
 // PatchBackupStatusAndRetry updates a certain backup's status in the k8s database,

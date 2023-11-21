@@ -32,10 +32,7 @@ func GetSnapshotSnapshotBackupsMetadata(
 	cli client.Client,
 	namespace string,
 	clusterName string,
-) (*time.Time, *time.Time, error) {
-	var oldestSnaphsot time.Time
-	var newestSnaphsot time.Time
-
+) (oldestSnaphsot *time.Time, newestSnaphsot *time.Time, err error) {
 	var list storagesnapshotv1.VolumeSnapshotList
 	if err := cli.List(
 		ctx,
@@ -66,13 +63,13 @@ func GetSnapshotSnapshotBackupsMetadata(
 			if err != nil {
 				return nil, nil, err
 			}
-			if oldestSnaphsot.IsZero() || endTime.Before(oldestSnaphsot) {
-				oldestSnaphsot = endTime
+			if oldestSnaphsot.IsZero() || endTime.Before(*oldestSnaphsot) {
+				oldestSnaphsot = &endTime
 			}
 			if newestSnaphsot.IsZero() || newestSnaphsot.Before(endTime) {
-				newestSnaphsot = endTime
+				newestSnaphsot = &endTime
 			}
 		}
 	}
-	return &oldestSnaphsot, &newestSnaphsot, nil
+	return oldestSnaphsot, newestSnaphsot, nil
 }

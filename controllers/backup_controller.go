@@ -471,8 +471,7 @@ func updateClusterWithSnapshotBackupsMetadata(
 
 	origCluster := cluster.DeepCopy()
 
-	cluster.SetFirstRecoverabilityByMethod(apiv1.BackupMethodVolumeSnapshot, oldestSnapshot)
-	cluster.SetLastSuccessfulBackupByMethod(apiv1.BackupMethodVolumeSnapshot, newestSnapshot)
+	cluster.UpdateBackupTimes(apiv1.BackupMethodVolumeSnapshot, oldestSnapshot, newestSnapshot)
 
 	if !reflect.DeepEqual(origCluster.Status, cluster.Status) {
 		err = cli.Status().Patch(ctx, &cluster, client.MergeFrom(origCluster))

@@ -3907,7 +3907,7 @@ spec:
                 type: array
               firstRecoverabilityPoint:
                 description: The first recoverability point, stored as a date in RFC3339
-                  format
+                  format. This field is calculated from the content of FirstRecoverabilityPointByMethod
                 type: string
               firstRecoverabilityPointByMethod:
                 additionalProperties:
@@ -3976,7 +3976,8 @@ spec:
                   format: date-time
                   type: string
                 description: Last successful backup, stored as a date in RFC3339 format,
-                  per backup method type
+                  per backup method type This field is calculated from the content
+                  of LastSuccessfulBackupByMethod
                 type: object
               latestGeneratedNode:
                 description: ID of the latest generated node (used to avoid node name
