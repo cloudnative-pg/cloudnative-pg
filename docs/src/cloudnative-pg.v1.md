@@ -4367,11 +4367,11 @@ if not specified)</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>storage</code><br/>
+<tr><td><code>storage</code> <B>[Required]</B><br/>
 <a href="#postgresql-cnpg-io-v1-StorageConfiguration"><i>StorageConfiguration</i></a>
 </td>
 <td>
-   <p>TODO: update the comment</p>
+   <p>The storage configuration for the tablespace</p>
 </td>
 </tr>
 <tr><td><code>temporary</code><br/>

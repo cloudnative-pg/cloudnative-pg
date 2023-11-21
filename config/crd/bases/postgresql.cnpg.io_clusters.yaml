@@ -3371,7 +3371,7 @@ spec:
                     (defaults to false if not specified)
                   properties:
                     storage:
-                      description: 'TODO: update the comment'
+                      description: The storage configuration for the tablespace
                       properties:
                         pvcTemplate:
                           description: Template to be used to generate the Persistent
@@ -3615,6 +3615,8 @@ spec:
                       description: This flag indicates if the tablespace is a temporary
                         tablespace or not (default false)
                       type: boolean
+                  required:
+                  - storage
                   type: object
                 description: The tablespaces configuration
                 type: object

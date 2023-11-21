@@ -1635,9 +1635,8 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 // the storage specification, and whether it is temporary (defaults to false
 // if not specified)
 type TablespaceConfiguration struct {
-	// TODO: update the comment
-	// +optional
-	Storage StorageConfiguration `json:"storage,omitempty"`
+	// The storage configuration for the tablespace
+	Storage StorageConfiguration `json:"storage"`
 
 	// This flag indicates if the tablespace is a temporary tablespace or not (default false)
 	// +optional
