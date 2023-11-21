@@ -9,6 +9,7 @@ on:
       - reopened
       - labeled
       - unlabeled
+
 env:
   REPO_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
 
