@@ -346,7 +346,7 @@ var _ = DescribeTable("test creation of volume mounts",
 		apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Instances: 1,
-				Tablespaces: map[string]*apiv1.TablespaceConfiguration{
+				Tablespaces: map[string]apiv1.TablespaceConfiguration{
 					"fragglerock": {
 						Storage: apiv1.StorageConfiguration{
 							Size: "3Gi",
@@ -435,7 +435,7 @@ var _ = DescribeTable("test creation of volumes",
 		apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Instances: 1,
-				Tablespaces: map[string]*apiv1.TablespaceConfiguration{
+				Tablespaces: map[string]apiv1.TablespaceConfiguration{
 					"fragglerock": {
 						Storage: apiv1.StorageConfiguration{
 							Size: "3Gi",

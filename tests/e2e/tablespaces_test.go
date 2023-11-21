@@ -194,7 +194,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				addTablespaces(cluster, map[string]*apiv1.TablespaceConfiguration{
+				addTablespaces(cluster, map[string]apiv1.TablespaceConfiguration{
 					"thirdtablespace": {
 						Storage: apiv1.StorageConfiguration{
 							Size: "1Gi",
@@ -283,7 +283,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
-				addTablespaces(cluster, map[string]*apiv1.TablespaceConfiguration{
+				addTablespaces(cluster, map[string]apiv1.TablespaceConfiguration{
 					"atablespace": {
 						Storage: apiv1.StorageConfiguration{
 							Size: "1Gi",
@@ -431,7 +431,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
 				updated := cluster.DeepCopy()
-				updated.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
+				updated.Spec.Tablespaces = map[string]apiv1.TablespaceConfiguration{
 					"atablespace": {
 						Storage: apiv1.StorageConfiguration{
 							Size: "1Gi",
@@ -465,10 +465,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 	})
 })
 
-func addTablespaces(cluster *apiv1.Cluster, tbsMap map[string]*apiv1.TablespaceConfiguration) {
+func addTablespaces(cluster *apiv1.Cluster, tbsMap map[string]apiv1.TablespaceConfiguration) {
 	updated := cluster.DeepCopy()
 	if updated.Spec.Tablespaces == nil {
-		updated.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{}
+		updated.Spec.Tablespaces = map[string]apiv1.TablespaceConfiguration{}
 	}
 
 	for tbsName, configuration := range tbsMap {

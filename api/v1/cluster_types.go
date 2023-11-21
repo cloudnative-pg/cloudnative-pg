@@ -456,7 +456,7 @@ type ClusterSpec struct {
 
 	// The tablespaces configuration
 	// +optional
-	Tablespaces map[string]*TablespaceConfiguration `json:"tablespaces,omitempty"`
+	Tablespaces map[string]TablespaceConfiguration `json:"tablespaces,omitempty"`
 }
 
 const (

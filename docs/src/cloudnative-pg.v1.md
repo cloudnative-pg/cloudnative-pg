@@ -1696,7 +1696,7 @@ Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
 <tr><td><code>tablespaces</code><br/>
-<a href="#postgresql-cnpg-io-v1-*github-com-cloudnative-pg-cloudnative-pg-api-v1-TablespaceConfiguration"><i>map[string]TablespaceConfiguration</i></a>
+<a href="#postgresql-cnpg-io-v1-TablespaceConfiguration"><i>map[string]TablespaceConfiguration</i></a>
 </td>
 <td>
    <p>The tablespaces configuration</p>
@@ -4270,6 +4270,7 @@ This specifies which owner the processed resources should relate to.</p>
 
 - [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
 
+- [TablespaceConfiguration](#postgresql-cnpg-io-v1-TablespaceConfiguration)
 
 
 <p>StorageConfiguration is the configuration of the storage of the PostgreSQL instances
@@ -4345,6 +4346,39 @@ if all the labels values match.</p>
 </td>
 <td>
    <p>This flag enables the constraints for sync replicas</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## TablespaceConfiguration     {#postgresql-cnpg-io-v1-TablespaceConfiguration}
+
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>TablespaceConfiguration is the configuration of a tablespace, and includes
+the storage specification, and whether it is temporary (defaults to false
+if not specified)</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>storage</code><br/>
+<a href="#postgresql-cnpg-io-v1-StorageConfiguration"><i>StorageConfiguration</i></a>
+</td>
+<td>
+   <p>TODO: update the comment</p>
+</td>
+</tr>
+<tr><td><code>temporary</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>This flag indicates if the tablespace is a temporary tablespace or not (default false)</p>
 </td>
 </tr>
 </tbody>

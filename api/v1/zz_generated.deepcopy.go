@@ -767,18 +767,9 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 	}
 	if in.Tablespaces != nil {
 		in, out := &in.Tablespaces, &out.Tablespaces
-		*out = make(map[string]*TablespaceConfiguration, len(*in))
+		*out = make(map[string]TablespaceConfiguration, len(*in))
 		for key, val := range *in {
-			var outVal *TablespaceConfiguration
-			if val == nil {
-				(*out)[key] = nil
-			} else {
-				inVal := (*in)[key]
-				in, out := &inVal, &outVal
-				*out = new(TablespaceConfiguration)
-				(*in).DeepCopyInto(*out)
-			}
-			(*out)[key] = outVal
+			(*out)[key] = *val.DeepCopy()
 		}
 	}
 }

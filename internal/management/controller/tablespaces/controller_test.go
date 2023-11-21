@@ -77,7 +77,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 
 	When("tablespace configurations are realizable", func() {
 		It("it will do nothing if the DB contains the tablespaces in spec", func(ctx context.Context) {
-			tablespacesSpec := map[string]*apiv1.TablespaceConfiguration{
+			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
 				"foo": {
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
@@ -102,7 +102,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 		})
 
 		It("it will Create a tablespace in spec that is missing from DB", func(ctx context.Context) {
-			tablespacesSpec := map[string]*apiv1.TablespaceConfiguration{
+			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
 				"foo": {
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",

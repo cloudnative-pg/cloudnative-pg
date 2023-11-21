@@ -498,7 +498,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 	It("It should succeed increasing size of tablespaces", func() {
 		// Now we set the proper storage configuration
-		cluster.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
+		cluster.Spec.Tablespaces = map[string]apiv1.TablespaceConfiguration{
 			"fragglerock": {
 				Storage: apiv1.StorageConfiguration{
 					Size: "4Gi",
@@ -516,7 +516,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 	It("It should succeed decreasing size of tablespaces", func() {
 		// Now we set the proper storage configuration
-		cluster.Spec.Tablespaces = map[string]*apiv1.TablespaceConfiguration{
+		cluster.Spec.Tablespaces = map[string]apiv1.TablespaceConfiguration{
 			"fragglerock": {
 				Storage: apiv1.StorageConfiguration{
 					Size: "2Gi",

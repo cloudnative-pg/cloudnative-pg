@@ -70,7 +70,7 @@ type TablespaceConfigurationAdapter struct {
 func evaluateNextActions(
 	ctx context.Context,
 	tablespaceInDBSlice []infrastructure.Tablespace,
-	tablespaceInSpecMap map[string]*apiv1.TablespaceConfiguration,
+	tablespaceInSpecMap map[string]apiv1.TablespaceConfiguration,
 ) TablespaceByAction {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
 	contextLog.Debug("evaluating tablespace actions")
@@ -89,10 +89,10 @@ func evaluateNextActions(
 		switch {
 		case !isTbsInDB:
 			tablespaceByAction[TbsToCreate] = append(tablespaceByAction[TbsToCreate],
-				tablespaceAdapterFromName(tbsInSpecName, *tbsInSpec))
+				tablespaceAdapterFromName(tbsInSpecName, tbsInSpec))
 		default:
 			tablespaceByAction[TbsIsReconciled] = append(tablespaceByAction[TbsIsReconciled],
-				tablespaceAdapterFromName(tbsInSpecName, *tbsInSpec))
+				tablespaceAdapterFromName(tbsInSpecName, tbsInSpec))
 		}
 	}
 

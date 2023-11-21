@@ -192,7 +192,7 @@ type Instance struct {
 	roleSynchronizerChan chan *apiv1.ManagedConfiguration
 
 	// tablespaceSynchronizerChan is used to send tablespace configuration to the tablespace synchronizer
-	tablespaceSynchronizerChan chan map[string]*apiv1.TablespaceConfiguration
+	tablespaceSynchronizerChan chan map[string]apiv1.TablespaceConfiguration
 }
 
 // IsFenced checks whether the instance is marked as fenced
@@ -253,14 +253,14 @@ func (instance *Instance) RoleSynchronizerChan() <-chan *apiv1.ManagedConfigurat
 }
 
 // TriggerTablespaceSynchronizer sends the configuration to the tablespace synchronizer
-func (instance *Instance) TriggerTablespaceSynchronizer(config map[string]*apiv1.TablespaceConfiguration) {
+func (instance *Instance) TriggerTablespaceSynchronizer(config map[string]apiv1.TablespaceConfiguration) {
 	go func() {
 		instance.tablespaceSynchronizerChan <- config
 	}()
 }
 
 // TablespaceSynchronizerChan returns the communication channel to the tablespace synchronizer
-func (instance *Instance) TablespaceSynchronizerChan() <-chan map[string]*apiv1.TablespaceConfiguration {
+func (instance *Instance) TablespaceSynchronizerChan() <-chan map[string]apiv1.TablespaceConfiguration {
 	return instance.tablespaceSynchronizerChan
 }
 
@@ -306,7 +306,7 @@ func NewInstance() *Instance {
 		instanceCommandChan:        make(chan InstanceCommand),
 		slotsReplicatorChan:        make(chan *apiv1.ReplicationSlotsConfiguration),
 		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
-		tablespaceSynchronizerChan: make(chan map[string]*apiv1.TablespaceConfiguration),
+		tablespaceSynchronizerChan: make(chan map[string]apiv1.TablespaceConfiguration),
 	}
 }
 
