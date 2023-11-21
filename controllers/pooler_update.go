@@ -252,7 +252,7 @@ func (r *PoolerReconciler) ensureServiceAccountPullSecret(
 	pooler *apiv1.Pooler,
 	conf *configuration.Data,
 ) (string, error) {
-	contextLog := log.FromContext(ctx)
+	contextLog := log.FromContext(ctx).WithName("pooler_pull_secret")
 	if conf.OperatorNamespace == "" {
 		// We are not getting started via a k8s deployment. Perhaps we are running in our development environment
 		return "", nil
@@ -307,12 +307,15 @@ func (r *PoolerReconciler) ensureServiceAccountPullSecret(
 	if _, isOwned := isOwnedByPooler(&remoteSecret); !isOwned {
 		return pullSecretName, nil
 	}
-
 	if reflect.DeepEqual(remoteSecret.Data, secret.Data) && reflect.DeepEqual(remoteSecret.Type, secret.Type) {
 		return pullSecretName, nil
 	}
+	patchedSecret := remoteSecret.DeepCopy()
+	patchedSecret.Data = secret.Data
+	patchedSecret.Type = secret.Type
 
-	return pullSecretName, r.Patch(ctx, secret, client.MergeFrom(&remoteSecret))
+	contextLog.Info("patching the pull secret")
+	return pullSecretName, r.Patch(ctx, patchedSecret, client.MergeFrom(&remoteSecret))
 }
 
 func ensureServiceAccountHaveImagePullSecret(serviceAccount *corev1.ServiceAccount, pullSecretName string) {
