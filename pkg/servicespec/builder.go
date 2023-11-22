@@ -19,8 +19,10 @@ package servicespec
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Builder enables users to create a serviceTemplate starting from a baseline
@@ -69,6 +71,40 @@ func (builder *Builder) WithLabel(name, value string) *Builder {
 // WithServiceType adds a label to the current status
 func (builder *Builder) WithServiceType(serviceType corev1.ServiceType) *Builder {
 	builder.status.Spec.Type = serviceType
+	return builder
+}
+
+// WithPorts adds a label to the current status
+func (builder *Builder) WithPorts(port int) *Builder {
+	builder.status.Spec.Ports = []corev1.ServicePort{
+		{
+			Name:       "pgbouncer",
+			Protocol:   corev1.ProtocolTCP,
+			TargetPort: intstr.FromInt(port),
+			Port:       int32(port),
+		},
+	}
+	return builder
+}
+
+// WithSelector adds a label to the current status
+func (builder *Builder) WithSelector(name string) *Builder {
+	builder.status.Spec.Selector = map[string]string{
+		utils.PgbouncerNameLabel: name,
+	}
+
+	return builder
+}
+
+// WithName adds a name to the current status
+func (builder *Builder) WithName(name string) *Builder {
+	builder.status.ObjectMeta.Name = name
+	return builder
+}
+
+// WithNamespace adds a name to the current status
+func (builder *Builder) WithNamespace(ns string) *Builder {
+	builder.status.ObjectMeta.Namespace = ns
 	return builder
 }
 

@@ -18,8 +18,6 @@ package pgbouncer
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
@@ -31,31 +29,17 @@ import (
 // pgbouncer
 func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) *corev1.Service {
 	serviceTemplate := servicespec.NewFrom(pooler.Spec.ServiceTemplate).
-		WithServiceType(pooler.Spec.ServiceTemplate.Spec.Type).
+		WithName(pooler.Name).
+		WithNamespace(pooler.Namespace).
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
+		WithServiceType(pooler.Spec.ServiceTemplate.Spec.Type).
+		WithPorts(pgBouncerConfig.PgBouncerPort).
+		WithSelector(pooler.Name).
 		Build()
 
 	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        pooler.Name,
-			Namespace:   pooler.Namespace,
-			Labels:      serviceTemplate.ObjectMeta.Labels,
-			Annotations: serviceTemplate.ObjectMeta.Annotations,
-		},
-		Spec: corev1.ServiceSpec{
-			Type: serviceTemplate.Spec.Type,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "pgbouncer",
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(pgBouncerConfig.PgBouncerPort),
-					Port:       pgBouncerConfig.PgBouncerPort,
-				},
-			},
-			Selector: map[string]string{
-				utils.PgbouncerNameLabel: pooler.Name,
-			},
-		},
+		ObjectMeta: serviceTemplate.ObjectMeta,
+		Spec:       serviceTemplate.Spec,
 	}
 }
