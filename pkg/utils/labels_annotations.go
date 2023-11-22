@@ -210,7 +210,8 @@ type PodRole string
 const (
 	// PodRoleInstance the label value indicating an instance
 	PodRoleInstance PodRole = "instance"
-	PodRolePooler   PodRole = "pooler"
+	// PodRolePooler the label value indicating a pooler instance
+	PodRolePooler PodRole = "pooler"
 )
 
 // PVCRole describes the role of a PVC
