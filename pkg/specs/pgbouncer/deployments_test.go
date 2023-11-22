@@ -75,7 +75,7 @@ var _ = Describe("Deployment", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
 
-		expectedHash, err := hash.ComputeVersionedHash(pooler.Spec, 2)
+		expectedHash, err := hash.ComputeVersionedHash(pooler.Spec, 3)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		// Check the computed hash
@@ -86,6 +86,7 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment.ObjectMeta.Namespace).To(Equal(pooler.Namespace))
 		Expect(deployment.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
 		Expect(deployment.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
+		Expect(deployment.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 		// Check the DeploymentSpec
 		Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
@@ -95,6 +96,7 @@ var _ = Describe("Deployment", func() {
 		podTemplate := deployment.Spec.Template
 		Expect(podTemplate.ObjectMeta.Annotations).To(Equal(pooler.Spec.Template.ObjectMeta.Annotations))
 		Expect(podTemplate.ObjectMeta.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
+		Expect(podTemplate.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName]).To(Equal(specs.ClusterRoleLabelPrimary))
 
 		// Check the containers
 		Expect(podTemplate.Spec.Containers).ToNot(BeEmpty())
