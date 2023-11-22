@@ -32,7 +32,7 @@ import (
 type CreateConfiguration struct {
 	Status         PVCStatus
 	NodeSerial     int
-	Role           utils.PVCRole
+	Role           PVCRole
 	TablespaceName string
 	Storage        apiv1.StorageConfiguration
 	Source         *corev1.TypedLocalObjectReference
@@ -45,27 +45,15 @@ func Build(
 	configuration *CreateConfiguration,
 ) (*corev1.PersistentVolumeClaim, error) {
 	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
-	pvcName := GetName(instanceName, configuration.Role)
-	if configuration.Role == utils.PVCRolePgTablespace {
-		pvcName = specs.PvcNameForTablespace(instanceName, configuration.TablespaceName)
-	}
-
-	labels := map[string]string{
-		utils.InstanceNameLabelName: instanceName,
-		utils.PvcRoleLabelName:      string(configuration.Role),
-	}
-	if configuration.Role == utils.PVCRolePgTablespace {
-		labels[utils.TablespaceNameLabelName] = configuration.TablespaceName
-	}
-
+	pvcRole := configuration.Role
 	builder := resources.NewPersistentVolumeClaimBuilder().
 		BeginMetadata().
-		WithNamespacedName(pvcName, cluster.Namespace).
+		WithNamespacedName(pvcRole.GetPVCName(instanceName), cluster.Namespace).
 		WithAnnotations(map[string]string{
 			utils.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
 			utils.PVCStatusAnnotationName:     configuration.Status,
 		}).
-		WithLabels(labels).
+		WithLabels(pvcRole.GetLabels(instanceName)).
 		WithClusterInheritance(cluster).
 		EndMetadata().
 		WithSpec(configuration.Storage.PersistentVolumeClaimTemplate).

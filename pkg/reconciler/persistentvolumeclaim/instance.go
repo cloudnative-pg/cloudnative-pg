@@ -85,12 +85,12 @@ func reconcileSingleInstanceMissingPVCs(
 			continue
 		}
 
-		conf, err := getStorageConfiguration(cluster, expectedPVC.role, expectedPVC.tablespaceName)
+		conf, err := expectedPVC.role.GetStorageConfiguration(cluster)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		pvcSource, err := source.ForRole(expectedPVC.role, expectedPVC.tablespaceName)
+		pvcSource, err := expectedPVC.role.GetSource(source)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

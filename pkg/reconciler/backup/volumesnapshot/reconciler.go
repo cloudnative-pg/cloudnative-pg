@@ -430,7 +430,7 @@ func (se *Reconciler) createSnapshot(
 	targetPod *corev1.Pod,
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
-	role := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+	role := pvc.Labels[utils.PvcRoleLabelName]
 	name, err := getSnapshotName(backup.Name, role)
 	if err != nil {
 		return err
@@ -438,7 +438,7 @@ func (se *Reconciler) createSnapshot(
 
 	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 	var snapshotClassName *string
-	if role == utils.PVCRolePgWal && snapshotConfig.WalClassName != "" {
+	if role == string(utils.PVCRoleValueWal) && snapshotConfig.WalClassName != "" {
 		snapshotClassName = &snapshotConfig.WalClassName
 	}
 
@@ -585,11 +585,11 @@ func (se *Reconciler) waitSnapshotToBeReady(
 }
 
 // getSnapshotName gets the snapshot name for a certain PVC
-func getSnapshotName(backupName string, role utils.PVCRole) (string, error) {
-	switch role {
-	case utils.PVCRolePgData, "":
+func getSnapshotName(backupName string, role string) (string, error) {
+	switch utils.PVCRoleValue(role) {
+	case utils.PVCRoleValueData, "":
 		return backupName, nil
-	case utils.PVCRolePgWal:
+	case utils.PVCRoleValueWal:
 		return fmt.Sprintf("%s-wal", backupName), nil
 	default:
 		return "", fmt.Errorf("unhandled PVCRole type: %s", role)

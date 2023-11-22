@@ -40,19 +40,13 @@ var _ = Describe("Storage configuration", func() {
 	}
 
 	It("Should not fail when the roles are correct", func() {
-		configuration, err := getStorageConfiguration(cluster, utils.PVCRolePgData, "")
+		configuration, err := PVCRolePgData.GetStorageConfiguration(cluster)
 		Expect(configuration).ToNot(BeNil())
 		Expect(err).ToNot(HaveOccurred())
 
-		configuration, err = getStorageConfiguration(cluster, utils.PVCRolePgWal, "")
+		configuration, err = PVCRolePgWal.GetStorageConfiguration(cluster)
 		Expect(configuration).ToNot(BeNil())
 		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("fail if we look for the wrong role", func() {
-		configuration, err := getStorageConfiguration(cluster, "NoRol", "")
-		Expect(err).To(HaveOccurred())
-		Expect(configuration.StorageClass).To(BeNil())
 	})
 })
 
@@ -115,7 +109,7 @@ var _ = Describe("Storage source", func() {
 						Elements: []apiv1.BackupSnapshotElementStatus{
 							{
 								Name: "completed-backup",
-								Type: string(utils.PVCRolePgData),
+								Type: string(utils.PVCRoleValueData),
 							},
 						},
 					},
@@ -127,22 +121,17 @@ var _ = Describe("Storage source", func() {
 	When("bootstrapping from a VolumeSnapshot", func() {
 		When("we don't have backups", func() {
 			When("there's no source WAL archive", func() {
-				It("should fail when looking for a wrong role", func(ctx context.Context) {
-					_, err := ptr.To(StorageSource{}).ForRole("NoRol", "")
-					Expect(err).To(HaveOccurred())
-				})
-
 				It("should return the correct source when choosing pgdata", func(ctx context.Context) {
-					source, err := GetCandidateStorageSourceForReplica(
-						ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgData, "")
+					source, err := PVCRolePgData.GetSource(GetCandidateStorageSourceForReplica(
+						ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(source).ToNot(BeNil())
 					Expect(source.Name).To(Equal(pgDataSnapshotVolumeName))
 				})
 
 				It("should return the correct source when choosing pgwal", func(ctx context.Context) {
-					source, err := GetCandidateStorageSourceForReplica(
-						ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}).ForRole(utils.PVCRolePgWal, "")
+					source, err := PVCRolePgWal.GetSource(GetCandidateStorageSourceForReplica(
+						ctx, clusterWithBootstrapSnapshot, apiv1.BackupList{}))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(source).ToNot(BeNil())
 					Expect(source.Name).To(Equal(pgWalSnapshotVolumeName))
@@ -153,11 +142,11 @@ var _ = Describe("Storage source", func() {
 				It("should return an empty storage source", func(ctx context.Context) {
 					clusterSourceWALArchive := clusterWithBootstrapSnapshot.DeepCopy()
 					clusterSourceWALArchive.Spec.Bootstrap.Recovery.Source = "test"
-					source, err := GetCandidateStorageSourceForReplica(
+					source, err := PVCRolePgData.GetSource(GetCandidateStorageSourceForReplica(
 						ctx,
 						clusterSourceWALArchive,
 						apiv1.BackupList{},
-					).ForRole(utils.PVCRolePgData, "")
+					))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(source).To(BeNil())
 				})
@@ -166,11 +155,11 @@ var _ = Describe("Storage source", func() {
 
 		When("we have backups", func() {
 			It("should return the correct backup", func(ctx context.Context) {
-				source, err := GetCandidateStorageSourceForReplica(
+				source, err := PVCRolePgData.GetSource(GetCandidateStorageSourceForReplica(
 					ctx,
 					clusterWithBootstrapSnapshot,
 					backupList,
-				).ForRole(utils.PVCRolePgData, "")
+				))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(source).ToNot(BeNil())
 				Expect(source.Name).To(Equal("completed-backup"))
@@ -180,11 +169,11 @@ var _ = Describe("Storage source", func() {
 
 	When("not bootstrapping from a VolumeSnapshot with no backups", func() {
 		It("should return an empty storage source", func(ctx context.Context) {
-			source, err := GetCandidateStorageSourceForReplica(
+			source, err := PVCRolePgData.GetSource(GetCandidateStorageSourceForReplica(
 				ctx,
 				clusterWithBackupSection,
 				apiv1.BackupList{},
-			).ForRole(utils.PVCRolePgData, "")
+			))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(source).To(BeNil())
 		})
@@ -192,11 +181,11 @@ var _ = Describe("Storage source", func() {
 
 	When("not bootstrapping from a VolumeSnapshot with backups", func() {
 		It("should return the backup as storage source", func(ctx context.Context) {
-			source, err := GetCandidateStorageSourceForReplica(
+			source, err := PVCRolePgData.GetSource(GetCandidateStorageSourceForReplica(
 				ctx,
 				clusterWithBackupSection,
 				backupList,
-			).ForRole(utils.PVCRolePgData, "")
+			))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(source).ToNot(BeNil())
 			Expect(source.Name).To(Equal("completed-backup"))
@@ -208,11 +197,11 @@ var _ = Describe("Storage source", func() {
 			clusterNoWalArchiving := clusterWithBackupSection.DeepCopy()
 			clusterNoWalArchiving.Spec.Backup = nil
 
-			source, err := GetCandidateStorageSourceForReplica(
+			source, err := PVCRolePgData.GetSource(GetCandidateStorageSourceForReplica(
 				ctx,
 				clusterNoWalArchiving,
 				backupList,
-			).ForRole(utils.PVCRolePgData, "")
+			))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(source).To(BeNil())
 		})
@@ -235,7 +224,7 @@ var _ = Describe("candidate backups", func() {
 				Elements: []apiv1.BackupSnapshotElementStatus{
 					{
 						Name: "completed-backup",
-						Type: string(utils.PVCRolePgData),
+						Type: string(utils.PVCRoleValueData),
 					},
 				},
 			},
@@ -256,7 +245,7 @@ var _ = Describe("candidate backups", func() {
 				Elements: []apiv1.BackupSnapshotElementStatus{
 					{
 						Name: "bad-name",
-						Type: string(utils.PVCRolePgData),
+						Type: string(utils.PVCRoleValueData),
 					},
 				},
 			},

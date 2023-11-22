@@ -31,7 +31,6 @@ import (
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -94,7 +93,7 @@ var _ = Describe("scale down", func() {
 			}
 
 			instanceName := findDeletableInstance(cluster, resources.instances.Items)
-			pvcWalName := persistentvolumeclaim.GetName(instanceName, utils.PVCRolePgWal)
+			pvcWalName := persistentvolumeclaim.PVCRolePgWal.GetPVCName(instanceName)
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.Pod{},

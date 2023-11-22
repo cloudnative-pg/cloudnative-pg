@@ -169,19 +169,19 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				return false
 			}
 
-			pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
-				if pvc.Name == GetName(instanceName, utils.PVCRolePgData) {
+				if pvc.Name == PVCRolePgData.GetPVCName(instanceName) {
 					found = true
-					if pvcRole != utils.PVCRolePgData {
+					if pvcRole != string(utils.PVCRoleValueData) {
 						return false
 					}
 				}
 
-				if pvc.Name == GetName(instanceName, utils.PVCRolePgWal) {
+				if pvc.Name == PVCRolePgWal.GetPVCName(instanceName) {
 					found = true
-					if pvcRole != utils.PVCRolePgWal {
+					if pvcRole != string(utils.PVCRoleValueWal) {
 						return false
 					}
 				}
@@ -198,20 +198,20 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 		update: func(pvc *corev1.PersistentVolumeClaim) {
 			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 
-			pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
-				if pvc.Name == GetName(instanceName, utils.PVCRolePgData) {
+				if pvc.Name == PVCRolePgData.GetPVCName(instanceName) {
 					found = true
-					if pvcRole != utils.PVCRolePgData {
-						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgData)
+					if pvcRole != string(utils.PVCRoleValueData) {
+						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRoleValueData)
 					}
 				}
 
-				if pvc.Name == GetName(instanceName, utils.PVCRolePgWal) {
+				if pvc.Name == PVCRolePgWal.GetPVCName(instanceName) {
 					found = true
-					if pvcRole != utils.PVCRolePgWal {
-						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgWal)
+					if pvcRole != string(utils.PVCRoleValueWal) {
+						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRoleValueWal)
 					}
 				}
 

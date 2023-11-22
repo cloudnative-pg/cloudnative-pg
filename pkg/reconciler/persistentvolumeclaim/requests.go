@@ -55,10 +55,17 @@ func reconcilePVCQuantity(
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
 	tablespace := pvc.Labels[utils.TablespaceNameLabelName]
+	pvcRole, err := GetPVCRole(pvc.Labels[utils.PvcRoleLabelName], tablespace)
+	if err != nil {
+		contextLogger.Error(err,
+			"encountered an error while trying to get pvc role from label",
+			"role", pvc.Labels[utils.PvcRoleLabelName],
+		)
+		return err
+	}
 
-	storageConfiguration, err := getStorageConfiguration(cluster, pvcRole, tablespace)
+	storageConfiguration, err := pvcRole.GetStorageConfiguration(cluster)
 	if err != nil {
 		contextLogger.Error(err,
 			"encountered an error while trying to obtain the storage configuration",

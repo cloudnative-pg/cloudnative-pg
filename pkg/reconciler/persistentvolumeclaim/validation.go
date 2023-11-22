@@ -74,7 +74,7 @@ func (status *ValidationStatus) addWarningf(name string, format string, args ...
 func (status *ValidationStatus) validateVolumeSnapshot(
 	name string,
 	snapshot *volumesnapshot.VolumeSnapshot,
-	expectedRole utils.PVCRole,
+	expectedRole PVCRole,
 ) {
 	if snapshot == nil {
 		status.addErrorf(name, "VolumeSnapshot doesn't exist")
@@ -84,11 +84,11 @@ func (status *ValidationStatus) validateVolumeSnapshot(
 	pvcRoleLabel := snapshot.GetAnnotations()[utils.PvcRoleLabelName]
 	if len(pvcRoleLabel) == 0 {
 		status.addWarningf(name, "Empty PVC role annotation")
-	} else if pvcRoleLabel != string(expectedRole) {
+	} else if pvcRoleLabel != expectedRole.GetRoleName() {
 		status.addErrorf(
 			name,
 			"Expected role '%s', found '%s'",
-			utils.PVCRolePgData,
+			utils.PVCRoleValueData,
 			pvcRoleLabel)
 	}
 
@@ -127,7 +127,7 @@ func VerifyDataSourceCoherence(
 	if err != nil {
 		return result, err
 	}
-	result.validateVolumeSnapshot(source.Storage.Name, pgDataSnapshot, utils.PVCRolePgData)
+	result.validateVolumeSnapshot(source.Storage.Name, pgDataSnapshot, PVCRolePgData)
 
 	var pgWalSnapshot *volumesnapshot.VolumeSnapshot
 	if source.WalStorage != nil {
@@ -138,7 +138,7 @@ func VerifyDataSourceCoherence(
 		if err != nil {
 			return result, err
 		}
-		result.validateVolumeSnapshot(source.WalStorage.Name, pgWalSnapshot, utils.PVCRolePgWal)
+		result.validateVolumeSnapshot(source.WalStorage.Name, pgWalSnapshot, PVCRolePgWal)
 	}
 
 	if pgDataSnapshot != nil && pgWalSnapshot != nil {

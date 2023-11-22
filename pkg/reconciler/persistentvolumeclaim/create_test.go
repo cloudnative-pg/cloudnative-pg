@@ -49,14 +49,14 @@ var _ = Describe("testing create function", func() {
 		cc = &CreateConfiguration{
 			Status:     StatusReady,
 			NodeSerial: 1,
-			Role:       utils.PVCRolePgData,
+			Role:       PVCRolePgData,
 			Storage: apiv1.StorageConfiguration{
 				Size: "1Gi",
 			},
 		}
 
 		instanceName = specs.GetInstanceName(cluster.Name, cc.NodeSerial)
-		pvcName = GetName(instanceName, cc.Role)
+		pvcName = cc.Role.GetPVCName(instanceName)
 	})
 
 	Context("when PVC does not exist", func() {

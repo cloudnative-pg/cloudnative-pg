@@ -18,8 +18,6 @@ package persistentvolumeclaim
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,33 +39,6 @@ type StorageSource struct {
 
 	// The (optional) data source that should be used for WALs
 	TablespaceSource map[string]corev1.TypedLocalObjectReference `json:"tablespaceSource"`
-}
-
-// ForRole gets the storage source given a PVC role
-func (source *StorageSource) ForRole(
-	role utils.PVCRole,
-	tablespaceName string,
-) (*corev1.TypedLocalObjectReference, error) {
-	if source == nil {
-		return nil, nil
-	}
-
-	switch role {
-	case utils.PVCRolePgData:
-		return &source.DataSource, nil
-	case utils.PVCRolePgWal:
-		if source.WALSource == nil {
-			return nil, fmt.Errorf("missing StorageSource for PostgreSQL WAL (Write-Ahead Log) PVC")
-		}
-		return source.WALSource, nil
-	case utils.PVCRolePgTablespace:
-		if source, has := source.TablespaceSource[tablespaceName]; has {
-			return &source, nil
-		}
-		return nil, fmt.Errorf("missing StorageSource for tablespace %s PVC", tablespaceName)
-	default:
-		return nil, errors.New("unknown PVC role for StorageSource")
-	}
 }
 
 // GetCandidateStorageSourceForPrimary gets the candidate storage source
@@ -162,14 +133,13 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 			Kind:     apiv1.VolumeSnapshotKind,
 			Name:     element.Name,
 		}
-		switch utils.PVCRole(element.Type) {
-		case utils.PVCRolePgData:
+		switch element.Type {
+		case string(utils.PVCRoleValueData):
 			result.DataSource = reference
-		case utils.PVCRolePgWal:
+		case string(utils.PVCRoleValueWal):
 			result.WALSource = &reference
 		}
 	}
-
 	return &result
 }
 

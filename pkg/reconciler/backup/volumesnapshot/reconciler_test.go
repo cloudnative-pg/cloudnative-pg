@@ -40,7 +40,7 @@ import (
 
 var _ = Describe("getSnapshotName", func() {
 	It("should return only the backup name when the role is PVCRolePgData", func() {
-		name, err := getSnapshotName("backup123", utils.PVCRolePgData)
+		name, err := getSnapshotName("backup123", string(utils.PVCRoleValueData))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(name).To(Equal("backup123"))
 	})
@@ -52,7 +52,7 @@ var _ = Describe("getSnapshotName", func() {
 	})
 
 	It("should append '-wal' to the backup name when the role is PVCRolePgWal", func() {
-		name, err := getSnapshotName("backup123", utils.PVCRolePgWal)
+		name, err := getSnapshotName("backup123", string(utils.PVCRoleValueWal))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(name).To(Equal("backup123-wal"))
 	})
@@ -106,7 +106,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 					Name:      clusterName + "-2",
 					Namespace: namespace,
 					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+						utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
 					},
 				},
 			},
@@ -115,7 +115,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 					Name:      clusterName + "-2-wal",
 					Namespace: namespace,
 					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+						utils.PvcRoleLabelName: string(utils.PVCRoleValueWal),
 					},
 				},
 			},

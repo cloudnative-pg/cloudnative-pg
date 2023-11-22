@@ -103,13 +103,13 @@ func SetSnapshotNameAsEnv(
 	}
 
 	for _, item := range snapshotList.Items {
-		switch utils.PVCRole(item.Annotations[utils.PvcRoleLabelName]) {
-		case utils.PVCRolePgData:
+		switch utils.PVCRoleValue(item.Annotations[utils.PvcRoleLabelName]) {
+		case utils.PVCRoleValueData:
 			err := os.Setenv(dataSnapshotName, item.Name)
 			if err != nil {
 				return err
 			}
-		case utils.PVCRolePgWal:
+		case utils.PVCRoleValueWal:
 			err := os.Setenv(walSnapshotName, item.Name)
 			if err != nil {
 				return err

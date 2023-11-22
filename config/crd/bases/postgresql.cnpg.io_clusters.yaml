@@ -3341,10 +3341,9 @@ spec:
                       reapplied to the created PVCs. Size cannot be decreased.
                     type: string
                   storageClass:
-                    description: 'StorageClass to use for database data (`PGDATA`).
-                      Applied after evaluating the PVC template, if available. If
-                      not specified, generated PVCs will be satisfied by the default
-                      storage class TODO: update the comment'
+                    description: StorageClass to use for PVCs. Applied after evaluating
+                      the PVC template, if available. If not specified, the generated
+                      PVCs will use the default storage class
                     type: string
                 type: object
               superuserSecret:
@@ -3603,10 +3602,9 @@ spec:
                             be decreased.
                           type: string
                         storageClass:
-                          description: 'StorageClass to use for database data (`PGDATA`).
-                            Applied after evaluating the PVC template, if available.
-                            If not specified, generated PVCs will be satisfied by
-                            the default storage class TODO: update the comment'
+                          description: StorageClass to use for PVCs. Applied after
+                            evaluating the PVC template, if available. If not specified,
+                            the generated PVCs will use the default storage class
                           type: string
                       type: object
                   required:
@@ -4010,10 +4008,9 @@ spec:
                       reapplied to the created PVCs. Size cannot be decreased.
                     type: string
                   storageClass:
-                    description: 'StorageClass to use for database data (`PGDATA`).
-                      Applied after evaluating the PVC template, if available. If
-                      not specified, generated PVCs will be satisfied by the default
-                      storage class TODO: update the comment'
+                    description: StorageClass to use for PVCs. Applied after evaluating
+                      the PVC template, if available. If not specified, the generated
+                      PVCs will use the default storage class
                     type: string
                 type: object
             required:

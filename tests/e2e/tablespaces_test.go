@@ -546,7 +546,7 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 			var tablespacePvcNames []string
 			for _, pvc := range pvcList.Items {
 				roleLabel := pvc.Labels[utils.PvcRoleLabelName]
-				if roleLabel != utils.PVCRolePgTablespace {
+				if roleLabel != string(utils.PVCRoleValueTablespace) {
 					continue
 				}
 				tablespacePvcNames = append(tablespacePvcNames, pvc.Name)
@@ -675,7 +675,7 @@ func eventuallyHasExpectedNumberOfPVCs(pvcCount int, namespace string) {
 		tbsPvc := 0
 		for _, pvc := range pvcList.Items {
 			roleLabel := pvc.Labels[utils.PvcRoleLabelName]
-			if roleLabel != utils.PVCRolePgTablespace {
+			if roleLabel != string(utils.PVCRoleValueTablespace) {
 				continue
 			}
 			tbsPvc++

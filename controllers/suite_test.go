@@ -45,7 +45,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -386,7 +385,7 @@ func newFakePVC(
 		&persistentvolumeclaim.CreateConfiguration{
 			Status:     status,
 			NodeSerial: serial,
-			Role:       utils.PVCRolePgData,
+			Role:       persistentvolumeclaim.PVCRolePgData,
 			Storage:    cluster.Spec.StorageConfiguration,
 		})
 	Expect(err).ToNot(HaveOccurred())
@@ -402,7 +401,7 @@ func newFakePVC(
 			&persistentvolumeclaim.CreateConfiguration{
 				Status:     status,
 				NodeSerial: serial,
-				Role:       utils.PVCRolePgWal,
+				Role:       persistentvolumeclaim.PVCRolePgWal,
 				Storage:    cluster.Spec.StorageConfiguration,
 			},
 		)

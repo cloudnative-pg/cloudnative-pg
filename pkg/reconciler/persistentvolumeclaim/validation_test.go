@@ -39,7 +39,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", &snapshot, utils.PVCRolePgData)
+		status.validateVolumeSnapshot("pgdata", &snapshot, PVCRolePgData)
 		Expect(status).To(Equal(ValidationStatus{
 			Warnings: []ValidationMessage{
 				{
@@ -58,7 +58,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 
 	It("Fails when the snapshot doesn't exist", func() {
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", nil, utils.PVCRolePgData)
+		status.validateVolumeSnapshot("pgdata", nil, PVCRolePgData)
 		Expect(status).To(Equal(ValidationStatus{
 			Errors: []ValidationMessage{
 				{
@@ -80,7 +80,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", &snapshot, utils.PVCRolePgData)
+		status.validateVolumeSnapshot("pgdata", &snapshot, PVCRolePgData)
 		Expect(status).To(Equal(ValidationStatus{
 			Errors: []ValidationMessage{
 				{
@@ -109,7 +109,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+							utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
 						},
 					},
 				},
@@ -121,7 +121,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-two",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+							utils.PvcRoleLabelName: string(utils.PVCRoleValueWal),
 						},
 					},
 				},
@@ -163,7 +163,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+							utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
 						},
 					},
 				},
@@ -175,7 +175,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+							utils.PvcRoleLabelName: string(utils.PVCRoleValueWal),
 						},
 					},
 				},
@@ -210,7 +210,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+							utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
 						},
 					},
 				},
@@ -242,7 +242,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+							utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
 						},
 					},
 				},
