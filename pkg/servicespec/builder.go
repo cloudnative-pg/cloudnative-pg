@@ -23,13 +23,13 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// Builder enables to user to create a PodTemplate starting from a baseline
+// Builder enables users to create a serviceTemplate starting from a baseline
 // and adding patches
 type Builder struct {
 	status apiv1.ServiceTemplateSpec
 }
 
-// New creates a new empty podTemplate builder
+// New creates a new empty serviceTemplate builder
 func New() *Builder {
 	return NewFrom(nil)
 }
@@ -72,7 +72,7 @@ func (builder *Builder) WithServiceType(serviceType corev1.ServiceType) *Builder
 	return builder
 }
 
-// Build gets the final Pod template
+// Build gets the final ServiceTemplate
 func (builder *Builder) Build() *apiv1.ServiceTemplateSpec {
 	return &builder.status
 }
