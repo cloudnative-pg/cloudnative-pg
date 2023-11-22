@@ -147,9 +147,12 @@ func (r *PgWal) GetRoleName() string {
 // GetLabels will be used as the label value
 func (r *PgTablespace) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
-		utils.InstanceNameLabelName:   instanceName,
-		utils.PvcRoleLabelName:        string(r.roleName),
-		utils.TablespaceNameLabelName: r.tablespaceName,
+		utils.InstanceNameLabelName: instanceName,
+		utils.PvcRoleLabelName:      string(r.roleName),
+	}
+	// we need empty check here as we don't want to impact the label filter with empty value
+	if r.tablespaceName != "" {
+		labels[utils.TablespaceNameLabelName] = r.tablespaceName
 	}
 	return labels
 }
