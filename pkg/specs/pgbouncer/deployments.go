@@ -48,15 +48,10 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		return nil, err
 	}
 
-	clusterRole := specs.ClusterRoleLabelReplica
-	if pooler.Spec.Type == apiv1.PoolerTypeRW {
-		clusterRole = specs.ClusterRoleLabelPrimary
-	}
-
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
-		WithLabel(utils.ClusterInstanceRoleLabelName, clusterRole).
+		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
@@ -128,9 +123,9 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
 			Labels: map[string]string{
-				utils.ClusterLabelName:             cluster.Name,
-				utils.PgbouncerNameLabel:           pooler.Name,
-				utils.ClusterInstanceRoleLabelName: clusterRole,
+				utils.ClusterLabelName:   cluster.Name,
+				utils.PgbouncerNameLabel: pooler.Name,
+				utils.PodRoleLabelName:   string(utils.PodRolePooler),
 			},
 			Annotations: map[string]string{
 				utils.PoolerSpecHashAnnotationName: poolerHash,
