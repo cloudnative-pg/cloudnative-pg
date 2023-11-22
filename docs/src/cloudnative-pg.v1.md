@@ -4273,8 +4273,8 @@ This specifies which owner the processed resources should relate to.</p>
 - [TablespaceConfiguration](#postgresql-cnpg-io-v1-TablespaceConfiguration)
 
 
-<p>StorageConfiguration is the configuration of the storage of the PostgreSQL instances
-TODO: update the comment</p>
+<p>StorageConfiguration is the configuration used to create and reconcile PVCs,
+usable for WAL volumes, PGDATA volumes, or tablespaces</p>
 
 
 <table class="table">
@@ -4284,11 +4284,10 @@ TODO: update the comment</p>
 <i>string</i>
 </td>
 <td>
-   <p>StorageClass to use for database data (<code>PGDATA</code>). Applied after
+   <p>StorageClass to use for PVCs. Applied after
 evaluating the PVC template, if available.
-If not specified, generated PVCs will be satisfied by the
-default storage class
-TODO: update the comment</p>
+If not specified, the generated PVCs will use the
+default storage class</p>
 </td>
 </tr>
 <tr><td><code>size</code><br/>

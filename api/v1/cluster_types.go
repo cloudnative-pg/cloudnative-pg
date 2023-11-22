@@ -1583,7 +1583,7 @@ type RecoveryTarget struct {
 }
 
 // StorageConfiguration is the configuration used to create and reconcile PVCs,
-// usable for WAL volumnes, PGDATA volumes, or tablespaces
+// usable for WAL volumes, PGDATA volumes, or tablespaces
 type StorageConfiguration struct {
 	// StorageClass to use for PVCs. Applied after
 	// evaluating the PVC template, if available.
