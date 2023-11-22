@@ -127,7 +127,7 @@ func VerifyDataSourceCoherence(
 	if err != nil {
 		return result, err
 	}
-	result.validateVolumeSnapshot(source.Storage.Name, pgDataSnapshot, PVCRolePgData)
+	result.validateVolumeSnapshot(source.Storage.Name, pgDataSnapshot, PgData{})
 
 	var pgWalSnapshot *volumesnapshot.VolumeSnapshot
 	if source.WalStorage != nil {
@@ -138,7 +138,7 @@ func VerifyDataSourceCoherence(
 		if err != nil {
 			return result, err
 		}
-		result.validateVolumeSnapshot(source.WalStorage.Name, pgWalSnapshot, PVCRolePgWal)
+		result.validateVolumeSnapshot(source.WalStorage.Name, pgWalSnapshot, PgWal{})
 	}
 
 	if pgDataSnapshot != nil && pgWalSnapshot != nil {

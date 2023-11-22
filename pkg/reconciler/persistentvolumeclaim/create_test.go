@@ -49,7 +49,7 @@ var _ = Describe("testing create function", func() {
 		cc = &CreateConfiguration{
 			Status:     StatusReady,
 			NodeSerial: 1,
-			Role:       PVCRolePgData,
+			Role:       PgData{},
 			Storage: apiv1.StorageConfiguration{
 				Size: "1Gi",
 			},

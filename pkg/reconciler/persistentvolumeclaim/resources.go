@@ -138,11 +138,14 @@ func (e *expectedPVC) toCreateConfiguration(
 }
 
 func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
-	roles := []PVCRole{PVCRolePgData}
+	roles := []PVCRole{&PgData{}}
 	if cluster.ShouldCreateWalArchiveVolume() {
-		roles = append(roles, PVCRolePgWal)
+		roles = append(roles, &PgWal{})
 	}
-	return buildExpectedPVCs(cluster, instanceName, roles)
+	for tbsName := range cluster.Spec.Tablespaces {
+		roles = append(roles, &PgTablespace{tablespaceName: tbsName})
+	}
+	return buildExpectedPVCs(instanceName, roles)
 }
 
 // getExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
@@ -155,56 +158,18 @@ func getExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName
 	return expectedPVCNames
 }
 
-// containsRole returns true if the roleName of given role is in the given role list
-func containsRole(roles []PVCRole, role PVCRole) bool {
-	for _, pvcRole := range roles {
-		if pvcRole.GetRoleName() == role.GetRoleName() {
-			return true
+// here we should register any new PVC for the instance
+func buildExpectedPVCs(instanceName string, roles []PVCRole) []expectedPVC {
+	expectedMounts := make([]expectedPVC, len(roles))
+
+	for i, rl := range roles {
+		expectedMounts[i] = expectedPVC{
+			name:          rl.GetPVCName(instanceName),
+			role:          rl,
+			initialStatus: rl.GetInitialStatus(),
 		}
 	}
-	return false
-}
 
-// here we should register any new PVC for the instance
-func buildExpectedPVCs(cluster *apiv1.Cluster, instanceName string, roles []PVCRole) []expectedPVC {
-	expectedMounts := make([]expectedPVC, 0, len(cluster.Spec.Tablespaces)+2)
-
-	if containsRole(roles, PVCRolePgData) {
-		// At the moment detecting a pod is missing the data pvc has no real use.
-		// In the future we will handle all the PVC creation with the package reconciler
-		expectedMounts = append(expectedMounts,
-			expectedPVC{
-				name: PVCRolePgData.GetPVCName(instanceName),
-				role: PVCRolePgData,
-				// This requires an init, ideally we should move to a design where each pvc can be init separately
-				// and then  attached
-				initialStatus: StatusInitializing,
-			},
-		)
-	}
-
-	if containsRole(roles, PVCRolePgWal) {
-		expectedMounts = append(expectedMounts,
-			expectedPVC{
-				name:          PVCRolePgWal.GetPVCName(instanceName),
-				role:          PVCRolePgWal,
-				initialStatus: StatusReady,
-			},
-		)
-	}
-
-	for tbsName := range cluster.Spec.Tablespaces {
-		tbsRole := NewPGTablespacePVCRole(tbsName)
-		expectedMounts = append(expectedMounts,
-			expectedPVC{
-				name: tbsRole.GetPVCName(instanceName),
-				role: tbsRole,
-				// This requires an init, ideally we should move to a design where each pvc can be init separately
-				// and then  attached
-				initialStatus: StatusReady,
-			},
-		)
-	}
 	return expectedMounts
 }
 
@@ -235,7 +200,7 @@ func GetInstancePVCs(
 
 	var pvcs []corev1.PersistentVolumeClaim
 
-	pgData, err := getPvcList(PVCRolePgData, instanceName)
+	pgData, err := getPvcList(&PgData{}, instanceName)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +208,7 @@ func GetInstancePVCs(
 		pvcs = append(pvcs, pgData.Items...)
 	}
 
-	pgWal, err := getPvcList(PVCRolePgWal, instanceName)
+	pgWal, err := getPvcList(&PgWal{}, instanceName)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +216,7 @@ func GetInstancePVCs(
 		pvcs = append(pvcs, pgWal.Items...)
 	}
 
-	tablespacesPVClist, err := getPvcList(PVCRolePgTablespace, instanceName)
+	tablespacesPVClist, err := getPvcList(&PgTablespace{}, instanceName)
 	if err != nil {
 		return nil, err
 	}

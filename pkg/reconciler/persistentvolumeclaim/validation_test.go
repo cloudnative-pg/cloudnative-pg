@@ -39,7 +39,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", &snapshot, PVCRolePgData)
+		status.validateVolumeSnapshot("pgdata", &snapshot, PgData{})
 		Expect(status).To(Equal(ValidationStatus{
 			Warnings: []ValidationMessage{
 				{
@@ -58,7 +58,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 
 	It("Fails when the snapshot doesn't exist", func() {
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", nil, PVCRolePgData)
+		status.validateVolumeSnapshot("pgdata", nil, PgData{})
 		Expect(status).To(Equal(ValidationStatus{
 			Errors: []ValidationMessage{
 				{
@@ -80,7 +80,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", &snapshot, PVCRolePgData)
+		status.validateVolumeSnapshot("pgdata", &snapshot, PgData{})
 		Expect(status).To(Equal(ValidationStatus{
 			Errors: []ValidationMessage{
 				{

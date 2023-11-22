@@ -44,10 +44,10 @@ var _ = Describe("Reconcile Resources", func() {
 		clusterName := "Cluster-pvc-resources"
 		pvcs := corev1.PersistentVolumeClaimList{
 			Items: []corev1.PersistentVolumeClaim{
-				makePVC(clusterName, "1", PVCRolePgData, false),
-				makePVC(clusterName, "2", PVCRolePgWal, false),      // role is out of sync with name
-				makePVC(clusterName, "3-wal", PVCRolePgData, false), // role is out of sync with name
-				makePVC(clusterName, "3", PVCRolePgData, false),
+				makePVC(clusterName, "1", PgData{}, false),
+				makePVC(clusterName, "2", PgWal{}, false),      // role is out of sync with name
+				makePVC(clusterName, "3-wal", PgData{}, false), // role is out of sync with name
+				makePVC(clusterName, "3", PgData{}, false),
 			},
 		}
 		cluster := &apiv1.Cluster{
@@ -196,10 +196,10 @@ var _ = Describe("PVC reconciliation", func() {
 	It("Will reconcile each PVC's with the correct labels", func() {
 		pvcs := corev1.PersistentVolumeClaimList{
 			Items: []corev1.PersistentVolumeClaim{
-				makePVC(clusterName, "1", PVCRolePgData, false),
-				makePVC(clusterName, "2", PVCRolePgWal, false),      // role is out of sync with name
-				makePVC(clusterName, "3-wal", PVCRolePgData, false), // role is out of sync with name
-				makePVC(clusterName, "3", PVCRolePgData, false),
+				makePVC(clusterName, "1", PgData{}, false),
+				makePVC(clusterName, "2", PgWal{}, false),      // role is out of sync with name
+				makePVC(clusterName, "3-wal", PgData{}, false), // role is out of sync with name
+				makePVC(clusterName, "3", PgData{}, false),
 			},
 		}
 		cluster := &apiv1.Cluster{
@@ -281,9 +281,9 @@ var _ = Describe("PVC reconciliation", func() {
 			},
 		}
 
-		pvc := makePVC(clusterName, "1", PVCRolePgData, false)
-		pvc2 := makePVC(clusterName, "2", PVCRolePgWal, false)         // role is out of sync with name
-		pvc3Wal := makePVC(clusterName, "3-wal", PVCRolePgData, false) // role is out of sync with name
+		pvc := makePVC(clusterName, "1", PgData{}, false)
+		pvc2 := makePVC(clusterName, "2", PgWal{}, false)         // role is out of sync with name
+		pvc3Wal := makePVC(clusterName, "3-wal", PgData{}, false) // role is out of sync with name
 		pvc3Data := makePVC(clusterName, "3", nil, false)
 		pvcs := []corev1.PersistentVolumeClaim{
 			pvc,
@@ -342,10 +342,10 @@ var _ = Describe("PVC reconciliation", func() {
 			makePod(clusterName, "3", specs.ClusterRoleLabelReplica),
 		}
 
-		pvc := makePVC(clusterName, "1", PVCRolePgData, false)
-		pvc2 := makePVC(clusterName, "2", PVCRolePgData, false)
-		pvc3Wal := makePVC(clusterName, "3-wal", PVCRolePgWal, false)
-		pvc3Data := makePVC(clusterName, "3", PVCRolePgData, false)
+		pvc := makePVC(clusterName, "1", PgData{}, false)
+		pvc2 := makePVC(clusterName, "2", PgData{}, false)
+		pvc3Wal := makePVC(clusterName, "3-wal", PgWal{}, false)
+		pvc3Data := makePVC(clusterName, "3", PgData{}, false)
 		pvcs := []corev1.PersistentVolumeClaim{
 			pvc,
 			pvc2,
@@ -408,11 +408,11 @@ var _ = Describe("Storage configuration", func() {
 	}
 
 	It("Should not fail when the roles it's correct", func() {
-		configuration, err := PVCRolePgData.GetStorageConfiguration(cluster)
+		configuration, err := PgData{}.GetStorageConfiguration(cluster)
 		Expect(configuration).ToNot(BeNil())
 		Expect(err).ToNot(HaveOccurred())
 
-		configuration, err = PVCRolePgWal.GetStorageConfiguration(cluster)
+		configuration, err = PgWal{}.GetStorageConfiguration(cluster)
 		Expect(configuration).ToNot(BeNil())
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -433,9 +433,9 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 				Name: clusterName,
 			},
 		}
-		pvc = makePVC(clusterName, "1", PVCRolePgData, false)
+		pvc = makePVC(clusterName, "1", PgData{}, false)
 		tbsName := "fragglerock"
-		pvc2 = makePVC(clusterName, "2", PVCRolePgTablespace.WithTablespace(tbsName), false)
+		pvc2 = makePVC(clusterName, "2", PgTablespace{tablespaceName: tbsName}, false)
 		pvc2.Spec.Resources.Requests = map[corev1.ResourceName]resource.Quantity{
 			"storage": resource.MustParse("3Gi"),
 		}

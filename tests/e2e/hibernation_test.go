@@ -229,12 +229,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			clusterManifest, currentPrimary := getPrimaryAndClusterManifest(namespace, clusterName)
 
 			By("collecting pgWal pvc details of current primary", func() {
-				pvcInfo := getPvc(persistentvolumeclaim.PVCRolePgWal, currentPrimary)
+				pvcInfo := getPvc(persistentvolumeclaim.PgWal{}, currentPrimary)
 				beforeHibernationPgWalPvcUID = pvcInfo.GetUID()
 			})
 
 			By("collecting pgData pvc details of current primary", func() {
-				pvcInfo := getPvc(persistentvolumeclaim.PVCRolePgData, currentPrimary)
+				pvcInfo := getPvc(persistentvolumeclaim.PgData{}, currentPrimary)
 				beforeHibernationPgDataPvcUID = pvcInfo.GetUID()
 			})
 
@@ -256,14 +256,14 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace,
 				clusterName,
 				[]persistentvolumeclaim.PVCRole{
-					persistentvolumeclaim.PVCRolePgWal,
-					persistentvolumeclaim.PVCRolePgData,
+					persistentvolumeclaim.PgWal{},
+					persistentvolumeclaim.PgData{},
 				},
 			)
 
 			By("verifying primary pgWal pvc info", func() {
 				verifyPvc(
-					persistentvolumeclaim.PVCRolePgWal,
+					persistentvolumeclaim.PgWal{},
 					beforeHibernationPgWalPvcUID,
 					clusterManifest,
 					currentPrimary,
@@ -272,7 +272,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 			By("verifying primary pgData pvc info", func() {
 				verifyPvc(
-					persistentvolumeclaim.PVCRolePgData,
+					persistentvolumeclaim.PgData{},
 					beforeHibernationPgDataPvcUID,
 					clusterManifest,
 					currentPrimary,
@@ -333,7 +333,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 					clusterName)
 
 				By("collecting pgData pvc details of current primary", func() {
-					pvcInfo := getPvc(persistentvolumeclaim.PVCRolePgData, currentPrimary)
+					pvcInfo := getPvc(persistentvolumeclaim.PgData{}, currentPrimary)
 					beforeHibernationPgDataPvcUID = pvcInfo.GetUID()
 				})
 
@@ -354,12 +354,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				verifyClusterResources(
 					namespace,
 					clusterName,
-					[]persistentvolumeclaim.PVCRole{persistentvolumeclaim.PVCRolePgData},
+					[]persistentvolumeclaim.PVCRole{persistentvolumeclaim.PgData{}},
 				)
 
 				By("verifying primary pgData pvc info", func() {
 					verifyPvc(
-						persistentvolumeclaim.PVCRolePgData,
+						persistentvolumeclaim.PgData{},
 						beforeHibernationPgDataPvcUID,
 						clusterManifest,
 						currentPrimary,

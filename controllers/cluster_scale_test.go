@@ -93,7 +93,7 @@ var _ = Describe("scale down", func() {
 			}
 
 			instanceName := findDeletableInstance(cluster, resources.instances.Items)
-			pvcWalName := persistentvolumeclaim.PVCRolePgWal.GetPVCName(instanceName)
+			pvcWalName := persistentvolumeclaim.PgWal{}.GetPVCName(instanceName)
 			Expect(isResourceExisting(
 				ctx,
 				&corev1.Pod{},
