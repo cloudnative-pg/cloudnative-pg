@@ -76,15 +76,9 @@ var _ = Describe("BackupStatus structure", func() {
 		})
 		Expect(status.BackupSnapshotStatus.Elements).To(HaveLen(2))
 		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
-			BackupSnapshotElementStatus{
-				Name: "cluster-example-snapshot-1",
-				Type: string(utils.PVCRolePgData),
-			}))
+			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-1", Type: string(utils.PVCRolePgData)}))
 		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
-			BackupSnapshotElementStatus{
-				Name: "cluster-example-snapshot-2",
-				Type: string(utils.PVCRolePgWal),
-			}))
+			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-2", Type: string(utils.PVCRolePgWal)}))
 	})
 
 	Context("backup phases", func() {
