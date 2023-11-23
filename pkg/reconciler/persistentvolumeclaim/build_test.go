@@ -36,7 +36,7 @@ var _ = Describe("PVC Creation", func() {
 			&CreateConfiguration{
 				Status:     StatusInitializing,
 				NodeSerial: 0,
-				Role:       PgData{},
+				Calculator: NewPgDataCalculator(),
 				Storage: apiv1.StorageConfiguration{
 					Size:         "1Gi",
 					StorageClass: &storageClass,
@@ -59,7 +59,7 @@ var _ = Describe("PVC Creation", func() {
 						},
 					},
 				},
-				Role: PgData{},
+				Calculator: NewPgDataCalculator(),
 			},
 		)
 		Expect(err).NotTo(HaveOccurred())
@@ -71,7 +71,7 @@ var _ = Describe("PVC Creation", func() {
 			&CreateConfiguration{
 				Status:     StatusInitializing,
 				NodeSerial: 0,
-				Role:       PgData{},
+				Calculator: NewPgDataCalculator(),
 				Storage: apiv1.StorageConfiguration{
 					Size:         "2Gi",
 					StorageClass: &storageClass,
@@ -93,7 +93,7 @@ var _ = Describe("PVC Creation", func() {
 			&CreateConfiguration{
 				Status:     StatusInitializing,
 				NodeSerial: 0,
-				Role:       PgData{},
+				Calculator: NewPgDataCalculator(),
 				Storage: apiv1.StorageConfiguration{
 					Size:         "0Gi",
 					StorageClass: &storageClass,
@@ -109,7 +109,7 @@ var _ = Describe("PVC Creation", func() {
 			&CreateConfiguration{
 				Status:     StatusInitializing,
 				NodeSerial: 0,
-				Role:       PgData{},
+				Calculator: NewPgDataCalculator(),
 				Storage: apiv1.StorageConfiguration{
 					Size:         "nil",
 					StorageClass: &storageClass,
@@ -131,7 +131,7 @@ var _ = Describe("PVC Creation", func() {
 			&CreateConfiguration{
 				Status:     StatusInitializing,
 				NodeSerial: 1,
-				Role:       PgTablespace{tablespaceName: tbsName},
+				Calculator: NewPgTablespaceCalculator(tbsName),
 				Storage: apiv1.StorageConfiguration{
 					Size:         "2Gi",
 					StorageClass: &storageClass,

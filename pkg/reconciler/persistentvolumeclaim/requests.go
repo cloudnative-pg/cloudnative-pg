@@ -55,7 +55,7 @@ func reconcilePVCQuantity(
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	pvcRole, err := GetPVCRole(pvc.GetLabels())
+	pvcRole, err := GetExpectedObjectCalculator(pvc.GetLabels())
 	if err != nil {
 		contextLogger.Error(err,
 			"encountered an error while trying to get pvc role from label",

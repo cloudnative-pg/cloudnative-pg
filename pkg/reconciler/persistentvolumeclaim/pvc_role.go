@@ -12,67 +12,92 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// PVCRole is the common interface for all PVC roles
-type PVCRole interface {
+// Meta is an object capable of describing the metadata of a pvc
+type Meta interface {
+	// GetName will be used to get the name of the PVC
+	GetName(instanceName string) string
 	// GetLabels will be used as the label value
 	GetLabels(instanceName string) map[string]string
-	// GetPVCName will be used to get the name of the PVC
-	GetPVCName(instanceName string) string
-	// GetStorageConfiguration will return the storage configuration to be used
-	// for this PVC role and this cluster
-	GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error)
+	// GetRoleName return the role name in string
+	GetRoleName() string
+}
+
+// Bootstrap is an object capable of describing the starting status of a pvc
+type Bootstrap interface {
+	// GetInitialStatus returns the status the PVC should be first created with
+	GetInitialStatus() PVCStatus
+}
+
+// Backup is an object capable of describing the backup behaviour of a pvc
+type Backup interface {
+	// GetSnapshotName gets the snapshot name for a certain PVC
+	GetSnapshotName(backupName string) string
 	// GetVolumeSnapshotClass will return the volume snapshot class to be used
 	// when snapshotting a PVC with this Role.
 	GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string
-	// GetSource gets the PVC source to be used when creating a new PVC
-	GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error)
-	// GetRoleName return the role name in string
-	GetRoleName() string
-	// GetInitialStatus returns the status the PVC should be first created with
-	GetInitialStatus() PVCStatus
-	// GetSnapshotName gets the snapshot name for a certain PVC
-	GetSnapshotName(backupName string) string
 }
 
-// GetPVCRole return pvcRole based on the roleName given
-func GetPVCRole(labels map[string]string) (PVCRole, error) {
+// Configuration is an object capable of describing the configuration of a pvc
+type Configuration interface {
+	// GetStorageConfiguration will return the storage configuration to be used
+	// for this PVC role and this cluster
+	GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error)
+	// GetSource gets the PVC source to be used when creating a new PVC
+	GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error)
+}
+
+// Calculator returns the data needed for a given pvc
+type Calculator interface {
+	Bootstrap
+	Backup
+	Configuration
+	Meta
+}
+
+// GetExpectedObjectCalculator return an object capable of determining a series of data for the given pvc
+func GetExpectedObjectCalculator(labels map[string]string) (Calculator, error) {
 	roleName := labels[utils.PvcRoleLabelName]
 	tbsName := labels[utils.TablespaceNameLabelName]
 	switch utils.PVCRoleValue(roleName) {
 	case utils.PVCRoleValueData:
-		return PgData{}, nil
+		return NewPgDataCalculator(), nil
 	case utils.PVCRoleValueWal:
-		return PgWal{}, nil
+		return NewPgWalCalculator(), nil
 	case utils.PVCRoleValueTablespace:
-		return PgTablespace{tablespaceName: tbsName}, nil
+		return NewPgTablespaceCalculator(tbsName), nil
 	default:
 		return nil, fmt.Errorf("unknown pvc role name: %s", roleName)
 	}
 }
 
-// NewTablespaceRole creates a new role for a tablespace
-// TODO: replace this with the tablespaces factory
-func NewTablespaceRole(name string) PgTablespace {
-	return PgTablespace{tablespaceName: name}
-}
+// pgData describes the role of a PVC which used for pg_data
+type pgData struct{}
 
-// TODO: factory for the PGCRole interface
-// TODO: avoid exporting struct types
-// TODO: export only the interface and the factory
+// pgWal describes the role of a PVC which used for pg_wal
+type pgWal struct{}
 
-// PgData describes the role of a PVC which used for pg_data
-type PgData struct{}
-
-// PgWal describes the role of a PVC which used for pg_wal
-type PgWal struct{}
-
-// PgTablespace describes the role of a PVC which used for tablespace
-type PgTablespace struct {
+// pgTablespace describes the role of a PVC which used for tablespace
+type pgTablespace struct {
 	tablespaceName string
 }
 
+// NewPgDataCalculator returns a Calculator for a PVC of PG_DATA type
+func NewPgDataCalculator() Calculator {
+	return pgData{}
+}
+
+// NewPgWalCalculator returns a Calculator for a PVC of PG_WAL type
+func NewPgWalCalculator() Calculator {
+	return pgWal{}
+}
+
+// NewPgTablespaceCalculator returns a Calculator for a PVC of PG_TABLESPACE type
+func NewPgTablespaceCalculator(tbsName string) Calculator {
+	return pgTablespace{tablespaceName: tbsName}
+}
+
 // GetLabels will be used as the label value
-func (r PgData) GetLabels(instanceName string) map[string]string {
+func (r pgData) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
 		utils.InstanceNameLabelName: instanceName,
 		utils.PvcRoleLabelName:      string(utils.PVCRoleValueData),
@@ -80,19 +105,19 @@ func (r PgData) GetLabels(instanceName string) map[string]string {
 	return labels
 }
 
-// GetPVCName will be used to get the name of the PVC
-func (r PgData) GetPVCName(instanceName string) string {
+// GetName will be used to get the name of the PVC
+func (r pgData) GetName(instanceName string) string {
 	return instanceName
 }
 
 // GetStorageConfiguration will return the storage configuration to be used
 // for this PVC role and this cluster
-func (r PgData) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error) {
+func (r pgData) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error) {
 	return cluster.Spec.StorageConfiguration, nil
 }
 
 // GetSource gets the PVC source to be used when creating a new PVC
-func (r PgData) GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error) {
+func (r pgData) GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error) {
 	if source == nil {
 		return nil, nil
 	}
@@ -100,22 +125,22 @@ func (r PgData) GetSource(source *StorageSource) (*corev1.TypedLocalObjectRefere
 }
 
 // GetRoleName return the role name in string
-func (r PgData) GetRoleName() string {
+func (r pgData) GetRoleName() string {
 	return string(utils.PVCRoleValueData)
 }
 
 // GetInitialStatus returns the status the PVC should be first created with
-func (r PgData) GetInitialStatus() PVCStatus {
+func (r pgData) GetInitialStatus() PVCStatus {
 	return StatusInitializing
 }
 
 // GetSnapshotName gets the snapshot name for a certain PVC
-func (r PgData) GetSnapshotName(backupName string) string {
+func (r pgData) GetSnapshotName(backupName string) string {
 	return backupName
 }
 
-// GetVolumeSnapshotClass implements the PVCRole interface
-func (r PgData) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
+// GetVolumeSnapshotClass implements the Role interface
+func (r pgData) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
 	if len(configuration.ClassName) > 0 {
 		return ptr.To(configuration.ClassName)
 	}
@@ -123,8 +148,8 @@ func (r PgData) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfig
 	return nil
 }
 
-// GetSourceFromBackup implements the PVCRole interface
-func (r PgData) GetSourceFromBackup(backup *apiv1.Backup) *corev1.TypedLocalObjectReference {
+// GetSourceFromBackup implements the Role interface
+func (r pgData) GetSourceFromBackup(backup *apiv1.Backup) *corev1.TypedLocalObjectReference {
 	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
 		if element.Type == string(utils.PVCRoleValueData) {
 			return &corev1.TypedLocalObjectReference{
@@ -139,7 +164,7 @@ func (r PgData) GetSourceFromBackup(backup *apiv1.Backup) *corev1.TypedLocalObje
 }
 
 // GetLabels will be used as the label value
-func (r PgWal) GetLabels(instanceName string) map[string]string {
+func (r pgWal) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
 		utils.InstanceNameLabelName: instanceName,
 		utils.PvcRoleLabelName:      string(utils.PVCRoleValueWal),
@@ -147,19 +172,19 @@ func (r PgWal) GetLabels(instanceName string) map[string]string {
 	return labels
 }
 
-// GetPVCName will be used to get the name of the PVC
-func (r PgWal) GetPVCName(instanceName string) string {
+// GetName will be used to get the name of the PVC
+func (r pgWal) GetName(instanceName string) string {
 	return instanceName + apiv1.WalArchiveVolumeSuffix
 }
 
 // GetStorageConfiguration will return the storage configuration to be used
 // for this PVC role and this cluster
-func (r PgWal) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error) {
+func (r pgWal) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error) {
 	return *cluster.Spec.WalStorage, nil
 }
 
 // GetSource gets the PVC source to be used when creating a new PVC
-func (r PgWal) GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error) {
+func (r pgWal) GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error) {
 	if source == nil {
 		return nil, nil
 	}
@@ -170,22 +195,22 @@ func (r PgWal) GetSource(source *StorageSource) (*corev1.TypedLocalObjectReferen
 }
 
 // GetRoleName return the role name in string
-func (r PgWal) GetRoleName() string {
+func (r pgWal) GetRoleName() string {
 	return string(utils.PVCRoleValueWal)
 }
 
 // GetInitialStatus returns the status the PVC should be first created with
-func (r PgWal) GetInitialStatus() PVCStatus {
+func (r pgWal) GetInitialStatus() PVCStatus {
 	return StatusReady
 }
 
 // GetSnapshotName gets the snapshot name for a certain PVC
-func (r PgWal) GetSnapshotName(backupName string) string {
+func (r pgWal) GetSnapshotName(backupName string) string {
 	return fmt.Sprintf("%s%s", backupName, apiv1.WalArchiveVolumeSuffix)
 }
 
-// GetVolumeSnapshotClass implements the PVCRole interface
-func (r PgWal) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
+// GetVolumeSnapshotClass implements the Role interface
+func (r pgWal) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
 	if len(configuration.WalClassName) > 0 {
 		return ptr.To(configuration.WalClassName)
 	}
@@ -198,7 +223,7 @@ func (r PgWal) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfigu
 }
 
 // GetLabels will be used as the label value
-func (r PgTablespace) GetLabels(instanceName string) map[string]string {
+func (r pgTablespace) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
 		utils.InstanceNameLabelName: instanceName,
 		utils.PvcRoleLabelName:      string(utils.PVCRoleValueTablespace),
@@ -210,15 +235,15 @@ func (r PgTablespace) GetLabels(instanceName string) map[string]string {
 	return labels
 }
 
-// GetPVCName will be used to get the name of the PVC
-func (r PgTablespace) GetPVCName(instanceName string) string {
+// GetName will be used to get the name of the PVC
+func (r pgTablespace) GetName(instanceName string) string {
 	pvcName := specs.PvcNameForTablespace(instanceName, r.tablespaceName)
 	return pvcName
 }
 
 // GetStorageConfiguration will return the storage configuration to be used
 // for this PVC role and this cluster
-func (r PgTablespace) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error) {
+func (r pgTablespace) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error) {
 	var storageConfiguration *apiv1.StorageConfiguration
 	for tbsName, config := range cluster.Spec.Tablespaces {
 		config := config
@@ -239,7 +264,7 @@ func (r PgTablespace) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.Sto
 }
 
 // GetSource gets the PVC source to be used when creating a new PVC
-func (r PgTablespace) GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error) {
+func (r pgTablespace) GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error) {
 	if source == nil {
 		return nil, nil
 	}
@@ -250,22 +275,22 @@ func (r PgTablespace) GetSource(source *StorageSource) (*corev1.TypedLocalObject
 }
 
 // GetRoleName return the role name in string
-func (r PgTablespace) GetRoleName() string {
+func (r pgTablespace) GetRoleName() string {
 	return string(utils.PVCRoleValueTablespace)
 }
 
 // GetInitialStatus returns the status the PVC should be first created with
-func (r PgTablespace) GetInitialStatus() PVCStatus {
+func (r pgTablespace) GetInitialStatus() PVCStatus {
 	return StatusReady
 }
 
 // GetSnapshotName gets the snapshot name for a certain PVC
-func (r PgTablespace) GetSnapshotName(backupName string) string {
+func (r pgTablespace) GetSnapshotName(backupName string) string {
 	return specs.SnapshotBackupNameForTablespace(backupName, r.tablespaceName)
 }
 
-// GetVolumeSnapshotClass implements the PVCRole interface
-func (r PgTablespace) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
+// GetVolumeSnapshotClass implements the Role interface
+func (r pgTablespace) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
 	if className, ok := configuration.TablespaceClassName[r.tablespaceName]; ok && len(className) > 0 {
 		return ptr.To(className)
 	}

@@ -41,12 +41,12 @@ import (
 
 var _ = Describe("getSnapshotName", func() {
 	It("should return only the backup name when the role is PVCRolePgData", func() {
-		name := persistentvolumeclaim.PgData{}.GetSnapshotName("backup123")
+		name := persistentvolumeclaim.NewPgDataCalculator().GetSnapshotName("backup123")
 		Expect(name).To(Equal("backup123"))
 	})
 
 	It("should append '-wal' to the backup name when the role is PVCRolePgWal", func() {
-		name := persistentvolumeclaim.PgWal{}.GetSnapshotName("backup123")
+		name := persistentvolumeclaim.NewPgWalCalculator().GetSnapshotName("backup123")
 		Expect(name).To(Equal("backup123-wal"))
 	})
 })

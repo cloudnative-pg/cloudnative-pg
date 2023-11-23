@@ -1309,6 +1309,13 @@ spec:
                         - cluster
                         - backup
                         type: string
+                      tablespaceClassName:
+                        additionalProperties:
+                          type: string
+                        description: TablespaceClassName specifies the Snapshot Class
+                          to be used for the tablespaces. defaults to the PGDATA Snapshot
+                          Class, if set
+                        type: object
                       walClassName:
                         description: WalClassName specifies the Snapshot Class to
                           be used for the PG_WAL PersistentVolumeClaim.

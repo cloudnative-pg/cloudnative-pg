@@ -49,9 +49,9 @@ var _ = Describe("pvc role test", func() {
 			DataSource: dataSource,
 		}
 
-		role := PgData{}
+		role := NewPgDataCalculator()
 		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRoleValueData))
-		Expect(role.GetPVCName(instanceName)).To(BeIdenticalTo(instanceName))
+		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusInitializing))
 		Expect(role.GetSnapshotName(backupName)).To(BeIdenticalTo(backupName))
@@ -86,9 +86,9 @@ var _ = Describe("pvc role test", func() {
 			WALSource: &walSource,
 		}
 
-		role := PgWal{}
+		role := NewPgWalCalculator()
 		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRoleValueWal))
-		Expect(role.GetPVCName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.WalArchiveVolumeSuffix))
+		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.WalArchiveVolumeSuffix))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusReady))
 		Expect(role.GetSnapshotName(backupName)).To(BeIdenticalTo(backupName + "-wal"))
@@ -138,9 +138,9 @@ var _ = Describe("pvc role test", func() {
 			},
 		}
 
-		role := PgTablespace{tablespaceName: tbsName}
+		role := NewPgTablespaceCalculator(tbsName)
 		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRoleValueTablespace))
-		Expect(role.GetPVCName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.TablespaceVolumeInfix + tbsName))
+		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.TablespaceVolumeInfix + tbsName))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusReady))
 		Expect(role.GetSnapshotName(backupName)).To(BeIdenticalTo(backupName + apiv1.TablespaceVolumeInfix + tbsName))

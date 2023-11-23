@@ -360,12 +360,17 @@ spec:
                         name:
                           description: Name is the snapshot resource name
                           type: string
+                        tablespaceName:
+                          description: TablespaceName is the name of the snapshotted
+                            tablespace. Only set when type is PG_TABLESPACE
+                          type: string
                         type:
                           description: Type is tho role of the snapshot in the cluster,
-                            such as PG_DATA and PG_WAL
+                            such as PG_DATA, PG_WAL and PG_TABLESPACE
                           type: string
                       required:
                       - name
+                      - tablespaceName
                       - type
                       type: object
                     type: array

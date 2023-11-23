@@ -385,7 +385,7 @@ func newFakePVC(
 		&persistentvolumeclaim.CreateConfiguration{
 			Status:     status,
 			NodeSerial: serial,
-			Role:       persistentvolumeclaim.PgData{},
+			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
 			Storage:    cluster.Spec.StorageConfiguration,
 		})
 	Expect(err).ToNot(HaveOccurred())
@@ -401,7 +401,7 @@ func newFakePVC(
 			&persistentvolumeclaim.CreateConfiguration{
 				Status:     status,
 				NodeSerial: serial,
-				Role:       persistentvolumeclaim.PgWal{},
+				Calculator: persistentvolumeclaim.NewPgWalCalculator(),
 				Storage:    cluster.Spec.StorageConfiguration,
 			},
 		)

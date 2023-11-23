@@ -32,7 +32,7 @@ import (
 type CreateConfiguration struct {
 	Status         PVCStatus
 	NodeSerial     int
-	Role           PVCRole
+	Calculator     Calculator
 	TablespaceName string
 	Storage        apiv1.StorageConfiguration
 	Source         *corev1.TypedLocalObjectReference
@@ -45,15 +45,15 @@ func Build(
 	configuration *CreateConfiguration,
 ) (*corev1.PersistentVolumeClaim, error) {
 	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
-	pvcRole := configuration.Role
+	calculator := configuration.Calculator
 	builder := resources.NewPersistentVolumeClaimBuilder().
 		BeginMetadata().
-		WithNamespacedName(pvcRole.GetPVCName(instanceName), cluster.Namespace).
+		WithNamespacedName(calculator.GetName(instanceName), cluster.Namespace).
 		WithAnnotations(map[string]string{
 			utils.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
 			utils.PVCStatusAnnotationName:     configuration.Status,
 		}).
-		WithLabels(pvcRole.GetLabels(instanceName)).
+		WithLabels(calculator.GetLabels(instanceName)).
 		WithClusterInheritance(cluster).
 		EndMetadata().
 		WithSpec(configuration.Storage.PersistentVolumeClaimTemplate).

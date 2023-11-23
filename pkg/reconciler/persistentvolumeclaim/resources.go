@@ -116,7 +116,7 @@ func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool
 }
 
 type expectedPVC struct {
-	role          PVCRole
+	calculator    Calculator
 	name          string
 	initialStatus PVCStatus
 }
@@ -129,7 +129,7 @@ func (e *expectedPVC) toCreateConfiguration(
 	cc := &CreateConfiguration{
 		Status:     e.initialStatus,
 		NodeSerial: serial,
-		Role:       e.role,
+		Calculator: e.calculator,
 		Storage:    storage,
 		Source:     source,
 	}
@@ -138,12 +138,12 @@ func (e *expectedPVC) toCreateConfiguration(
 }
 
 func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
-	roles := []PVCRole{&PgData{}}
+	roles := []Calculator{NewPgDataCalculator()}
 	if cluster.ShouldCreateWalArchiveVolume() {
-		roles = append(roles, &PgWal{})
+		roles = append(roles, NewPgWalCalculator())
 	}
 	for tbsName := range cluster.Spec.Tablespaces {
-		roles = append(roles, &PgTablespace{tablespaceName: tbsName})
+		roles = append(roles, NewPgTablespaceCalculator(tbsName))
 	}
 	return buildExpectedPVCs(instanceName, roles)
 }
@@ -159,13 +159,13 @@ func getExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName
 }
 
 // here we should register any new PVC for the instance
-func buildExpectedPVCs(instanceName string, roles []PVCRole) []expectedPVC {
+func buildExpectedPVCs(instanceName string, roles []Calculator) []expectedPVC {
 	expectedMounts := make([]expectedPVC, len(roles))
 
 	for i, rl := range roles {
 		expectedMounts[i] = expectedPVC{
-			name:          rl.GetPVCName(instanceName),
-			role:          rl,
+			name:          rl.GetName(instanceName),
+			calculator:    rl,
 			initialStatus: rl.GetInitialStatus(),
 		}
 	}
@@ -181,9 +181,9 @@ func GetInstancePVCs(
 	namespace string,
 ) ([]corev1.PersistentVolumeClaim, error) {
 	// getPvcList returns the PVCs matching the instance name as well as the role
-	getPvcList := func(role PVCRole, instance string) (*corev1.PersistentVolumeClaimList, error) {
+	getPvcList := func(pvcMeta Meta, instance string) (*corev1.PersistentVolumeClaimList, error) {
 		var pvcList corev1.PersistentVolumeClaimList
-		matchClusterName := client.MatchingLabels(role.GetLabels(instance))
+		matchClusterName := client.MatchingLabels(pvcMeta.GetLabels(instance))
 		err := cli.List(ctx,
 			&pvcList,
 			client.InNamespace(namespace),
@@ -200,7 +200,7 @@ func GetInstancePVCs(
 
 	var pvcs []corev1.PersistentVolumeClaim
 
-	pgData, err := getPvcList(&PgData{}, instanceName)
+	pgData, err := getPvcList(NewPgDataCalculator(), instanceName)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func GetInstancePVCs(
 		pvcs = append(pvcs, pgData.Items...)
 	}
 
-	pgWal, err := getPvcList(&PgWal{}, instanceName)
+	pgWal, err := getPvcList(NewPgWalCalculator(), instanceName)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func GetInstancePVCs(
 		pvcs = append(pvcs, pgWal.Items...)
 	}
 
-	tablespacesPVClist, err := getPvcList(&PgTablespace{}, instanceName)
+	tablespacesPVClist, err := getPvcList(&pgTablespace{}, instanceName)
 	if err != nil {
 		return nil, err
 	}

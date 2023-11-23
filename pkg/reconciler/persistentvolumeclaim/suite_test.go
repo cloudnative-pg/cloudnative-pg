@@ -34,7 +34,7 @@ func TestSpecs(t *testing.T) {
 	RunSpecs(t, "PersistentVolumeClaim reconciler")
 }
 
-func makePVC(clusterName string, suffix string, role PVCRole, isResizing bool) corev1.PersistentVolumeClaim {
+func makePVC(clusterName string, suffix string, meta Meta, isResizing bool) corev1.PersistentVolumeClaim {
 	annotations := map[string]string{
 		utils.ClusterSerialAnnotationName: suffix,
 		utils.PVCStatusAnnotationName:     StatusReady,
@@ -49,8 +49,8 @@ func makePVC(clusterName string, suffix string, role PVCRole, isResizing bool) c
 	}
 
 	var labels map[string]string
-	if role != nil {
-		labels = role.GetLabels(clusterName + "-" + suffix)
+	if meta != nil {
+		labels = meta.GetLabels(clusterName + "-" + suffix)
 	}
 
 	return corev1.PersistentVolumeClaim{

@@ -431,7 +431,15 @@ the selected PostgreSQL instance</p>
 <i>string</i>
 </td>
 <td>
-   <p>Type is tho role of the snapshot in the cluster, such as PG_DATA and PG_WAL</p>
+   <p>Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL and PG_TABLESPACE</p>
+</td>
+</tr>
+<tr><td><code>tablespaceName</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>TablespaceName is the name of the snapshotted tablespace. Only set
+when type is PG_TABLESPACE</p>
 </td>
 </tr>
 </tbody>
@@ -4483,6 +4491,14 @@ It is the default class for the other types if no specific class is present</p>
 </td>
 <td>
    <p>WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.</p>
+</td>
+</tr>
+<tr><td><code>tablespaceClassName</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>TablespaceClassName specifies the Snapshot Class to be used for the tablespaces.
+defaults to the PGDATA Snapshot Class, if set</p>
 </td>
 </tr>
 <tr><td><code>snapshotOwnerReference</code><br/>

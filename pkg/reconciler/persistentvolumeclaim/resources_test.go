@@ -34,7 +34,7 @@ var _ = Describe("PVC detection", func() {
 	It("will list PVCs with Jobs or Pods or which are Ready", func() {
 		clusterName := "myCluster"
 		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, PgData{}, isResizing)
+			return makePVC(clusterName, serial, NewPgDataCalculator(), isResizing)
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			makeClusterPVC("1", false), // has a Pod
@@ -143,7 +143,7 @@ var _ = Describe("instance with tablespace test", func() {
 		expectedPVCs := getExpectedPVCsFromCluster(cluster, instanceName)
 		Expect(expectedPVCs).Should(HaveLen(5))
 		for _, pvc := range expectedPVCs {
-			Expect(pvc.name).Should(Equal(pvc.role.GetPVCName(instanceName)))
+			Expect(pvc.name).Should(Equal(pvc.calculator.GetName(instanceName)))
 		}
 	})
 })

@@ -431,13 +431,13 @@ func (se *Reconciler) createSnapshot(
 	targetPod *corev1.Pod,
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
-	pvcRole, err := persistentvolumeclaim.GetPVCRole(pvc.GetLabels())
+	pvcCalculator, err := persistentvolumeclaim.GetExpectedObjectCalculator(pvc.GetLabels())
 	if err != nil {
 		return err
 	}
 
 	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-	snapshotClassName := pvcRole.GetVolumeSnapshotClass(&snapshotConfig)
+	snapshotClassName := pvcCalculator.GetVolumeSnapshotClass(&snapshotConfig)
 
 	labels := pvc.Labels
 	utils.MergeMap(labels, snapshotConfig.Labels)
@@ -447,7 +447,7 @@ func (se *Reconciler) createSnapshot(
 
 	snapshot := storagesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        pvcRole.GetSnapshotName(backup.Name),
+			Name:        pvcCalculator.GetSnapshotName(backup.Name),
 			Namespace:   pvc.Namespace,
 			Labels:      labels,
 			Annotations: annotations,
