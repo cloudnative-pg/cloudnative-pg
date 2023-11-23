@@ -227,10 +227,22 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 			})
 
 			By("creating new backup and verifying backup is ready", func() {
+				backupCondition, err := testUtils.GetConditionsInClusterStatus(
+					namespace,
+					clusterName,
+					env,
+					apiv1.ConditionBackup,
+				)
+				Expect(err).ShouldNot(HaveOccurred())
 				_, stderr, err := testUtils.Run(fmt.Sprintf("kubectl cnpg backup %s -n %s", clusterName, namespace))
 				Expect(stderr).To(BeEmpty())
 				Expect(err).ShouldNot(HaveOccurred())
-
+				AssertBackupConditionTimestampChangedInClusterStatus(
+					namespace,
+					clusterName,
+					apiv1.ConditionBackup,
+					&backupCondition.LastTransitionTime,
+				)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 			})
 

@@ -148,7 +148,8 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 				Name: tbs.Name,
 			}
 			if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
-				return fmt.Errorf("cannot create tablespace before data directory is created")
+				return fmt.Errorf("cannot create tablespace before data directory is created. tablespace: %v",
+					tbs.Name)
 			}
 			err := tbsManager.Create(ctx, tablespace)
 			if err != nil {
