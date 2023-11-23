@@ -3623,4 +3623,62 @@ var _ = Describe("Tablespaces validation", func() {
 		}
 		Expect(cluster.ValidateChanges(oldCluster)).To(HaveLen(1))
 	})
+
+	It("should not complain when the backup section refers to a tbs that is defined", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]TablespaceConfiguration{
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "9Gi",
+						},
+					},
+				},
+				Backup: &BackupConfiguration{
+					VolumeSnapshot: &VolumeSnapshotConfiguration{
+						TablespaceClassName: map[string]string{
+							"my-tablespace1": "random",
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateTablespaceBackupSnapshot()).To(BeEmpty())
+	})
+
+	It("should complain when the backup section refers to a tbs that is not defined", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster1",
+			},
+			Spec: ClusterSpec{
+				Instances: 3,
+				StorageConfiguration: StorageConfiguration{
+					Size: "10Gi",
+				},
+				Tablespaces: map[string]TablespaceConfiguration{
+					"my-tablespace1": {
+						Storage: StorageConfiguration{
+							Size: "9Gi",
+						},
+					},
+				},
+				Backup: &BackupConfiguration{
+					VolumeSnapshot: &VolumeSnapshotConfiguration{
+						TablespaceClassName: map[string]string{
+							"not-present": "random",
+						},
+					},
+				},
+			},
+		}
+		Expect(cluster.validateTablespaceBackupSnapshot()).To(HaveLen(1))
+	})
 })

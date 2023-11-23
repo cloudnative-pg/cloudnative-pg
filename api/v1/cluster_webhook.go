@@ -293,6 +293,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateName,
 		r.validateTablespacesNames,
 		r.validateBootstrapPgBaseBackupSource,
+		r.validateTablespaceBackupSnapshot,
 		r.validateBootstrapRecoverySource,
 		r.validateBootstrapRecoveryDataSource,
 		r.validateExternalClusters,
@@ -1644,6 +1645,28 @@ func (r *Cluster) validateTablespacesNames() field.ErrorList {
 				err.Error()))
 		}
 	}
+	return result
+}
+
+func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
+	if r.Spec.Backup == nil || r.Spec.Backup.VolumeSnapshot == nil ||
+		len(r.Spec.Backup.VolumeSnapshot.TablespaceClassName) == 0 {
+		return nil
+	}
+	backupTbs := r.Spec.Backup.VolumeSnapshot.TablespaceClassName
+
+	var result field.ErrorList
+	for name := range backupTbs {
+		if name, ok := r.Spec.Tablespaces[name]; !ok {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "backup", "volumeSnapshot", "tablespaceClassName"),
+				name,
+				"specified the VolumeSnapshot backup configuration for the tablespace: %s, but it can't be found in the "+
+					"the '.spec.tablespaces' stanza",
+			))
+		}
+	}
+
 	return result
 }
 
