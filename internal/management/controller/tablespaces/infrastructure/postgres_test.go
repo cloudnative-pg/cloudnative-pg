@@ -28,8 +28,8 @@ import (
 )
 
 var _ = Describe("Postgres tablespaces functions test", func() {
-	expectedListStmt := "SELECT spcname FROM pg_tablespace WHERE spcname NOT LIKE 'pg_%'"
-	expectedCreateStmt := "CREATE TABLESPACE \"%s\" LOCATION '%s'"
+	expectedListStmt := "SELECT spcname FROM pg_tablespace WHERE spcname NOT LIKE $1"
+	expectedCreateStmt := "CREATE TABLESPACE \"%s\" LOCATION $1"
 	It("should send the expected query to list tablespaces and parse the return", func(ctx SpecContext) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
@@ -39,7 +39,7 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 			[]string{"spcname"}).
 			AddRow("atablespace").
 			AddRow("anothertablespace")
-		mock.ExpectQuery(expectedListStmt).WillReturnRows(rows)
+		mock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
 		tbs, err := tbsManager.List(ctx)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(tbs).To(HaveLen(2))
@@ -52,7 +52,7 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		tbsManager := newPostgresTablespaceManager(db)
-		mock.ExpectQuery(expectedListStmt).WillReturnError(fmt.Errorf("boom"))
+		mock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnError(fmt.Errorf("boom"))
 		tbs, err := tbsManager.List(ctx)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("boom"))
@@ -63,9 +63,10 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 		tbsName := "atablespace"
-		stmt := fmt.Sprintf(expectedCreateStmt, tbsName, specs.LocationForTablespace(tbsName))
+		stmt := fmt.Sprintf(expectedCreateStmt, tbsName)
 		tbsManager := newPostgresTablespaceManager(db)
-		mock.ExpectExec(stmt).WillReturnResult(sqlmock.NewResult(2, 1))
+		mock.ExpectExec(stmt).WithArgs(specs.LocationForTablespace(tbsName)).
+			WillReturnResult(sqlmock.NewResult(2, 1))
 		err = tbsManager.Create(ctx, Tablespace{Name: tbsName})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(mock.ExpectationsWereMet()).To(Succeed())
@@ -74,9 +75,10 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 		tbsName := "atablespace"
-		stmt := fmt.Sprintf(expectedCreateStmt, tbsName, specs.LocationForTablespace(tbsName))
+		stmt := fmt.Sprintf(expectedCreateStmt, tbsName)
 		tbsManager := newPostgresTablespaceManager(db)
-		mock.ExpectExec(stmt).WillReturnError(fmt.Errorf("boom"))
+		mock.ExpectExec(stmt).WithArgs(specs.LocationForTablespace(tbsName)).
+			WillReturnError(fmt.Errorf("boom"))
 		err = tbsManager.Create(ctx, Tablespace{Name: tbsName})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("boom"))
