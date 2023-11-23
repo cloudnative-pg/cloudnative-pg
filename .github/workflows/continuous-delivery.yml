@@ -42,9 +42,9 @@ env:
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
   BUILD_PUSH_CACHE_TO: ""
-  DOCKER_REGISTRY: "ghcr.io"
-  DOCKER_REGISTRY_USER: ${{ github.actor }}
-  DOCKER_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+  REGISTRY: "ghcr.io"
+  REGISTRY_USER: ${{ github.actor }}
+  REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   REPOSITORY_OWNER: "cloudnative-pg"
   SLACK_USERNAME: "cnpg-bot"
   BUILD_MANAGER_RELEASE_ARGS: "build --skip-validate --rm-dist --id manager"
@@ -362,9 +362,9 @@ jobs:
         name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ env.DOCKER_REGISTRY_USER }}
-          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
         uses: docker/build-push-action@v5
@@ -542,10 +542,6 @@ jobs:
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.localTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
-      DOCKER_SERVER: ${DOCKER_REGISTRY}
-      DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
-      DOCKER_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
-
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
@@ -553,7 +549,7 @@ jobs:
       E2E_CSI_STORAGE_CLASS: csi-hostpath-sc
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-hostpath-snapclass
       LOG_DIR: ${{ github.workspace }}/kind-logs/
-      DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
+      REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "local"
       TESTING_LICENSE: ""
       E2E_ENABLE_REDWOOD: false
@@ -594,9 +590,9 @@ jobs:
         name: Login into docker registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ env.DOCKER_REGISTRY_USER }}
-          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
       -
         # 'Retry' preparing the E2E test ENV
         name: Prepare the environment
@@ -781,10 +777,6 @@ jobs:
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.aksTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
-      DOCKER_SERVER: ${DOCKER_REGISTRY}
-      DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
-      DOCKER_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
-
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
       # AZURE_STORAGE_KEY: this one is gathered during a subsequent step
 
@@ -833,9 +825,9 @@ jobs:
         name: Login into docker registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ env.DOCKER_REGISTRY_USER }}
-          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Azure Login
         uses: azure/login@v1.5.0
@@ -1125,10 +1117,6 @@ jobs:
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.eksTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
-      DOCKER_SERVER: ${DOCKER_REGISTRY}
-      DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
-      DOCKER_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
-
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
@@ -1163,9 +1151,9 @@ jobs:
         name: Login into docker registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ env.DOCKER_REGISTRY_USER }}
-          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
@@ -1514,10 +1502,6 @@ jobs:
       TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.gkeTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
-      DOCKER_SERVER: ${DOCKER_REGISTRY}
-      DOCKER_USERNAME: ${DOCKER_REGISTRY_USER}
-      DOCKER_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
-
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
@@ -1547,9 +1531,9 @@ jobs:
         name: Login into docker registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ env.DOCKER_REGISTRY_USER }}
-          password: ${{ env.DOCKER_REGISTRY_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
