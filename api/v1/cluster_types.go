@@ -89,6 +89,10 @@ const (
 	// get the name of the PVC dedicated to WAL files.
 	WalArchiveVolumeSuffix = "-wal"
 
+	// TablespaceVolumeInfix is the infix added between the instance name
+	// and tablespace name to get the name of PVC for a certain tablespace
+	TablespaceVolumeInfix = "-tbs-"
+
 	// StreamingReplicationUser is the name of the user we'll use for
 	// streaming replication purposes
 	StreamingReplicationUser = "streaming_replica"

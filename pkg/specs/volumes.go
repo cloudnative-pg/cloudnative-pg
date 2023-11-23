@@ -74,13 +74,18 @@ func convertPostgresIDToK8s(tablespaceName string) string {
 // PvcNameForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func PvcNameForTablespace(podName, tablespaceName string) string {
-	return podName + "-tbs-" + convertPostgresIDToK8sName(tablespaceName)
+	return podName + apiv1.TablespaceVolumeInfix + convertPostgresIDToK8sName(tablespaceName)
 }
 
 // VolumeMountNameForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func VolumeMountNameForTablespace(tablespaceName string) string {
 	return convertPostgresIDToK8sName(tablespaceName)
+}
+
+// SnapshotBackupNameForTablespace returns the volume snapshot backup name for the tablespace
+func SnapshotBackupNameForTablespace(backupName, tablespaceName string) string {
+	return backupName + apiv1.TablespaceVolumeInfix + convertPostgresIDToK8sName(tablespaceName)
 }
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {

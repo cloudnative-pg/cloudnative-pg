@@ -142,7 +142,7 @@ func (r PgWal) GetInitialStatus() PVCStatus {
 
 // GetSnapshotName gets the snapshot name for a certain PVC
 func (r PgWal) GetSnapshotName(backupName string) string {
-	return fmt.Sprintf("%s-wal", backupName)
+	return fmt.Sprintf("%s%s", backupName, apiv1.WalArchiveVolumeSuffix)
 }
 
 // GetLabels will be used as the label value
@@ -209,6 +209,5 @@ func (r PgTablespace) GetInitialStatus() PVCStatus {
 
 // GetSnapshotName gets the snapshot name for a certain PVC
 func (r PgTablespace) GetSnapshotName(backupName string) string {
-	// TODO tablespace support
-	return backupName + "-tbs"
+	return specs.SnapshotBackupNameForTablespace(backupName, r.tablespaceName)
 }

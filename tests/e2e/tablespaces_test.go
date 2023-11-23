@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -725,6 +726,7 @@ func latestBaseBackupContainsExpectedTars(
 		ls, err := testUtils.ListFilesOnMinio(namespace, minioClientName, backupInfoFiles)
 		Expect(err).ShouldNot(HaveOccurred())
 		frags := strings.Split(ls, "\n")
+		slices.Sort(frags)
 		Expect(frags).To(HaveLen(numBackups))
 		latestBaseBackup := filepath.Dir(frags[numBackups-1])
 		tarsInLastBackup := strings.TrimPrefix(filepath.Join(latestBaseBackup, "*.tar"), "minio/")
