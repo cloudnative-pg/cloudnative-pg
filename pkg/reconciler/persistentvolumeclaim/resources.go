@@ -216,7 +216,7 @@ func GetInstancePVCs(
 		pvcs = append(pvcs, pgWal.Items...)
 	}
 
-	tablespacesPVClist, err := getPvcList(&pgTablespace{}, instanceName)
+	tablespacesPVClist, err := getPvcList(newTablespaceMetaCalculator(), instanceName)
 	if err != nil {
 		return nil, err
 	}
