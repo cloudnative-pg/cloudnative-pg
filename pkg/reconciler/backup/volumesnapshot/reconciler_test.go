@@ -32,6 +32,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -40,27 +41,13 @@ import (
 
 var _ = Describe("getSnapshotName", func() {
 	It("should return only the backup name when the role is PVCRolePgData", func() {
-		name, err := getSnapshotName("backup123", string(utils.PVCRoleValueData))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(name).To(Equal("backup123"))
-	})
-
-	It("should return only the backup name when the role is an empty string", func() {
-		name, err := getSnapshotName("backup123", "")
-		Expect(err).NotTo(HaveOccurred())
+		name := persistentvolumeclaim.PgData{}.GetSnapshotName("backup123")
 		Expect(name).To(Equal("backup123"))
 	})
 
 	It("should append '-wal' to the backup name when the role is PVCRolePgWal", func() {
-		name, err := getSnapshotName("backup123", string(utils.PVCRoleValueWal))
-		Expect(err).NotTo(HaveOccurred())
+		name := persistentvolumeclaim.PgWal{}.GetSnapshotName("backup123")
 		Expect(name).To(Equal("backup123-wal"))
-	})
-
-	It("should return an error for unhandled PVCRole types", func() {
-		_, err := getSnapshotName("backup123", "UNKNOWN_ROLE")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(Equal("unhandled PVCRole type: UNKNOWN_ROLE"))
 	})
 })
 

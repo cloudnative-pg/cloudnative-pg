@@ -25,10 +25,14 @@ type PVCRole interface {
 	GetRoleName() string
 	// GetInitialStatus returns the status the PVC should be first created with
 	GetInitialStatus() PVCStatus
+	// GetSnapshotName gets the snapshot name for a certain PVC
+	GetSnapshotName(backupName string) string
 }
 
 // GetPVCRole return pvcRole based on the roleName given
-func GetPVCRole(roleName string, tbsName string) (PVCRole, error) {
+func GetPVCRole(labels map[string]string) (PVCRole, error) {
+	roleName := labels[utils.PvcRoleLabelName]
+	tbsName := labels[utils.TablespaceNameLabelName]
 	switch utils.PVCRoleValue(roleName) {
 	case utils.PVCRoleValueData:
 		return PgData{}, nil
@@ -90,6 +94,11 @@ func (r PgData) GetInitialStatus() PVCStatus {
 	return StatusInitializing
 }
 
+// GetSnapshotName gets the snapshot name for a certain PVC
+func (r PgData) GetSnapshotName(backupName string) string {
+	return backupName
+}
+
 // GetLabels will be used as the label value
 func (r PgWal) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
@@ -129,6 +138,11 @@ func (r PgWal) GetRoleName() string {
 // GetInitialStatus returns the status the PVC should be first created with
 func (r PgWal) GetInitialStatus() PVCStatus {
 	return StatusReady
+}
+
+// GetSnapshotName gets the snapshot name for a certain PVC
+func (r PgWal) GetSnapshotName(backupName string) string {
+	return fmt.Sprintf("%s-wal", backupName)
 }
 
 // GetLabels will be used as the label value
@@ -191,4 +205,10 @@ func (r PgTablespace) GetRoleName() string {
 // GetInitialStatus returns the status the PVC should be first created with
 func (r PgTablespace) GetInitialStatus() PVCStatus {
 	return StatusReady
+}
+
+// GetSnapshotName gets the snapshot name for a certain PVC
+func (r PgTablespace) GetSnapshotName(backupName string) string {
+	// TODO tablespace support
+	return backupName + "-tbs"
 }

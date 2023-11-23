@@ -55,8 +55,7 @@ func reconcilePVCQuantity(
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	tablespace := pvc.Labels[utils.TablespaceNameLabelName]
-	pvcRole, err := GetPVCRole(pvc.Labels[utils.PvcRoleLabelName], tablespace)
+	pvcRole, err := GetPVCRole(pvc.GetLabels())
 	if err != nil {
 		contextLogger.Error(err,
 			"encountered an error while trying to get pvc role from label",

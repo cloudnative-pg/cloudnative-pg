@@ -36,6 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -430,15 +431,13 @@ func (se *Reconciler) createSnapshot(
 	targetPod *corev1.Pod,
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
-	role := pvc.Labels[utils.PvcRoleLabelName]
-	name, err := getSnapshotName(backup.Name, role)
+	pvcRole, err := persistentvolumeclaim.GetPVCRole(pvc.GetLabels())
 	if err != nil {
 		return err
 	}
-
 	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 	var snapshotClassName *string
-	if role == string(utils.PVCRoleValueWal) && snapshotConfig.WalClassName != "" {
+	if pvcRole.GetRoleName() == string(utils.PVCRoleValueWal) && snapshotConfig.WalClassName != "" {
 		snapshotClassName = &snapshotConfig.WalClassName
 	}
 
@@ -455,7 +454,7 @@ func (se *Reconciler) createSnapshot(
 
 	snapshot := storagesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
+			Name:        pvcRole.GetSnapshotName(backup.Name),
 			Namespace:   pvc.Namespace,
 			Labels:      labels,
 			Annotations: annotations,
@@ -582,16 +581,4 @@ func (se *Reconciler) waitSnapshotToBeReady(
 	}
 
 	return nil, nil
-}
-
-// getSnapshotName gets the snapshot name for a certain PVC
-func getSnapshotName(backupName string, role string) (string, error) {
-	switch utils.PVCRoleValue(role) {
-	case utils.PVCRoleValueData, "":
-		return backupName, nil
-	case utils.PVCRoleValueWal:
-		return fmt.Sprintf("%s-wal", backupName), nil
-	default:
-		return "", fmt.Errorf("unhandled PVCRole type: %s", role)
-	}
 }
