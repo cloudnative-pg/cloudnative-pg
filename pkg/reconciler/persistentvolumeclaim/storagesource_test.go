@@ -109,7 +109,7 @@ var _ = Describe("Storage source", func() {
 						Elements: []apiv1.BackupSnapshotElementStatus{
 							{
 								Name: "completed-backup",
-								Type: string(utils.PVCRoleValueData),
+								Type: string(utils.PVCRolePgData),
 							},
 						},
 					},
@@ -224,7 +224,7 @@ var _ = Describe("candidate backups", func() {
 				Elements: []apiv1.BackupSnapshotElementStatus{
 					{
 						Name: "completed-backup",
-						Type: string(utils.PVCRoleValueData),
+						Type: string(utils.PVCRolePgData),
 					},
 				},
 			},
@@ -245,7 +245,7 @@ var _ = Describe("candidate backups", func() {
 				Elements: []apiv1.BackupSnapshotElementStatus{
 					{
 						Name: "bad-name",
-						Type: string(utils.PVCRoleValueData),
+						Type: string(utils.PVCRolePgData),
 					},
 				},
 			},

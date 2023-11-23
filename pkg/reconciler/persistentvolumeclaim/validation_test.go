@@ -109,7 +109,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
+							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 						},
 					},
 				},
@@ -121,7 +121,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-two",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRoleValueWal),
+							utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
 						},
 					},
 				},
@@ -163,7 +163,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
+							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 						},
 					},
 				},
@@ -175,7 +175,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRoleValueWal),
+							utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
 						},
 					},
 				},
@@ -210,7 +210,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
+							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 						},
 					},
 				},
@@ -242,7 +242,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							utils.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
+							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 						},
 					},
 				},

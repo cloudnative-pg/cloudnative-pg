@@ -61,7 +61,7 @@ var _ = Describe("BackupStatus structure", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-1",
 					Annotations: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				},
 			},
@@ -69,7 +69,7 @@ var _ = Describe("BackupStatus structure", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-2",
 					Annotations: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRoleValueWal),
+						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
 					},
 				},
 			},
@@ -78,12 +78,12 @@ var _ = Describe("BackupStatus structure", func() {
 		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
 			BackupSnapshotElementStatus{
 				Name: "cluster-example-snapshot-1",
-				Type: string(utils.PVCRoleValueData),
+				Type: string(utils.PVCRolePgData),
 			}))
 		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
 			BackupSnapshotElementStatus{
 				Name: "cluster-example-snapshot-2",
-				Type: string(utils.PVCRoleValueWal),
+				Type: string(utils.PVCRolePgWal),
 			}))
 	})
 

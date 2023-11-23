@@ -457,7 +457,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 	It("Without the proper storage configuration it should always fail", func() {
 		pvc.Labels = map[string]string{
-			utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
+			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 		}
 
 		err := reconcilePVCQuantity(
@@ -482,7 +482,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 	It("It should not fail it's everything is ok", func() {
 		pvc.Labels = map[string]string{
-			utils.PvcRoleLabelName: string(utils.PVCRoleValueData),
+			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 		}
 		cluster.Spec.StorageConfiguration.Size = "1Gi"
 

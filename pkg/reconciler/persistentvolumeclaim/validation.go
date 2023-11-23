@@ -88,7 +88,7 @@ func (status *ValidationStatus) validateVolumeSnapshot(
 		status.addErrorf(
 			name,
 			"Expected role '%s', found '%s'",
-			utils.PVCRoleValueData,
+			utils.PVCRolePgData,
 			pvcRoleLabel)
 	}
 

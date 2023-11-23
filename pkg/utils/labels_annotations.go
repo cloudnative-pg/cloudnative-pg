@@ -215,18 +215,16 @@ const (
 	PodRoleInstance PodRole = "instance"
 )
 
-// PVCRoleValue describe the PVCRole of given pvc
-type PVCRoleValue string
+// PVCRole describes the role of a PVC
+type PVCRole string
 
 const (
-	// PVCRoleValueData the label value for the data PVC role
-	PVCRoleValueData PVCRoleValue = "PG_DATA"
-
-	// PVCRoleValueWal the label value for the wal PVC role
-	PVCRoleValueWal PVCRoleValue = "PG_WAL"
-
-	// PVCRoleValueTablespace the label value for the tablespace PVC role
-	PVCRoleValueTablespace PVCRoleValue = "PG_TABLESPACE"
+	// PVCRolePgData the label value for the data PVC role
+	PVCRolePgData PVCRole = "PG_DATA"
+	// PVCRolePgWal the label value for the wal PVC role
+	PVCRolePgWal PVCRole = "PG_WAL"
+	// PVCRolePgTablespace the label value for the tablespace PVC role
+	PVCRolePgTablespace PVCRole = "PG_TABLESPACE"
 )
 
 // LabelClusterName labels the object with the cluster name

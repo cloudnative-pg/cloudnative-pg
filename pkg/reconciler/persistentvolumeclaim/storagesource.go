@@ -134,9 +134,9 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 			Name:     element.Name,
 		}
 		switch element.Type {
-		case string(utils.PVCRoleValueData):
+		case string(utils.PVCRolePgData):
 			result.DataSource = reference
-		case string(utils.PVCRoleValueWal):
+		case string(utils.PVCRolePgWal):
 			result.WALSource = &reference
 		}
 	}

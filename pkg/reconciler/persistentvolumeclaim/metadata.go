@@ -174,14 +174,14 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				var found bool
 				if pvc.Name == (NewPgDataCalculator()).GetName(instanceName) {
 					found = true
-					if pvcRole != string(utils.PVCRoleValueData) {
+					if pvcRole != string(utils.PVCRolePgData) {
 						return false
 					}
 				}
 
 				if pvc.Name == (NewPgWalCalculator()).GetName(instanceName) {
 					found = true
-					if pvcRole != string(utils.PVCRoleValueWal) {
+					if pvcRole != string(utils.PVCRolePgWal) {
 						return false
 					}
 				}
@@ -189,7 +189,7 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				for name := range cluster.Spec.Tablespaces {
 					if NewPgTablespaceCalculator(name).GetName(instanceName) == pvc.Name {
 						found = true
-						if pvcRole != string(utils.PVCRoleValueTablespace) {
+						if pvcRole != string(utils.PVCRolePgTablespace) {
 							return false
 						}
 
@@ -214,23 +214,23 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				var found bool
 				if pvc.Name == (NewPgDataCalculator()).GetName(instanceName) {
 					found = true
-					if pvcRole != string(utils.PVCRoleValueData) {
-						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRoleValueData)
+					if pvcRole != string(utils.PVCRolePgData) {
+						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgData)
 					}
 				}
 
 				if pvc.Name == (NewPgWalCalculator()).GetName(instanceName) {
 					found = true
-					if pvcRole != string(utils.PVCRoleValueWal) {
-						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRoleValueWal)
+					if pvcRole != string(utils.PVCRolePgWal) {
+						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgWal)
 					}
 				}
 
 				for name := range cluster.Spec.Tablespaces {
 					if NewPgTablespaceCalculator(name).GetName(instanceName) == pvc.Name {
 						found = true
-						if pvcRole != string(utils.PVCRoleValueTablespace) {
-							pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRoleValueTablespace)
+						if pvcRole != string(utils.PVCRolePgTablespace) {
+							pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgTablespace)
 						}
 
 						if pvc.Labels[utils.TablespaceNameLabelName] != name {

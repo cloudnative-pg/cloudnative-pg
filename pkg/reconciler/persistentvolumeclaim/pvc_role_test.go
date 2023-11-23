@@ -31,7 +31,7 @@ var _ = Describe("pvc role test", func() {
 		instanceName := "instance1"
 		backupName := "backup1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:      string(utils.PVCRoleValueData),
+			utils.PvcRoleLabelName:      string(utils.PVCRolePgData),
 			utils.InstanceNameLabelName: instanceName,
 		}
 		cluster := apiv1.Cluster{
@@ -50,7 +50,7 @@ var _ = Describe("pvc role test", func() {
 		}
 
 		role := NewPgDataCalculator()
-		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRoleValueData))
+		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgData))
 		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusInitializing))
@@ -68,7 +68,7 @@ var _ = Describe("pvc role test", func() {
 		instanceName := "instance1"
 		backupName := "backup1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:      string(utils.PVCRoleValueWal),
+			utils.PvcRoleLabelName:      string(utils.PVCRolePgWal),
 			utils.InstanceNameLabelName: instanceName,
 		}
 		cluster := apiv1.Cluster{
@@ -87,7 +87,7 @@ var _ = Describe("pvc role test", func() {
 		}
 
 		role := NewPgWalCalculator()
-		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRoleValueWal))
+		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgWal))
 		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.WalArchiveVolumeSuffix))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusReady))
@@ -107,7 +107,7 @@ var _ = Describe("pvc role test", func() {
 		backupName := "backup1"
 		tbsName := "tbs1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:        string(utils.PVCRoleValueTablespace),
+			utils.PvcRoleLabelName:        string(utils.PVCRolePgTablespace),
 			utils.InstanceNameLabelName:   instanceName,
 			utils.TablespaceNameLabelName: tbsName,
 		}
@@ -139,7 +139,7 @@ var _ = Describe("pvc role test", func() {
 		}
 
 		role := NewPgTablespaceCalculator(tbsName)
-		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRoleValueTablespace))
+		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgTablespace))
 		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.TablespaceVolumeInfix + tbsName))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusReady))
