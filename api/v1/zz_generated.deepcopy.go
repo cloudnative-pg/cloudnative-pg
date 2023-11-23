@@ -2276,6 +2276,13 @@ func (in *VolumeSnapshotConfiguration) DeepCopyInto(out *VolumeSnapshotConfigura
 			(*out)[key] = val
 		}
 	}
+	if in.TablespaceClassName != nil {
+		in, out := &in.TablespaceClassName, &out.TablespaceClassName
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Online != nil {
 		in, out := &in.Online, &out.Online
 		*out = new(bool)

@@ -114,7 +114,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	podList *postgres.PostgresqlStatusList,
 	primaryPod corev1.Pod,
 	inPlacePossible bool,
-	forceRestart bool,
+	forceRecreate bool,
 	reason rolloutReason,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
@@ -132,7 +132,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		return true, nil
 	}
 
-	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart || forceRestart {
+	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart || forceRecreate {
 		if inPlacePossible {
 			// In-place restart is possible
 			if err := r.updateRestartAnnotation(ctx, cluster, primaryPod); err != nil {

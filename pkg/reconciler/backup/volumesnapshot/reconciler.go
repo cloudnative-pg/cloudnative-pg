@@ -435,16 +435,9 @@ func (se *Reconciler) createSnapshot(
 	if err != nil {
 		return err
 	}
-	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-	var snapshotClassName *string
-	if pvcRole.GetRoleName() == string(utils.PVCRoleValueWal) && snapshotConfig.WalClassName != "" {
-		snapshotClassName = &snapshotConfig.WalClassName
-	}
 
-	// this is the default value if nothing else was assigned
-	if snapshotClassName == nil && snapshotConfig.ClassName != "" {
-		snapshotClassName = &snapshotConfig.ClassName
-	}
+	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
+	snapshotClassName := pvcRole.GetVolumeSnapshotClass(&snapshotConfig)
 
 	labels := pvc.Labels
 	utils.MergeMap(labels, snapshotConfig.Labels)

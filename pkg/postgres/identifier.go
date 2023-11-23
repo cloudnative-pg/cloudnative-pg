@@ -28,9 +28,9 @@ const (
 	// postgresIdentifierMaxLen is the maximum length PostgreSQL allows for identifiers
 	postgresIdentifierMaxLen int = 63
 
-	// prefix denoting tablespaces managed by the Postgres system
+	// SystemTablespacesPrefix is the prefix denoting tablespaces managed by the Postgres system
 	// see https://www.postgresql.org/docs/current/sql-createtablespace.html
-	systemTablespacesPrefix = "pg_"
+	SystemTablespacesPrefix = "pg_"
 )
 
 // regex to verify a Postgres-compliant identifier
@@ -39,7 +39,7 @@ var postgresIdentifierRegex = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_$]*$")
 
 // IsTablespaceNameValid check if tablespace name is valid or not
 func IsTablespaceNameValid(name string) (bool, error) {
-	if strings.HasPrefix(name, systemTablespacesPrefix) {
+	if strings.HasPrefix(name, SystemTablespacesPrefix) {
 		return false, fmt.Errorf("tablespace names beginning 'pg_' are reserved for Postgres")
 	}
 

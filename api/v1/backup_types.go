@@ -121,8 +121,12 @@ type BackupSnapshotElementStatus struct {
 	// Name is the snapshot resource name
 	Name string `json:"name"`
 
-	// Type is tho role of the snapshot in the cluster, such as PG_DATA and PG_WAL
+	// Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL an PG_TABLESPACE
 	Type string `json:"type"`
+
+	// TablespaceName is the name of the snapshotted tablespace. Only set
+	// when type is PG_TABLESPACE
+	TablespaceName string `json:"tablespaceName"`
 }
 
 // BackupStatus defines the observed state of Backup

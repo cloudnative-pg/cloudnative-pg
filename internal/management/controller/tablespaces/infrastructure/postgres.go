@@ -24,6 +24,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
@@ -53,7 +54,8 @@ func (tbsMgr postgresTablespaceManager) List(ctx context.Context) ([]Tablespace,
 
 	rows, err := tbsMgr.superUserDB.QueryContext(
 		ctx,
-		"SELECT spcname FROM pg_tablespace WHERE spcname NOT LIKE 'pg_%'",
+		"SELECT spcname FROM pg_tablespace WHERE spcname NOT LIKE $1",
+		postgres.SystemTablespacesPrefix,
 	)
 	if err != nil {
 		return nil, wrapErr(err)
@@ -90,10 +92,11 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 		return fmt.Errorf("while creating tablespace %s: %w", tbs.Name, err)
 	}
 	var err error
-	if _, err = tbsMgr.superUserDB.ExecContext(ctx, fmt.Sprintf("CREATE TABLESPACE %s LOCATION '%s'",
-		pgx.Identifier{tbs.Name}.Sanitize(),
+	if _, err = tbsMgr.superUserDB.ExecContext(
+		ctx,
+		fmt.Sprintf("CREATE TABLESPACE %s LOCATION $1", pgx.Identifier{tbs.Name}.Sanitize()),
 		specs.LocationForTablespace(tbs.Name),
-	)); err != nil {
+	); err != nil {
 		return wrapErr(err)
 	}
 	return nil

@@ -221,6 +221,7 @@ func (r *InstanceReconciler) Reconcile(
 			return result, err
 		}
 	}
+
 	if err = r.refreshCredentialsFromSecret(ctx, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("while updating database owner password: %w", err)
 	}

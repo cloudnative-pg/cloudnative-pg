@@ -186,7 +186,18 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 					}
 				}
 
-				// TODO: HANDLE TABLESPACE
+				for name, _ := range cluster.Spec.Tablespaces {
+					if NewTablespaceRole(name).GetPVCName(instanceName) == pvc.Name {
+						found = true
+						if pvcRole != string(utils.PVCRoleValueTablespace) {
+							return false
+						}
+
+						if pvc.Labels[utils.TablespaceNameLabelName] != name {
+							return false
+						}
+					}
+				}
 
 				if found && pvc.Labels[utils.InstanceNameLabelName] != instanceName {
 					return false
@@ -212,6 +223,19 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 					found = true
 					if pvcRole != string(utils.PVCRoleValueWal) {
 						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRoleValueWal)
+					}
+				}
+
+				for name, _ := range cluster.Spec.Tablespaces {
+					if NewTablespaceRole(name).GetPVCName(instanceName) == pvc.Name {
+						found = true
+						if pvcRole != string(utils.PVCRoleValueTablespace) {
+							pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRoleValueTablespace)
+						}
+
+						if pvc.Labels[utils.TablespaceNameLabelName] != name {
+							pvc.Labels[utils.TablespaceNameLabelName] = name
+						}
 					}
 				}
 

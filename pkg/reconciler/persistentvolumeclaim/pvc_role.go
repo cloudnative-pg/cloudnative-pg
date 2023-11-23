@@ -3,7 +3,9 @@ package persistentvolumeclaim
 import (
 	"fmt"
 
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -19,6 +21,9 @@ type PVCRole interface {
 	// GetStorageConfiguration will return the storage configuration to be used
 	// for this PVC role and this cluster
 	GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error)
+	// GetVolumeSnapshotClass will return the volume snapshot class to be used
+	// when snapshotting a PVC with this Role.
+	GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string
 	// GetSource gets the PVC source to be used when creating a new PVC
 	GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error)
 	// GetRoleName return the role name in string
@@ -44,6 +49,16 @@ func GetPVCRole(labels map[string]string) (PVCRole, error) {
 		return nil, fmt.Errorf("unknown pvc role name: %s", roleName)
 	}
 }
+
+// NewTablespaceRole creates a new role for a tablespace
+// TODO: replace this with the tablespaces factory
+func NewTablespaceRole(name string) PgTablespace {
+	return PgTablespace{tablespaceName: name}
+}
+
+// TODO: factory for the PGCRole interface
+// TODO: avoid exporting struct types
+// TODO: export only the interface and the factory
 
 // PgData describes the role of a PVC which used for pg_data
 type PgData struct{}
@@ -99,6 +114,30 @@ func (r PgData) GetSnapshotName(backupName string) string {
 	return backupName
 }
 
+// GetVolumeSnapshotClass implements the PVCRole interface
+func (r PgData) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
+	if len(configuration.ClassName) > 0 {
+		return ptr.To(configuration.ClassName)
+	}
+
+	return nil
+}
+
+// GetSourceFromBackup implements the PVCRole interface
+func (r PgData) GetSourceFromBackup(backup *apiv1.Backup) *corev1.TypedLocalObjectReference {
+	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
+		if element.Type == string(utils.PVCRoleValueData) {
+			return &corev1.TypedLocalObjectReference{
+				APIGroup: ptr.To(volumesnapshot.GroupName),
+				Kind:     apiv1.VolumeSnapshotKind,
+				Name:     element.Name,
+			}
+		}
+	}
+
+	return nil
+}
+
 // GetLabels will be used as the label value
 func (r PgWal) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
@@ -143,6 +182,19 @@ func (r PgWal) GetInitialStatus() PVCStatus {
 // GetSnapshotName gets the snapshot name for a certain PVC
 func (r PgWal) GetSnapshotName(backupName string) string {
 	return fmt.Sprintf("%s%s", backupName, apiv1.WalArchiveVolumeSuffix)
+}
+
+// GetVolumeSnapshotClass implements the PVCRole interface
+func (r PgWal) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
+	if len(configuration.WalClassName) > 0 {
+		return ptr.To(configuration.WalClassName)
+	}
+
+	if len(configuration.ClassName) > 0 {
+		return ptr.To(configuration.ClassName)
+	}
+
+	return nil
 }
 
 // GetLabels will be used as the label value
@@ -210,4 +262,17 @@ func (r PgTablespace) GetInitialStatus() PVCStatus {
 // GetSnapshotName gets the snapshot name for a certain PVC
 func (r PgTablespace) GetSnapshotName(backupName string) string {
 	return specs.SnapshotBackupNameForTablespace(backupName, r.tablespaceName)
+}
+
+// GetVolumeSnapshotClass implements the PVCRole interface
+func (r PgTablespace) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnapshotConfiguration) *string {
+	if className, ok := configuration.TablespaceClassName[r.tablespaceName]; ok && len(className) > 0 {
+		return ptr.To(className)
+	}
+
+	if len(configuration.ClassName) > 0 {
+		return ptr.To(configuration.ClassName)
+	}
+
+	return nil
 }

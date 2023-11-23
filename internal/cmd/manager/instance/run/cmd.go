@@ -164,6 +164,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
+
 	// postgres CSV logs handler (PGAudit too)
 	postgresLogPipe := logpipe.NewLogPipe()
 	if err := mgr.Add(postgresLogPipe); err != nil {

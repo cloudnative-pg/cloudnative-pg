@@ -148,6 +148,10 @@ type VolumeSnapshotConfiguration struct {
 	// WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.
 	// +optional
 	WalClassName string `json:"walClassName,omitempty"`
+	// TablespaceClassName specifies the Snapshot Class to be used for the tablespaces.
+	// defaults to the PGDATA Snapshot Class, if set
+	// +optional
+	TablespaceClassName map[string]string `json:"tablespaceClassName,omitempty"`
 	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have
 	// +optional
 	// +kubebuilder:validation:Enum:=none;cluster;backup
