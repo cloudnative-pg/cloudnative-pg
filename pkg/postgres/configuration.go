@@ -341,13 +341,10 @@ var (
 		"ssl":                                    fixedConfigurationParameter,
 		"ssl_ca_file":                            fixedConfigurationParameter,
 		"ssl_cert_file":                          fixedConfigurationParameter,
-		"ssl_ciphers":                            fixedConfigurationParameter,
 		"ssl_crl_file":                           fixedConfigurationParameter,
 		"ssl_dh_params_file":                     fixedConfigurationParameter,
 		"ssl_ecdh_curve":                         fixedConfigurationParameter,
 		"ssl_key_file":                           fixedConfigurationParameter,
-		"ssl_max_protocol_version":               fixedConfigurationParameter,
-		"ssl_min_protocol_version":               fixedConfigurationParameter,
 		"ssl_passphrase_command":                 fixedConfigurationParameter,
 		"ssl_passphrase_command_supports_reload": fixedConfigurationParameter,
 		"ssl_prefer_server_ciphers":              fixedConfigurationParameter,
@@ -377,6 +374,8 @@ var (
 			"dynamic_shared_memory_type": "posix",
 			"wal_sender_timeout":         "5s",
 			"wal_receiver_timeout":       "5s",
+			"ssl_max_protocol_version":   "TLSv1.3",
+			"ssl_min_protocol_version":   "TLSv1.3",
 			// Workaround for PostgreSQL not behaving correctly when
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.
