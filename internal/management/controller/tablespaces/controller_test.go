@@ -19,6 +19,7 @@ package tablespaces
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
@@ -62,10 +63,19 @@ func (m *mockTablespaceManager) Create(
 	return nil
 }
 
-type mockTablespaceStorageManager struct{}
+type mockTablespaceStorageManager struct {
+	unavailableStorageLocations []string
+}
 
-func (mst mockTablespaceStorageManager) storageExists(_ string) (bool, error) {
-	return true, nil
+func (mst mockTablespaceStorageManager) storageExists(tablespaceName string) (bool, error) {
+	return !slices.Contains(
+		mst.unavailableStorageLocations,
+		mst.getStorageLocation(tablespaceName),
+	), nil
+}
+
+func (mst mockTablespaceStorageManager) getStorageLocation(tablespaceName string) string {
+	return fmt.Sprintf("/%s", tablespaceName)
 }
 
 var _ = Describe("Tablespace synchronizer tests", func() {
@@ -76,7 +86,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 	}
 
 	When("tablespace configurations are realizable", func() {
-		It("it will do nothing if the DB contains the tablespaces in spec", func(ctx context.Context) {
+		It("will do nothing if the DB contains the tablespaces in spec", func(ctx context.Context) {
 			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
 				"foo": {
 					Storage: apiv1.StorageConfiguration{
@@ -94,14 +104,15 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			err = tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+			result, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
 				mockTablespaceStorageManager{}, tbsByAction)
+			Expect(result).To(BeNil())
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(tbsManager.callHistory).To(HaveLen(1))
 			Expect(tbsManager.callHistory).To(ConsistOf("list"))
 		})
 
-		It("it will Create a tablespace in spec that is missing from DB", func(ctx context.Context) {
+		It("will create a tablespace in spec that is missing from DB", func(ctx context.Context) {
 			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
 				"foo": {
 					Storage: apiv1.StorageConfiguration{
@@ -124,11 +135,37 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			err = tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+			result, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
 				mockTablespaceStorageManager{}, tbsByAction)
+			Expect(result).To(BeNil())
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(tbsManager.callHistory).To(HaveLen(2))
 			Expect(tbsManager.callHistory).To(ConsistOf("list", "create"))
+		})
+
+		It("will requeue the tablespace creation if the mount path doesn't exist", func(ctx context.Context) {
+			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
+				"foo": {
+					Storage: apiv1.StorageConfiguration{
+						Size: "1Gi",
+					},
+				},
+			}
+			tbsManager := mockTablespaceManager{}
+			tbsInDatabase, err := tbsManager.List(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
+			result, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+				mockTablespaceStorageManager{
+					unavailableStorageLocations: []string{
+						"/foo",
+					},
+				}, tbsByAction)
+			Expect(result).To(Not(BeNil()))
+			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(tbsManager.callHistory).To(HaveLen(1))
+			Expect(tbsManager.callHistory).To(ConsistOf("list"))
 		})
 	})
 })

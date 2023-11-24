@@ -27,14 +27,18 @@ import (
 )
 
 type tablespaceStorageManager interface {
+	getStorageLocation(tbsName string) string
 	storageExists(tbsName string) (bool, error)
 }
 
 type instanceTablespaceStorageManager struct{}
 
+func (ism instanceTablespaceStorageManager) getStorageLocation(tbsName string) string {
+	return specs.LocationForTablespace(tbsName)
+}
+
 func (ism instanceTablespaceStorageManager) storageExists(tbsName string) (bool, error) {
-	location := specs.LocationForTablespace(tbsName)
-	return fileutils.FileExists(location)
+	return fileutils.FileExists(ism.getStorageLocation(tbsName))
 }
 
 type (

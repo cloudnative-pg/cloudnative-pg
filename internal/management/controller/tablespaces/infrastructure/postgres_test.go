@@ -21,15 +21,13 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Postgres tablespaces functions test", func() {
 	expectedListStmt := "SELECT spcname FROM pg_tablespace WHERE spcname NOT LIKE $1"
-	expectedCreateStmt := "CREATE TABLESPACE \"%s\" LOCATION $1"
+	expectedCreateStmt := "CREATE TABLESPACE \"%s\" LOCATION '/var/lib/postgresql/tablespaces/atablespace/data'"
 	It("should send the expected query to list tablespaces and parse the return", func(ctx SpecContext) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
@@ -65,7 +63,7 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		tbsName := "atablespace"
 		stmt := fmt.Sprintf(expectedCreateStmt, tbsName)
 		tbsManager := newPostgresTablespaceManager(db)
-		mock.ExpectExec(stmt).WithArgs(specs.LocationForTablespace(tbsName)).
+		mock.ExpectExec(stmt).
 			WillReturnResult(sqlmock.NewResult(2, 1))
 		err = tbsManager.Create(ctx, Tablespace{Name: tbsName})
 		Expect(err).ShouldNot(HaveOccurred())
@@ -77,7 +75,7 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		tbsName := "atablespace"
 		stmt := fmt.Sprintf(expectedCreateStmt, tbsName)
 		tbsManager := newPostgresTablespaceManager(db)
-		mock.ExpectExec(stmt).WithArgs(specs.LocationForTablespace(tbsName)).
+		mock.ExpectExec(stmt).
 			WillReturnError(fmt.Errorf("boom"))
 		err = tbsManager.Create(ctx, Tablespace{Name: tbsName})
 		Expect(err).To(HaveOccurred())

@@ -18,10 +18,12 @@ package tablespaces
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -74,48 +76,58 @@ func (r *TablespaceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	contextLogger.Info("starting up the tablespace reconciler")
-	return r.reconcile(ctx, cluster)
+	contextLogger.Debug("starting up the tablespace reconciler")
+	result, err := r.reconcile(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if result != nil {
+		return *result, nil
+	}
+	return reconcile.Result{}, nil
 }
 
 func (r *TablespaceReconciler) reconcile(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-) (reconcile.Result, error) {
+) (*reconcile.Result, error) {
 	superUserDB, err := r.instance.GetSuperUserDB()
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("while reconcile tablespaces: %w", err)
+		return nil, fmt.Errorf("while reconcile tablespaces: %w", err)
 	}
 
 	tbsManager := infrastructure.NewPostgresTablespaceManager(superUserDB)
 	tbsStorageManager := instanceTablespaceStorageManager{}
 	tbsInDatabase, err := tbsManager.List(ctx)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("could not fetch tablespaces from database: %w", err)
+		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
 	}
 
 	tbsByAction := evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	if len(tbsByAction.convertToTablespaceNameByStatus()[apiv1.TablespaceStatusPendingReconciliation]) == 0 {
-		return reconcile.Result{}, nil
+		return nil, nil
 	}
 
-	if err := r.applyTablespaceActions(
+	if result, err := r.applyTablespaceActions(
 		ctx,
 		tbsManager,
 		tbsStorageManager,
 		tbsByAction,
-	); err != nil {
-		return reconcile.Result{}, fmt.Errorf("while reconciling tablespaces in the database: %w", err)
+	); result != nil || err != nil {
+		if err != nil {
+			err = fmt.Errorf("while reconciling tablespaces in the database: %w", err)
+		}
+		return result, err
 	}
 
 	tbsInDatabase, err = tbsManager.List(ctx)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("could not fetch tablespaces from database: %w", err)
+		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
 	}
 	tbsByAction = evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	updatedCluster := cluster.DeepCopy()
 	updatedCluster.Status.TablespaceStatus.ByStatus = tbsByAction.convertToTablespaceNameByStatus()
-	return reconcile.Result{}, r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
+	return nil, r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
 }
 
 // applyTablespaceActions applies the actions to reconcile tablespace in the DB with the Spec
@@ -124,7 +136,7 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 	tbsManager infrastructure.TablespaceManager,
 	tbsStorageManager tablespaceStorageManager,
 	tbsByAction TablespaceByAction,
-) error {
+) (*ctrl.Result, error) {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
 
 	for action, tbsAdapters := range tbsByAction {
@@ -133,11 +145,11 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 			continue
 		}
 
-		contextLog.Info("tablespaces in database out of sync with in Spec, evaluating action",
+		contextLog.Debug("tablespaces in database out of sync with in Spec, evaluating action",
 			"tablespaces", getTablespaceNames(tbsAdapters), "action", action)
 
 		if action != TbsToCreate {
-			contextLog.Error(fmt.Errorf("only tablespace creation is supported"), "action", action)
+			contextLog.Error(errors.New("only tablespace creation is supported"), "action", action)
 			continue
 		}
 
@@ -148,15 +160,21 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 				Name: tbs.Name,
 			}
 			if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
-				return fmt.Errorf("cannot create tablespace before data directory is created. tablespace: %v",
-					tbs.Name)
+				contextLog.Debug("deferring tablespace until creation of the mount point for the new volume",
+					"tablespaceName", tbs.Name,
+					"tablespacePath", tbsStorageManager.getStorageLocation(tbs.Name))
+				return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 			}
 			err := tbsManager.Create(ctx, tablespace)
 			if err != nil {
-				contextLog.Error(err, "while performing "+string(action), "tablespace", tbs.Name)
-				return err
+				contextLog.Error(
+					err, "while performing action",
+					"action", action,
+					"tablespace", tbs.Name)
+				return nil, err
 			}
 		}
 	}
-	return nil
+
+	return nil, nil
 }

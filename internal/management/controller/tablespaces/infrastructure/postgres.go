@@ -87,7 +87,11 @@ func (tbsMgr postgresTablespaceManager) List(ctx context.Context) ([]Tablespace,
 // Create the tablespace in the database, if tablespace is temporary tablespace, need reload configure
 func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespace) error {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler_create")
-	contextLog.Trace("Invoked Create", "tbs", tbs)
+	tablespaceLocation := specs.LocationForTablespace(tbs.Name)
+
+	contextLog.Info("Creating tablespace",
+		"tablespaceName", tbs,
+		"tablespaceLocation", tablespaceLocation)
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while creating tablespace %s: %w", tbs.Name, err)
 	}
@@ -97,7 +101,7 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 		fmt.Sprintf(
 			"CREATE TABLESPACE %s LOCATION '%s'",
 			pgx.Identifier{tbs.Name}.Sanitize(),
-			specs.LocationForTablespace(tbs.Name),
+			tablespaceLocation,
 		),
 	); err != nil {
 		return wrapErr(err)
