@@ -13,14 +13,11 @@ spec:
       storage:
         size: 1Gi
         storageClass: standard
-      temporary: false
     another_tablespace:
       storage:
         size: 2Gi
         storageClass: standard
-      temporary: true
     tablespacea1:
-      temporary: true
       storage:
         size: 2Gi
         storageClass: standard
