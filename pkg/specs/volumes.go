@@ -28,19 +28,19 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
-// PgWalVolumePath its the path used by the WAL volume when present
+// PgWalVolumePath is the path used by the WAL volume when present
 const PgWalVolumePath = "/var/lib/postgresql/wal"
 
-// PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
+// PgWalVolumePgWalPath is the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
-// PgTableSpaceVolumePath its the base path used by tablespace when present
-const PgTableSpaceVolumePath = "/var/lib/postgresql/tablespaces"
+// PgTablespaceVolumePath is the base path used by tablespace when present
+const PgTablespaceVolumePath = "/var/lib/postgresql/tablespaces"
 
 // MountForTablespace returns the normalized tablespace volume name for a given
 // tablespace, on a cluster pod
 func MountForTablespace(tablespaceName string) string {
-	return path.Join(PgTableSpaceVolumePath, tablespaceName)
+	return path.Join(PgTablespaceVolumePath, tablespaceName)
 }
 
 // LocationForTablespace returns the data location for tablespace on a cluster pod

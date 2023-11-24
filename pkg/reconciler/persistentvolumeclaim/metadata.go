@@ -172,14 +172,14 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
-				if pvc.Name == (NewPgDataCalculator()).GetName(instanceName) {
+				if pvc.Name == NewPgDataCalculator().GetName(instanceName) {
 					found = true
 					if pvcRole != string(utils.PVCRolePgData) {
 						return false
 					}
 				}
 
-				if pvc.Name == (NewPgWalCalculator()).GetName(instanceName) {
+				if pvc.Name == NewPgWalCalculator().GetName(instanceName) {
 					found = true
 					if pvcRole != string(utils.PVCRolePgWal) {
 						return false
@@ -212,14 +212,14 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
-				if pvc.Name == (NewPgDataCalculator()).GetName(instanceName) {
+				if pvc.Name == NewPgDataCalculator().GetName(instanceName) {
 					found = true
 					if pvcRole != string(utils.PVCRolePgData) {
 						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgData)
 					}
 				}
 
-				if pvc.Name == (NewPgWalCalculator()).GetName(instanceName) {
+				if pvc.Name == NewPgWalCalculator().GetName(instanceName) {
 					found = true
 					if pvcRole != string(utils.PVCRolePgWal) {
 						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgWal)

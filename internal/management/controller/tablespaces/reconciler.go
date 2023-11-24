@@ -65,7 +65,7 @@ func (r *TablespaceReconciler) Reconcile(
 	}
 
 	if !cluster.ContainsTablespaces() {
-		contextLogger.Info("no tablespaces to create")
+		contextLogger.Debug("no tablespaces to create")
 		return reconcile.Result{}, nil
 	}
 

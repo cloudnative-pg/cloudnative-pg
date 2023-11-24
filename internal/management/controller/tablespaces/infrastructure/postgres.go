@@ -94,8 +94,11 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 	var err error
 	if _, err = tbsMgr.superUserDB.ExecContext(
 		ctx,
-		fmt.Sprintf("CREATE TABLESPACE %s LOCATION $1", pgx.Identifier{tbs.Name}.Sanitize()),
-		specs.LocationForTablespace(tbs.Name),
+		fmt.Sprintf(
+			"CREATE TABLESPACE %s LOCATION '%s'",
+			pgx.Identifier{tbs.Name}.Sanitize(),
+			specs.LocationForTablespace(tbs.Name),
+		),
 	); err != nil {
 		return wrapErr(err)
 	}
