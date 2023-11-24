@@ -116,7 +116,7 @@ func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool
 }
 
 type expectedPVC struct {
-	calculator    Calculator
+	calculator    ExpectedObjectCalculator
 	name          string
 	initialStatus PVCStatus
 }
@@ -138,7 +138,7 @@ func (e *expectedPVC) toCreateConfiguration(
 }
 
 func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
-	roles := []Calculator{NewPgDataCalculator()}
+	roles := []ExpectedObjectCalculator{NewPgDataCalculator()}
 	if cluster.ShouldCreateWalArchiveVolume() {
 		roles = append(roles, NewPgWalCalculator())
 	}
@@ -159,7 +159,7 @@ func getExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName
 }
 
 // here we should register any new PVC for the instance
-func buildExpectedPVCs(instanceName string, roles []Calculator) []expectedPVC {
+func buildExpectedPVCs(instanceName string, roles []ExpectedObjectCalculator) []expectedPVC {
 	expectedMounts := make([]expectedPVC, len(roles))
 
 	for i, rl := range roles {

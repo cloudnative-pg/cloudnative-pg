@@ -115,7 +115,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			Expect(strings.Contains(string(message), actualStatus)).Should(BeEquivalentTo(true),
 				actualStatus+"\\not-contained-in\\"+string(message))
 		}
-		verifyClusterResources := func(namespace, clusterName string, objs []persistentvolumeclaim.Calculator) {
+		verifyClusterResources := func(namespace, clusterName string, objs []persistentvolumeclaim.ExpectedObjectCalculator) {
 			By(fmt.Sprintf("verifying cluster resources are removed "+
 				"post hibernation where roles %v", objs), func() {
 				timeout := 120
@@ -200,8 +200,8 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				})
 			})
 		}
-		verifyPvc := func(expectedObject persistentvolumeclaim.Calculator, pvcUid types.UID, clusterManifest []byte,
-			instanceName string,
+		verifyPvc := func(expectedObject persistentvolumeclaim.ExpectedObjectCalculator, pvcUid types.UID,
+			clusterManifest []byte, instanceName string,
 		) {
 			pvcInfo := getPvc(expectedObject, instanceName)
 			Expect(pvcUid).Should(BeEquivalentTo(pvcInfo.GetUID()))
@@ -255,7 +255,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			verifyClusterResources(
 				namespace,
 				clusterName,
-				[]persistentvolumeclaim.Calculator{
+				[]persistentvolumeclaim.ExpectedObjectCalculator{
 					persistentvolumeclaim.NewPgWalCalculator(),
 					persistentvolumeclaim.NewPgDataCalculator(),
 				},
@@ -354,7 +354,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				verifyClusterResources(
 					namespace,
 					clusterName,
-					[]persistentvolumeclaim.Calculator{persistentvolumeclaim.NewPgDataCalculator()},
+					[]persistentvolumeclaim.ExpectedObjectCalculator{persistentvolumeclaim.NewPgDataCalculator()},
 				)
 
 				By("verifying primary pgData pvc info", func() {

@@ -32,7 +32,7 @@ import (
 type CreateConfiguration struct {
 	Status         PVCStatus
 	NodeSerial     int
-	Calculator     Calculator
+	Calculator     ExpectedObjectCalculator
 	TablespaceName string
 	Storage        apiv1.StorageConfiguration
 	Source         *corev1.TypedLocalObjectReference

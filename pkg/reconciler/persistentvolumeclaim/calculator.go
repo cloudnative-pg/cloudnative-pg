@@ -46,8 +46,8 @@ type Configuration interface {
 	GetSource(source *StorageSource) (*corev1.TypedLocalObjectReference, error)
 }
 
-// Calculator returns the data needed for a given pvc
-type Calculator interface {
+// ExpectedObjectCalculator returns the data needed for a given pvc
+type ExpectedObjectCalculator interface {
 	Bootstrap
 	Backup
 	Configuration
@@ -55,7 +55,7 @@ type Calculator interface {
 }
 
 // GetExpectedObjectCalculator return an object capable of determining a series of data for the given pvc
-func GetExpectedObjectCalculator(labels map[string]string) (Calculator, error) {
+func GetExpectedObjectCalculator(labels map[string]string) (ExpectedObjectCalculator, error) {
 	roleName := labels[utils.PvcRoleLabelName]
 	tbsName := labels[utils.TablespaceNameLabelName]
 	switch utils.PVCRole(roleName) {
@@ -81,13 +81,13 @@ type pgTablespaceCalculator struct {
 	tablespaceName string
 }
 
-// NewPgDataCalculator returns a Calculator for a PVC of PG_DATA type
-func NewPgDataCalculator() Calculator {
+// NewPgDataCalculator returns a ExpectedObjectCalculator for a PVC of PG_DATA type
+func NewPgDataCalculator() ExpectedObjectCalculator {
 	return pgDataCalculator{}
 }
 
-// NewPgWalCalculator returns a Calculator for a PVC of PG_WAL type
-func NewPgWalCalculator() Calculator {
+// NewPgWalCalculator returns a ExpectedObjectCalculator for a PVC of PG_WAL type
+func NewPgWalCalculator() ExpectedObjectCalculator {
 	return pgWalCalculator{}
 }
 
@@ -95,8 +95,8 @@ func newTablespaceMetaCalculator() Meta {
 	return pgTablespaceCalculator{}
 }
 
-// NewPgTablespaceCalculator returns a Calculator for a PVC of PG_TABLESPACE type
-func NewPgTablespaceCalculator(tbsName string) Calculator {
+// NewPgTablespaceCalculator returns a ExpectedObjectCalculator for a PVC of PG_TABLESPACE type
+func NewPgTablespaceCalculator(tbsName string) ExpectedObjectCalculator {
 	return pgTablespaceCalculator{tablespaceName: tbsName}
 }
 
