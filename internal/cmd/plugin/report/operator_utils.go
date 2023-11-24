@@ -88,13 +88,25 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 	return &mWebhookConfig, &vWebhookConfig, nil
 }
 
-func getWebhookService(ctx context.Context, config v1.WebhookClientConfig) (corev1.Service, error) {
-	var webhookService corev1.Service
+func getWebhookService(
+	ctx context.Context,
+	mutatingWebhookList *v1.MutatingWebhookConfigurationList,
+) (corev1.Service, error) {
+	if len(mutatingWebhookList.Items) == 0 ||
+		len(mutatingWebhookList.Items[0].Webhooks) == 0 {
+		return corev1.Service{}, nil
+	}
 
+	config := mutatingWebhookList.Items[0].Webhooks[0].ClientConfig
+	if config.Service == nil {
+		return corev1.Service{}, nil
+	}
 	objKey := types.NamespacedName{
 		Name:      config.Service.Name,
 		Namespace: config.Service.Namespace,
 	}
+
+	var webhookService corev1.Service
 	err := plugin.Client.Get(ctx, objKey, &webhookService)
 
 	return webhookService, err
