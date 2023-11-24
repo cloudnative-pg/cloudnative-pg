@@ -228,3 +228,11 @@ process, please refer to it.
    `templates` folder in the helm chart.
 4. Proceed with the release process as described in the `RELEASE.md`
    file in the `charts` repository.
+
+## Versions in the bug issue template
+
+Once the release is completed, make sure that both the CloudNativePG versions
+and the Kubernetes ones are aligned with the supported release page.
+
+Open the `.github/ISSUE_TEMPLATES/bug.yml` file and update it accordingly.
+
