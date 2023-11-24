@@ -126,7 +126,7 @@ type BackupSnapshotElementStatus struct {
 
 	// TablespaceName is the name of the snapshotted tablespace. Only set
 	// when type is PG_TABLESPACE
-	TablespaceName string `json:"tablespaceName"`
+	TablespaceName string `json:"tablespaceName,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
@@ -320,8 +320,9 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volu
 	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
 	for idx, volumeSnapshot := range snapshots {
 		snapshotNames[idx] = BackupSnapshotElementStatus{
-			Name: volumeSnapshot.Name,
-			Type: volumeSnapshot.Annotations[utils.PvcRoleLabelName],
+			Name:           volumeSnapshot.Name,
+			Type:           volumeSnapshot.Annotations[utils.PvcRoleLabelName],
+			TablespaceName: volumeSnapshot.Labels[utils.TablespaceNameLabelName],
 		}
 	}
 	snapshotStatus.Elements = snapshotNames

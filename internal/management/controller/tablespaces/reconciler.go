@@ -50,7 +50,7 @@ func (r *TablespaceReconciler) Reconcile(
 		return reconcile.Result{}, err
 	}
 	if !isPrimary {
-		contextLogger.Info("skipping the Tablespace reconciler in replicas")
+		contextLogger.Debug("skipping the tablespace reconciler in replicas")
 		return reconcile.Result{}, nil
 	}
 

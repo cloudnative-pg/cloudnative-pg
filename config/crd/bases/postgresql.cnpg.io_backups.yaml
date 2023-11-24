@@ -370,7 +370,6 @@ spec:
                           type: string
                       required:
                       - name
-                      - tablespaceName
                       - type
                       type: object
                     type: array
