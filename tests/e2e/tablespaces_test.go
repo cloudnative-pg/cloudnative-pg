@@ -612,20 +612,26 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 	clusterName := cluster.ObjectMeta.Name
 	By("checking the expected tablespaces are in the database", func() {
 		Eventually(func(g Gomega) {
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			instances, err := env.GetClusterPodList(namespace, clusterName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			tbsListing, stdErr, err := env.ExecQueryInInstancePod(
-				testUtils.PodLocator{
-					Namespace: namespace,
-					PodName:   primary.Name,
-				}, testUtils.DatabaseName("app"),
-				"SELECT spcname FROM pg_tablespace;",
-			)
-			g.Expect(stdErr).To(BeEmpty())
-			g.Expect(err).ShouldNot(HaveOccurred())
-			for tbsName := range cluster.Spec.Tablespaces {
-				g.Expect(tbsListing).To(ContainSubstring(tbsName))
+			var tbsListing string
+			for _, instance := range instances.Items {
+				var stdErr string
+				var err error
+				tbsListing, stdErr, err = env.ExecQueryInInstancePod(
+					testUtils.PodLocator{
+						Namespace: namespace,
+						PodName:   instance.Name,
+					}, testUtils.DatabaseName("app"),
+					"SELECT oid, spcname FROM pg_tablespace;",
+				)
+				g.Expect(stdErr).To(BeEmpty())
+				g.Expect(err).ShouldNot(HaveOccurred())
+				for tbsName := range cluster.Spec.Tablespaces {
+					g.Expect(tbsListing).To(ContainSubstring(tbsName))
+				}
 			}
+			GinkgoWriter.Printf("Tablespaces in DB:\n%s\n", tbsListing)
 		}, timeout).Should(Succeed())
 	})
 }
@@ -719,18 +725,23 @@ func latestBaseBackupContainsExpectedTars(
 	numBackups int,
 	expectedTars int,
 ) {
-	Eventually(func() (int, error) {
+	Eventually(func(g Gomega) {
 		// we list the backup.info files to get the listing of base backups
 		// directories in minio
 		backupInfoFiles := filepath.Join("*", clusterName, "base", "*", "*.info")
 		ls, err := testUtils.ListFilesOnMinio(namespace, minioClientName, backupInfoFiles)
-		Expect(err).ShouldNot(HaveOccurred())
+		g.Expect(err).ShouldNot(HaveOccurred())
 		frags := strings.Split(ls, "\n")
 		slices.Sort(frags)
-		Expect(frags).To(HaveLen(numBackups))
+		report := fmt.Sprintf("directories:\n%s\n", strings.Join(frags, "\n"))
+		g.Expect(frags).To(HaveLen(numBackups), report)
 		latestBaseBackup := filepath.Dir(frags[numBackups-1])
 		tarsInLastBackup := strings.TrimPrefix(filepath.Join(latestBaseBackup, "*.tar"), "minio/")
+		listing, err := testUtils.ListFilesOnMinio(namespace, minioClientName, tarsInLastBackup)
+		g.Expect(err).ShouldNot(HaveOccurred())
+		report = report + fmt.Sprintf("tar listing:\n%s\n", listing)
 		numTars, err := testUtils.CountFilesOnMinio(namespace, minioClientName, tarsInLastBackup)
-		return numTars, err
-	}, 120).Should(Equal(expectedTars))
+		g.Expect(err).ShouldNot(HaveOccurred())
+		g.Expect(numTars).To(Equal(expectedTars), report)
+	}, 120).Should(Succeed())
 }
