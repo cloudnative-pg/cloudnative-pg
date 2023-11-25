@@ -739,7 +739,7 @@ func latestBaseBackupContainsExpectedTars(
 		tarsInLastBackup := strings.TrimPrefix(filepath.Join(latestBaseBackup, "*.tar"), "minio/")
 		listing, err := testUtils.ListFilesOnMinio(namespace, minioClientName, tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
-		report = report + fmt.Sprintf("tar listing:\n%s\n", listing)
+		report += fmt.Sprintf("tar listing:\n%s\n", listing)
 		numTars, err := testUtils.CountFilesOnMinio(namespace, minioClientName, tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(numTars).To(Equal(expectedTars), report)
