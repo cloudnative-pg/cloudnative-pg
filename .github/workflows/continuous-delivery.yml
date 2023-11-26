@@ -551,8 +551,6 @@ jobs:
       LOG_DIR: ${{ github.workspace }}/kind-logs/
       REGISTRY_MIRROR: https://mirror.gcr.io
       TEST_CLOUD_VENDOR: "local"
-      TESTING_LICENSE: ""
-      E2E_ENABLE_REDWOOD: false
     steps:
       -
         name: Cleanup Disk
@@ -638,18 +636,22 @@ jobs:
         # generate E2E test summary in the follow-up job 'summarize-e2e-tests'
         name: Create individual artifact for each E2E test
         if: (always() && !cancelled())
+        env:
+          RUNNER: "local"
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
-          echo '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           python .github/generate-test-artifacts.py \
             -o testartifacts-${{ env.MATRIX }} \
             -f tests/e2e/out/report.json \
-            -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+            --environment=true
           if [ -f tests/e2e/out/upgrade_report.json ]; then
             python .github/generate-test-artifacts.py \
               -o testartifacts-${{ env.MATRIX }} \
               -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+              --environment=true
           fi
       -
         name: Archive test artifacts
@@ -779,9 +781,6 @@ jobs:
 
       AZURE_STORAGE_ACCOUNT: ${{ needs.e2e-aks-setup.outputs.azure_storage_account }}
       # AZURE_STORAGE_KEY: this one is gathered during a subsequent step
-
-      E2E_ENABLE_REDWOOD: "false"
-      TESTING_LICENSE: ""
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -943,18 +942,22 @@ jobs:
         # generate E2E test summary in the follow-up job 'summarize-e2e-tests'
         name: Create individual artifact for each E2E test
         if: (always() && !cancelled())
+        env:
+          RUNNER: "aks"
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
-          echo '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           python .github/generate-test-artifacts.py \
             -o testartifacts-${{ env.MATRIX }} \
             -f tests/e2e/out/report.json \
-            -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+            --environment=true
           if [ -f tests/e2e/out/upgrade_report.json ]; then
             python .github/generate-test-artifacts.py \
               -o testartifacts-${{ env.MATRIX }} \
               -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "redwood": "${{env.E2E_ENABLE_REDWOOD}}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+              --environment=true
           fi
       -
         name: Archive test artifacts
@@ -1128,8 +1131,6 @@ jobs:
       AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES }}
       TEST_CLOUD_VENDOR: "eks"
 
-      E2E_ENABLE_REDWOOD: "false"
-      TESTING_LICENSE: ""
     steps:
       -
         name: Set cluster name
@@ -1321,18 +1322,22 @@ jobs:
         # generate E2E test summary in the follow-up job 'summarize-e2e-tests'
         name: Create individual artifact for each E2E test
         if: (always() && !cancelled())
+        env:
+          RUNNER: "eks"
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
-          echo '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           python .github/generate-test-artifacts.py \
             -o testartifacts-${{ env.MATRIX }} \
             -f tests/e2e/out/report.json \
-            -m '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+            --environment=true
           if [ -f tests/e2e/out/upgrade_report.json ]; then
             python .github/generate-test-artifacts.py \
               -o testartifacts-${{ env.MATRIX }} \
               -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+              --environment=true
           fi
       -
         name: Archive test artifacts
@@ -1512,8 +1517,6 @@ jobs:
       ZONE: europe-west3-a
       TEST_CLOUD_VENDOR: "gke"
 
-      E2E_ENABLE_REDWOOD: "false"
-      TESTING_LICENSE: ""
     steps:
       -
         name: Checkout code
@@ -1637,18 +1640,22 @@ jobs:
         # generate E2E test summary in the follow-up job 'summarize-e2e-tests'
         name: Create individual artifact for each E2E test
         if: (always() && !cancelled())
+        env:
+          RUNNER: "gke"
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
         run: |
           set +x
-          echo '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
           python .github/generate-test-artifacts.py \
             -o testartifacts-${{ env.MATRIX }} \
             -f tests/e2e/out/report.json \
-            -m '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+            --environment=true
           if [ -f tests/e2e/out/upgrade_report.json ]; then
             python .github/generate-test-artifacts.py \
               -o testartifacts-${{ env.MATRIX }} \
               -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "postgres_kind": "${{env.POSTGRES_KIND}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{env.BRANCH_NAME}}", "refname": "${{needs.evaluate_options.outputs.git_ref}}" }'
+              --environment=true
           fi
       -
         name: Archive test artifacts

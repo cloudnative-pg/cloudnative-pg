@@ -35,7 +35,48 @@ def flatten(arr):
     return out
 
 
-def convert_ginkgo_test(t, matrix):
+def env_to_json():
+    """Convert a set of environment varialbes into a valid JSON with the following
+    format:
+     {
+        "runner": , # eg. local, aks
+        "id": , # the matrix ID eg. local-v1.22.2-PostgreSQL-13.5
+        "postgres": , # version of PostgreSQL eg. 13.5
+        "kubernetes": , # version of K8s eg. v1.22.2
+        "runid": , # the GH Action run-id -> ${{ github.run_id }}
+        "branch": , # dev/xxxx-1666 -> you get this with "${{github.head_ref}}" ... EXCEPT
+        "refname": , # it may be blank, and then we want: "${{github.ref_name}}"
+        "repo": , # cloudnative-pg/cloudnative-pg -> you get this from GH with ${{github.repository}}
+    }
+    """
+
+    runner = os.getenv("RUNNER")
+    postgres = os.getenv("POSTGRES_VERSION")
+    postgres_kind = os.getenv("POSTGRES_KIND")
+    kubernetes_version = os.getenv("K8S_VERSION")
+    runid = os.getenv("RUN_ID")
+    id = os.getenv("MATRIX")
+    repo = os.getenv("REPOSITORY")
+    branch = os.getenv("BRANCH_NAME")
+    refname = os.getenv("GIT_REF")
+
+    matrix = f"""
+    {{
+    "runner": "{runner}",
+    "postgres": "{postgres}",
+    "postgres_kind": "{postgres_kind}",
+    "kubernetes": "{kubernetes_version}",
+    "runid": "{runid}",
+    "id": "{id}",
+    "repo": "{repo}",
+    "branch": "{branch}",
+    "refname": "{refname}"
+    }}
+    """
+    return matrix
+
+
+def convert_ginkgo_test(test, matrix):
     """converts a test spec in ginkgo JSON format into a normalized JSON object.
     The matrix arg will be passed from the GH Actions, and is expected to be
     a JSON of the form:
@@ -51,20 +92,20 @@ def convert_ginkgo_test(t, matrix):
     }
     """
     err = ""
-    errFile = ""
-    errLine = 0
-    if "Failure" in t:
-        err = t["Failure"]["Message"]
-        errFile = t["Failure"]["Location"]["FileName"]
-        errLine = t["Failure"]["Location"]["LineNumber"]
+    err_file = ""
+    err_line = 0
+    if "Failure" in test:
+        err = test["Failure"]["Message"]
+        err_file = test["Failure"]["Location"]["FileName"]
+        err_line = test["Failure"]["Location"]["LineNumber"]
 
-    state = t["State"]
+    state = test["State"]
     # if the test failed but it had an Ignore label, mark it as ignoreFailed
     # so it doesn't count as FAILED but we can still see how much it's failing
     if (
         state == "failed"
         and "ContainerHierarchyLabels" in t
-        and "ignore-fails" in flatten(t["ContainerHierarchyLabels"])
+        and "ignore-fails" in flatten(test["ContainerHierarchyLabels"])
     ):
         state = "ignoreFailed"
 
@@ -72,16 +113,18 @@ def convert_ginkgo_test(t, matrix):
     if branch == "":
         branch = matrix["refname"]
 
-    x = {
-        "name": " - ".join(t["ContainerHierarchyTexts"]) + " -- " + t["LeafNodeText"],
+    ginkgo_format = {
+        "name": " - ".join(test["ContainerHierarchyTexts"])
+        + " -- "
+        + test["LeafNodeText"],
         "state": state,
-        "start_time": t["StartTime"],
-        "end_time": t[
+        "start_time": test["StartTime"],
+        "end_time": test[
             "EndTime"
         ],  # NOTE: Grafana will need a default timestamp field. This is a good candidate
         "error": err,
-        "error_file": errFile,
-        "error_line": errLine,
+        "error_file": err_file,
+        "error_line": err_line,
         "platform": matrix["runner"],
         "postgres_kind": matrix["postgres_kind"],
         "matrix_id": matrix["id"],
@@ -91,10 +134,10 @@ def convert_ginkgo_test(t, matrix):
         "repo": matrix["repo"],
         "branch": branch,
     }
-    return x
+    return ginkgo_format
 
 
-def write_artifact(artifact, matrix):
+def write_artifact(artifact, artifact_dir, matrix):
     """writes an artifact to local storage as a JSON file
 
     The computed filename will be used as the ID to introduce the payload into
@@ -110,10 +153,13 @@ def write_artifact(artifact, matrix):
     slug = whitespace.sub("_", artifact["name"])
     h = hashlib.sha224(slug.encode("utf-8")).hexdigest()
     filename = matrix["id"] + "_" + h + ".json"
-    if dir != "":
-        filename = dir + "/" + filename
-    with open(filename, "w") as f:
-        f.write(json.dumps(artifact))
+    if artifact_dir != "":
+        filename = artifact_dir + "/" + filename
+    try:
+        with open(filename, "w") as f:
+            f.write(json.dumps(artifact))
+    except (FileNotFoundError, PermissionError) as e:
+        print(f"Error: {e}")
 
 
 def create_artifact(matrix, name, state, error):
@@ -146,7 +192,6 @@ def create_artifact(matrix, name, state, error):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
         description="Create JSON artifacts from E2E JSON report"
     )
@@ -166,20 +211,28 @@ if __name__ == "__main__":
     parser.add_argument(
         "-m", "--matrix", type=str, help="the matrix with GH execution variables"
     )
+    parser.add_argument(
+        "-e",
+        "--environment",
+        type=bool,
+        help="tell the script to use environment variable sto get the GH execution variables",
+    )
 
     args = parser.parse_args()
 
     print("test matrix: ")
-    print(args.matrix)
-    if args.matrix:
+    if args.environment:
+        matrix = json.loads(env_to_json())
+    elif args.matrix:
         matrix = json.loads(args.matrix)
+    print(matrix)
 
-    dir = ""
+    outputDir = ""
     if args.outdir:
-        dir = args.outdir
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-            print("Directory ", dir, " Created ")
+        outputDir = args.outdir
+        if not os.path.exists(outputDir):
+            os.makedirs(outputDir)
+            print("Directory ", outputDir, " Created ")
 
     # If the ginkgo report file is not found, produce a "failed" artifact
     if not os.path.exists(args.file):
@@ -193,7 +246,7 @@ if __name__ == "__main__":
             "failed",
             "ginkgo Report Not Found: " + args.file,
         )
-        write_artifact(artifact, matrix)
+        write_artifact(artifact, outputDir, matrix)
         exit(0)
 
     # MAIN LOOP: go over each `SpecReport` in the Ginkgo JSON output, convert
@@ -204,10 +257,10 @@ if __name__ == "__main__":
             for t in testResults[0]["SpecReports"]:
                 if (t["State"] != "skipped") and (t["LeafNodeText"] != ""):
                     test1 = convert_ginkgo_test(t, matrix)
-                    write_artifact(test1, matrix)
+                    write_artifact(test1, outputDir, matrix)
     except Exception as e:
         # Reflect any unexpected failure in an artifact
         artifact = create_artifact(
             matrix, "Generate artifacts from Ginkgo report", "failed", f"{e}"
         )
-        write_artifact(artifact, matrix)
+        write_artifact(artifact, outputDir, matrix)
