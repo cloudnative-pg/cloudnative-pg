@@ -626,64 +626,6 @@ type ManagedRoles struct {
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
-type BackupTimeByMethod map[BackupMethod]metav1.Time
-
-type BackupTimes struct {
-	BackupTimeByMethod `json:",omitempty"`
-}
-
-func (backupTime BackupTimes) set(backupMethod BackupMethod, value *time.Time) {
-	if value != nil {
-		if backupTime.BackupTimeByMethod == nil {
-			backupTime.BackupTimeByMethod = make(map[BackupMethod]metav1.Time)
-		}
-		backupTime.BackupTimeByMethod[backupMethod] = metav1.NewTime(*value)
-	} else {
-		delete(backupTime.BackupTimeByMethod, backupMethod)
-	}
-}
-
-func (backupTime BackupTimes) getComparer() func(metav1.Time, metav1.Time) bool {
-	panic("must be overridden")
-}
-
-func (backupTime BackupTimes) tryGetFirstRFC3339Time() string {
-	compare := backupTime.getComparer()
-
-	var first metav1.Time
-	for _, ts := range backupTime.BackupTimeByMethod {
-		if first.IsZero() || compare(ts, first) {
-			first = ts
-		}
-	}
-	result := ""
-	if !first.IsZero() {
-		result = first.Format(time.RFC3339)
-	}
-
-	return result
-}
-
-type FirstRecoverabilityPoint struct {
-	BackupTimes `json:",omitempty"`
-}
-
-func (f FirstRecoverabilityPoint) getComparer() func(metav1.Time, metav1.Time) bool {
-	return func(a metav1.Time, b metav1.Time) bool {
-		return a.Before(&b)
-	}
-}
-
-type LastSuccessfulBackup struct {
-	BackupTimes `json:",omitempty"`
-}
-
-func (l LastSuccessfulBackup) getComparer() func(metav1.Time, metav1.Time) bool {
-	return func(a metav1.Time, b metav1.Time) bool {
-		return b.Before(&a)
-	}
-}
-
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -797,7 +739,7 @@ type ClusterStatus struct {
 
 	// The first recoverability point, stored as a date in RFC3339 format, per backup method type
 	// +optional
-	FirstRecoverabilityPointByMethod FirstRecoverabilityPoint `json:"firstRecoverabilityPointByMethod,omitempty"`
+	FirstRecoverabilityPointByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityPointByMethod,omitempty"`
 
 	// Last successful backup, stored as a date in RFC3339 format
 	// +optional
@@ -806,7 +748,7 @@ type ClusterStatus struct {
 	// Last successful backup, stored as a date in RFC3339 format, per backup method type
 	// This field is calculated from the content of LastSuccessfulBackupByMethod
 	// +optional
-	LastSuccessfulBackupByMethod LastSuccessfulBackup `json:"lastSuccessfulBackupByMethod,omitempty"`
+	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
 
 	// Stored as a date in RFC3339 format
 	// +optional
@@ -3066,11 +3008,52 @@ func (cluster *Cluster) UpdateBackupTimes(
 	firstRecoverabilityPoint *time.Time,
 	lastSuccessfulBackup *time.Time,
 ) {
-	cluster.Status.FirstRecoverabilityPointByMethod.set(backupMethod, firstRecoverabilityPoint)
-	cluster.Status.FirstRecoverabilityPoint = cluster.Status.FirstRecoverabilityPointByMethod.tryGetFirstRFC3339Time()
+	type comparer func(a metav1.Time, b metav1.Time) bool
+	tryGetFirstRFC3339Time := func(m map[BackupMethod]metav1.Time, comparer comparer) string {
+		var first metav1.Time
+		for _, ts := range m {
+			if first.IsZero() || comparer(ts, first) {
+				first = ts
+			}
+		}
+		result := ""
+		if !first.IsZero() {
+			result = first.Format(time.RFC3339)
+		}
 
-	cluster.Status.LastSuccessfulBackupByMethod.set(backupMethod, lastSuccessfulBackup)
-	cluster.Status.LastSuccessfulBackup = cluster.Status.LastSuccessfulBackupByMethod.tryGetFirstRFC3339Time()
+		return result
+	}
+
+	calculateMap := func(origMap map[BackupMethod]metav1.Time, value *time.Time) map[BackupMethod]metav1.Time {
+		tempMap := origMap
+		if tempMap == nil {
+			tempMap = make(map[BackupMethod]metav1.Time)
+		}
+		if value != nil {
+			tempMap[backupMethod] = metav1.NewTime(*value)
+			return tempMap
+		}
+
+		delete(tempMap, backupMethod)
+		return tempMap
+	}
+
+	cluster.Status.FirstRecoverabilityPointByMethod = calculateMap(cluster.Status.FirstRecoverabilityPointByMethod,
+		firstRecoverabilityPoint)
+
+	cluster.Status.FirstRecoverabilityPoint = tryGetFirstRFC3339Time(
+		cluster.Status.FirstRecoverabilityPointByMethod,
+		func(a metav1.Time, b metav1.Time) bool {
+			return a.Before(&b)
+		})
+
+	cluster.Status.LastSuccessfulBackupByMethod = calculateMap(cluster.Status.LastSuccessfulBackupByMethod,
+		lastSuccessfulBackup)
+	cluster.Status.LastSuccessfulBackup = tryGetFirstRFC3339Time(
+		cluster.Status.LastSuccessfulBackupByMethod,
+		func(a metav1.Time, b metav1.Time) bool {
+			return b.Before(&a)
+		})
 }
 
 // BuildPostgresOptions create the list of options that
