@@ -309,7 +309,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.Short])
 		})
 
-		It("can create the volume snapshot backup use declare way and verify the backup", func() {
+		It("can create the volume snapshot backup declaratively and verify the backup", func() {
 			backupName, err = env.GetResourceNameFromYAML(clusterVolumesnapshoBackupManifest)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -338,7 +338,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			})
 		})
 
-		It("can create the volume snapshot backup use plugin way and verify the backup", func() {
+		It("can create the volume snapshot backup using the plugin and verify the backup", func() {
 			backupName = clusterName + utils.GetCurrentTimestampWithFormat("20060102150405")
 			By("creating a volumeSnapshot and waiting until it's completed", func() {
 				err := testUtils.CreateOnDemandBackupViaKubectlPlugin(
