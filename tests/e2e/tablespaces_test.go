@@ -39,7 +39,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage, tests.LabelBasic), func() {
+var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
+	tests.LabelStorage,
+	tests.LabelBasic,
+	tests.LabelSnapshot,
+	tests.LabelBackupRestore), func() {
 	const (
 		level           = tests.Medium
 		namespacePrefix = "tablespaces"
@@ -271,6 +275,112 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke, tests.LabelStorage
 			})
 		})
 	})
+
+	Context("on a new cluster with tablespaces and volumesnapshot support", Ordered, func() {
+		var backupName string
+		var err error
+		var backupObject *apiv1.Backup
+		const (
+			clusterManifest = fixturesDir +
+				"/tablespaces/cluster-volume-snapshot-tablespaces.yaml.template"
+			clusterVolumesnapshoBackupManifest = fixturesDir +
+				"/tablespaces/cluster-volume-snapshot-backup.yaml.template"
+		)
+
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
+		BeforeAll(func() {
+			// Create a cluster in a namespace we'll delete after the test
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				return env.DeleteNamespace(namespace)
+			})
+
+			clusterSetup(clusterManifest)
+		})
+
+		It("can verify tablespaces and PVC were created", func() {
+			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[testUtils.Short])
+			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.Short])
+			AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.Short])
+		})
+
+		It("can create the volume snapshot backup use declare way and verify the backup", func() {
+			backupName, err = env.GetResourceNameFromYAML(clusterVolumesnapshoBackupManifest)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("creating backup %s and verifying backup is ready", backupName), func() {
+				backupObject = testUtils.ExecuteBackup(
+					namespace,
+					clusterVolumesnapshoBackupManifest,
+					false,
+					testTimeouts[testUtils.VolumeSnapshotIsReady],
+					env,
+				)
+				AssertBackupConditionInClusterStatus(namespace, clusterName)
+			})
+
+			By("checking that volumeSnapshots are properly labeled", func() {
+				Eventually(func(g Gomega) {
+					for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
+						volumeSnapshot, err := env.GetVolumeSnapshot(namespace, snapshot.Name)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
+						g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
+						g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+					}
+				}).Should(Succeed())
+				Expect(len(backupObject.Status.BackupSnapshotStatus.Elements)).To(BeIdenticalTo(4))
+			})
+		})
+
+		It("can create the volume snapshot backup use plugin way and verify the backup", func() {
+			backupName = clusterName + utils.GetCurrentTimestampWithFormat("20060102150405")
+			By("creating a volumeSnapshot and waiting until it's completed", func() {
+				err := testUtils.CreateOnDemandBackupViaKubectlPlugin(
+					namespace,
+					clusterName,
+					backupName,
+					apiv1.BackupTargetStandby,
+					apiv1.BackupMethodVolumeSnapshot,
+				)
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(func(g Gomega) {
+					backupList, err := env.GetBackupList(namespace)
+					g.Expect(err).ToNot(HaveOccurred())
+					for _, backup := range backupList.Items {
+						backup := backup
+						if backup.Name != backupName {
+							continue
+						}
+						backupObject = &backup
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
+						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(4))
+					}
+				}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
+			})
+
+			By("checking that volumeSnapshots are properly labeled", func() {
+				Eventually(func(g Gomega) {
+					for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
+						volumeSnapshot, err := env.GetVolumeSnapshot(namespace, snapshot.Name)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
+						g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
+						g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+					}
+				}).Should(Succeed())
+			})
+		})
+	})
+
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
