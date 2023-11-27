@@ -34,7 +34,6 @@ spec:
   <- snipped ->
 
   tablespaces:
-  tablespaces:
     atablespace:
       storage:
         size: 1Gi
