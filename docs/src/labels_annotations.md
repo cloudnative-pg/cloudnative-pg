@@ -49,7 +49,7 @@ These predefined labels are managed by CloudNativePG.
 :   Role of the job (that is, `import`, `initdb`, `join`, ...)
 
 `cnpg.io/podRole`
-:   Currently fixed to `instance` to identify a pod running PostgreSQL
+:   Role of the pod: `instance`, or `pooler`
 
 `cnpg.io/poolerName`
 :   Name of the PgBouncer pooler
