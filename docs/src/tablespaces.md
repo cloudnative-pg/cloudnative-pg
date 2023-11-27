@@ -1,7 +1,6 @@
 # Declarative Tablespaces
 
-<!-- TODO: content needs to be added ahead of merging to main -->
-With *declarative tablespaces*, CloudNativePG brings support for
+With *declarative tablespaces*, CloudNativePG offers support for
 [PostgreSQL tablespaces](https://www.postgresql.org/docs/current/manage-ag-tablespaces.html).
 
 Quoting from the PostgreSQL documentation on Tablespaces:
@@ -20,8 +19,8 @@ tablespaces are implemented leveraging Persistent Volume Claims (and Persistent
 Volumes).
 Each tablespace defined in the cluster is housed in its own persistent volume.
 CloudNativePG takes care of generating the PVCs, mounting the required volumes
-in the instance Pods, and ensuring replicas are ready to support tablespaces
-before activating them in the primary.
+in the instance Pods in normalized locations, and ensuring replicas are ready
+to support tablespaces before activating them in the primary.
 
 Using declarative tablespaces is easy. You can find a full example in
 [`cluster-example-with-tablespaces.yaml`](samples/cluster-example-with-tablespaces.yaml).
@@ -69,7 +68,7 @@ app=# select oid, spcname from pg_tablespace;
 (5 rows)
 ```
 
-And you can start using them right away:
+You can start using them right away:
 
 ``` txt
 app=# create table fibonacci(num int) tablespace another_tablespace;
@@ -93,7 +92,7 @@ status:
 
 Tablespaces, coupled with PostgreSQL's
 [declarative partitioning](https://www.postgresql.org/docs/14/ddl-partitioning.html),
-can be
+can help horizontally scale storage or relieve i/o contention.
 The PostgreSQL documentation contains an example of this usage.
 
 ``` sql
@@ -101,3 +100,5 @@ CREATE TABLE measurement_y2007m12 PARTITION OF measurement
     FOR VALUES FROM ('2007-12-01') TO ('2008-01-01')
     TABLESPACE fasttablespace;
 ```
+
+## TODO -- we still need to write the recovery part
