@@ -18,7 +18,6 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -627,6 +626,64 @@ type ManagedRoles struct {
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
+type BackupTimeByMethod map[BackupMethod]metav1.Time
+
+type BackupTimes struct {
+	BackupTimeByMethod `json:",omitempty"`
+}
+
+func (backupTime BackupTimes) set(backupMethod BackupMethod, value *time.Time) {
+	if value != nil {
+		if backupTime.BackupTimeByMethod == nil {
+			backupTime.BackupTimeByMethod = make(map[BackupMethod]metav1.Time)
+		}
+		backupTime.BackupTimeByMethod[backupMethod] = metav1.NewTime(*value)
+	} else {
+		delete(backupTime.BackupTimeByMethod, backupMethod)
+	}
+}
+
+func (backupTime BackupTimes) getComparer() func(metav1.Time, metav1.Time) bool {
+	panic("must be overridden")
+}
+
+func (backupTime BackupTimes) tryGetFirstRFC3339Time() string {
+	compare := backupTime.getComparer()
+
+	var first metav1.Time
+	for _, ts := range backupTime.BackupTimeByMethod {
+		if first.IsZero() || compare(ts, first) {
+			first = ts
+		}
+	}
+	result := ""
+	if !first.IsZero() {
+		result = first.Format(time.RFC3339)
+	}
+
+	return result
+}
+
+type FirstRecoverabilityPoint struct {
+	BackupTimes `json:",omitempty"`
+}
+
+func (f FirstRecoverabilityPoint) getComparer() func(metav1.Time, metav1.Time) bool {
+	return func(a metav1.Time, b metav1.Time) bool {
+		return a.Before(&b)
+	}
+}
+
+type LastSuccessfulBackup struct {
+	BackupTimes `json:",omitempty"`
+}
+
+func (l LastSuccessfulBackup) getComparer() func(metav1.Time, metav1.Time) bool {
+	return func(a metav1.Time, b metav1.Time) bool {
+		return b.Before(&a)
+	}
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -740,7 +797,7 @@ type ClusterStatus struct {
 
 	// The first recoverability point, stored as a date in RFC3339 format, per backup method type
 	// +optional
-	FirstRecoverabilityPointByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityPointByMethod,omitempty"`
+	FirstRecoverabilityPointByMethod FirstRecoverabilityPoint `json:"firstRecoverabilityPointByMethod,omitempty"`
 
 	// Last successful backup, stored as a date in RFC3339 format
 	// +optional
@@ -749,7 +806,7 @@ type ClusterStatus struct {
 	// Last successful backup, stored as a date in RFC3339 format, per backup method type
 	// This field is calculated from the content of LastSuccessfulBackupByMethod
 	// +optional
-	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
+	LastSuccessfulBackupByMethod LastSuccessfulBackup `json:"lastSuccessfulBackupByMethod,omitempty"`
 
 	// Stored as a date in RFC3339 format
 	// +optional
@@ -795,45 +852,6 @@ type ClusterStatus struct {
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
 	// +optional
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
-}
-
-// MarshalJSON implements json.Marshaler interface and is
-// used to render the two virtual fields FirstRecoverabilityPoint and LastSuccessfulBackup
-func (cs ClusterStatus) MarshalJSON() ([]byte, error) {
-	cs.calculateFields()
-
-	// Encode without calling MarshalJSON again
-	type ClusterStatusAlias ClusterStatus
-	return json.Marshal(&struct {
-		*ClusterStatusAlias
-	}{
-		ClusterStatusAlias: (*ClusterStatusAlias)(&cs),
-	})
-}
-
-func (cs *ClusterStatus) calculateFields() {
-	var first metav1.Time
-	for _, ts := range cs.FirstRecoverabilityPointByMethod {
-		if first.IsZero() || ts.Before(&first) {
-			first = ts
-		}
-	}
-	cs.FirstRecoverabilityPoint = ""
-	if !first.IsZero() {
-		cs.FirstRecoverabilityPoint = first.Format(time.RFC3339)
-	}
-
-	var last metav1.Time
-	for _, ts := range cs.LastSuccessfulBackupByMethod {
-		ts := ts
-		if last.IsZero() || last.Before(&ts) {
-			last = ts
-		}
-	}
-	cs.LastSuccessfulBackup = ""
-	if !last.IsZero() {
-		cs.LastSuccessfulBackup = last.Format(time.RFC3339)
-	}
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -3048,25 +3066,11 @@ func (cluster *Cluster) UpdateBackupTimes(
 	firstRecoverabilityPoint *time.Time,
 	lastSuccessfulBackup *time.Time,
 ) {
-	if firstRecoverabilityPoint != nil {
-		if cluster.Status.FirstRecoverabilityPointByMethod == nil {
-			cluster.Status.FirstRecoverabilityPointByMethod = make(map[BackupMethod]metav1.Time)
-		}
-		cluster.Status.FirstRecoverabilityPointByMethod[backupMethod] = metav1.NewTime(*firstRecoverabilityPoint)
-	} else {
-		delete(cluster.Status.FirstRecoverabilityPointByMethod, backupMethod)
-	}
+	cluster.Status.FirstRecoverabilityPointByMethod.set(backupMethod, firstRecoverabilityPoint)
+	cluster.Status.FirstRecoverabilityPoint = cluster.Status.FirstRecoverabilityPointByMethod.tryGetFirstRFC3339Time()
 
-	if lastSuccessfulBackup != nil {
-		if cluster.Status.LastSuccessfulBackupByMethod == nil {
-			cluster.Status.LastSuccessfulBackupByMethod = make(map[BackupMethod]metav1.Time)
-		}
-		cluster.Status.LastSuccessfulBackupByMethod[backupMethod] = metav1.NewTime(*lastSuccessfulBackup)
-	} else {
-		delete(cluster.Status.LastSuccessfulBackupByMethod, backupMethod)
-	}
-
-	cluster.Status.calculateFields()
+	cluster.Status.LastSuccessfulBackupByMethod.set(backupMethod, lastSuccessfulBackup)
+	cluster.Status.LastSuccessfulBackup = cluster.Status.LastSuccessfulBackupByMethod.tryGetFirstRFC3339Time()
 }
 
 // BuildPostgresOptions create the list of options that

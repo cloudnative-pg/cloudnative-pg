@@ -347,23 +347,31 @@ var _ = Describe("update snapshot backup metadata", func() {
 		Expect(updatedCluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
 		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod).
 			ToNot(HaveKey(apiv1.BackupMethodBarmanObjectStore))
-		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodVolumeSnapshot]).
+		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod.BackupTimeByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(twoHoursAgo))
 		Expect(updatedCluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
 		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod).
 			ToNot(HaveKey(apiv1.BackupMethodBarmanObjectStore))
-		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
+		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod.BackupTimeByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(oneHourAgo))
 	})
 
 	It("should consider other methods when update the metadata", func(ctx context.Context) {
 		cluster.Status.FirstRecoverabilityPoint = threeHoursAgo.Format(time.RFC3339)
-		cluster.Status.FirstRecoverabilityPointByMethod = map[apiv1.BackupMethod]metav1.Time{
-			apiv1.BackupMethodBarmanObjectStore: threeHoursAgo,
+		cluster.Status.FirstRecoverabilityPointByMethod = apiv1.FirstRecoverabilityPoint{
+			BackupTimes: apiv1.BackupTimes{
+				BackupTimeByMethod: map[apiv1.BackupMethod]metav1.Time{
+					apiv1.BackupMethodBarmanObjectStore: threeHoursAgo,
+				},
+			},
 		}
 		cluster.Status.LastSuccessfulBackup = now.Format(time.RFC3339)
-		cluster.Status.LastSuccessfulBackupByMethod = map[apiv1.BackupMethod]metav1.Time{
-			apiv1.BackupMethodBarmanObjectStore: now,
+		cluster.Status.LastSuccessfulBackupByMethod = apiv1.LastSuccessfulBackup{
+			BackupTimes: apiv1.BackupTimes{
+				BackupTimeByMethod: map[apiv1.BackupMethod]metav1.Time{
+					apiv1.BackupMethodBarmanObjectStore: now,
+				},
+			},
 		}
 		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster).
@@ -380,27 +388,35 @@ var _ = Describe("update snapshot backup metadata", func() {
 		}, &updatedCluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedCluster.Status.FirstRecoverabilityPoint).To(Equal(threeHoursAgo.Format(time.RFC3339)))
-		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
+		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod.BackupTimeByMethod[apiv1.BackupMethodBarmanObjectStore]).
 			To(Equal(threeHoursAgo))
-		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodVolumeSnapshot]).
+		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod.BackupTimeByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(twoHoursAgo))
 		Expect(updatedCluster.Status.LastSuccessfulBackup).To(Equal(now.Format(time.RFC3339)))
-		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
+		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod.BackupTimeByMethod[apiv1.BackupMethodBarmanObjectStore]).
 			To(Equal(now))
-		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
+		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod.BackupTimeByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(oneHourAgo))
 	})
 
 	It("should override other method metadata when appropriate", func(ctx context.Context) {
 		cluster.Status.FirstRecoverabilityPoint = oneHourAgo.Format(time.RFC3339)
-		cluster.Status.FirstRecoverabilityPointByMethod = map[apiv1.BackupMethod]metav1.Time{
-			apiv1.BackupMethodBarmanObjectStore: oneHourAgo,
-			apiv1.BackupMethodVolumeSnapshot:    now,
+		cluster.Status.FirstRecoverabilityPointByMethod = apiv1.FirstRecoverabilityPoint{
+			BackupTimes: apiv1.BackupTimes{
+				BackupTimeByMethod: map[apiv1.BackupMethod]metav1.Time{
+					apiv1.BackupMethodBarmanObjectStore: oneHourAgo,
+					apiv1.BackupMethodVolumeSnapshot:    now,
+				},
+			},
 		}
 		cluster.Status.LastSuccessfulBackup = oneHourAgo.Format(time.RFC3339)
-		cluster.Status.LastSuccessfulBackupByMethod = map[apiv1.BackupMethod]metav1.Time{
-			apiv1.BackupMethodBarmanObjectStore: twoHoursAgo,
-			apiv1.BackupMethodVolumeSnapshot:    threeHoursAgo,
+		cluster.Status.LastSuccessfulBackupByMethod = apiv1.LastSuccessfulBackup{
+			BackupTimes: apiv1.BackupTimes{
+				BackupTimeByMethod: map[apiv1.BackupMethod]metav1.Time{
+					apiv1.BackupMethodBarmanObjectStore: twoHoursAgo,
+					apiv1.BackupMethodVolumeSnapshot:    threeHoursAgo,
+				},
+			},
 		}
 		fakeClient := fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster).
@@ -417,14 +433,14 @@ var _ = Describe("update snapshot backup metadata", func() {
 		}, &updatedCluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedCluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
-		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
+		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod.BackupTimeByMethod[apiv1.BackupMethodBarmanObjectStore]).
 			To(Equal(oneHourAgo))
-		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodVolumeSnapshot]).
+		Expect(updatedCluster.Status.FirstRecoverabilityPointByMethod.BackupTimeByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(twoHoursAgo))
 		Expect(updatedCluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
-		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
+		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod.BackupTimeByMethod[apiv1.BackupMethodBarmanObjectStore]).
 			To(Equal(twoHoursAgo))
-		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
+		Expect(updatedCluster.Status.LastSuccessfulBackupByMethod.BackupTimeByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(oneHourAgo))
 	})
 })
