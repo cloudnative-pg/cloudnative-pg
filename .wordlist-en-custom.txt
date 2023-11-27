@@ -223,7 +223,6 @@ Noland
 O'Reilly
 OLTP
 OOM
-OpenSSL
 OU
 ObjectMeta
 OngoingBackupStatus
@@ -232,6 +231,7 @@ OngoingSnapshotBackups
 OnlineConfiguration
 OnlineUpdateEnabled
 OnlineUpgrading
+OpenSSL
 OpenShift
 Openshift
 OperatorGroup
