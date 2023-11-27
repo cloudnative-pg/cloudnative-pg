@@ -121,8 +121,12 @@ type BackupSnapshotElementStatus struct {
 	// Name is the snapshot resource name
 	Name string `json:"name"`
 
-	// Type is tho role of the snapshot in the cluster, such as PG_DATA and PG_WAL
+	// Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL and PG_TABLESPACE
 	Type string `json:"type"`
+
+	// TablespaceName is the name of the snapshotted tablespace. Only set
+	// when type is PG_TABLESPACE
+	TablespaceName string `json:"tablespaceName,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
@@ -316,8 +320,9 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volu
 	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
 	for idx, volumeSnapshot := range snapshots {
 		snapshotNames[idx] = BackupSnapshotElementStatus{
-			Name: volumeSnapshot.Name,
-			Type: volumeSnapshot.Annotations[utils.PvcRoleLabelName],
+			Name:           volumeSnapshot.Name,
+			Type:           volumeSnapshot.Annotations[utils.PvcRoleLabelName],
+			TablespaceName: volumeSnapshot.Labels[utils.TablespaceNameLabelName],
 		}
 	}
 	snapshotStatus.Elements = snapshotNames
