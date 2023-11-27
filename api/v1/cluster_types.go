@@ -3024,30 +3024,29 @@ func (cluster *Cluster) UpdateBackupTimes(
 		return result
 	}
 
-	calculateMap := func(origMap map[BackupMethod]metav1.Time, value *time.Time) map[BackupMethod]metav1.Time {
-		tempMap := origMap
-		if tempMap == nil {
-			tempMap = make(map[BackupMethod]metav1.Time)
-		}
-		if value != nil {
-			tempMap[backupMethod] = metav1.NewTime(*value)
-			return tempMap
+	setTime := func(backupTimes map[BackupMethod]metav1.Time, value *time.Time) map[BackupMethod]metav1.Time {
+		if value == nil {
+			delete(backupTimes, backupMethod)
+			return backupTimes
 		}
 
-		delete(tempMap, backupMethod)
-		return tempMap
+		if backupTimes == nil {
+			backupTimes = make(map[BackupMethod]metav1.Time)
+		}
+
+		backupTimes[backupMethod] = metav1.NewTime(*value)
+		return backupTimes
 	}
 
-	cluster.Status.FirstRecoverabilityPointByMethod = calculateMap(cluster.Status.FirstRecoverabilityPointByMethod,
+	cluster.Status.FirstRecoverabilityPointByMethod = setTime(cluster.Status.FirstRecoverabilityPointByMethod,
 		firstRecoverabilityPoint)
-
 	cluster.Status.FirstRecoverabilityPoint = tryGetFirstRFC3339Time(
 		cluster.Status.FirstRecoverabilityPointByMethod,
 		func(a metav1.Time, b metav1.Time) bool {
 			return a.Before(&b)
 		})
 
-	cluster.Status.LastSuccessfulBackupByMethod = calculateMap(cluster.Status.LastSuccessfulBackupByMethod,
+	cluster.Status.LastSuccessfulBackupByMethod = setTime(cluster.Status.LastSuccessfulBackupByMethod,
 		lastSuccessfulBackup)
 	cluster.Status.LastSuccessfulBackup = tryGetFirstRFC3339Time(
 		cluster.Status.LastSuccessfulBackupByMethod,
