@@ -431,7 +431,15 @@ the selected PostgreSQL instance</p>
 <i>string</i>
 </td>
 <td>
-   <p>Type is tho role of the snapshot in the cluster, such as PG_DATA and PG_WAL</p>
+   <p>Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL and PG_TABLESPACE</p>
+</td>
+</tr>
+<tr><td><code>tablespaceName</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>TablespaceName is the name of the snapshotted tablespace. Only set
+when type is PG_TABLESPACE</p>
 </td>
 </tr>
 </tbody>
@@ -1695,6 +1703,13 @@ sources to the pods to be used by Env</p>
 Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
+<tr><td><code>tablespaces</code><br/>
+<a href="#postgresql-cnpg-io-v1-TablespaceConfiguration"><i>map[string]TablespaceConfiguration</i></a>
+</td>
+<td>
+   <p>The tablespaces configuration</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -1745,6 +1760,13 @@ Defaults to: <code>RuntimeDefault</code></p>
 </td>
 <td>
    <p>ManagedRolesStatus reports the state of the managed roles in the cluster</p>
+</td>
+</tr>
+<tr><td><code>tablespacesStatus</code><br/>
+<a href="#postgresql-cnpg-io-v1-TablespacesState"><i>TablespacesState</i></a>
+</td>
+<td>
+   <p>TablespaceStatus reports the state of the declarative tablespaces in the cluster</p>
 </td>
 </tr>
 <tr><td><code>timelineID</code><br/>
@@ -2158,6 +2180,13 @@ PostgreSQL cluster from an existing storage</p>
 </td>
 <td>
    <p>Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)</p>
+</td>
+</tr>
+<tr><td><code>tablespaceStorage</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#typedlocalobjectreference-v1-core"><i>map[string]core/v1.TypedLocalObjectReference</i></a>
+</td>
+<td>
+   <p>Configuration of the storage for PostgreSQL tablespaces</p>
 </td>
 </tr>
 </tbody>
@@ -4265,8 +4294,11 @@ This specifies which owner the processed resources should relate to.</p>
 
 - [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
 
+- [TablespaceConfiguration](#postgresql-cnpg-io-v1-TablespaceConfiguration)
 
-<p>StorageConfiguration is the configuration of the storage of the PostgreSQL instances</p>
+
+<p>StorageConfiguration is the configuration used to create and reconcile PVCs,
+usable for WAL volumes, PGDATA volumes, or tablespaces</p>
 
 
 <table class="table">
@@ -4276,9 +4308,9 @@ This specifies which owner the processed resources should relate to.</p>
 <i>string</i>
 </td>
 <td>
-   <p>StorageClass to use for database data (<code>PGDATA</code>). Applied after
+   <p>StorageClass to use for PVCs. Applied after
 evaluating the PVC template, if available.
-If not specified, generated PVCs will be satisfied by the
+If not specified, the generated PVCs will use the
 default storage class</p>
 </td>
 </tr>
@@ -4337,6 +4369,55 @@ if all the labels values match.</p>
 </td>
 <td>
    <p>This flag enables the constraints for sync replicas</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## TablespaceConfiguration     {#postgresql-cnpg-io-v1-TablespaceConfiguration}
+
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>TablespaceConfiguration is the configuration of a tablespace, and includes
+the storage specification for the tablespace</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>storage</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-StorageConfiguration"><i>StorageConfiguration</i></a>
+</td>
+<td>
+   <p>The storage configuration for the tablespace</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## TablespacesState     {#postgresql-cnpg-io-v1-TablespacesState}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>TablespacesState tracks the status of a cluster's declarative tablespaces</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>byStatus</code><br/>
+<i>map[TablespaceStatus][]string</i>
+</td>
+<td>
+   <p>ByStatus gives the list of tablespaces in each state</p>
 </td>
 </tr>
 </tbody>
@@ -4426,6 +4507,14 @@ It is the default class for the other types if no specific class is present</p>
 </td>
 <td>
    <p>WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.</p>
+</td>
+</tr>
+<tr><td><code>tablespaceClassName</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>TablespaceClassName specifies the Snapshot Class to be used for the tablespaces.
+defaults to the PGDATA Snapshot Class, if set</p>
 </td>
 </tr>
 <tr><td><code>snapshotOwnerReference</code><br/>
