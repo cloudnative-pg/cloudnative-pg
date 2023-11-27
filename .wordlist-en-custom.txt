@@ -373,7 +373,13 @@ TCP
 TLS
 TOC
 TODO
+TablespaceClassName
+TablespaceConfiguration
 TablespaceMapFile
+TablespaceName
+TablespaceStatus
+Tablespaces
+TablespacesState
 TemporaryData
 TimelineId
 TopologyKey
@@ -1082,8 +1088,12 @@ systemd
 sysv
 tAc
 tablespace
+tablespaceClassName
 tablespaceMapFile
+tablespaceName
+tablespaceStorage
 tablespaces
+tablespacesStatus
 targetImmediate
 targetLSN
 targetName

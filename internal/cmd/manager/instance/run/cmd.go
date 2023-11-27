@@ -40,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
@@ -248,6 +249,13 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	}
 	if err = mgr.Add(localSrv); err != nil {
 		setupLog.Error(err, "unable to add local webserver runnable")
+		return err
+	}
+
+	setupLog.Info("starting tablespace manager")
+	if err := tablespaces.NewTablespaceReconciler(instance, mgr.GetClient()).
+		SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create tablespace reconciler")
 		return err
 	}
 

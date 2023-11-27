@@ -155,6 +155,19 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.canBeInPlace).To(BeFalse())
 	})
 
+	It("checkPodSpecIsOutdated should not return any error", func(ctx SpecContext) {
+		pod := specs.PodWithExistingStorage(cluster, 1)
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			PendingRestart: true,
+		}
+		rollout, err := checkPodSpecIsOutdated(status, &cluster)
+		Expect(rollout.required).To(BeFalse())
+		Expect(rollout.canBeInPlace).To(BeFalse())
+		Expect(rollout.reason).To(BeEmpty())
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	It("checks when a rollout is needed for any reason", func(ctx SpecContext) {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		status := postgres.PostgresqlStatus{

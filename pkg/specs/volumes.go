@@ -18,6 +18,9 @@ package specs
 
 import (
 	"fmt"
+	"path"
+	"sort"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -25,11 +28,65 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
-// PgWalVolumePath its the path used by the WAL volume when present
+// PgWalVolumePath is the path used by the WAL volume when present
 const PgWalVolumePath = "/var/lib/postgresql/wal"
 
-// PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
+// PgWalVolumePgWalPath is the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
+
+// PgTablespaceVolumePath is the base path used by tablespace when present
+const PgTablespaceVolumePath = "/var/lib/postgresql/tablespaces"
+
+// MountForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func MountForTablespace(tablespaceName string) string {
+	return path.Join(PgTablespaceVolumePath, tablespaceName)
+}
+
+// LocationForTablespace returns the data location for tablespace on a cluster pod
+func LocationForTablespace(tablespaceName string) string {
+	return path.Join(MountForTablespace(tablespaceName), "data")
+}
+
+// convertPostgresIDToK8sName returns a postgres identifier without the characters
+// that are illegal in K8s names and domains. (Lowercase RFC 1123)
+func convertPostgresIDToK8sName(tablespaceName string) string {
+	name := convertPostgresIDToK8s(tablespaceName)
+	name = strings.ReplaceAll(name, "_", "-") // reversible
+	name = strings.ToLower(name)              // irreversible
+	return name
+}
+
+// convertPostgresIDToK8s transforms a postgres identifier to be a valid K8s
+// label.
+//
+// NOTE: this is a reversible transformation, as we swap invalid K8s chars into invalid PG chars
+func convertPostgresIDToK8s(tablespaceName string) string {
+	// Postgres identifiers can begin with _ or a letter, K8's must begin
+	// with an alphanumeric. We convert _ to 1 in this edge case
+	if strings.HasPrefix(tablespaceName, "_") {
+		tablespaceName = strings.Replace(tablespaceName, "_", "1", 1)
+	}
+	name := strings.ReplaceAll(tablespaceName, "$", "-")
+	return name
+}
+
+// PvcNameForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func PvcNameForTablespace(podName, tablespaceName string) string {
+	return podName + apiv1.TablespaceVolumeInfix + convertPostgresIDToK8sName(tablespaceName)
+}
+
+// VolumeMountNameForTablespace returns the normalized tablespace volume name for a given
+// tablespace, on a cluster pod
+func VolumeMountNameForTablespace(tablespaceName string) string {
+	return convertPostgresIDToK8sName(tablespaceName)
+}
+
+// SnapshotBackupNameForTablespace returns the volume snapshot backup name for the tablespace
+func SnapshotBackupNameForTablespace(backupName, tablespaceName string) string {
+	return backupName + apiv1.TablespaceVolumeInfix + convertPostgresIDToK8sName(tablespaceName)
+}
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
@@ -96,6 +153,25 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 					},
 				},
 			})
+	}
+
+	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
+	// later it will be  retrieved to do deepEquals
+	if cluster.ContainsTablespaces() {
+		// Try to get a fix order of name
+		tbsNames := getSortedTablespaceList(cluster)
+		for i := range tbsNames {
+			result = append(result,
+				corev1.Volume{
+					Name: VolumeMountNameForTablespace(tbsNames[i]),
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: PvcNameForTablespace(podName, tbsNames[i]),
+						},
+					},
+				},
+			)
+		}
 	}
 
 	if cluster.ShouldCreateProjectedVolume() {
@@ -221,7 +297,32 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		)
 	}
 
+	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
+	// later it will be  retrieved to do deepEquals
+	if cluster.ContainsTablespaces() {
+		tbsNames := getSortedTablespaceList(cluster)
+		for i := range tbsNames {
+			volumeMounts = append(volumeMounts,
+				corev1.VolumeMount{
+					Name:      VolumeMountNameForTablespace(tbsNames[i]),
+					MountPath: MountForTablespace(tbsNames[i]),
+				},
+			)
+		}
+	}
 	return volumeMounts
+}
+
+func getSortedTablespaceList(cluster apiv1.Cluster) []string {
+	// Try to get a fix order of name
+	tbsNames := make([]string, len(cluster.Spec.Tablespaces))
+	i := 0
+	for name := range cluster.Spec.Tablespaces {
+		tbsNames[i] = name
+		i++
+	}
+	sort.Strings(tbsNames)
+	return tbsNames
 }
 
 func createProjectedVolume(cluster apiv1.Cluster) corev1.Volume {

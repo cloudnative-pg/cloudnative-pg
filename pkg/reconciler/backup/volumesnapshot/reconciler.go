@@ -36,6 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -430,22 +431,13 @@ func (se *Reconciler) createSnapshot(
 	targetPod *corev1.Pod,
 	pvc *corev1.PersistentVolumeClaim,
 ) error {
-	role := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
-	name, err := getSnapshotName(backup.Name, role)
+	pvcCalculator, err := persistentvolumeclaim.GetExpectedObjectCalculator(pvc.GetLabels())
 	if err != nil {
 		return err
 	}
 
 	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
-	var snapshotClassName *string
-	if role == utils.PVCRolePgWal && snapshotConfig.WalClassName != "" {
-		snapshotClassName = &snapshotConfig.WalClassName
-	}
-
-	// this is the default value if nothing else was assigned
-	if snapshotClassName == nil && snapshotConfig.ClassName != "" {
-		snapshotClassName = &snapshotConfig.ClassName
-	}
+	snapshotClassName := pvcCalculator.GetVolumeSnapshotClass(&snapshotConfig)
 
 	if pvc.Annotations == nil {
 		pvc.Annotations = map[string]string{}
@@ -462,7 +454,7 @@ func (se *Reconciler) createSnapshot(
 
 	snapshot := storagesnapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
+			Name:        pvcCalculator.GetSnapshotName(backup.Name),
 			Namespace:   pvc.Namespace,
 			Labels:      labels,
 			Annotations: annotations,
@@ -589,16 +581,4 @@ func (se *Reconciler) waitSnapshotToBeReady(
 	}
 
 	return nil, nil
-}
-
-// getSnapshotName gets the snapshot name for a certain PVC
-func getSnapshotName(backupName string, role utils.PVCRole) (string, error) {
-	switch role {
-	case utils.PVCRolePgData, "":
-		return backupName, nil
-	case utils.PVCRolePgWal:
-		return fmt.Sprintf("%s-wal", backupName), nil
-	default:
-		return "", fmt.Errorf("unhandled PVCRole type: %s", role)
-	}
 }
