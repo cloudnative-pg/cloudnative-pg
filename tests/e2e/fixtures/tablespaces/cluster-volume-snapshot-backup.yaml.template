@@ -1,0 +1,8 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: cluster-tablespaces-volume-snapshot-backup
+spec:
+  method: volumeSnapshot
+  cluster:
+    name: cluster-tablespaces-volume-snapshot
