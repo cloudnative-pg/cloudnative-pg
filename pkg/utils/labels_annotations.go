@@ -40,6 +40,9 @@ const (
 	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
 	PvcRoleLabelName = MetadataNamespace + "/pvcRole"
 
+	// TablespaceNameLabelName is the name of the label containing tablespace name that a pvc holds
+	TablespaceNameLabelName = "cnpg.io/tablespaceName"
+
 	// PodRoleLabelName is the name of the label containing the podRole value
 	PodRoleLabelName = MetadataNamespace + "/podRole"
 
@@ -216,10 +219,12 @@ const (
 type PVCRole string
 
 const (
-	// PVCRolePgData is a PVC used for storing PG_DATA
+	// PVCRolePgData the label value for the data PVC role
 	PVCRolePgData PVCRole = "PG_DATA"
-	// PVCRolePgWal is a PVC used for storing PG_WAL
+	// PVCRolePgWal the label value for the wal PVC role
 	PVCRolePgWal PVCRole = "PG_WAL"
+	// PVCRolePgTablespace the label value for the tablespace PVC role
+	PVCRolePgTablespace PVCRole = "PG_TABLESPACE"
 )
 
 // LabelClusterName labels the object with the cluster name

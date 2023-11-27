@@ -2603,6 +2603,24 @@ func AssertPostgresNoPendingRestart(namespace, clusterName string, cmdTimeout ti
 	})
 }
 
+func AssertBackupConditionTimestampChangedInClusterStatus(
+	namespace,
+	clusterName string,
+	clusterConditionType apiv1.ClusterConditionType,
+	lastTransactionTimeStamp *v1.Time,
+) {
+	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
+		Eventually(func() (bool, error) {
+			getBackupCondition, err := testsUtils.GetConditionsInClusterStatus(
+				namespace, clusterName, env, clusterConditionType)
+			if err != nil {
+				return false, err
+			}
+			return getBackupCondition.LastTransitionTime.After(lastTransactionTimeStamp.Time), nil
+		}, 300, 5).Should(BeTrue())
+	})
+}
+
 func AssertBackupConditionInClusterStatus(namespace, clusterName string) {
 	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
 		Eventually(func() (string, error) {
