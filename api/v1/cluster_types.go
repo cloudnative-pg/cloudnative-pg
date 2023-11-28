@@ -742,11 +742,11 @@ type ClusterStatus struct {
 	FirstRecoverabilityPointByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityPointByMethod,omitempty"`
 
 	// Last successful backup, stored as a date in RFC3339 format
+	// This field is calculated from the content of LastSuccessfulBackupByMethod
 	// +optional
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
 
 	// Last successful backup, stored as a date in RFC3339 format, per backup method type
-	// This field is calculated from the content of LastSuccessfulBackupByMethod
 	// +optional
 	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
 
@@ -3002,23 +3002,26 @@ func (backupConfiguration *BackupConfiguration) IsBarmanEndpointCASet() bool {
 }
 
 // UpdateBackupTimes sets the firstRecoverabilityPoint and lastSuccessfulBackup
-// for the provided method.
+// for the provided method, as well as the overall firstRecoverabilityPoint and
+// lastSuccessfulBackup for the cluster
 func (cluster *Cluster) UpdateBackupTimes(
 	backupMethod BackupMethod,
 	firstRecoverabilityPoint *time.Time,
 	lastSuccessfulBackup *time.Time,
 ) {
 	type comparer func(a metav1.Time, b metav1.Time) bool
-	tryGetFirstRFC3339Time := func(m map[BackupMethod]metav1.Time, comparer comparer) string {
-		var first metav1.Time
+	// tryGetMaxTime gets either the newest or oldest time from a set of backup times,
+	// depending on the comparer argument passed to it
+	tryGetMaxTime := func(m map[BackupMethod]metav1.Time, compare comparer) string {
+		var maximum metav1.Time
 		for _, ts := range m {
-			if first.IsZero() || comparer(ts, first) {
-				first = ts
+			if maximum.IsZero() || compare(ts, maximum) {
+				maximum = ts
 			}
 		}
 		result := ""
-		if !first.IsZero() {
-			result = first.Format(time.RFC3339)
+		if !maximum.IsZero() {
+			result = maximum.Format(time.RFC3339)
 		}
 
 		return result
@@ -3040,16 +3043,18 @@ func (cluster *Cluster) UpdateBackupTimes(
 
 	cluster.Status.FirstRecoverabilityPointByMethod = setTime(cluster.Status.FirstRecoverabilityPointByMethod,
 		firstRecoverabilityPoint)
-	cluster.Status.FirstRecoverabilityPoint = tryGetFirstRFC3339Time(
+	cluster.Status.FirstRecoverabilityPoint = tryGetMaxTime(
 		cluster.Status.FirstRecoverabilityPointByMethod,
+		// we pass a comparer to get the first among the recoverability points
 		func(a metav1.Time, b metav1.Time) bool {
 			return a.Before(&b)
 		})
 
 	cluster.Status.LastSuccessfulBackupByMethod = setTime(cluster.Status.LastSuccessfulBackupByMethod,
 		lastSuccessfulBackup)
-	cluster.Status.LastSuccessfulBackup = tryGetFirstRFC3339Time(
+	cluster.Status.LastSuccessfulBackup = tryGetMaxTime(
 		cluster.Status.LastSuccessfulBackupByMethod,
+		// we pass a comparer to get the last among the last backup times per method
 		func(a metav1.Time, b metav1.Time) bool {
 			return b.Before(&a)
 		})

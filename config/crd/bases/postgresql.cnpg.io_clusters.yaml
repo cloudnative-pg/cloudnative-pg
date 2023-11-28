@@ -3970,14 +3970,14 @@ spec:
                 type: string
               lastSuccessfulBackup:
                 description: Last successful backup, stored as a date in RFC3339 format
+                  This field is calculated from the content of LastSuccessfulBackupByMethod
                 type: string
               lastSuccessfulBackupByMethod:
                 additionalProperties:
                   format: date-time
                   type: string
                 description: Last successful backup, stored as a date in RFC3339 format,
-                  per backup method type This field is calculated from the content
-                  of LastSuccessfulBackupByMethod
+                  per backup method type
                 type: object
               latestGeneratedNode:
                 description: ID of the latest generated node (used to avoid node name

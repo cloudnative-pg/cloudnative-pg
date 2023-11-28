@@ -427,7 +427,8 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	}
 }
 
-// updateClusterStatusWithBackupTimes returns true if it changes the backup times in Status
+// updateClusterStatusWithBackupTimes updates the last successful backup time and first
+// recoverability point for the cluster
 func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) {
 	firstRecoverabilityPoint := backupList.FirstRecoverabilityPoint()
 	var lastSuccessfulBackup *time.Time
