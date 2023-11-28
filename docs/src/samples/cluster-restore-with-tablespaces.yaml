@@ -1,0 +1,28 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore-with-tablespaces
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      backup:
+        name: cluster-example-with-tablespaces-20231128093940
+
+  tablespaces:
+    atablespace:
+      storage:
+        size: 1Gi
+        storageClass: standard
+    another_tablespace:
+      storage:
+        size: 2Gi
+        storageClass: standard
+    tablespacea1:
+      storage:
+        size: 2Gi
+        storageClass: standard
