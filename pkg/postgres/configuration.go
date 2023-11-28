@@ -341,13 +341,10 @@ var (
 		"ssl":                                    fixedConfigurationParameter,
 		"ssl_ca_file":                            fixedConfigurationParameter,
 		"ssl_cert_file":                          fixedConfigurationParameter,
-		"ssl_ciphers":                            fixedConfigurationParameter,
 		"ssl_crl_file":                           fixedConfigurationParameter,
 		"ssl_dh_params_file":                     fixedConfigurationParameter,
 		"ssl_ecdh_curve":                         fixedConfigurationParameter,
 		"ssl_key_file":                           fixedConfigurationParameter,
-		"ssl_max_protocol_version":               fixedConfigurationParameter,
-		"ssl_min_protocol_version":               fixedConfigurationParameter,
 		"ssl_passphrase_command":                 fixedConfigurationParameter,
 		"ssl_passphrase_command_supports_reload": fixedConfigurationParameter,
 		"ssl_prefer_server_ciphers":              fixedConfigurationParameter,
@@ -393,6 +390,10 @@ var (
 			{130000, MajorVersionRangeUnlimited}: {
 				"wal_keep_size":      "512MB",
 				"shared_memory_type": "mmap",
+			},
+			{120000, MajorVersionRangeUnlimited}: {
+				"ssl_max_protocol_version": "TLSv1.3",
+				"ssl_min_protocol_version": "TLSv1.3",
 			},
 		},
 		MandatorySettings: SettingsCollection{
