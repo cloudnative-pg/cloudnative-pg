@@ -405,7 +405,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
 	}
 
-	if err := updateClusterWithSnapshotBackupsMetadata(ctx, r.Client, cluster.Namespace, cluster.Name); err != nil {
+	if err := updateClusterWithSnapshotsBackupTimes(ctx, r.Client, cluster.Namespace, cluster.Name); err != nil {
 		contextLogger.Error(err, "could not update cluster's backups metadata")
 	}
 
@@ -441,9 +441,9 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 	return targetPod, nil
 }
 
-// updateClusterWithSnapshotBackupsMetadata updates a cluster's FirstRecoverabilityPoint
+// updateClusterWithSnapshotsBackupTimes updates a cluster's FirstRecoverabilityPoint
 // and LastSuccessfulBackup based on the available snapshots
-func updateClusterWithSnapshotBackupsMetadata(
+func updateClusterWithSnapshotsBackupTimes(
 	ctx context.Context,
 	cli client.Client,
 	namespace string,
@@ -463,7 +463,7 @@ func updateClusterWithSnapshotBackupsMetadata(
 		return wrapErr("could not refresh cluster", err)
 	}
 
-	oldestSnapshot, newestSnapshot, err := volumesnapshot.GetSnapshotSnapshotBackupsMetadata(ctx, cli,
+	oldestSnapshot, newestSnapshot, err := volumesnapshot.GetSnapshotsBackupTimes(ctx, cli,
 		namespace, name)
 	if err != nil {
 		return wrapErr("could not get snapshots metadata", err)

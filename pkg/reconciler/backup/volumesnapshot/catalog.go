@@ -26,8 +26,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// GetSnapshotSnapshotBackupsMetadata gets the time of the oldest snapshot for the cluster
-func GetSnapshotSnapshotBackupsMetadata(
+// GetSnapshotsBackupTimes gets the time of the oldest and newest snapshots for the cluster
+func GetSnapshotsBackupTimes(
 	ctx context.Context,
 	cli client.Client,
 	namespace string,

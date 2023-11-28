@@ -335,7 +335,7 @@ var _ = Describe("update snapshot backup metadata", func() {
 			WithStatusSubresource(cluster).
 			WithLists(&snapshots).Build()
 
-		err := updateClusterWithSnapshotBackupsMetadata(ctx, fakeClient, cluster.Namespace, cluster.Name)
+		err := updateClusterWithSnapshotsBackupTimes(ctx, fakeClient, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 
 		var updatedCluster apiv1.Cluster
@@ -370,7 +370,7 @@ var _ = Describe("update snapshot backup metadata", func() {
 			WithStatusSubresource(cluster).
 			WithLists(&snapshots).Build()
 
-		err := updateClusterWithSnapshotBackupsMetadata(ctx, fakeClient, cluster.Namespace, cluster.Name)
+		err := updateClusterWithSnapshotsBackupTimes(ctx, fakeClient, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 
 		var updatedCluster apiv1.Cluster
@@ -407,7 +407,7 @@ var _ = Describe("update snapshot backup metadata", func() {
 			WithStatusSubresource(cluster).
 			WithLists(&snapshots).Build()
 
-		err := updateClusterWithSnapshotBackupsMetadata(ctx, fakeClient, cluster.Namespace, cluster.Name)
+		err := updateClusterWithSnapshotsBackupTimes(ctx, fakeClient, cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 
 		var updatedCluster apiv1.Cluster
