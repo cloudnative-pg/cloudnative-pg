@@ -153,7 +153,7 @@ var _ = Describe("update barman backup metadata", func() {
 	var barmanBackups *catalog.Catalog
 
 	var (
-		now           = metav1.Now().Rfc3339Copy()
+		now           = metav1.NewTime(time.Now().Local().Truncate(time.Second))
 		oneHourAgo    = metav1.NewTime(now.Add(-1 * time.Hour))
 		twoHoursAgo   = metav1.NewTime(now.Add(-2 * time.Hour))
 		threeHoursAgo = metav1.NewTime(now.Add(-3 * time.Hour))
