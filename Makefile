@@ -91,10 +91,9 @@ help: ## Display this help.
 ##@ Development
 
 ENVTEST_ASSETS_DIR=$$(pwd)/testbin
-test: generate fmt vet manifests ## Run tests.
+test: generate fmt vet manifests envtest ## Run tests.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
-	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest ;\
-	source <(setup-envtest use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
+	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
 	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils ;
@@ -331,7 +330,7 @@ kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
 
 .PHONY: operator-sdk
 operator-sdk: ## Install the operator-sdk app
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version | awk -F '"' '{print $$2}' 2>/dev/null), $(OPERATOR_SDK_VERSION))
+ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\

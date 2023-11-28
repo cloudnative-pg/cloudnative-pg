@@ -106,7 +106,7 @@ var _ = Describe("Get the logs", func() {
 	})
 
 	It("should fail if can't write a file", func() {
-		cl.outputFile = "/test-file.log"
+		cl.outputFile = "/this-does-not-exist/test-file.log"
 		err := saveClusterLogs(cl)
 		Expect(err).To(HaveOccurred())
 	})
