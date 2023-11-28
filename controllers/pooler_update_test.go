@@ -230,8 +230,9 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure the service doesn't exist", func() {
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler, cluster)
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
+			expectedSVC, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 
@@ -240,7 +241,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler, cluster)
+			expectedSVC, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -258,7 +260,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler, cluster)
+			expectedSVC, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -274,7 +277,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler, cluster)
+			expectedSVC, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(previousResourceVersion).ToNot(Equal(svc.ResourceVersion))
