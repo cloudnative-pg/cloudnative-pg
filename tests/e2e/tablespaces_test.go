@@ -235,7 +235,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				eventuallyHasExpectedNumberOfPVCs(6, namespace)
 			})
 
-			By("creating new backup and verifying backup is ready", func() {
+			By("creating a new backup and verifying backup is ready", func() {
 				backupCondition, err := testUtils.GetConditionsInClusterStatus(
 					namespace,
 					clusterName,
@@ -263,7 +263,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				latestBaseBackupContainsExpectedTars(clusterName, namespace, backups, 4)
 			})
 
-			By("verify backup status", func() {
+			By("verifying backup status", func() {
 				Eventually(func() (string, error) {
 					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
@@ -409,15 +409,19 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			})
 		})
 
-		It(fmt.Sprintf("can create the cluster by restoring from volume snapshot backup %v", backupName),
+		It(fmt.Sprintf("can create the cluster by restoring from a volume snapshot backup %v", backupName),
 			func() {
 				By("fetching the volume snapshots", func() {
 					snapshotList, err := getSnapshots(backupName, clusterName, namespace)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(len(backupObject.Status.BackupSnapshotStatus.Elements)))
 
-					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backupObject, snapshotDataEnv, snapshotWalEnv,
-						snapshotTbsEnv)
+					envVars := testUtils.EnvVarsForSnapshots{
+						DataSnapshot:             snapshotDataEnv,
+						WalSnapshot:              snapshotWalEnv,
+						TablespaceSnapshotPrefix: snapshotTbsEnv,
+					}
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backupObject, envVars)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -430,7 +434,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 						env)
 				})
 
-				By("can verify tablespaces and PVC were created", func() {
+				By("verifying that tablespaces and PVC were created", func() {
 					restoredCluster, err := env.GetCluster(namespace, clusterToRestoreName)
 					Expect(err).ToNot(HaveOccurred())
 					AssertClusterHasMountPointsAndVolumesForTablespaces(restoredCluster, 2,
@@ -474,8 +478,12 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(len(backupObject.Status.BackupSnapshotStatus.Elements)))
 
-					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backupObject, snapshotDataEnv, snapshotWalEnv,
-						snapshotTbsEnv)
+					envVars := testUtils.EnvVarsForSnapshots{
+						DataSnapshot:             snapshotDataEnv,
+						WalSnapshot:              snapshotWalEnv,
+						TablespaceSnapshotPrefix: snapshotTbsEnv,
+					}
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backupObject, envVars)
 					Expect(err).ToNot(HaveOccurred())
 				})
 

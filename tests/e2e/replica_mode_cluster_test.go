@@ -306,8 +306,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv,
-					"")
+				envVars := testUtils.EnvVarsForSnapshots{
+					DataSnapshot: snapshotDataEnv,
+					WalSnapshot:  snapshotWalEnv,
+				}
+				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
 				Expect(err).ToNot(HaveOccurred())
 			})
 

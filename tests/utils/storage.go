@@ -90,14 +90,20 @@ func ObjectMatchesAnnotations(
 	return true
 }
 
+// EnvVarsForSnapshots represents the environment variables to use to track snapshots
+// and apply them in test fixture templates
+type EnvVarsForSnapshots struct {
+	DataSnapshot             string
+	WalSnapshot              string
+	TablespaceSnapshotPrefix string
+}
+
 // SetSnapshotNameAsEnv sets the names of a PG_DATA, a PG_WAL and a list of PG_TABLESPACE snapshots from a
 // given snapshotList as env variables
 func SetSnapshotNameAsEnv(
 	snapshotList *volumesnapshot.VolumeSnapshotList,
 	backup *apiv1.Backup,
-	dataSnapshotName,
-	walSnapshotName,
-	tbsSnapshotNamePrefix string,
+	envVars EnvVarsForSnapshots,
 ) error {
 	if len(snapshotList.Items) != len(backup.Status.BackupSnapshotStatus.Elements) {
 		return fmt.Errorf("could not find the expected number of snapshots")
@@ -106,18 +112,18 @@ func SetSnapshotNameAsEnv(
 	for _, item := range snapshotList.Items {
 		switch utils.PVCRole(item.Annotations[utils.PvcRoleLabelName]) {
 		case utils.PVCRolePgData:
-			err := os.Setenv(dataSnapshotName, item.Name)
+			err := os.Setenv(envVars.DataSnapshot, item.Name)
 			if err != nil {
 				return err
 			}
 		case utils.PVCRolePgWal:
-			err := os.Setenv(walSnapshotName, item.Name)
+			err := os.Setenv(envVars.WalSnapshot, item.Name)
 			if err != nil {
 				return err
 			}
 		case utils.PVCRolePgTablespace:
 			tbsName := item.Labels[utils.TablespaceNameLabelName]
-			err := os.Setenv(tbsSnapshotNamePrefix+"_"+tbsName, item.Name)
+			err := os.Setenv(envVars.TablespaceSnapshotPrefix+"_"+tbsName, item.Name)
 			if err != nil {
 				return err
 			}
