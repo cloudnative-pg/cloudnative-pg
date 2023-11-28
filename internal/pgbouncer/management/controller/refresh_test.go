@@ -73,7 +73,7 @@ var _ = Describe("RefreshConfigurationFiles", func() {
 
 	Context("when given an invalid file path", func() {
 		BeforeEach(func() {
-			files["/dev/null"] = []byte("content")
+			files["/proc/you-cannot-write-here.conf"] = []byte("content")
 		})
 
 		It("should return an error", func() {
