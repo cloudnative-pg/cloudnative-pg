@@ -174,6 +174,10 @@ By default, the operator sets both [`ssl_min_protocol_version`](https://www.post
 and [`ssl_max_protocol_version`](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-SSL-MAX-PROTOCOL-VERSION)
 to `TLSv1.3`.
 
+!!! Important
+    In PostgreSQL 11 these two GUC doesn't exists hence, in these specific version
+    these values aren't set and will keep using the default ones.
+
 This assumes that the PostgreSQL operand images include an OpenSSL library that
 supports the `TLSv1.3` version.
 
