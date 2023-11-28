@@ -130,13 +130,15 @@ type PodTemplateSpec struct {
 	Spec corev1.PodSpec `json:"spec,omitempty"`
 }
 
+// ServiceTemplateSpec is a structure allowing the user to set
+// a template for Service generation.
 type ServiceTemplateSpec struct {
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	ObjectMeta metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Specification of the desired behavior of the pod.
+	// Specification of the desired behavior of the service.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec corev1.ServiceSpec `json:"spec,omitempty"`
