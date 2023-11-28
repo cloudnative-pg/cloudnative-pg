@@ -18,28 +18,48 @@ package pgbouncer
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
 // Service create the specification for the service of
 // pgbouncer
-func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) *corev1.Service {
+func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*corev1.Service, error) {
+	poolerHash, err := hash.ComputeVersionedHash(pooler.Spec, 3)
+	if err != nil {
+		return nil, err
+	}
+
 	serviceTemplate := servicespec.NewFrom(pooler.Spec.ServiceTemplate).
-		WithName(pooler.Name).
-		WithNamespace(pooler.Namespace).
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
-		WithServiceType(pooler.Spec.ServiceTemplate.Spec.Type).
-		WithPorts(pgBouncerConfig.PgBouncerPort).
-		WithSelector(pooler.Name).
+		WithServiceType(corev1.ServiceTypeClusterIP, false).
+		WithServicePort(&corev1.ServicePort{
+			Name:       "pgbouncer",
+			Port:       pgBouncerConfig.PgBouncerPort,
+			TargetPort: intstr.FromString("pgbouncer"),
+			Protocol:   corev1.ProtocolTCP,
+		}).
+		WithSelector(pooler.Name, true).
+		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
+		WithLabel(utils.ClusterLabelName, cluster.Name).
+		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
+		WithAnnotation(utils.PoolerSpecHashAnnotationName, poolerHash).
 		Build()
 
 	return &corev1.Service{
-		ObjectMeta: serviceTemplate.ObjectMeta,
-		Spec:       serviceTemplate.Spec,
-	}
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        pooler.Name,
+			Namespace:   pooler.Namespace,
+			Labels:      serviceTemplate.ObjectMeta.Labels,
+			Annotations: serviceTemplate.ObjectMeta.Annotations,
+		},
+		Spec: serviceTemplate.Spec,
+	}, nil
 }

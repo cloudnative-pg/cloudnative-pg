@@ -18,6 +18,7 @@ package servicespec
 
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -39,11 +40,48 @@ var _ = Describe("Service template builder", func() {
 	})
 
 	It("adds labels", func() {
-		Expect(New().WithLabel("test", "label").Build().ObjectMeta.Labels["label"]).
+		Expect(New().WithLabel("test", "label").Build().ObjectMeta.Labels["test"]).
 			To(Equal("label"))
 	})
 
 	It("sets service type", func() {
-		Expect(New().WithServiceType(corev1.ServiceTypeLoadBalancer).Build().Spec.Type).To(Equal(corev1.ServiceTypeLoadBalancer))
+		Expect(New().WithServiceType(corev1.ServiceTypeLoadBalancer, true).Build().Spec.Type).To(Equal(corev1.ServiceTypeLoadBalancer))
+	})
+
+	It("updates pgbouncer port", func() {
+		Expect(NewFrom(&apiv1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Name: "pgbouncer",
+						Port: 5432,
+					},
+				},
+			},
+		}).WithServicePort(&corev1.ServicePort{
+			Name: "pgbouncer",
+			Port: 9999,
+		}).Build().Spec.Ports[0].Port).To(Equal(int32(9999)))
+	})
+
+	It("adds pgbouncer port if not present", func() {
+		service := New().WithServicePort(&corev1.ServicePort{
+			Name: "pgbouncer",
+			Port: 9999,
+		}).Build()
+
+		Expect(service.Spec.Ports).To(HaveLen(1))
+		Expect(service.Spec.Ports[0].Name).To(Equal("pgbouncer"))
+		Expect(service.Spec.Ports[0].Port).To(Equal(int32(9999)))
+	})
+
+	It("overrides selector", func() {
+		Expect(NewFrom(&apiv1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					utils.PgbouncerNameLabel: "myservice",
+				},
+			},
+		}).WithSelector("otherservice", true).Build().Spec.Selector).To(Equal(map[string]string{utils.PgbouncerNameLabel: "otherservice"}))
 	})
 })

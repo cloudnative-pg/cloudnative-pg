@@ -19,7 +19,6 @@ package servicespec
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -69,42 +68,33 @@ func (builder *Builder) WithLabel(name, value string) *Builder {
 }
 
 // WithServiceType adds a service type to the current status
-func (builder *Builder) WithServiceType(serviceType corev1.ServiceType) *Builder {
-	builder.status.Spec.Type = serviceType
+func (builder *Builder) WithServiceType(serviceType corev1.ServiceType, overwrite bool) *Builder {
+	if overwrite {
+		builder.status.Spec.Type = serviceType
+	}
 	return builder
 }
 
-// WithPorts adds a port to the current status
-func (builder *Builder) WithPorts(port int) *Builder {
-	builder.status.Spec.Ports = []corev1.ServicePort{
-		{
-			Name:       "pgbouncer",
-			Protocol:   corev1.ProtocolTCP,
-			TargetPort: intstr.FromInt(port),
-			Port:       int32(port),
-		},
+// WithServicePort adds a port to the current status
+func (builder *Builder) WithServicePort(value *corev1.ServicePort) *Builder {
+	for idx, port := range builder.status.Spec.Ports {
+		if port.Name == value.Name {
+			builder.status.Spec.Ports[idx] = *value
+		}
 	}
+
+	builder.status.Spec.Ports = append(builder.status.Spec.Ports, *value)
 	return builder
 }
 
 // WithSelector adds a selector to the current status
-func (builder *Builder) WithSelector(name string) *Builder {
-	builder.status.Spec.Selector = map[string]string{
-		utils.PgbouncerNameLabel: name,
+func (builder *Builder) WithSelector(name string, overwrite bool) *Builder {
+	if overwrite {
+		builder.status.Spec.Selector = map[string]string{
+			utils.PgbouncerNameLabel: name,
+		}
 	}
 
-	return builder
-}
-
-// WithName adds a name to the current status
-func (builder *Builder) WithName(name string) *Builder {
-	builder.status.ObjectMeta.Name = name
-	return builder
-}
-
-// WithNamespace sets a namespace to the current status
-func (builder *Builder) WithNamespace(ns string) *Builder {
-	builder.status.ObjectMeta.Namespace = ns
 	return builder
 }
 
