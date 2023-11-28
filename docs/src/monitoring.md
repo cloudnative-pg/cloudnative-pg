@@ -582,7 +582,6 @@ cnpg_<MetricName>_<ColumnName>{<LabelColumnName>=<LabelColumnValue> ... } <Colum
 
 !!! Note
     `LabelColumnName` are metrics with `usage` set to `LABEL` and their `Value`.
-<!-- Looks like something was left out of this sentence? -->
 
 Considering the previous `pg_replication` example, the exporter's endpoint
 returns the following output when invoked:
