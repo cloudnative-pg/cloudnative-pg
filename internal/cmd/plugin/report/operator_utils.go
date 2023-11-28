@@ -18,13 +18,12 @@ package report
 
 import (
 	"context"
-
+	"fmt"
 	v1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 func getWebhooks(ctx context.Context, stopRedact bool) (
@@ -35,17 +34,6 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 		validatingWebhookConfigList v1.ValidatingWebhookConfigurationList
 		mWebhookConfig              v1.MutatingWebhookConfigurationList
 		vWebhookConfig              v1.ValidatingWebhookConfigurationList
-		mutatingWebhookNames        = []string{
-			"mbackup.cnpg.io",
-			"mcluster.cnpg.io",
-			"mscheduledbackup.cnpg.io",
-		}
-		validatingWebhookNames = []string{
-			"vbackup.cnpg.io",
-			"vcluster.cnpg.io",
-			"vpooler.cnpg.io",
-			"vscheduledbackup.cnpg.io",
-		}
 	)
 
 	if err := plugin.Client.List(ctx, &mutatingWebhookConfigList); err != nil {
@@ -54,7 +42,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 
 	for _, item := range mutatingWebhookConfigList.Items {
 		for _, webhook := range item.Webhooks {
-			if utils.StringInSlice(mutatingWebhookNames, webhook.Name) {
+			if webhook.Rules[0].APIGroups[0] == "postgresql.cnpg.io" {
 				mWebhookConfig.Items = append(mWebhookConfig.Items, item)
 			}
 		}
@@ -73,7 +61,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 
 	for _, item := range validatingWebhookConfigList.Items {
 		for _, webhook := range item.Webhooks {
-			if utils.StringInSlice(validatingWebhookNames, webhook.Name) {
+			if webhook.Rules[0].APIGroups[0] == "postgresql.cnpg.io" {
 				vWebhookConfig.Items = append(vWebhookConfig.Items, item)
 			}
 		}
@@ -85,6 +73,11 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 			}
 		}
 	}
+
+	if len(mWebhookConfig.Items) == 0 || len(vWebhookConfig.Items) == 0 {
+		return nil, nil, fmt.Errorf("can't find the webhooks related to the operator")
+	}
+
 	return &mWebhookConfig, &vWebhookConfig, nil
 }
 
