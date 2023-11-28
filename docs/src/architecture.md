@@ -31,7 +31,7 @@ shipping. These features have been used in production by millions of users aroun
 the world for over a decade.
 
 PostgreSQL supports both asynchronous and synchronous streaming replication
-over the network, as well as asynchronous file-based log shipping. (File-based log shipping isnormally
+over the network, as well as asynchronous file-based log shipping. (File-based log shipping is normally
 used as a fallback option, for example, to store WAL files in an object store.)
 Replicas are usually called *standby servers* and can also be used for
 read-only workloads, thanks to the *hot standby* feature.
