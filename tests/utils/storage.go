@@ -90,13 +90,14 @@ func ObjectMatchesAnnotations(
 	return true
 }
 
-// SetSnapshotNameAsEnv sets the names of a PG_DATA and a PG_WAL snapshots from a given snapshotList
-// as env variables
+// SetSnapshotNameAsEnv sets the names of a PG_DATA, a PG_WAL and a list of PG_TABLESPACE snapshots from a
+// given snapshotList as env variables
 func SetSnapshotNameAsEnv(
 	snapshotList *volumesnapshot.VolumeSnapshotList,
 	backup *apiv1.Backup,
 	dataSnapshotName,
-	walSnapshotName string,
+	walSnapshotName,
+	tbsSnapshotNamePrefix string,
 ) error {
 	if len(snapshotList.Items) != len(backup.Status.BackupSnapshotStatus.Elements) {
 		return fmt.Errorf("could not find the expected number of snapshots")
@@ -111,6 +112,12 @@ func SetSnapshotNameAsEnv(
 			}
 		case utils.PVCRolePgWal:
 			err := os.Setenv(walSnapshotName, item.Name)
+			if err != nil {
+				return err
+			}
+		case utils.PVCRolePgTablespace:
+			tbsName := item.Labels[utils.TablespaceNameLabelName]
+			err := os.Setenv(tbsSnapshotNamePrefix+"_"+tbsName, item.Name)
 			if err != nil {
 				return err
 			}

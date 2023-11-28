@@ -281,7 +281,8 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv)
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv,
+						"")
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -453,7 +454,8 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				snapshotList := getAndVerifySnapshots(clusterToBackup, backup)
-				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, &backup, snapshotDataEnv, snapshotWalEnv)
+				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, &backup, snapshotDataEnv, snapshotWalEnv,
+					"")
 				Expect(err).ToNot(HaveOccurred())
 
 				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterToRestoreFilePath)
@@ -739,7 +741,8 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv)
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, snapshotDataEnv, snapshotWalEnv,
+						"")
 					Expect(err).ToNot(HaveOccurred())
 				})
 
