@@ -374,8 +374,6 @@ var (
 			"dynamic_shared_memory_type": "posix",
 			"wal_sender_timeout":         "5s",
 			"wal_receiver_timeout":       "5s",
-			"ssl_max_protocol_version":   "TLSv1.3",
-			"ssl_min_protocol_version":   "TLSv1.3",
 			// Workaround for PostgreSQL not behaving correctly when
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.
@@ -392,6 +390,10 @@ var (
 			{130000, MajorVersionRangeUnlimited}: {
 				"wal_keep_size":      "512MB",
 				"shared_memory_type": "mmap",
+			},
+			{120000, MajorVersionRangeUnlimited}: {
+				"ssl_max_protocol_version": "TLSv1.3",
+				"ssl_min_protocol_version": "TLSv1.3",
 			},
 		},
 		MandatorySettings: SettingsCollection{
