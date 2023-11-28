@@ -2,72 +2,71 @@
 
 !!! Important
     Installing Prometheus and Grafana is beyond the scope of this project.
-    We assume they are correctly installed in your system. However, for
-    experimentation we provide instructions in 
-    [Part 4 of the Quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana).
+    We assume they're correctly installed in your system. However, for
+    experimentation, we provide instructions in 
+    [Part 4 of the quick start](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana).
 
-## Monitoring Instances
+## Monitoring instances
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
-[Prometheus](https://prometheus.io/) via HTTP, on port 9187, named `metrics`.
+[Prometheus](https://prometheus.io/), named `metrics`. This exporter is provided by way of HTTP on port 9187.
 The operator comes with a [predefined set of metrics](#predefined-set-of-metrics), as well as a highly
-configurable and customizable system to define additional queries via one or
-more `ConfigMap` or `Secret` resources (see the
-["User defined metrics" section](#user-defined-metrics) below for details).
+configurable and customizable system to define additional queries by way of one or
+more `ConfigMap` or `Secret` resources. See
+[User defined metrics](#user-defined-metrics) for details.
 
 !!! Important
-    Starting from version 1.11, CloudNativePG already installs
+    Starting from version 1.11, CloudNativePG installs
     [by default a set of predefined metrics](#default-set-of-metrics) in
-    a `ConfigMap` called `default-monitoring`.
+    a ConfigMap called `default-monitoring`.
 
 !!! Info
-    You can inspect the exported metrics by following the instructions in
-    the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
-    section below.
+    You can inspect the exported metrics. See
+    [How to inspect the exported metrics](#how-to-inspect-the-exported-metrics) for details.
 
 All monitoring queries that are performed on PostgreSQL are:
 
-- atomic (one transaction per query)
-- executed with the `pg_monitor` role
-- executed with `application_name` set to `cnpg_metrics_exporter`
-- executed as user `postgres`
+- Atomic (one transaction per query)
+- Executed with the pg_monitor role
+- Executed with `application_name` set to `cnpg_metrics_exporter`
+- Executed as the user postgres
 
-Please refer to the "Predefined Roles" section in PostgreSQL
-[documentation](https://www.postgresql.org/docs/current/predefined-roles.html)
-for details on the `pg_monitor` role.
+See [Predefined Roles](https://www.postgresql.org/docs/current/predefined-roles.html)
+in the PostgreSQL documentation for details on the pg_monitor role.
 
 Queries, by default, are run against the *main database*, as defined by
 the specified `bootstrap` method of the `Cluster` resource, according
 to the following logic:
 
-- using `initdb`: queries will be run by default against the specified database
-  in `initdb.database`, or `app` if not specified
-- using `recovery`: queries will be run by default against the specified database
-  in `recovery.database`, or `postgres` if not specified
-- using `pg_basebackup`: queries will be run by default against the specified database
-  in `pg_basebackup.database`, or `postgres` if not specified
+- Using `initdb` – Queries are run by default against the specified database
+  in `initdb.database`, or `app` if not specified.
+- Using `recovery` – Queries are run by default against the specified database
+  in `recovery.database`, or `postgres` if not specified.
+- Using `pg_basebackup` – Queries are run by default against the specified database
+  in `pg_basebackup.database`, or `postgres` if not specified.
 
-The default database can always be overridden for a given user-defined metric,
+You can override the default database for a given user-defined metric
 by specifying a list of one or more databases in the `target_databases` option.
 
 !!! Seealso "Prometheus/Grafana"
-    If you are interested in evaluating the integration of CloudNativePG
+    If you're interested in evaluating the integration of CloudNativePG
     with Prometheus and Grafana, you can find a quick setup guide
-    in [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
+    in [Part 4 of the quick start](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana).
 
-### Prometheus Operator example
+### Prometheus operator example
 
-A specific PostgreSQL cluster can be monitored using the
-[Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource 
+You can monitor a specific PostgreSQL cluster using the
+[Prometheus operator's](https://github.com/prometheus-operator/prometheus-operator) resource 
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
-A PodMonitor correctly pointing to a Cluster can be automatically created by the operator by setting
-`.spec.monitoring.enablePodMonitor` to `true` in the Cluster resource itself (default: false).
+The operator can create a PodMonitor correctly pointing to a cluster. To enable this ability, set
+`.spec.monitoring.enablePodMonitor` to `true` in the `Cluster` resource (default: false).
 
 !!! Important
-    Any change to the `PodMonitor` created automatically will be overridden by the Operator at the next reconciliation
-    cycle, in case you need to customize it, you can do so as described below.
+    The operator overrides any change to the `PodMonitor` created automatically at the next reconciliation
+    cycle. You can customize this configuration.
 
-To deploy a `PodMonitor` for a specific Cluster manually, you can just define it as follows, changing it as needed:
+To deploy a `PodMonitor` for a specific cluster manually, you can define it as follows and change it as needed:
+
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
@@ -82,36 +81,36 @@ spec:
 ```
 
 !!! Important
-    Make sure you modify the example above with a unique name as well as the
-    correct cluster's namespace and labels (we are using `cluster-example`).
+    Make sure that you modify the example by using a unique name as well as the
+    correct cluster namespace and labels. The example uses `cluster-example`.
 
 !!! Important
-    Label `postgresql`, used in previous versions of this document, is deprecated
-    and will be removed in the future. Please use the label `cnpg.io/cluster`
-    instead to select the instances.
+    The label `postgresql`, used in previous versions of this document, is deprecated
+    and will be removed in the future. To select the instances, use the label `cnpg.io/cluster`
+    instead.
 
 ### Predefined set of metrics
 
-Every PostgreSQL instance exporter automatically exposes a set of predefined
+Every PostgreSQL instance exporter exposes a set of predefined
 metrics, which can be classified in two major categories:
 
-- PostgreSQL related metrics, starting with `cnpg_collector_*`, including:
+- PostgreSQL-related metrics, starting with `cnpg_collector_*`, including:
 
-    - number of WAL files and total size on disk
-    - number of `.ready` and `.done` files in the archive status folder
-    - requested minimum and maximum number of synchronous replicas, as well as
+    - Number of WAL files and total size on disk
+    - Number of `.ready` and `.done` files in the archive status folder
+    - Requested minimum and maximum number of synchronous replicas, as well as
       the expected and actually observed values
-    - number of distinct nodes accommodating the instances
-    - timestamps indicating last failed and last available backup, as well
+    - Number of distinct nodes accommodating the instances
+    - Timestamps indicating last failed and last available backup, as well
       as the first point of recoverability for the cluster
-    - flag indicating if replica cluster mode is enabled or disabled
-    - flag indicating if a manual switchover is required
-    - flag indicating if fencing is enabled or disabled
+    - Flag indicating if replica cluster mode is enabled or disabled
+    - Flag indicating if a manual switchover is required
+    - Flag indicating if fencing is enabled or disabled
 
 - Go runtime related metrics, starting with `go_*`
 
-Below is a sample of the metrics returned by the `localhost:9187/metrics`
-endpoint of an instance. As you can see, the Prometheus format is
+The following sample shows the metrics returned by the `localhost:9187/metrics`
+endpoint of an instance. The Prometheus format is
 self-documenting:
 
 ```text
@@ -348,22 +347,22 @@ go_threads 18
 
 !!! Note
     `cnpg_collector_postgres_version` is a GaugeVec metric containing
-    the `Major.Minor` version of PostgreSQL. The full semantic version
-    `Major.Minor.Patch` can be found inside one of its label field
+    the `Major.Minor` version of PostgreSQL. You can find the full semantic version
+    `Major.Minor.Patch` inside one of its label fields,
     named `full`.
 
 !!! Note
     `cnpg_collector_first_recoverability_point` and `cnpg_collector_last_available_backup_timestamp`
-    will be zero until your first backup to the object store. This is separate from the WAL archival.
+    are zero until your first backup to the object store. This operation is separate from the WAL archival.
 
-### User defined metrics
+### User-defined metrics
 
-This feature is currently in *beta* state and the format is inspired by the
+This feature is currently in beta state, and the format is inspired by the
 [queries.yaml file (release 0.12)](https://github.com/prometheus-community/postgres_exporter/blob/v0.12.1/queries.yaml)
 of the PostgreSQL Prometheus Exporter.
 
-Custom metrics can be defined by users by referring to the created `Configmap`/`Secret` in a `Cluster` definition
-under the `.spec.monitoring.customQueriesConfigMap` or `customQueriesSecret` section as in the following example:
+You can define custom metrics by referring to the created ConfigMap/secret in a `Cluster` definition
+under the `.spec.monitoring.customQueriesConfigMap` or `customQueriesSecret` section, as in the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -385,22 +384,22 @@ spec:
 
 The `customQueriesConfigMap`/`customQueriesSecret` sections contain a list of
 `ConfigMap`/`Secret` references specifying the key in which the custom queries are defined.
-Take care that the referred resources have to be created **in the same namespace as the Cluster** resource.
+Be sure to create the referred resources in the same namespace as the `Cluster` resource.
 
 !!! Note
-    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
+    If you want the instances to reload ConfigMaps and secrets, you can
+    add a label with key `cnpg.io/reload` to it. Otherwise, you have to reload
     the instances using the `kubectl cnpg reload` subcommand.
 
 !!! Important
-    When a user defined metric overwrites an already existing metric the instance manager prints a json warning log,
-    containing the message:`Query with the same name already found. Overwriting the existing one.`
-    and a key `queryName` containing the overwritten query name.
+    When a user-defined metric overwrites an existing metric, the instance manager prints a json warning log
+    containing the message: `Query with the same name already found. Overwriting the existing one.`
+    It also contains a key `queryName` containing the overwritten query name.
 
-#### Example of a user defined metric
+#### Example of a user-defined metric
 
-Here you can see an example of a `ConfigMap` containing a single custom query,
-referenced by the `Cluster` example above:
+This example shows a ConfigMap containing a single custom query,
+referenced by previous the `Cluster` example:
 
 ```yaml
 apiVersion: v1
@@ -437,29 +436,33 @@ data:
             description: "Number of streaming replicas connected to the instance"
 ```
 
-A list of basic monitoring queries can be found in the
+You can find a list of basic monitoring queries in the
 [`default-monitoring.yaml` file](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/config/manager/default-monitoring.yaml)
-that is already installed in your CloudNativePG deployment (see ["Default set of metrics"](#default-set-of-metrics)).
+that's installed in your CloudNativePG deployment (see [Default set of metrics](#default-set-of-metrics)).
 
-#### Example of a user defined metric running on multiple databases
+#### Example of a user-defined metric running on multiple databases
 
-If the `target_databases` option lists more than one database
+If the `target_databases` option lists more than one database,
 the metric is collected from each of them.
 
-Database auto-discovery can be enabled for a specific query by specifying a
-*shell-like pattern* (i.e., containing `*`, `?` or `[]`) in the list of
-`target_databases`. If provided, the operator will expand the list of target
-databases by adding all the databases returned by the execution of `SELECT
-datname FROM pg_database WHERE datallowconn AND NOT datistemplate` and matching
-the pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
+You can enable database auto-discovery for a specific query by specifying a
+*shell-like pattern* (that is, containing `*`, `?`, or `[]`) in the list of
+`target_databases`. If you provide this pattern, the operator expands the list of target
+databases by adding all the databases returned by executing the following command:
+
+```
+SELECTdatname FROM pg_database WHERE datallowconn AND NOT datistemplate
+```
+
+It matches the pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
 
 !!! Note
     The `*` character has a [special meaning](https://yaml.org/spec/1.2/spec.html#id2786448) in yaml,
-    so you need to quote (`"*"`) the `target_databases` value when it includes such a pattern.
+    so you need to quote (`"*"`) the `target_databases` value when it includes that pattern.
 
-It is recommended that you always include the name of the database
-in the returned labels, for example using the `current_database()` function
-as in the following example:
+We recommend that you always include the name of the database
+in the returned labels. For example, use the `current_database()` function,
+as shown in the following example:
 
 ```yaml
 some_query: |
@@ -481,7 +484,7 @@ some_query: |
     - freddie
 ```
 
-This will produce in the following metric being exposed:
+This results in the following metric being exposed:
 
 ```text
 cnpg_some_query_rows{datname="albert"} 2
@@ -489,7 +492,7 @@ cnpg_some_query_rows{datname="bb"} 5
 cnpg_some_query_rows{datname="freddie"} 10
 ```
 
-Here is an example of a query with auto-discovery enabled which also
+This example shows a query with auto-discovery enabled that also
 runs on the `template1` database (otherwise not returned by the
 aforementioned query):
 
@@ -512,7 +515,7 @@ some_query: |
     - "template1"
 ```
 
-The above example will produce the following metrics (provided the databases exist):
+This example produces the following metrics, provided the databases exist:
 
 ```text
 cnpg_some_query_rows{datname="albert"} 2
@@ -522,7 +525,7 @@ cnpg_some_query_rows{datname="template1"} 7
 cnpg_some_query_rows{datname="postgres"} 42
 ```
 
-### Structure of a user defined metric
+### Structure of a user-defined metric
 
 Every custom query has the following basic structure:
 
@@ -535,42 +538,42 @@ Every custom query has the following basic structure:
             description: "<MetricDescription>"
 ```
 
-Here is a short description of all the available fields:
+Where:
 
-- `<MetricName>`: the name of the Prometheus metric
-    - `query`: the SQL query to run on the target database to generate the metrics
-    - `primary`: whether to run the query only on the primary instance
-    - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
-    - `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on
-       (e.g. `">=11.0.0"` or `">=12.0.0 <=15.0.0"`)
-    - `target_databases`: a list of databases to run the `query` against,
+- `<MetricName>` – The name of the Prometheus metric.
+    - `query` – The SQL query to run on the target database to generate the metrics.
+    - `primary` – Whether to run the query only on the primary instance.
+    - `master` – Same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated).<!-- wokeignore:rule=master -->
+    - `runonserver` – A semantic version range to limit the versions of PostgreSQL for the query to run on
+       (for example, `">=11.0.0"` or `">=12.0.0 <=15.0.0"`).
+    - `target_databases` – A list of databases to run the `query` against,
       or a [shell-like pattern](#example-of-a-user-defined-metric-running-on-multiple-databases)
       to enable auto discovery. Overwrites the default database if provided.
-    - `metrics`: section containing a list of all exported columns, defined as follows:
-      - `<ColumnName>`: the name of the column returned by the query
-          - `usage`: one of the values described below
-          - `description`: the metric's description
-          - `metrics_mapping`: the optional column mapping when `usage` is set to `MAPPEDMETRIC`
+    - `metrics` – Section containing a list of all exported columns, defined as follows:
+      - `<ColumnName>` – The name of the column returned by the query.
+          - `usage` – One of the values shown in the following table.
+          - `description` – The metric's description.
+          - `metrics_mapping` – The optional column mapping when `usage` is set to `MAPPEDMETRIC`.
 
-The possible values for `usage` are:
+The table shows the possible values for `usage`.
 
-| Column Usage Label  | Description                                              |
+| Column usage label  | Description                                              |
 |:--------------------|:---------------------------------------------------------|
-| `DISCARD`           | this column should be ignored                            |
-| `LABEL`             | use this column as a label                               |
-| `COUNTER`           | use this column as a counter                             |
-| `GAUGE`             | use this column as a gauge                               |
-| `MAPPEDMETRIC`      | use this column with the supplied mapping of text values |
-| `DURATION`          | use this column as a text duration (in milliseconds)     |
-| `HISTOGRAM`         | use this column as a histogram                          |
+| `DISCARD`           | Ignore this column.                                      |
+| `LABEL`             | Use this column as a label.                              |
+| `COUNTER`           | Use this column as a counter.                            |
+| `GAUGE`             | Use this column as a gauge.                              |
+| `MAPPEDMETRIC`      | Use this column with the supplied mapping of text values.|
+| `DURATION`          | Use this column as a text duration (in milliseconds).    |
+| `HISTOGRAM`         | Use this column as a histogram.                          |
 
 
-Please visit the ["Metric Types" page](https://prometheus.io/docs/concepts/metric_types/)
-from the Prometheus documentation for more information.
+See [Metric Types](https://prometheus.io/docs/concepts/metric_types/)
+in the Prometheus documentation for more information.
 
-### Output of a user defined metric
+### Output of a user-defined metric
 
-Custom defined metrics are returned by the Prometheus exporter endpoint (`:9187/metrics`)
+Custom-defined metrics are returned by the Prometheus exporter endpoint (`:9187/metrics`)
 with the following format:
 
 ```text
@@ -578,11 +581,11 @@ cnpg_<MetricName>_<ColumnName>{<LabelColumnName>=<LabelColumnValue> ... } <Colum
 ```
 
 !!! Note
-    `LabelColumnName` are metrics with `usage` set to `LABEL` and their `Value`
+    `LabelColumnName` are metrics with `usage` set to `LABEL` and their `Value`.
+<!-- Looks like something was left out of this sentence? -->
 
-
-Considering the `pg_replication` example above, the exporter's endpoint would
-return the following output when invoked:
+Considering the previous `pg_replication` example, the exporter's endpoint
+returns the following output when invoked:
 
 ```text
 # HELP cnpg_pg_replication_in_recovery Whether the instance is in recovery
@@ -601,52 +604,51 @@ cnpg_pg_replication_is_wal_receiver_up 0
 
 ### Default set of metrics
 
-The operator can be configured to automatically inject in a Cluster a set of 
-monitoring queries defined in a ConfigMap or a Secret, inside the operator's namespace.
+You can configure the operator to inject in a cluster a set of 
+monitoring queries defined in a ConfigMap or a secret, inside the operator's namespace.
 You have to set the `MONITORING_QUERIES_CONFIGMAP` or
-`MONITORING_QUERIES_SECRET` key in the ["operator configuration"](operator_conf.md),
-respectively to the name of the ConfigMap or the Secret;
-the operator will then use the content of the `queries` key.
+`MONITORING_QUERIES_SECRET` key in the [operator configuration](operator_conf.md),
+respectively to the name of the ConfigMap or the secret.
+The operator then uses the content of the `queries` key.
 
-Any change to the `queries` content will be immediately reflected on all the
-deployed Clusters using it.
+Any change to the `queries` content is immediately reflected on all the
+deployed clusters using it.
 
 The operator installation manifests come with a predefined ConfigMap, 
-called `cnpg-default-monitoring`, to be used by all Clusters.
+called `cnpg-default-monitoring`, to be used by all clusters.
 `MONITORING_QUERIES_CONFIGMAP` is by default set to `cnpg-default-monitoring` in the operator configuration.
 
 If you want to disable the default set of metrics, you can:
-- disable it at operator level: set the `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET` key to `""`
+- Disable it at operator level. Set the `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET` key to `""`
   (empty string), in the operator ConfigMap. Changes to operator ConfigMap require an operator restart.
-- disable it for a specific Cluster: set `.spec.monitoring.disableDefaultQueries` to `true` in the Cluster.
+- Disable it for a specific cluster. Set `.spec.monitoring.disableDefaultQueries` to `true` in the cluster.
 
 !!! Important
-    The ConfigMap or Secret specified via `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET`
-    will always be copied to the Cluster's namespace with a fixed name: `cnpg-default-monitoring`.
-    So that, if you intend to have default metrics, you should not create a ConfigMap with this name in the cluster's namespace.
+    The ConfigMap or secret specified with `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET`
+    is always copied to the cluster's namespace with a fixed name: `cnpg-default-monitoring`.
+    If you intend to have default metrics, don't create a ConfigMap with this name in the cluster's namespace.
 
 ### Differences with the Prometheus Postgres exporter
 
-CloudNativePG is inspired by the PostgreSQL Prometheus Exporter, but
-presents some differences. In particular, the `cache_seconds` field is not implemented
+CloudNativePG is inspired by the PostgreSQL Prometheus exporter but
+presents some differences. In particular, the `cache_seconds` field isn't implemented
 in CloudNativePG's exporter.
 
 ## Monitoring the operator
 
-The operator internally exposes [Prometheus](https://prometheus.io/) metrics
-via HTTP on port 8080, named `metrics`.
+The operator internally exposes [Prometheus](https://prometheus.io/) metrics, named `metrics`,`
+by way of HTTP on port 8080.
 
 !!! Info
     You can inspect the exported metrics by following the instructions in
-    the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
-    section below.
-
-Currently, the operator exposes default `kubebuilder` metrics, see
+    [How to inspect the exported metrics](#how-to-inspect-the-exported-metrics).
+    
+Currently, the operator exposes default `kubebuilder` metrics. See the
 [kubebuilder documentation](https://book.kubebuilder.io/reference/metrics.html) for more details.
 
 ### Prometheus Operator example
 
-The operator deployment can be monitored using the
+The operator deployment can be monitored using
 [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining the following
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
 resource:
@@ -666,15 +668,15 @@ spec:
 
 ## How to inspect the exported metrics
 
-In this section we provide some basic instructions on how to inspect
+These basic instructions show how to inspect
 the metrics exported by a specific PostgreSQL instance manager (primary
-or replica) or the operator, using a temporary pod running `curl` in
+or replica) or the operator. The examples use a temporary pod running `curl` in
 the same namespace.
 
 !!! Note
-    In the example below we assume we are working in the default namespace,
-    alongside with the PostgreSQL cluster. Please feel free to adapt
-    this example to your use case, by applying basic Kubernetes knowledge.
+    The example assumes you're working in the default namespace,
+    alongside the PostgreSQL cluster. You can adapt
+    this example to your use case by applying basic Kubernetes knowledge.
 
 Create the `curl.yaml` file with this content:
 
@@ -696,33 +698,33 @@ Then create the pod:
 kubectl apply -f curl.yaml
 ```
 
-In case you want to inspect the metrics exported by an instance, you need
-to connect to port 9187 of the target pod. This is the generic command to be
-run (make sure you use the correct IP for the pod):
+If you want to inspect the metrics exported by an instance, you need
+to connect to port 9187 of the target pod. This is the generic command to
+run. Be sure you use the correct IP for the pod.
 
 ```shell
 kubectl exec -ti curl -- curl -s <pod_ip>:9187/metrics
 ```
 
-For example, if your PostgreSQL cluster is called `cluster-example` and
-you want to retrieve the exported metrics of the first pod in the cluster,
-you can run the following command to programmatically get the IP of
+For example, suppose your PostgreSQL cluster is called `cluster-example`, and
+you want to retrieve the exported metrics of the first pod in the cluster.
+You can run the following command to programmatically get the IP of
 that pod:
 
 ```shell
 POD_IP=$(kubectl get pod cluster-example-1 --template '{{.status.podIP}}')
 ```
 
-And then run:
+Then run:
 
 ```shell
 kubectl exec -ti curl -- curl -s ${POD_IP}:9187/metrics
 ```
 
-In case you want to access the metrics of the operator, you need to point
-to the pod where the operator is running, and use TCP port 8080 as target.
+If you want to access the metrics of the operator, you need to point
+to the pod where the operator is running and use TCP port 8080 as target.
 
-At the end of the inspection, please make sure you delete the `curl` pod:
+At the end of the inspection, make sure you delete the `curl` pod:
 
 ```shell
 kubectl delete -f curl.yaml
@@ -731,34 +733,32 @@ kubectl delete -f curl.yaml
 ## Auxiliary resources
 
 !!! Important
-    These resources are provided for illustration and experimentation, and do
-    not represent any kind of recommendation for your production system
+    These resources are provided for illustration and experimentation. They aren't
+    any kind of recommendation for your production system.
 
 In the [`doc/src/samples/monitoring/`](https://github.com/cloudnative-pg/cloudnative-pg/tree/main/docs/src/samples/monitoring)
-directory you will find a series of sample files for observability.
-Please refer to [Part 4 of the quickstart](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
-section for context:
+directory are a series of sample files for observability.
+See [Part 4 of the quick start](quickstart.md#part-4-monitor-clusters-with-prometheus-and-grafana)
+for context:
 
-- `kube-stack-config.yaml`: a configuration file for the kube-stack helm chart
+- `kube-stack-config.yaml` – A configuration file for the kube-stack helm chart
   installation. It ensures that Prometheus listens for all PodMonitor resources.
-- `prometheusrule.yaml`: a `PrometheusRule` with alerts for CloudNativePG.
-  NOTE: this does not include inter-operation with notification services. Please refer
-  to the [Prometheus documentation](https://prometheus.io/docs/alerting/latest/alertmanager/).
-- `podmonitor.yaml`: a `PodMonitor` for the CloudNativePG Operator deployment.
-- `grafana-configmap.yaml`: a ConfigMap containing the definition of the sample
-  CloudNativePG Dashboard. Note the labels in the definition, which ensure that
-  the Grafana deployment will find the ConfigMap.
+- `prometheusrule.yaml` – A `PrometheusRule` with alerts for CloudNativePG.
+  NOTE: This doesn't include inter-operation with notification services. See
+  the [Prometheus documentation](https://prometheus.io/docs/alerting/latest/alertmanager/).
+- `podmonitor.yaml` – A `PodMonitor` for the CloudNativePG operator deployment.
+- `grafana-configmap.yaml` – A ConfigMap containing the definition of the sample
+  CloudNativePG dashboard. Note the labels in the definition, which ensure that
+  the Grafana deployment can find the ConfigMap.
 
 In addition, we provide the "raw" sources for the Grafana dashboard and the
-Prometheus alert rules, for your reference:
+Prometheus alert rules for your reference:
 
-- `alerts.yaml`: Prometheus rules with alerts
-- `grafana-dashboard.json`: the CloudNativePG dashboard as a native Grafana JSON.
+- `alerts.yaml` – Prometheus rules with alerts.
+- `grafana-dashboard.json` – The CloudNativePG dashboard as a native Grafana JSON.
 
-Note that, for the configuration of `kube-prometheus-stack`, other fields and
-settings are available over what we provide in `kube-stack-config.yaml`.
-
+For configuring `kube-prometheus-stack`, other fields and
+settings are available in addition to what we provide in `kube-stack-config.yaml`.
 You can execute `helm show values prometheus-community/kube-prometheus-stack`
-to view them. For further information, please refer to the
-[kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack)
-page.
+to view them. For more information, see
+[kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack).
