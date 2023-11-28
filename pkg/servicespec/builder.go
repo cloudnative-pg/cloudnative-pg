@@ -68,13 +68,13 @@ func (builder *Builder) WithLabel(name, value string) *Builder {
 	return builder
 }
 
-// WithServiceType adds a label to the current status
+// WithServiceType adds a service type to the current status
 func (builder *Builder) WithServiceType(serviceType corev1.ServiceType) *Builder {
 	builder.status.Spec.Type = serviceType
 	return builder
 }
 
-// WithPorts adds a label to the current status
+// WithPorts adds a port to the current status
 func (builder *Builder) WithPorts(port int) *Builder {
 	builder.status.Spec.Ports = []corev1.ServicePort{
 		{
@@ -87,7 +87,7 @@ func (builder *Builder) WithPorts(port int) *Builder {
 	return builder
 }
 
-// WithSelector adds a label to the current status
+// WithSelector adds a selector to the current status
 func (builder *Builder) WithSelector(name string) *Builder {
 	builder.status.Spec.Selector = map[string]string{
 		utils.PgbouncerNameLabel: name,
@@ -102,7 +102,7 @@ func (builder *Builder) WithName(name string) *Builder {
 	return builder
 }
 
-// WithNamespace adds a name to the current status
+// WithNamespace sets a namespace to the current status
 func (builder *Builder) WithNamespace(ns string) *Builder {
 	builder.status.ObjectMeta.Namespace = ns
 	return builder
