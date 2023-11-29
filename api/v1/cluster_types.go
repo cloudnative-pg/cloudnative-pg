@@ -862,6 +862,8 @@ const (
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
+	// ConditionPVCResize represents whether a PVC resize is successful
+	ConditionPVCResize ClusterConditionType = "PVCResizeSucceeded"
 )
 
 // A Condition that can be used to communicate the Backup progress
@@ -933,6 +935,14 @@ const (
 	// ConditionReasonContinuousArchivingFailing means that the condition has changed because
 	// the WAL archiving is not working correctly
 	ConditionReasonContinuousArchivingFailing ConditionReason = "ContinuousArchivingFailing"
+
+	// ConditionReasonPVCResizeSuccess means that the condition changed because the
+	// PVC resizing was working correctly
+	ConditionReasonPVCResizeSuccess ConditionReason = "PVCResizeSuccess"
+
+	// ConditionReasonPVCResizeFailing means that the condition has changed because
+	// the PVC resizing is not working correctly
+	ConditionReasonPVCResizeFailing ConditionReason = "PVCResizeFailing"
 
 	// ClusterReady means that the condition changed because the cluster is ready and working properly
 	ClusterReady ConditionReason = "ClusterIsReady"

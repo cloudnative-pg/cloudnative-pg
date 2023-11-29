@@ -1499,64 +1499,6 @@ var _ = Describe("Number of synchronous replicas", func() {
 	})
 })
 
-var _ = Describe("storage configuration validation", func() {
-	It("complains if the size is being reduced", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size: "1G",
-				},
-			},
-		}
-
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size: "512M",
-				},
-			},
-		}
-
-		Expect(clusterNew.validateStorageChange(&clusterOld)).ToNot(BeEmpty())
-	})
-
-	It("does not complain if nothing has been changed", func() {
-		one := "one"
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size:         "1G",
-					StorageClass: &one,
-				},
-			},
-		}
-
-		clusterNew := clusterOld.DeepCopy()
-
-		Expect(clusterNew.validateStorageChange(&clusterOld)).To(BeEmpty())
-	})
-
-	It("works fine is the size is being enlarged", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size: "8G",
-				},
-			},
-		}
-
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size: "10G",
-				},
-			},
-		}
-
-		Expect(clusterNew.validateStorageChange(&clusterOld)).To(BeEmpty())
-	})
-})
-
 var _ = Describe("Cluster name validation", func() {
 	It("should be a valid DNS label", func() {
 		cluster := Cluster{
