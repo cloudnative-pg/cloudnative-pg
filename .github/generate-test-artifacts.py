@@ -105,7 +105,7 @@ def convert_ginkgo_test(test, matrix):
     # In such case it doesn't count as FAILED, but we can still see how much it's failing
     if (
         state == "failed"
-        and "ContainerHierarchyLabels" in t
+        and "ContainerHierarchyLabels" in test
         and "ignore-fails" in flatten(test["ContainerHierarchyLabels"])
     ):
         state = "ignoreFailed"
