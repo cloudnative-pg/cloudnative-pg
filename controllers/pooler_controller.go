@@ -190,6 +190,15 @@ func (r *PoolerReconciler) mapSecretToPooler() handler.MapFunc {
 // getPoolersUsingSecret get a list of poolers which are using the passed secret
 func getPoolersUsingSecret(poolers apiv1.PoolerList, secret *corev1.Secret) (requests []types.NamespacedName) {
 	for _, pooler := range poolers.Items {
+		if name, ok := isOwnedByPooler(secret); ok && pooler.Name == name {
+			requests = append(requests,
+				types.NamespacedName{
+					Name:      pooler.Name,
+					Namespace: pooler.Namespace,
+				})
+			continue
+		}
+
 		if pooler.Spec.PgBouncer != nil && pooler.GetAuthQuerySecretName() == secret.Name {
 			requests = append(requests,
 				types.NamespacedName{
