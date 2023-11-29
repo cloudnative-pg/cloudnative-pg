@@ -1892,14 +1892,30 @@ configmap data</p>
 <i>string</i>
 </td>
 <td>
-   <p>The first recoverability point, stored as a date in RFC3339 format</p>
+   <p>The first recoverability point, stored as a date in RFC3339 format.
+This field is calculated from the content of FirstRecoverabilityPointByMethod</p>
+</td>
+</tr>
+<tr><td><code>firstRecoverabilityPointByMethod</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
+</td>
+<td>
+   <p>The first recoverability point, stored as a date in RFC3339 format, per backup method type</p>
 </td>
 </tr>
 <tr><td><code>lastSuccessfulBackup</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Stored as a date in RFC3339 format</p>
+   <p>Last successful backup, stored as a date in RFC3339 format
+This field is calculated from the content of LastSuccessfulBackupByMethod</p>
+</td>
+</tr>
+<tr><td><code>lastSuccessfulBackupByMethod</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta"><i>map[BackupMethod]meta/v1.Time</i></a>
+</td>
+<td>
+   <p>Last successful backup, stored as a date in RFC3339 format, per backup method type</p>
 </td>
 </tr>
 <tr><td><code>lastFailedBackup</code><br/>

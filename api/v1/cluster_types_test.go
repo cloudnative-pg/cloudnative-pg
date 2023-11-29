@@ -19,7 +19,7 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -30,7 +30,7 @@ import (
 
 var _ = Describe("PostgreSQL cluster type", func() {
 	postgresql := Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "clustername",
 		},
 	}
@@ -63,7 +63,7 @@ var _ = Describe("PostgreSQL cluster type", func() {
 
 var _ = Describe("PostgreSQL services name", func() {
 	postgresql := Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "clustername",
 		},
 	}
@@ -140,7 +140,7 @@ var _ = Describe("Node maintenance window", func() {
 var _ = Describe("Bootstrap via initdb", func() {
 	It("will create an application database if specified", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clusterName",
 			},
 			Spec: ClusterSpec{
@@ -163,7 +163,7 @@ var _ = Describe("Bootstrap via initdb", func() {
 
 	It("will run post application sql refs if specified for secrets", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clusterName",
 			},
 			Spec: ClusterSpec{
@@ -194,7 +194,7 @@ var _ = Describe("Bootstrap via initdb", func() {
 
 	It("will run post application sql refs if specified for configmaps", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clusterName",
 			},
 			Spec: ClusterSpec{
@@ -225,7 +225,7 @@ var _ = Describe("Bootstrap via initdb", func() {
 
 	It("will not run post application sql refs if not specified", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clusterName",
 			},
 			Spec: ClusterSpec{
@@ -246,7 +246,7 @@ var _ = Describe("Bootstrap via initdb", func() {
 
 	It("will not create an application database if not requested", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clusterName",
 			},
 		}
@@ -264,7 +264,7 @@ var _ = Describe("Bootstrap via initdb", func() {
 var _ = Describe("Bootstrap via pg_basebackup", func() {
 	It("will create an application database if specified", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clusterName",
 			},
 			Spec: ClusterSpec{
@@ -288,7 +288,7 @@ var _ = Describe("Bootstrap via pg_basebackup", func() {
 
 	It("will get default application secrets name if not specified", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clusterName",
 			},
 		}
@@ -379,7 +379,7 @@ var _ = Describe("external cluster list", func() {
 
 var _ = Describe("look up for secrets", func() {
 	cluster := Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "clustername",
 		},
 	}
@@ -403,7 +403,7 @@ var _ = Describe("look up for secrets", func() {
 var _ = Describe("A secret resource version", func() {
 	It("do not contains any secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 		}
@@ -414,7 +414,7 @@ var _ = Describe("A secret resource version", func() {
 	It("do not contains any metrics secret", func() {
 		metrics := make(map[string]string, 1)
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -431,7 +431,7 @@ var _ = Describe("A secret resource version", func() {
 		metrics := make(map[string]string, 1)
 		metrics["a-secret"] = "test-version"
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -446,7 +446,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the superuser secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 		}
@@ -456,7 +456,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the application secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 		}
@@ -466,7 +466,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the client ca secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -483,7 +483,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the replication secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -500,7 +500,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the replication secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -517,7 +517,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the server ca secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -534,7 +534,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the server cert secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -551,7 +551,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the barman endpoint ca secret", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Spec: ClusterSpec{
@@ -573,7 +573,7 @@ var _ = Describe("A secret resource version", func() {
 
 	It("contains the secret generated by the PgBouncer integration", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Spec: ClusterSpec{},
@@ -598,7 +598,7 @@ var _ = Describe("A config map resource version", func() {
 	It("do not contains any metrics configmap", func() {
 		metrics := make(map[string]string, 1)
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -615,7 +615,7 @@ var _ = Describe("A config map resource version", func() {
 		metrics := make(map[string]string, 1)
 		metrics["a-configmap"] = "test-version"
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Status: ClusterStatus{
@@ -660,7 +660,7 @@ var _ = Describe("PostgreSQL version detection", func() {
 var _ = Describe("Default Metrics", func() {
 	It("correctly says default metrics are not disabled when no monitoring is passed", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Spec: ClusterSpec{},
@@ -671,7 +671,7 @@ var _ = Describe("Default Metrics", func() {
 	It("correctly says default metrics are not disabled when explicitly not disabled", func() {
 		f := false
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Spec: ClusterSpec{Monitoring: &MonitoringConfiguration{DisableDefaultQueries: &f}},
@@ -682,7 +682,7 @@ var _ = Describe("Default Metrics", func() {
 	It("correctly says default metrics are disabled when explicitly disabled", func() {
 		t := true
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "clustername",
 			},
 			Spec: ClusterSpec{Monitoring: &MonitoringConfiguration{DisableDefaultQueries: &t}},
@@ -742,7 +742,7 @@ var _ = Describe("Barman Endpoint CA for replica cluster", func() {
 var _ = Describe("Fencing annotation", func() {
 	When("one instance is fenced", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
 					utils.FencedInstanceAnnotation: "[\"one\"]",
 				},
@@ -760,7 +760,7 @@ var _ = Describe("Fencing annotation", func() {
 
 	When("the whole cluster is fenced", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
 					utils.FencedInstanceAnnotation: "[\"*\"]",
 				},
@@ -776,7 +776,7 @@ var _ = Describe("Fencing annotation", func() {
 
 	When("the annotation doesn't exist", func() {
 		cluster := Cluster{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{},
 			},
 		}
