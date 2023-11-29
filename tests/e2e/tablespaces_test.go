@@ -20,10 +20,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -47,6 +50,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 	const (
 		level           = tests.Medium
 		namespacePrefix = "tablespaces"
+		minioCaSecName  = "minio-server-ca-secret"
+		minioTLSSecName = "minio-server-tls-secret"
 	)
 	var (
 		clusterName string
@@ -98,12 +103,45 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 		})
 	}
 
+	minioSetup := func(namespace string) {
+		By("creating ca and tls certificate secrets", func() {
+			// create CA certificates
+			_, caPair, err := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
+			Expect(err).ToNot(HaveOccurred())
+
+			// sign and create secret using CA certificate and key
+			serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
+				[]string{"minio-service.internal.mydomain.net, minio-service.default.svc, minio-service.default,"},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			serverSecret := serverPair.GenerateCertificateSecret(namespace, minioTLSSecName)
+			err = env.Client.Create(env.Ctx, serverSecret)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("creating the credentials for minio", func() {
+			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+		})
+
+		By("setting up minio", func() {
+			setup, err := testUtils.MinioSSLSetup(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			err = testUtils.InstallMinio(env, setup, uint(testTimeouts[testUtils.MinioInstallation]))
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		// Create the minio client pod and wait for it to be ready.
+		// We'll use it to check if everything is archived correctly
+		By("setting up minio client pod", func() {
+			minioClient := testUtils.MinioSSLClient(namespace)
+			err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	}
 	Context("on a new cluster with tablespaces", Ordered, func() {
 		var backupName string
 		var err error
 		const (
-			minioCaSecName  = "minio-server-ca-secret"
-			minioTLSSecName = "minio-server-tls-secret"
 			clusterManifest = fixturesDir +
 				"/tablespaces/cluster-with-tablespaces.yaml.template"
 			clusterBackupManifest = fixturesDir +
@@ -121,41 +159,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
 			})
-
-			By("creating ca and tls certificate secrets", func() {
-				// create CA certificates
-				_, caPair, err := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
-				Expect(err).ToNot(HaveOccurred())
-
-				// sign and create secret using CA certificate and key
-				serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
-					[]string{"minio-service.internal.mydomain.net, minio-service.default.svc, minio-service.default,"},
-				)
-				Expect(err).ToNot(HaveOccurred())
-				serverSecret := serverPair.GenerateCertificateSecret(namespace, minioTLSSecName)
-				err = env.Client.Create(env.Ctx, serverSecret)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("creating the credentials for minio", func() {
-				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
-			})
-
-			By("setting up minio", func() {
-				setup, err := testUtils.MinioSSLSetup(namespace)
-				Expect(err).ToNot(HaveOccurred())
-				err = testUtils.InstallMinio(env, setup, uint(testTimeouts[testUtils.MinioInstallation]))
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			// Create the minio client pod and wait for it to be ready.
-			// We'll use it to check if everything is archived correctly
-			By("setting up minio client pod", func() {
-				minioClient := testUtils.MinioSSLClient(namespace)
-				err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
+			minioSetup(namespace)
 			clusterSetup(clusterManifest)
 		})
 
@@ -231,7 +235,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				eventuallyHasExpectedNumberOfPVCs(6, namespace)
 			})
 
-			By("creating new backup and verifying backup is ready", func() {
+			By("creating a new backup and verifying backup is ready", func() {
 				backupCondition, err := testUtils.GetConditionsInClusterStatus(
 					namespace,
 					clusterName,
@@ -259,7 +263,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				latestBaseBackupContainsExpectedTars(clusterName, namespace, backups, 4)
 			})
 
-			By("verify backup status", func() {
+			By("verifying backup status", func() {
 				Eventually(func() (string, error) {
 					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
@@ -285,8 +289,18 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				"/tablespaces/cluster-volume-snapshot-tablespaces.yaml.template"
 			clusterVolumesnapshoBackupManifest = fixturesDir +
 				"/tablespaces/cluster-volume-snapshot-backup.yaml.template"
-		)
+			clusterVolumesnapshoRestoreManifest = fixturesDir +
+				"/tablespaces/cluster-volume-snapshot-tablespaces-restore.yaml.template"
+			clusterVolumesnapshoPITRManifest = fixturesDir +
+				"/tablespaces/cluster-volume-snapshot-tablespaces-pitr.yaml.template"
 
+			snapshotDataEnv       = "SNAPSHOT_PITR_PGDATA"
+			snapshotWalEnv        = "SNAPSHOT_PITR_PGWAL"
+			snapshotTbsEnv        = "SNAPSHOT_PITR_PGTABLESPACE"
+			tableName             = "online_test"
+			recoveryTargetTimeEnv = "SNAPSHOT_PITR"
+		)
+		checkPointTimeout := time.Second * 10
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
@@ -300,6 +314,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				return env.DeleteNamespace(namespace)
 			})
 
+			minioSetup(namespace)
 			clusterSetup(clusterManifest)
 		})
 
@@ -339,6 +354,19 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 		})
 
 		It("can create the volume snapshot backup using the plugin and verify the backup", func() {
+			By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+				// Create a "test" table with values 1,2
+				AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+
+				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				// Execute a checkpoint
+				_, _, err = env.EventuallyExecCommand(
+					env.Ctx, *primaryPod, specs.PostgresContainerName, &checkPointTimeout,
+					"psql", "-U", "postgres", "-tAc", "CHECKPOINT")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
 			backupName = clusterName + utils.GetCurrentTimestampWithFormat("20060102150405")
 			By("creating a volumeSnapshot and waiting until it's completed", func() {
 				err := testUtils.CreateOnDemandBackupViaKubectlPlugin(
@@ -375,10 +403,114 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 						g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
 						g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
 						g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+
 					}
 				}).Should(Succeed())
 			})
 		})
+
+		It(fmt.Sprintf("can create the cluster by restoring from a volume snapshot backup %v", backupName),
+			func() {
+				By("fetching the volume snapshots", func() {
+					snapshotList, err := getSnapshots(backupName, clusterName, namespace)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backupObject.Status.BackupSnapshotStatus.Elements)))
+
+					envVars := testUtils.EnvVarsForSnapshots{
+						DataSnapshot:             snapshotDataEnv,
+						WalSnapshot:              snapshotWalEnv,
+						TablespaceSnapshotPrefix: snapshotTbsEnv,
+					}
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backupObject, envVars)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterVolumesnapshoRestoreManifest)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("creating the cluster to be restored through snapshot", func() {
+					AssertCreateCluster(namespace, clusterToRestoreName, clusterVolumesnapshoRestoreManifest, env)
+					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[testUtils.ClusterIsReadySlow],
+						env)
+				})
+
+				By("verifying that tablespaces and PVC were created", func() {
+					restoredCluster, err := env.GetCluster(namespace, clusterToRestoreName)
+					Expect(err).ToNot(HaveOccurred())
+					AssertClusterHasMountPointsAndVolumesForTablespaces(restoredCluster, 2,
+						testTimeouts[testUtils.Short])
+					AssertClusterHasPvcsAndDataDirsForTablespaces(restoredCluster, testTimeouts[testUtils.Short])
+					AssertDatabaseContainsTablespaces(restoredCluster, testTimeouts[testUtils.Short])
+				})
+
+				By("verifying the correct data exists in the restored cluster", func() {
+					restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
+					Expect(err).ToNot(HaveOccurred())
+					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, restoredPrimary)
+				})
+			})
+
+		It(fmt.Sprintf("can create the cluster by recovery from volume snapshot backup with pitr %v", backupName),
+			func() {
+				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+					// Insert 2 more rows which we expect not to be present at the end of the recovery
+					insertRecordIntoTable(namespace, clusterName, tableName, 3, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterName, tableName, 4, psqlClientPod)
+					// Because GetCurrentTimestamp() rounds down to the second and is executed
+					// right after the creation of the test data, we wait for 1s to avoid not
+					// including the newly created data within the recovery_target_time
+					time.Sleep(1 * time.Second)
+					// Get the recovery_target_time and pass it to the template engine
+					recoveryTargetTime, err := testUtils.GetCurrentTimestamp(namespace, clusterName, env, psqlClientPod)
+					Expect(err).ToNot(HaveOccurred())
+					err = os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
+					Expect(err).ToNot(HaveOccurred())
+
+					// Insert 2 more rows which we expect not to be present at the end of the recovery
+					insertRecordIntoTable(namespace, clusterName, tableName, 5, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterName, tableName, 6, psqlClientPod)
+
+					// Close and archive the current WAL file
+					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+				})
+				By("fetching the volume snapshots", func() {
+					snapshotList, err := getSnapshots(backupName, clusterName, namespace)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backupObject.Status.BackupSnapshotStatus.Elements)))
+
+					envVars := testUtils.EnvVarsForSnapshots{
+						DataSnapshot:             snapshotDataEnv,
+						WalSnapshot:              snapshotWalEnv,
+						TablespaceSnapshotPrefix: snapshotTbsEnv,
+					}
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backupObject, envVars)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				clusterToPITRName, err := env.GetResourceNameFromYAML(clusterVolumesnapshoPITRManifest)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("creating the cluster to be restored through snapshot", func() {
+					AssertCreateCluster(namespace, clusterToPITRName, clusterVolumesnapshoPITRManifest, env)
+					AssertClusterIsReady(namespace, clusterToPITRName, testTimeouts[testUtils.ClusterIsReadySlow],
+						env)
+				})
+
+				By("can verify tablespaces and PVC were created", func() {
+					recoveryCluster, err := env.GetCluster(namespace, clusterToPITRName)
+					Expect(err).ToNot(HaveOccurred())
+					AssertClusterHasMountPointsAndVolumesForTablespaces(recoveryCluster, 2,
+						testTimeouts[testUtils.Short])
+					AssertClusterHasPvcsAndDataDirsForTablespaces(recoveryCluster, testTimeouts[testUtils.Short])
+					AssertDatabaseContainsTablespaces(recoveryCluster, testTimeouts[testUtils.Short])
+				})
+
+				By("verifying the correct data exists in the restored cluster", func() {
+					recoveryPrimary, err := env.GetClusterPrimary(namespace, clusterToPITRName)
+					Expect(err).ToNot(HaveOccurred())
+					AssertDataExpectedCount(namespace, clusterToPITRName, tableName, 4, recoveryPrimary)
+				})
+			})
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
@@ -854,4 +986,22 @@ func latestBaseBackupContainsExpectedTars(
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(numTars).To(Equal(expectedTars), report)
 	}, 120).Should(Succeed())
+}
+
+func getSnapshots(
+	backupName string,
+	clusterName string,
+	namespace string,
+) (volumesnapshot.VolumeSnapshotList, error) {
+	var snapshotList volumesnapshot.VolumeSnapshotList
+	err := env.Client.List(env.Ctx, &snapshotList, client.InNamespace(namespace),
+		client.MatchingLabels{
+			utils.ClusterLabelName:    clusterName,
+			utils.BackupNameLabelName: backupName,
+		})
+	if err != nil {
+		return snapshotList, err
+	}
+
+	return snapshotList, nil
 }
