@@ -92,7 +92,7 @@ status:
 Tablespaces, coupled with PostgreSQL's
 [declarative partitioning](https://www.postgresql.org/docs/14/ddl-partitioning.html),
 can help horizontally scale storage or relieve i/o contention.
-The PostgreSQL documentation contains an example of this usage.
+The PostgreSQL documentation contains an example of this usage:
 
 ``` sql
 CREATE TABLE measurement_y2007m12 PARTITION OF measurement
@@ -100,4 +100,43 @@ CREATE TABLE measurement_y2007m12 PARTITION OF measurement
     TABLESPACE fasttablespace;
 ```
 
-## TODO -- we still need to write the recovery part
+## Recovery (and backup)
+
+Taking a backup of a cluster with declarative tablespaces entails no extra
+complexity. You can simply follow the [backup documentation](backup.md).
+
+!!! Warning
+    By default, backups are taken from replica nodes. A backup taken immediately
+    after the creation of tablespaces in a cluster could result in an
+    incomplete view of the tablespaces from the replica, and thus an incomplete
+    backup. The lag will be resolved in a maximum of 5 minutes, with the next
+    reconciliation.
+
+Once a cluster with tablespaces has a base backup, it is possible to restore a
+new cluster from it. It is important to ensure the replica cluster has the same
+tablespaces defined as the source cluster.
+
+``` yaml
+spec:
+
+  <- snipped ->
+
+  bootstrap:
+    recovery:
+      backup:
+        name: < name of cluster backup >
+
+  tablespaces:
+    atablespace:
+      storage:
+        size: 1Gi
+        storageClass: standard
+    another_tablespace:
+      storage:
+        size: 2Gi
+        storageClass: standard
+    tablespacea1:
+      storage:
+        size: 2Gi
+        storageClass: standard
+```
