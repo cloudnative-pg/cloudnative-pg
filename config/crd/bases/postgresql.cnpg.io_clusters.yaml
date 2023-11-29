@@ -3907,8 +3907,15 @@ spec:
                 type: array
               firstRecoverabilityPoint:
                 description: The first recoverability point, stored as a date in RFC3339
-                  format
+                  format. This field is calculated from the content of FirstRecoverabilityPointByMethod
                 type: string
+              firstRecoverabilityPointByMethod:
+                additionalProperties:
+                  format: date-time
+                  type: string
+                description: The first recoverability point, stored as a date in RFC3339
+                  format, per backup method type
+                type: object
               healthyPVC:
                 description: List of all the PVCs not dangling nor initializing
                 items:
@@ -3962,8 +3969,16 @@ spec:
                 description: Stored as a date in RFC3339 format
                 type: string
               lastSuccessfulBackup:
-                description: Stored as a date in RFC3339 format
+                description: Last successful backup, stored as a date in RFC3339 format
+                  This field is calculated from the content of LastSuccessfulBackupByMethod
                 type: string
+              lastSuccessfulBackupByMethod:
+                additionalProperties:
+                  format: date-time
+                  type: string
+                description: Last successful backup, stored as a date in RFC3339 format,
+                  per backup method type
+                type: object
               latestGeneratedNode:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)

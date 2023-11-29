@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -414,20 +415,28 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
 		origCluster := b.Cluster.DeepCopy()
 
-		// Set the first recoverability point
-		if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
-			firstRecoverabilityPoint := ts.Format(time.RFC3339)
-			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
-			lastBackup := backupList.LatestBackupInfo()
-			if lastBackup != nil {
-				b.Cluster.Status.LastSuccessfulBackup = lastBackup.EndTime.Format(time.RFC3339)
-			}
-		}
+		// Set the first recoverability point and the last successful backup
+		updateClusterStatusWithBackupTimes(b.Cluster, backupList)
 
+		if reflect.DeepEqual(origCluster.Status, b.Cluster.Status) {
+			return nil
+		}
 		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 	}); err != nil {
 		b.Log.Error(err, "while setting the firstRecoverabilityPoint and latestSuccessfulBackup")
 	}
+}
+
+// updateClusterStatusWithBackupTimes updates the last successful backup time and first
+// recoverability point for the cluster
+func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) {
+	firstRecoverabilityPoint := backupList.FirstRecoverabilityPoint()
+	var lastSuccessfulBackup *time.Time
+	if lastSuccessfulBackupInfo := backupList.LatestBackupInfo(); lastSuccessfulBackupInfo != nil {
+		lastSuccessfulBackup = &lastSuccessfulBackupInfo.EndTime
+	}
+
+	cluster.UpdateBackupTimes(apiv1.BackupMethodBarmanObjectStore, firstRecoverabilityPoint, lastSuccessfulBackup)
 }
 
 // PatchBackupStatusAndRetry updates a certain backup's status in the k8s database,

@@ -19,6 +19,7 @@ package postgres
 import (
 	"context"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -141,5 +143,117 @@ var _ = Describe("testing backup command", func() {
 		Expect(clusterCond.Reason).To(Equal(string(apiv1.ConditionReasonLastBackupFailed)))
 
 		Expect(backup.Status.Error).To(Equal(clusterCond.Message))
+	})
+})
+
+var _ = Describe("update barman backup metadata", func() {
+	const namespace = "test"
+
+	var cluster *apiv1.Cluster
+	var barmanBackups *catalog.Catalog
+
+	var (
+		now           = metav1.NewTime(time.Now().Local().Truncate(time.Second))
+		oneHourAgo    = metav1.NewTime(now.Add(-1 * time.Hour))
+		twoHoursAgo   = metav1.NewTime(now.Add(-2 * time.Hour))
+		threeHoursAgo = metav1.NewTime(now.Add(-3 * time.Hour))
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{},
+			},
+		}
+
+		barmanBackups = &catalog.Catalog{
+			List: []catalog.BarmanBackup{
+				{
+					BackupName: "twoHoursAgo",
+					BeginTime:  threeHoursAgo.Time,
+					EndTime:    twoHoursAgo.Time,
+				},
+				{
+					BackupName: "youngest",
+					BeginTime:  twoHoursAgo.Time,
+					EndTime:    oneHourAgo.Time,
+				},
+			},
+		}
+	})
+
+	It("should update cluster with no metadata", func() {
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(BeEmpty())
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod).To(BeEmpty())
+		Expect(cluster.Status.LastSuccessfulBackup).To(BeEmpty())
+		Expect(cluster.Status.LastSuccessfulBackupByMethod).To(BeEmpty())
+
+		updateClusterStatusWithBackupTimes(cluster, barmanBackups)
+
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(twoHoursAgo))
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod).
+			ToNot(HaveKey(apiv1.BackupMethodVolumeSnapshot))
+		Expect(cluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
+		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(oneHourAgo))
+		Expect(cluster.Status.LastSuccessfulBackupByMethod).
+			ToNot(HaveKey(apiv1.BackupMethodVolumeSnapshot))
+	})
+
+	It("will update the metadata if they are outdated", func() {
+		cluster.Status = apiv1.ClusterStatus{
+			FirstRecoverabilityPoint: now.Format(time.RFC3339),
+			FirstRecoverabilityPointByMethod: map[apiv1.BackupMethod]metav1.Time{
+				apiv1.BackupMethodBarmanObjectStore: now,
+			},
+			LastSuccessfulBackup: threeHoursAgo.Format(time.RFC3339),
+			LastSuccessfulBackupByMethod: map[apiv1.BackupMethod]metav1.Time{
+				apiv1.BackupMethodBarmanObjectStore: threeHoursAgo,
+			},
+		}
+
+		updateClusterStatusWithBackupTimes(cluster, barmanBackups)
+
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(twoHoursAgo))
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod).
+			ToNot(HaveKey(apiv1.BackupMethodVolumeSnapshot))
+		Expect(cluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
+		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(oneHourAgo))
+		Expect(cluster.Status.LastSuccessfulBackupByMethod).
+			ToNot(HaveKey(apiv1.BackupMethodVolumeSnapshot))
+	})
+
+	It("will keep metadata from other methods if appropriate", func() {
+		cluster.Status = apiv1.ClusterStatus{
+			FirstRecoverabilityPoint: now.Format(time.RFC3339),
+			FirstRecoverabilityPointByMethod: map[apiv1.BackupMethod]metav1.Time{
+				apiv1.BackupMethodBarmanObjectStore: now,
+				apiv1.BackupMethodVolumeSnapshot:    threeHoursAgo,
+			},
+			LastSuccessfulBackup: threeHoursAgo.Format(time.RFC3339),
+			LastSuccessfulBackupByMethod: map[apiv1.BackupMethod]metav1.Time{
+				apiv1.BackupMethodBarmanObjectStore: threeHoursAgo,
+				apiv1.BackupMethodVolumeSnapshot:    now,
+			},
+		}
+
+		updateClusterStatusWithBackupTimes(cluster, barmanBackups)
+
+		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(threeHoursAgo.Format(time.RFC3339)))
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(twoHoursAgo))
+		Expect(cluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodVolumeSnapshot]).
+			To(Equal(threeHoursAgo))
+		Expect(cluster.Status.LastSuccessfulBackup).To(Equal(now.Format(time.RFC3339)))
+		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
+			To(Equal(oneHourAgo))
+		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
+			To(Equal(now))
 	})
 })

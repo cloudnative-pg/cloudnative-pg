@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -404,6 +405,10 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
 	}
 
+	if err := updateClusterWithSnapshotsBackupTimes(ctx, r.Client, cluster.Namespace, cluster.Name); err != nil {
+		contextLogger.Error(err, "could not update cluster's backups metadata")
+	}
+
 	return nil, nil
 }
 
@@ -434,6 +439,47 @@ func (r *BackupReconciler) getSnapshotTargetPod(
 	contextLogger.Debug("Found pod for backup", "pod", targetPod.Name)
 
 	return targetPod, nil
+}
+
+// updateClusterWithSnapshotsBackupTimes updates a cluster's FirstRecoverabilityPoint
+// and LastSuccessfulBackup based on the available snapshots
+func updateClusterWithSnapshotsBackupTimes(
+	ctx context.Context,
+	cli client.Client,
+	namespace string,
+	name string,
+) error {
+	wrapErr := func(msg string, err error) error {
+		return fmt.Errorf("in updateFirstRecoverabilityPont, %s: %w", msg, err)
+	}
+
+	// refresh the cluster, as this function will get called after the backup
+	// has finished, potentially a long time
+	var cluster apiv1.Cluster
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, &cluster); err != nil {
+		return wrapErr("could not refresh cluster", err)
+	}
+
+	oldestSnapshot, newestSnapshot, err := volumesnapshot.GetSnapshotsBackupTimes(ctx, cli,
+		namespace, name)
+	if err != nil {
+		return wrapErr("could not get snapshots metadata", err)
+	}
+
+	origCluster := cluster.DeepCopy()
+
+	cluster.UpdateBackupTimes(apiv1.BackupMethodVolumeSnapshot, oldestSnapshot, newestSnapshot)
+
+	if !reflect.DeepEqual(origCluster.Status, cluster.Status) {
+		err = cli.Status().Patch(ctx, &cluster, client.MergeFrom(origCluster))
+		if err != nil {
+			return wrapErr("could not patch cluster status", err)
+		}
+	}
+	return nil
 }
 
 // isErrorRetryable detects is an error is retryable or not

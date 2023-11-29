@@ -732,13 +732,23 @@ type ClusterStatus struct {
 	// +optional
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
 
-	// The first recoverability point, stored as a date in RFC3339 format
+	// The first recoverability point, stored as a date in RFC3339 format.
+	// This field is calculated from the content of FirstRecoverabilityPointByMethod
 	// +optional
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
-	// Stored as a date in RFC3339 format
+	// The first recoverability point, stored as a date in RFC3339 format, per backup method type
+	// +optional
+	FirstRecoverabilityPointByMethod map[BackupMethod]metav1.Time `json:"firstRecoverabilityPointByMethod,omitempty"`
+
+	// Last successful backup, stored as a date in RFC3339 format
+	// This field is calculated from the content of LastSuccessfulBackupByMethod
 	// +optional
 	LastSuccessfulBackup string `json:"lastSuccessfulBackup,omitempty"`
+
+	// Last successful backup, stored as a date in RFC3339 format, per backup method type
+	// +optional
+	LastSuccessfulBackupByMethod map[BackupMethod]metav1.Time `json:"lastSuccessfulBackupByMethod,omitempty"`
 
 	// Stored as a date in RFC3339 format
 	// +optional
@@ -2989,6 +2999,65 @@ func (backupConfiguration *BackupConfiguration) IsBarmanEndpointCASet() bool {
 		backupConfiguration.BarmanObjectStore.EndpointCA != nil &&
 		backupConfiguration.BarmanObjectStore.EndpointCA.Name != "" &&
 		backupConfiguration.BarmanObjectStore.EndpointCA.Key != ""
+}
+
+// UpdateBackupTimes sets the firstRecoverabilityPoint and lastSuccessfulBackup
+// for the provided method, as well as the overall firstRecoverabilityPoint and
+// lastSuccessfulBackup for the cluster
+func (cluster *Cluster) UpdateBackupTimes(
+	backupMethod BackupMethod,
+	firstRecoverabilityPoint *time.Time,
+	lastSuccessfulBackup *time.Time,
+) {
+	type comparer func(a metav1.Time, b metav1.Time) bool
+	// tryGetMaxTime gets either the newest or oldest time from a set of backup times,
+	// depending on the comparer argument passed to it
+	tryGetMaxTime := func(m map[BackupMethod]metav1.Time, compare comparer) string {
+		var maximum metav1.Time
+		for _, ts := range m {
+			if maximum.IsZero() || compare(ts, maximum) {
+				maximum = ts
+			}
+		}
+		result := ""
+		if !maximum.IsZero() {
+			result = maximum.Format(time.RFC3339)
+		}
+
+		return result
+	}
+
+	setTime := func(backupTimes map[BackupMethod]metav1.Time, value *time.Time) map[BackupMethod]metav1.Time {
+		if value == nil {
+			delete(backupTimes, backupMethod)
+			return backupTimes
+		}
+
+		if backupTimes == nil {
+			backupTimes = make(map[BackupMethod]metav1.Time)
+		}
+
+		backupTimes[backupMethod] = metav1.NewTime(*value)
+		return backupTimes
+	}
+
+	cluster.Status.FirstRecoverabilityPointByMethod = setTime(cluster.Status.FirstRecoverabilityPointByMethod,
+		firstRecoverabilityPoint)
+	cluster.Status.FirstRecoverabilityPoint = tryGetMaxTime(
+		cluster.Status.FirstRecoverabilityPointByMethod,
+		// we pass a comparer to get the first among the recoverability points
+		func(a metav1.Time, b metav1.Time) bool {
+			return a.Before(&b)
+		})
+
+	cluster.Status.LastSuccessfulBackupByMethod = setTime(cluster.Status.LastSuccessfulBackupByMethod,
+		lastSuccessfulBackup)
+	cluster.Status.LastSuccessfulBackup = tryGetMaxTime(
+		cluster.Status.LastSuccessfulBackupByMethod,
+		// we pass a comparer to get the last among the last backup times per method
+		func(a metav1.Time, b metav1.Time) bool {
+			return b.Before(&a)
+		})
 }
 
 // BuildPostgresOptions create the list of options that
