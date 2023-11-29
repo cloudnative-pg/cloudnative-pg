@@ -36,17 +36,17 @@ def flatten(arr):
 
 
 def env_to_json():
-    """Convert a set of environment varialbes into a valid JSON with the following
-    format:
-     {
-        "runner": , # eg. local, aks
-        "id": , # the matrix ID eg. local-v1.22.2-PostgreSQL-13.5
-        "postgres": , # version of PostgreSQL eg. 13.5
-        "kubernetes": , # version of K8s eg. v1.22.2
+    """Convert a set of environment variables into a valid JSON with the following format:
+    {
+        "runner": , # e.g. local, aks, eks, gke
+        "id": , # the matrix ID e.g. local-v1.22.2-PostgreSQL-13.5
+        "postgres": , # version of PostgreSQL e.g. 13.5
+        "postgres_kind": , # flavor of PostgreSQL
+        "kubernetes": , # version of K8s e.g. v1.22.2
         "runid": , # the GH Action run-id -> ${{ github.run_id }}
-        "branch": , # dev/xxxx-1666 -> you get this with "${{github.head_ref}}" ... EXCEPT
-        "refname": , # it may be blank, and then we want: "${{github.ref_name}}"
-        "repo": , # cloudnative-pg/cloudnative-pg -> you get this from GH with ${{github.repository}}
+        "branch": , # dev/xxxx-1666 -> you get this with "${{ github.head_ref }}" ... EXCEPT
+        "refname": , # it may be blank, and then we want: "${{ github.ref_name }}"
+        "repo": , # cloudnative-pg/cloudnative-pg -> you get this from GH with ${{ github.repository }}
     }
     """
 
@@ -77,18 +77,19 @@ def env_to_json():
 
 
 def convert_ginkgo_test(test, matrix):
-    """converts a test spec in ginkgo JSON format into a normalized JSON object.
+    """Converts a test spec in ginkgo JSON format into a normalized JSON object.
     The matrix arg will be passed from the GH Actions, and is expected to be
     a JSON of the form:
     {
-        "runner": , # eg. local, aks
-        "id": , # the matrix ID eg. local-v1.22.2-PostgreSQL-13.5
-        "postgres": , # version of PostgreSQL eg. 13.5
-        "kubernetes": , # version of K8s eg. v1.22.2
+        "runner": , # e.g. local, aks, eks, gke
+        "id": , # the matrix ID e.g. local-v1.22.2-PostgreSQL-13.5
+        "postgres": , # version of PostgreSQL e.g. 13.5
+        "postgres_kind": , # flavor of PostgreSQL
+        "kubernetes": , # version of K8s e.g. v1.22.2
         "runid": , # the GH Action run-id -> ${{ github.run_id }}
-        "branch": , # dev/xxxx-1666 -> you get this with "${{github.head_ref}}" ... EXCEPT
-        "refname": , # depending on how the job was triggered, the above may be blank, and then we want: "${{github.ref_name}}"
-        "repo": , # cloudnative-pg/cloudnative-pg -> you get this from GH with ${{github.repository}}
+        "branch": , # dev/xxxx-1666 -> you get this with "${{ github.head_ref }}" ... EXCEPT
+        "refname": , # it may be blank, and then we want: "${{ github.ref_name }}"
+        "repo": , # cloudnative-pg/cloudnative-pg -> you get this from GH with ${{ github.repository }}
     }
     """
     err = ""
@@ -100,8 +101,8 @@ def convert_ginkgo_test(test, matrix):
         err_line = test["Failure"]["Location"]["LineNumber"]
 
     state = test["State"]
-    # if the test failed but it had an Ignore label, mark it as ignoreFailed
-    # so it doesn't count as FAILED but we can still see how much it's failing
+    # If the test failed but had an Ignore label, mark it as ignoreFailed.
+    # In such case it doesn't count as FAILED, but we can still see how much it's failing
     if (
         state == "failed"
         and "ContainerHierarchyLabels" in t
@@ -215,16 +216,22 @@ if __name__ == "__main__":
         "-e",
         "--environment",
         type=bool,
-        help="tell the script to use environment variable sto get the GH execution variables",
+        help="get the matrix arguments from environment variables. "
+             "Variables defined with -m/--matrix take priority",
     )
 
     args = parser.parse_args()
 
     print("test matrix: ")
+    matrix = {}
+    # First, try to gather the matrix from env variables
     if args.environment:
         matrix = json.loads(env_to_json())
-    elif args.matrix:
-        matrix = json.loads(args.matrix)
+    # If defined, user provided arguments will take priority
+    if args.matrix:
+        args_matrix = json.loads(args.matrix)
+        matrix.update(args_matrix)
+
     print(matrix)
 
     outputDir = ""
