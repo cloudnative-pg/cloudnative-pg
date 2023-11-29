@@ -719,7 +719,7 @@ func (instance *Instance) WaitForPrimaryAvailable() error {
 		_ = db.Close()
 	}()
 
-	return waitForConnectionAvailable(db)
+	return instance.waitForConnectionAvailable(db)
 }
 
 // CompleteCrashRecovery temporary starts up the server and wait for it
@@ -744,12 +744,12 @@ func (instance *Instance) WaitForSuperuserConnectionAvailable() error {
 		return err
 	}
 
-	return waitForConnectionAvailable(db)
+	return instance.waitForConnectionAvailable(db)
 }
 
 // waitForConnectionAvailable waits until we can connect to the passed
 // sql.DB connection
-func waitForConnectionAvailable(db *sql.DB) error {
+func (instance *Instance) waitForConnectionAvailable(db *sql.DB) error {
 	errorIsRetryable := func(err error) bool {
 		return err != nil
 	}
@@ -757,7 +757,10 @@ func waitForConnectionAvailable(db *sql.DB) error {
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
 		err := db.Ping()
 		if err != nil {
-			log.Info("DB not available, will retry", "err", err)
+			if !instance.isStatusRunning() && err.Error() == "sql: database is closed" {
+				return nil
+			}
+			log.Info("DB not available, will retry for connections available", "err", err)
 		}
 		return err
 	})
@@ -831,7 +834,7 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
 		result, err := db.Query("IDENTIFY_SYSTEM")
 		if err != nil || result.Err() != nil {
-			log.Info("DB not available, will retry", "err", err)
+			log.Info("DB not available, will retry for streaming connection available", "err", err)
 			return err
 		}
 		defer func() {
