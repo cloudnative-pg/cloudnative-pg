@@ -22,9 +22,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -77,6 +79,32 @@ var _ = Describe("pooler_controller unit tests", func() {
 			Expect(reqs).To(HaveLen(len(expectedContent)))
 			Expect(reqs).To(Equal(expectedContent))
 		})
+	})
+
+	It("should make sure to create a request for any pooler owned secret", func() {
+		namespace := newFakeNamespace()
+		cluster := newFakeCNPGCluster(namespace)
+
+		pooler1 := *newFakePooler(cluster)
+		pooler2 := *newFakePooler(cluster)
+		poolerList := v1.PoolerList{Items: []v1.Pooler{pooler1, pooler2}}
+
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "random-image-pull-secret",
+				Namespace: namespace,
+			},
+		}
+
+		err := ctrl.SetControllerReference(&pooler1, secret, schemeBuilder.BuildWithAllKnownScheme())
+		Expect(err).ToNot(HaveOccurred())
+
+		req := getPoolersUsingSecret(poolerList, secret)
+		Expect(req).To(HaveLen(1))
+		Expect(req[0]).To(Equal(types.NamespacedName{
+			Name:      pooler1.Name,
+			Namespace: pooler1.Namespace,
+		}))
 	})
 
 	It("should make sure that mapSecretToPooler produces the correct requests", func() {
