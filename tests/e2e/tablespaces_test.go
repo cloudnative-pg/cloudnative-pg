@@ -59,6 +59,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 		cluster     *apiv1.Cluster
 	)
 
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -146,6 +148,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				"/tablespaces/cluster-with-tablespaces.yaml.template"
 			clusterBackupManifest = fixturesDir +
 				"/tablespaces/cluster-with-tablespaces-backup.yaml.template"
+			fullBackupName = "full-barman-backup"
 		)
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
@@ -206,7 +209,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				addTablespaces(cluster, map[string]apiv1.TablespaceConfiguration{
 					"thirdtablespace": {
 						Storage: apiv1.StorageConfiguration{
-							Size: "1Gi",
+							Size:         "1Gi",
+							StorageClass: &storageClassName,
 						},
 					},
 				})
@@ -243,7 +247,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 					apiv1.ConditionBackup,
 				)
 				Expect(err).ShouldNot(HaveOccurred())
-				_, stderr, err := testUtils.Run(fmt.Sprintf("kubectl cnpg backup %s -n %s", clusterName, namespace))
+				_, stderr, err := testUtils.Run(
+					fmt.Sprintf("kubectl cnpg backup %s -n %s --backup-name %s",
+						clusterName, namespace, fullBackupName))
 				Expect(stderr).To(BeEmpty())
 				Expect(err).ShouldNot(HaveOccurred())
 				AssertBackupConditionTimestampChangedInClusterStatus(
@@ -276,6 +282,33 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.LastFailedBackup, err
 				}, 30).Should(BeEmpty())
+			})
+		})
+
+		It("can create the cluster by restoring from the object store", func() {
+			barmanBackupNameEnv := "BARMAN_BACKUP_NAME"
+			err := os.Setenv(barmanBackupNameEnv, fullBackupName)
+			Expect(err).ToNot(HaveOccurred())
+
+			const clusterRestoreFromBarmanManifest string = fixturesDir +
+				"/tablespaces/restore-cluster-from-barman.yaml.template"
+
+			restoredClusterName, err := env.GetResourceNameFromYAML(clusterRestoreFromBarmanManifest)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating the cluster to be restored through snapshot", func() {
+				AssertCreateCluster(namespace, restoredClusterName, clusterRestoreFromBarmanManifest, env)
+				AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReadySlow],
+					env)
+			})
+
+			By("verifying that tablespaces and PVC were created", func() {
+				restoredCluster, err := env.GetCluster(namespace, restoredClusterName)
+				Expect(err).ToNot(HaveOccurred())
+				AssertClusterHasMountPointsAndVolumesForTablespaces(restoredCluster, 3,
+					testTimeouts[testUtils.Short])
+				AssertClusterHasPvcsAndDataDirsForTablespaces(restoredCluster, testTimeouts[testUtils.Short])
+				AssertDatabaseContainsTablespaces(restoredCluster, testTimeouts[testUtils.Short])
 			})
 		})
 	})
@@ -648,6 +681,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			})
 		})
 	})
+
 	Context("on a plain cluster with primaryUpdateMethod=switchover", Ordered, func() {
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
