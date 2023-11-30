@@ -34,4 +34,7 @@ type TablespaceManager interface {
 
 	// Create the tablespace in the database
 	Create(ctx context.Context, tablespace Tablespace) error
+
+	// Update the tablespace in the database (change ownership)
+	Update(ctx context.Context, tablespace Tablespace) error
 }
