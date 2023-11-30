@@ -52,12 +52,12 @@ type (
 
 // possible tablespace actions
 const (
-	// TbsIsReconciled tablespaces action represent tablespace already reconciled
+	// TbsIsReconciled means the tablespace already reconciled
 	TbsIsReconciled TablespaceAction = "RECONCILED"
-	// TbsToCreate tablespaces action represent tablespace going to create
+	// TbsToCreate means the tablespace needs to be created
 	TbsToCreate TablespaceAction = "CREATE"
-	// TbsPending tablespaces action represent tablespace can not be created now, waiting for pending pvc ready
-	TbsPending TablespaceAction = "PENDING"
+	// TbsToUpdate means the tablespace needs to be updated
+	TbsToUpdate TablespaceAction = "UPDATE"
 )
 
 // TablespaceConfigurationAdapter the adapter class for tablespace configuration
@@ -87,11 +87,17 @@ func evaluateNextActions(
 	// we go through all the tablespaces in spec and create them if missing in DB
 	// NOTE: we do not at the moment support update/Delete
 	for tbsInSpecName, tbsInSpec := range tablespaceInSpecMap {
-		_, isTbsInDB := tbsInDBNamed[tbsInSpecName]
+		dbTablespace, isTbsInDB := tbsInDBNamed[tbsInSpecName]
+
 		switch {
 		case !isTbsInDB:
 			tablespaceByAction[TbsToCreate] = append(tablespaceByAction[TbsToCreate],
 				tablespaceAdapterFromName(tbsInSpecName, tbsInSpec))
+
+		case dbTablespace.Owner != tbsInSpec.Owner:
+			tablespaceByAction[TbsToUpdate] = append(tablespaceByAction[TbsToUpdate],
+				tablespaceAdapterFromName(tbsInSpecName, tbsInSpec))
+
 		default:
 			tablespaceByAction[TbsIsReconciled] = append(tablespaceByAction[TbsIsReconciled],
 				tablespaceAdapterFromName(tbsInSpecName, tbsInSpec))
@@ -101,12 +107,12 @@ func evaluateNextActions(
 	return tablespaceByAction
 }
 
-// convertToTablespaceNameByStatus convert the next action need to status so we can patch it to cluster
+// convertToTablespaceNameByStatus convert the next action need to status, so we can patch it to cluster
 func (r TablespaceByAction) convertToTablespaceNameByStatus() TablespaceNameByStatus {
 	statusByAction := map[TablespaceAction]apiv1.TablespaceStatus{
 		TbsIsReconciled: apiv1.TablespaceStatusReconciled,
 		TbsToCreate:     apiv1.TablespaceStatusPendingReconciliation,
-		TbsPending:      apiv1.TablespaceStatusPendingReconciliation,
+		TbsToUpdate:     apiv1.TablespaceStatusPendingReconciliation,
 	}
 
 	tablespaceByStatus := make(TablespaceNameByStatus)

@@ -1677,12 +1677,12 @@ func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
 
 	var result field.ErrorList
 	for name := range backupTbs {
-		if name, ok := r.Spec.Tablespaces[name]; !ok {
+		if _, ok := r.Spec.Tablespaces[name]; !ok {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "backup", "volumeSnapshot", "tablespaceClassName"),
 				name,
-				"specified the VolumeSnapshot backup configuration for the tablespace: %s, but it can't be found in the "+
-					"the '.spec.tablespaces' stanza",
+				fmt.Sprintf("specified the VolumeSnapshot backup configuration for the tablespace: %s, "+
+					"but it can't be found in the '.spec.tablespaces' stanza", name),
 			))
 		}
 	}
