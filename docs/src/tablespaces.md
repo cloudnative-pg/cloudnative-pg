@@ -66,7 +66,28 @@ in the high availability Postgres cluster, and mount them in each pod when they
 have been provisioned.
 
 Then, it will ensure that the `current` and `this_year` tablespace are created
-on the primary PostgreSQL instance using the `CREATE TABLESPACE` command.
+on the primary PostgreSQL instance using the `CREATE TABLESPACE` command. By
+default, unless differently specified, tablespaces are owned by the `app`
+application user (as defined in `.spec.bootstrap.initdb.owner`) — see
+["Bootstrap a new cluster](bootstrap.md#bootstrap-an-empty-cluster-initdb) for
+details.
+This default behavior should work in most microservice database use cases.
+
+You can change the owner of a tablespace through the `owner` option, for example
+the `postgres` user, like in the following excerpt:
+
+```yaml
+  # ...
+  tablespaces:
+    clapton:
+      size: 10Gi
+      owner: postgres
+```
+
+!!! Important
+    Make sure that, if you change the ownership of a tablespace, you are using
+    an existing role. Otherwise, the status of the cluster will report the
+    issue and stop reconciling tablespaces until fixed.
 
 ## Adding a new tablespace
 
