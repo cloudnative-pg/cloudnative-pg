@@ -180,11 +180,11 @@ func (r *TablespaceReconciler) applyCreateTablespace(
 	ctx context.Context,
 	tbsManager infrastructure.TablespaceManager,
 	tbsStorageManager tablespaceStorageManager,
-	actionList []TablespaceConfigurationAdapter,
+	tbsConfigs []TablespaceConfigurationAdapter,
 ) (*ctrl.Result, error) {
 	contextLog := log.FromContext(ctx).WithName("tbs_create_reconciler")
 
-	for _, tbs := range actionList {
+	for _, tbs := range tbsConfigs {
 		contextLog.Trace("creating tablespace ", "tablespace", tbs.Name)
 		tbs := tbs
 		tablespace := infrastructure.Tablespace{
@@ -212,11 +212,11 @@ func (r *TablespaceReconciler) applyCreateTablespace(
 func (r *TablespaceReconciler) applyUpdateTablespace(
 	ctx context.Context,
 	tbsManager infrastructure.TablespaceManager,
-	actionList []TablespaceConfigurationAdapter,
+	tbsConfigs []TablespaceConfigurationAdapter,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("tbs_update_reconciler")
 
-	for _, tbs := range actionList {
+	for _, tbs := range tbsConfigs {
 		contextLog.Trace("updating tablespace ", "tablespace", tbs.Name)
 		tbs := tbs
 		tablespace := infrastructure.Tablespace{

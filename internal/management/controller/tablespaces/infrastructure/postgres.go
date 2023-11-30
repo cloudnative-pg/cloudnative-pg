@@ -118,16 +118,16 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 	return nil
 }
 
-// Create the tablespace in the database, if tablespace is temporary tablespace, need reload configure
+// Update the tablespace in the database (change ownership)
 func (tbsMgr postgresTablespaceManager) Update(ctx context.Context, tbs Tablespace) error {
-	contextLog := log.FromContext(ctx).WithName("tbs_reconciler_create")
+	contextLog := log.FromContext(ctx).WithName("tbs_reconciler_update")
 	tablespaceLocation := specs.LocationForTablespace(tbs.Name)
 
 	contextLog.Info("Updating tablespace",
 		"tablespace", tbs,
 		"tablespaceLocation", tablespaceLocation)
 	wrapErr := func(err error) error {
-		return fmt.Errorf("while creating tablespace %s: %w", tbs.Name, err)
+		return fmt.Errorf("while updating tablespace %s: %w", tbs.Name, err)
 	}
 	var err error
 	if _, err = tbsMgr.superUserDB.ExecContext(

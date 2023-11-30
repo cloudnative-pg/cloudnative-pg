@@ -52,14 +52,12 @@ type (
 
 // possible tablespace actions
 const (
-	// TbsIsReconciled tablespaces action represent tablespace already reconciled
+	// TbsIsReconciled means the tablespace already reconciled
 	TbsIsReconciled TablespaceAction = "RECONCILED"
-	// TbsToCreate tablespaces action represent tablespace going to create
+	// TbsToCreate means the tablespace needs to be created
 	TbsToCreate TablespaceAction = "CREATE"
-	// TbsToReconcile tablespaces action represent tablespaces on which we need to change
+	// TbsToReconcile means the tablespace needs to be updated
 	TbsToUpdate TablespaceAction = "UPDATE"
-	// TbsPending tablespaces action represent tablespace can not be created now, waiting for pending pvc ready
-	TbsPending TablespaceAction = "PENDING"
 )
 
 // TablespaceConfigurationAdapter the adapter class for tablespace configuration
@@ -115,7 +113,6 @@ func (r TablespaceByAction) convertToTablespaceNameByStatus() TablespaceNameBySt
 		TbsIsReconciled: apiv1.TablespaceStatusReconciled,
 		TbsToCreate:     apiv1.TablespaceStatusPendingReconciliation,
 		TbsToUpdate:     apiv1.TablespaceStatusPendingReconciliation,
-		TbsPending:      apiv1.TablespaceStatusPendingReconciliation,
 	}
 
 	tablespaceByStatus := make(TablespaceNameByStatus)
