@@ -407,6 +407,14 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 
 	patchedPdb := oldPdb.DeepCopy()
 	patchedPdb.Spec = pdb.Spec
+
+	if patchedPdb.Annotations == nil {
+		patchedPdb.Annotations = map[string]string{}
+	}
+	if patchedPdb.Labels == nil {
+		patchedPdb.Labels = map[string]string{}
+	}
+
 	utils.MergeMap(patchedPdb.Annotations, pdb.Annotations)
 	utils.MergeMap(patchedPdb.Labels, pdb.Labels)
 
