@@ -4395,18 +4395,27 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
-              tablespacesStatus:
+              tablespaceStatus:
                 description: TablespaceStatus reports the state of the declarative
                   tablespaces in the cluster
-                properties:
-                  byStatus:
-                    additionalProperties:
-                      items:
-                        type: string
-                      type: array
-                    description: ByStatus gives the list of tablespaces in each state
-                    type: object
-                type: object
+                items:
+                  description: TablespaceState represent the status of a tablespace
+                    in a cluster
+                  properties:
+                    error:
+                      description: Error is the reconciliation error, if any
+                      type: string
+                    name:
+                      description: Name is the name of the tablespace
+                      type: string
+                    status:
+                      description: State is the latest reconciliation state
+                      type: string
+                  required:
+                  - name
+                  - status
+                  type: object
+                type: array
               targetPrimary:
                 description: Target primary instance, this is different from the previous
                   one during a switchover or a failover

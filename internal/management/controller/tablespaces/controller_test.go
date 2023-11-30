@@ -108,7 +108,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			result, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+			result, _, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
 				mockTablespaceStorageManager{}, tbsByAction)
 			Expect(result).To(BeNil())
 			Expect(err).ShouldNot(HaveOccurred())
@@ -172,7 +172,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			result, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+			result, _, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
 				mockTablespaceStorageManager{}, tbsByAction)
 			Expect(result).To(BeNil())
 			Expect(err).ShouldNot(HaveOccurred())
@@ -193,7 +193,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			result, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+			result, _, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
 				mockTablespaceStorageManager{
 					unavailableStorageLocations: []string{
 						"/foo",

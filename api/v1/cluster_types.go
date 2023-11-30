@@ -638,22 +638,29 @@ type ManagedRoles struct {
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
+// TablespaceState represent the status of a tablespace in a cluster
+type TablespaceState struct {
+	// Name is the name of the tablespace
+	Name string `json:"name"`
+
+	// State is the latest reconciliation state
+	State TablespaceStatus `json:"status"`
+
+	// Error is the reconciliation error, if any
+	// +optional
+	Error string `json:"error,omitempty"`
+}
+
 // TablespaceStatus represents the status of a tablespace in the cluster
 type TablespaceStatus string
 
 const (
 	// TablespaceStatusReconciled indicates the tablespace in DB matches the Spec
 	TablespaceStatusReconciled TablespaceStatus = "reconciled"
+
 	// TablespaceStatusPendingReconciliation indicates the tablespace in Spec requires creation in the DB
 	TablespaceStatusPendingReconciliation TablespaceStatus = "pending"
 )
-
-// TablespacesState tracks the status of a cluster's declarative tablespaces
-type TablespacesState struct {
-	// ByStatus gives the list of tablespaces in each state
-	// +optional
-	ByStatus map[TablespaceStatus][]string `json:"byStatus,omitempty"`
-}
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
@@ -679,7 +686,7 @@ type ClusterStatus struct {
 
 	// TablespaceStatus reports the state of the declarative tablespaces in the cluster
 	// +optional
-	TablespaceStatus TablespacesState `json:"tablespacesStatus,omitempty"`
+	TablespaceStatus []TablespaceState `json:"tablespaceStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	// +optional

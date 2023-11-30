@@ -109,7 +109,7 @@ func (r *TablespaceReconciler) reconcile(
 	}
 
 	// Reconcile the tablespaces into the database
-	result, applyError := r.applyTablespaceActions(
+	result, irreconcilableTablespaces, applyError := r.applyTablespaceActions(
 		ctx,
 		tbsManager,
 		tbsStorageManager,
@@ -127,6 +127,9 @@ func (r *TablespaceReconciler) reconcile(
 	tbsByAction = evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	updatedCluster := cluster.DeepCopy()
 	updatedCluster.Status.TablespaceStatus.ByStatus = tbsByAction.convertToTablespaceNameByStatus()
+	if len(irreconcilableTablespaces) > 0 {
+		updatedCluster.Status.TablespaceStatus.CannotReconcile = irreconcilableTablespaces
+	}
 	if err := r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster)); err != nil {
 		return nil, fmt.Errorf("while setting the tablespace reconciler status: %w", err)
 	}
@@ -135,14 +138,36 @@ func (r *TablespaceReconciler) reconcile(
 }
 
 // applyTablespaceActions applies the actions to reconcile tablespace in the DB with the Spec
+// returns a k8s Result, a collection of tablespaces with Postgres errors, and an error argument
+// in case of unexpected errors
 func (r *TablespaceReconciler) applyTablespaceActions(
 	ctx context.Context,
 	tbsManager infrastructure.TablespaceManager,
 	tbsStorageManager tablespaceStorageManager,
 	tbsByAction TablespaceByAction,
-) (*ctrl.Result, error) {
+) (*ctrl.Result, map[string][]string, error) {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
 
+	irreconcilableTablespaces := make(map[string][]string)
+	var applyErr error
+
+	handleError := func(err error, tbsName string, action TablespaceAction) {
+		// log unexpected errors, collect expectable PostgreSQL errors
+		if err == nil {
+			return
+		}
+		isExpectable, newErr := getTablespaceError(err, tbsName, action)
+		if isExpectable {
+			irreconcilableTablespaces[tbsName] = append(irreconcilableTablespaces[tbsName], newErr.Error())
+		} else {
+			contextLog.Error(newErr, "while performing action",
+				"action", action,
+				"tablespace", tbsName)
+			applyErr = err
+		}
+	}
+
+	var needRequeue bool
 	for action, tbsAdapters := range tbsByAction {
 		if action == TbsIsReconciled {
 			contextLog.Debug("no action required", "action", action)
@@ -173,7 +198,11 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 		}
 	}
 
-	return nil, nil
+	if needRequeue {
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, irreconcilableTablespaces, applyErr
+	}
+
+	return nil, irreconcilableTablespaces, applyErr
 }
 
 func (r *TablespaceReconciler) applyCreateTablespace(
