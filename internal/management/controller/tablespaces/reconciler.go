@@ -152,34 +152,85 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 		contextLog.Debug("tablespaces in database out of sync with in Spec, evaluating action",
 			"tablespaces", getTablespaceNames(tbsAdapters), "action", action)
 
-		if action != TbsToCreate {
-			contextLog.Error(errors.New("only tablespace creation is supported"), "action", action)
-			continue
-		}
+		switch action {
+		case TbsToCreate:
+			if result, err := r.applyCreateTablespace(
+				ctx,
+				tbsManager,
+				tbsStorageManager,
+				tbsAdapters,
+			); result != nil || err != nil {
+				return result, err
+			}
 
-		for _, tbs := range tbsAdapters {
-			contextLog.Trace("creating tablespace ", "tablespace", tbs.Name)
-			tbs := tbs
-			tablespace := infrastructure.Tablespace{
-				Name:  tbs.Name,
-				Owner: tbs.Owner,
-			}
-			if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
-				contextLog.Debug("deferring tablespace until creation of the mount point for the new volume",
-					"tablespaceName", tbs.Name,
-					"tablespacePath", tbsStorageManager.getStorageLocation(tbs.Name))
-				return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-			}
-			err := tbsManager.Create(ctx, tablespace)
-			if err != nil {
-				contextLog.Error(
-					err, "while performing action",
-					"action", action,
-					"tablespace", tbs.Name)
+		case TbsToUpdate:
+			if err := r.applyUpdateTablespace(ctx, tbsManager, tbsAdapters); err != nil {
 				return nil, err
 			}
+
+		default:
+			contextLog.Error(errors.New("unsupported action"), "action", action)
 		}
 	}
 
 	return nil, nil
+}
+
+func (r *TablespaceReconciler) applyCreateTablespace(
+	ctx context.Context,
+	tbsManager infrastructure.TablespaceManager,
+	tbsStorageManager tablespaceStorageManager,
+	actionList []TablespaceConfigurationAdapter,
+) (*ctrl.Result, error) {
+	contextLog := log.FromContext(ctx).WithName("tbs_create_reconciler")
+
+	for _, tbs := range actionList {
+		contextLog.Trace("creating tablespace ", "tablespace", tbs.Name)
+		tbs := tbs
+		tablespace := infrastructure.Tablespace{
+			Name:  tbs.Name,
+			Owner: tbs.Owner,
+		}
+		if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
+			contextLog.Debug("deferring tablespace until creation of the mount point for the new volume",
+				"tablespaceName", tbs.Name,
+				"tablespacePath", tbsStorageManager.getStorageLocation(tbs.Name))
+			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		err := tbsManager.Create(ctx, tablespace)
+		if err != nil {
+			contextLog.Error(
+				err, "while performing action",
+				"tablespace", tbs.Name)
+			return nil, err
+		}
+	}
+
+	return nil, nil
+}
+
+func (r *TablespaceReconciler) applyUpdateTablespace(
+	ctx context.Context,
+	tbsManager infrastructure.TablespaceManager,
+	actionList []TablespaceConfigurationAdapter,
+) error {
+	contextLog := log.FromContext(ctx).WithName("tbs_update_reconciler")
+
+	for _, tbs := range actionList {
+		contextLog.Trace("updating tablespace ", "tablespace", tbs.Name)
+		tbs := tbs
+		tablespace := infrastructure.Tablespace{
+			Name:  tbs.Name,
+			Owner: tbs.Owner,
+		}
+		err := tbsManager.Update(ctx, tablespace)
+		if err != nil {
+			contextLog.Error(
+				err, "while performing action",
+				"tablespace", tbs.Name)
+			return err
+		}
+	}
+
+	return nil
 }

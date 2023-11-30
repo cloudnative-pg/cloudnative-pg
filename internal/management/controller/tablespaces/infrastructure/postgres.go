@@ -98,7 +98,7 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 	tablespaceLocation := specs.LocationForTablespace(tbs.Name)
 
 	contextLog.Info("Creating tablespace",
-		"tablespaceName", tbs,
+		"tablespace", tbs,
 		"tablespaceLocation", tablespaceLocation)
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while creating tablespace %s: %w", tbs.Name, err)
@@ -111,6 +111,31 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 			pgx.Identifier{tbs.Name}.Sanitize(),
 			pgx.Identifier{tbs.Owner}.Sanitize(),
 			tablespaceLocation,
+		),
+	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
+}
+
+// Create the tablespace in the database, if tablespace is temporary tablespace, need reload configure
+func (tbsMgr postgresTablespaceManager) Update(ctx context.Context, tbs Tablespace) error {
+	contextLog := log.FromContext(ctx).WithName("tbs_reconciler_create")
+	tablespaceLocation := specs.LocationForTablespace(tbs.Name)
+
+	contextLog.Info("Updating tablespace",
+		"tablespace", tbs,
+		"tablespaceLocation", tablespaceLocation)
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while creating tablespace %s: %w", tbs.Name, err)
+	}
+	var err error
+	if _, err = tbsMgr.superUserDB.ExecContext(
+		ctx,
+		fmt.Sprintf(
+			"ALTER TABLESPACE %s OWNER TO %s",
+			pgx.Identifier{tbs.Name}.Sanitize(),
+			pgx.Identifier{tbs.Owner}.Sanitize(),
 		),
 	); err != nil {
 		return wrapErr(err)

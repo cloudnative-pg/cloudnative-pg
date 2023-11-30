@@ -48,7 +48,8 @@ func (m *mockTablespaceManager) List(_ context.Context) ([]infrastructure.Tables
 func (m *mockTablespaceManager) Update(
 	_ context.Context, _ infrastructure.Tablespace,
 ) error {
-	return fmt.Errorf("not in use yet")
+	m.callHistory = append(m.callHistory, "update")
+	return nil
 }
 
 func (m *mockTablespaceManager) Create(
@@ -92,12 +93,14 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
+					Owner: "app",
 				},
 			}
 			tbsManager := mockTablespaceManager{
 				tablespaces: map[string]infrastructure.Tablespace{
 					"foo": {
-						Name: "foo",
+						Name:  "foo",
+						Owner: "app",
 					},
 				},
 			}
@@ -110,6 +113,36 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(tbsManager.callHistory).To(HaveLen(1))
 			Expect(tbsManager.callHistory).To(ConsistOf("list"))
+		})
+
+		It("will change the owner when needed", func(ctx context.Context) {
+			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
+				"foo": {
+					Storage: apiv1.StorageConfiguration{
+						Size: "1Gi",
+					},
+					Owner: "new_user",
+				},
+			}
+			tbsManager := mockTablespaceManager{
+				tablespaces: map[string]infrastructure.Tablespace{
+					"foo": {
+						Name:  "foo",
+						Owner: "app",
+					},
+				},
+			}
+			tbsInDatabase, err := tbsManager.List(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
+			Expect(tbsByAction[TbsToUpdate]).To(HaveLen(1))
+
+			result, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+				mockTablespaceStorageManager{}, tbsByAction)
+			Expect(result).To(BeNil())
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(tbsManager.callHistory).To(HaveLen(2))
+			Expect(tbsManager.callHistory).To(ConsistOf("list", "update"))
 		})
 
 		It("will create a tablespace in spec that is missing from DB", func(ctx context.Context) {
