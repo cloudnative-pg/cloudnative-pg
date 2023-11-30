@@ -249,15 +249,7 @@ func createOrPatchClusterCredentialSecret(
 	}
 
 	patchedSecret := currentSecret.DeepCopy()
-	if patchedSecret.Annotations == nil {
-		patchedSecret.Annotations = map[string]string{}
-	}
-	if patchedSecret.Labels == nil {
-		patchedSecret.Labels = map[string]string{}
-	}
-
-	utils.MergeMap(patchedSecret.Annotations, proposed.Annotations)
-	utils.MergeMap(patchedSecret.Labels, proposed.Labels)
+	utils.MergeObjectsMetadata(patchedSecret, proposed)
 
 	// we cannot compare the data due to the password being randomly generated everytime
 	if reflect.DeepEqual(patchedSecret.Labels, currentSecret.Labels) &&
@@ -363,11 +355,17 @@ func (r *ClusterReconciler) serviceReconciler(ctx context.Context, proposed *cor
 
 	// we preserve existing labels/annotation that could be added by third parties
 	if !utils.IsMapSubset(livingService.Labels, proposed.Labels) {
+		if livingService.Labels == nil {
+			livingService.Labels = map[string]string{}
+		}
 		utils.MergeMap(livingService.Labels, proposed.Labels)
 		shouldUpdate = true
 	}
 
 	if !utils.IsMapSubset(livingService.Annotations, proposed.Annotations) {
+		if livingService.Annotations == nil {
+			livingService.Labels = map[string]string{}
+		}
 		utils.MergeMap(livingService.Annotations, proposed.Annotations)
 		shouldUpdate = true
 	}
@@ -407,16 +405,7 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 
 	patchedPdb := oldPdb.DeepCopy()
 	patchedPdb.Spec = pdb.Spec
-
-	if patchedPdb.Annotations == nil {
-		patchedPdb.Annotations = map[string]string{}
-	}
-	if patchedPdb.Labels == nil {
-		patchedPdb.Labels = map[string]string{}
-	}
-
-	utils.MergeMap(patchedPdb.Annotations, pdb.Annotations)
-	utils.MergeMap(patchedPdb.Labels, pdb.Labels)
+	utils.MergeObjectsMetadata(patchedPdb, pdb)
 
 	if reflect.DeepEqual(patchedPdb.Spec, oldPdb.Spec) && reflect.DeepEqual(patchedPdb.ObjectMeta, oldPdb.ObjectMeta) {
 		// Everything fine, the two pdbs are the same for us
@@ -909,17 +898,8 @@ func createOrPatchPodMonitor(
 	default:
 		origPodMonitor := podMonitor.DeepCopy()
 		podMonitor.Spec = expectedPodMonitor.Spec
-
-		if podMonitor.Annotations == nil {
-			podMonitor.Annotations = map[string]string{}
-		}
-		if podMonitor.Labels == nil {
-			podMonitor.Labels = map[string]string{}
-		}
-
 		// We don't override the current labels/annotations given that there could be data that isn't managed by us
-		utils.MergeMap(podMonitor.Labels, expectedPodMonitor.Labels)
-		utils.MergeMap(podMonitor.Annotations, expectedPodMonitor.Annotations)
+		utils.MergeObjectsMetadata(podMonitor, expectedPodMonitor)
 
 		// If there's no changes we are done
 		if reflect.DeepEqual(origPodMonitor, podMonitor) {

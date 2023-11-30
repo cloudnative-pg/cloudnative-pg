@@ -101,15 +101,7 @@ func (r *PoolerReconciler) updateDeployment(
 		deployment := resources.Deployment.DeepCopy()
 		deployment.Spec = generatedDeployment.Spec
 
-		if deployment.Annotations == nil {
-			deployment.Annotations = map[string]string{}
-		}
-		if deployment.Labels == nil {
-			deployment.Labels = map[string]string{}
-		}
-
-		utils.MergeMap(deployment.Labels, generatedDeployment.Labels)
-		utils.MergeMap(deployment.Annotations, generatedDeployment.Annotations)
+		utils.MergeObjectsMetadata(deployment, generatedDeployment)
 
 		contextLog.Info("Updating deployment")
 		err = r.Patch(ctx, deployment, client.MergeFrom(resources.Deployment))
@@ -147,10 +139,7 @@ func (r *PoolerReconciler) reconcileService(
 
 	patchedService := resources.Service.DeepCopy()
 	patchedService.Spec = expectedService.Spec
-	if patchedService.Labels == nil {
-		patchedService.Labels = make(map[string]string)
-	}
-	utils.MergeMap(patchedService.Labels, expectedService.Labels)
+	utils.MergeObjectsMetadata(patchedService, expectedService)
 
 	if reflect.DeepEqual(patchedService.ObjectMeta, resources.Service.ObjectMeta) &&
 		reflect.DeepEqual(patchedService.Spec, resources.Service.Spec) {
