@@ -909,6 +909,14 @@ func createOrPatchPodMonitor(
 	default:
 		origPodMonitor := podMonitor.DeepCopy()
 		podMonitor.Spec = expectedPodMonitor.Spec
+
+		if podMonitor.Annotations == nil {
+			podMonitor.Annotations = map[string]string{}
+		}
+		if podMonitor.Labels == nil {
+			podMonitor.Labels = map[string]string{}
+		}
+
 		// We don't override the current labels/annotations given that there could be data that isn't managed by us
 		utils.MergeMap(podMonitor.Labels, expectedPodMonitor.Labels)
 		utils.MergeMap(podMonitor.Annotations, expectedPodMonitor.Annotations)

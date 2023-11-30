@@ -447,6 +447,13 @@ func (se *Reconciler) createSnapshot(
 		snapshotClassName = &snapshotConfig.ClassName
 	}
 
+	if pvc.Annotations == nil {
+		pvc.Annotations = map[string]string{}
+	}
+	if pvc.Labels == nil {
+		pvc.Labels = map[string]string{}
+	}
+
 	labels := pvc.Labels
 	utils.MergeMap(labels, snapshotConfig.Labels)
 	annotations := pvc.Annotations
