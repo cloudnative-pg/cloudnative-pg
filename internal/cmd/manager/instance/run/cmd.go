@@ -116,7 +116,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		"version", versions.Version,
 		"build", versions.Info)
 
-	gracefulShutdownTimeout := time.Duration(int64(instance.MaxStopDelay) * int64(time.Second))
+	gracefulShutdownTimeout := time.Duration(instance.MaxStopDelay) * time.Second
 
 	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
