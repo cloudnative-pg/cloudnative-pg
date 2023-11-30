@@ -4396,6 +4396,13 @@ the storage specification for the tablespace</p>
    <p>The storage configuration for the tablespace</p>
 </td>
 </tr>
+<tr><td><code>owner</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Owner is the PostgreSQL user owning the tablespace</p>
+</td>
+</tr>
 </tbody>
 </table>
 

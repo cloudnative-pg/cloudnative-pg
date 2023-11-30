@@ -153,6 +153,26 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 			SlotPrefix: "_cnpg_",
 		}
 	}
+
+	if len(r.Spec.Tablespaces) > 0 {
+		r.defaultTablespaces()
+	}
+}
+
+// defaultTablespaces adds the tablespace owner where the
+// user didn't specify it
+func (r *Cluster) defaultTablespaces() {
+	defaultOwner := r.GetApplicationDatabaseOwner()
+	if len(defaultOwner) == 0 {
+		defaultOwner = "postgres"
+	}
+
+	for name, tablespaceConfiguration := range r.Spec.Tablespaces {
+		if len(tablespaceConfiguration.Owner) == 0 {
+			tablespaceConfiguration.Owner = defaultOwner
+		}
+		r.Spec.Tablespaces[name] = tablespaceConfiguration
+	}
 }
 
 // defaultMonitoringQueries adds the default monitoring queries configMap

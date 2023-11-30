@@ -54,7 +54,14 @@ func (tbsMgr postgresTablespaceManager) List(ctx context.Context) ([]Tablespace,
 
 	rows, err := tbsMgr.superUserDB.QueryContext(
 		ctx,
-		"SELECT spcname FROM pg_tablespace WHERE spcname NOT LIKE $1",
+		`
+		SELECT
+			pg_tablespace.spcname spcname,
+			COALESCE(pg_roles.rolname, '') rolname
+		FROM pg_tablespace
+		LEFT JOIN pg_roles ON pg_tablespace.spcowner = pg_roles.oid
+		WHERE spcname NOT LIKE $1
+		`,
 		postgres.SystemTablespacesPrefix,
 	)
 	if err != nil {
@@ -71,6 +78,7 @@ func (tbsMgr postgresTablespaceManager) List(ctx context.Context) ([]Tablespace,
 		var tbs Tablespace
 		err := rows.Scan(
 			&tbs.Name,
+			&tbs.Owner,
 		)
 		if err != nil {
 			return nil, wrapErr(err)
@@ -99,8 +107,9 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 	if _, err = tbsMgr.superUserDB.ExecContext(
 		ctx,
 		fmt.Sprintf(
-			"CREATE TABLESPACE %s LOCATION '%s'",
+			"CREATE TABLESPACE %s OWNER %s LOCATION '%s'",
 			pgx.Identifier{tbs.Name}.Sanitize(),
+			pgx.Identifier{tbs.Owner}.Sanitize(),
 			tablespaceLocation,
 		),
 	); err != nil {
