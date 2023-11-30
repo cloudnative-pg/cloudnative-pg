@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MetadataNamespace is the annotation and label namespace used by the operator
@@ -370,12 +371,17 @@ func IsEmptyWalArchiveCheckEnabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[skipEmptyWalArchiveCheck] != string(annotationStatusEnabled)
 }
 
-// MergeMap transfers the content of a giver map to a receiver
-// ensure the receiver is not nil before call this method
-func MergeMap(receiver, giver map[string]string) {
+func mergeMap(receiver, giver map[string]string) map[string]string {
 	for key, value := range giver {
 		receiver[key] = value
 	}
+	return receiver
+}
+
+// MergeMap transfers the content of a giver map to a receiver
+// ensure the receiver is not nil before call this method
+func MergeMap(receiver, giver map[string]string) {
+	_ = mergeMap(receiver, giver)
 }
 
 // GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map
@@ -397,4 +403,17 @@ func SetInstanceRole(meta metav1.ObjectMeta, role string) {
 	}
 	meta.Labels[ClusterRoleLabelName] = role
 	meta.Labels[ClusterInstanceRoleLabelName] = role
+}
+
+// MergeObjectsMetadata is capable of merging the labels and annotations of two objects metadata
+func MergeObjectsMetadata(receiver client.Object, giver client.Object) {
+	if receiver.GetLabels() == nil {
+		receiver.SetLabels(map[string]string{})
+	}
+	if receiver.GetAnnotations() == nil {
+		receiver.SetAnnotations(map[string]string{})
+	}
+
+	receiver.SetLabels(mergeMap(receiver.GetLabels(), giver.GetLabels()))
+	receiver.SetAnnotations(mergeMap(receiver.GetAnnotations(), giver.GetAnnotations()))
 }
