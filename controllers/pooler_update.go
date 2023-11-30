@@ -101,6 +101,13 @@ func (r *PoolerReconciler) updateDeployment(
 		deployment := resources.Deployment.DeepCopy()
 		deployment.Spec = generatedDeployment.Spec
 
+		if deployment.Annotations == nil {
+			deployment.Annotations = map[string]string{}
+		}
+		if deployment.Labels == nil {
+			deployment.Labels = map[string]string{}
+		}
+
 		utils.MergeMap(deployment.Labels, generatedDeployment.Labels)
 		utils.MergeMap(deployment.Annotations, generatedDeployment.Annotations)
 

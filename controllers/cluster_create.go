@@ -406,6 +406,14 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 
 	patchedPdb := oldPdb.DeepCopy()
 	patchedPdb.Spec = pdb.Spec
+
+	if patchedPdb.Annotations == nil {
+		patchedPdb.Annotations = map[string]string{}
+	}
+	if patchedPdb.Labels == nil {
+		patchedPdb.Labels = map[string]string{}
+	}
+
 	utils.MergeMap(patchedPdb.Annotations, pdb.Annotations)
 	utils.MergeMap(patchedPdb.Labels, pdb.Labels)
 
@@ -900,6 +908,14 @@ func createOrPatchPodMonitor(
 	default:
 		origPodMonitor := podMonitor.DeepCopy()
 		podMonitor.Spec = expectedPodMonitor.Spec
+
+		if podMonitor.Annotations == nil {
+			podMonitor.Annotations = map[string]string{}
+		}
+		if podMonitor.Labels == nil {
+			podMonitor.Labels = map[string]string{}
+		}
+
 		// We don't override the current labels/annotations given that there could be data that isn't managed by us
 		utils.MergeMap(podMonitor.Labels, expectedPodMonitor.Labels)
 		utils.MergeMap(podMonitor.Annotations, expectedPodMonitor.Annotations)

@@ -346,6 +346,7 @@ func IsEmptyWalArchiveCheckEnabled(object *metav1.ObjectMeta) bool {
 }
 
 // MergeMap transfers the content of a giver map to a receiver
+// ensure the receiver is not nil before call this method
 func MergeMap(receiver, giver map[string]string) {
 	for key, value := range giver {
 		receiver[key] = value
