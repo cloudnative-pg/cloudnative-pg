@@ -20,7 +20,11 @@ import "context"
 
 // Tablespace represents the tablespace information read from / written to the Database
 type Tablespace struct {
+	// Name is the name of the tablespace
 	Name string `json:"name"`
+
+	// Owner is the owner of this tablespace
+	Owner string `json:"owner"`
 }
 
 // TablespaceManager abstracts the functionality of reconciling with PostgreSQL tablespaces

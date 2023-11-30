@@ -108,18 +108,18 @@ func (r *TablespaceReconciler) reconcile(
 		return nil, nil
 	}
 
-	if result, err := r.applyTablespaceActions(
+	// Reconcile the tablespaces into the database
+	result, applyError := r.applyTablespaceActions(
 		ctx,
 		tbsManager,
 		tbsStorageManager,
 		tbsByAction,
-	); result != nil || err != nil {
-		if err != nil {
-			err = fmt.Errorf("while reconciling tablespaces in the database: %w", err)
-		}
-		return result, err
+	)
+	if result != nil {
+		return result, nil
 	}
 
+	// Update the status of the cluster
 	tbsInDatabase, err = tbsManager.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
@@ -127,7 +127,11 @@ func (r *TablespaceReconciler) reconcile(
 	tbsByAction = evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	updatedCluster := cluster.DeepCopy()
 	updatedCluster.Status.TablespaceStatus.ByStatus = tbsByAction.convertToTablespaceNameByStatus()
-	return nil, r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster))
+	if err := r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster)); err != nil {
+		return nil, fmt.Errorf("while setting the tablespace reconciler status: %w", err)
+	}
+
+	return nil, applyError
 }
 
 // applyTablespaceActions applies the actions to reconcile tablespace in the DB with the Spec
@@ -157,7 +161,8 @@ func (r *TablespaceReconciler) applyTablespaceActions(
 			contextLog.Trace("creating tablespace ", "tablespace", tbs.Name)
 			tbs := tbs
 			tablespace := infrastructure.Tablespace{
-				Name: tbs.Name,
+				Name:  tbs.Name,
+				Owner: tbs.Owner,
 			}
 			if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
 				contextLog.Debug("deferring tablespace until creation of the mount point for the new volume",

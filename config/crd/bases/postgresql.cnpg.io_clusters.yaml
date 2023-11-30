@@ -3375,6 +3375,9 @@ spec:
                   description: TablespaceConfiguration is the configuration of a tablespace,
                     and includes the storage specification for the tablespace
                   properties:
+                    owner:
+                      description: Owner is the PostgreSQL user owning the tablespace
+                      type: string
                     storage:
                       description: The storage configuration for the tablespace
                       properties:

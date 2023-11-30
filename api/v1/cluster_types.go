@@ -1653,6 +1653,10 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 type TablespaceConfiguration struct {
 	// The storage configuration for the tablespace
 	Storage StorageConfiguration `json:"storage"`
+
+	// Owner is the PostgreSQL user owning the tablespace
+	// +optional
+	Owner string `json:"owner,omitempty"`
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.
