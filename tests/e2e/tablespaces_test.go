@@ -297,7 +297,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the cluster to be restored through snapshot", func() {
-				AssertCreateCluster(namespace, restoredClusterName, clusterRestoreFromBarmanManifest, env)
+				CreateResourceFromFile(namespace, clusterRestoreFromBarmanManifest)
+				// A delay of 5 min when restoring with tablespaces is normal, let's give extra time
 				AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReadySlow],
 					env)
 			})
@@ -462,7 +463,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot", func() {
-					AssertCreateCluster(namespace, clusterToRestoreName, clusterVolumesnapshoRestoreManifest, env)
+					CreateResourceFromFile(namespace, clusterVolumesnapshoRestoreManifest)
 					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[testUtils.ClusterIsReadySlow],
 						env)
 				})
@@ -524,7 +525,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot", func() {
-					AssertCreateCluster(namespace, clusterToPITRName, clusterVolumesnapshoPITRManifest, env)
+					CreateResourceFromFile(namespace, clusterVolumesnapshoPITRManifest)
 					AssertClusterIsReady(namespace, clusterToPITRName, testTimeouts[testUtils.ClusterIsReadySlow],
 						env)
 				})
