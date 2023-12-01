@@ -3044,16 +3044,13 @@ func (cluster *Cluster) IsInplaceRestartPhase() bool {
 // GetTablespaceConfiguration returns the tablespaceConfiguration for the given name
 // otherwise return nil
 func (cluster *Cluster) GetTablespaceConfiguration(name string) *TablespaceConfiguration {
-	if cluster.Spec.Tablespaces == nil {
-		return nil
-	}
-
 	for _, tbsConfig := range cluster.Spec.Tablespaces {
 		tbsConfig := tbsConfig
 		if name == tbsConfig.Name {
 			return &tbsConfig
 		}
 	}
+
 	return nil
 }
 

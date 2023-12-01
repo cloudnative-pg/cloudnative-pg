@@ -971,3 +971,44 @@ var _ = Describe("Ephemeral volume size limits", func() {
 		Expect(spec.GetTemporaryDataLimit().String()).To(Equal("20Mi"))
 	})
 })
+
+var _ = Describe("Tablespaces", func() {
+	cluster := Cluster{
+		Spec: ClusterSpec{
+			Tablespaces: []TablespaceConfiguration{
+				{
+					Name: "first_tablespace",
+					Storage: StorageConfiguration{
+						Size: "5Gi",
+					},
+				},
+				{
+					Name: "second_tablespace",
+					Storage: StorageConfiguration{
+						Size: "5Gi",
+					},
+				},
+			},
+		},
+	}
+
+	emptyCluster := Cluster{}
+
+	When("the cluster specification is empty", func() {
+		It("can't get any tablespace configuration", func() {
+			Expect(emptyCluster.GetTablespaceConfiguration("test")).To(BeNil())
+		})
+	})
+
+	When("a tablespace with the asked name exists", func() {
+		It("can get the tablespace configuration", func() {
+			Expect(cluster.GetTablespaceConfiguration("first_tablespace")).ToNot(BeNil())
+		})
+	})
+
+	When("a tablespace with the asked name doesn't exist", func() {
+		It("cannot get the tablespace configuration", func() {
+			Expect(cluster.GetTablespaceConfiguration("non_existing_tablespace")).To(BeNil())
+		})
+	})
+})

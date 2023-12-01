@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -762,15 +763,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 
 func addTablespaces(cluster *apiv1.Cluster, tbsSlice []apiv1.TablespaceConfiguration) {
 	updated := cluster.DeepCopy()
-	if updated.Spec.Tablespaces == nil {
-		updated.Spec.Tablespaces = []apiv1.TablespaceConfiguration{}
-	}
+	updated.Spec.Tablespaces = append(updated.Spec.Tablespaces, tbsSlice...)
 
-	for _, configuration := range tbsSlice {
-		if cluster.GetTablespaceConfiguration(configuration.Name) == nil {
-			updated.Spec.Tablespaces = append(updated.Spec.Tablespaces, configuration)
-		}
-	}
 	err := env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 	Expect(err).ToNot(HaveOccurred())
 }
@@ -808,7 +802,7 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 				g.Expect(hasPostgresContainer).To(BeTrue())
 				for _, tbsConfig := range cluster.Spec.Tablespaces {
 					g.Expect(mountPaths).To(ContainElements(
-						"/var/lib/postgresql/tablespaces/" + tbsConfig.Name,
+						path.Join("/var/lib/postgresql/tablespaces/", tbsConfig.Name),
 					))
 				}
 
