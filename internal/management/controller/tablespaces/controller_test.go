@@ -107,11 +107,14 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			}
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
-			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			result, _, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
-				mockTablespaceStorageManager{}, tbsByAction)
-			Expect(result).To(BeNil())
-			Expect(err).ShouldNot(HaveOccurred())
+			tbsSteps := evaluateNextSteps(ctx, tbsInDatabase, tablespacesSpec)
+			result := tablespaceReconciler.applySteps(ctx, &tbsManager,
+				mockTablespaceStorageManager{}, tbsSteps)
+			Expect(result).To(ConsistOf(apiv1.TablespaceState{
+				Name:  "foo",
+				State: apiv1.TablespaceStatusReconciled,
+				Error: "",
+			}))
 			Expect(tbsManager.callHistory).To(HaveLen(1))
 			Expect(tbsManager.callHistory).To(ConsistOf("list"))
 		})
@@ -136,13 +139,16 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			}
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
-			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			Expect(tbsByAction[TbsToUpdate]).To(HaveLen(1))
-
-			result, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+			tbsByAction := evaluateNextSteps(ctx, tbsInDatabase, tablespacesSpec)
+			result := tablespaceReconciler.applySteps(ctx, &tbsManager,
 				mockTablespaceStorageManager{}, tbsByAction)
-			Expect(result).To(BeNil())
-			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result).To(ConsistOf(
+				apiv1.TablespaceState{
+					Name:  "foo",
+					State: apiv1.TablespaceStatusReconciled,
+					Error: "",
+				},
+			))
 			Expect(tbsManager.callHistory).To(HaveLen(2))
 			Expect(tbsManager.callHistory).To(ConsistOf("list", "update"))
 		})
@@ -171,11 +177,19 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			}
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
-			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			result, _, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
-				mockTablespaceStorageManager{}, tbsByAction)
-			Expect(result).To(BeNil())
-			Expect(err).ShouldNot(HaveOccurred())
+			tbsSteps := evaluateNextSteps(ctx, tbsInDatabase, tablespacesSpec)
+			result := tablespaceReconciler.applySteps(ctx, &tbsManager,
+				mockTablespaceStorageManager{}, tbsSteps)
+			Expect(result).To(ConsistOf(
+				apiv1.TablespaceState{
+					Name:  "foo",
+					State: apiv1.TablespaceStatusReconciled,
+				},
+				apiv1.TablespaceState{
+					Name:  "bar",
+					State: apiv1.TablespaceStatusReconciled,
+				},
+			))
 			Expect(tbsManager.callHistory).To(HaveLen(2))
 			Expect(tbsManager.callHistory).To(ConsistOf("list", "create"))
 		})
@@ -192,16 +206,20 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			tbsManager := mockTablespaceManager{}
 			tbsInDatabase, err := tbsManager.List(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
-			tbsByAction := evaluateNextActions(ctx, tbsInDatabase, tablespacesSpec)
-			result, _, err := tablespaceReconciler.applyTablespaceActions(ctx, &tbsManager,
+			tbsByAction := evaluateNextSteps(ctx, tbsInDatabase, tablespacesSpec)
+			result := tablespaceReconciler.applySteps(ctx, &tbsManager,
 				mockTablespaceStorageManager{
 					unavailableStorageLocations: []string{
 						"/foo",
 					},
 				}, tbsByAction)
-			Expect(result).To(Not(BeNil()))
-			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
-			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result).To(ConsistOf(
+				apiv1.TablespaceState{
+					Name:  "foo",
+					State: apiv1.TablespaceStatusPendingReconciliation,
+					Error: "deferred until mount point is created",
+				},
+			))
 			Expect(tbsManager.callHistory).To(HaveLen(1))
 			Expect(tbsManager.callHistory).To(ConsistOf("list"))
 		})

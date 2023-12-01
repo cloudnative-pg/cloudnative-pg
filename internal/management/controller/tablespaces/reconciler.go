@@ -18,12 +18,10 @@ package tablespaces
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -103,163 +101,43 @@ func (r *TablespaceReconciler) reconcile(
 		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
 	}
 
-	tbsByAction := evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
-	if len(tbsByAction.convertToTablespaceNameByStatus()[apiv1.TablespaceStatusPendingReconciliation]) == 0 {
-		return nil, nil
-	}
-
-	// Reconcile the tablespaces into the database
-	result, irreconcilableTablespaces, applyError := r.applyTablespaceActions(
+	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
+	result := r.applySteps(
 		ctx,
 		tbsManager,
 		tbsStorageManager,
-		tbsByAction,
+		steps,
 	)
-	if result != nil {
-		return result, nil
-	}
 
-	// Update the status of the cluster
-	tbsInDatabase, err = tbsManager.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
-	}
-	tbsByAction = evaluateNextActions(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Status.TablespaceStatus.ByStatus = tbsByAction.convertToTablespaceNameByStatus()
-	if len(irreconcilableTablespaces) > 0 {
-		updatedCluster.Status.TablespaceStatus.CannotReconcile = irreconcilableTablespaces
-	}
+	updatedCluster.Status.TablespaceStatus = result
 	if err := r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster)); err != nil {
 		return nil, fmt.Errorf("while setting the tablespace reconciler status: %w", err)
 	}
 
-	return nil, applyError
-}
-
-// applyTablespaceActions applies the actions to reconcile tablespace in the DB with the Spec
-// returns a k8s Result, a collection of tablespaces with Postgres errors, and an error argument
-// in case of unexpected errors
-func (r *TablespaceReconciler) applyTablespaceActions(
-	ctx context.Context,
-	tbsManager infrastructure.TablespaceManager,
-	tbsStorageManager tablespaceStorageManager,
-	tbsByAction TablespaceByAction,
-) (*ctrl.Result, map[string][]string, error) {
-	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
-
-	irreconcilableTablespaces := make(map[string][]string)
-	var applyErr error
-
-	handleError := func(err error, tbsName string, action TablespaceAction) {
-		// log unexpected errors, collect expectable PostgreSQL errors
-		if err == nil {
-			return
-		}
-		isExpectable, newErr := getTablespaceError(err, tbsName, action)
-		if isExpectable {
-			irreconcilableTablespaces[tbsName] = append(irreconcilableTablespaces[tbsName], newErr.Error())
-		} else {
-			contextLog.Error(newErr, "while performing action",
-				"action", action,
-				"tablespace", tbsName)
-			applyErr = err
+	for _, tbs := range updatedCluster.Status.TablespaceStatus {
+		if tbs.State == apiv1.TablespaceStatusPendingReconciliation {
+			return &reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 	}
-
-	var needRequeue bool
-	for action, tbsAdapters := range tbsByAction {
-		if action == TbsIsReconciled {
-			contextLog.Debug("no action required", "action", action)
-			continue
-		}
-
-		contextLog.Debug("tablespaces in database out of sync with in Spec, evaluating action",
-			"tablespaces", getTablespaceNames(tbsAdapters), "action", action)
-
-		switch action {
-		case TbsToCreate:
-			if result, err := r.applyCreateTablespace(
-				ctx,
-				tbsManager,
-				tbsStorageManager,
-				tbsAdapters,
-			); result != nil || err != nil {
-				return result, err
-			}
-
-		case TbsToUpdate:
-			if err := r.applyUpdateTablespace(ctx, tbsManager, tbsAdapters); err != nil {
-				return nil, err
-			}
-
-		default:
-			contextLog.Error(errors.New("unsupported action"), "action", action)
-		}
-	}
-
-	if needRequeue {
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, irreconcilableTablespaces, applyErr
-	}
-
-	return nil, irreconcilableTablespaces, applyErr
-}
-
-func (r *TablespaceReconciler) applyCreateTablespace(
-	ctx context.Context,
-	tbsManager infrastructure.TablespaceManager,
-	tbsStorageManager tablespaceStorageManager,
-	tbsConfigs []apiv1.TablespaceConfiguration,
-) (*ctrl.Result, error) {
-	contextLog := log.FromContext(ctx).WithName("tbs_create_reconciler")
-
-	for _, tbs := range tbsConfigs {
-		contextLog.Trace("creating tablespace ", "tablespace", tbs.Name)
-		tbs := tbs
-		tablespace := infrastructure.Tablespace{
-			Name:  tbs.Name,
-			Owner: tbs.Owner,
-		}
-		if exists, err := tbsStorageManager.storageExists(tbs.Name); err != nil || !exists {
-			contextLog.Debug("deferring tablespace until creation of the mount point for the new volume",
-				"tablespaceName", tbs.Name,
-				"tablespacePath", tbsStorageManager.getStorageLocation(tbs.Name))
-			return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-		}
-		err := tbsManager.Create(ctx, tablespace)
-		if err != nil {
-			contextLog.Error(
-				err, "while performing action",
-				"tablespace", tbs.Name)
-			return nil, err
-		}
-	}
-
 	return nil, nil
 }
 
-func (r *TablespaceReconciler) applyUpdateTablespace(
+// applySteps applies the actions to reconcile tablespace in the DB with the Spec
+// returns a k8s Result, a collection of tablespaces with Postgres errors, and an error argument
+// in case of unexpected errors
+func (r *TablespaceReconciler) applySteps(
 	ctx context.Context,
 	tbsManager infrastructure.TablespaceManager,
-	tbsConfigs []apiv1.TablespaceConfiguration,
-) error {
-	contextLog := log.FromContext(ctx).WithName("tbs_update_reconciler")
+	tbsStorageManager tablespaceStorageManager,
+	actions []tablespaceReconcilerStep,
+) []apiv1.TablespaceState {
+	result := make([]apiv1.TablespaceState, len(actions))
 
-	for _, tbs := range tbsConfigs {
-		contextLog.Trace("updating tablespace ", "tablespace", tbs.Name)
-		tbs := tbs
-		tablespace := infrastructure.Tablespace{
-			Name:  tbs.Name,
-			Owner: tbs.Owner,
-		}
-		err := tbsManager.Update(ctx, tablespace)
-		if err != nil {
-			contextLog.Error(
-				err, "while performing action",
-				"tablespace", tbs.Name)
-			return err
-		}
+	for idx, step := range actions {
+		step := step
+		result[idx] = step.execute(ctx, tbsManager, tbsStorageManager)
 	}
 
-	return nil
+	return result
 }
