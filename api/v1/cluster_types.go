@@ -464,7 +464,7 @@ type ClusterSpec struct {
 
 	// The tablespaces configuration
 	// +optional
-	Tablespaces map[string]TablespaceConfiguration `json:"tablespaces,omitempty"`
+	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
 }
 
 const (
@@ -1651,6 +1651,9 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 // TablespaceConfiguration is the configuration of a tablespace, and includes
 // the storage specification for the tablespace
 type TablespaceConfiguration struct {
+	// The name of the tablespace
+	Name string `json:"name"`
+
 	// The storage configuration for the tablespace
 	Storage StorageConfiguration `json:"storage"`
 
@@ -3036,6 +3039,19 @@ func (cluster *Cluster) GetCoredumpFilter() string {
 func (cluster *Cluster) IsInplaceRestartPhase() bool {
 	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
 		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
+}
+
+// GetTablespaceConfiguration returns the tablespaceConfiguration for the given name
+// otherwise return nil
+func (cluster *Cluster) GetTablespaceConfiguration(name string) *TablespaceConfiguration {
+	for _, tbsConfig := range cluster.Spec.Tablespaces {
+		tbsConfig := tbsConfig
+		if name == tbsConfig.Name {
+			return &tbsConfig
+		}
+	}
+
+	return nil
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

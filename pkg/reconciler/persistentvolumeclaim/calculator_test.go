@@ -113,8 +113,9 @@ var _ = Describe("pvc role test", func() {
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				Tablespaces: map[string]apiv1.TablespaceConfiguration{
-					"tbs1": {
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					{
+						Name: "tbs1",
 						Storage: apiv1.StorageConfiguration{
 							Size: "5Gi",
 						},

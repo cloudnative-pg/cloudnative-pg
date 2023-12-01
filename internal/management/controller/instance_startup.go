@@ -314,7 +314,8 @@ func (r *InstanceReconciler) ReconcileTablespaces(
 		return nil
 	}
 
-	for tbsName := range cluster.Spec.Tablespaces {
+	for _, tbsConfig := range cluster.Spec.Tablespaces {
+		tbsName := tbsConfig.Name
 		mountPoint := specs.MountForTablespace(tbsName)
 		if tbsMount, err := fileutils.FileExists(mountPoint); err != nil {
 			contextLogger.Error(err, "while checking for mountpoint", "instance",

@@ -309,9 +309,9 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateMaxSyncReplicas,
 		r.validateStorageSize,
 		r.validateWalStorageSize,
-		r.validateTablespacesStorageSize,
+		r.validateTablespaceStorageSize,
 		r.validateName,
-		r.validateTablespacesNames,
+		r.validateTablespaceNames,
 		r.validateBootstrapPgBaseBackupSource,
 		r.validateTablespaceBackupSnapshot,
 		r.validateBootstrapRecoverySource,
@@ -1475,17 +1475,19 @@ func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateTablespacesStorageSize() field.ErrorList {
+func (r *Cluster) validateTablespaceStorageSize() field.ErrorList {
 	if r.Spec.Tablespaces == nil {
 		return nil
 	}
 
 	var result field.ErrorList
 
-	for tablespaceName, tablespaceConf := range r.Spec.Tablespaces {
+	for idx, tablespaceConf := range r.Spec.Tablespaces {
+		tablespaceConf := tablespaceConf
 		result = append(result,
 			validateStorageConfigurationSize(
-				*field.NewPath("tablespaces", tablespaceName), tablespaceConf.Storage)...,
+				*field.NewPath("spec", "tablespaces").Index(idx),
+				tablespaceConf.Storage)...,
 		)
 	}
 	return result
@@ -1565,22 +1567,22 @@ func (r *Cluster) validateTablespacesChange(old *Cluster) field.ErrorList {
 	}
 
 	var errs field.ErrorList
-	for k, oldConf := range old.Spec.Tablespaces {
-		if newConf, found := r.Spec.Tablespaces[k]; found {
+	for idx, oldConf := range old.Spec.Tablespaces {
+		name := oldConf.Name
+		if newConf := r.GetTablespaceConfiguration(name); newConf != nil {
 			errs = append(errs, validateStorageConfigurationChange(
-				field.NewPath("spec", "tablespaces", k),
+				field.NewPath("spec", "tablespaces").Index(idx),
 				oldConf.Storage,
 				newConf.Storage,
 			)...)
 		} else {
 			errs = append(errs,
 				field.Invalid(
-					field.NewPath("spec", "tablespaces", k),
+					field.NewPath("spec", "tablespaces").Index(idx),
 					r.Spec.Tablespaces,
 					"no tablespace can be deleted once created"))
 		}
 	}
-
 	return errs
 }
 
@@ -1638,29 +1640,30 @@ func (r *Cluster) validateName() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateTablespacesNames() field.ErrorList {
+func (r *Cluster) validateTablespaceNames() field.ErrorList {
 	var result field.ErrorList
 	if r.Spec.Tablespaces == nil {
 		return nil
 	}
 
 	hasTablespace := make(map[string]bool)
-	for name := range r.Spec.Tablespaces {
+	for idx, tbsConfig := range r.Spec.Tablespaces {
+		name := tbsConfig.Name
 		// NOTE: postgres identifiers are case-insensitive, so we could have
 		// different map keys (names) which are identical for PG
 		_, found := hasTablespace[strings.ToLower(name)]
 		if found {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", "tablespaces"),
+				field.NewPath("spec", "tablespaces").Index(idx),
 				name,
-				"tablespace is duplicate: "+name))
+				"duplicate tablespace name"))
 			continue
 		}
 		hasTablespace[strings.ToLower(name)] = true
 
 		if _, err := postgres.IsTablespaceNameValid(name); err != nil {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", "tablespaces"),
+				field.NewPath("spec", "tablespaces").Index(idx),
 				name,
 				err.Error()))
 		}
@@ -1677,7 +1680,7 @@ func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
 
 	var result field.ErrorList
 	for name := range backupTbs {
-		if _, ok := r.Spec.Tablespaces[name]; !ok {
+		if tbsConfig := r.GetTablespaceConfiguration(name); tbsConfig == nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "backup", "volumeSnapshot", "tablespaceClassName"),
 				name,
@@ -1686,7 +1689,6 @@ func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
 			))
 		}
 	}
-
 	return result
 }
 

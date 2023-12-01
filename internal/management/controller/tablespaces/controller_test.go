@@ -88,8 +88,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 
 	When("tablespace configurations are realizable", func() {
 		It("will do nothing if the DB contains the tablespaces in spec", func(ctx context.Context) {
-			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
-				"foo": {
+			tablespacesSpec := []apiv1.TablespaceConfiguration{
+				{
+					Name: "foo",
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
@@ -116,8 +117,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 		})
 
 		It("will change the owner when needed", func(ctx context.Context) {
-			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
-				"foo": {
+			tablespacesSpec := []apiv1.TablespaceConfiguration{
+				{
+					Name: "foo",
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
@@ -146,13 +148,15 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 		})
 
 		It("will create a tablespace in spec that is missing from DB", func(ctx context.Context) {
-			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
-				"foo": {
+			tablespacesSpec := []apiv1.TablespaceConfiguration{
+				{
+					Name: "foo",
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
 				},
-				"bar": {
+				{
+					Name: "bar",
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
@@ -177,8 +181,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 		})
 
 		It("will requeue the tablespace creation if the mount path doesn't exist", func(ctx context.Context) {
-			tablespacesSpec := map[string]apiv1.TablespaceConfiguration{
-				"foo": {
+			tablespacesSpec := []apiv1.TablespaceConfiguration{
+				{
+					Name: "foo",
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},

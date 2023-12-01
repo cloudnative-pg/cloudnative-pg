@@ -186,14 +186,14 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 					}
 				}
 
-				for name := range cluster.Spec.Tablespaces {
-					if NewPgTablespaceCalculator(name).GetName(instanceName) == pvc.Name {
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
+					if NewPgTablespaceCalculator(tbsConfig.Name).GetName(instanceName) == pvc.Name {
 						found = true
 						if pvcRole != string(utils.PVCRolePgTablespace) {
 							return false
 						}
 
-						if pvc.Labels[utils.TablespaceNameLabelName] != name {
+						if pvc.Labels[utils.TablespaceNameLabelName] != tbsConfig.Name {
 							return false
 						}
 					}
@@ -226,15 +226,15 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 					}
 				}
 
-				for name := range cluster.Spec.Tablespaces {
-					if NewPgTablespaceCalculator(name).GetName(instanceName) == pvc.Name {
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
+					if NewPgTablespaceCalculator(tbsConfig.Name).GetName(instanceName) == pvc.Name {
 						found = true
 						if pvcRole != string(utils.PVCRolePgTablespace) {
 							pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgTablespace)
 						}
 
-						if pvc.Labels[utils.TablespaceNameLabelName] != name {
-							pvc.Labels[utils.TablespaceNameLabelName] = name
+						if pvc.Labels[utils.TablespaceNameLabelName] != tbsConfig.Name {
+							pvc.Labels[utils.TablespaceNameLabelName] = tbsConfig.Name
 						}
 					}
 				}

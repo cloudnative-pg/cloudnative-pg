@@ -119,18 +119,21 @@ var _ = Describe("instance with tablespace test", func() {
 		Spec: apiv1.ClusterSpec{
 			StorageConfiguration: apiv1.StorageConfiguration{},
 			WalStorage:           &apiv1.StorageConfiguration{},
-			Tablespaces: map[string]apiv1.TablespaceConfiguration{
-				"tbs1": {
+			Tablespaces: []apiv1.TablespaceConfiguration{
+				{
+					Name: "tbs1",
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
 				},
-				"tbs2": {
+				{
+					Name: "tbs2",
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
 				},
-				"tbs3": {
+				{
+					Name: "tbs3",
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
