@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -206,8 +207,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				cluster, err := env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				addTablespaces(cluster, map[string]apiv1.TablespaceConfiguration{
-					"thirdtablespace": {
+				addTablespaces(cluster, []apiv1.TablespaceConfiguration{
+					{
+						Name: "thirdtablespace",
 						Storage: apiv1.StorageConfiguration{
 							Size:         "1Gi",
 							StorageClass: &storageClassName,
@@ -572,13 +574,15 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
-				addTablespaces(cluster, map[string]apiv1.TablespaceConfiguration{
-					"atablespace": {
+				addTablespaces(cluster, []apiv1.TablespaceConfiguration{
+					{
+						Name: "atablespace",
 						Storage: apiv1.StorageConfiguration{
 							Size: "1Gi",
 						},
 					},
-					"anothertablespace": {
+					{
+						Name: "anothertablespace",
 						Storage: apiv1.StorageConfiguration{
 							Size: "1Gi",
 						},
@@ -721,13 +725,15 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
 				updated := cluster.DeepCopy()
-				updated.Spec.Tablespaces = map[string]apiv1.TablespaceConfiguration{
-					"atablespace": {
+				updated.Spec.Tablespaces = []apiv1.TablespaceConfiguration{
+					{
+						Name: "atablespace",
 						Storage: apiv1.StorageConfiguration{
 							Size: "1Gi",
 						},
 					},
-					"anothertablespace": {
+					{
+						Name: "anothertablespace",
 						Storage: apiv1.StorageConfiguration{
 							Size: "1Gi",
 						},
@@ -755,15 +761,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 	})
 })
 
-func addTablespaces(cluster *apiv1.Cluster, tbsMap map[string]apiv1.TablespaceConfiguration) {
+func addTablespaces(cluster *apiv1.Cluster, tbsSlice []apiv1.TablespaceConfiguration) {
 	updated := cluster.DeepCopy()
-	if updated.Spec.Tablespaces == nil {
-		updated.Spec.Tablespaces = map[string]apiv1.TablespaceConfiguration{}
-	}
+	updated.Spec.Tablespaces = append(updated.Spec.Tablespaces, tbsSlice...)
 
-	for tbsName, configuration := range tbsMap {
-		updated.Spec.Tablespaces[tbsName] = configuration
-	}
 	err := env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 	Expect(err).ToNot(HaveOccurred())
 }
@@ -799,9 +800,9 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 				g.Expect(pod.Spec.Containers).ToNot(BeEmpty())
 				hasPostgresContainer, mountPaths := podMountPaths(pod)
 				g.Expect(hasPostgresContainer).To(BeTrue())
-				for tbsName := range cluster.Spec.Tablespaces {
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
 					g.Expect(mountPaths).To(ContainElements(
-						"/var/lib/postgresql/tablespaces/" + tbsName,
+						path.Join("/var/lib/postgresql/tablespaces/", tbsConfig.Name),
 					))
 				}
 
@@ -813,12 +814,12 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 						claimNames = append(claimNames, vol.PersistentVolumeClaim.ClaimName)
 					}
 				}
-				for tbsName := range cluster.Spec.Tablespaces {
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
 					g.Expect(volumeNames).To(ContainElement(
-						tbsName,
+						tbsConfig.Name,
 					))
 					g.Expect(claimNames).To(ContainElement(
-						pod.Name + "-tbs-" + tbsName,
+						pod.Name + "-tbs-" + tbsConfig.Name,
 					))
 				}
 			}
@@ -842,20 +843,20 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 				tablespacePvcNames = append(tablespacePvcNames, pvc.Name)
 				tbsName := pvc.Labels[utils.TablespaceNameLabelName]
 				g.Expect(tbsName).ToNot(BeEmpty())
-				_, labelTbsInCluster := cluster.Spec.Tablespaces[tbsName]
-				g.Expect(labelTbsInCluster).To(BeTrue())
-				for tbs, config := range cluster.Spec.Tablespaces {
-					if tbsName == tbs {
+				labelTbsInCluster := cluster.GetTablespaceConfiguration(tbsName)
+				g.Expect(labelTbsInCluster).ToNot(BeNil())
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
+					if tbsName == tbsConfig.Name {
 						g.Expect(pvc.Spec.Resources.Requests.Storage()).
-							To(BeEquivalentTo(config.Storage.GetSizeOrNil()))
+							To(BeEquivalentTo(tbsConfig.Storage.GetSizeOrNil()))
 					}
 				}
 			}
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
-				for tbsName := range cluster.Spec.Tablespaces {
-					g.Expect(tablespacePvcNames).To(ContainElement(pod.Name + "-tbs-" + tbsName))
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
+					g.Expect(tablespacePvcNames).To(ContainElement(pod.Name + "-tbs-" + tbsConfig.Name))
 				}
 			}
 		}, timeout).Should(Succeed())
@@ -866,8 +867,8 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 			pvcList, err := env.GetClusterPodList(namespace, clusterName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			for _, pod := range pvcList.Items {
-				for tbsName := range cluster.Spec.Tablespaces {
-					dataDir := fmt.Sprintf("/var/lib/postgresql/tablespaces/%s/data", tbsName)
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
+					dataDir := fmt.Sprintf("/var/lib/postgresql/tablespaces/%s/data", tbsConfig.Name)
 					owner, stdErr, err := env.ExecCommandInInstancePod(
 						testUtils.PodLocator{
 							Namespace: namespace,
@@ -904,8 +905,8 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 				)
 				g.Expect(stdErr).To(BeEmpty())
 				g.Expect(err).ShouldNot(HaveOccurred())
-				for tbsName := range cluster.Spec.Tablespaces {
-					g.Expect(tbsListing).To(ContainSubstring(tbsName))
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
+					g.Expect(tbsListing).To(ContainSubstring(tbsConfig.Name))
 				}
 			}
 			GinkgoWriter.Printf("Tablespaces in DB:\n%s\n", tbsListing)

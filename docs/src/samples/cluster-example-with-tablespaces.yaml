@@ -9,15 +9,15 @@ spec:
     size: 1Gi
 
   tablespaces:
-    atablespace:
+    - name: atablespace
       storage:
         size: 1Gi
         storageClass: standard
-    another_tablespace:
+    - name: another_tablespace
       storage:
         size: 2Gi
         storageClass: standard
-    tablespacea1:
+    - name: tablespacea1
       storage:
         size: 2Gi
         storageClass: standard

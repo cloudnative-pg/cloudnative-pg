@@ -317,8 +317,8 @@ func getSortedTablespaceList(cluster apiv1.Cluster) []string {
 	// Try to get a fix order of name
 	tbsNames := make([]string, len(cluster.Spec.Tablespaces))
 	i := 0
-	for name := range cluster.Spec.Tablespaces {
-		tbsNames[i] = name
+	for _, tbsConfig := range cluster.Spec.Tablespaces {
+		tbsNames[i] = tbsConfig.Name
 		i++
 	}
 	sort.Strings(tbsNames)

@@ -1704,7 +1704,7 @@ Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
 <tr><td><code>tablespaces</code><br/>
-<a href="#postgresql-cnpg-io-v1-TablespaceConfiguration"><i>map[string]TablespaceConfiguration</i></a>
+<a href="#postgresql-cnpg-io-v1-TablespaceConfiguration"><i>[]TablespaceConfiguration</i></a>
 </td>
 <td>
    <p>The tablespaces configuration</p>
@@ -4389,6 +4389,13 @@ the storage specification for the tablespace</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the tablespace</p>
+</td>
+</tr>
 <tr><td><code>storage</code> <B>[Required]</B><br/>
 <a href="#postgresql-cnpg-io-v1-StorageConfiguration"><i>StorageConfiguration</i></a>
 </td>

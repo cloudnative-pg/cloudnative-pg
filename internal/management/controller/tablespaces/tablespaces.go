@@ -45,7 +45,7 @@ type (
 	// TablespaceAction encodes the action necessary for a tablespaceAction
 	TablespaceAction string
 	// TablespaceByAction tablespaces group by action which is needed to take
-	TablespaceByAction map[TablespaceAction][]TablespaceConfigurationAdapter
+	TablespaceByAction map[TablespaceAction][]apiv1.TablespaceConfiguration
 	// TablespaceNameByStatus tablespace name group by status which will applied to cluster status
 	TablespaceNameByStatus map[apiv1.TablespaceStatus][]string
 )
@@ -72,7 +72,7 @@ type TablespaceConfigurationAdapter struct {
 func evaluateNextActions(
 	ctx context.Context,
 	tablespaceInDBSlice []infrastructure.Tablespace,
-	tablespaceInSpecMap map[string]apiv1.TablespaceConfiguration,
+	tablespaceInSpecSlice []apiv1.TablespaceConfiguration,
 ) TablespaceByAction {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
 	contextLog.Debug("evaluating tablespace actions")
@@ -86,21 +86,22 @@ func evaluateNextActions(
 
 	// we go through all the tablespaces in spec and create them if missing in DB
 	// NOTE: we do not at the moment support update/Delete
-	for tbsInSpecName, tbsInSpec := range tablespaceInSpecMap {
-		dbTablespace, isTbsInDB := tbsInDBNamed[tbsInSpecName]
+	for _, tbsInSpec := range tablespaceInSpecSlice {
+		tbsInSpec := tbsInSpec
+		dbTablespace, isTbsInDB := tbsInDBNamed[tbsInSpec.Name]
 
 		switch {
 		case !isTbsInDB:
 			tablespaceByAction[TbsToCreate] = append(tablespaceByAction[TbsToCreate],
-				tablespaceAdapterFromName(tbsInSpecName, tbsInSpec))
+				tbsInSpec)
 
 		case dbTablespace.Owner != tbsInSpec.Owner:
 			tablespaceByAction[TbsToUpdate] = append(tablespaceByAction[TbsToUpdate],
-				tablespaceAdapterFromName(tbsInSpecName, tbsInSpec))
+				tbsInSpec)
 
 		default:
 			tablespaceByAction[TbsIsReconciled] = append(tablespaceByAction[TbsIsReconciled],
-				tablespaceAdapterFromName(tbsInSpecName, tbsInSpec))
+				tbsInSpec)
 		}
 	}
 
@@ -126,13 +127,8 @@ func (r TablespaceByAction) convertToTablespaceNameByStatus() TablespaceNameBySt
 	return tablespaceByStatus
 }
 
-// tablespaceAdapterFromName create a TablespaceConfigurationAdapter from the given information
-func tablespaceAdapterFromName(tbsName string, tbsConfig apiv1.TablespaceConfiguration) TablespaceConfigurationAdapter {
-	return TablespaceConfigurationAdapter{Name: tbsName, TablespaceConfiguration: tbsConfig}
-}
-
-// getTablespaceNames convert the TablespaceConfigurationAdapter slice to tablespaceName slice
-func getTablespaceNames(tbsSlice []TablespaceConfigurationAdapter) []string {
+// getTablespaceNames convert the TablespaceConfiguration slice to tablespaceName slice
+func getTablespaceNames(tbsSlice []apiv1.TablespaceConfiguration) []string {
 	names := make([]string, len(tbsSlice))
 	for i, tbs := range tbsSlice {
 		names[i] = tbs.Name

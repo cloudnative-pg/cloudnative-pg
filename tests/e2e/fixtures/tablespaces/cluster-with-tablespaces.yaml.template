@@ -13,11 +13,11 @@ spec:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
   tablespaces:
-    atablespace:
+    - name: atablespace
       storage:
         size: 1Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-    anothertablespace:
+    - name: anothertablespace
       storage:
         size: 2Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
