@@ -14,11 +14,11 @@ spec:
     storageClass: ${E2E_CSI_STORAGE_CLASS}
     size: 1Gi
   tablespaces:
-    tbs1:
+    - name: tbs1
       storage:
         storageClass: ${E2E_CSI_STORAGE_CLASS}
         size: 1Gi
-    tbs2:
+    - name: tbs2
       storage:
         storageClass: ${E2E_CSI_STORAGE_CLASS}
         size: 1Gi

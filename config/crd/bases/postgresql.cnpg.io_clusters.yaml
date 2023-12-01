@@ -3371,10 +3371,14 @@ spec:
                 format: int32
                 type: integer
               tablespaces:
-                additionalProperties:
+                description: The tablespaces configuration
+                items:
                   description: TablespaceConfiguration is the configuration of a tablespace,
                     and includes the storage specification for the tablespace
                   properties:
+                    name:
+                      description: The name of the tablespace
+                      type: string
                     owner:
                       description: Owner is the PostgreSQL user owning the tablespace
                       type: string
@@ -3618,10 +3622,10 @@ spec:
                           type: string
                       type: object
                   required:
+                  - name
                   - storage
                   type: object
-                description: The tablespaces configuration
-                type: object
+                type: array
               topologySpreadConstraints:
                 description: 'TopologySpreadConstraints specifies how to spread matching
                   pods among the given topology. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/'

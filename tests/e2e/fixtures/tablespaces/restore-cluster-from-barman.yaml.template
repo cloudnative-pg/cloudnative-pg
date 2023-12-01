@@ -14,15 +14,15 @@ spec:
         name: ${BARMAN_BACKUP_NAME}
 
   tablespaces:
-    atablespace:
+    - name: atablespace
       storage:
         size: 1Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-    anothertablespace:
+    - name: anothertablespace
       storage:
         size: 2Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-    thirdtablespace:
+    - name: thirdtablespace
       storage:
         size: 1Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

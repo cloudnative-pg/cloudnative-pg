@@ -346,13 +346,15 @@ var _ = DescribeTable("test creation of volume mounts",
 		apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Instances: 1,
-				Tablespaces: map[string]apiv1.TablespaceConfiguration{
-					"fragglerock": {
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					{
+						Name: "fragglerock",
 						Storage: apiv1.StorageConfiguration{
 							Size: "3Gi",
 						},
 					},
-					"futurama": {
+					{
+						Name: "futurama",
 						Storage: apiv1.StorageConfiguration{
 							Size: "2Gi",
 						},
@@ -435,13 +437,15 @@ var _ = DescribeTable("test creation of volumes",
 		apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				Instances: 1,
-				Tablespaces: map[string]apiv1.TablespaceConfiguration{
-					"fragglerock": {
+				Tablespaces: []apiv1.TablespaceConfiguration{
+					{
+						Name: "fragglerock",
 						Storage: apiv1.StorageConfiguration{
 							Size: "3Gi",
 						},
 					},
-					"futurama": {
+					{
+						Name: "futurama",
 						Storage: apiv1.StorageConfiguration{
 							Size: "2Gi",
 						},

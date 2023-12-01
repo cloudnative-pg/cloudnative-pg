@@ -249,10 +249,10 @@ func (r pgTablespaceCalculator) GetName(instanceName string) string {
 // for this PVC role and this cluster
 func (r pgTablespaceCalculator) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error) {
 	var storageConfiguration *apiv1.StorageConfiguration
-	for tbsName, config := range cluster.Spec.Tablespaces {
-		config := config
-		if tbsName == r.tablespaceName {
-			storageConfiguration = &config.Storage
+	for _, tbsConfig := range cluster.Spec.Tablespaces {
+		tbsConfig := tbsConfig
+		if tbsConfig.Name == r.tablespaceName {
+			storageConfiguration = &tbsConfig.Storage
 			break
 		}
 	}

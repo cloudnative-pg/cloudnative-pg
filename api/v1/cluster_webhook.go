@@ -1482,10 +1482,11 @@ func (r *Cluster) validateTablespacesStorageSize() field.ErrorList {
 
 	var result field.ErrorList
 
-	for tablespaceName, tablespaceConf := range r.Spec.Tablespaces {
+	for _, tablespaceConf := range r.Spec.Tablespaces {
+		tablespaceConf := tablespaceConf
 		result = append(result,
 			validateStorageConfigurationSize(
-				*field.NewPath("tablespaces", tablespaceName), tablespaceConf.Storage)...,
+				*field.NewPath("tablespaces", tablespaceConf.Name), tablespaceConf.Storage)...,
 		)
 	}
 	return result
@@ -1565,22 +1566,22 @@ func (r *Cluster) validateTablespacesChange(old *Cluster) field.ErrorList {
 	}
 
 	var errs field.ErrorList
-	for k, oldConf := range old.Spec.Tablespaces {
-		if newConf, found := r.Spec.Tablespaces[k]; found {
+	for _, oldConf := range old.Spec.Tablespaces {
+		name := oldConf.Name
+		if newConf := r.GetTablespaceConfiguration(name); newConf != nil {
 			errs = append(errs, validateStorageConfigurationChange(
-				field.NewPath("spec", "tablespaces", k),
+				field.NewPath("spec", "tablespaces", name),
 				oldConf.Storage,
 				newConf.Storage,
 			)...)
 		} else {
 			errs = append(errs,
 				field.Invalid(
-					field.NewPath("spec", "tablespaces", k),
+					field.NewPath("spec", "tablespaces", name),
 					r.Spec.Tablespaces,
 					"no tablespace can be deleted once created"))
 		}
 	}
-
 	return errs
 }
 
@@ -1645,7 +1646,8 @@ func (r *Cluster) validateTablespacesNames() field.ErrorList {
 	}
 
 	hasTablespace := make(map[string]bool)
-	for name := range r.Spec.Tablespaces {
+	for _, tbsConfig := range r.Spec.Tablespaces {
+		name := tbsConfig.Name
 		// NOTE: postgres identifiers are case-insensitive, so we could have
 		// different map keys (names) which are identical for PG
 		_, found := hasTablespace[strings.ToLower(name)]
@@ -1677,7 +1679,7 @@ func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
 
 	var result field.ErrorList
 	for name := range backupTbs {
-		if _, ok := r.Spec.Tablespaces[name]; !ok {
+		if tbsConfig := r.GetTablespaceConfiguration(name); tbsConfig == nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "backup", "volumeSnapshot", "tablespaceClassName"),
 				name,
@@ -1686,7 +1688,6 @@ func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
 			))
 		}
 	}
-
 	return result
 }
 
