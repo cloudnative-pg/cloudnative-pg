@@ -24,7 +24,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-// evaluateNextSteps evaluates the next steps going to take for tablespace
+// evaluateNextSteps evaluates the next steps needed to reconcile tablespaces
 func evaluateNextSteps(
 	ctx context.Context,
 	tablespaceInDBSlice []infrastructure.Tablespace,
@@ -41,7 +41,7 @@ func evaluateNextSteps(
 	}
 
 	// we go through all the tablespaces in spec and create them if missing in DB
-	// NOTE: we do not at the moment support update/Delete
+	// NOTE: we do not at the moment support Dropping tablespaces
 	for idx, tbsInSpec := range tablespaceInSpecSlice {
 		tbsInSpec := tbsInSpec
 		dbTablespace, isTbsInDB := tbsInDBNamed[tbsInSpec.Name]

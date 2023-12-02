@@ -109,13 +109,15 @@ func (r *TablespaceReconciler) reconcile(
 		steps,
 	)
 
+	// update the cluster status
 	updatedCluster := cluster.DeepCopy()
-	updatedCluster.Status.TablespaceStatus = result
+	updatedCluster.Status.TablespacesStatus = result
 	if err := r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster)); err != nil {
 		return nil, fmt.Errorf("while setting the tablespace reconciler status: %w", err)
 	}
 
-	for _, tbs := range updatedCluster.Status.TablespaceStatus {
+	// if any tablespace is pending reconciliation, requeue
+	for _, tbs := range updatedCluster.Status.TablespacesStatus {
 		if tbs.State == apiv1.TablespaceStatusPendingReconciliation {
 			return &reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 		}
@@ -123,9 +125,9 @@ func (r *TablespaceReconciler) reconcile(
 	return nil, nil
 }
 
-// applySteps applies the actions to reconcile tablespace in the DB with the Spec
-// returns a k8s Result, a collection of tablespaces with Postgres errors, and an error argument
-// in case of unexpected errors
+// applySteps applies the actions to reconcile tablespaces in the DB with the Spec
+// returns a collection of tablespace states, which may contain Postgres errors
+// if they arose when applying the steps
 func (r *TablespaceReconciler) applySteps(
 	ctx context.Context,
 	tbsManager infrastructure.TablespaceManager,

@@ -811,8 +811,8 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		}
 	}
 	in.ManagedRolesStatus.DeepCopyInto(&out.ManagedRolesStatus)
-	if in.TablespaceStatus != nil {
-		in, out := &in.TablespaceStatus, &out.TablespaceStatus
+	if in.TablespacesStatus != nil {
+		in, out := &in.TablespacesStatus, &out.TablespacesStatus
 		*out = make([]TablespaceState, len(*in))
 		copy(*out, *in)
 	}

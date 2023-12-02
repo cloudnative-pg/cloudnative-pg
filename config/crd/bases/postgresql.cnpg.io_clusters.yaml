@@ -4395,11 +4395,11 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
-              tablespaceStatus:
-                description: TablespaceStatus reports the state of the declarative
+              tablespacesStatus:
+                description: TablespacesStatus reports the state of the declarative
                   tablespaces in the cluster
                 items:
-                  description: TablespaceState represent the status of a tablespace
+                  description: TablespaceState represents the state of a tablespace
                     in a cluster
                   properties:
                     error:

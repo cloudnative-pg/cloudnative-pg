@@ -638,7 +638,7 @@ type ManagedRoles struct {
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
-// TablespaceState represent the status of a tablespace in a cluster
+// TablespaceState represents the state of a tablespace in a cluster
 type TablespaceState struct {
 	// Name is the name of the tablespace
 	Name string `json:"name"`
@@ -684,9 +684,9 @@ type ClusterStatus struct {
 	// +optional
 	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus,omitempty"`
 
-	// TablespaceStatus reports the state of the declarative tablespaces in the cluster
+	// TablespacesStatus reports the state of the declarative tablespaces in the cluster
 	// +optional
-	TablespaceStatus []TablespaceState `json:"tablespaceStatus,omitempty"`
+	TablespacesStatus []TablespaceState `json:"tablespacesStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	// +optional
