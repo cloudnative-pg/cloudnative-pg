@@ -4408,12 +4408,12 @@ spec:
                     name:
                       description: Name is the name of the tablespace
                       type: string
-                    status:
+                    state:
                       description: State is the latest reconciliation state
                       type: string
                   required:
                   - name
-                  - status
+                  - state
                   type: object
                 type: array
               targetPrimary:

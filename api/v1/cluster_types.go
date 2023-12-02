@@ -644,7 +644,7 @@ type TablespaceState struct {
 	Name string `json:"name"`
 
 	// State is the latest reconciliation state
-	State TablespaceStatus `json:"status"`
+	State TablespaceStatus `json:"state"`
 
 	// Error is the reconciliation error, if any
 	// +optional

@@ -1762,11 +1762,11 @@ Defaults to: <code>RuntimeDefault</code></p>
    <p>ManagedRolesStatus reports the state of the managed roles in the cluster</p>
 </td>
 </tr>
-<tr><td><code>tablespaceStatus</code><br/>
+<tr><td><code>tablespacesStatus</code><br/>
 <a href="#postgresql-cnpg-io-v1-TablespaceState"><i>[]TablespaceState</i></a>
 </td>
 <td>
-   <p>TablespaceStatus reports the state of the declarative tablespaces in the cluster</p>
+   <p>TablespacesStatus reports the state of the declarative tablespaces in the cluster</p>
 </td>
 </tr>
 <tr><td><code>timelineID</code><br/>
@@ -4421,7 +4421,7 @@ the storage specification for the tablespace</p>
 - [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
 
 
-<p>TablespaceState represent the status of a tablespace in a cluster</p>
+<p>TablespaceState represents the state of a tablespace in a cluster</p>
 
 
 <table class="table">
@@ -4434,7 +4434,7 @@ the storage specification for the tablespace</p>
    <p>Name is the name of the tablespace</p>
 </td>
 </tr>
-<tr><td><code>status</code> <B>[Required]</B><br/>
+<tr><td><code>state</code> <B>[Required]</B><br/>
 <a href="#postgresql-cnpg-io-v1-TablespaceStatus"><i>TablespaceStatus</i></a>
 </td>
 <td>
