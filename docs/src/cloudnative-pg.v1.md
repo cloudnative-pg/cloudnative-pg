@@ -1763,10 +1763,10 @@ Defaults to: <code>RuntimeDefault</code></p>
 </td>
 </tr>
 <tr><td><code>tablespacesStatus</code><br/>
-<a href="#postgresql-cnpg-io-v1-TablespacesState"><i>TablespacesState</i></a>
+<a href="#postgresql-cnpg-io-v1-TablespaceState"><i>[]TablespaceState</i></a>
 </td>
 <td>
-   <p>TablespaceStatus reports the state of the declarative tablespaces in the cluster</p>
+   <p>TablespacesStatus reports the state of the declarative tablespaces in the cluster</p>
 </td>
 </tr>
 <tr><td><code>timelineID</code><br/>
@@ -4413,7 +4413,7 @@ the storage specification for the tablespace</p>
 </tbody>
 </table>
 
-## TablespacesState     {#postgresql-cnpg-io-v1-TablespacesState}
+## TablespaceState     {#postgresql-cnpg-io-v1-TablespaceState}
 
 
 **Appears in:**
@@ -4421,21 +4421,49 @@ the storage specification for the tablespace</p>
 - [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
 
 
-<p>TablespacesState tracks the status of a cluster's declarative tablespaces</p>
+<p>TablespaceState represents the state of a tablespace in a cluster</p>
 
 
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>byStatus</code><br/>
-<i>map[TablespaceStatus][]string</i>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
 </td>
 <td>
-   <p>ByStatus gives the list of tablespaces in each state</p>
+   <p>Name is the name of the tablespace</p>
+</td>
+</tr>
+<tr><td><code>state</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-TablespaceStatus"><i>TablespaceStatus</i></a>
+</td>
+<td>
+   <p>State is the latest reconciliation state</p>
+</td>
+</tr>
+<tr><td><code>error</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Error is the reconciliation error, if any</p>
 </td>
 </tr>
 </tbody>
 </table>
+
+## TablespaceStatus     {#postgresql-cnpg-io-v1-TablespaceStatus}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [TablespaceState](#postgresql-cnpg-io-v1-TablespaceState)
+
+
+<p>TablespaceStatus represents the status of a tablespace in the cluster</p>
+
+
+
 
 ## Topology     {#postgresql-cnpg-io-v1-Topology}
 
