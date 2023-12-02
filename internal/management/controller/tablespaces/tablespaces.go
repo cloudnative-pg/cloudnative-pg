@@ -21,63 +21,19 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-type tablespaceStorageManager interface {
-	getStorageLocation(tbsName string) string
-	storageExists(tbsName string) (bool, error)
-}
-
-type instanceTablespaceStorageManager struct{}
-
-func (ism instanceTablespaceStorageManager) getStorageLocation(tbsName string) string {
-	return specs.LocationForTablespace(tbsName)
-}
-
-func (ism instanceTablespaceStorageManager) storageExists(tbsName string) (bool, error) {
-	return fileutils.FileExists(ism.getStorageLocation(tbsName))
-}
-
-type (
-	// TablespaceAction encodes the action necessary for a tablespaceAction
-	TablespaceAction string
-	// TablespaceByAction tablespaces group by action which is needed to take
-	TablespaceByAction map[TablespaceAction][]apiv1.TablespaceConfiguration
-	// TablespaceNameByStatus tablespace name group by status which will applied to cluster status
-	TablespaceNameByStatus map[apiv1.TablespaceStatus][]string
-)
-
-// possible tablespace actions
-const (
-	// TbsIsReconciled means the tablespace already reconciled
-	TbsIsReconciled TablespaceAction = "RECONCILED"
-	// TbsToCreate means the tablespace needs to be created
-	TbsToCreate TablespaceAction = "CREATE"
-	// TbsToUpdate means the tablespace needs to be updated
-	TbsToUpdate TablespaceAction = "UPDATE"
-)
-
-// TablespaceConfigurationAdapter the adapter class for tablespace configuration
-type TablespaceConfigurationAdapter struct {
-	// Name tablespace name
-	Name string
-	// TablespaceConfiguration tablespace with configuration settings
-	apiv1.TablespaceConfiguration
-}
-
-// evaluateNextActions evaluates the next action going to take for tablespace
-func evaluateNextActions(
+// evaluateNextSteps evaluates the next steps needed to reconcile tablespaces
+func evaluateNextSteps(
 	ctx context.Context,
 	tablespaceInDBSlice []infrastructure.Tablespace,
 	tablespaceInSpecSlice []apiv1.TablespaceConfiguration,
-) TablespaceByAction {
+) []tablespaceReconcilerStep {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler")
 	contextLog.Debug("evaluating tablespace actions")
 
-	tablespaceByAction := make(TablespaceByAction)
+	result := make([]tablespaceReconcilerStep, len(tablespaceInSpecSlice))
 
 	tbsInDBNamed := make(map[string]infrastructure.Tablespace)
 	for idx, tbs := range tablespaceInDBSlice {
@@ -85,53 +41,28 @@ func evaluateNextActions(
 	}
 
 	// we go through all the tablespaces in spec and create them if missing in DB
-	// NOTE: we do not at the moment support update/Delete
-	for _, tbsInSpec := range tablespaceInSpecSlice {
+	// NOTE: we do not at the moment support Dropping tablespaces
+	for idx, tbsInSpec := range tablespaceInSpecSlice {
 		tbsInSpec := tbsInSpec
 		dbTablespace, isTbsInDB := tbsInDBNamed[tbsInSpec.Name]
 
 		switch {
 		case !isTbsInDB:
-			tablespaceByAction[TbsToCreate] = append(tablespaceByAction[TbsToCreate],
-				tbsInSpec)
+			result[idx] = &createTablespaceAction{
+				tablespace: tbsInSpec,
+			}
 
 		case dbTablespace.Owner != tbsInSpec.Owner:
-			tablespaceByAction[TbsToUpdate] = append(tablespaceByAction[TbsToUpdate],
-				tbsInSpec)
+			result[idx] = &updateTablespaceAction{
+				tablespace: tbsInSpec,
+			}
 
 		default:
-			tablespaceByAction[TbsIsReconciled] = append(tablespaceByAction[TbsIsReconciled],
-				tbsInSpec)
+			result[idx] = &noopTablespaceAction{
+				tablespace: tbsInSpec,
+			}
 		}
 	}
 
-	return tablespaceByAction
-}
-
-// convertToTablespaceNameByStatus convert the next action need to status, so we can patch it to cluster
-func (r TablespaceByAction) convertToTablespaceNameByStatus() TablespaceNameByStatus {
-	statusByAction := map[TablespaceAction]apiv1.TablespaceStatus{
-		TbsIsReconciled: apiv1.TablespaceStatusReconciled,
-		TbsToCreate:     apiv1.TablespaceStatusPendingReconciliation,
-		TbsToUpdate:     apiv1.TablespaceStatusPendingReconciliation,
-	}
-
-	tablespaceByStatus := make(TablespaceNameByStatus)
-	for action, tbsAdapterSlice := range r {
-		for _, tbsAdapter := range tbsAdapterSlice {
-			tablespaceByStatus[statusByAction[action]] = append(tablespaceByStatus[statusByAction[action]],
-				tbsAdapter.Name)
-		}
-	}
-
-	return tablespaceByStatus
-}
-
-// getTablespaceNames convert the TablespaceConfiguration slice to tablespaceName slice
-func getTablespaceNames(tbsSlice []apiv1.TablespaceConfiguration) []string {
-	names := make([]string, len(tbsSlice))
-	for i, tbs := range tbsSlice {
-		names[i] = tbs.Name
-	}
-	return names
+	return result
 }

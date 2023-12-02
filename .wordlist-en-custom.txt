@@ -377,6 +377,7 @@ TablespaceClassName
 TablespaceConfiguration
 TablespaceMapFile
 TablespaceName
+TablespaceState
 TablespaceStatus
 Tablespaces
 TablespacesState
@@ -1091,6 +1092,7 @@ tablespace
 tablespaceClassName
 tablespaceMapFile
 tablespaceName
+tablespaceStatus
 tablespaceStorage
 tablespaces
 tablespacesStatus
