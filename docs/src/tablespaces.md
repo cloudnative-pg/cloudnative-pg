@@ -185,15 +185,17 @@ application user (as defined in `.spec.bootstrap.initdb.owner`) — see
 details.
 This default behavior should work in most microservice database use cases.
 
-You can change the owner of a tablespace through the `owner` option, for example
+You can set the owner of a tablespace through the `owner` stanza, for example
 the `postgres` user, like in the following excerpt:
 
 ```yaml
   # ...
   tablespaces:
-    clapton:
-      size: 10Gi
-      owner: postgres
+    - name: clapton
+      owner:
+        name: postgres
+      storage:
+        size: 1Gi
 ```
 
 !!! Important
@@ -201,6 +203,41 @@ the `postgres` user, like in the following excerpt:
     an existing role. Otherwise, the status of the cluster will report the
     issue and stop reconciling tablespaces until fixed. It is your responsibility
     to monitor the status and the log, and promptly intervene by fixing the issue.
+
+If you define a tablespace with an owner that doesn't exist, CloudNativePG will
+be unable to create the tablespace, and will reflect this in the cluster status:
+
+``` yaml
+spec:
+  instances: 3
+
+  # ...
+
+  tablespaces:
+    - name: tbs1
+      storage:
+        size: 1Gi
+    - name: tbs2
+      storage:
+        size: 2Gi
+    - name: tbs3
+      owner:
+        name: badhombre
+      storage:
+        size: 2Gi
+        status:
+
+  <- snipped ->
+  tablespacesStatus:
+  - name: tbs1
+    status: reconciled
+  - name: tbs2
+    status: reconciled
+  - error: 'while creating tablespace tbs3: ERROR: role "badhombre" does
+      not exist (SQLSTATE 42704)'
+    name: tbs3
+    status: pending
+```
 
 ## Backup and Recovery
 
@@ -289,4 +326,3 @@ temporary operations), we recommend not to mix the two workloads.
 
 Currently, tablespaces cannot be removed from an existing CloudNativePG
 cluster.
-
