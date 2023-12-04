@@ -113,11 +113,11 @@ func NewCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("while parsing the online value: %w", err)
 			}
-			parsedImmediateCheckpoint, err := parseOptionalBooleanString(online)
+			parsedImmediateCheckpoint, err := parseOptionalBooleanString(immediateCheckpoint)
 			if err != nil {
 				return fmt.Errorf("while parsing the immediate-checkpoint value: %w", err)
 			}
-			parsedWaitForArchive, err := parseOptionalBooleanString(online)
+			parsedWaitForArchive, err := parseOptionalBooleanString(waitForArchive)
 			if err != nil {
 				return fmt.Errorf("while parsing the wait-for-archive value: %w", err)
 			}
