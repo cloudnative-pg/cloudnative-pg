@@ -146,7 +146,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		return fmt.Errorf("could not get webhooks: %w", err)
 	}
 
-	webhookService, err := getWebhookService(ctx, mutatingWebhook.Items[0].Webhooks[0].ClientConfig)
+	webhookService, err := getWebhookService(ctx, mutatingWebhook)
 	if err != nil {
 		return fmt.Errorf("could not get webhook service: %w", err)
 	}

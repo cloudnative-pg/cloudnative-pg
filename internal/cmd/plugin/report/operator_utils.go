@@ -18,13 +18,14 @@ package report
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 func getWebhooks(ctx context.Context, stopRedact bool) (
@@ -35,17 +36,6 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 		validatingWebhookConfigList v1.ValidatingWebhookConfigurationList
 		mWebhookConfig              v1.MutatingWebhookConfigurationList
 		vWebhookConfig              v1.ValidatingWebhookConfigurationList
-		mutatingWebhookNames        = []string{
-			"mbackup.cnpg.io",
-			"mcluster.cnpg.io",
-			"mscheduledbackup.cnpg.io",
-		}
-		validatingWebhookNames = []string{
-			"vbackup.cnpg.io",
-			"vcluster.cnpg.io",
-			"vpooler.cnpg.io",
-			"vscheduledbackup.cnpg.io",
-		}
 	)
 
 	if err := plugin.Client.List(ctx, &mutatingWebhookConfigList); err != nil {
@@ -54,7 +44,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 
 	for _, item := range mutatingWebhookConfigList.Items {
 		for _, webhook := range item.Webhooks {
-			if utils.StringInSlice(mutatingWebhookNames, webhook.Name) {
+			if len(webhook.Rules) > 0 && webhook.Rules[0].APIGroups[0] == apiv1.GroupVersion.Group {
 				mWebhookConfig.Items = append(mWebhookConfig.Items, item)
 			}
 		}
@@ -73,7 +63,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 
 	for _, item := range validatingWebhookConfigList.Items {
 		for _, webhook := range item.Webhooks {
-			if utils.StringInSlice(validatingWebhookNames, webhook.Name) {
+			if len(webhook.Rules) > 0 && webhook.Rules[0].APIGroups[0] == apiv1.GroupVersion.Group {
 				vWebhookConfig.Items = append(vWebhookConfig.Items, item)
 			}
 		}
@@ -85,16 +75,36 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 			}
 		}
 	}
+
+	if len(mWebhookConfig.Items) == 0 || len(vWebhookConfig.Items) == 0 {
+		return nil, nil, fmt.Errorf(
+			"can't find the webhooks that targeting resources within the group %s",
+			apiv1.GroupVersion.Group,
+		)
+	}
+
 	return &mWebhookConfig, &vWebhookConfig, nil
 }
 
-func getWebhookService(ctx context.Context, config v1.WebhookClientConfig) (corev1.Service, error) {
-	var webhookService corev1.Service
+func getWebhookService(
+	ctx context.Context,
+	mutatingWebhookList *v1.MutatingWebhookConfigurationList,
+) (corev1.Service, error) {
+	if len(mutatingWebhookList.Items) == 0 ||
+		len(mutatingWebhookList.Items[0].Webhooks) == 0 {
+		return corev1.Service{}, nil
+	}
 
+	config := mutatingWebhookList.Items[0].Webhooks[0].ClientConfig
+	if config.Service == nil {
+		return corev1.Service{}, nil
+	}
 	objKey := types.NamespacedName{
 		Name:      config.Service.Name,
 		Namespace: config.Service.Namespace,
 	}
+
+	var webhookService corev1.Service
 	err := plugin.Client.Get(ctx, objKey, &webhookService)
 
 	return webhookService, err
