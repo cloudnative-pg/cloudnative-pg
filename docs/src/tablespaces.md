@@ -153,15 +153,15 @@ spec:
       storageClass: balanced
 ```
 
-The `yardbirds` cluster example above requests 5 persistent volume claims using
+The `yardbirds` cluster example above requests 4 persistent volume claims using
 3 different storage classes:
 
 - default storage class: used by the `PGDATA` and WALs
 - `fastest`: used by the `current` tablespace to store the most active and
   demanding set of data in the database
-- `balanced`: used by the `old` tablespace to store older partitions of data
-  that are rarely accessed by users and where performance expectations are
-  not the highest
+- `balanced`: used by the `this_year` tablespace to store older partitions of
+  data that are rarely accessed by users and where performance expectations
+  are not the highest
 
 You can then take advantage of horizontal table partitioning and create
 the current month's table (e.g. facts for December 2023) in the `current`
