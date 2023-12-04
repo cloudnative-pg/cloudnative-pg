@@ -94,7 +94,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
-					Owner: "app",
+					Owner: apiv1.DatabaseRoleRef{
+						Name: "app",
+					},
 				},
 			}
 			tbsManager := mockTablespaceManager{
@@ -126,7 +128,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
-					Owner: "new_user",
+					Owner: apiv1.DatabaseRoleRef{
+						Name: "new_user",
+					},
 				},
 			}
 			tbsManager := mockTablespaceManager{

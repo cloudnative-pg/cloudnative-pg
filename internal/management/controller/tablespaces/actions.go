@@ -55,7 +55,7 @@ func (r *createTablespaceAction) execute(
 	}
 	tablespace := infrastructure.Tablespace{
 		Name:  r.tablespace.Name,
-		Owner: r.tablespace.Owner,
+		Owner: r.tablespace.Owner.Name,
 	}
 	err := tbsManager.Create(ctx, tablespace)
 	if err != nil {
@@ -87,7 +87,7 @@ func (r *updateTablespaceAction) execute(
 	contextLog.Trace("updating tablespace ", "tablespace", r.tablespace.Name)
 	tablespace := infrastructure.Tablespace{
 		Name:  r.tablespace.Name,
-		Owner: r.tablespace.Owner,
+		Owner: r.tablespace.Owner.Name,
 	}
 	err := tbsManager.Update(ctx, tablespace)
 	if err != nil {

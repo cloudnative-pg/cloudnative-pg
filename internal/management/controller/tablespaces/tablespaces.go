@@ -52,7 +52,7 @@ func evaluateNextSteps(
 				tablespace: tbsInSpec,
 			}
 
-		case dbTablespace.Owner != tbsInSpec.Owner:
+		case dbTablespace.Owner != tbsInSpec.Owner.Name:
 			result[idx] = &updateTablespaceAction{
 				tablespace: tbsInSpec,
 			}
