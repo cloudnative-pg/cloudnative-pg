@@ -10,6 +10,9 @@ on:
       - labeled
       - unlabeled
 
+env:
+  REPO_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   require-labels:
     name: Require labels
@@ -19,5 +22,5 @@ jobs:
         uses: docker://agilepathway/pull-request-label-checker:v1.6.9
         with:
           any_of: "ok to merge :ok_hand:"
-          none_of: do not merge
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          none_of: "do not merge"
+          repo_token: ${{ env.REPO_TOKEN }}

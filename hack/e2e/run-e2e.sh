@@ -40,14 +40,14 @@ notinpath () {
 }
 
 ensure_image_pull_secret() {
-  if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
+  if [ -n "${REGISTRY-}" ] && [ -n "${REGISTRY_USER-}" ] && [ -n "${REGISTRY_PASSWORD-}" ]; then
     if ! kubectl get secret cnpg-pull-secret -n cnpg-system >/dev/null 2>&1; then
       kubectl create secret docker-registry \
         -n cnpg-system \
         cnpg-pull-secret \
-        --docker-server="${DOCKER_SERVER}" \
-        --docker-username="${DOCKER_USERNAME}" \
-        --docker-password="${DOCKER_PASSWORD}"
+        --docker-server="${REGISTRY}" \
+        --docker-username="${REGISTRY_USER}" \
+        --docker-password="${REGISTRY_PASSWORD}"
     fi
   fi
 }
