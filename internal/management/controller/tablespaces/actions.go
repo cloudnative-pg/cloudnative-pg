@@ -50,6 +50,7 @@ func (r *createTablespaceAction) execute(
 		return apiv1.TablespaceState{
 			Name:  r.tablespace.Name,
 			State: apiv1.TablespaceStatusPendingReconciliation,
+			Owner: r.tablespace.Owner.Name,
 			Error: "deferred until mount point is created",
 		}
 	}
@@ -62,6 +63,7 @@ func (r *createTablespaceAction) execute(
 		contextLog.Error(err, "while performing action", "tablespace", r.tablespace.Name)
 		return apiv1.TablespaceState{
 			Name:  r.tablespace.Name,
+			Owner: r.tablespace.Owner.Name,
 			State: apiv1.TablespaceStatusPendingReconciliation,
 			Error: err.Error(),
 		}
@@ -69,6 +71,7 @@ func (r *createTablespaceAction) execute(
 
 	return apiv1.TablespaceState{
 		Name:  r.tablespace.Name,
+		Owner: r.tablespace.Owner.Name,
 		State: apiv1.TablespaceStatusReconciled,
 	}
 }
@@ -96,6 +99,7 @@ func (r *updateTablespaceAction) execute(
 			"tablespace", r.tablespace.Name)
 		return apiv1.TablespaceState{
 			Name:  r.tablespace.Name,
+			Owner: r.tablespace.Owner.Name,
 			State: apiv1.TablespaceStatusPendingReconciliation,
 			Error: err.Error(),
 		}
@@ -103,6 +107,7 @@ func (r *updateTablespaceAction) execute(
 
 	return apiv1.TablespaceState{
 		Name:  r.tablespace.Name,
+		Owner: r.tablespace.Owner.Name,
 		State: apiv1.TablespaceStatusReconciled,
 	}
 }
@@ -118,6 +123,7 @@ func (r *noopTablespaceAction) execute(
 ) apiv1.TablespaceState {
 	return apiv1.TablespaceState{
 		Name:  r.tablespace.Name,
+		Owner: r.tablespace.Owner.Name,
 		State: apiv1.TablespaceStatusReconciled,
 	}
 }

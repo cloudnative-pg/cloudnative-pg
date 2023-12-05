@@ -114,6 +114,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 				mockTablespaceStorageManager{}, tbsSteps)
 			Expect(result).To(ConsistOf(apiv1.TablespaceState{
 				Name:  "foo",
+				Owner: "app",
 				State: apiv1.TablespaceStatusReconciled,
 				Error: "",
 			}))
@@ -149,6 +150,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			Expect(result).To(ConsistOf(
 				apiv1.TablespaceState{
 					Name:  "foo",
+					Owner: "new_user",
 					State: apiv1.TablespaceStatusReconciled,
 					Error: "",
 				},
@@ -187,10 +189,12 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			Expect(result).To(ConsistOf(
 				apiv1.TablespaceState{
 					Name:  "foo",
+					Owner: "",
 					State: apiv1.TablespaceStatusReconciled,
 				},
 				apiv1.TablespaceState{
 					Name:  "bar",
+					Owner: "",
 					State: apiv1.TablespaceStatusReconciled,
 				},
 			))
@@ -220,6 +224,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			Expect(result).To(ConsistOf(
 				apiv1.TablespaceState{
 					Name:  "foo",
+					Owner: "",
 					State: apiv1.TablespaceStatusPendingReconciliation,
 					Error: "deferred until mount point is created",
 				},

@@ -643,6 +643,10 @@ type TablespaceState struct {
 	// Name is the name of the tablespace
 	Name string `json:"name"`
 
+	// Owner is the PostgreSQL user owning the tablespace
+	// +optional
+	Owner string `json:"owner,omitempty"`
+
 	// State is the latest reconciliation state
 	State TablespaceStatus `json:"state"`
 
