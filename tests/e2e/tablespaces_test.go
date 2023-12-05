@@ -224,8 +224,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 
 				addTablespaces(cluster, []apiv1.TablespaceConfiguration{
 					{
-						Name:  "thirdtablespace",
-						Owner: "dante",
+						Name: "thirdtablespace",
+						Owner: apiv1.DatabaseRoleRef{
+							Name: "dante",
+						},
 						Storage: apiv1.StorageConfiguration{
 							Size:         "1Gi",
 							StorageClass: &storageClassName,
@@ -795,7 +797,7 @@ func updateTablespaceOwner(cluster *apiv1.Cluster, tablespaceName, newOwner stri
 	updated := cluster.DeepCopy()
 	for idx, value := range updated.Spec.Tablespaces {
 		if value.Name == tablespaceName {
-			updated.Spec.Tablespaces[idx].Owner = newOwner
+			updated.Spec.Tablespaces[idx].Owner.Name = newOwner
 		}
 	}
 	err := env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
@@ -811,9 +813,9 @@ func AssertTablespaceReconciled(
 		Eventually(func(g Gomega) bool {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			for state, names := range cluster.Status.TablespaceStatus.ByStatus {
-				if state == apiv1.TablespaceStatusReconciled {
-					return len(names) > 0 && slices.Contains(names, tablespaceName)
+			for _, state := range cluster.Status.TablespacesStatus {
+				if state.State == apiv1.TablespaceStatusReconciled && state.Name == tablespaceName {
+					return true
 				}
 			}
 			return false

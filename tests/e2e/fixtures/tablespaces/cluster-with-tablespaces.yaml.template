@@ -18,7 +18,8 @@ spec:
         size: 1Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     - name: anothertablespace
-      owner: dante
+      owner:
+        name: dante
       storage:
         size: 2Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
