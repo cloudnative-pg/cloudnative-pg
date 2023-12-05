@@ -68,7 +68,8 @@ func (m metadataReconciler) reconcile(
 	return nil
 }
 
-// reconcileMetadataComingFromInstance ensures that the PVCs have the correct metadata that is inherited by the instance
+// reconcileMetadataComingFromInstance ensures that the PVCs have the correct metadata
+// inherited from the instance
 func reconcileMetadataComingFromInstance(
 	ctx context.Context,
 	c client.Client,
