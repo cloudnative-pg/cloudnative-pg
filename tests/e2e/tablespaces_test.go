@@ -171,6 +171,21 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 2, testTimeouts[testUtils.Short])
 			AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.Short])
 			AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.Short])
+			AssertRoleReconciled(namespace, clusterName, "dante", testTimeouts[testUtils.Short])
+			AssertRoleReconciled(namespace, clusterName, "alpha", testTimeouts[testUtils.Short])
+			AssertTablespaceAndOwnerExist(cluster, "atablespace", "app")
+			AssertTablespaceAndOwnerExist(cluster, "anothertablespace", "dante")
+		})
+
+		It("can update the cluster by change the owner of tablesapce", func() {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			updateTablespaceOwner(cluster, "anothertablespace", "alpha")
+
+			cluster, err = env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertTablespaceReconciled(namespace, clusterName, "anothertablespace", testTimeouts[testUtils.Short])
+			AssertTablespaceAndOwnerExist(cluster, "anothertablespace", "alpha")
 		})
 
 		It("can create the backup and verify content in the object store", func() {
@@ -210,6 +225,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				addTablespaces(cluster, []apiv1.TablespaceConfiguration{
 					{
 						Name: "thirdtablespace",
+						Owner: apiv1.DatabaseRoleRef{
+							Name: "dante",
+						},
 						Storage: apiv1.StorageConfiguration{
 							Size:         "1Gi",
 							StorageClass: &storageClassName,
@@ -230,6 +248,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				AssertClusterHasMountPointsAndVolumesForTablespaces(cluster, 3, testTimeouts[testUtils.PodRollout])
 				AssertClusterHasPvcsAndDataDirsForTablespaces(cluster, testTimeouts[testUtils.PodRollout])
 				AssertDatabaseContainsTablespaces(cluster, testTimeouts[testUtils.PodRollout])
+				AssertTablespaceAndOwnerExist(cluster, "atablespace", "app")
+				AssertTablespaceAndOwnerExist(cluster, "anothertablespace", "alpha")
+				AssertTablespaceAndOwnerExist(cluster, "thirdtablespace", "dante")
 			})
 
 			By("waiting for the cluster to be ready", func() {
@@ -312,6 +333,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 					testTimeouts[testUtils.Short])
 				AssertClusterHasPvcsAndDataDirsForTablespaces(restoredCluster, testTimeouts[testUtils.Short])
 				AssertDatabaseContainsTablespaces(restoredCluster, testTimeouts[testUtils.Short])
+				AssertTablespaceAndOwnerExist(cluster, "atablespace", "app")
+				AssertTablespaceAndOwnerExist(cluster, "anothertablespace", "alpha")
+				AssertTablespaceAndOwnerExist(cluster, "thirdtablespace", "dante")
 			})
 		})
 	})
@@ -769,6 +793,55 @@ func addTablespaces(cluster *apiv1.Cluster, tbsSlice []apiv1.TablespaceConfigura
 	Expect(err).ToNot(HaveOccurred())
 }
 
+func updateTablespaceOwner(cluster *apiv1.Cluster, tablespaceName, newOwner string) {
+	updated := cluster.DeepCopy()
+	for idx, value := range updated.Spec.Tablespaces {
+		if value.Name == tablespaceName {
+			updated.Spec.Tablespaces[idx].Owner.Name = newOwner
+		}
+	}
+	err := env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
+	Expect(err).ToNot(HaveOccurred())
+}
+
+func AssertTablespaceReconciled(
+	namespace, clusterName,
+	tablespaceName string,
+	timeout int,
+) {
+	By(fmt.Sprintf("checking if tablespace %v is in reconciled status", tablespaceName), func() {
+		Eventually(func(g Gomega) bool {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			for _, state := range cluster.Status.TablespacesStatus {
+				if state.State == apiv1.TablespaceStatusReconciled && state.Name == tablespaceName {
+					return true
+				}
+			}
+			return false
+		}, timeout).Should(BeTrue())
+	})
+}
+
+func AssertRoleReconciled(
+	namespace, clusterName,
+	roleName string,
+	timeout int,
+) {
+	By(fmt.Sprintf("checking if role %v is in reconciled status", roleName), func() {
+		Eventually(func(g Gomega) bool {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			for state, names := range cluster.Status.ManagedRolesStatus.ByStatus {
+				if state == apiv1.RoleStatusReconciled {
+					return len(names) > 0 && slices.Contains(names, roleName)
+				}
+			}
+			return false
+		}, timeout).Should(BeTrue())
+	})
+}
+
 func AssertClusterHasMountPointsAndVolumesForTablespaces(
 	cluster *apiv1.Cluster,
 	numTablespaces int,
@@ -901,7 +974,7 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 						Namespace: namespace,
 						PodName:   instance.Name,
 					}, testUtils.DatabaseName("app"),
-					"SELECT oid, spcname FROM pg_tablespace;",
+					"SELECT oid, spcname, pg_get_userbyid(spcowner) FROM pg_tablespace;",
 				)
 				g.Expect(stdErr).To(BeEmpty())
 				g.Expect(err).ShouldNot(HaveOccurred())
@@ -912,6 +985,26 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 			GinkgoWriter.Printf("Tablespaces in DB:\n%s\n", tbsListing)
 		}, timeout).Should(Succeed())
 	})
+}
+
+func AssertTablespaceAndOwnerExist(cluster *apiv1.Cluster, tablespace, owner string) {
+	namespace := cluster.ObjectMeta.Namespace
+	clusterName := cluster.ObjectMeta.Name
+	primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+	Expect(err).ShouldNot(HaveOccurred())
+	result, stdErr, err := env.ExecQueryInInstancePod(
+		testUtils.PodLocator{
+			Namespace: namespace,
+			PodName:   primaryPod.Name,
+		}, testUtils.DatabaseName("app"),
+		fmt.Sprintf("SELECT 1 FROM pg_tablespace WHERE spcname = '%s' AND pg_get_userbyid(spcowner) = '%s';",
+			tablespace,
+			owner),
+	)
+	Expect(stdErr).To(BeEmpty())
+	Expect(err).ShouldNot(HaveOccurred())
+	Expect(result).To(Equal("1\n"))
+	GinkgoWriter.Printf("Found Tablespaces %s with owner %s", tablespace, owner)
 }
 
 func assertCanHibernateClusterWithTablespaces(

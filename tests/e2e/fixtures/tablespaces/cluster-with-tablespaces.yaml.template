@@ -18,9 +18,37 @@ spec:
         size: 1Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     - name: anothertablespace
+      owner:
+        name: dante
       storage:
         size: 2Gi
         storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  managed:
+      roles:
+      - name: dante
+        ensure: present
+        comment: Dante Alighieri
+        login: false
+        superuser: false
+        createdb: true
+        createrole: false
+        inherit: false
+        replication: false
+        bypassrls: false
+        inRoles:
+          - app
+      - name: alpha
+        ensure: present
+        login: false
+        superuser: true
+        createdb: true
+        createrole: false
+        inherit: false
+        replication: false
+        bypassrls: false
+        inRoles:
+          - app
 
   backup:
     barmanObjectStore:
