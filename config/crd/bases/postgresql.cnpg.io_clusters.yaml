@@ -4413,10 +4413,7 @@ spec:
                       type: string
                     owner:
                       description: Owner is the PostgreSQL user owning the tablespace
-                      properties:
-                        name:
-                          type: string
-                      type: object
+                      type: string
                     state:
                       description: State is the latest reconciliation state
                       type: string

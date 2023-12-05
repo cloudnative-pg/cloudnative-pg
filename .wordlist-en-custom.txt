@@ -102,6 +102,7 @@ DNS
 DataBackupConfiguration
 DataBase
 DataSource
+DatabaseRoleRef
 DeploymentStrategy
 DevOps
 DevSecOps

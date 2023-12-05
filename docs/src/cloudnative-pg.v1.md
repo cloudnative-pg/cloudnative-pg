@@ -2192,6 +2192,29 @@ PostgreSQL cluster from an existing storage</p>
 </tbody>
 </table>
 
+## DatabaseRoleRef     {#postgresql-cnpg-io-v1-DatabaseRoleRef}
+
+
+**Appears in:**
+
+- [TablespaceConfiguration](#postgresql-cnpg-io-v1-TablespaceConfiguration)
+
+
+<p>DatabaseRoleRef is a reference an a role available inside PostgreSQL</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code><br/>
+<i>string</i>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
 ## EmbeddedObjectMetadata     {#postgresql-cnpg-io-v1-EmbeddedObjectMetadata}
 
 
@@ -4404,7 +4427,7 @@ the storage specification for the tablespace</p>
 </td>
 </tr>
 <tr><td><code>owner</code><br/>
-<i>string</i>
+<a href="#postgresql-cnpg-io-v1-DatabaseRoleRef"><i>DatabaseRoleRef</i></a>
 </td>
 <td>
    <p>Owner is the PostgreSQL user owning the tablespace</p>
@@ -4432,6 +4455,13 @@ the storage specification for the tablespace</p>
 </td>
 <td>
    <p>Name is the name of the tablespace</p>
+</td>
+</tr>
+<tr><td><code>owner</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Owner is the PostgreSQL user owning the tablespace</p>
 </td>
 </tr>
 <tr><td><code>state</code> <B>[Required]</B><br/>

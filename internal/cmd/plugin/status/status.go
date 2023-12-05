@@ -942,7 +942,7 @@ func (fullStatus *PostgresqlStatus) printTablespacesStatus() {
 	tbsStatus.AddHeader("Tablespace", "Owner", "Status", "Error")
 
 	for _, tbs := range tablespacesStatus {
-		tbsStatus.AddLine(tbs.Name, tbs.Owner.Name, tbs.State, tbs.Error)
+		tbsStatus.AddLine(tbs.Name, tbs.Owner, tbs.State, tbs.Error)
 	}
 	tbsStatus.Print()
 	fmt.Println()
