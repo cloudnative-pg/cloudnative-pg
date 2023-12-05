@@ -380,8 +380,11 @@ func mergeMap(receiver, giver map[string]string) map[string]string {
 
 // MergeMap transfers the content of a giver map to a receiver
 // ensure the receiver is not nil before call this method
-func MergeMap(receiver, giver map[string]string) {
-	_ = mergeMap(receiver, giver)
+func MergeMap(receiver, giver map[string]string) map[string]string {
+	if receiver == nil {
+		receiver = map[string]string{}
+	}
+	return mergeMap(receiver, giver)
 }
 
 // GetInstanceRole tries to fetch the ClusterRoleLabelName andClusterInstanceRoleLabelName value from a given labels map
@@ -407,13 +410,6 @@ func SetInstanceRole(meta metav1.ObjectMeta, role string) {
 
 // MergeObjectsMetadata is capable of merging the labels and annotations of two objects metadata
 func MergeObjectsMetadata(receiver client.Object, giver client.Object) {
-	if receiver.GetLabels() == nil {
-		receiver.SetLabels(map[string]string{})
-	}
-	if receiver.GetAnnotations() == nil {
-		receiver.SetAnnotations(map[string]string{})
-	}
-
-	receiver.SetLabels(mergeMap(receiver.GetLabels(), giver.GetLabels()))
-	receiver.SetAnnotations(mergeMap(receiver.GetAnnotations(), giver.GetAnnotations()))
+	receiver.SetLabels(MergeMap(receiver.GetLabels(), giver.GetLabels()))
+	receiver.SetAnnotations(MergeMap(receiver.GetAnnotations(), giver.GetAnnotations()))
 }

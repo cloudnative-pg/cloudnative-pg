@@ -44,6 +44,10 @@ func CollectDifferencesFromMaps(p1 map[string]string, p2 map[string]string) map[
 
 // IsMapSubset returns true if mapSubset is a subset of mapSet otherwise false
 func IsMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
+	if mapSet == nil {
+		return mapSubset == nil
+	}
+
 	if len(mapSet) < len(mapSubset) {
 		return false
 	}

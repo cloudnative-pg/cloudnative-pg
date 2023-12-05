@@ -447,17 +447,8 @@ func (se *Reconciler) createSnapshot(
 		snapshotClassName = &snapshotConfig.ClassName
 	}
 
-	if pvc.Annotations == nil {
-		pvc.Annotations = map[string]string{}
-	}
-	if pvc.Labels == nil {
-		pvc.Labels = map[string]string{}
-	}
-
-	labels := pvc.Labels
-	utils.MergeMap(labels, snapshotConfig.Labels)
-	annotations := pvc.Annotations
-	utils.MergeMap(annotations, snapshotConfig.Annotations)
+	labels := utils.MergeMap(pvc.Labels, snapshotConfig.Labels)
+	annotations := utils.MergeMap(pvc.Annotations, snapshotConfig.Annotations)
 	transferLabelsToAnnotations(labels, annotations)
 
 	snapshot := storagesnapshotv1.VolumeSnapshot{

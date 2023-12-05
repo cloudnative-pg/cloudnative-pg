@@ -537,15 +537,9 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 	if st == nil {
 		return
 	}
-	if sa.Labels == nil {
-		sa.Labels = map[string]string{}
-	}
-	if sa.Annotations == nil {
-		sa.Annotations = map[string]string{}
-	}
 
-	utils.MergeMap(sa.Labels, st.Metadata.Labels)
-	utils.MergeMap(sa.Annotations, st.Metadata.Annotations)
+	sa.Labels = utils.MergeMap(sa.Labels, st.Metadata.Labels)
+	sa.Annotations = utils.MergeMap(sa.Annotations, st.Metadata.Annotations)
 }
 
 // PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
