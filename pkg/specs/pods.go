@@ -39,25 +39,6 @@ import (
 )
 
 const (
-	// ClusterSerialAnnotationName is the name of the annotation containing the
-	// serial number of the node
-	ClusterSerialAnnotationName = utils.ClusterSerialAnnotationName
-
-	// ClusterRestartAnnotationName is the name of the annotation containing the
-	// latest required restart time
-	ClusterRestartAnnotationName = utils.ClusterRestartAnnotationName
-
-	// ClusterReloadAnnotationName is the name of the annotation containing the
-	// latest required restart time
-	ClusterReloadAnnotationName = utils.ClusterReloadAnnotationName
-
-	// ClusterRoleLabelName label is applied to Pods to mark primary ones
-	// Deprecated: Use utils.ClusterInstanceRoleLabelName
-	ClusterRoleLabelName = utils.ClusterRoleLabelName
-
-	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
-	WatchedLabelName = utils.WatchedLabelName
-
 	// ClusterRoleLabelPrimary is written in labels to represent primary servers
 	ClusterRoleLabelPrimary = "primary"
 
