@@ -80,13 +80,13 @@ The cluster status has a section for tablespaces:
 status:
 
   <- snipped ->
-
   tablespacesStatus:
-    byStatus:
-      reconciled:
-      - another_tablespace
-      - atablespace
-      - tablespacea1
+  - name: atablespace
+    state: reconciled
+  - name: another_tablespace
+    state: reconciled
+  - name: tablespacea1
+    state: reconciled
 ```
 
 Tablespaces, coupled with PostgreSQL's
