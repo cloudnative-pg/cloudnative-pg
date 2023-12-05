@@ -92,12 +92,15 @@ information about this important security feature.
 The operator creates a persistent volume claim (PVC) for each PostgreSQL
 instance, with the goal to store the `PGDATA`, and then mounts it into each Pod.
 
-Additionally, it supports the creation of clusters with a separate PVC
-on which to store PostgreSQL Write-Ahead Log (WAL), as explained in the
-["Volume for WAL" section](#volume-for-wal) below.
+Additionally, it supports the creation of clusters with:
+
+- a separate PVC on which to store PostgreSQL Write-Ahead Log (WAL), as
+  explained in the ["Volume for WAL" section](#volume-for-wal) below
+- additional separate volumes reserved for PostgreSQL tablespaces, as explained
+  in the ["Tablespaces" section](tablespaces.md)
 
 In CloudNativePG, the volumes attached to a single PostgreSQL instance
-are defined as **PVC group**.
+are defined as a **PVC group**.
 
 ## Configuration via a storage class
 
@@ -220,6 +223,12 @@ spec:
 !!! Important
     Removing `walStorage` is not supported: once added, a separate volume for
     WALs cannot be removed from an existing Postgres cluster.
+
+## Volumes for tablespaces
+
+CloudNativePG supports declarative tablespaces. You can add one or more
+volumes, each dedicated to a single PostgreSQL tablespace.
+See ["Tablespaces" section](tablespaces.md) for details.
 
 ## Volume expansion
 

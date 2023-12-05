@@ -396,9 +396,8 @@ Postgres instance, with dedicated storage.
 We proved that this extreme architectural pattern works when we benchmarked
 [running PostgreSQL on bare metal Kubernetes with local persistent
 volumes](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/).
-A current limitation of CloudNativePG, which will be overcome in version 1.22,
-is the lack of support for tablespaces. Once tablespaces are available, horizontal partitioning can be
-easily implemented.
+Tablespaces and horizontal partitioning are data modeling techniques that you
+can use to improve the vertical scalability of you databases.
 
 **How can I specify a time zone in the PostgreSQL cluster?**
 
