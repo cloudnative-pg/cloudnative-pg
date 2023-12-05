@@ -287,7 +287,6 @@ spec:
         size: 2Gi
 ```
 
-<!--
 ## Temporary tablespaces
 
 PostgreSQL allows you to define one or more temporary tablespaces to create
@@ -303,12 +302,19 @@ then sequentially iterates through the list.
 
 Temporary tablespaces work like regular tablespaces, including the backup part.
 
-CloudNativePG provides the `.spec.tablespaces.NAME.temporary` option to
+CloudNativePG provides the `.spec.tablespaces[*].name.temporary` option to
 determine whether a tablespace can be used for temporary usage, entirely
 abstracting the management of the `temp_tablespaces` PostgreSQL option from
 you.
 
 ```yaml
+spec:
+  [...]
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+      temporary: true
 ```
 
 They can be created at the initialization time or added later, requiring a
@@ -319,8 +325,6 @@ option (which doesn't require a restart of PostgreSQL to be changed).
 Although temporary tablespaces can also work as regular tablespaces (meaning
 that users can also host regular data on them while also using them for
 temporary operations), we recommend not to mix the two workloads.
-
--->
 
 ## Limitations
 

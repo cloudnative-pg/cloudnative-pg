@@ -113,3 +113,72 @@ var _ = Describe("testing the building of the ldap config string", func() {
 			ldapSearchFilter, ldapSearchAttribute)))
 	})
 })
+
+var _ = Describe("Test building of the list of temporary tablespaces", func() {
+	clusterWithoutTablespaces := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "configurationTest",
+			Namespace: "default",
+		},
+
+		Spec: apiv1.ClusterSpec{},
+	}
+
+	clusterWithoutTemporaryTablespaces := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "configurationTest",
+			Namespace: "default",
+		},
+
+		Spec: apiv1.ClusterSpec{
+			Tablespaces: []apiv1.TablespaceConfiguration{
+				{
+					Name:      "data_tablespace",
+					Temporary: false,
+				},
+			},
+		},
+	}
+
+	clusterWithTemporaryTablespaces := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "configurationTest",
+			Namespace: "default",
+		},
+
+		Spec: apiv1.ClusterSpec{
+			Tablespaces: []apiv1.TablespaceConfiguration{
+				{
+					Name:      "data_tablespace",
+					Temporary: false,
+				},
+				{
+					Name:      "temporary_tablespace",
+					Temporary: true,
+				},
+				{
+					Name:      "other_temporary_tablespace",
+					Temporary: true,
+				},
+			},
+		},
+	}
+
+	It("doesn't set temp_tablespaces if there are no declared tablespaces", func() {
+		config, _, err := createPostgresqlConfiguration(&clusterWithoutTablespaces, true)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(config).ToNot(ContainSubstring("temp_tablespaces"))
+	})
+
+	It("doesn't set temp_tablespaces if there are no temporary tablespaces", func() {
+		config, _, err := createPostgresqlConfiguration(&clusterWithoutTemporaryTablespaces, true)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(config).ToNot(ContainSubstring("temp_tablespaces"))
+	})
+
+	It("sets temp_tablespaces when there are temporary tablespaces", func() {
+		config, _, err := createPostgresqlConfiguration(&clusterWithTemporaryTablespaces, true)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(config).To(ContainSubstring("temp_tablespaces = 'other_temporary_tablespace,temporary_tablespace'"))
+	})
+})

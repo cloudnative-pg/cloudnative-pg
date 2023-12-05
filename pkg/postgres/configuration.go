@@ -226,6 +226,9 @@ type ConfigurationInfo struct {
 
 	// Is this a replica cluster?
 	IsReplicaCluster bool
+
+	// TemporaryTablespaces is the list of temporary tablespaces
+	TemporaryTablespaces []string
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -316,6 +319,7 @@ var (
 		"recovery_target_xid":       fixedConfigurationParameter,
 		"restore_command":           fixedConfigurationParameter,
 		"shared_preload_libraries":  fixedConfigurationParameter,
+		"temp_tablespaces":          fixedConfigurationParameter,
 		"unix_socket_directories":   blockedConfigurationParameter,
 		"unix_socket_group":         blockedConfigurationParameter,
 		"unix_socket_permissions":   blockedConfigurationParameter,
@@ -537,6 +541,11 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 		// Set all user provided shared preload libraries
 		setUserSharedPreloadLibraries(info, configuration)
+	}
+
+	// Apply the list of temporary tablespaces
+	if len(info.TemporaryTablespaces) > 0 {
+		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
 	}
 
 	return configuration

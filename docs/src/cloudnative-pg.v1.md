@@ -4461,6 +4461,13 @@ the storage specification for the tablespace</p>
    <p>Owner is the PostgreSQL user owning the tablespace</p>
 </td>
 </tr>
+<tr><td><code>temporary</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Temporary means the tablespaces is meant to be used for temporary tables</p>
+</td>
+</tr>
 </tbody>
 </table>
 
