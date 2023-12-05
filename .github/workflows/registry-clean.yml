@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+env:
+  IMAGE_NAME: "cloudnative-pg-testing"
+  ORG_NAME: "cloudnative-pg"
+  SNOK_TOKEN: ${{ secrets.REPO_GHA_PAT }}
+  CONTAINER_IMAGE_NAMES: "pgbouncer-testing, postgresql-testing, postgis-testing"
 
 jobs:
   clean-ghcr:
@@ -15,23 +20,23 @@ jobs:
     steps:
     # once issue https://github.com/snok/container-retention-policy/issues/33 is fixed
     # we can merge the two steps into one
-      - name: Delete '-testing' images for cloudnative-pg
+      - name: Delete '-testing' images for ${{ env.IMAGE_NAME }}
         uses: snok/container-retention-policy@v2
         with:
-          image-names: cloudnative-pg-testing
+          image-names: ${{ env.IMAGE_NAME }}
           cut-off: 5 days ago UTC
           keep-at-least: 1
           account-type: org
-          org-name: cloudnative-pg
+          org-name: ${{ env.ORG_NAME }}
           # use the GITHUB_TOKEN when issue https://github.com/snok/container-retention-policy/issues/27 is fixed
-          token: ${{ secrets.REPO_GHA_PAT }}
+          token: ${{ env.SNOK_TOKEN }}
       - name: Delete '-testing' images for containers
         uses: snok/container-retention-policy@v2
         with:
-          image-names: pgbouncer-testing, postgresql-testing, postgis-testing
+          image-names: ${{ env.CONTAINER_IMAGE_NAMES }}
           cut-off: A week ago UTC
           keep-at-least: 1
           account-type: org
-          org-name: cloudnative-pg
+          org-name: ${{ env.ORG_NAME }}
           # use the GITHUB_TOKEN when issue https://github.com/snok/container-retention-policy/issues/27 is fixed
-          token: ${{ secrets.REPO_GHA_PAT }}
+          token: ${{ env.SNOK_TOKEN }}
