@@ -156,3 +156,17 @@ var _ = Describe("Annotate pods management", func() {
 		Expect(isPresent).To(BeFalse())
 	})
 })
+
+var _ = Describe("MergeMap Functionality", func() {
+	It("must initialize a map before merging", func() {
+		result := MergeOrInitMap(nil, map[string]string{"one": "1"})
+		Expect(result).To(Equal(map[string]string{"one": "1"}))
+	})
+
+	It("must override or set values of keys in the second parameter", func() {
+		result := MergeOrInitMap(
+			map[string]string{"one": "1", "two": "2"},
+			map[string]string{"one": "2", "three": "3"})
+		Expect(result).To(Equal(map[string]string{"one": "2", "two": "2", "three": "3"}))
+	})
+})
