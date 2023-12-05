@@ -23,6 +23,7 @@ from operator import itemgetter
 from typing import Dict, List
 
 POSTGRES_REPO = "ghcr.io/cloudnative-pg/postgresql"
+
 PG_VERSIONS_FILE = ".github/pg_versions.json"
 AKS_VERSIONS_FILE = ".github/aks_versions.json"
 EKS_VERSIONS_FILE = ".github/eks_versions.json"
@@ -79,6 +80,7 @@ def filter_version(versions_list, version_range):
         )
     )
 
+
 # Default timeout for the e2e test
 with open(E2E_TEST_TIMEOUT) as json_file:
     timeout_list = json.load(json_file)
@@ -128,19 +130,21 @@ POSTGRES = MajorVersionList(postgres_versions)
 class E2EJob(dict):
     """Build a single job of the matrix"""
 
-    def __init__(self, k8s_version, postgres_version_list):
+    def __init__(self, k8s_version, postgres_version_list, flavor):
         postgres_version = postgres_version_list.latest
         postgres_version_pre = postgres_version_list.oldest
 
-        name = f"{k8s_version}-PostgreSQL-{postgres_version}"
-        repo = POSTGRES_REPO
+        if flavor == "pg":
+            name = f"{k8s_version}-PostgreSQL-{postgres_version}"
+            repo = POSTGRES_REPO
+            kind = "PostgreSQL"
 
         super().__init__(
             {
                 "id": name,
                 "k8s_version": k8s_version,
                 "postgres_version": postgres_version,
-                "postgres_kind": "PostgreSQL",
+                "postgres_kind": kind,
                 "postgres_img": f"{repo}:{postgres_version}",
                 "postgres_pre_img": f"{repo}:{postgres_version_pre}",
             }
@@ -153,8 +157,8 @@ class E2EJob(dict):
 def build_push_include_local():
     """Build the list of tests running on push"""
     return {
-        E2EJob(KIND_K8S.latest, POSTGRES.latest),
-        E2EJob(KIND_K8S.oldest, POSTGRES.oldest),
+        E2EJob(KIND_K8S.latest, POSTGRES.latest, "pg"),
+        E2EJob(KIND_K8S.oldest, POSTGRES.oldest, "pg"),
     }
 
 
@@ -165,12 +169,12 @@ def build_pull_request_include_local():
     # Iterate over K8S versions
     for k8s_version in KIND_K8S:
         result |= {
-            E2EJob(k8s_version, POSTGRES.latest),
+            E2EJob(k8s_version, POSTGRES.latest, "pg"),
         }
 
     # Iterate over PostgreSQL versions
     for postgres_version in POSTGRES.values():
-        result |= {E2EJob(KIND_K8S.latest, postgres_version)}
+        result |= {E2EJob(KIND_K8S.latest, postgres_version, "pg")}
 
     return result
 
@@ -182,12 +186,12 @@ def build_main_include_local():
     # Iterate over K8S versions
     for k8s_version in KIND_K8S:
         result |= {
-            E2EJob(k8s_version, POSTGRES.latest),
+            E2EJob(k8s_version, POSTGRES.latest, "pg"),
         }
 
     # Iterate over PostgreSQL versions
     for postgres_version in POSTGRES.values():
-        result |= {E2EJob(KIND_K8S.latest, postgres_version)}
+        result |= {E2EJob(KIND_K8S.latest, postgres_version, "pg")}
 
     return result
 
@@ -204,13 +208,13 @@ def build_push_include_cloud(engine_version_list):
 
 def build_pull_request_include_cloud(engine_version_list):
     return {
-        E2EJob(engine_version_list.latest, POSTGRES.latest),
+        E2EJob(engine_version_list.latest, POSTGRES.latest, "pg"),
     }
 
 
 def build_main_include_cloud(engine_version_list):
     return {
-        E2EJob(engine_version_list.latest, POSTGRES.latest),
+        E2EJob(engine_version_list.latest, POSTGRES.latest, "pg"),
     }
 
 
@@ -220,12 +224,12 @@ def build_schedule_include_cloud(engine_version_list):
     # Iterate over K8S versions
     for k8s_version in engine_version_list:
         result |= {
-            E2EJob(k8s_version, POSTGRES.latest),
+            E2EJob(k8s_version, POSTGRES.latest, "pg"),
         }
 
     # Iterate over PostgreSQL versions
     for postgres_version in POSTGRES.values():
-        result |= {E2EJob(engine_version_list.latest, postgres_version)}
+        result |= {E2EJob(engine_version_list.latest, postgres_version, "pg")}
 
     return result
 
