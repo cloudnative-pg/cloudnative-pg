@@ -347,12 +347,12 @@ func (r *ClusterReconciler) serviceReconciler(ctx context.Context, proposed *cor
 
 	// we preserve existing labels/annotation that could be added by third parties
 	if !utils.IsMapSubset(livingService.Labels, proposed.Labels) {
-		livingService.Labels = utils.MergeMap(livingService.Labels, proposed.Labels)
+		livingService.Labels = utils.MergeOrInitMap(livingService.Labels, proposed.Labels)
 		shouldUpdate = true
 	}
 
 	if !utils.IsMapSubset(livingService.Annotations, proposed.Annotations) {
-		livingService.Annotations = utils.MergeMap(livingService.Annotations, proposed.Annotations)
+		livingService.Annotations = utils.MergeOrInitMap(livingService.Annotations, proposed.Annotations)
 		shouldUpdate = true
 	}
 

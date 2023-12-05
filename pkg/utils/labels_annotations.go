@@ -380,7 +380,13 @@ func mergeMap(receiver, giver map[string]string) map[string]string {
 
 // MergeMap transfers the content of a giver map to a receiver
 // ensure the receiver is not nil before call this method
-func MergeMap(receiver, giver map[string]string) map[string]string {
+func MergeMap(receiver, giver map[string]string) {
+	_ = mergeMap(receiver, giver)
+}
+
+// MergeOrInitMap merges the content of a giver map into a receiver map.
+// If the receiver is nil, it initializes it first.
+func MergeOrInitMap(receiver, giver map[string]string) map[string]string {
 	if receiver == nil {
 		receiver = map[string]string{}
 	}
@@ -410,6 +416,6 @@ func SetInstanceRole(meta metav1.ObjectMeta, role string) {
 
 // MergeObjectsMetadata is capable of merging the labels and annotations of two objects metadata
 func MergeObjectsMetadata(receiver client.Object, giver client.Object) {
-	receiver.SetLabels(MergeMap(receiver.GetLabels(), giver.GetLabels()))
-	receiver.SetAnnotations(MergeMap(receiver.GetAnnotations(), giver.GetAnnotations()))
+	receiver.SetLabels(MergeOrInitMap(receiver.GetLabels(), giver.GetLabels()))
+	receiver.SetAnnotations(MergeOrInitMap(receiver.GetAnnotations(), giver.GetAnnotations()))
 }
