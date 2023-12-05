@@ -1671,6 +1671,11 @@ type TablespaceConfiguration struct {
 	// Owner is the PostgreSQL user owning the tablespace
 	// +optional
 	Owner DatabaseRoleRef `json:"owner,omitempty"`
+
+	// Temporary means the tablespaces is meant to be used for temporary tables
+	// +optional
+	// +kubebuilder:default:=false
+	Temporary bool `json:"temporary,omitempty"`
 }
 
 // DatabaseRoleRef is a reference an a role available inside PostgreSQL

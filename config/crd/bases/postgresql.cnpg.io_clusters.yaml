@@ -3624,6 +3624,11 @@ spec:
                             the generated PVCs will use the default storage class
                           type: string
                       type: object
+                    temporary:
+                      default: false
+                      description: Temporary means the tablespaces is meant to be
+                        used for temporary tables
+                      type: boolean
                   required:
                   - name
                   - storage
