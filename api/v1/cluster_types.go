@@ -1666,7 +1666,13 @@ type TablespaceConfiguration struct {
 
 	// Owner is the PostgreSQL user owning the tablespace
 	// +optional
-	Owner string `json:"owner,omitempty"`
+	Owner DatabaseRoleRef `json:"owner,omitempty"`
+}
+
+// DatabaseRoleRef is a reference an a role available inside PostgreSQL
+type DatabaseRoleRef struct {
+	// +optional
+	Name string `json:"name,omitempty"`
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.

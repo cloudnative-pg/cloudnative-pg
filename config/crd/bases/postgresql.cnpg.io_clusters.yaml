@@ -3381,7 +3381,10 @@ spec:
                       type: string
                     owner:
                       description: Owner is the PostgreSQL user owning the tablespace
-                      type: string
+                      properties:
+                        name:
+                          type: string
+                      type: object
                     storage:
                       description: The storage configuration for the tablespace
                       properties:

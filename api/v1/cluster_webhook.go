@@ -168,8 +168,8 @@ func (r *Cluster) defaultTablespaces() {
 	}
 
 	for name, tablespaceConfiguration := range r.Spec.Tablespaces {
-		if len(tablespaceConfiguration.Owner) == 0 {
-			tablespaceConfiguration.Owner = defaultOwner
+		if len(tablespaceConfiguration.Owner.Name) == 0 {
+			tablespaceConfiguration.Owner.Name = defaultOwner
 		}
 		r.Spec.Tablespaces[name] = tablespaceConfiguration
 	}
