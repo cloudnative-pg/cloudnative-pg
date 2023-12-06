@@ -30,13 +30,24 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
-// BackupClient a client to interact with the instance backup endpoints
-type BackupClient struct {
+// backupClient a client to interact with the instance backup endpoints
+type backupClient struct {
 	cli *http.Client
 }
 
+// BackupClient is a struct capable of interacting with the instance backup endpoints
+type BackupClient interface {
+	StatusWithErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error)
+	Start(
+		ctx context.Context,
+		podIP string,
+		sbq StartBackupRequest,
+	) error
+	Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error
+}
+
 // NewBackupClient creates a client capable of interacting with the instance backup endpoints
-func NewBackupClient() *BackupClient {
+func NewBackupClient() BackupClient {
 	const connectionTimeout = 2 * time.Second
 	const requestTimeout = 30 * time.Second
 
@@ -50,12 +61,12 @@ func NewBackupClient() *BackupClient {
 		},
 		Timeout: requestTimeout,
 	}
-	return &BackupClient{cli: timeoutClient}
+	return &backupClient{cli: timeoutClient}
 }
 
 // StatusWithErrors retrieves the current status of the backup.
 // Returns the response body in case there is an error in the request
-func (c *BackupClient) StatusWithErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error) {
+func (c *backupClient) StatusWithErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error) {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
@@ -66,7 +77,7 @@ func (c *BackupClient) StatusWithErrors(ctx context.Context, podIP string) (*Res
 }
 
 // Start runs the pg_start_backup
-func (c *BackupClient) Start(
+func (c *backupClient) Start(
 	ctx context.Context,
 	podIP string,
 	sbq StartBackupRequest,
@@ -90,7 +101,7 @@ func (c *BackupClient) Start(
 }
 
 // Stop runs the command pg_stop_backup
-func (c *BackupClient) Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error {
+func (c *backupClient) Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)

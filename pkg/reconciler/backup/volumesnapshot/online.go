@@ -29,7 +29,7 @@ import (
 )
 
 type onlineExecutor struct {
-	backupClient *webserver.BackupClient
+	backupClient webserver.BackupClient
 }
 
 func newOnlineExecutor() *onlineExecutor {
