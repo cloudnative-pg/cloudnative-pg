@@ -18,26 +18,14 @@ package persistentvolumeclaim
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
-
-// GetName builds the name for a given PVC of the instance
-func GetName(instanceName string, role utils.PVCRole) string {
-	pvcName := instanceName
-	if role == utils.PVCRolePgWal {
-		pvcName += apiv1.WalArchiveVolumeSuffix
-	}
-	return pvcName
-}
 
 // FilterByPodSpec returns all the corev1.PersistentVolumeClaim that are used inside the podSpec
 func FilterByPodSpec(
@@ -128,7 +116,7 @@ func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool
 }
 
 type expectedPVC struct {
-	role          utils.PVCRole
+	calculator    ExpectedObjectCalculator
 	name          string
 	initialStatus PVCStatus
 }
@@ -141,7 +129,7 @@ func (e *expectedPVC) toCreateConfiguration(
 	cc := &CreateConfiguration{
 		Status:     e.initialStatus,
 		NodeSerial: serial,
-		Role:       e.role,
+		Calculator: e.calculator,
 		Storage:    storage,
 		Source:     source,
 	}
@@ -150,12 +138,13 @@ func (e *expectedPVC) toCreateConfiguration(
 }
 
 func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []expectedPVC {
-	roles := []utils.PVCRole{utils.PVCRolePgData}
-
+	roles := []ExpectedObjectCalculator{NewPgDataCalculator()}
 	if cluster.ShouldCreateWalArchiveVolume() {
-		roles = append(roles, utils.PVCRolePgWal)
+		roles = append(roles, NewPgWalCalculator())
 	}
-
+	for _, tbsConfig := range cluster.Spec.Tablespaces {
+		roles = append(roles, NewPgTablespaceCalculator(tbsConfig.Name))
+	}
 	return buildExpectedPVCs(instanceName, roles)
 }
 
@@ -169,68 +158,19 @@ func getExpectedInstancePVCNamesFromCluster(cluster *apiv1.Cluster, instanceName
 	return expectedPVCNames
 }
 
-func containsRole(roles []utils.PVCRole, role utils.PVCRole) bool {
-	for _, pvcRole := range roles {
-		if pvcRole == role {
-			return true
-		}
-	}
-	return false
-}
-
 // here we should register any new PVC for the instance
-func buildExpectedPVCs(instanceName string, roles []utils.PVCRole) []expectedPVC {
-	var expectedMounts []expectedPVC
+func buildExpectedPVCs(instanceName string, roles []ExpectedObjectCalculator) []expectedPVC {
+	expectedMounts := make([]expectedPVC, len(roles))
 
-	if containsRole(roles, utils.PVCRolePgData) {
-		// At the moment detecting a pod is missing the data pvc has no real use.
-		// In the future we will handle all the PVC creation with the package reconciler
-		dataPVCName := GetName(instanceName, utils.PVCRolePgData)
-		expectedMounts = append(expectedMounts,
-			expectedPVC{
-				name: dataPVCName,
-				role: utils.PVCRolePgData,
-				// This requires a init, ideally we should move to a design where each pvc can be init separately
-				// and then  attached
-				initialStatus: StatusInitializing,
-			},
-		)
-	}
-
-	if containsRole(roles, utils.PVCRolePgWal) {
-		walPVCName := GetName(instanceName, utils.PVCRolePgWal)
-		expectedMounts = append(expectedMounts,
-			expectedPVC{
-				name:          walPVCName,
-				role:          utils.PVCRolePgWal,
-				initialStatus: StatusReady,
-			},
-		)
+	for i, rl := range roles {
+		expectedMounts[i] = expectedPVC{
+			name:          rl.GetName(instanceName),
+			calculator:    rl,
+			initialStatus: rl.GetInitialStatus(),
+		}
 	}
 
 	return expectedMounts
-}
-
-func getStorageConfiguration(
-	cluster *apiv1.Cluster,
-	role utils.PVCRole,
-) (apiv1.StorageConfiguration, error) {
-	var storageConfiguration *apiv1.StorageConfiguration
-	switch role {
-	case utils.PVCRolePgData:
-		storageConfiguration = &cluster.Spec.StorageConfiguration
-	case utils.PVCRolePgWal:
-		storageConfiguration = cluster.Spec.WalStorage
-	default:
-		return apiv1.StorageConfiguration{}, fmt.Errorf("unknown pvcRole: %s", string(role))
-	}
-
-	if storageConfiguration == nil {
-		return apiv1.StorageConfiguration{},
-			fmt.Errorf("storage configuration doesn't exist for the given PVC role: %s", role)
-	}
-
-	return *storageConfiguration, nil
 }
 
 // GetInstancePVCs gets all the PVC associated with a given instance
@@ -240,36 +180,48 @@ func GetInstancePVCs(
 	instanceName string,
 	namespace string,
 ) ([]corev1.PersistentVolumeClaim, error) {
-	getPVC := func(name string) (*corev1.PersistentVolumeClaim, error) {
-		var pvc corev1.PersistentVolumeClaim
-		err := cli.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &pvc)
+	// getPvcList returns the PVCs matching the instance name as well as the role
+	getPvcList := func(pvcMeta Meta, instance string) (*corev1.PersistentVolumeClaimList, error) {
+		var pvcList corev1.PersistentVolumeClaimList
+		matchClusterName := client.MatchingLabels(pvcMeta.GetLabels(instance))
+		err := cli.List(ctx,
+			&pvcList,
+			client.InNamespace(namespace),
+			matchClusterName,
+		)
 		if errors.IsNotFound(err) {
 			return nil, nil
 		}
 		if err != nil {
 			return nil, err
 		}
-		return &pvc, nil
+		return &pvcList, nil
 	}
 
 	var pvcs []corev1.PersistentVolumeClaim
 
-	pgDataName := GetName(instanceName, utils.PVCRolePgData)
-	pgData, err := getPVC(pgDataName)
+	pgData, err := getPvcList(NewPgDataCalculator(), instanceName)
 	if err != nil {
 		return nil, err
 	}
-	if pgData != nil {
-		pvcs = append(pvcs, *pgData)
+	if pgData != nil && len(pgData.Items) > 0 {
+		pvcs = append(pvcs, pgData.Items...)
 	}
 
-	pgWalName := GetName(instanceName, utils.PVCRolePgWal)
-	pgWal, err := getPVC(pgWalName)
+	pgWal, err := getPvcList(NewPgWalCalculator(), instanceName)
 	if err != nil {
 		return nil, err
 	}
-	if pgWal != nil {
-		pvcs = append(pvcs, *pgWal)
+	if pgWal != nil && len(pgWal.Items) > 0 {
+		pvcs = append(pvcs, pgWal.Items...)
+	}
+
+	tablespacesPVClist, err := getPvcList(newTablespaceMetaCalculator(), instanceName)
+	if err != nil {
+		return nil, err
+	}
+	if tablespacesPVClist != nil && len(tablespacesPVClist.Items) > 0 {
+		pvcs = append(pvcs, tablespacesPVClist.Items...)
 	}
 
 	return pvcs, nil

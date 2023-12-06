@@ -18,8 +18,10 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/retry"
@@ -295,4 +297,51 @@ func (r *InstanceReconciler) ReconcileWalStorage(ctx context.Context) error {
 	// We moved all the files now we should create the proper symlink
 	contextLogger.Debug("Creating symlink", "from", specs.PgWalPath, "to", specs.PgWalVolumePgWalPath)
 	return os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath)
+}
+
+// ReconcileTablespaces ensures the mount points created for the tablespaces
+// are there, and creates a subdirectory in each of them, which will therefore
+// be owned by the `postgres` user (rather than `root` as the mount point),
+// as required in order to hold PostgreSQL Tablespaces
+func (r *InstanceReconciler) ReconcileTablespaces(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	const dataDir = "data"
+	contextLogger := log.FromContext(ctx)
+
+	if !cluster.ContainsTablespaces() {
+		return nil
+	}
+
+	for _, tbsConfig := range cluster.Spec.Tablespaces {
+		tbsName := tbsConfig.Name
+		mountPoint := specs.MountForTablespace(tbsName)
+		if tbsMount, err := fileutils.FileExists(mountPoint); err != nil {
+			contextLogger.Error(err, "while checking for mountpoint", "instance",
+				r.instance.PodName, "tablespace", tbsName)
+			return err
+		} else if !tbsMount {
+			contextLogger.Error(fmt.Errorf("mountpoint not found"),
+				"mountpoint for tablespaces is missing",
+				"instance", r.instance.PodName, "tablespace", tbsName)
+			continue
+		}
+
+		info, err := os.Lstat(mountPoint)
+		if err != nil {
+			return fmt.Errorf("while checking for tablespace mount point: %w", err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("the tablespace %s mount: %s is not a directory", tbsName, mountPoint)
+		}
+		err = fileutils.EnsureDirectoryExists(filepath.Join(mountPoint, dataDir))
+		if err != nil {
+			contextLogger.Error(err,
+				"could not create data dir in tablespace mount",
+				"instance", r.instance.PodName, "tablespace", tbsName)
+			return fmt.Errorf("while creating data dir in tablespace %s: %w", mountPoint, err)
+		}
+	}
+	return nil
 }

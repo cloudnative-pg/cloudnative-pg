@@ -89,6 +89,10 @@ const (
 	// get the name of the PVC dedicated to WAL files.
 	WalArchiveVolumeSuffix = "-wal"
 
+	// TablespaceVolumeInfix is the infix added between the instance name
+	// and tablespace name to get the name of PVC for a certain tablespace
+	TablespaceVolumeInfix = "-tbs-"
+
 	// StreamingReplicationUser is the name of the user we'll use for
 	// streaming replication purposes
 	StreamingReplicationUser = "streaming_replica"
@@ -144,6 +148,10 @@ type VolumeSnapshotConfiguration struct {
 	// WalClassName specifies the Snapshot Class to be used for the PG_WAL PersistentVolumeClaim.
 	// +optional
 	WalClassName string `json:"walClassName,omitempty"`
+	// TablespaceClassName specifies the Snapshot Class to be used for the tablespaces.
+	// defaults to the PGDATA Snapshot Class, if set
+	// +optional
+	TablespaceClassName map[string]string `json:"tablespaceClassName,omitempty"`
 	// SnapshotOwnerReference indicates the type of owner reference the snapshot should have
 	// +optional
 	// +kubebuilder:validation:Enum:=none;cluster;backup
@@ -453,6 +461,10 @@ type ClusterSpec struct {
 	// Defaults to: `RuntimeDefault`
 	// +optional
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
+
+	// The tablespaces configuration
+	// +optional
+	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
 }
 
 const (
@@ -626,6 +638,34 @@ type ManagedRoles struct {
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
+// TablespaceState represents the state of a tablespace in a cluster
+type TablespaceState struct {
+	// Name is the name of the tablespace
+	Name string `json:"name"`
+
+	// Owner is the PostgreSQL user owning the tablespace
+	// +optional
+	Owner string `json:"owner,omitempty"`
+
+	// State is the latest reconciliation state
+	State TablespaceStatus `json:"state"`
+
+	// Error is the reconciliation error, if any
+	// +optional
+	Error string `json:"error,omitempty"`
+}
+
+// TablespaceStatus represents the status of a tablespace in the cluster
+type TablespaceStatus string
+
+const (
+	// TablespaceStatusReconciled indicates the tablespace in DB matches the Spec
+	TablespaceStatusReconciled TablespaceStatus = "reconciled"
+
+	// TablespaceStatusPendingReconciliation indicates the tablespace in Spec requires creation in the DB
+	TablespaceStatusPendingReconciliation TablespaceStatus = "pending"
+)
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -647,6 +687,10 @@ type ClusterStatus struct {
 	// ManagedRolesStatus reports the state of the managed roles in the cluster
 	// +optional
 	ManagedRolesStatus ManagedRoles `json:"managedRolesStatus,omitempty"`
+
+	// TablespacesStatus reports the state of the declarative tablespaces in the cluster
+	// +optional
+	TablespacesStatus []TablespaceState `json:"tablespacesStatus,omitempty"`
 
 	// The timeline of the Postgres cluster
 	// +optional
@@ -1486,6 +1530,10 @@ type DataSource struct {
 	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
 	// +optional
 	WalStorage *corev1.TypedLocalObjectReference `json:"walStorage,omitempty"`
+
+	// Configuration of the storage for PostgreSQL tablespaces
+	// +optional
+	TablespaceStorage map[string]corev1.TypedLocalObjectReference `json:"tablespaceStorage,omitempty"`
 }
 
 // BackupSource contains the backup we need to restore from, plus some
@@ -1563,11 +1611,12 @@ type RecoveryTarget struct {
 	Exclusive *bool `json:"exclusive,omitempty"`
 }
 
-// StorageConfiguration is the configuration of the storage of the PostgreSQL instances
+// StorageConfiguration is the configuration used to create and reconcile PVCs,
+// usable for WAL volumes, PGDATA volumes, or tablespaces
 type StorageConfiguration struct {
-	// StorageClass to use for database data (`PGDATA`). Applied after
+	// StorageClass to use for PVCs. Applied after
 	// evaluating the PVC template, if available.
-	// If not specified, generated PVCs will be satisfied by the
+	// If not specified, the generated PVCs will use the
 	// default storage class
 	// +optional
 	StorageClass *string `json:"storageClass,omitempty"`
@@ -1608,6 +1657,26 @@ func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
 	}
 
 	return nil
+}
+
+// TablespaceConfiguration is the configuration of a tablespace, and includes
+// the storage specification for the tablespace
+type TablespaceConfiguration struct {
+	// The name of the tablespace
+	Name string `json:"name"`
+
+	// The storage configuration for the tablespace
+	Storage StorageConfiguration `json:"storage"`
+
+	// Owner is the PostgreSQL user owning the tablespace
+	// +optional
+	Owner DatabaseRoleRef `json:"owner,omitempty"`
+}
+
+// DatabaseRoleRef is a reference an a role available inside PostgreSQL
+type DatabaseRoleRef struct {
+	// +optional
+	Name string `json:"name,omitempty"`
 }
 
 // SyncReplicaElectionConstraints contains the constraints for sync replicas election.
@@ -2720,6 +2789,11 @@ func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
 }
 
+// ContainsTablespaces returns true if for this cluster, we need to create tablespaces
+func (cluster *Cluster) ContainsTablespaces() bool {
+	return len(cluster.Spec.Tablespaces) != 0
+}
+
 // GetPostgresUID returns the UID that is being used for the "postgres"
 // user
 func (cluster Cluster) GetPostgresUID() int64 {
@@ -2982,6 +3056,19 @@ func (cluster *Cluster) GetCoredumpFilter() string {
 func (cluster *Cluster) IsInplaceRestartPhase() bool {
 	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
 		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
+}
+
+// GetTablespaceConfiguration returns the tablespaceConfiguration for the given name
+// otherwise return nil
+func (cluster *Cluster) GetTablespaceConfiguration(name string) *TablespaceConfiguration {
+	for _, tbsConfig := range cluster.Spec.Tablespaces {
+		tbsConfig := tbsConfig
+		if name == tbsConfig.Name {
+			return &tbsConfig
+		}
+	}
+
+	return nil
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

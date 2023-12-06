@@ -1,0 +1,46 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-tablespaces-volume-snapshot-restore
+spec:
+  instances: 2
+  primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  tablespaces:
+    - name: tbs1
+      storage:
+        storageClass: ${E2E_CSI_STORAGE_CLASS}
+        size: 1Gi
+    - name: tbs2
+      storage:
+        storageClass: ${E2E_CSI_STORAGE_CLASS}
+        size: 1Gi
+
+  bootstrap:
+    recovery:
+      volumeSnapshots:
+        storage:
+          name: ${SNAPSHOT_PITR_PGDATA}
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+        walStorage:
+          name: ${SNAPSHOT_PITR_PGWAL}
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+        tablespaceStorage:
+          tbs1:
+            name: ${SNAPSHOT_PITR_PGTABLESPACE_tbs1}
+            kind: VolumeSnapshot
+            apiGroup: snapshot.storage.k8s.io
+          tbs2:
+            name: ${SNAPSHOT_PITR_PGTABLESPACE_tbs2}
+            kind: VolumeSnapshot
+            apiGroup: snapshot.storage.k8s.io
+

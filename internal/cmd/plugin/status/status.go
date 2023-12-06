@@ -116,6 +116,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printReplicaStatus(verbose)
 	status.printUnmanagedReplicationSlotStatus()
 	status.printRoleManagerStatus()
+	status.printTablespacesStatus()
 	status.printInstancesStatus()
 
 	if nonFatalError != nil {
@@ -906,6 +907,45 @@ func (fullStatus *PostgresqlStatus) printRoleManagerStatus() {
 		errorStatus.Print()
 		fmt.Println()
 	}
+}
+
+func (fullStatus *PostgresqlStatus) printTablespacesStatus() {
+	const header = "Tablespaces status"
+
+	tablespacesStatus := fullStatus.Cluster.Status.TablespacesStatus
+	var containsErrors, hasPendingTablespaces bool
+	for _, stat := range tablespacesStatus {
+		if stat.Error != "" {
+			containsErrors = true
+		}
+		if stat.State == apiv1.TablespaceStatusPendingReconciliation {
+			hasPendingTablespaces = true
+		}
+	}
+
+	headerColor := aurora.Green
+	if containsErrors {
+		headerColor = aurora.Red
+	} else if hasPendingTablespaces {
+		headerColor = aurora.Yellow
+	}
+
+	fmt.Println(headerColor(header))
+
+	if len(tablespacesStatus) == 0 {
+		fmt.Println("No managed tablespaces")
+		fmt.Println()
+		return
+	}
+
+	tbsStatus := tabby.New()
+	tbsStatus.AddHeader("Tablespace", "Owner", "Status", "Error")
+
+	for _, tbs := range tablespacesStatus {
+		tbsStatus.AddLine(tbs.Name, tbs.Owner, tbs.State, tbs.Error)
+	}
+	tbsStatus.Print()
+	fmt.Println()
 }
 
 func getPrimaryStartTime(cluster *apiv1.Cluster) string {

@@ -1,0 +1,7 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: cluster-tablespaces-backup
+spec:
+  cluster:
+    name: cluster-tablespaces

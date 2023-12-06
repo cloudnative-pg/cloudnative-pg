@@ -59,9 +59,7 @@ const (
 	DefaultApplicationUserName = DefaultApplicationDatabaseName
 )
 
-const (
-	sharedBuffersParameter = "shared_buffers"
-)
+const sharedBuffersParameter = "shared_buffers"
 
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
@@ -154,6 +152,26 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 			Enabled:    ptr.To(true),
 			SlotPrefix: "_cnpg_",
 		}
+	}
+
+	if len(r.Spec.Tablespaces) > 0 {
+		r.defaultTablespaces()
+	}
+}
+
+// defaultTablespaces adds the tablespace owner where the
+// user didn't specify it
+func (r *Cluster) defaultTablespaces() {
+	defaultOwner := r.GetApplicationDatabaseOwner()
+	if len(defaultOwner) == 0 {
+		defaultOwner = "postgres"
+	}
+
+	for name, tablespaceConfiguration := range r.Spec.Tablespaces {
+		if len(tablespaceConfiguration.Owner.Name) == 0 {
+			tablespaceConfiguration.Owner.Name = defaultOwner
+		}
+		r.Spec.Tablespaces[name] = tablespaceConfiguration
 	}
 }
 
@@ -291,8 +309,11 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateMaxSyncReplicas,
 		r.validateStorageSize,
 		r.validateWalStorageSize,
+		r.validateTablespaceStorageSize,
 		r.validateName,
+		r.validateTablespaceNames,
 		r.validateBootstrapPgBaseBackupSource,
+		r.validateTablespaceBackupSnapshot,
 		r.validateBootstrapRecoverySource,
 		r.validateBootstrapRecoveryDataSource,
 		r.validateExternalClusters,
@@ -346,13 +367,21 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 			"old", old)
 		return nil
 	}
-	allErrs = append(allErrs, r.validateImageChange(old.Spec.ImageName)...)
-	allErrs = append(allErrs, r.validateConfigurationChange(old)...)
-	allErrs = append(allErrs, r.validateStorageChange(old)...)
-	allErrs = append(allErrs, r.validateWalStorageChange(old)...)
-	allErrs = append(allErrs, r.validateReplicaModeChange(old)...)
-	allErrs = append(allErrs, r.validateUnixPermissionIdentifierChange(old)...)
-	allErrs = append(allErrs, r.validateReplicationSlotsChange(old)...)
+	type validationFunc func(old *Cluster) field.ErrorList
+	validations := []validationFunc{
+		r.validateImageChange,
+		r.validateConfigurationChange,
+		r.validateStorageChange,
+		r.validateWalStorageChange,
+		r.validateTablespacesChange,
+		r.validateReplicaModeChange,
+		r.validateUnixPermissionIdentifierChange,
+		r.validateReplicationSlotsChange,
+	}
+	for _, validate := range validations {
+		allErrs = append(allErrs, validate(old)...)
+	}
+
 	return allErrs
 }
 
@@ -1227,7 +1256,7 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 
 // validateImageChange validate the change from a certain image name
 // to a new one.
-func (r *Cluster) validateImageChange(old string) field.ErrorList {
+func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	newVersion := r.Spec.ImageName
@@ -1236,11 +1265,12 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 		newVersion = configuration.Current.PostgresImageName
 	}
 
-	if old == "" {
-		old = configuration.Current.PostgresImageName
+	oldVersion := old.Spec.ImageName
+	if oldVersion == "" {
+		oldVersion = configuration.Current.PostgresImageName
 	}
 
-	status, err := postgres.CanUpgrade(old, newVersion)
+	status, err := postgres.CanUpgrade(oldVersion, newVersion)
 	if err != nil {
 		result = append(
 			result,
@@ -1255,7 +1285,7 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 				field.NewPath("spec", "imageName"),
 				r.Spec.ImageName,
 				fmt.Sprintf("can't upgrade between %v and %v",
-					old, newVersion)))
+					oldVersion, newVersion)))
 	}
 
 	return result
@@ -1431,26 +1461,48 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 }
 
 func (r *Cluster) validateStorageSize() field.ErrorList {
-	return validateStorageConfigurationSize("Storage", r.Spec.StorageConfiguration)
+	return validateStorageConfigurationSize(*field.NewPath("spec", "storage"), r.Spec.StorageConfiguration)
 }
 
 func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	var result field.ErrorList
 
 	if r.ShouldCreateWalArchiveVolume() {
-		result = append(result, validateStorageConfigurationSize("walStorage", *r.Spec.WalStorage)...)
+		result = append(result,
+			validateStorageConfigurationSize(*field.NewPath("spec", "walStorage"), *r.Spec.WalStorage)...)
 	}
 
 	return result
 }
 
-func validateStorageConfigurationSize(structPath string, storageConfiguration StorageConfiguration) field.ErrorList {
+func (r *Cluster) validateTablespaceStorageSize() field.ErrorList {
+	if r.Spec.Tablespaces == nil {
+		return nil
+	}
+
+	var result field.ErrorList
+
+	for idx, tablespaceConf := range r.Spec.Tablespaces {
+		tablespaceConf := tablespaceConf
+		result = append(result,
+			validateStorageConfigurationSize(
+				*field.NewPath("spec", "tablespaces").Index(idx),
+				tablespaceConf.Storage)...,
+		)
+	}
+	return result
+}
+
+func validateStorageConfigurationSize(
+	structPath field.Path,
+	storageConfiguration StorageConfiguration,
+) field.ErrorList {
 	var result field.ErrorList
 
 	if storageConfiguration.Size != "" {
 		if _, err := resource.ParseQuantity(storageConfiguration.Size); err != nil {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", structPath, "size"),
+				structPath.Child("size"),
 				storageConfiguration.Size,
 				"Size value isn't valid"))
 		}
@@ -1460,7 +1512,7 @@ func validateStorageConfigurationSize(structPath string, storageConfiguration St
 		(storageConfiguration.PersistentVolumeClaimTemplate == nil ||
 			storageConfiguration.PersistentVolumeClaimTemplate.Resources.Requests.Storage().IsZero()) {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", structPath, "size"),
+			structPath.Child("size"),
 			storageConfiguration.Size,
 			"Size not configured. Please add it, or a storage request in the pvcTemplate."))
 	}
@@ -1471,7 +1523,7 @@ func validateStorageConfigurationSize(structPath string, storageConfiguration St
 // Validate a change in the storage
 func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
 	return validateStorageConfigurationChange(
-		"storage",
+		field.NewPath("spec", "storage"),
 		old.Spec.StorageConfiguration,
 		r.Spec.StorageConfiguration,
 	)
@@ -1491,12 +1543,52 @@ func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 		}
 	}
 
-	return validateStorageConfigurationChange("walStorage", *old.Spec.WalStorage, *r.Spec.WalStorage)
+	return validateStorageConfigurationChange(
+		field.NewPath("spec", "walStorage"),
+		*old.Spec.WalStorage,
+		*r.Spec.WalStorage,
+	)
+}
+
+// validateTablespacesChange checks that no tablespaces have been deleted, and that
+// no tablespaces have an invalid storage update
+func (r *Cluster) validateTablespacesChange(old *Cluster) field.ErrorList {
+	if old.Spec.Tablespaces == nil {
+		return nil
+	}
+
+	if old.Spec.Tablespaces != nil && r.Spec.Tablespaces == nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "tablespaces"),
+				r.Spec.Tablespaces,
+				"tablespaces section cannot be deleted once created"),
+		}
+	}
+
+	var errs field.ErrorList
+	for idx, oldConf := range old.Spec.Tablespaces {
+		name := oldConf.Name
+		if newConf := r.GetTablespaceConfiguration(name); newConf != nil {
+			errs = append(errs, validateStorageConfigurationChange(
+				field.NewPath("spec", "tablespaces").Index(idx),
+				oldConf.Storage,
+				newConf.Storage,
+			)...)
+		} else {
+			errs = append(errs,
+				field.Invalid(
+					field.NewPath("spec", "tablespaces").Index(idx),
+					r.Spec.Tablespaces,
+					"no tablespace can be deleted once created"))
+		}
+	}
+	return errs
 }
 
 // validateStorageConfigurationChange generates an error list by comparing two StorageConfiguration
 func validateStorageConfigurationChange(
-	structPath string,
+	structPath *field.Path,
 	oldStorage StorageConfiguration,
 	newStorage StorageConfiguration,
 ) field.ErrorList {
@@ -1519,7 +1611,7 @@ func validateStorageConfigurationChange(
 
 	return field.ErrorList{
 		field.Invalid(
-			field.NewPath("spec", structPath),
+			structPath,
 			newSize,
 			fmt.Sprintf("can't shrink existing storage from %v to %v", oldSize, newSize)),
 	}
@@ -1545,6 +1637,58 @@ func (r *Cluster) validateName() field.ErrorList {
 			"the maximum length of a cluster name is 50 characters"))
 	}
 
+	return result
+}
+
+func (r *Cluster) validateTablespaceNames() field.ErrorList {
+	var result field.ErrorList
+	if r.Spec.Tablespaces == nil {
+		return nil
+	}
+
+	hasTablespace := make(map[string]bool)
+	for idx, tbsConfig := range r.Spec.Tablespaces {
+		name := tbsConfig.Name
+		// NOTE: postgres identifiers are case-insensitive, so we could have
+		// different map keys (names) which are identical for PG
+		_, found := hasTablespace[strings.ToLower(name)]
+		if found {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "tablespaces").Index(idx),
+				name,
+				"duplicate tablespace name"))
+			continue
+		}
+		hasTablespace[strings.ToLower(name)] = true
+
+		if _, err := postgres.IsTablespaceNameValid(name); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "tablespaces").Index(idx),
+				name,
+				err.Error()))
+		}
+	}
+	return result
+}
+
+func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
+	if r.Spec.Backup == nil || r.Spec.Backup.VolumeSnapshot == nil ||
+		len(r.Spec.Backup.VolumeSnapshot.TablespaceClassName) == 0 {
+		return nil
+	}
+	backupTbs := r.Spec.Backup.VolumeSnapshot.TablespaceClassName
+
+	var result field.ErrorList
+	for name := range backupTbs {
+		if tbsConfig := r.GetTablespaceConfiguration(name); tbsConfig == nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "backup", "volumeSnapshot", "tablespaceClassName"),
+				name,
+				fmt.Sprintf("specified the VolumeSnapshot backup configuration for the tablespace: %s, "+
+					"but it can't be found in the '.spec.tablespaces' stanza", name),
+			))
+		}
+	}
 	return result
 }
 

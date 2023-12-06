@@ -169,20 +169,33 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				return false
 			}
 
-			pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
-				if pvc.Name == GetName(instanceName, utils.PVCRolePgData) {
+				if pvc.Name == NewPgDataCalculator().GetName(instanceName) {
 					found = true
-					if pvcRole != utils.PVCRolePgData {
+					if pvcRole != string(utils.PVCRolePgData) {
 						return false
 					}
 				}
 
-				if pvc.Name == GetName(instanceName, utils.PVCRolePgWal) {
+				if pvc.Name == NewPgWalCalculator().GetName(instanceName) {
 					found = true
-					if pvcRole != utils.PVCRolePgWal {
+					if pvcRole != string(utils.PVCRolePgWal) {
 						return false
+					}
+				}
+
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
+					if NewPgTablespaceCalculator(tbsConfig.Name).GetName(instanceName) == pvc.Name {
+						found = true
+						if pvcRole != string(utils.PVCRolePgTablespace) {
+							return false
+						}
+
+						if pvc.Labels[utils.TablespaceNameLabelName] != tbsConfig.Name {
+							return false
+						}
 					}
 				}
 
@@ -196,20 +209,33 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 		update: func(pvc *corev1.PersistentVolumeClaim) {
 			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 
-			pvcRole := utils.PVCRole(pvc.Labels[utils.PvcRoleLabelName])
+			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
-				if pvc.Name == GetName(instanceName, utils.PVCRolePgData) {
+				if pvc.Name == NewPgDataCalculator().GetName(instanceName) {
 					found = true
-					if pvcRole != utils.PVCRolePgData {
+					if pvcRole != string(utils.PVCRolePgData) {
 						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgData)
 					}
 				}
 
-				if pvc.Name == GetName(instanceName, utils.PVCRolePgWal) {
+				if pvc.Name == NewPgWalCalculator().GetName(instanceName) {
 					found = true
-					if pvcRole != utils.PVCRolePgWal {
+					if pvcRole != string(utils.PVCRolePgWal) {
 						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgWal)
+					}
+				}
+
+				for _, tbsConfig := range cluster.Spec.Tablespaces {
+					if NewPgTablespaceCalculator(tbsConfig.Name).GetName(instanceName) == pvc.Name {
+						found = true
+						if pvcRole != string(utils.PVCRolePgTablespace) {
+							pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgTablespace)
+						}
+
+						if pvc.Labels[utils.TablespaceNameLabelName] != tbsConfig.Name {
+							pvc.Labels[utils.TablespaceNameLabelName] = tbsConfig.Name
+						}
 					}
 				}
 

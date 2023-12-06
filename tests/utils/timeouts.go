@@ -41,6 +41,7 @@ const (
 	NewPrimaryAfterSwitchover Timeout = "newPrimaryAfterSwitchover"
 	NewPrimaryAfterFailover   Timeout = "newPrimaryAfterFailover"
 	NewTargetOnFailover       Timeout = "newTargetOnFailover"
+	PodRollout                Timeout = "podRollout"
 	OperatorIsReady           Timeout = "operatorIsReady"
 	LargeObject               Timeout = "largeObject"
 	WalsInMinio               Timeout = "walsInMinio"
@@ -48,6 +49,7 @@ const (
 	BackupIsReady             Timeout = "backupIsReady"
 	DrainNode                 Timeout = "drainNode"
 	VolumeSnapshotIsReady     Timeout = "volumeSnapshotIsReady"
+	Short                     Timeout = "short"
 )
 
 // DefaultTestTimeouts contains the default timeout in seconds for various events
@@ -60,6 +62,7 @@ var DefaultTestTimeouts = map[Timeout]int{
 	NewPrimaryAfterSwitchover: 45,
 	NewPrimaryAfterFailover:   30,
 	NewTargetOnFailover:       120,
+	PodRollout:                120,
 	OperatorIsReady:           120,
 	LargeObject:               300,
 	WalsInMinio:               60,
@@ -67,6 +70,7 @@ var DefaultTestTimeouts = map[Timeout]int{
 	BackupIsReady:             180,
 	DrainNode:                 900,
 	VolumeSnapshotIsReady:     300,
+	Short:                     5,
 }
 
 // Timeouts returns the map of timeouts, where each event gets the timeout specificed

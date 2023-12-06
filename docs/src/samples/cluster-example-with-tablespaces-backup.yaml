@@ -1,0 +1,37 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-with-tablespaces
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: minio
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+        storageClass: standard
+    - name: another_tablespace
+      storage:
+        size: 2Gi
+        storageClass: standard
+    - name: tablespacea1
+      storage:
+        size: 2Gi
+        storageClass: standard

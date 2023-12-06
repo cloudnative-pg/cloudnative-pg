@@ -1,0 +1,56 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-tablespaces-volume-snapshot
+spec:
+  instances: 2
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_CSI_STORAGE_CLASS}
+    size: 1Gi
+
+  tablespaces:
+    - name: tbs1
+      storage:
+        storageClass: ${E2E_CSI_STORAGE_CLASS}
+        size: 1Gi
+    - name: tbs2
+      storage:
+        storageClass: ${E2E_CSI_STORAGE_CLASS}
+        size: 1Gi
+
+  backup:
+    volumeSnapshot:
+      className: ${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS}
+      snapshotOwnerReference: cluster
+    barmanObjectStore:
+      destinationPath: s3://cluster-backups/
+      endpointURL: https://minio-service:9000
+      endpointCA:
+        key: ca.crt
+        name: minio-server-ca-secret
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
+      wal:
+        compression: gzip
+      data:
+        immediateCheckpoint: true
+      tags:
+        retention: "30days"
+      historyTags:
+        retention: "30days"
+    retentionPolicy: "30d"

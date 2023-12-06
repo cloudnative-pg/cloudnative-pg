@@ -1,0 +1,28 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore-with-tablespaces
+spec:
+  instances: 2
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      backup:
+        name: ${BARMAN_BACKUP_NAME}
+
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    - name: anothertablespace
+      storage:
+        size: 2Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    - name: thirdtablespace
+      storage:
+        size: 1Gi
+        storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

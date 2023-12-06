@@ -35,6 +35,7 @@ nav:
   - recovery.md
   - postgresql_conf.md
   - declarative_role_management.md
+  - tablespaces.md
   - operator_conf.md
   - cluster_conf.md
   - storage.md

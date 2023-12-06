@@ -423,6 +423,16 @@ opening up for hybrid and multi-cloud setups (currently, manual switchover
 across data centers is required, while waiting for Kubernetes federation
 native capabilities).
 
+### Tablespace support
+
+CloudNativePG seamlessly integrates robust support for PostgreSQL tablespaces
+by facilitating the declarative definition of individual persistent volumes.
+This innovative feature empowers you to efficiently distribute I/O operations
+across a diverse array of storage devices. Through the transparent
+orchestration of tablespaces, CloudNativePG enhances the performance and
+scalability of PostgreSQL databases, ensuring a streamlined and optimized
+experience for managing large scale data storage in cloud-native environments.
+
 ### Liveness and readiness probes
 
 The operator defines liveness and readiness probes for the Postgres

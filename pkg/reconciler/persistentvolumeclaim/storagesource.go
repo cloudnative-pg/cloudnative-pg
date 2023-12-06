@@ -18,7 +18,6 @@ package persistentvolumeclaim
 
 import (
 	"context"
-	"errors"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,22 +36,9 @@ type StorageSource struct {
 
 	// The (optional) data source that should be used for WALs
 	WALSource *corev1.TypedLocalObjectReference `json:"walSource"`
-}
 
-// ForRole gets the storage source given a PVC role
-func (source *StorageSource) ForRole(role utils.PVCRole) (*corev1.TypedLocalObjectReference, error) {
-	if source == nil {
-		return nil, nil
-	}
-
-	switch role {
-	case utils.PVCRolePgData:
-		return &source.DataSource, nil
-	case utils.PVCRolePgWal:
-		return source.WALSource, nil
-	default:
-		return nil, errors.New("unknown PVC role for StorageSource")
-	}
+	// The (optional) data source that should be used for WALs
+	TablespaceSource map[string]corev1.TypedLocalObjectReference `json:"tablespaceSource"`
 }
 
 // GetCandidateStorageSourceForPrimary gets the candidate storage source
@@ -176,7 +162,8 @@ func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSou
 
 	volumeSnapshots := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
 	return &StorageSource{
-		DataSource: volumeSnapshots.Storage,
-		WALSource:  volumeSnapshots.WalStorage,
+		DataSource:       volumeSnapshots.Storage,
+		WALSource:        volumeSnapshots.WalStorage,
+		TablespaceSource: volumeSnapshots.TablespaceStorage,
 	}
 }

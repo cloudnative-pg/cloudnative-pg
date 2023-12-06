@@ -396,7 +396,7 @@ The following requirements apply to the `pg_basebackup` bootstrap method:
 
 - target and source must have the same hardware architecture
 - target and source must have the same major PostgreSQL version
-- source must not have any tablespace defined (see ["Current limitations"](#current-limitations) below)
+- target and source must have the same tablespaces
 - source must be configured with enough `max_wal_senders` to grant
   access from the target for this one-off operation by providing at least
   one *walsender* for the backup plus one for WAL streaming
@@ -595,21 +595,6 @@ With the above configuration, the following will happen after recovery is comple
     recovered from the original cluster.
 
 #### Current limitations
-
-##### Missing tablespace support
-
-CloudNativePG does not currently include full declarative management
-of PostgreSQL global objects, namely roles, databases, and tablespaces.
-While roles and databases are copied from the source instance to the target
-cluster, tablespaces require a capability that this version of
-CloudNativePG is missing: definition and management of additional
-persistent volumes. When dealing with base backup and tablespaces, PostgreSQL
-itself requires that the exact mount points in the source instance
-must also exist in the target instance, in our case, the pods in Kubernetes
-that CloudNativePG manages. For this reason, you cannot directly
-migrate in CloudNativePG a PostgreSQL instance that takes advantage
-of tablespaces (you first need to remove them from the source or, if your
-organization requires this feature, contact EDB to prioritize it).
 
 ##### Snapshot copy
 
