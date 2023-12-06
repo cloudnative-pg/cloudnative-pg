@@ -560,6 +560,7 @@ jobs:
 
       - name: Run Snyk to check Docker image for vulnerabilities
         uses: snyk/actions/docker@master
+        if: ${{ !github.event.pull_request.head.repo.fork }}
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -570,7 +571,8 @@ jobs:
       - name: Upload result to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v2
         if: |
-          github.repository_owner == 'cloudnative-pg'
+          github.repository_owner == 'cloudnative-pg' &&
+          !github.event.pull_request.head.repo.fork
         with:
           sarif_file: snyk.sarif
 
