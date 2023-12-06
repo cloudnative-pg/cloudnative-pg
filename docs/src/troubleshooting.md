@@ -39,6 +39,44 @@ following plugins/utilities to be available in your system:
   If you are on Windows OS, you can use [`findstr`](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/findstr) as an alternative to `grep` or directly use [`wsl`](https://docs.microsoft.com/en-us/windows/wsl/)
   and install your preferred *nix distro and use the tools mentioned above.
 
+## First steps
+
+To get a quick overview of the situation in the cluster or installation of
+interest, the `kubectl` plugin is the first tool to reach for:
+
+1. the [status subcommand](kubectl-plugin.md#status) provides an overview of a
+  cluster
+2. the [report subcommand](kubectl-plugin.md#report) provides the manifests
+  for clusters and the operator deployment. It can also include logs by using
+  the `--logs` option.
+  The report generated via the plugin will include the full cluster manifest.
+
+The plugin can also be installed via packages on air-gapped systems. Please see
+the full details in the [plugin document](kubectl-plugin.md) page.
+
+And become familiar with it.
+
+## Are there backups?
+
+After getting the cluster manifest with the plugin, you should verify if backups
+are set up and working.
+
+In cluster with backups set up, you will find, in the cluster Status, the fields
+`lastSuccessfulBackup` and `firstRecoverabilityPoint`. You should make sure
+there is a recent `lastSuccessfulBackup`.
+
+A cluster without the `spec.backup` stanza of course will not have backups, and
+you will see, in the cluster logs, an insistent message:
+
+> `Backup not configured, skip WAL archiving`.
+
+Depending on your findings regarding backups, it may be advisable to perform
+an emergency backup before proceeding with troubleshooting operations. This
+is described in the following section.
+
+It is not advisable, and **extremely risky**, to operate a database without
+keeping regular backups.
+
 ## Emergency backup
 
 In some emergency situations, you might need to take an emergency logical
@@ -92,7 +130,7 @@ kubectl exec -i new-cluster-example-1 -c postgres \
 
 The above steps might be integrated into the `cnpg` plugin at some stage in the future.
 
-### Logs
+## Logs
 
 Every resource created and controlled by CloudNativePG logs to
 standard output, as expected by Kubernetes, and directly in [JSON
