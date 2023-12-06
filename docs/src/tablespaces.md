@@ -49,7 +49,7 @@ primary.
 
 Tablespaces can be setup when the cluster is created, or added at a later time
 — provided the storage is available when requested. Currently, they cannot be
-removed, but this feature will be introduced in a future minor/patch version
+removed, but this limitation will be addressed in a future minor/patch version
 of CloudNativePG.
 
 ## Using declarative tablespaces
