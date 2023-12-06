@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,6 +93,14 @@ type PoolerMonitoringConfiguration struct {
 	// +kubebuilder:default:=false
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
+
+	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+	// +optional
+	PodMonitorMetricRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
+
+	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+	// +optional
+	PodMonitorRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
 
 // PodTemplateSpec is a structure allowing the user to set

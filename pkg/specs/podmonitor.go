@@ -47,7 +47,9 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		},
 		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
 			{
-				Port: "metrics",
+				Port:                 "metrics",
+				MetricRelabelConfigs: c.cluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs,
+				RelabelConfigs:       c.cluster.Spec.Monitoring.PodMonitorRelabelConfigs,
 			},
 		},
 	}
