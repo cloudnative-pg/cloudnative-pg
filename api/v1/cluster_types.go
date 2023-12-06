@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2000,6 +2001,14 @@ type MonitoringConfiguration struct {
 	// +kubebuilder:default:=false
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
+
+	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+	// +optional
+	PodMonitorMetricRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
+
+	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+	// +optional
+	PodMonitorRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
 
 // AreDefaultQueriesDisabled checks whether default monitoring queries should be disabled

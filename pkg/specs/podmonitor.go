@@ -41,15 +41,17 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)
 
-	endpoint := monitoringv1.PodMetricsEndpoint{
-		Port: "metrics",
-	}
-
 	spec := monitoringv1.PodMonitorSpec{
 		Selector: metav1.LabelSelector{
 			MatchLabels: meta.Labels,
 		},
-		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{endpoint},
+		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
+			{
+				Port:                 "metrics",
+				MetricRelabelConfigs: c.cluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs,
+				RelabelConfigs:       c.cluster.Spec.Monitoring.PodMonitorRelabelConfigs,
+			},
+		},
 	}
 
 	return &monitoringv1.PodMonitor{
