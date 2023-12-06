@@ -297,6 +297,7 @@ RUNTIME
 ReadWriteOnce
 RedHat
 RedHat's
+RelabelConfig
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationSlotsConfiguration
@@ -871,6 +872,8 @@ podAffinityTerm
 podAntiAffinity
 podAntiAffinityType
 podMetricsEndpoints
+podMonitorMetricRelabelings
+podMonitorRelabelings
 podName
 podmonitor
 podtemplates
@@ -933,6 +936,7 @@ redhat
 rehydrate
 rehydrated
 rehydration
+relabelings
 relatime
 replicationSecretVersion
 replicationSlots
