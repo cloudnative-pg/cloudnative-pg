@@ -62,7 +62,7 @@ jobs:
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
       -
         name: 'Auth GKE'
-        uses: 'google-github-actions/auth@v1'
+        uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
