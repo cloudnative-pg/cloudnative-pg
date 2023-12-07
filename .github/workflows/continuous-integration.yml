@@ -148,7 +148,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           # Disable setup-go caching. Cache is better handled by the golangci-lint action
           cache: false
@@ -259,7 +259,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -298,7 +298,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -333,7 +333,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -394,7 +394,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
