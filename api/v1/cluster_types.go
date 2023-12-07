@@ -1673,9 +1673,10 @@ type TablespaceConfiguration struct {
 	// +optional
 	Owner DatabaseRoleRef `json:"owner,omitempty"`
 
-	// Temporary means the tablespace will be added as a `temp_tablespaces`
+	// When set to true, the tablespace will be added as a `temp_tablespaces`
 	// entry in PostgreSQL, and will be available to automatically house temp
-	// database objects or other temporary files
+	// database objects, or other temporary files. Please refer to PostgreSQL
+	// documentation for more information on the `temp_tablespaces` GUC.
 	// +optional
 	// +kubebuilder:default:=false
 	Temporary bool `json:"temporary,omitempty"`

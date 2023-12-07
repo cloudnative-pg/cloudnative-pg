@@ -317,14 +317,17 @@ spec:
       temporary: true
 ```
 
-They can be created at the initialization time or added later, requiring a
-rolling update. The `temporary: true/false` simply adds/removes the
+They can be created at initialization time or added later, requiring a
+rolling update. The `temporary: true/false` option simply adds/removes the
 tablespace name to/from the list of tablespaces in the `temp_tablespaces`
 option (which doesn't require a restart of PostgreSQL to be changed).
 
 Although temporary tablespaces can also work as regular tablespaces (meaning
 that users can also host regular data on them while also using them for
 temporary operations), we recommend not to mix the two workloads.
+
+See [PostgreSQL documentation on `temp_tablespaces`](https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-TEMP-TABLESPACES)
+for details.
 
 ## kubectl plugin support
 

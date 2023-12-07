@@ -3776,10 +3776,11 @@ spec:
                       type: object
                     temporary:
                       default: false
-                      description: Temporary means the tablespace will be added as
-                        a `temp_tablespaces` entry in PostgreSQL, and will be available
-                        to automatically house temp database objects or other temporary
-                        files
+                      description: When set to true, the tablespace will be added
+                        as a `temp_tablespaces` entry in PostgreSQL, and will be available
+                        to automatically house temp database objects, or other temporary
+                        files. Please refer to PostgreSQL documentation for more information
+                        on the `temp_tablespaces` GUC.
                       type: boolean
                   required:
                   - name
