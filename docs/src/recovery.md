@@ -1,65 +1,67 @@
 # Recovery
 
 In PostgreSQL terminology, recovery is the process of starting a PostgreSQL
-instance using a previously taken backup. The PostgreSQL recovery mechanism
-is very solid and rich. It also supports Point In Time Recovery, which allows
-you to restore a given cluster up to any point in time from the first available
-backup in your catalog to the last archived WAL (as you can see, the WAL
-archive is mandatory in this case).
+instance using an existing backup. The PostgreSQL recovery mechanism
+is very solid and rich. It also supports point-in-time recovery (PITR), which allows
+you to restore a given cluster up to any point in time, from the first available
+backup in your catalog to the last archived WAL. (The WAL
+archive is mandatory in this case.)
 
-In CloudNativePG, recovery cannot be performed "in-place" on an existing
-cluster. Recovery is rather a way to bootstrap a new Postgres cluster
+In CloudNativePG, you can't perform recovery in place on an existing
+cluster. Recovery is instead a way to bootstrap a new Postgres cluster
 starting from an available physical backup.
 
 !!! Note
-    For details on the `bootstrap` stanza, please refer to the
-    ["Bootstrap" section](bootstrap.md).
+    For details on the `bootstrap` stanza, see
+    [Bootstrap](bootstrap.md).
 
-The `recovery` bootstrap mode lets you create a new cluster from an existing
-physical base backup, and then reapply the WAL files containing the REDO log
+The `recovery` bootstrap mode lets you create a cluster from an existing
+physical base backup. You then reapply the WAL files containing the REDO log
 from the archive.
 
 WAL files are pulled from the defined *recovery object store*.
 
-Base backups may be taken either on object stores, or using volume snapshots
+Base backups can be taken either on object stores or using volume snapshots
 (from version 1.21).
 
 !!! Warning
     Recovery using volume snapshots had an initial release on 1.20.1. Because of
-    the amount of progress on the feature for 1.21.0, it is strongly advised
-    that you upgrade to 1.21.0 or more advanced releases to use volume
-    snapshots.
+    the amount of progress on the feature for 1.21.0, to use volume
+    snapshots, we strongly advise
+    you to upgrade to 1.21.0 or more advanced releases.
 
-Recovery from a *recovery object store* can be achieved in two ways:
+You can achieve recovery from a *recovery object store* in two ways:
 
-- using a recovery object store, that is, a backup of another cluster
-  created by Barman Cloud and defined via the `barmanObjectStore` option
-  in the `externalClusters` section (*recommended*)
-- using an existing `Backup` object in the same namespace (this was the
-  only option available before version 1.8.0).
+- We recommend using a recovery object store, that is, a backup of another cluster
+  created by Barman Cloud and defined by way of the `barmanObjectStore` option
+  in the `externalClusters` section.
+- Alternatively, you can use an existing `Backup` object in the same namespace. This was the
+  only option available before version 1.8.0.
 
 Both recovery methods enable either full recovery (up to the last
 available WAL) or up to a [point in time](#point-in-time-recovery-pitr).
-When performing a full recovery, the cluster can also be started
+When performing a full recovery, you can also start the cluster
 in replica mode (see [replica clusters](replica_cluster.md) for reference).
 If using replica mode, make sure that the PostgreSQL configuration
 (`.spec.postgresql.parameters`) of the recovered cluster is
-compatible, from a physical replication standpoint, with the original one.
+compatible with the original one from a physical replication standpoint.
 
 For recovery using volume snapshots:
 
-- using a consistent set of `VolumeSnapshot` objects that all belong to the
-  same backup, and identified by the same `cnpg.io/cluster` and
-  `cnpg.io/backupName` labels, then recovering through the `volumeSnapshots`
+- Use a consistent set of `VolumeSnapshot` objects that all belong to the
+  same backup and are identified by the same `cnpg.io/cluster` and
+  `cnpg.io/backupName` labels. Then, recover through the `volumeSnapshots`
   option in the `.spec.bootstrap.recovery` stanza, as described in
-  ["Recovery from `VolumeSnapshot` objects"](#recovery-from-volumesnapshot-objects) below
+  [Recovery from `VolumeSnapshot` objects](#recovery-from-volumesnapshot-objects).
 
 ## Recovery from an object store
 
 You can recover from a backup created by Barman Cloud and stored on a supported
-object store. Once you have defined the external cluster, including all the
+object store. After you define the external cluster, including all the
 required configuration in the `barmanObjectStore` section, you need to
-reference it in the `.spec.recovery.source` option. The following example
+reference it in the `.spec.recovery.source` option. 
+
+This example
 defines a recovery object store in a blob container in Azure:
 
 ```yaml
@@ -93,33 +95,33 @@ spec:
 ```
 
 !!! Important
-    By default the `recovery` method strictly uses the `name` of the
+    By default, the `recovery` method strictly uses the `name` of the
     cluster in the `externalClusters` section as the name of the main folder
-    of the backup data within the object store, which is normally reserved
+    of the backup data within the object store. This name is normally reserved
     for the name of the server. You can specify a different folder name
-    with the `barmanObjectStore.serverName` property.
+    using the `barmanObjectStore.serverName` property.
 
 !!! Note
-    In the above example we are taking advantage of the parallel WAL restore
+    This example takes advantage of the parallel WAL restore
     feature, dedicating up to 8 jobs to concurrently fetch the required WAL
     files from the archive. This feature can appreciably reduce the recovery time.
     Make sure that you plan ahead for this scenario and correctly tune the
-    value of this parameter for your environment. It will certainly make a
-    difference **when** (not if) you'll need it.
+    value of this parameter for your environment. It will make a
+    difference when you need it, and you will.
 
 ## Recovery from `VolumeSnapshot` objects
 
 !!! Warning
-    When creating replicas after having recovered the primary instance from
+    When creating replicas after recovering the primary instance from
     the volume snapshot, the operator might end up using `pg_basebackup`
-    to synchronize them, resulting in a slower process depending on the size
+    to synchronize them. This behavior results in a slower process, depending on the size
     of the database. This limitation will be lifted in the future when support
-    for online backups and PVC cloning will be introduced.
+    for online backups and PVC cloning are introduced.
 
 CloudNativePG can create a new cluster from a `VolumeSnapshot` of a PVC of an
 existing `Cluster` that's been taken using the declarative API for
 [volume snapshot backups](backup_volumesnapshot.md).
-You will need to specify the name of the snapshot, as in the following example:
+You must specify the name of the snapshot, as in the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -166,17 +168,17 @@ bootstrap:
 !!! Warning
     If bootstrapping a replica-mode cluster from snapshots, to leverage
     snapshots for the standby instances and not just the primary,
-    it would be advisable to:
+    we recommend that you:
 
-    1. start with a single instance replica cluster. The primary instance will
-      be recovered using the snapshot and available WALs form the source cluster
-    2. take a snapshot of the primary in the replica cluster
-    3. increase the number of instances in the replica cluster as desired
+    1. Start with a single instance replica cluster. The primary instance will
+      be recovered using the snapshot, and available WALs form the source cluster.
+    2. Take a snapshot of the primary in the replica cluster.
+    3. Increase the number of instances in the replica cluster as desired.
 
 ## Recovery from a `Backup` object
 
-In case a `Backup` resource is already available in the namespace in which the
-cluster should be created, you can specify its name through
+If a `Backup` resource is already available in the namespace in which you need to create the
+cluster, you can specify the name using
 `.spec.bootstrap.recovery.backup.name`, as in the following example:
 
 ```yaml
@@ -199,10 +201,10 @@ spec:
 This bootstrap method allows you to specify just a reference to the
 backup that needs to be restored.
 
-The previous example implies the application database and its owning user to be
+The previous example implies the application database and its owning user is
 the default one, `app`. If the PostgreSQL cluster being restored was using
-different names, they can be specified as documented in the [Configure the
-application database](#configure-the-application-database) section.
+different names, you can specify them as documented in [Configure the
+application database](#configure-the-application-database).
 
 ## Additional considerations
 
@@ -210,16 +212,16 @@ Whether you recover from a recovery object store, a volume snapshot, or an
 existing `Backup` resource, the following considerations apply:
 
 - The application database name and the application database user are preserved
-  from the backup that is being restored. The operator does not currently attempt
+  from the backup that's being restored. The operator doesn't currently attempt
   to back up the underlying secrets, as this is part of the usual maintenance
-  activity of the Kubernetes cluster itself.
-- To preserve the original `postgres` user password, you need to properly
+  activity of the Kubernetes cluster.
+- To preserve the original postgres user password, you need to properly
   configure `enableSuperuserAccess` and supply a `superuserSecret`.
-- By default, the recovery will continue up to the latest
+- By default, the recovery continues up to the latest
   available WAL on the default target timeline (`current` for PostgreSQL up to
-  11, `latest` for version 12 and above).
-  You can optionally specify a `recoveryTarget` to perform a point in time
-  recovery (see the ["Point in time recovery" section](#point-in-time-recovery-pitr)).
+  11, `latest` for version 12 and later).
+  You can optionally specify a `recoveryTarget` to perform a point-in-time
+  recovery (see [Point in time recovery (PITR)](#point-in-time-recovery-pitr)).
 
 !!! Important
     Consider using the `barmanObjectStore.wal.maxParallel` option to speed
@@ -228,23 +230,23 @@ existing `Backup` resource, the following considerations apply:
 
 ## Point in time recovery (PITR)
 
-Instead of replaying all the WALs up to the latest one, we can ask PostgreSQL
-to stop replaying WALs at any given point in time, after having extracted a
-base backup. PostgreSQL uses this technique to achieve *point-in-time* recovery
-(PITR). The presence of a WAL archive is mandatory.
+Instead of replaying all the WALs up to the latest one, after extracting a
+base backup, you can ask PostgreSQL
+to stop replaying WALs at any given point in time. PostgreSQL uses this technique to achieve 
+PITR. The presence of a WAL archive is mandatory.
 
 !!! Important
-    PITR requires you to specify a **recovery target**, by using the options
-    described in the ["Recovery targets" section](#recovery-targets) below.
+    PITR requires you to specify a recovery target by using the options
+    described in [Recovery targets](#recovery-targets).
 
-The operator will generate the configuration parameters required for this
-feature to work in case a recovery target is specified.
+The operator generates the configuration parameters required for this
+feature to work if you specify a recovery target.
 
 ### PITR from an object store
 
-The example below uses a recovery object store in Azure that contains both
+This example uses a recovery object store in Azure that contains both
 the base backups and the WAL archive. The recovery target is based on a
-requested timestamp:
+requested timestamp.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -280,37 +282,37 @@ spec:
           maxParallel: 8
 ```
 
-You might have noticed that in the above example you only had to specify
-the `targetTime` in the form of a timestamp, without having to worry about
-specifying the base backup from which to start the recovery.
+In this example, you had to specify only
+the `targetTime` in the form of a timestamp. You didn't have to
+specify the base backup from which to start the recovery.
 
 The `backupID` option is the one that allows you to specify the base backup
 from which to initiate the recovery process. By default, this value is
 empty.
 
 If you assign a value to it (in the form of a Barman backup ID), the operator
-will use that backup as base for the recovery.
+uses that backup as the base for the recovery.
 
 !!! Important
     You need to make sure that such a backup exists and is accessible.
 
-If the backup ID is not specified, the operator will automatically detect the
+If you don't specify the backup ID, the operator detects the
 base backup for the recovery as follows:
 
-- when you use `targetTime` or `targetLSN`, the operator selects the closest
-  backup that was completed before that target
-- otherwise the operator selects the last available backup in chronological
+- When you use `targetTime` or `targetLSN`, the operator selects the closest
+  backup that was completed before that target.
+- Otherwise, the operator selects the last available backup, in chronological
   order.
 
-### PITR from `VolumeSnapshot` Objects
+### PITR from `VolumeSnapshot` objects
 
-The example below uses:
+The example that follows uses:
 
-- a Kubernetes volume snapshot for the `PGDATA` containing the base backup from
-  which to start the recovery process, identified in the
-  `recovery.volumeSnapshots` section and called `test-snapshot-1`
-- a recovery object store in MinIO containing the WAL archive, identified by
-  the `recovery.source` option in the form of an external cluster definition
+- A Kubernetes volume snapshot for the `PGDATA` containing the base backup from
+  which to start the recovery process. This snapshot is identified in the
+  `recovery.volumeSnapshots` section and called `test-snapshot-1`.
+- A recovery object store in MinIO containing the WAL archive. The object store is identified by
+  the `recovery.source` option in the form of an external cluster definition.
 
 The recovery target is based on a requested timestamp.
 
@@ -346,54 +348,53 @@ spec:
 ```
 
 !!! Note
-    In case the backed up Cluster had `walStorage` enabled, you also must
+    If the backed-up cluster had `walStorage` enabled, you also must
     specify the volume snapshot containing the `PGWAL` directory, as mentioned
-    in the [Recovery from VolumeSnapshot objects](#recovery-from-volumesnapshot-objects)
-    section.
+    in [Recovery from VolumeSnapshot objects](#recovery-from-volumesnapshot-objects).
 
 !!! Warning
-    It is your responsibility to ensure that the end time of the base backup in
-    the volume snapshot is prior to the recovery target timestamp.
+    It's your responsibility to ensure that the end time of the base backup in
+    the volume snapshot is before the recovery target timestamp.
 
 ### Recovery targets
 
 Here are the recovery target criteria you can use:
 
 targetTime
-:  time stamp up to which recovery will proceed, expressed in
-   [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) format
-   (the precise stopping point is also influenced by the `exclusive` option)
+:  Time stamp up to which recovery proceeds, expressed in
+   [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) format.
+   (The precise stopping point is also influenced by the `exclusive` option.)
 
 targetXID
-:  transaction ID up to which recovery will proceed
-   (the precise stopping point is also influenced by the `exclusive` option);
-   keep in mind that while transaction IDs are assigned sequentially at
+:  Transaction ID up to which recovery proceeds.
+   (The precise stopping point is also influenced by the `exclusive` option.)
+   Keep in mind that while transaction IDs are assigned sequentially at
    transaction start, transactions can complete in a different numeric order.
-   The transactions that will be recovered are those that committed before
-   (and optionally including) the specified one
+   The transactions that are recovered are those that committed before
+   (and optionally including) the specified one.
 
 targetName
-:  named restore point (created with `pg_create_restore_point()`) to which
-   recovery will proceed
+:  Named restore point (created with `pg_create_restore_point()`) to which
+   recovery proceeds.
 
 targetLSN
-:  LSN of the write-ahead log location up to which recovery will proceed
-   (the precise stopping point is also influenced by the `exclusive` option)
+:  LSN of the write-ahead log location up to which recovery proceeds.
+   (The precise stopping point is also influenced by the `exclusive` option.)
 
 targetImmediate
-:  recovery should end as soon as a consistent state is reached - i.e. as early
+:  Recovery ends as soon as a consistent state is reached, that is, as early
    as possible. When restoring from an online backup, this means the point where
-   taking the backup ended
+   taking the backup ended.
 
 
 !!! Important
-    While the operator is able to automatically retrieve the closest backup
-    when either `targetTime` or `targetLSN` is specified, this is not possible
+    The operator can retrieve the closest backup
+    when you specify either `targetTime` or `targetLSN`. However, this isn't possible
     for the remaining targets: `targetName`, `targetXID`, and `targetImmediate`.
-    In such cases, it is important to specify `backupID`, unless you are OK with
-    the last available backup in the catalog.
+    In such cases, it's important to specify `backupID`, unless
+    the last available backup in the catalog is acceptable.
 
-The example below uses a `targetName` based recovery target:
+This example uses a `targetName`-based recovery target:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -408,17 +409,17 @@ kind: Cluster
 [...]
 ```
 
-You can choose only a single one among the targets above in each
+You can choose only a single one among the targets in each
 `recoveryTarget` configuration.
 
-Additionally, you can specify `targetTLI` force recovery to a specific
+Additionally, you can specify `targetTLI` to force recovery to a specific
 timeline.
 
 By default, the previous parameters are considered to be inclusive, stopping
-just after the recovery target, matching [the behavior in PostgreSQL](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RECOVERY-TARGET-INCLUSIVE)
+just after the recovery target, matching [the behavior in PostgreSQL](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RECOVERY-TARGET-INCLUSIVE).
 You can request exclusive behavior,
 stopping right before the recovery target, by setting the `exclusive` parameter to
-`true` like in the following example relying on a blob container in Azure
+`true`. The following example shows this behavior, relying on a blob container in Azure
 for both base backups and the WAL archive:
 
 ```yaml
@@ -457,16 +458,16 @@ spec:
 
 ## Configure the application database
 
-For the recovered cluster, we can configure the application database name and
+For the recovered cluster, you can configure the application database name and
 credentials with additional configuration. To update application database
-credentials, we can generate our own passwords, store them as secrets, and
-update the database use the secrets. Or we can also let the operator generate a
-secret with randomly secure password for use. Please reference the
-["Bootstrap an empty cluster"](bootstrap.md#bootstrap-an-empty-cluster-initdb)
-section for more information about secrets.
+credentials, you can generate your own passwords, store them as secrets, and
+update the database to use the secrets. Or you can also let the operator generate a
+secret with a randomly secure password for use. See
+[Bootstrap an empty cluster](bootstrap.md#bootstrap-an-empty-cluster-initdb)
+for more information about secrets.
 
-The following example configure the application database `app` with owner
-`app`, and supplied secret `app-secret`.
+This example configures the application database `app` with owner
+`app` and supplied secret `app-secret`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -482,42 +483,43 @@ spec:
       [...]
 ```
 
-With the above configuration, the following will happen after recovery is completed:
+With this configuration, the following happens after recovery is complete:
 
-1. if database `app` does not exist, a new database `app` will be created.
-2. if user `app` does not exist, a new user `app` will be created.
-3. if user `app` is not the owner of database, user `app` will be granted
+1. If database `app` doesn't exist, a new database `app` is created.
+2. If user `app` doesn't exist, a new user `app` is created.
+3. if user `app` isn't the owner of the database, user `app` is granted
 as owner of database `app`.
-4. If value of `username` match value of `owner` in secret, the password of
-application database will be changed to the value of `password` in secret.
+4. If the value of `username` matches the value of `owner` in the secret, the password of
+application database is changed to the value of `password` in the secret.
 
 !!! Important
-    For a replica cluster with replica mode enabled, the operator will not
-    create any database or user in the PostgreSQL instance, as these will be
+    For a replica cluster with replica mode enabled, the operator doesn't
+    create any database or user in the PostgreSQL instance. These are
     recovered from the original cluster.
 
 ## How recovery works under the hood
 
 <!-- TODO: do we need this section? -->
+<!-- Also, "under the hood" is an idiom and should be replaced with something more precise -->
 
 You can use the data uploaded to the object storage to *bootstrap* a
-new cluster from a previously taken backup.
-The operator will orchestrate the recovery process using the
+new cluster from an existing backup.
+The operator orchestrates the recovery process using the
 `barman-cloud-restore` tool (for the base backup) and the
 `barman-cloud-wal-restore` tool (for WAL files, including parallel support, if
 requested).
 
-For details and instructions on the `recovery` bootstrap method, please refer
-to the ["Bootstrap from a backup" section](bootstrap.md#bootstrap-from-a-backup-recovery).
+For details and instructions on the `recovery` bootstrap method, see
+[Bootstrap from a backup](bootstrap.md#bootstrap-from-a-backup-recovery).
 
 !!! Important
-    If you are not familiar with how [PostgreSQL PITR](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-PITR-RECOVERY)
+    If you're not familiar with how [PostgreSQL PITR](https://www.postgresql.org/docs/current/continuous-archiving.html#BACKUP-PITR-RECOVERY)
     works, we suggest that you configure the recovery cluster as the original
     one when it comes to `.spec.postgresql.parameters`. Once the new cluster is
     restored, you can then change the settings as desired.
 
-Under the hood, the operator will inject an init container in the first
-instance of the new cluster, and the init container will start recovering the
+The way it works is that the operator injects an init container in the first
+instance of the new cluster, and the init container starts recovering the
 backup from the object storage.
 
 !!! Important
@@ -525,39 +527,39 @@ backup from the object storage.
     the size of the backup, as well as the speed of both the network and the
     storage.
 
-When the base backup recovery process is completed, the operator starts the
-Postgres instance in recovery mode: in this phase, PostgreSQL is up, albeit not
+When the base backup recovery process is complete, the operator starts the
+Postgres instance in recovery mode. In this phase, PostgreSQL is up, though not
 able to accept connections, and the pod is healthy according to the
-liveness probe. Through the `restore_command`, PostgreSQL starts fetching WAL
-files from the archive (you can speed up this phase by setting the
-`maxParallel` option and enable the parallel WAL restore capability).
+liveness probe. By way of the `restore_command`, PostgreSQL starts fetching WAL
+files from the archive. (You can speed up this phase by setting the
+`maxParallel` option and enabling the parallel WAL restore capability.)
 
 This phase terminates when PostgreSQL reaches the target (either the end of the
-WAL or the required target in case of Point-In-Time-Recovery). Indeed, you can
-optionally specify a `recoveryTarget` to perform a point in time recovery. If
-left unspecified, the recovery will continue up to the latest available WAL on
+WAL or the required target in case of PITR. You can
+optionally specify a `recoveryTarget` to perform a PITR. If
+left unspecified, the recovery continues up to the latest available WAL on
 the default target timeline (`current` for PostgreSQL up to 11, `latest` for
-version 12 and above).
+version 12 and later).
 
-Once the recovery is complete, the operator will set the required
-superuser password into the instance. The new primary instance will start
-as usual, and the remaining instances will join the cluster as replicas.
+Once the recovery is complete, the operator sets the required
+superuser password into the instance. The new primary instance starts
+as usual, and the remaining instances join the cluster as replicas.
 
-The process is transparent for the user and it is managed by the instance
-manager running in the Pods.
+The process is transparent for the user and is managed by the instance
+manager running in the pods.
 
 ## Restoring into a cluster with a backup section
 
 <!-- TODO: do we need this section? -->
 
-A manifest for a cluster restore may include a `backup` section.
-This means that the new cluster, after recovery, will start archiving WAL's and
+A manifest for a cluster restore might include a `backup` section.
+This means that,after recovery, the new cluster starts archiving WALs and
 taking backups if configured to do so.
 
-For example, the section below could be part of a manifest for a Cluster
-bootstrapping from Cluster `cluster-example-backup`, and would create a
-new folder in the storage bucket named `recoveredCluster` where the base backups
-and WAL's of the recovered cluster would be stored.
+For example, this section is part of a manifest for a cluster
+bootstrapping from the cluster `cluster-example-backup`. In the storage bucket, it creates a
+folder named `recoveredCluster`, where the base backups
+and WALs of the recovered cluster are stored.
 
 ``` yaml
   backup:
@@ -582,22 +584,21 @@ and WAL's of the recovered cluster would be stored.
       s3Credentials:
 ```
 
-You should not re-use the exact same `barmanObjectStore` configuration
-for different clusters. There could be cases where the existing information
+Don't reuse the same `barmanObjectStore` configuration
+for different clusters. There might be cases where the existing information
 in the storage buckets could be overwritten by the new cluster.
 
 !!! Warning
-    The operator includes a safety check to ensure a cluster will not
+    The operator includes a safety check to ensure a cluster doesn't
     overwrite a storage bucket that contained information. A cluster that would
-    overwrite existing storage will remain in state `Setting up primary` with
-    Pods in an Error state.
-    The pod logs will show:
+    overwrite existing storage remains in the state `Setting up primary` with
+    pods in an error state.
+    The pod logs show:
     `ERROR: WAL archive check failed for server recoveredCluster: Expected empty archive`
 
 !!! Important
     If you set the `cnpg.io/skipEmptyWalArchiveCheck` annotation to `enabled` in
-    the recovered cluster, you can skip the above check. This is not recommended
-    as for the general use case the above check works fine. Please don't do
-    this unless you are familiar with PostgreSQL recovery system, as this can lead
-    you to severe data loss.
-
+    the recovered cluster, you can skip the safety check. We don't recommend skipping the check
+    because, for the general use case, the check works fine. Skip this check
+    only if you're familiar with the PostgreSQL recovery system, as
+    severe data loss can occur.
