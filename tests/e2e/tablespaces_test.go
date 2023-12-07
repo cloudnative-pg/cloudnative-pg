@@ -202,11 +202,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				cluster = updatedCluster
 			})
 
-			By("checking the temp_tablespaces setting reflect the specification", func() {
+			By("checking the temp_tablespaces setting reflects the specification", func() {
 				AssertTempTablespaceContent(cluster, 60, cluster.Spec.Tablespaces[0].Name)
 			})
 
-			By("creating a temporary table and verify that it is stored inside the temporary tablespace", func() {
+			By("creating a temporary table and verifying that it is stored in the temporary tablespace", func() {
 				AssertTempTablespaceBehavior(cluster, cluster.Spec.Tablespaces[0].Name)
 			})
 		})
@@ -1058,7 +1058,7 @@ func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespace
 		Expect(err).ShouldNot(HaveOccurred())
 		commandOutputLines := strings.Split(strings.Trim(commandOutput, " \n"), "\n")
 		Expect(commandOutputLines[len(commandOutputLines)-1]).To(Equal(expectedTempTablespaceName))
-		GinkgoWriter.Printf("Command output is is currently set to:\n%s\n", commandOutput)
+		GinkgoWriter.Printf("CREATE TEMPORARY ... command output was:\n%s\n", commandOutput)
 	})
 }
 
