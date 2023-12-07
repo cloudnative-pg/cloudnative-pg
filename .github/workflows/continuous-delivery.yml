@@ -264,7 +264,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -580,7 +580,7 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -799,7 +799,7 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -1144,7 +1144,7 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -1526,7 +1526,7 @@ jobs:
           ref: ${{ needs.evaluate_options.outputs.git_ref }}
       -
         name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
