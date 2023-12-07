@@ -74,8 +74,7 @@ Depending on your findings regarding backups, it may be advisable to perform
 an emergency backup before proceeding with troubleshooting operations. This
 is described in the following section.
 
-It is not advisable, and **extremely risky**, to operate a database without
-keeping regular backups.
+It is **extremely risky** to operate a database without keeping regular backups.
 
 ## Emergency backup
 
