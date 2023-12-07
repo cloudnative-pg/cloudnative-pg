@@ -287,7 +287,6 @@ spec:
         size: 2Gi
 ```
 
-<!--
 ## Temporary tablespaces
 
 PostgreSQL allows you to define one or more temporary tablespaces to create
@@ -301,18 +300,25 @@ When you specify more than one temporary tablespace, PostgreSQL randomly picks
 one the first time a temporary object needs to be created in a transaction,
 then sequentially iterates through the list.
 
-Temporary tablespaces work like regular tablespaces, including the backup part.
+Temporary tablespaces work like regular tablespaces, also regarding backups.
 
-CloudNativePG provides the `.spec.tablespaces.NAME.temporary` option to
-determine whether a tablespace can be used for temporary usage, entirely
-abstracting the management of the `temp_tablespaces` PostgreSQL option from
-you.
+CloudNativePG provides the `.spec.tablespaces[*].name.temporary` option to
+determine whether a tablespace should be added to the `temp_tablespaces`
+PostgreSQL parameter, and thus become eligible to store temporary data that
+does not have an explicit tablespace assignment.
 
 ```yaml
+spec:
+  [...]
+  tablespaces:
+    - name: atablespace
+      storage:
+        size: 1Gi
+      temporary: true
 ```
 
-They can be created at the initialization time or added later, requiring a
-rolling update. The `temporary: true/false` simply adds/removes the
+They can be created at initialization time or added later, requiring a
+rolling update. The `temporary: true/false` option simply adds/removes the
 tablespace name to/from the list of tablespaces in the `temp_tablespaces`
 option (which doesn't require a restart of PostgreSQL to be changed).
 
@@ -320,7 +326,28 @@ Although temporary tablespaces can also work as regular tablespaces (meaning
 that users can also host regular data on them while also using them for
 temporary operations), we recommend not to mix the two workloads.
 
--->
+See [PostgreSQL documentation on `temp_tablespaces`](https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-TEMP-TABLESPACES)
+for details.
+
+## kubectl plugin support
+
+The [kubectl status](kubectl-plugin.md#status) plugin includes a section
+dedicated to tablespaces which offers a convenient overview, including
+tablespace status, owner, temporary flag, or any errors:
+
+``` yaml
+[...]
+
+Tablespaces status
+Tablespace          Owner  Status      Temporary  Error
+----------          -----  ------      ---------  -----
+atablespace         app    reconciled  true       
+another_tablespace  app    reconciled  true       
+tablespacea1        app    reconciled  false 
+
+Instances status
+[...]
+```
 
 ## Limitations
 

@@ -188,6 +188,29 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			AssertTablespaceAndOwnerExist(cluster, "anothertablespace", "alpha")
 		})
 
+		It("can update the cluster to set a tablespace as temporary", func() {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("setting the first tablespace as temporary", func() {
+				Expect(cluster.Spec.Tablespaces[0].Temporary).To(BeFalse())
+				updatedCluster := cluster.DeepCopy()
+				updatedCluster.Spec.Tablespaces[0].Temporary = true
+				err = env.Client.Patch(env.Ctx, updatedCluster, client.MergeFrom(cluster))
+				Expect(err).ToNot(HaveOccurred())
+
+				cluster = updatedCluster
+			})
+
+			By("checking the temp_tablespaces setting reflects the specification", func() {
+				AssertTempTablespaceContent(cluster, 60, cluster.Spec.Tablespaces[0].Name)
+			})
+
+			By("creating a temporary table and verifying that it is stored in the temporary tablespace", func() {
+				AssertTempTablespaceBehavior(cluster, cluster.Spec.Tablespaces[0].Name)
+			})
+		})
+
 		It("can create the backup and verify content in the object store", func() {
 			backupName, err = env.GetResourceNameFromYAML(clusterBackupManifest)
 			Expect(err).ToNot(HaveOccurred())
@@ -984,6 +1007,58 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 			}
 			GinkgoWriter.Printf("Tablespaces in DB:\n%s\n", tbsListing)
 		}, timeout).Should(Succeed())
+	})
+}
+
+func AssertTempTablespaceContent(cluster *apiv1.Cluster, timeout int, content string) {
+	namespace := cluster.ObjectMeta.Namespace
+	clusterName := cluster.ObjectMeta.Name
+	By("checking the expected setting in a new PG session", func() {
+		Eventually(func(g Gomega) {
+			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			if err != nil {
+				g.Expect(err).ShouldNot(HaveOccurred())
+			}
+
+			settingValue, stdErr, err := env.ExecQueryInInstancePod(
+				testUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   primary.Name,
+				}, testUtils.DatabaseName("app"),
+				"SHOW temp_tablespaces",
+			)
+			g.Expect(stdErr).To(BeEmpty())
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(strings.Trim(settingValue, " \n")).To(Equal(content))
+			GinkgoWriter.Printf("temp_tablespaces is currently set to:\n%s\n", settingValue)
+		}, timeout).Should(Succeed())
+	})
+}
+
+func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespaceName string) {
+	namespace := cluster.ObjectMeta.Namespace
+	clusterName := cluster.ObjectMeta.Name
+
+	primary, err := env.GetClusterPrimary(namespace, clusterName)
+	if err != nil {
+		Expect(err).ShouldNot(HaveOccurred())
+	}
+
+	By("checking the temporary table is created into the temporary tablespace", func() {
+		commandOutput, stdErr, err := env.ExecQueryInInstancePod(
+			testUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   primary.Name,
+			}, testUtils.DatabaseName("app"),
+			"CREATE TEMPORARY TABLE cnp_e2e_test_table (i INTEGER); "+
+				"SELECT spcname FROM pg_tablespace WHERE OID="+
+				"(SELECT reltablespace FROM pg_class WHERE oid = 'cnp_e2e_test_table'::regclass)",
+		)
+		Expect(stdErr).To(BeEmpty())
+		Expect(err).ShouldNot(HaveOccurred())
+		commandOutputLines := strings.Split(strings.Trim(commandOutput, " \n"), "\n")
+		Expect(commandOutputLines[len(commandOutputLines)-1]).To(Equal(expectedTempTablespaceName))
+		GinkgoWriter.Printf("CREATE TEMPORARY ... command output was:\n%s\n", commandOutput)
 	})
 }
 

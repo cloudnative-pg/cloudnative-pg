@@ -404,6 +404,14 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 	// Set cluster name
 	info.ClusterName = cluster.Name
 
+	// Set temporary tablespaces
+	for _, tablespace := range cluster.Spec.Tablespaces {
+		if tablespace.Temporary {
+			info.TemporaryTablespaces = append(info.TemporaryTablespaces, tablespace.Name)
+		}
+	}
+	sort.Strings(info.TemporaryTablespaces)
+
 	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
 	return conf, sha256, nil
 }

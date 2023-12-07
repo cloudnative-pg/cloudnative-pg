@@ -930,6 +930,13 @@ func (fullStatus *PostgresqlStatus) printTablespacesStatus() {
 		headerColor = aurora.Yellow
 	}
 
+	temporaryTablespaces := stringset.New()
+	for _, tablespace := range fullStatus.Cluster.Spec.Tablespaces {
+		if tablespace.Temporary {
+			temporaryTablespaces.Put(tablespace.Name)
+		}
+	}
+
 	fmt.Println(headerColor(header))
 
 	if len(tablespacesStatus) == 0 {
@@ -939,10 +946,10 @@ func (fullStatus *PostgresqlStatus) printTablespacesStatus() {
 	}
 
 	tbsStatus := tabby.New()
-	tbsStatus.AddHeader("Tablespace", "Owner", "Status", "Error")
+	tbsStatus.AddHeader("Tablespace", "Owner", "Status", "Temporary", "Error")
 
 	for _, tbs := range tablespacesStatus {
-		tbsStatus.AddLine(tbs.Name, tbs.Owner, tbs.State, tbs.Error)
+		tbsStatus.AddLine(tbs.Name, tbs.Owner, tbs.State, temporaryTablespaces.Has(tbs.Name), tbs.Error)
 	}
 	tbsStatus.Print()
 	fmt.Println()
