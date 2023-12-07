@@ -61,7 +61,7 @@ And become familiar with it.
 After getting the cluster manifest with the plugin, you should verify if backups
 are set up and working.
 
-In cluster with backups set up, you will find, in the cluster Status, the fields
+In a cluster with backups set up, you will find, in the cluster Status, the fields
 `lastSuccessfulBackup` and `firstRecoverabilityPoint`. You should make sure
 there is a recent `lastSuccessfulBackup`.
 
