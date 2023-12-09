@@ -1571,7 +1571,7 @@ jobs:
           credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
       -
         name: Set up Cloud SDK and kubectl
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           install_components: 'kubectl,gke-gcloud-auth-plugin'
