@@ -119,4 +119,4 @@ your PostgreSQL Cluster.
     Remember to update `bootstrap.recovery.backup.name` with the backup name.
 : [`cluster-restore-with-tablespaces.yaml`](samples/cluster-restore-with-tablespaces.yaml)
 
-For a list of available options, please refer to the ["API Reference" page](cloudnative-pg.v1.md).
+For a list of available options, see the ["API Reference" page](cloudnative-pg.v1.md).
