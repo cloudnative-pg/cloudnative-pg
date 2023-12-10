@@ -77,8 +77,8 @@ injects the operator executable inside each pod, in a file named
 `/controller/manager`. The application is used to control the underlying
 PostgreSQL instance and to reconcile the pod status with the instance
 based on the PostgreSQL cluster topology. The instance manager also starts a
-web server that's invoked by the kubelet for probes. Unix signals invoked
-by the kubelet are filtered by the instance manager. Where appropriate, they're
+web server that's invoked by the `kubelet` for probes. Unix signals invoked
+by the `kubelet` are filtered by the instance manager. Where appropriate, they're
 forwarded to the `postgres` process for fast and controlled reactions to
 external events. The instance manager is written in Go and has no external
 dependencies.
