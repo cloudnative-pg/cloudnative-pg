@@ -125,8 +125,8 @@ status:
 
 ## Storage classes and tablespaces
 
-As you can for PGDATA and WAL volumes, you can use different storage classes for your
-tablespaces. This is a convenient way of optimizing your resources,
+You can use different storage classes for your tablespaces, just as you can for PGDATA and
+WAL volumes. This is a convenient way of optimizing your resources,
 balancing performance and costs of your storage based on data access usage and
 expectations.
 
@@ -156,7 +156,7 @@ spec:
 The `yardbirds` cluster example requests 4 persistent volume claims using
 3 different storage classes:
 
-- Default storage class – Used by the `PGDATA` and WALs.
+- Default storage class – Used by the `PGDATA` and WAL volumes.
 - `fastest` – Used by the `current` tablespace to store the most active and
   demanding set of data in the database.
 - `balanced` – Used by the `this_year` tablespace to store older partitions of
@@ -263,7 +263,7 @@ The reason is that tablespace management commands like `CREATE TABLESPACE`
 are WAL logged and are replayed by any physical replication client (streaming or by way of WAL shipping).
 
 It's your responsibility to ensure that replica clusters have the same list of
-tablespaces, with the same name. (Storage class and size might vary.)
+tablespaces, with the same name. Storage class and size might vary.
 
 For example:
 
@@ -291,7 +291,7 @@ spec:
 
 PostgreSQL allows you to define one or more temporary tablespaces to create
 temporary objects (temporary tables and indexes on temporary tables) when a
-`CREATE` command doesn't explicitly specify a tablespace. It also allows you to define temporary
+`CREATE` command doesn't explicitly specify a tablespace, and to create temporary
 files for purposes such as sorting large data sets. When no temporary
 tablespace is specified, PostgreSQL uses the default tablespace of a database, which is
 currently the main `PGDATA` volume.
@@ -320,7 +320,7 @@ spec:
 They can be created at initialization time or added later, requiring a
 rolling update. The `temporary: true/false` option adds or removes the
 tablespace name to or from the list of tablespaces in the `temp_tablespaces`
-option. (This change doesn't require a restart of PostgreSQL.)
+option. This change doesn't require a restart of PostgreSQL.
 
 Although temporary tablespaces can also work as regular tablespaces (meaning
 that users can also host regular data on them while using them for
