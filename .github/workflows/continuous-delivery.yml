@@ -295,6 +295,8 @@ jobs:
           author_name=$(git show -s --format='%an' "${commit_sha}")
           author_email=$(git show -s --format='%ae' "${commit_sha}")
 
+          gh pr view "${{ github.event.issue.number }}" --json headRefName -q '.headRefName'
+          
           # extract branch name
           if [[ ${{ github.event_name }} == 'workflow_dispatch' ]] || [[ ${{ github.event_name }} == 'schedule' ]]
           then
