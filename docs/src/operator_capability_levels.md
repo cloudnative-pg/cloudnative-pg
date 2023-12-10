@@ -495,7 +495,7 @@ for the underlying node to be available again.
 Fencing is the process of protecting the data in one, more, or even all
 instances of a PostgreSQL cluster when they appear to be malfunctioning.
 When an instance is fenced, the PostgreSQL server process is
-guaranteed to be shut down, while the pod is kept running. This ensure
+guaranteed to be shut down, while the pod is kept running. This ensures
 that, until the fence is lifted, data on the pod isn't modified by PostgreSQL
 and that you can investigate file system for debugging and troubleshooting
 purposes.
