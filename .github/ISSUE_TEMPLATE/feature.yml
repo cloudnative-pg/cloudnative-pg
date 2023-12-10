@@ -57,6 +57,16 @@ body:
         - "N/A"
     validations:
       required: true
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Are you willing to actively contribute to this feature?
+      description: Let us know if you are interested in developing this feature.
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
   - type: checkboxes
     id: terms
     attributes:
