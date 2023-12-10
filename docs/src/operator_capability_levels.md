@@ -219,7 +219,7 @@ it also makes sure that all instances are properly reloaded or restarted.
 
 ### Import of existing PostgreSQL databases
 
-Since version 1.16, the operator provides a declarative way to import existing
+The operator provides a declarative way to import existing
 Postgres databases in a new CloudNativePG cluster in Kubernetes, using
 offline migrations.
 The same feature also covers offline major upgrades of PostgreSQL databases.
