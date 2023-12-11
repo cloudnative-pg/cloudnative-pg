@@ -30,7 +30,7 @@ import (
 // ConfigureConnectionToServer creates a connection string to the external
 // server, using the configuration inside the cluster and dumping the secret when
 // needed in a custom passfile.
-// This function returns a connection string and an error state
+// Returns a connection string or any error encountered
 func ConfigureConnectionToServer(
 	ctx context.Context, client ctrl.Client,
 	namespace string, server *apiv1.ExternalCluster,
