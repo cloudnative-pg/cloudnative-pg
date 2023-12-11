@@ -73,7 +73,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(res.Deployment).ToNot(BeNil())
 
 			deployment := getPoolerDeployment(ctx, pooler)
-			Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
+			Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 		})
 
 		By("making sure that if the pooler.spec doesn't change the deployment isn't updated", func() {
