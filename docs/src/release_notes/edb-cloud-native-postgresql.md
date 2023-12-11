@@ -99,7 +99,7 @@ Fixes:
 - Fix a memory leak in code fetching status from Postgres pods
 - Disable PostgreSQL self-restart after a crash. The instance controller handles
   the lifecycle of the PostgreSQL instance
-- Prevent modification of `spec.postgresUID` and `spec.postgresGID` fields
+- Prevent modification of `.spec.postgresUID` and `.spec.postgresGID` fields
   in validation webhook. Changing these fields after Cluster creation makes PostgreSQL unable to start
 - Reduce the log verbosity from the backup and WAL archiving handling code
 - Correct a bug resulting in a Cluster being marked as `Healthy` when not initialized yet
@@ -470,7 +470,7 @@ Features:
 Security Enhancements:
 
 - Add the `.spec.certificates.clientCASecret` and
-  `spec.certificates.replicationTLSSecret` options to define custom client
+  `.spec.certificates.replicationTLSSecret` options to define custom client
   Certification Authority and certificate for the PostgreSQL server, to be used
   to authenticate client certificates and secure communication between PostgreSQL
   nodes
