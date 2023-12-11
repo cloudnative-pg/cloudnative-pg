@@ -828,6 +828,8 @@ type podMonitorManager interface {
 	IsPodMonitorEnabled() bool
 	// BuildPodMonitor builds a new PodMonitor object
 	BuildPodMonitor() *monitoringv1.PodMonitor
+	// GetNamespacedName returns a PodMonitor's NamespacedName
+	GetNamespacedName() types.NamespacedName
 }
 
 // createOrPatchPodMonitor
@@ -854,15 +856,11 @@ func createOrPatchPodMonitor(
 		return nil
 	}
 
-	expectedPodMonitor := manager.BuildPodMonitor()
 	// We get the current pod monitor
 	podMonitor := &monitoringv1.PodMonitor{}
 	if err := cli.Get(
 		ctx,
-		client.ObjectKey{
-			Name:      expectedPodMonitor.Name,
-			Namespace: expectedPodMonitor.Namespace,
-		},
+		manager.GetNamespacedName(),
 		podMonitor,
 	); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -887,10 +885,11 @@ func createOrPatchPodMonitor(
 	// Pod monitor enabled and no pod monitor - create it
 	case manager.IsPodMonitorEnabled() && podMonitor == nil:
 		contextLogger.Debug("Creating PodMonitor")
-		return cli.Create(ctx, expectedPodMonitor)
+		return cli.Create(ctx, manager.BuildPodMonitor())
 	// Pod monitor enabled and pod monitor present - update it
 	default:
 		origPodMonitor := podMonitor.DeepCopy()
+		expectedPodMonitor := manager.BuildPodMonitor()
 		podMonitor.Spec = expectedPodMonitor.Spec
 		// We don't override the current labels/annotations given that there could be data that isn't managed by us
 		utils.MergeObjectsMetadata(podMonitor, expectedPodMonitor)
