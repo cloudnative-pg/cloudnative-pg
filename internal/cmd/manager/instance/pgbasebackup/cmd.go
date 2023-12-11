@@ -122,20 +122,12 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		return fmt.Errorf("missing external cluster")
 	}
 
-	connectionString, pgpass, err := external.ConfigureConnectionToServer(
+	connectionString, err := external.ConfigureConnectionToServer(
 		ctx, env.client, env.info.Namespace, &server)
 	if err != nil {
 		return err
 	}
 
-	// Unfortunately lib/pq doesn't support the passfile
-	// connection option so we must rely on an environment
-	// variable.
-	if pgpass != "" {
-		if err = os.Setenv("PGPASSFILE", pgpass); err != nil {
-			return err
-		}
-	}
 	err = postgres.ClonePgData(connectionString, env.info.PgData, env.info.PgWal)
 	if err != nil {
 		return err

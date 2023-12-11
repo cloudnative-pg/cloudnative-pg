@@ -23,7 +23,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -433,7 +432,7 @@ func getConnectionPoolerForExternalCluster(
 	modifiedExternalCluster := externalCluster.DeepCopy()
 	delete(modifiedExternalCluster.ConnectionParameters, "dbname")
 
-	sourceDBConnectionString, pgpass, err := external.ConfigureConnectionToServer(
+	sourceDBConnectionString, err := external.ConfigureConnectionToServer(
 		ctx,
 		client,
 		namespaceOfNewCluster,
@@ -441,15 +440,6 @@ func getConnectionPoolerForExternalCluster(
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	// Unfortunately lib/pq doesn't support the passfile
-	// connection option so we must rely on an environment
-	// variable.
-	if pgpass != "" {
-		if err = os.Setenv("PGPASSFILE", pgpass); err != nil {
-			return nil, err
-		}
 	}
 
 	return pool.NewPostgresqlConnectionPool(sourceDBConnectionString), nil
