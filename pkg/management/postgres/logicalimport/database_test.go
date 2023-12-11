@@ -67,7 +67,8 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 		var expectedQuery *sqlmock.ExpectedQuery
 		BeforeEach(func() {
 			expectedQuery = mock.
-				ExpectQuery("SELECT EXISTS(SELECT datname FROM pg_catalog.pg_database WHERE datname = $1)")
+				ExpectQuery("SELECT EXISTS(SELECT datname FROM pg_catalog.pg_database WHERE datname = $1)").
+				WithArgs("test")
 		})
 
 		It("should return true when the db exists", func() {

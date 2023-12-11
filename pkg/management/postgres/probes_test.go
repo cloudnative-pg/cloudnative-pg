@@ -55,7 +55,8 @@ var _ = Describe("probes", func() {
 				coalesce(sync_state, ''),
 				coalesce(sync_priority, 0)
 			FROM pg_catalog.pg_stat_replication
-			WHERE application_name ~ $1 AND usename = $2`)).WillReturnError(errFailedQuery)
+			WHERE application_name ~ $1 AND usename = $2`),
+		).WithArgs("-[0-9]+$", "streaming_replica").WillReturnError(errFailedQuery)
 
 		err = instance.fillWalStatusFromConnection(status, db)
 		Expect(err).To(Equal(errFailedQuery))
