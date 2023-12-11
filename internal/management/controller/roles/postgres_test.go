@@ -395,7 +395,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			"inroles",
 		}).
 			AddRow([]byte(`{"role1","role2"}`))
-		mock.ExpectQuery(expectedMembershipStmt).WillReturnRows(rows)
+		mock.ExpectQuery(expectedMembershipStmt).WithArgs("foo").WillReturnRows(rows)
 
 		roles, err := prm.GetParentRoles(ctx, DatabaseRole{Name: "foo"})
 		Expect(err).ShouldNot(HaveOccurred())
@@ -408,7 +408,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(err).ToNot(HaveOccurred())
 		prm := NewPostgresRoleManager(db)
 
-		mock.ExpectQuery(expectedMembershipStmt).WillReturnError(fmt.Errorf("kaboom"))
+		mock.ExpectQuery(expectedMembershipStmt).WithArgs("foo").WillReturnError(fmt.Errorf("kaboom"))
 		roles, err := prm.GetParentRoles(ctx, DatabaseRole{Name: "foo"})
 		Expect(err).Should(HaveOccurred())
 		Expect(roles).To(BeEmpty())
@@ -537,16 +537,16 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole()
 
-		mock.ExpectQuery(lastTransactionQuery).WillReturnError(errors.New("Kaboom"))
+		mock.ExpectQuery(lastTransactionQuery).WithArgs("foo").WillReturnError(errors.New("Kaboom"))
 		_, err = prm.GetLastTransactionID(context.TODO(), dbRole)
 		Expect(err).To(HaveOccurred())
 
-		mock.ExpectQuery(lastTransactionQuery).WillReturnError(sql.ErrNoRows)
+		mock.ExpectQuery(lastTransactionQuery).WithArgs("foo").WillReturnError(sql.ErrNoRows)
 		_, err = prm.GetLastTransactionID(context.TODO(), dbRole)
 		Expect(err).To(HaveOccurred())
 
 		rows.AddRow("1321")
-		mock.ExpectQuery(lastTransactionQuery).WillReturnRows(rows)
+		mock.ExpectQuery(lastTransactionQuery).WithArgs("foo").WillReturnRows(rows)
 		transID, err := prm.GetLastTransactionID(context.TODO(), dbRole)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(transID).To(BeEquivalentTo(1321))
