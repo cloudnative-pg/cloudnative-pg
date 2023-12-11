@@ -27,6 +27,9 @@ ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-image)}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
+DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
+DOCKER_PASSWORD=${DOCKER_PASSWORD:-${REGISTRY_PASSWORD:-}}
 
 notinpath () {
     case "$PATH" in
@@ -40,14 +43,14 @@ notinpath () {
 }
 
 ensure_image_pull_secret() {
-  if [ -n "${REGISTRY-}" ] && [ -n "${REGISTRY_USER-}" ] && [ -n "${REGISTRY_PASSWORD-}" ]; then
+  if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
     if ! kubectl get secret cnpg-pull-secret -n cnpg-system >/dev/null 2>&1; then
       kubectl create secret docker-registry \
         -n cnpg-system \
         cnpg-pull-secret \
-        --docker-server="${REGISTRY}" \
-        --docker-username="${REGISTRY_USER}" \
-        --docker-password="${REGISTRY_PASSWORD}"
+        --docker-server="${DOCKER_SERVER}" \
+        --docker-username="${DOCKER_USERNAME}" \
+        --docker-password="${DOCKER_PASSWORD}"
     fi
   fi
 }
