@@ -1944,7 +1944,7 @@ This field is calculated from the content of LastSuccessfulBackupByMethod</p>
 </td>
 <td>
    <p>The timestamp when the primary was detected to be unhealthy
-This field is reported when spec.failoverDelay is populated or during online upgrades</p>
+This field is reported when <code>.spec.failoverDelay</code> is populated or during online upgrades</p>
 </td>
 </tr>
 <tr><td><code>targetPrimaryTimestamp</code><br/>

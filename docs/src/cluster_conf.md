@@ -50,14 +50,14 @@ duration of a pod's life, without persisting across pod restarts.
 ### Volume for temporary storage
 
 An ephemeral volume used for temporary storage. You can configure an upper
-bound on the size using the `spec.ephemeralVolumesSizeLimit.temporaryData`
+bound on the size using the `.spec.ephemeralVolumesSizeLimit.temporaryData`
 field in the cluster spec.
 
 ### Volume for shared memory
 
 This volume is used as shared memory space for Postgres and as an ephemeral
 type but stored in memory. You can configure an upper bound on the size using
-the `spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec.
+the `.spec.ephemeralVolumesSizeLimit.shm` field in the cluster spec.
 Use this field only in case of
 [PostgreSQL running with `posix` shared memory dynamic allocation](postgresql_conf.md#dynamic-shared-memory-settings).
 

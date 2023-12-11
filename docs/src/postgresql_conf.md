@@ -358,7 +358,7 @@ host all all all scram-sha-256 # (or md5 for PostgreSQL version <= 13)
 Refer to the PostgreSQL documentation for [more information on `pg_hba.conf`](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html).
 
 Inside the cluster manifest, `pg_hba` lines are added as list items
-in `spec.postgresql.pg_hba`, as in the following excerpt:
+in `.spec.postgresql.pg_hba`, as in the following excerpt:
 
 ``` yaml
   postgresql:
@@ -441,7 +441,7 @@ shm on /dev/shm type tmpfs (rw,nosuid,nodev,noexec,relatime,size=******)
 ```
 
 If you would like to set a maximum size for the `shm` volume, you can do so by
-setting the `spec.ephemeralVolumesSizeLimit.shm` field in the `Cluster` resource.
+setting the `.spec.ephemeralVolumesSizeLimit.shm` field in the `Cluster` resource.
 For example:
 
 ```yaml

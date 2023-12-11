@@ -88,9 +88,9 @@ file and define the following parts accordingly:
 - define the bootstrap part for the replica cluster. We can either bootstrap via
   streaming using the `pg_basebackup` section, or bootstrap from a volume snapshot
   or an object store using the `recovery` section
-- define the continuous recovery part (`spec.replica`) in the replica cluster. All
-  we need to do is to enable the replica mode through option `spec.replica.enabled`
-  and set the `externalClusters` name in option `spec.replica.source`
+- define the continuous recovery part (`.spec.replica`) in the replica cluster. All
+  we need to do is to enable the replica mode through option `.spec.replica.enabled`
+  and set the `externalClusters` name in option `.spec.replica.source`
 
 #### Example using pg_basebackup
 
@@ -206,7 +206,7 @@ for it in the `samples/` subdirectory.
 
 To promote the **designated primary** to **primary**, all we need to do is to
 disable the replica mode in the replica cluster through the option
-`spec.replica.enabled`
+`.spec.replica.enabled`
 
 ```yaml
  replica:
