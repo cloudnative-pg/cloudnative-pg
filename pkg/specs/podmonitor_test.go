@@ -20,6 +20,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -44,5 +45,11 @@ var _ = Describe("PodMonitor test", func() {
 		Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(clusterName))
 		Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(clusterName))
 		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(monitoringv1.PodMetricsEndpoint{Port: "metrics"}))
+	})
+
+	It("does not panic if monitoring section is not present", func() {
+		cluster := apiv1.Cluster{}
+		mgr := NewClusterPodMonitorManager(&cluster)
+		Expect(mgr.BuildPodMonitor()).ToNot(BeNil())
 	})
 })

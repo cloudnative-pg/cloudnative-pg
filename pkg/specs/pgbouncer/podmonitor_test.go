@@ -82,4 +82,13 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 			Expect(podMonitor.Spec.PodMetricsEndpoints[0].Port).To(Equal("metrics"))
 		})
 	})
+
+	Context("when monitoring if not configured", func() {
+		It("does not panic", func() {
+			pooler := apiv1.Pooler{}
+			manager := NewPoolerPodMonitorManager(&pooler)
+			podMonitor := manager.BuildPodMonitor()
+			Expect(podMonitor).ToNot(BeNil())
+		})
+	})
 })
