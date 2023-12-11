@@ -858,10 +858,7 @@ func createOrPatchPodMonitor(
 	podMonitor := &monitoringv1.PodMonitor{}
 	if err := cli.Get(
 		ctx,
-		client.ObjectKey{
-			Name:      expectedPodMonitor.Name,
-			Namespace: expectedPodMonitor.Namespace,
-		},
+		client.ObjectKeyFromObject(expectedPodMonitor),
 		podMonitor,
 	); err != nil {
 		if !apierrs.IsNotFound(err) {

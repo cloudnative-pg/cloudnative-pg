@@ -51,17 +51,16 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 
 	utils.SetAsOwnedBy(&meta, c.pooler.ObjectMeta, c.pooler.TypeMeta)
 
+	endpoint := monitoringv1.PodMetricsEndpoint{
+		Port: "metrics",
+	}
+
 	spec := monitoringv1.PodMonitorSpec{
 		Selector: metav1.LabelSelector{
 			MatchLabels: meta.Labels,
 		},
-		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
-			{
-				Port: "metrics",
-			},
-		},
+		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{endpoint},
 	}
-
 	return &monitoringv1.PodMonitor{
 		ObjectMeta: meta,
 		Spec:       spec,
