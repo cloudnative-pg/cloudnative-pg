@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -90,7 +91,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		By("making sure that the deployments gets updated if the pooler.spec changes", func() {
 			const instancesNumber int32 = 3
 			poolerUpdate := pooler.DeepCopy()
-			poolerUpdate.Spec.Instances = instancesNumber
+			poolerUpdate.Spec.Instances = ptr.To(instancesNumber)
 
 			beforeDep := getPoolerDeployment(ctx, poolerUpdate)
 

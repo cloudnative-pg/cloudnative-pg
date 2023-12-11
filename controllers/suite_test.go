@@ -37,6 +37,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
@@ -142,7 +143,7 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 				Name: cluster.Name,
 			},
 			Type:      "rw",
-			Instances: 1,
+			Instances: ptr.To(int32(1)),
 			PgBouncer: &apiv1.PgBouncerSpec{
 				PoolMode: apiv1.PgBouncerPoolModeSession,
 			},
