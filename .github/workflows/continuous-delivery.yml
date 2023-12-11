@@ -245,6 +245,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      pull-requests: read
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
       # 'branch_name' is used in 'GetMostRecentReleaseTag' in the Go code
