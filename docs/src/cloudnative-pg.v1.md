@@ -4465,9 +4465,10 @@ the storage specification for the tablespace</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Temporary means the tablespace will be added as a <code>temp_tablespaces</code>
+   <p>When set to true, the tablespace will be added as a <code>temp_tablespaces</code>
 entry in PostgreSQL, and will be available to automatically house temp
-database objects or other temporary files</p>
+database objects, or other temporary files. Please refer to PostgreSQL
+documentation for more information on the <code>temp_tablespaces</code> GUC.</p>
 </td>
 </tr>
 </tbody>
