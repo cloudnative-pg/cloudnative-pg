@@ -560,7 +560,9 @@ jobs:
 
       - name: Run Snyk to check Docker image for vulnerabilities
         uses: snyk/actions/docker@master
-        if: ${{ !github.event.pull_request.head.repo.fork }}
+        if: |
+          github.repository_owner == 'cloudnative-pg' &&
+          !github.event.pull_request.head.repo.fork
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
