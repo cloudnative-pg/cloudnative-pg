@@ -411,7 +411,7 @@ documentation:
 Although time zones can even be used at session, transaction and even as part
 of a query in PostgreSQL, a very common way is to set them up globally. With
 CloudNativePG you can configure the cluster level time zone in the
-`spec.postgresql.parameters` section as in the following example:
+`.spec.postgresql.parameters` section as in the following example:
 
 ``` yaml
 apiVersion: postgresql.cnpg.io/v1

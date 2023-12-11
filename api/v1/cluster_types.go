@@ -653,7 +653,7 @@ type ClusterStatus struct {
 	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
 
 	// The timestamp when the primary was detected to be unhealthy
-	// This field is reported when spec.failoverDelay is populated or during online upgrades
+	// This field is reported when `.spec.failoverDelay` is populated or during online upgrades
 	// +optional
 	CurrentPrimaryFailingSinceTimestamp string `json:"currentPrimaryFailingSinceTimestamp,omitempty"`
 

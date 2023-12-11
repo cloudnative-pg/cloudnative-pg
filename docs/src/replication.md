@@ -172,7 +172,7 @@ the replicas are eligible for synchronous replication.
     (see ["Synchronous replication"](replication.md#synchronous-replication)).
 
 The example below shows how this can be done through the
-`syncReplicaElectionConstraint` section within `spec.postgresql`.
+`syncReplicaElectionConstraint` section within `.spec.postgresql`.
 `nodeLabelsAntiAffinity` allows you to specify those node labels that need to
 be evaluated to make sure that synchronous replication will be dynamically
 configured by the operator between the current primary and the replicas which
