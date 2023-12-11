@@ -19,7 +19,6 @@ package pgbouncer
 import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -38,14 +37,6 @@ func NewPoolerPodMonitorManager(pooler *apiv1.Pooler) *PoolerPodMonitorManager {
 // IsPodMonitorEnabled returns a boolean indicating if the PodMonitor should exists or not
 func (c PoolerPodMonitorManager) IsPodMonitorEnabled() bool {
 	return c.pooler.Spec.Monitoring != nil && c.pooler.Spec.Monitoring.EnablePodMonitor
-}
-
-// GetNamespacedName returns a PodMonitor's NamespacedName
-func (c PoolerPodMonitorManager) GetNamespacedName() types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: c.pooler.Namespace,
-		Name:      c.pooler.Name,
-	}
 }
 
 // BuildPodMonitor builds a new PodMonitor object

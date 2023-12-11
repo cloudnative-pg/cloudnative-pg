@@ -445,13 +445,6 @@ func (m *mockPodMonitorManager) BuildPodMonitor() *v1.PodMonitor {
 	return m.podMonitor
 }
 
-func (m *mockPodMonitorManager) GetNamespacedName() types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: m.podMonitor.Namespace,
-		Name:      m.podMonitor.Name,
-	}
-}
-
 var _ = Describe("CreateOrPatchPodMonitor", func() {
 	var (
 		ctx                 context.Context
