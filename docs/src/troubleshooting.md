@@ -41,19 +41,18 @@ following plugins/utilities to be available in your system:
 
 ## First steps
 
-To get a quick overview of the situation in the cluster or installation of
-interest, the `kubectl` plugin is the first tool to reach for:
+To quickly get an overview of the cluster or installation, the `kubectl` plugin
+is the primary tool to use:
 
 1. the [status subcommand](kubectl-plugin.md#status) provides an overview of a
   cluster
 2. the [report subcommand](kubectl-plugin.md#report) provides the manifests
-  for clusters and the operator deployment. It can also include logs by using
+  for clusters and the operator deployment. It can also include logs using
   the `--logs` option.
   The report generated via the plugin will include the full cluster manifest.
 
-The plugin can also be installed via packages on air-gapped systems. Please see
-the full details in the [plugin document](kubectl-plugin.md) page and become
-familiar with it.
+The plugin can be installed on air-gapped systems via packages.
+Please refer to the [plugin document](kubectl-plugin.md) for complete instructions.
 
 ## Are there backups?
 
@@ -64,16 +63,16 @@ In a cluster with backups set up, you will find, in the cluster Status, the fiel
 `lastSuccessfulBackup` and `firstRecoverabilityPoint`. You should make sure
 there is a recent `lastSuccessfulBackup`.
 
-A cluster without the `spec.backup` stanza of course will not have backups, and
-you will see, in the PostgreSQL logs, an insistent message:
+A cluster lacking the `.spec.backup` stanza won't have backups. 
+An insistent message will appear in the PostgreSQL logs:
 
 ```
 Backup not configured, skip WAL archiving.
 ```
 
-Depending on your findings regarding backups, it may be advisable to perform
-an emergency backup before proceeding with troubleshooting operations. This
-is described in the following section.
+Before proceeding with troubleshooting operations, it may be advisable
+to perform an emergency backup depending on your findings regarding backups.
+Refer to the following section for instructions.
 
 It is **extremely risky** to operate a production database without keeping
 regular backups.
