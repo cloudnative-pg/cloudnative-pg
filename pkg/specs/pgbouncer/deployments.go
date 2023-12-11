@@ -132,7 +132,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &pooler.Spec.Instances,
+			Replicas: pooler.Spec.Instances,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					utils.PgbouncerNameLabel: pooler.Name,
