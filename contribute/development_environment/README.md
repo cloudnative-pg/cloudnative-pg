@@ -41,9 +41,9 @@ on your local workstation.
 Make sure you have the following executables available in the `PATH`
 environment variable:
 
-- Go 1.17+ compiler
+- Go 1.21+ compiler
 - GNU Make
-- [Kind](https://kind.sigs.k8s.io/) v0.11.x or greater
+- [Kind](https://kind.sigs.k8s.io/) v0.20.x or greater
 - [golangci-lint](https://github.com/golangci/golangci-lint)
 - [goreleaser](https://goreleaser.com/)
 
