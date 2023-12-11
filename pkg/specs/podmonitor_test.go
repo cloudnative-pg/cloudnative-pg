@@ -20,7 +20,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,13 +32,13 @@ var _ = Describe("PodMonitor test", func() {
 		clusterName      = "test"
 		clusterNamespace = "test-namespace"
 	)
-	cluster := v1.Cluster{
+	cluster := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: clusterNamespace,
 			Name:      clusterName,
 		},
-		Spec: v1.ClusterSpec{
-			Monitoring: &v1.MonitoringConfiguration{
+		Spec: apiv1.ClusterSpec{
+			Monitoring: &apiv1.MonitoringConfiguration{
 				EnablePodMonitor: true,
 			},
 		},
@@ -103,5 +103,11 @@ var _ = Describe("PodMonitor test", func() {
 		expectedEndpoint.MetricRelabelConfigs = metricRelabelings
 		expectedEndpoint.RelabelConfigs = relabelings
 		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
+	})
+
+	It("does not panic if monitoring section is not present", func() {
+		cluster := apiv1.Cluster{}
+		mgr := NewClusterPodMonitorManager(&cluster)
+		Expect(mgr.BuildPodMonitor()).ToNot(BeNil())
 	})
 })
