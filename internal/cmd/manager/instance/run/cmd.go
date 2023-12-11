@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/servers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
@@ -256,6 +257,13 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	if err := tablespaces.NewTablespaceReconciler(instance, mgr.GetClient()).
 		SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create tablespace reconciler")
+		return err
+	}
+
+	setupLog.Info("starting external server manager")
+	if err := servers.NewExternalServersReconciler(instance, mgr.GetClient()).
+		SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create external servers reconciler")
 		return err
 	}
 

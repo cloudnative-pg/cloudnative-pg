@@ -24,6 +24,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pgpass"
 )
 
 const (
@@ -35,19 +37,20 @@ const (
 // CustomExternalSecretsPath is the custom path where the cryptographic material
 // needed to connect to an external cluster will be dumped.
 // This will be used by the unit tests.
-var CustomExternalSecretsPath string
+var customExternalSecretsPath string
 
 func getExternalSecretsPath() string {
-	if CustomExternalSecretsPath != "" {
-		return CustomExternalSecretsPath
+	if customExternalSecretsPath != "" {
+		return customExternalSecretsPath
 	}
 
 	return defaultExternalSecretsPath
 }
 
-// ReadSecretKeyRef dumps a certain secret to a file inside a temporary folder
-// using 0600 as permission bits
-func ReadSecretKeyRef(
+// readSecretKeyRef reads the passed secret selector into a string.
+// This function is mainly useful to get a PostgreSQL's role password
+// from a Kubernetes secret
+func readSecretKeyRef(
 	ctx context.Context, client ctrl.Client,
 	namespace string, selector *corev1.SecretKeySelector,
 ) (string, error) {
@@ -65,13 +68,13 @@ func ReadSecretKeyRef(
 	return string(value), err
 }
 
-// DumpSecretKeyRefToFile dumps a certain secret to a file inside a temporary folder
+// dumpSecretKeyRefToFile dumps a certain secret to a file inside a temporary folder
 // using 0600 as permission bits.
 //
 // This function overlaps with the Kubernetes ability to mount a secret in a pod,
 // with the difference that we can change the attached secret without restarting the pod.
 // We also need to have more control over when the secret content is updated.
-func DumpSecretKeyRefToFile(
+func dumpSecretKeyRefToFile(
 	ctx context.Context, client ctrl.Client,
 	namespace string, serverName string, selector *corev1.SecretKeySelector,
 ) (string, error) {
@@ -109,34 +112,19 @@ func DumpSecretKeyRefToFile(
 	return f.Name(), nil
 }
 
-// CreatePgPassFile creates a pgpass file inside the user home directory
-func CreatePgPassFile(serverName, password string) (string, error) {
-	pgpassContent := fmt.Sprintf(
-		"%v:%v:%v:%v:%v",
-		"*", // hostname
-		"*", // port
-		"*", // database
-		"*", // username
-		password)
+// createPgPassFile creates a pgpass file inside the user home directory
+func createPgPassFile(
+	serverName string,
+	connectionParameters map[string]string,
+	password string,
+) (string, error) {
+	pgpassLine := pgpass.NewConnectionInfo(connectionParameters, password)
 
 	directory := path.Join(getExternalSecretsPath(), serverName)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return "", err
 	}
-
 	filePath := path.Join(directory, "pgpass")
-	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0o600) // #nosec
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = f.Close()
-	}()
 
-	_, err = f.WriteString(pgpassContent)
-	if err != nil {
-		return "", err
-	}
-
-	return f.Name(), nil
+	return filePath, pgpass.From(pgpassLine).Write(filePath)
 }
