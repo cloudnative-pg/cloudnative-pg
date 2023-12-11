@@ -3,7 +3,7 @@ module github.com/cloudnative-pg/cloudnative-pg
 go 1.21
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/DATA-DOG/go-sqlmock v1.5.1
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/blang/semver v3.5.1+incompatible
@@ -12,7 +12,7 @@ require (
 	github.com/go-logr/logr v1.3.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.4.0
-	github.com/jackc/pgx/v5 v5.5.0
+	github.com/jackc/pgx/v5 v5.5.1
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.3.0
 	github.com/lib/pq v1.10.9
