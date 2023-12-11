@@ -52,9 +52,8 @@ interest, the `kubectl` plugin is the first tool to reach for:
   The report generated via the plugin will include the full cluster manifest.
 
 The plugin can also be installed via packages on air-gapped systems. Please see
-the full details in the [plugin document](kubectl-plugin.md) page.
-
-And become familiar with it.
+the full details in the [plugin document](kubectl-plugin.md) page and become
+familiar with it.
 
 ## Are there backups?
 
@@ -66,15 +65,18 @@ In a cluster with backups set up, you will find, in the cluster Status, the fiel
 there is a recent `lastSuccessfulBackup`.
 
 A cluster without the `spec.backup` stanza of course will not have backups, and
-you will see, in the cluster logs, an insistent message:
+you will see, in the PostgreSQL logs, an insistent message:
 
-> `Backup not configured, skip WAL archiving`.
+```
+Backup not configured, skip WAL archiving.
+```
 
 Depending on your findings regarding backups, it may be advisable to perform
 an emergency backup before proceeding with troubleshooting operations. This
 is described in the following section.
 
-It is **extremely risky** to operate a database without keeping regular backups.
+It is **extremely risky** to operate a production database without keeping
+regular backups.
 
 ## Emergency backup
 
