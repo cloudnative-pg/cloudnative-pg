@@ -90,7 +90,7 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment.Labels[utils.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
 
 		// Check the DeploymentSpec
-		Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
+		Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 		Expect(deployment.Spec.Selector.MatchLabels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
 
 		// Check the PodTemplateSpec
@@ -110,7 +110,7 @@ var _ = Describe("Deployment", func() {
 		deployment, err := Deployment(pooler, cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
-		Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
+		Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 	})
 
 	It("sets the correct deployment strategy", func() {
