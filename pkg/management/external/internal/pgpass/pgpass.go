@@ -48,7 +48,7 @@ func (data *Data) WithLine(line ConnectionInfo) *Data {
 
 // Write writes the content of this data file into the chosen file
 // name, truncating if existing
-func (data Data) Write(fileName string) error {
+func (data *Data) Write(fileName string) error {
 	lines := make([]string, len(data.info))
 	for i, line := range data.info {
 		lines[i] = line.BuildLine()
