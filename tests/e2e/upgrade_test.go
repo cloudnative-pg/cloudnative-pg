@@ -19,7 +19,6 @@ package e2e
 import (
 	"errors"
 	"fmt"
-	"k8s.io/utils/ptr"
 	"os"
 	"strconv"
 	"strings"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
