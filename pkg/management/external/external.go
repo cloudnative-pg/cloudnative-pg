@@ -29,14 +29,13 @@ import (
 
 // ConfigureConnectionToServer creates a connection string to the external
 // server, using the configuration inside the cluster and dumping the secret when
-// needed. This function will return a connection string, the name of the pgpass file
-// to be used, and an error state
+// needed in a custom passfile.
+// Returns a connection string or any error encountered
 func ConfigureConnectionToServer(
 	ctx context.Context, client ctrl.Client,
 	namespace string, server *apiv1.ExternalCluster,
-) (string, string, error) {
+) (string, error) {
 	connectionParameters := make(map[string]string, len(server.ConnectionParameters))
-	pgpassfile := ""
 
 	for key, value := range server.ConnectionParameters {
 		connectionParameters[key] = value
@@ -45,7 +44,7 @@ func ConfigureConnectionToServer(
 	if server.SSLCert != nil {
 		name, err := DumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLCert)
 		if err != nil {
-			return "", "", err
+			return "", err
 		}
 
 		connectionParameters["sslcert"] = name
@@ -54,7 +53,7 @@ func ConfigureConnectionToServer(
 	if server.SSLKey != nil {
 		name, err := DumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLKey)
 		if err != nil {
-			return "", "", err
+			return "", err
 		}
 
 		connectionParameters["sslkey"] = name
@@ -63,7 +62,7 @@ func ConfigureConnectionToServer(
 	if server.SSLRootCert != nil {
 		name, err := DumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLRootCert)
 		if err != nil {
-			return "", "", err
+			return "", err
 		}
 
 		connectionParameters["sslrootcert"] = name
@@ -72,14 +71,16 @@ func ConfigureConnectionToServer(
 	if server.Password != nil {
 		password, err := ReadSecretKeyRef(ctx, client, namespace, server.Password)
 		if err != nil {
-			return "", "", err
+			return "", err
 		}
 
-		pgpassfile, err = CreatePgPassFile(server.Name, password)
+		pgpassfile, err := CreatePgPassFile(server.Name, password)
 		if err != nil {
-			return "", "", err
+			return "", err
 		}
+
+		connectionParameters["passfile"] = pgpassfile
 	}
 
-	return configfile.CreateConnectionString(connectionParameters), pgpassfile, nil
+	return configfile.CreateConnectionString(connectionParameters), nil
 }
