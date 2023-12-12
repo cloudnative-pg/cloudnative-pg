@@ -1160,6 +1160,11 @@ type PostgresConfiguration struct {
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
 
+	// PostgreSQL User Name Maps rules (lines to be appended
+	// to the pg_ident.conf file)
+	// +optional
+	PgIdent []string `json:"pg_ident,omitempty"`
+
 	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
 	// set up.
 	// +optional

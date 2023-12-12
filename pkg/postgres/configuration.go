@@ -50,6 +50,18 @@ hostssl all cnpg_pooler_pgbouncer all cert
 host all all all {{.DefaultAuthenticationMethod}}
 `
 
+	// identTemplateString is the template used to generate the pg_ident.conf
+	// configuration file
+	identTemplateString = `
+# Grant local access
+local {{.Username}} postgres
+
+# Additional mappings
+{{ range $rule := .Mappings }}
+{{ $rule -}}
+{{ end }}
+`
+
 	// fixedConfigurationParameter are the configuration parameters
 	// whose value is managed by the operator and should not be changed
 	// by the user
@@ -151,6 +163,9 @@ host all all all {{.DefaultAuthenticationMethod}}
 
 // hbaTemplate is the template used to create the HBA configuration
 var hbaTemplate = template.Must(template.New("pg_hba.conf").Parse(hbaTemplateString))
+
+// identTemplate is the template used to create the HBA configuration
+var identTemplate = template.Must(template.New("pg_ident.conf").Parse(identTemplateString))
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
 const MajorVersionRangeUnlimited = 0
@@ -442,6 +457,26 @@ func CreateHBARules(hba []string,
 	}
 
 	return hbaContent.String(), nil
+}
+
+// CreateIdentRules will create the content of pg_ident.conf file given
+// the rules set by the cluster spec
+func CreateIdentRules(ident []string, username string) (string, error) {
+	var identContent bytes.Buffer
+
+	templateData := struct {
+		Mappings []string
+		Username string
+	}{
+		Mappings: ident,
+		Username: username,
+	}
+
+	if err := identTemplate.Execute(&identContent, templateData); err != nil {
+		return "", err
+	}
+
+	return identContent.String(), nil
 }
 
 // PgConfiguration wraps configuration parameters with some checks
