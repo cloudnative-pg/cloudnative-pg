@@ -119,7 +119,7 @@ jobs:
               - '.github/workflows/continuous-integration.yml'
               - '.goreleaser*.yml'
               - 'Dockerfile'
-              - 'Dockerfile-ubi'
+              - 'Dockerfile-ubi8'
               - 'Makefile'
               - 'go.mod'
               - 'go.sum'
@@ -507,7 +507,7 @@ jobs:
             type=ref,event=pr
 
       - name: Docker meta UBI
-        id: docker-meta-ubi
+        id: docker-meta-ubi8
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.OPERATOR_IMAGE_NAME }}
@@ -596,16 +596,16 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
-          file: Dockerfile-ubi
+          file: Dockerfile-ubi8
           push: ${{ env.PUSH }}
           build-args: |
             VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta-ubi.outputs.tags }}
+          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
 
       - name: Output images
         env:
           TAGS: ${{ steps.docker-meta.outputs.tags }}
-          TAGS_UBI: ${{ steps.docker-meta-ubi.outputs.tags }}
+          TAGS_UBI: ${{ steps.docker-meta-ubi8.outputs.tags }}
         run: |
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
