@@ -35,9 +35,9 @@ func (r *Reconciler) Reconcile(
 ) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx).WithName("external_servers_reconciler")
 	// if the context has already been cancelled,
-	// trying to reconcile would just lead to misleading errors being reported
+	// trying to synchronize would just lead to misleading errors being reported
 	if err := ctx.Err(); err != nil {
-		contextLogger.Warning("Context cancelled, will not start tablespace reconcile", "err", err)
+		contextLogger.Warning("Context cancelled, will not start externalservers reconcile", "err", err)
 		return reconcile.Result{}, nil
 	}
 
@@ -57,7 +57,7 @@ func (r *Reconciler) Reconcile(
 
 	// For each external server, we ensure we download the credentials
 	for i := range cluster.Spec.ExternalClusters {
-		r.reconcile(
+		r.synchronize(
 			ctx,
 			cluster.Namespace,
 			&cluster.Spec.ExternalClusters[i])
@@ -66,7 +66,7 @@ func (r *Reconciler) Reconcile(
 	return reconcile.Result{}, nil
 }
 
-func (r *Reconciler) reconcile(
+func (r *Reconciler) synchronize(
 	ctx context.Context,
 	namespace string,
 	server *apiv1.ExternalCluster,
@@ -75,7 +75,7 @@ func (r *Reconciler) reconcile(
 
 	connectionString, err := external.ConfigureConnectionToServer(ctx, r.client, namespace, server)
 	if err != nil {
-		contextLogger.Info("Cannot reconcile external server connection parameters", "err", err)
+		contextLogger.Info("Cannot synchronize external server connection parameters", "err", err)
 	} else {
 		contextLogger.Debug("External server connection string", "connectionString", connectionString)
 	}
