@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,7 +33,7 @@ var _ = Describe("PodMonitor test", func() {
 			clusterName      = "test"
 			clusterNamespace = "test-namespace"
 		)
-		cluster := v1.Cluster{
+		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: clusterNamespace,
 				Name:      clusterName,
