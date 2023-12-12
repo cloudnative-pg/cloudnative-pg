@@ -74,16 +74,10 @@ func (instance *Instance) writeReplicaConfigurationForDesignatedPrimary(
 		return false, fmt.Errorf("missing external cluster")
 	}
 
-	connectionString, pgpassfile, err := external.ConfigureConnectionToServer(
+	connectionString, err := external.ConfigureConnectionToServer(
 		ctx, cli, instance.Namespace, &server)
 	if err != nil {
 		return false, err
-	}
-
-	if pgpassfile != "" {
-		connectionString = fmt.Sprintf("%v passfile=%v",
-			connectionString,
-			pgpassfile)
 	}
 
 	return UpdateReplicaConfiguration(instance.PgData, connectionString, "")

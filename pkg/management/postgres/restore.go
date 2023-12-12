@@ -139,7 +139,7 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 			return fmt.Errorf("missing external cluster: %v", cluster.Spec.ReplicaCluster.Source)
 		}
 
-		connectionString, _, err := external.ConfigureConnectionToServer(
+		connectionString, err := external.ConfigureConnectionToServer(
 			ctx, cli, info.Namespace, &server)
 		if err != nil {
 			return err
@@ -272,7 +272,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 			return fmt.Errorf("missing external cluster: %v", cluster.Spec.ReplicaCluster.Source)
 		}
 
-		connectionString, _, err := external.ConfigureConnectionToServer(
+		connectionString, err := external.ConfigureConnectionToServer(
 			ctx, typedClient, info.Namespace, &server)
 		if err != nil {
 			return err
