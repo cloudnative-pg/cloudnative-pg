@@ -42,7 +42,7 @@ func (r *Reconciler) Reconcile(
 	}
 
 	// Fetch the Cluster from the cache
-	cluster, err := r.GetCluster(ctx)
+	cluster, err := r.getCluster(ctx)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// The cluster has been deleted.

@@ -50,10 +50,10 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// GetCluster gets the managed cluster through the client
-func (r *Reconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
+// getCluster gets the managed cluster through the client
+func (r *Reconciler) getCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
-	err := r.GetClient().Get(ctx,
+	err := r.client.Get(ctx,
 		types.NamespacedName{
 			Namespace: r.instance.Namespace,
 			Name:      r.instance.ClusterName,
@@ -64,14 +64,4 @@ func (r *Reconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	}
 
 	return &cluster, nil
-}
-
-// GetClient returns the dynamic client that is being used for a certain reconciler
-func (r *Reconciler) GetClient() client.Client {
-	return r.client
-}
-
-// Instance returns the PostgreSQL instance that this reconciler is working on
-func (r *Reconciler) Instance() *postgres.Instance {
-	return r.instance
 }
