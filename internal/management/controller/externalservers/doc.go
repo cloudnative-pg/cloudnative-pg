@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package servers contains the reconciler of external servers, taking
+// Package externalservers contains the reconciler of external servers, taking
 // care of enabling connectivity to every server defined in the relative
 // section of the CR
-package servers
+package externalservers

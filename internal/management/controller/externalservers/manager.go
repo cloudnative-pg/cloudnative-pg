@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package servers
+package externalservers
 
 import (
 	"context"
@@ -27,16 +27,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// ExternalServersReconciler is a Kubernetes controller that ensures Tablespaces
+// Reconciler is a Kubernetes controller that ensures Tablespaces
 // are created in Postgres
-type ExternalServersReconciler struct {
+type Reconciler struct {
 	instance *postgres.Instance
 	client   client.Client
 }
 
-// NewExternalServersReconciler creates a new TablespaceReconciler
-func NewExternalServersReconciler(instance *postgres.Instance, client client.Client) *ExternalServersReconciler {
-	controller := &ExternalServersReconciler{
+// NewReconciler creates a new TablespaceReconciler
+func NewReconciler(instance *postgres.Instance, client client.Client) *Reconciler {
+	controller := &Reconciler{
 		instance: instance,
 		client:   client,
 	}
@@ -44,14 +44,14 @@ func NewExternalServersReconciler(instance *postgres.Instance, client client.Cli
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ExternalServersReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
 		Complete(r)
 }
 
 // GetCluster gets the managed cluster through the client
-func (r *ExternalServersReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
+func (r *Reconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
 	err := r.GetClient().Get(ctx,
 		types.NamespacedName{
@@ -67,11 +67,11 @@ func (r *ExternalServersReconciler) GetCluster(ctx context.Context) (*apiv1.Clus
 }
 
 // GetClient returns the dynamic client that is being used for a certain reconciler
-func (r *ExternalServersReconciler) GetClient() client.Client {
+func (r *Reconciler) GetClient() client.Client {
 	return r.client
 }
 
 // Instance returns the PostgreSQL instance that this reconciler is working on
-func (r *ExternalServersReconciler) Instance() *postgres.Instance {
+func (r *Reconciler) Instance() *postgres.Instance {
 	return r.instance
 }

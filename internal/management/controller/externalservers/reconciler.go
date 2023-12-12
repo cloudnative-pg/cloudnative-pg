@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package servers
+package externalservers
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 )
 
 // Reconcile is the main reconciliation loop for the instance
-func (r *ExternalServersReconciler) Reconcile(
+func (r *Reconciler) Reconcile(
 	ctx context.Context,
 	_ reconcile.Request,
 ) (reconcile.Result, error) {
@@ -57,7 +57,7 @@ func (r *ExternalServersReconciler) Reconcile(
 
 	// For each external server, we ensure we download the credentials
 	for i := range cluster.Spec.ExternalClusters {
-		r.reconcileExternalServer(
+		r.reconcile(
 			ctx,
 			cluster.Namespace,
 			&cluster.Spec.ExternalClusters[i])
@@ -66,7 +66,7 @@ func (r *ExternalServersReconciler) Reconcile(
 	return reconcile.Result{}, nil
 }
 
-func (r *ExternalServersReconciler) reconcileExternalServer(
+func (r *Reconciler) reconcile(
 	ctx context.Context,
 	namespace string,
 	server *apiv1.ExternalCluster,
