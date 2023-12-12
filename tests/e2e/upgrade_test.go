@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -81,6 +82,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		restoreFile         = fixturesDir + "/upgrade/cluster-restore.yaml.template"
 		scheduledBackupFile = fixturesDir + "/upgrade/scheduled-backup.yaml"
 		countBackupsScript  = "sh -c 'mc find minio --name data.tar.gz | wc -l'"
+
+		pgBouncerSampleFile = fixturesDir + "/upgrade/pgbouncer.yaml"
+		pgBouncerName       = "pgbouncer"
 		level               = tests.Lowest
 	)
 
@@ -368,6 +372,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			AssertClusterIsReady(upgradeNamespace, clusterName1, testTimeouts[testsUtils.ClusterIsReady], env)
 		})
 
+		By("creating a Pooler with two instances", func() {
+			CreateResourceFromFile(upgradeNamespace, pgBouncerSampleFile)
+		})
+
 		// Now that everything is in place, we add a bit of data we'll use to
 		// check if the backup is working
 		By("creating data on the database", func() {
@@ -447,6 +455,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			CreateResourceFromFile(upgradeNamespace, scheduledBackupFile)
 		})
 		AssertScheduledBackupsAreScheduled(upgradeNamespace)
+
+		assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)
 
 		var podUIDs []types.UID
 		podList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
@@ -582,6 +592,25 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, 180).Should(BeEquivalentTo("2"))
 		})
 		AssertScheduledBackupsAreScheduled(upgradeNamespace)
+
+		By("scaling down the pooler to 0", func() {
+			assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)
+			assertPGBouncerEndpointsContainsPodsIP(upgradeNamespace, pgBouncerSampleFile, 2)
+
+			Eventually(func(g Gomega) {
+				pooler := apiv1.Pooler{}
+				err := env.Client.Get(env.Ctx,
+					ctrlclient.ObjectKey{Namespace: upgradeNamespace, Name: pgBouncerName},
+					&pooler)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				pooler.Spec.Instances = ptr.To(int32(0))
+				err = env.Client.Update(env.Ctx, &pooler)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).Should(Succeed())
+
+			assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 0)
+		})
 	}
 
 	It("works after an upgrade with rolling upgrade ", func() {

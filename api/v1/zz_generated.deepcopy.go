@@ -1650,6 +1650,11 @@ func (in *PoolerSecrets) DeepCopy() *PoolerSecrets {
 func (in *PoolerSpec) DeepCopyInto(out *PoolerSpec) {
 	*out = *in
 	out.Cluster = in.Cluster
+	if in.Instances != nil {
+		in, out := &in.Instances, &out.Instances
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Template != nil {
 		in, out := &in.Template, &out.Template
 		*out = new(PodTemplateSpec)
