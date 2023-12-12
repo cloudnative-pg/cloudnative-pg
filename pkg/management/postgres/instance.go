@@ -21,9 +21,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -193,6 +195,19 @@ type Instance struct {
 
 	// tablespaceSynchronizerChan is used to send tablespace configuration to the tablespace synchronizer
 	tablespaceSynchronizerChan chan map[string]apiv1.TablespaceConfiguration
+}
+
+// SetAlterSystemEnabled allows or deny writes to the
+// `postgresql.auto.conf` file in PGDATA, allowing and denying the
+// usage of the ALTER SYSTEM SQL command
+func (instance *Instance) SetAlterSystemEnabled(enabled bool) error {
+	autoConfFileName := path.Join(instance.PgData, "postgresql.auto.conf")
+
+	mode := fs.FileMode(0o600)
+	if !enabled {
+		mode = 0o400
+	}
+	return os.Chmod(autoConfFileName, mode)
 }
 
 // IsFenced checks whether the instance is marked as fenced

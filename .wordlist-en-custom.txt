@@ -634,6 +634,7 @@ dx
 ecdsa
 edb
 eks
+enableAlterSystem
 enablePodAntiAffinity
 enablePodMonitor
 enableSuperuserAccess

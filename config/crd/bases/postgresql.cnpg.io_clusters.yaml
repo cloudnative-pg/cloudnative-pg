@@ -2714,6 +2714,11 @@ spec:
               postgresql:
                 description: Configuration of the PostgreSQL server
                 properties:
+                  enableAlterSystem:
+                    description: If this parameter is true, the user will be able
+                      to invoke `ALTER SYSTEM` on this CNP Cluster. This should only
+                      be used for debugging and troubleshooting. Defaults to false.
+                    type: boolean
                   ldap:
                     description: Options to specify LDAP configuration
                     properties:
