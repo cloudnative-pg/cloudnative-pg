@@ -18,6 +18,8 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,7 +37,38 @@ func reconcileResourceRequests(
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
+	if len(pvcs) == 0 {
+		return nil
+	}
+
 	if !cluster.ShouldResizeInUseVolumes() {
+		contextLogger := log.FromContext(ctx)
+		sizeFromCluster := cluster.Spec.StorageConfiguration.GetSizeOrNil().AsDec()
+		// todo: we may have multiple pvcs for shrinking step by step by the user
+		sizeFromPVC := pvcs[0].Spec.Resources.Requests.Storage().AsDec()
+
+		switch sizeFromCluster.Cmp(sizeFromPVC) {
+		case -1:
+			contextLogger.Warning(
+				"cluster configuration has a smaller storage size than the current PVCs",
+				"clusterSize", sizeFromCluster,
+				"pvcSize", sizeFromPVC,
+			)
+			var condition metav1.Condition
+			condition.Type = string(apiv1.ConditionPVCResize)
+			condition.Status = metav1.ConditionFalse
+			condition.Reason = string(apiv1.ConditionReasonPVCResizePending)
+			condition.Message = "Waiting for manual intervention by the user."
+			return conditions.Patch(ctx, c, cluster, &condition)
+		case 0:
+			var condition metav1.Condition
+			condition.Type = string(apiv1.ConditionPVCResize)
+			condition.Status = metav1.ConditionTrue
+			condition.Reason = string(apiv1.ConditionReasonPVCResizeSuccess)
+			condition.Message = "The user has completed recreated pods and pvcs."
+			return conditions.Patch(ctx, c, cluster, &condition)
+		}
+
 		return nil
 	}
 

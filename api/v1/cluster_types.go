@@ -862,6 +862,8 @@ const (
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
+	// ConditionPVCResize represents whether a PVC resize is successful
+	ConditionPVCResize ClusterConditionType = "PVCResizeSucceeded"
 )
 
 // A Condition that can be used to communicate the Backup progress
@@ -942,6 +944,14 @@ const (
 
 	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
 	DetachedVolume ConditionReason = "DetachedVolume"
+
+	// ConditionReasonPVCResizeSuccess means that the condition changed because the
+	// PVC resizing was working correctly
+	ConditionReasonPVCResizeSuccess ConditionReason = "PVCResizeSuccess"
+
+	// ConditionReasonPVCResizePending means that the condition has changed because
+	// the PVC resizing is pending and requires manual intervention by the user.
+	ConditionReasonPVCResizePending ConditionReason = "PVCResizePending"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
