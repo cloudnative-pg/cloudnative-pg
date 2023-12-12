@@ -20,6 +20,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
@@ -47,7 +48,7 @@ var _ = Describe("Deployment", func() {
 			Spec: apiv1.PoolerSpec{
 				Cluster:   apiv1.LocalObjectReference{Name: "test-cluster"},
 				Type:      apiv1.PoolerTypeRW,
-				Instances: 1,
+				Instances: ptr.To(int32(1)),
 				Template:  &apiv1.PodTemplateSpec{},
 				PgBouncer: &apiv1.PgBouncerSpec{
 					PoolMode:  apiv1.PgBouncerPoolModeSession,
@@ -89,7 +90,7 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment.Labels[utils.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
 
 		// Check the DeploymentSpec
-		Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
+		Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 		Expect(deployment.Spec.Selector.MatchLabels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
 
 		// Check the PodTemplateSpec
@@ -105,11 +106,11 @@ var _ = Describe("Deployment", func() {
 	})
 
 	It("sets the correct number of replicas", func() {
-		pooler.Spec.Instances = 3
+		pooler.Spec.Instances = ptr.To(int32(3))
 		deployment, err := Deployment(pooler, cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
-		Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
+		Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 	})
 
 	It("sets the correct deployment strategy", func() {
