@@ -1,0 +1,12 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pgbouncer
+spec:
+  cluster:
+    name: cluster1
+
+  instances: 2
+  type: rw
+  pgbouncer:
+    poolMode: session
