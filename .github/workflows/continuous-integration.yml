@@ -506,7 +506,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
 
-      - name: Docker meta UBI
+      - name: Docker meta UBI8
         id: docker-meta-ubi8
         uses: docker/metadata-action@v5
         with:
@@ -591,7 +591,7 @@ jobs:
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
 
-      - name: Build and push UBI
+      - name: Build and push UBI8
         uses: docker/build-push-action@v5
         with:
           platforms: ${{ env.PLATFORMS }}
