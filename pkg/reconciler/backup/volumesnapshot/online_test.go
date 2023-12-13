@@ -32,27 +32,29 @@ import (
 )
 
 type fakeBackupClient struct {
-	startCalled bool
-	stopCalled  bool
-	injectError error
-	response    *webserver.Response[webserver.BackupResultData]
+	startCalled       bool
+	stopCalled        bool
+	injectStatusError error
+	injectStartError  error
+	injectStopError   error
+	response          *webserver.Response[webserver.BackupResultData]
 }
 
 func (f *fakeBackupClient) StatusWithErrors(
 	_ context.Context,
 	_ string,
 ) (*webserver.Response[webserver.BackupResultData], error) {
-	return f.response, f.injectError
+	return f.response, f.injectStatusError
 }
 
 func (f *fakeBackupClient) Start(_ context.Context, _ string, _ webserver.StartBackupRequest) error {
 	f.startCalled = true
-	return f.injectError
+	return f.injectStartError
 }
 
 func (f *fakeBackupClient) Stop(_ context.Context, _ string, _ webserver.StopBackupRequest) error {
 	f.stopCalled = true
-	return f.injectError
+	return f.injectStopError
 }
 
 var _ = Describe("onlineExecutor", func() {
@@ -98,11 +100,11 @@ var _ = Describe("onlineExecutor", func() {
 	It("should stop when encountering an error", func() {
 		expectedErr := errors.New("test-error")
 		onlineExec := onlineExecutor{backupClient: &fakeBackupClient{
-			injectError: expectedErr,
+			injectStatusError: expectedErr,
 		}}
 
 		_, err := onlineExec.prepare(ctx, cluster, backup, target)
-		Expect(err.Error()).To(ContainSubstring(expectedErr.Error()))
+		Expect(err).To(MatchError(expectedErr))
 	})
 
 	It("should stop when encountering an error inside the body", func() {
@@ -116,7 +118,37 @@ var _ = Describe("onlineExecutor", func() {
 		}}
 
 		_, err := onlineExec.prepare(ctx, cluster, backup, target)
-		Expect(err.Error()).To(ContainSubstring(expectedErr))
+		Expect(err).To(MatchError(ContainSubstring(expectedErr)))
+	})
+
+	It("should stop when encountering an error calling start", func() {
+		expectedErr := errors.New("test-error")
+		onlineExec := onlineExecutor{backupClient: &fakeBackupClient{
+			response: &webserver.Response[webserver.BackupResultData]{
+				Data: &webserver.BackupResultData{
+					BackupName: "not-correct-backup",
+				},
+			},
+			injectStartError: expectedErr,
+		}}
+
+		_, err := onlineExec.prepare(ctx, cluster, backup, target)
+		Expect(err).To(MatchError(expectedErr))
+	})
+
+	It("should return an error when encountering an unknown phase", func() {
+		const unexpectedPhase = "UNEXPECTED_PHASE"
+		onlineExec := onlineExecutor{backupClient: &fakeBackupClient{
+			response: &webserver.Response[webserver.BackupResultData]{
+				Data: &webserver.BackupResultData{
+					BackupName: backup.Name,
+					Phase:      unexpectedPhase,
+				},
+			},
+		}}
+
+		_, err := onlineExec.prepare(ctx, cluster, backup, target)
+		Expect(err).To(MatchError(ContainSubstring(unexpectedPhase)))
 	})
 
 	It("should start the backup if the current backup doesn't match", func() {
