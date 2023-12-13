@@ -1181,8 +1181,7 @@ type PostgresConfiguration struct {
 	// If this parameter is true, the user will be able to invoke `ALTER SYSTEM`
 	// on this CloudNativePG Cluster.
 	// This should only be used for debugging and troubleshooting.
-	// Defaults to true.
-	// +kubebuilder:default:=true
+	// Defaults to false.
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
 }
