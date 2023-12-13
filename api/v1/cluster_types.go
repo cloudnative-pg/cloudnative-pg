@@ -1181,7 +1181,8 @@ type PostgresConfiguration struct {
 	// If this parameter is true, the user will be able to invoke `ALTER SYSTEM`
 	// on this CNP Cluster.
 	// This should only be used for debugging and troubleshooting.
-	// Defaults to false.
+	// Defaults to true.
+	// +kubebuilder:default:=true
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
 }
