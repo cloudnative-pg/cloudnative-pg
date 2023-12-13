@@ -1592,6 +1592,11 @@ func validateStorageConfigurationChange(
 	oldStorage StorageConfiguration,
 	newStorage StorageConfiguration,
 ) field.ErrorList {
+	if !newStorage.ShouldResizeInUseVolumes() {
+		// we allow the user to shrink the storage by recreating pvc
+		return nil
+	}
+
 	oldSize := oldStorage.GetSizeOrNil()
 	if oldSize == nil {
 		// Can't read the old size, so can't tell if the new size is greater

@@ -862,6 +862,8 @@ const (
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
+	// ConditionPVCResize represents whether a PVC resize is successful
+	ConditionPVCResize ClusterConditionType = "PVCResizeSucceeded"
 )
 
 // A Condition that can be used to communicate the Backup progress
@@ -942,6 +944,14 @@ const (
 
 	// DetachedVolume is the reason that is set when we do a rolling upgrade to add a PVC volume to a cluster
 	DetachedVolume ConditionReason = "DetachedVolume"
+
+	// ConditionReasonPVCResizeSuccess means that the condition changed because the
+	// PVC resizing was working correctly
+	ConditionReasonPVCResizeSuccess ConditionReason = "PVCResizeSuccess"
+
+	// ConditionReasonPVCResizePending means that the condition has changed because
+	// the PVC resizing is pending and requires manual intervention by the user.
+	ConditionReasonPVCResizePending ConditionReason = "PVCResizePending"
 )
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
@@ -1644,6 +1654,16 @@ type StorageConfiguration struct {
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
 	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
+}
+
+// ShouldResizeInUseVolumes is true when we should resize PVC we already
+// created
+func (s *StorageConfiguration) ShouldResizeInUseVolumes() bool {
+	if s.ResizeInUseVolumes == nil {
+		return true
+	}
+
+	return *s.ResizeInUseVolumes
 }
 
 // GetSizeOrNil returns the requests storage size
@@ -2689,11 +2709,7 @@ func (cluster *Cluster) IsInstanceFenced(instance string) bool {
 // ShouldResizeInUseVolumes is true when we should resize PVC we already
 // created
 func (cluster *Cluster) ShouldResizeInUseVolumes() bool {
-	if cluster.Spec.StorageConfiguration.ResizeInUseVolumes == nil {
-		return true
-	}
-
-	return *cluster.Spec.StorageConfiguration.ResizeInUseVolumes
+	return cluster.Spec.StorageConfiguration.ShouldResizeInUseVolumes()
 }
 
 // ShouldCreateApplicationSecret returns true if for this cluster,

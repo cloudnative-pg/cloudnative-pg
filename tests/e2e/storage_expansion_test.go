@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/utils/ptr"
+
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -31,9 +33,11 @@ import (
 // with different storage providers in different k8s environments
 var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 	const (
-		sampleFile  = fixturesDir + "/storage_expansion/cluster-storage-expansion.yaml.template"
-		clusterName = "storage-expansion"
-		level       = tests.Lowest
+		expansionFile           = fixturesDir + "/storage_expansion/cluster-storage-expansion.yaml.template"
+		clusterForExpansionName = "storage-expansion"
+		shriningFile            = fixturesDir + "/storage_expansion/cluster-storage-shrinkage.yaml.template"
+		clusterForShrinkageName = "storage-shrinkage"
+		level                   = tests.Lowest
 	)
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -70,49 +74,58 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 				return env.DeleteNamespace(namespace)
 			})
 			// Creating a cluster with three nodes
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-			OnlineResizePVC(namespace, clusterName)
+			AssertCreateCluster(namespace, clusterForExpansionName, expansionFile, env)
+			OnlineResizePVC(namespace, clusterForExpansionName)
 		})
 	})
 
-	Context("can not be expanded", func() {
-		var namespace string
-		BeforeEach(func() {
-			// Initializing namespace variable to be used in test case
-			namespacePrefix = "storage-expansion-false"
-			// Extracting bool value of AllowVolumeExpansion
-			allowExpansion, err := utils.GetStorageAllowExpansion(defaultStorageClass, env)
-			Expect(err).ToNot(HaveOccurred())
-			if (allowExpansion != nil) && (*allowExpansion == true) {
-				Skip(fmt.Sprintf("AllowedVolumeExpansion is true on %v", defaultStorageClass))
+	It("expands PVCs via offline resize", func() {
+		var err error
+		namespacePrefix = "storage-expansion-false"
+		// Creating namespace
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
+			return env.DeleteNamespace(namespace)
 		})
 
-		It("expands PVCs via offline resize", func() {
-			var err error
-			// Creating namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-			By("update cluster for resizeInUseVolumes as false", func() {
-				// Updating cluster with 'resizeInUseVolumes' sets to 'false' in storage.
-				// Check if operator does not return error
-				Eventually(func() error {
-					_, _, err = utils.RunUnchecked("kubectl patch cluster " + clusterName + " -n " + namespace +
-						" -p '{\"spec\":{\"storage\":{\"resizeInUseVolumes\":false}}}' --type=merge")
-					if err != nil {
-						return err
-					}
-					return nil
-				}, 60, 5).Should(BeNil())
-			})
-			OfflineResizePVC(namespace, clusterName, 600)
+		AssertCreateCluster(namespace, clusterForExpansionName, expansionFile, env)
+
+		By("update cluster for resizeInUseVolumes as false", func() {
+			// Updating cluster with 'resizeInUseVolumes' sets to 'false' in storage and walStorage.
+			// Check if operator does not return error
+			Eventually(func(g Gomega) {
+				cluster, err := env.GetCluster(namespace, clusterForExpansionName)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				cluster.Spec.StorageConfiguration.ResizeInUseVolumes = ptr.To(false)
+				cluster.Spec.WalStorage.ResizeInUseVolumes = ptr.To(false)
+
+				err = env.Client.Update(env.Ctx, cluster)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).Should(Succeed())
 		})
+		OfflineResizePVC(namespace, clusterForExpansionName, "1Gi", "2Gi", 600)
+	})
+
+	It("shrink pvc via offline resize", func() {
+		var err error
+		namespacePrefix := "storage-shrinkagek"
+		// Creating namespace
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
+
+		AssertCreateCluster(namespace, clusterForShrinkageName, shriningFile, env)
+
+		OfflineResizePVC(namespace, clusterForShrinkageName, "2Gi", "1Gi", 600)
 	})
 })
