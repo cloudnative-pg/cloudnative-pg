@@ -1179,7 +1179,7 @@ type PostgresConfiguration struct {
 	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
 
 	// If this parameter is true, the user will be able to invoke `ALTER SYSTEM`
-	// on this CNP Cluster.
+	// on this CloudNativePG Cluster.
 	// This should only be used for debugging and troubleshooting.
 	// Defaults to true.
 	// +kubebuilder:default:=true

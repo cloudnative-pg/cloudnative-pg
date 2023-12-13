@@ -3552,7 +3552,7 @@ big enough to simulate an infinite timeout</p>
 </td>
 <td>
    <p>If this parameter is true, the user will be able to invoke <code>ALTER SYSTEM</code>
-on this CNP Cluster.
+on this CloudNativePG Cluster.
 This should only be used for debugging and troubleshooting.
 Defaults to true.</p>
 </td>

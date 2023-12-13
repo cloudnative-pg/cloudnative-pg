@@ -1,7 +1,7 @@
 # PostgreSQL Configuration
 
-Users that are familiar with PostgreSQL are aware of the existence of the following two files
-to configure an instance:
+Users that are familiar with PostgreSQL are aware of the existence of the
+following two files to configure an instance:
 
 - `postgresql.conf`: main run-time configuration file of PostgreSQL
 - `pg_hba.conf`: clients authentication file
@@ -20,6 +20,7 @@ These settings are the same across all instances.
     that are normally controlled by the operator might indeed lead to an
     unpredictable/unrecoverable state of the cluster.
     Moreover, `ALTER SYSTEM` changes are not replicated across the cluster.
+    See ["Enabling ALTER SYSTEM"](#enabling-alter-system) below for details.
 
 A reference for custom settings usage is included in the samples, see
 [`cluster-example-custom.yaml`](samples/cluster-example-custom.yaml).
@@ -407,6 +408,34 @@ After the change, the cluster instances will immediately reload the
 configuration to apply the changes.
 If the change involves a parameter requiring a restart, the operator will
 perform a rolling upgrade.
+
+## Enabling `ALTER SYSTEM`
+
+CloudNativePG strongly advocates employing the Cluster manifest as the
+exclusive method for altering the configuration of a PostgreSQL cluster. This
+approach guarantees coherence across the entire high-availability cluster and
+aligns with best practices for Infrastructure-as-Code.
+
+In CloudNativePG version 1.22 and onwards, the default configuration disables
+the use of `ALTER SYSTEM` on new Postgres clusters. This decision is rooted in
+the recognition of potential risks associated with this command. To enable the
+use of `ALTER SYSTEM`, you can explicitly set `.spec.postgresql.enableAlterSystem`
+to `true`.
+
+!!! Warning
+    Proceed with caution when utilizing `ALTER SYSTEM`. This command operates
+    directly on the connected instance and does not undergo replication.
+    CloudNativePG assumes responsibility for certain fixed parameters and complete
+    control over others, emphasizing the need for careful consideration.
+
+When `.spec.postgresql.enableAlterSystem` is configured as `false`, any attempt
+to execute `ALTER SYSTEM` will result in an error. The error message might
+resemble the following:
+
+``` output
+ERROR:  could not open file "postgresql.auto.conf": Permission denied
+```
+
 
 ## Dynamic Shared Memory settings
 

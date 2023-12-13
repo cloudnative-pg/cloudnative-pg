@@ -2717,8 +2717,9 @@ spec:
                   enableAlterSystem:
                     default: true
                     description: If this parameter is true, the user will be able
-                      to invoke `ALTER SYSTEM` on this CNP Cluster. This should only
-                      be used for debugging and troubleshooting. Defaults to true.
+                      to invoke `ALTER SYSTEM` on this CloudNativePG Cluster. This
+                      should only be used for debugging and troubleshooting. Defaults
+                      to true.
                     type: boolean
                   ldap:
                     description: Options to specify LDAP configuration
