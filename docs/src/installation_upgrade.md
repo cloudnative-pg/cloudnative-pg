@@ -236,19 +236,43 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.21.0, 1.20.3 or 1.19.5
+### Upgrading to 1.22.0, 1.21.2 or 1.20.5
 
 !!! Important
     We encourage all existing users of CloudNativePG to upgrade to version
-    1.21.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.20.3 or 1.19.5).
+    1.22.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.21.2 or 1.20.5).
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
     go through the release notes and upgrade instructions of all the
     intermediate minor releases. For example, if you want to move
-    from 1.19.x to 1.21, make sure you go through the release notes
-    and upgrade instructions for 1.20 and 1.21.
+    from 1.20.x to 1.22, make sure you go through the release notes
+    and upgrade instructions for 1.21 and 1.22.
+
+CloudNativePG keeps following the *security-by-default* approach and, after
+disabling `postgres` superuser access via the network in all new clusters, it
+now disables by default the usage of the `ALTER SYSTEM` command.
+
+If you want to retain the existing behavior, you need to explicitly enable it
+by setting `.spec.postgresql.enableAlterSystem` to `true`, as in the following
+excerpt:
+
+```yaml
+...
+  postgresql:
+    enableAlterSystem: true
+...
+```
+
+The reason behind this choice is to ensure that, by default, changes to the
+PostgreSQL configuration in a database cluster controlled by CloudNativePG are
+allowed only through the Kubernetes API.
+
+At the same time, we are providing an option to enable `ALTER SYSTEM` if you
+need to use it, even temporarily.
+
+### Upgrading to 1.21 from a previous minor version
 
 With the goal to keep improving out-of-the-box the *convention over
 configuration* behavior of the operator, CloudNativePG changes the default
@@ -259,9 +283,6 @@ value of several knobs in the following areas:
 - security
 - labels
 
-Some of the above changes have been backported to 1.20.3 and 1.19.5, as
-detailed below. Most of the changes will affect new PostgreSQL clusters only.
-
 !!! Warning
     Please read carefully the list of changes below, and how to modify the
     `Cluster` manifests to retain the existing behavior if you don't want to
@@ -270,9 +291,6 @@ detailed below. Most of the changes will affect new PostgreSQL clusters only.
     values unless you have valid reasons not to.
 
 #### Superuser access disabled
-
-!!! Important
-    This change takes effect starting from CloudNativePG 1.21.0.
 
 Pushing towards *security-by-default*, CloudNativePG now disables access
 `postgres` superuser access via the network in all new clusters, unless
@@ -290,11 +308,7 @@ spec:
 
 #### Replication slots for HA
 
-!!! Important
-    This change takes effect starting from CloudNativePG 1.21.0.
-
-[As already anticipated in release 1.20](installation_upgrade.md#replication-slots-for-high-availability),
-replication slots for High Availability are now enabled by default.
+Replication slots for High Availability are enabled by default.
 
 If you want to ensure replication slots are disabled, regardless of which
 version of CloudNativePG you are running, we advise you to explicitly declare
@@ -310,12 +324,7 @@ spec:
 
 #### Delay for PostgreSQL shutdown
 
-!!! Important
-    This change has been backported to all supported minor releases. As a
-    result, it will be available starting from versions 1.21.0, 1.20.3 and
-    1.19.5.
-
-Up to now, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
+Up to 1.20.2, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
 was set to 30 seconds. Despite the recommendations to change and tune this
 value, almost all the cases we have examined during support incidents or
 community issues show that this value is left unchanged.
@@ -352,17 +361,12 @@ spec:
 
 #### Delay for PostgreSQL startup
 
-!!! Important
-    This change has been backported to all supported minor releases. As a
-    result, it will be available starting from versions 1.21.0, 1.20.3 and
-    1.19.5.
-
-Until now, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
+Up to 1.20.2, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
 was set to 30 seconds, and CloudNativePG used this parameter as
 `initialDelaySeconds` for the Kubernetes liveness probe. Given that all the
 supported Kubernetes releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
-version 1.21 has adopted this approach as well (`startDelay` is now
-automatically divided into periods of 10 seconds of duration  each).
+`startDelay` is now automatically divided into periods of 10 seconds of
+duration  each.
 
 !!! Important
     In order to add the `startupProbe`, each pod needs to be restarted.
@@ -389,12 +393,7 @@ spec:
 
 #### Delay for PostgreSQL switchover
 
-!!! Important
-    This change has been backported to all supported minor releases. As a
-    result, it will be available starting from versions 1.21.0, 1.20.3 and
-    1.19.5.
-
-Up to now, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
+Up to 1.20.2, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
 was set by default to 40000000 seconds (over 15 months) to simulate a very long
 interval.
 
@@ -411,11 +410,6 @@ spec:
 
 #### Labels
 
-!!! Important
-    This change has been backported to all supported minor releases. As a
-    result, it will be available starting from versions 1.21.0, 1.20.3 and
-    1.19.5.
-
 In version 1.18, we deprecated the `postgresql` label in pods to identify the
 name of the cluster, and replaced it with the more canonical `cnpg.io/cluster`
 label. The `postgresql` label is no longer maintained.
@@ -426,9 +420,9 @@ in a future release.
 
 #### Shortcut for keeping the existing behavior
 
-If you want to explicitly keep the existing behavior of CloudNativePG
-(we advise not to), you need to set these values in all your `Cluster`
-definitions **before upgrading** to version 1.21.0, 1.20.3 or 1.19.5:
+If you want to explicitly keep the behavior of CloudNativePG up to version
+1.20.2 (we advise not to), you need to set these values in all your `Cluster`
+definitions **before upgrading** to a higher version:
 
 ```yaml
 spec:
@@ -512,9 +506,9 @@ spec:
 [Replication slots for High Availability](replication.md#replication-slots-for-high-availability)
 were introduced in CloudNativePG in version 1.18, but disabled by default.
 
-In version 1.20 we are preparing to enable this feature by default from version
-1.21, as replication slots enhance the resilience and robustness of a High
-Availability cluster.
+Version 1.20 prepares the ground for enabling this feature by default in any
+future release, as replication slots enhance the resilience and robustness of a
+High Availability cluster.
 
 For future compatibility, if you already know that your environments won't ever
 need replication slots, our recommendation is that you explicitly disable their
