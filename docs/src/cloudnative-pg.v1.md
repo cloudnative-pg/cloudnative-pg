@@ -29,7 +29,7 @@
     
   
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -70,7 +70,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
     
   
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -111,7 +111,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
     
   
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -152,7 +152,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
     
   
 <tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
 </td>
 <td>
    <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
@@ -220,7 +220,7 @@ More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</p
 </td>
 </tr>
 <tr><td><code>nodeAffinity</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#nodeaffinity-v1-core"><i>core/v1.NodeAffinity</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#nodeaffinity-v1-core"><i>core/v1.NodeAffinity</i></a>
 </td>
 <td>
    <p>NodeAffinity describes node affinity scheduling rules for the pod.
@@ -228,7 +228,7 @@ More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-no
 </td>
 </tr>
 <tr><td><code>tolerations</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#toleration-v1-core"><i>[]core/v1.Toleration</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#toleration-v1-core"><i>[]core/v1.Toleration</i></a>
 </td>
 <td>
    <p>Tolerations is a list of Tolerations that should be set for all the pods, in order to allow them to run
@@ -249,7 +249,7 @@ https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-p
 </td>
 </tr>
 <tr><td><code>additionalPodAntiAffinity</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podantiaffinity-v1-core"><i>core/v1.PodAntiAffinity</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podantiaffinity-v1-core"><i>core/v1.PodAntiAffinity</i></a>
 </td>
 <td>
    <p>AdditionalPodAntiAffinity allows to specify pod anti-affinity terms to be added to the ones generated
@@ -257,7 +257,7 @@ by the operator if EnablePodAntiAffinity is set to true (default) or to be used 
 </td>
 </tr>
 <tr><td><code>additionalPodAffinity</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podaffinity-v1-core"><i>core/v1.PodAffinity</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podaffinity-v1-core"><i>core/v1.PodAffinity</i></a>
 </td>
 <td>
    <p>AdditionalPodAffinity allows to specify pod affinity terms to be passed to all the cluster's pods.</p>
@@ -558,14 +558,14 @@ parameter is omitted</p>
 </td>
 </tr>
 <tr><td><code>startedAt</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>When the backup was started</p>
 </td>
 </tr>
 <tr><td><code>stoppedAt</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>When the backup was terminated</p>
@@ -1275,7 +1275,7 @@ and digests for deterministic and repeatable deployments
 </td>
 </tr>
 <tr><td><code>imagePullPolicy</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#pullpolicy-v1-core"><i>core/v1.PullPolicy</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#pullpolicy-v1-core"><i>core/v1.PullPolicy</i></a>
 </td>
 <td>
    <p>Image pull policy.
@@ -1470,7 +1470,7 @@ to be unhealthy</p>
 </td>
 </tr>
 <tr><td><code>topologySpreadConstraints</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#topologyspreadconstraint-v1-core"><i>[]core/v1.TopologySpreadConstraint</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#topologyspreadconstraint-v1-core"><i>[]core/v1.TopologySpreadConstraint</i></a>
 </td>
 <td>
    <p>TopologySpreadConstraints specifies how to spread matching pods among the given topology.
@@ -1479,7 +1479,7 @@ https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constrai
 </td>
 </tr>
 <tr><td><code>resources</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core"><i>core/v1.ResourceRequirements</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#resourcerequirements-v1-core"><i>core/v1.ResourceRequirements</i></a>
 </td>
 <td>
    <p>Resources requirements of every generated Pod. Please refer to
@@ -1559,7 +1559,7 @@ it can be with a switchover (<code>switchover</code>) or in-place (<code>restart
 </td>
 </tr>
 <tr><td><code>projectedVolumeTemplate</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#projectedvolumesource-v1-core"><i>core/v1.ProjectedVolumeSource</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#projectedvolumesource-v1-core"><i>core/v1.ProjectedVolumeSource</i></a>
 </td>
 <td>
    <p>Template to be used to define projected volumes, projected volumes will be mounted
@@ -1567,7 +1567,7 @@ under <code>/projected</code> base folder</p>
 </td>
 </tr>
 <tr><td><code>env</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#envvar-v1-core"><i>[]core/v1.EnvVar</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#envvar-v1-core"><i>[]core/v1.EnvVar</i></a>
 </td>
 <td>
    <p>Env follows the Env format to pass environment variables
@@ -1575,7 +1575,7 @@ to the pods created in the cluster</p>
 </td>
 </tr>
 <tr><td><code>envFrom</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#envfromsource-v1-core"><i>[]core/v1.EnvFromSource</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#envfromsource-v1-core"><i>[]core/v1.EnvFromSource</i></a>
 </td>
 <td>
    <p>EnvFrom follows the EnvFrom format to pass environment variables
@@ -1590,7 +1590,7 @@ sources to the pods to be used by Env</p>
 </td>
 </tr>
 <tr><td><code>seccompProfile</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#seccompprofile-v1-core"><i>core/v1.SeccompProfile</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#seccompprofile-v1-core"><i>core/v1.SeccompProfile</i></a>
 </td>
 <td>
    <p>The SeccompProfile applied to every Pod and Container.
@@ -1857,7 +1857,7 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 </td>
 </tr>
 <tr><td><code>conditions</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#condition-v1-meta"><i>[]meta/v1.Condition</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#condition-v1-meta"><i>[]meta/v1.Condition</i></a>
 </td>
 <td>
    <p>Conditions for cluster object</p>
@@ -2043,14 +2043,14 @@ PostgreSQL cluster from an existing storage</p>
     
   
 <tr><td><code>storage</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
 </td>
 <td>
    <p>Configuration of the storage of the instances</p>
 </td>
 </tr>
 <tr><td><code>walStorage</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
 </td>
 <td>
    <p>Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)</p>
@@ -2139,14 +2139,14 @@ storage</p>
     
   
 <tr><td><code>shm</code> <B>[Required]</B><br/>
-<i>k8s.io/apimachinery/pkg/api/resource.Quantity</i>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
 </td>
 <td>
    <p>Shm is the size limit of the shared memory volume</p>
 </td>
 </tr>
 <tr><td><code>temporaryData</code> <B>[Required]</B><br/>
-<i>k8s.io/apimachinery/pkg/api/resource.Quantity</i>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
 </td>
 <td>
    <p>TemporaryData is the size limit of the temporary data volume</p>
@@ -2187,7 +2187,7 @@ external cluster which is used in the other sections of the configuration</p>
 </td>
 </tr>
 <tr><td><code>sslCert</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The reference to an SSL certificate to be used to connect to this
@@ -2195,7 +2195,7 @@ instance</p>
 </td>
 </tr>
 <tr><td><code>sslKey</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The reference to an SSL private key to be used to connect to this
@@ -2203,7 +2203,7 @@ instance</p>
 </td>
 </tr>
 <tr><td><code>sslRootCert</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The reference to an SSL CA public key to be used to connect to this
@@ -2211,7 +2211,7 @@ instance</p>
 </td>
 </tr>
 <tr><td><code>password</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The reference to the password to be used to connect to the server</p>
@@ -2484,7 +2484,7 @@ the bind+search LDAP authentication process</p>
 </td>
 </tr>
 <tr><td><code>bindPassword</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
    <p>Secret with the password for the user to bind to the directory</p>
@@ -3034,7 +3034,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </td>
 </tr>
 <tr><td><code>spec</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podspec-v1-core"><i>core/v1.PodSpec</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#podspec-v1-core"><i>core/v1.PodSpec</i></a>
 </td>
 <td>
    <p>Specification of the desired behavior of the pod.
@@ -3212,7 +3212,7 @@ Pooler name should never match with any cluster name within the same namespace.<
 </td>
 </tr>
 <tr><td><code>deploymentStrategy</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#deploymentstrategy-v1-apps"><i>apps/v1.DeploymentStrategy</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#deploymentstrategy-v1-apps"><i>apps/v1.DeploymentStrategy</i></a>
 </td>
 <td>
    <p>The deployment strategy to use for pgbouncer to replace existing pods with new ones</p>
@@ -3667,7 +3667,7 @@ connections the role can make. <code>-1</code> (the default) means no limit.</p>
 </td>
 </tr>
 <tr><td><code>validUntil</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>Date and time after which the role's password is no longer valid.
@@ -3912,21 +3912,21 @@ standby, if available.</p>
     
   
 <tr><td><code>lastCheckTime</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>The latest time the schedule</p>
 </td>
 </tr>
 <tr><td><code>lastScheduleTime</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>Information when was the last time that backup was successfully scheduled.</p>
 </td>
 </tr>
 <tr><td><code>nextScheduleTime</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#time-v1-meta"><i>meta/v1.Time</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
 </td>
 <td>
    <p>Next time we will run a backup</p>
@@ -4193,7 +4193,7 @@ Size cannot be decreased.</p>
 </td>
 </tr>
 <tr><td><code>pvcTemplate</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#persistentvolumeclaimspec-v1-core"><i>core/v1.PersistentVolumeClaimSpec</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#persistentvolumeclaimspec-v1-core"><i>core/v1.PersistentVolumeClaimSpec</i></a>
 </td>
 <td>
    <p>Template to be used to generate the Persistent Volume Claim</p>
