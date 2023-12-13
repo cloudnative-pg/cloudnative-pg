@@ -605,6 +605,7 @@ dx
 ecdsa
 edb
 eks
+enableAlterSystem
 enablePodAntiAffinity
 enablePodMonitor
 enableSuperuserAccess
@@ -824,6 +825,7 @@ oc
 ol
 olm
 onlineUpdateEnabled
+onwards
 openldap
 openshift
 operability

@@ -233,9 +233,9 @@ only the operator itself.
 ### Upgrading to 1.20.3
 
 !!! Important
-    We encourage all existing users of CloudNativePG 1.20.x to upgrade at your
-    earliest possible convenience to 1.20.3, the latest stable version for this
-    minor release.
+    We encourage all existing users of CloudNativePG to upgrade to version
+    1.22.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.21.2 or 1.20.5).
 
 With the goal to keep improving out-of-the-box the *convention over
 configuration* behavior of the operator, CloudNativePG changes the default
@@ -244,8 +244,6 @@ value of several knobs in the following areas:
 - startup and shutdown control of the PostgreSQL instance
 - self-healing
 - labels
-
-Most of the changes will affect new PostgreSQL clusters only.
 
 !!! Warning
     Please read carefully the list of changes below, and how to modify the
@@ -256,7 +254,7 @@ Most of the changes will affect new PostgreSQL clusters only.
 
 #### Delay for PostgreSQL shutdown
 
-Up to now, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
+Up to 1.20.2, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
 was set to 30 seconds. Despite the recommendations to change and tune this
 value, almost all the cases we have examined during support incidents or
 community issues show that this value is left unchanged.
@@ -293,12 +291,12 @@ spec:
 
 #### Delay for PostgreSQL startup
 
-Until now, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
+Up to 1.20.2, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
 was set to 30 seconds, and CloudNativePG used this parameter as
 `initialDelaySeconds` for the Kubernetes liveness probe. Given that all the
 supported Kubernetes releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
-from this version we have adopted this approach as well (`startDelay` is now
-automatically divided into periods of 10 seconds of duration  each).
+`startDelay` is now automatically divided into periods of 10 seconds of
+duration  each.
 
 !!! Important
     In order to add the `startupProbe`, each pod needs to be restarted.
@@ -325,7 +323,7 @@ spec:
 
 #### Delay for PostgreSQL switchover
 
-Up to now, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
+Up to 1.20.2, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
 was set by default to 40000000 seconds (over 15 months) to simulate a very long
 interval.
 
@@ -352,9 +350,9 @@ in a future release.
 
 #### Shortcut for keeping the existing behavior
 
-If you want to explicitly keep the existing behavior of CloudNativePG
-(we advise not to), you need to set these values in all your `Cluster`
-definitions **before upgrading** to version 1.20.3:
+If you want to explicitly keep the behavior of CloudNativePG up to version
+1.20.2 (we advise not to), you need to set these values in all your `Cluster`
+definitions **before upgrading** to a higher version:
 
 ```yaml
 spec:
@@ -432,9 +430,9 @@ spec:
 [Replication slots for High Availability](replication.md#replication-slots-for-high-availability)
 were introduced in CloudNativePG in version 1.18, but disabled by default.
 
-In version 1.20 we are preparing to enable this feature by default from version
-1.21, as replication slots enhance the resilience and robustness of a High
-Availability cluster.
+Version 1.20 prepares the ground for enabling this feature by default in any
+future release, as replication slots enhance the resilience and robustness of a
+High Availability cluster.
 
 For future compatibility, if you already know that your environments won't ever
 need replication slots, our recommendation is that you explicitly disable their

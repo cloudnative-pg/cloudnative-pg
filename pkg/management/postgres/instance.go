@@ -21,9 +21,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -190,6 +192,19 @@ type Instance struct {
 
 	// roleSynchronizerChan is used to send managed role configuration to the role synchronizer
 	roleSynchronizerChan chan *apiv1.ManagedConfiguration
+}
+
+// SetAlterSystemEnabled allows or deny writes to the
+// `postgresql.auto.conf` file in PGDATA, allowing and denying the
+// usage of the ALTER SYSTEM SQL command
+func (instance *Instance) SetAlterSystemEnabled(enabled bool) error {
+	autoConfFileName := path.Join(instance.PgData, "postgresql.auto.conf")
+
+	mode := fs.FileMode(0o600)
+	if !enabled {
+		mode = 0o400
+	}
+	return os.Chmod(autoConfFileName, mode)
 }
 
 // IsFenced checks whether the instance is marked as fenced

@@ -990,6 +990,14 @@ type PostgresConfiguration struct {
 	// big enough to simulate an infinite timeout
 	// +optional
 	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
+
+	// If this parameter is true, the user will be able to invoke `ALTER SYSTEM`
+	// on this CloudNativePG Cluster.
+	// This should only be used for debugging and troubleshooting.
+	// Defaults to true.
+	// +kubebuilder:default:=true
+	// +optional
+	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL

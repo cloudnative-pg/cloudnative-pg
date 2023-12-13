@@ -225,3 +225,40 @@ var _ = Describe("check atomic bool", func() {
 		Expect(unAvailable).To(BeTrue())
 	})
 })
+
+var _ = Describe("ALTER SYSTEM enable and disable", func() {
+	var instance Instance
+	var autoConfFile string
+
+	BeforeEach(func() {
+		tmpDir := GinkgoT().TempDir()
+		instance.PgData = tmpDir
+
+		autoConfFile = filepath.Join(tmpDir, "postgresql.auto.conf")
+		f, err := os.Create(autoConfFile) // nolint: gosec
+		Expect(err).ToNot(HaveOccurred())
+
+		err = f.Close()
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should be able to enable ALTER SYSTEM", func() {
+		err := instance.SetAlterSystemEnabled(true)
+		Expect(err).ToNot(HaveOccurred())
+
+		info, err := os.Stat(autoConfFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(info.Mode()).To(BeEquivalentTo(0o600))
+	})
+
+	It("should be able to disable ALTER SYSTEM", func() {
+		err := instance.SetAlterSystemEnabled(false)
+		Expect(err).ToNot(HaveOccurred())
+
+		info, err := os.Stat(autoConfFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(info.Mode()).To(BeEquivalentTo(0o400))
+	})
+})
