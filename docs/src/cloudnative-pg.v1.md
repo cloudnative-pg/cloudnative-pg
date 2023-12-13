@@ -2364,7 +2364,13 @@ instance</p>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
 </td>
 <td>
-   <p>The reference to the password to be used to connect to the server</p>
+   <p>The reference to the password to be used to connect to the server.
+If a password is provided, CloudNativePG creates a PostgreSQL
+passfile at <code>/controller/external/NAME/pass</code> (where &quot;NAME&quot; is the
+cluster's name). This passfile is automatically referenced in the
+connection string when establishing a connection to the remote
+PostgreSQL server from the current PostgreSQL <code>Cluster</code>. This ensures
+secure and efficient password management for external clusters.</p>
 </td>
 </tr>
 <tr><td><code>barmanObjectStore</code><br/>
