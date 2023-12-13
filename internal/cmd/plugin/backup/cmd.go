@@ -192,6 +192,9 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: plugin.Namespace,
 			Name:      options.backupName,
+			Labels: map[string]string{
+				utils.ClusterLabelName: options.clusterName,
+			},
 		},
 		Spec: apiv1.BackupSpec{
 			Cluster: apiv1.LocalObjectReference{
