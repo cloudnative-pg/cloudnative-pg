@@ -111,10 +111,7 @@ func (r *InstanceReconciler) Reconcile(
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
 
-	// Takes care of the `.check-empty-wal-archive` file inside the PGDATA
-	// which, if present, before running the WAL archiver verifies that
-	// the backup object store is empty. This file is created immediately
-	// after initdb and removed after the first WAL is archived.
+	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
 		return reconcile.Result{}, err
 	}
@@ -135,6 +132,9 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, err
 	}
 	reloadNeeded = reloadNeeded || reloadConfigNeeded
+
+	// Reconcile postgresql.auto.conf file
+	r.reconcileAutoConf(ctx, cluster)
 
 	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
 	if !r.firstReconcileDone.Load() {
@@ -882,6 +882,26 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
 }
 
+// reconcileAutoConf reconciles the permission of `postgresql.auto.conf`
+// given the relative setting in `.spec.postgresql.enableAlterSystem`
+func (r *InstanceReconciler) reconcileAutoConf(ctx context.Context, cluster *apiv1.Cluster) {
+	contextLogger := log.FromContext(ctx)
+
+	err := r.instance.SetAlterSystemEnabled(
+		cluster.Spec.PostgresConfiguration.EnableAlterSystem,
+	)
+	if err != nil {
+		contextLogger.Error(
+			err, "Error while changing mode of the postgresql.auto.conf file, skipped")
+	}
+}
+
+// reconcileCheckWalArchiveFile takes care of the `.check-empty-wal-archive`
+// file inside the PGDATA.
+// If `.check-empty-wal-archive` is present, the WAL archiver verifies
+// that the backup object store is empty.
+// The file is created immediately after initdb and removed after the
+// first WAL is archived
 func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster) error {
 	filePath := filepath.Join(r.instance.PgData, archiver.CheckEmptyWalArchiveFile)
 	for _, condition := range cluster.Status.Conditions {
