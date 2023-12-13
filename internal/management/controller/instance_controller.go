@@ -111,9 +111,6 @@ func (r *InstanceReconciler) Reconcile(
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
 
-	// Reconcile postgresql.auto.conf file
-	r.reconcileAutoConf(ctx, cluster)
-
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
 		return reconcile.Result{}, err
@@ -135,6 +132,9 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, err
 	}
 	reloadNeeded = reloadNeeded || reloadConfigNeeded
+
+	// Reconcile postgresql.auto.conf file
+	r.reconcileAutoConf(ctx, cluster)
 
 	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
 	if !r.firstReconcileDone.Load() {

@@ -436,7 +436,6 @@ resemble the following:
 ERROR:  could not open file "postgresql.auto.conf": Permission denied
 ```
 
-
 ## Dynamic Shared Memory settings
 
 PostgreSQL supports a few implementations for dynamic shared memory
