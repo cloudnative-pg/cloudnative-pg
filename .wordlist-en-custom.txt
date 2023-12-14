@@ -841,6 +841,7 @@ ownerMetadata
 ownerReference
 packagemanifests
 parseable
+passfile
 passwd
 passwordSecret
 passwordStatus

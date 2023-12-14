@@ -1885,7 +1885,13 @@ type ExternalCluster struct {
 	// +optional
 	SSLRootCert *corev1.SecretKeySelector `json:"sslRootCert,omitempty"`
 
-	// The reference to the password to be used to connect to the server
+	// The reference to the password to be used to connect to the server.
+	// If a password is provided, CloudNativePG creates a PostgreSQL
+	// passfile at `/controller/external/NAME/pass` (where "NAME" is the
+	// cluster's name). This passfile is automatically referenced in the
+	// connection string when establishing a connection to the remote
+	// PostgreSQL server from the current PostgreSQL `Cluster`. This ensures
+	// secure and efficient password management for external clusters.
 	// +optional
 	Password *corev1.SecretKeySelector `json:"password,omitempty"`
 
