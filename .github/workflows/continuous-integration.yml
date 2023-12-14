@@ -649,6 +649,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
+
       - name: Create bundle
         env:
           IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
