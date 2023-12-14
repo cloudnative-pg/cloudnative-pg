@@ -27,8 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// Reconciler is a Kubernetes controller that ensures pgpass file for external servers
-// are well handled
+// Reconciler is a Kubernetes controller that ensures pgpass file for external servers is synchronized
 type Reconciler struct {
 	instance *postgres.Instance
 	client   client.Client
