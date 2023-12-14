@@ -493,6 +493,7 @@ event to occur instead of relying on the overall cluster health state. Available
 - LastBackupSucceeded
 - ContinuousArchiving
 - Ready
+- PVCResizeSucceeded
 
 `LastBackupSucceeded` is reporting the status of the latest backup. If set to `True` the
 last backup has been taken correctly, it is set to `False` otherwise.
@@ -503,6 +504,11 @@ last WAL archival process has been terminated correctly, it is set to `False` ot
 `Ready` is `True` when the cluster has the number of instances specified by the user
 and the primary instance is ready. This condition can be used in scripts to wait for
 the cluster to be created.
+
+`PVCResizeSucceeded` is reporting the status of the PVC resize. When the user changes
+the storage size while `resizeInUseVolumes` is set to `False`, the operator does not change
+the PVC size directly. Instead, it sets this condition to `False` and waits for the user
+to manually resize it offline. Once the PVC is resized, this condition is set to `True`.
 
 ### How to wait for a particular condition
 
@@ -520,6 +526,12 @@ $ kubectl wait --for=condition=ContinuousArchiving cluster/<CLUSTER-NAME> -n <NA
 ```bash
 $ kubectl wait --for=condition=Ready cluster/<CLUSTER-NAME> -n <NAMESPACE>
 ```
+
+- PVCResize
+```bash 
+$ kubectl wait --for=condition=PVCResizeSucceeded cluster/<CLUSTER-NAME> -n <NAMESPACE>
+```
+
 Below is a snippet of a `cluster.status` that contains a failing condition.
 
 ```bash
@@ -544,6 +556,11 @@ $ kubectl get cluster/<cluster-name> -o yaml
       reason: ClusterIsNotReady
       status: "False"
       type: Ready
+      
+    - message: pvcs [cluster-2, cluster-3] are needed to be resized manually.
+      reason: PVCResizePending
+      status: "False"
+      type: PVCResizeSucceeded
 
 
 ```

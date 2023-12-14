@@ -420,6 +420,11 @@ cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```
 
+## Shrinking storage
+
+Shrinking storage is not supported by Kubernetes. If you need to shrink the storage, you will need to recreate storages
+offline, refer to the ["Recreating storage"](#recreating-storage) section for more details.
+
 ## Static provisioning of persistent volumes
 
 CloudNativePG has been designed to work with dynamic volume provisioning, which
