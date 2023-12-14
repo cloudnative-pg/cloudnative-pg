@@ -2344,6 +2344,10 @@ type SecretsResourceVersion struct {
 	// +optional
 	BarmanEndpointCA string `json:"barmanEndpointCA,omitempty"`
 
+	// The resource versions of the external cluster secrets
+	// +optional
+	ExternalClusterSecretVersions map[string]string `json:"externalClusterSecretVersion,omitempty"`
+
 	// A map with the versions of all the secrets used to pass metrics.
 	// Map keys are the secret names, map values are the versions
 	// +optional
@@ -2368,6 +2372,21 @@ func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion
 		delete(secretResourceVersion.ManagedRoleSecretVersions, secret)
 	} else {
 		secretResourceVersion.ManagedRoleSecretVersions[secret] = *version
+	}
+}
+
+// SetExternalClusterSecretVersion Add or update or delete the resource version of the secret used in external clusters
+func (secretResourceVersion *SecretsResourceVersion) SetExternalClusterSecretVersion(
+	secretName string,
+	version *string,
+) {
+	if secretResourceVersion.ExternalClusterSecretVersions == nil {
+		secretResourceVersion.ExternalClusterSecretVersions = make(map[string]string)
+	}
+	if version == nil {
+		delete(secretResourceVersion.ExternalClusterSecretVersions, secretName)
+	} else {
+		secretResourceVersion.ExternalClusterSecretVersions[secretName] = *version
 	}
 }
 
@@ -2434,6 +2453,28 @@ func (cluster *Cluster) GetLDAPSecretName() string {
 // ContainsManagedRolesConfiguration returns true iff there are managed roles configured
 func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
 	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
+}
+
+// GetExternalClusterSecrets returns the secrets used by external Clusters
+func (cluster *Cluster) GetExternalClusterSecrets() map[string]struct{} {
+	secrets := make(map[string]struct{})
+	if cluster.Spec.ExternalClusters != nil {
+		for _, externalCluster := range cluster.Spec.ExternalClusters {
+			if externalCluster.Password != nil {
+				secrets[externalCluster.Password.Name] = struct{}{}
+			}
+			if externalCluster.SSLKey != nil {
+				secrets[externalCluster.SSLKey.Name] = struct{}{}
+			}
+			if externalCluster.SSLCert != nil {
+				secrets[externalCluster.SSLCert.Name] = struct{}{}
+			}
+			if externalCluster.SSLRootCert != nil {
+				secrets[externalCluster.SSLRootCert.Name] = struct{}{}
+			}
+		}
+	}
+	return secrets
 }
 
 // UsesSecretInManagedRoles checks if the given secret name is used in a managed role
@@ -2946,6 +2987,13 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		}
 	}
 
+	// watch the secrets defined in external clusters
+	externalClusterSecrets := cluster.GetExternalClusterSecrets()
+	for secretName := range externalClusterSecrets {
+		if secretName == secret {
+			return true
+		}
+	}
 	return false
 }
 

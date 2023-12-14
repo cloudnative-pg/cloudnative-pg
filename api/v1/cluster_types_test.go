@@ -336,6 +336,7 @@ var _ = Describe("resize in use volumes", func() {
 })
 
 var _ = Describe("external cluster list", func() {
+	emptyCluster := &Cluster{}
 	cluster := Cluster{
 		Spec: ClusterSpec{
 			ExternalClusters: []ExternalCluster{
@@ -357,6 +358,68 @@ var _ = Describe("external cluster list", func() {
 			},
 		},
 	}
+
+	clusterWithSecrets := Cluster{
+		Spec: ClusterSpec{
+			ExternalClusters: []ExternalCluster{
+				{
+					Name: "external-cluster1",
+					Password: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "passwordSecret",
+						},
+						Key: "test",
+					},
+					SSLRootCert: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "sslRootCertSecret",
+						},
+						Key: "test",
+					},
+					SSLCert: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "sslCertSecret",
+						},
+						Key: "test",
+					},
+					SSLKey: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "sslKey",
+						},
+						Key: "test",
+					},
+				},
+				{
+					Name: "external-cluster2",
+					Password: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "passwordSecret1",
+						},
+						Key: "test",
+					},
+					SSLRootCert: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "sslRootCertSecret",
+						},
+						Key: "test",
+					},
+					SSLCert: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "sslCertSecret",
+						},
+						Key: "test",
+					},
+					SSLKey: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "sslKey",
+						},
+						Key: "test",
+					},
+				},
+			},
+		},
+	}
+
 	It("can be looked up by name", func() {
 		server, ok := cluster.ExternalCluster("testServer")
 		Expect(ok).To(BeTrue())
@@ -374,6 +437,12 @@ var _ = Describe("external cluster list", func() {
 		server2, ok2 := cluster.ExternalCluster("testServer2")
 		Expect(ok2).To(BeTrue())
 		Expect(server2.GetServerName()).To(BeEquivalentTo("testServer2"), "default server name")
+	})
+
+	It("return the correct secrets number", func() {
+		Expect(emptyCluster.GetExternalClusterSecrets()).To(BeEmpty())
+		Expect(cluster.GetExternalClusterSecrets()).To(BeEmpty())
+		Expect(len(clusterWithSecrets.GetExternalClusterSecrets())).To(BeIdenticalTo(5))
 	})
 })
 

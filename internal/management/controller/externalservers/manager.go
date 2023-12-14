@@ -27,14 +27,14 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// Reconciler is a Kubernetes controller that ensures Tablespaces
-// are created in Postgres
+// Reconciler is a Kubernetes controller that ensures pgpass file for external servers
+// are well handled
 type Reconciler struct {
 	instance *postgres.Instance
 	client   client.Client
 }
 
-// NewReconciler creates a new TablespaceReconciler
+// NewReconciler creates a new ExternalServerReconciler
 func NewReconciler(instance *postgres.Instance, client client.Client) *Reconciler {
 	controller := &Reconciler{
 		instance: instance,

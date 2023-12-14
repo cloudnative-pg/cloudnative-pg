@@ -4540,6 +4540,11 @@ spec:
                     description: The resource version of the PostgreSQL client-side
                       CA secret version
                     type: string
+                  externalClusterSecretVersion:
+                    additionalProperties:
+                      type: string
+                    description: The resource versions of the external cluster secrets
+                    type: object
                   managedRoleSecretVersion:
                     additionalProperties:
                       type: string
