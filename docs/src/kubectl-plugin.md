@@ -965,3 +965,11 @@ reachable in your `PATH` variable to correctly work.
     The `kubectl cnpg snapshot` command has been removed.
     Please use the [`backup` command](#requesting-a-new-backup) to request
     backups using volume snapshots.
+
+## Integration with K9s
+
+The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
+popular terminal based UI to interact with Kubernetes clusters.
+
+See [`k9s/plugin.yml`](samples/k9s/plugin.yml) for details.
+
