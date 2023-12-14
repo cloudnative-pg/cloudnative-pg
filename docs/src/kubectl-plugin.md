@@ -124,11 +124,6 @@ Once the plugin was installed and deployed, you can start using it like this:
 kubectl cnpg <command> <args...>
 ```
 
-!!! Note
-    You can also run most of the plugins commands via
-    [k9s](https://github.com/derailed/k9s), a terminal based UI for kubernetes.
-    See [`k9s/plugin.yml`](samples/k9s/plugin.yml).
-
 ### Generation of installation manifests
 
 The `cnpg` plugin can be used to generate the YAML manifest for the
@@ -970,3 +965,11 @@ reachable in your `PATH` variable to correctly work.
     The `kubectl cnpg snapshot` command has been removed.
     Please use the [`backup` command](#requesting-a-new-backup) to request
     backups using volume snapshots.
+
+## Integration with K9s
+
+The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
+popular terminal based UI to interact with Kubernetes clusters.
+
+See [`k9s/plugin.yml`](samples/k9s/plugin.yml) for details.
+
