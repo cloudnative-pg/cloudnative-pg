@@ -250,9 +250,16 @@ only the operator itself.
     from 1.20.x to 1.22, make sure you go through the release notes
     and upgrade instructions for 1.21 and 1.22.
 
-CloudNativePG keeps following the *security-by-default* approach and, after
-disabling `postgres` superuser access via the network in all new clusters, it
-now disables by default the usage of the `ALTER SYSTEM` command.
+CloudNativePG continues to adhere to the security-by-default approach. As of
+version 1.22, the usage of the `ALTER SYSTEM` command is now disabled by
+default.
+
+The reason behind this choice is to ensure that, by default, changes to the
+PostgreSQL configuration in a database cluster controlled by CloudNativePG are
+allowed only through the Kubernetes API.
+
+At the same time, we are providing an option to enable `ALTER SYSTEM` if you
+need to use it, even temporarily.
 
 If you want to retain the existing behavior, you need to explicitly enable it
 by setting `.spec.postgresql.enableAlterSystem` to `true`, as in the following
@@ -265,12 +272,11 @@ excerpt:
 ...
 ```
 
-The reason behind this choice is to ensure that, by default, changes to the
-PostgreSQL configuration in a database cluster controlled by CloudNativePG are
-allowed only through the Kubernetes API.
-
-At the same time, we are providing an option to enable `ALTER SYSTEM` if you
-need to use it, even temporarily.
+!!! Important
+    You can execute this operation immediately following your upgrade to
+    version 1.22.0. Alternatively, you have the option to first upgrade to either
+    version 1.21.2 or 1.20.5 and then explicitly set it to true, as demonstrated in
+    the example above.
 
 ### Upgrading to 1.21 from a previous minor version
 
