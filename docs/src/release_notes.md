@@ -5,10 +5,10 @@ History of user-visible changes for CloudNativePG, classified for each minor rel
 - [CloudNativePG 1.21](release_notes/v1.21.md)
 - [CloudNativePG 1.20](release_notes/v1.20.md)
 
-For information on the community support policy for CloudNativePG, please
-refer to ["Supported releases"](supported_releases.md).
+For information on the community support policy for CloudNativePG, 
+see [Supported releases](supported_releases.md).
 
-Older releases:
+Earlier releases:
 
 - [CloudNativePG 1.19](release_notes/old/v1.19.md)
 - [CloudNativePG 1.18](release_notes/old/v1.18.md)
