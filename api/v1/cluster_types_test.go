@@ -440,9 +440,9 @@ var _ = Describe("external cluster list", func() {
 	})
 
 	It("return the correct secrets number", func() {
-		Expect(emptyCluster.GetExternalClusterSecrets()).To(BeEmpty())
-		Expect(cluster.GetExternalClusterSecrets()).To(BeEmpty())
-		Expect(len(clusterWithSecrets.GetExternalClusterSecrets())).To(BeIdenticalTo(5))
+		Expect(emptyCluster.GetExternalClusterSecrets().ToList()).To(BeEmpty())
+		Expect(cluster.GetExternalClusterSecrets().ToList()).To(BeEmpty())
+		Expect(len(clusterWithSecrets.GetExternalClusterSecrets().ToList())).To(BeIdenticalTo(5))
 	})
 })
 

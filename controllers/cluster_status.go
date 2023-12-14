@@ -593,7 +593,7 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 		}
 	}
 
-	for secretName := range cluster.GetExternalClusterSecrets() {
+	for _, secretName := range cluster.GetExternalClusterSecrets().ToList() {
 		externalSecretVersion, err := r.getSecretResourceVersion(ctx, cluster, secretName)
 		if err != nil {
 			return err

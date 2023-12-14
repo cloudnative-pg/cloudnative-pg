@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -2458,21 +2459,22 @@ func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
 }
 
 // GetExternalClusterSecrets returns the secrets used by external Clusters
-func (cluster *Cluster) GetExternalClusterSecrets() map[string]struct{} {
-	secrets := make(map[string]struct{})
+func (cluster *Cluster) GetExternalClusterSecrets() *stringset.Data {
+	secrets := stringset.New()
+
 	if cluster.Spec.ExternalClusters != nil {
 		for _, externalCluster := range cluster.Spec.ExternalClusters {
 			if externalCluster.Password != nil {
-				secrets[externalCluster.Password.Name] = struct{}{}
+				secrets.Put(externalCluster.Password.Name)
 			}
 			if externalCluster.SSLKey != nil {
-				secrets[externalCluster.SSLKey.Name] = struct{}{}
+				secrets.Put(externalCluster.SSLKey.Name)
 			}
 			if externalCluster.SSLCert != nil {
-				secrets[externalCluster.SSLCert.Name] = struct{}{}
+				secrets.Put(externalCluster.SSLCert.Name)
 			}
 			if externalCluster.SSLRootCert != nil {
-				secrets[externalCluster.SSLRootCert.Name] = struct{}{}
+				secrets.Put(externalCluster.SSLRootCert.Name)
 			}
 		}
 	}
@@ -2990,13 +2992,7 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 	}
 
 	// watch the secrets defined in external clusters
-	externalClusterSecrets := cluster.GetExternalClusterSecrets()
-	for secretName := range externalClusterSecrets {
-		if secretName == secret {
-			return true
-		}
-	}
-	return false
+	return cluster.GetExternalClusterSecrets().Has(secret)
 }
 
 // UsesConfigMap checks whether a given secret is used by a Cluster
