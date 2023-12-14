@@ -30,7 +30,7 @@ Base backups can be taken either on object stores or using volume snapshots
     snapshots, we strongly advise you to upgrade to 1.21 or more advanced
     releases.
 
-You can achieve recovery from a *recovery object store* in two ways:
+You can achieve recovery from a recovery object store in two ways:
 
 - We recommend using a recovery object store, that is, a backup of another cluster
   created by Barman Cloud and defined by way of the `barmanObjectStore` option

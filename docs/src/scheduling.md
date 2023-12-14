@@ -1,37 +1,37 @@
 # Scheduling
 
-Scheduling, in Kubernetes, is the process responsible for placing a new pod on
+In Kubernetes, scheduling is the process responsible for placing a new pod on
 the best node possible, based on several criteria.
 
 !!! Seealso "Kubernetes documentation"
-    Please refer to the
+    See the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/)
-    for more information on scheduling, including all the available policies. On
-    this page we assume you are familiar with concepts like affinity,
+    for more information on scheduling, including all the available policies.
+    We assume you're familiar with concepts like affinity,
     anti-affinity, node selectors, and so on.
 
-You can control how the CloudNativePG cluster's instances should be
-scheduled through the [`affinity`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-AffinityConfiguration)
-section in the definition of the cluster, which supports:
+You can control how to schedule the CloudNativePG cluster's instances
+through the [`affinity`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-AffinityConfiguration)
+section in the definition of the cluster. This section supports:
 
-- pod affinity/anti-affinity
-- node selectors
-- tolerations
+- Pod affinity and anti-affinity
+- Node selectors
+- Tolerations
 
 !!! Info
-    CloudNativePG does not support pod templates for finer control
+    CloudNativePG doesn't support pod templates for finer control
     on the scheduling of workloads. While they were part of the initial concept,
     the development team decided to postpone their introduction in a newer
-    version of the API (most likely v2 of CNPG).
+    version of the API, most likely v2 of CNPG.
 
 ## Pod affinity and anti-affinity
 
-Kubernetes allows you to control which nodes a pod should (*affinity*) or
-should not (*anti-affinity*) be scheduled, based on the actual workloads already
+Kubernetes allows you to control the nodes for a pod to schedule (*affinity*) or
+not to schedule (*anti-affinity*). This schedule is based on the actual workloads already
 running in those nodes.
-This is technically known as **inter-pod affinity/anti-affinity**.
+This control is technically known as *inter-pod affinity/anti-affinity*.
 
-CloudNativePG by default will configure the cluster's instances
+CloudNativePG by default configures the cluster's instances
 preferably on different nodes, resulting in the following `affinity` definition:
 
 ```yaml
@@ -49,7 +49,7 @@ affinity:
         weight: 100
 ```
 
-As a result of the following Cluster spec:
+The definition is a result of the following `Cluster` spec:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -69,44 +69,44 @@ spec:
     size: 1Gi
 ```
 
-Therefore, Kubernetes will *prefer* to schedule a 3-node PostgreSQL cluster over 3
-different nodes - resources permitting.
+Therefore, Kubernetes *prefers* to schedule a 3-node PostgreSQL cluster over 3
+different nodes, resources permitting.
 
-The aforementioned default behavior can be changed by tweaking the above settings.
+You can change the behavior by adjusting the settings.
 
-`podAntiAffinityType` can be set to `required`: resulting in
+You can set `podAntiAffinityType` to `required`, which results in
 `requiredDuringSchedulingIgnoredDuringExecution` being used instead of
-`preferredDuringSchedulingIgnoredDuringExecution`. Please, be aware that such a
-strong requirement might result in pending instances in case resources are not
-available (which is an expected condition when using
+`preferredDuringSchedulingIgnoredDuringExecution`. Be aware that such a
+strong requirement might result in pending instances if resources aren't
+available. This behavior is an expected condition when using
 [Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) <!-- wokeignore:rule=master -->
-for automated horizontal scaling of a Kubernetes cluster).
+for automated horizontal scaling of a Kubernetes cluster.
 
 !!! Seealso "Inter-pod affinity and anti-affinity"
-    More information on this topic is in the
+    More information is in the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
 
-Another possible value for `topologyKey` in a cloud environment can be
-`topology.kubernetes.io/zone`, to be sure pods will be spread across
-availability zones and not just nodes.  Please refer to
-["Well-Known Labels, Annotations and Taints"](https://kubernetes.io/docs/reference/labels-annotations-taints/)
+Another possible value for `topologyKey` in a cloud environment is
+`topology.kubernetes.io/zone`. This value helps to ensure pods are spread across
+availability zones and not just nodes. See
+[Well-Known Labels, Annotations and Taints](https://kubernetes.io/docs/reference/labels-annotations-taints/)
 for more options.
 
 You can disable the operator's generated anti-affinity policies by setting
-`enablePodAntiAffinity` to false.
+`enablePodAntiAffinity` to `false`.
 
-Additionally, in case a more fine-grained control is needed, you can specify a
-list of custom pod affinity or anti-affinity rules via the
+Additionally, if you need finer control, you can specify a
+list of custom pod affinity or anti-affinity rules using the
 `additionalPodAffinity` and `additionalPodAntiAffinity` configuration
-attributes. These rules will be added to the ones generated by the operator,
+attributes. These rules are added to the ones generated by the operator,
 if enabled, or passed transparently otherwise.
 
 !!! Note
     You have to pass to `additionalPodAntiAffinity` or `additionalPodAffinity`
-    the whole content of `podAntiAffinity` or `podAffinity` that is expected by the
-    Pod spec (please look at the following YAML as an example of having only one
+    the whole content of `podAntiAffinity` or `podAffinity` that's expected by the
+    `Pod` spec. The following YAML is an example of having only one
     instance of PostgreSQL running on every worker node, regardless of which
-    PostgreSQL cluster they belong to).
+    PostgreSQL cluster they belong to.
 
 ```yaml
     additionalPodAntiAffinity:
@@ -121,27 +121,26 @@ if enabled, or passed transparently otherwise.
 
 ## Node selection through `nodeSelector`
 
-Kubernetes allows `nodeSelector` to provide a list of labels (defined as
-key-value pairs) to select the nodes on which a pod can run. Specifically,
-the node must have each indicated key-value pair as labels for the
-pod to be scheduled and run.
+Kubernetes allows `nodeSelector` to provide a list of labels, defined as
+key-value pairs, to select the nodes on which a pod can run. Specifically,
+for the pod to be scheduled and run, the node must have each indicated key-value pair as labels.
 
-Similarly, CloudNativePG consents you to define a `nodeSelector` in the
+Similarly, CloudNativePG allows you to define a `nodeSelector` in the
 `affinity` section, so that you can request a PostgreSQL cluster to run only
 on nodes that have those labels.
 
 ## Tolerations
 
-Kubernetes allows you to specify (through `taints`) whether a node should repel
+Kubernetes allows you to specify (through `taints`) for a node to repel
 all pods not explicitly tolerating (through `tolerations`) their `taints`.
 
 So, by setting a proper set of `tolerations` for a workload matching a specific
-node's `taints`, Kubernetes scheduler will now take into consideration the
+node's `taints`, Kubernetes scheduler takes into consideration the
 tainted node, while deciding on which node to schedule the workload.
-Tolerations can be configured for all the pods of a Cluster through the
-`.spec.affinity.tolerations` section, which accepts the usual Kubernetes syntax
+Tolerations can be configured for all the pods of a cluster in the
+`.spec.affinity.tolerations` section. This section accepts the usual Kubernetes syntax
 for tolerations.
 
 !!! Seealso "Taints and Tolerations"
-    More information on taints and tolerations can be found in the
+    For more information on taints and tolerations, see the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
