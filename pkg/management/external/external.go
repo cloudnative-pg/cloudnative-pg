@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package external contains the functions needed to manage servers which are external to this
-// PostgreSQL cluster
 package external
 
 import (
 	"context"
+	"maps"
 
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,17 +31,15 @@ import (
 // needed in a custom passfile.
 // Returns a connection string or any error encountered
 func ConfigureConnectionToServer(
-	ctx context.Context, client ctrl.Client,
-	namespace string, server *apiv1.ExternalCluster,
+	ctx context.Context,
+	client ctrl.Client,
+	namespace string,
+	server *apiv1.ExternalCluster,
 ) (string, error) {
-	connectionParameters := make(map[string]string, len(server.ConnectionParameters))
-
-	for key, value := range server.ConnectionParameters {
-		connectionParameters[key] = value
-	}
+	connectionParameters := maps.Clone(server.ConnectionParameters)
 
 	if server.SSLCert != nil {
-		name, err := DumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLCert)
+		name, err := dumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLCert)
 		if err != nil {
 			return "", err
 		}
@@ -51,7 +48,7 @@ func ConfigureConnectionToServer(
 	}
 
 	if server.SSLKey != nil {
-		name, err := DumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLKey)
+		name, err := dumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLKey)
 		if err != nil {
 			return "", err
 		}
@@ -60,7 +57,7 @@ func ConfigureConnectionToServer(
 	}
 
 	if server.SSLRootCert != nil {
-		name, err := DumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLRootCert)
+		name, err := dumpSecretKeyRefToFile(ctx, client, namespace, server.Name, server.SSLRootCert)
 		if err != nil {
 			return "", err
 		}
@@ -69,12 +66,12 @@ func ConfigureConnectionToServer(
 	}
 
 	if server.Password != nil {
-		password, err := ReadSecretKeyRef(ctx, client, namespace, server.Password)
+		password, err := readSecretKeyRef(ctx, client, namespace, server.Password)
 		if err != nil {
 			return "", err
 		}
 
-		pgpassfile, err := CreatePgPassFile(server.Name, password)
+		pgpassfile, err := createPgPassFile(server.Name, connectionParameters, password)
 		if err != nil {
 			return "", err
 		}

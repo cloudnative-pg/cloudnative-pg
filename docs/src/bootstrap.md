@@ -64,12 +64,24 @@ storage that the CloudNativePG operator provides, please refer to the
 
 ## The `externalClusters` section
 
-The `externalClusters` section allows you to define one or more PostgreSQL
-clusters that are somehow related to the current one. While in the future
-this section will enable more complex scenarios, it is currently intended
-to define a cross-region PostgreSQL cluster based on physical replication,
-and spanning over different Kubernetes clusters or even traditional VM/bare-metal
-environments.
+The `externalClusters` section provides a mechanism for specifying one or more
+PostgreSQL clusters associated with the current configuration. Its primary use
+cases include:
+
+1. **Importing Databases:** Specify an external source to be utilized during
+  the [importation of databases](database_import.md) via logical backup and
+  restore, as part of the `initdb` bootstrap method.
+2. **Cross-Region Replication:** Define a cross-region PostgreSQL cluster
+  employing physical replication, capable of extending across distinct Kubernetes
+  clusters or traditional VM/bare-metal environments.
+3. **Recovery from Physical Base Backup:** Recover, fully or at a
+  given Point-In-Time, a PostgreSQL cluster by referencing a physical base
+  backup.
+
+!!! Info
+    Ongoing development will extend the functionality of `externalClusters` to
+    accommodate additional use cases, such as logical replication and foreign
+    servers in future releases.
 
 As far as bootstrapping is concerned, `externalClusters` can be used
 to define the source PostgreSQL cluster for either the `pg_basebackup`
@@ -102,6 +114,17 @@ through the PostgreSQL's `restore_command`, or any of the two.
 !!! Seealso "API reference"
     Please refer to the ["API reference for the `externalClusters` section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ExternalCluster)
     for more information.
+
+### Password files
+
+Whenever a password is supplied within an `externalClusters` entry,
+CloudNativePG autonomously manages a [PostgreSQL password file](https://www.postgresql.org/docs/current/libpq-pgpass.html)
+for it, residing at `/controller/external/NAME/pgpass` in each instance.
+
+This approach empowers CloudNativePG to securely establish connections with an
+external server without exposing any passwords in the connection string.
+Instead, the connection safely references the aforementioned file through the
+`passfile` connection parameter.
 
 ## Bootstrap an empty cluster (`initdb`)
 
