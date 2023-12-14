@@ -2383,11 +2383,13 @@ func (secretResourceVersion *SecretsResourceVersion) SetExternalClusterSecretVer
 	if secretResourceVersion.ExternalClusterSecretVersions == nil {
 		secretResourceVersion.ExternalClusterSecretVersions = make(map[string]string)
 	}
+
 	if version == nil {
 		delete(secretResourceVersion.ExternalClusterSecretVersions, secretName)
-	} else {
-		secretResourceVersion.ExternalClusterSecretVersions[secretName] = *version
+		return
 	}
+
+	secretResourceVersion.ExternalClusterSecretVersions[secretName] = *version
 }
 
 // GetImageName get the name of the image that should be used

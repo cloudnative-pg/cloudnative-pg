@@ -593,13 +593,12 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 		}
 	}
 
-	externalClusterSecrets := cluster.GetExternalClusterSecrets()
-	for secretName := range externalClusterSecrets {
-		version, err = r.getSecretResourceVersion(ctx, cluster, secretName)
+	for secretName := range cluster.GetExternalClusterSecrets() {
+		externalSecretVersion, err := r.getSecretResourceVersion(ctx, cluster, secretName)
 		if err != nil {
 			return err
 		}
-		versions.SetExternalClusterSecretVersion(secretName, &version)
+		versions.SetExternalClusterSecretVersion(secretName, &externalSecretVersion)
 	}
 
 	certificates := cluster.Status.Certificates
