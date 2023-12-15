@@ -232,6 +232,11 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 			continue
 		}
 
+		// If the candidate has not established a connection to the current primary, skip it
+		if !candidate.IsWalReceiverActive {
+			continue
+		}
+
 		// Set the current candidate as targetPrimary
 		contextLogger.Info("Current primary is running on unschedulable node, triggering a switchover",
 			"currentPrimary", primaryPod.Pod.Name, "currentPrimaryNode", primaryPod.Node,
