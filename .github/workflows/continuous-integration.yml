@@ -642,8 +642,6 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          # Disable setup-go caching. Cache is better handled by the golangci-lint action
-          cache: false
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
 
