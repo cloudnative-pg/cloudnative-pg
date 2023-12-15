@@ -18,6 +18,7 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +87,11 @@ func GetCandidateStorageSourceForReplica(
 		return nil
 	}
 
-	if result := getCandidateSourceFromBackupList(ctx, backupList); result != nil {
+	if result := getCandidateSourceFromBackupList(
+		ctx,
+		cluster.ObjectMeta.CreationTimestamp.Time,
+		backupList,
+	); result != nil {
 		return result
 	}
 
@@ -104,20 +109,31 @@ func GetCandidateStorageSourceForReplica(
 
 // getCandidateSourceFromBackupList gets a candidate storage source
 // given a backup list
-func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.BackupList) *StorageSource {
+func getCandidateSourceFromBackupList(
+	ctx context.Context,
+	clusterCreationTime time.Time,
+	backupList apiv1.BackupList,
+) *StorageSource {
 	contextLogger := log.FromContext(ctx)
 
 	backupList.SortByReverseCreationTime()
 	for idx := range backupList.Items {
 		backup := &backupList.Items[idx]
+		contextLogger := contextLogger.WithValues()
+
 		if !backup.IsCompletedVolumeSnapshot() {
-			contextLogger.Trace("skipping backup, not a valid storage source candidate",
-				"backupName", backup.Name)
+			contextLogger.Trace("skipping backup, not a valid storage source candidate")
 			continue
 		}
 
-		contextLogger.Debug("found a backup that is a valid storage source candidate",
-			"backupName", backup.Name)
+		if backup.ObjectMeta.CreationTimestamp.Time.Before(clusterCreationTime) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate " +
+					"because if was created before the Cluster object")
+			continue
+		}
+
+		contextLogger.Debug("found a backup that is a valid storage source candidate")
 
 		return getCandidateSourceFromBackup(backup)
 	}
