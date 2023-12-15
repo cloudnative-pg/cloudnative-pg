@@ -18,10 +18,10 @@ package persistentvolumeclaim
 
 import (
 	"context"
-	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -89,7 +89,7 @@ func GetCandidateStorageSourceForReplica(
 
 	if result := getCandidateSourceFromBackupList(
 		ctx,
-		cluster.ObjectMeta.CreationTimestamp.Time,
+		cluster.ObjectMeta.CreationTimestamp,
 		backupList,
 	); result != nil {
 		return result
@@ -111,7 +111,7 @@ func GetCandidateStorageSourceForReplica(
 // given a backup list
 func getCandidateSourceFromBackupList(
 	ctx context.Context,
-	clusterCreationTime time.Time,
+	clusterCreationTime metav1.Time,
 	backupList apiv1.BackupList,
 ) *StorageSource {
 	contextLogger := log.FromContext(ctx)
@@ -126,7 +126,7 @@ func getCandidateSourceFromBackupList(
 			continue
 		}
 
-		if backup.ObjectMeta.CreationTimestamp.Time.Before(clusterCreationTime) {
+		if backup.ObjectMeta.CreationTimestamp.Before(&clusterCreationTime) {
 			contextLogger.Info(
 				"skipping backup as a potential recovery storage source candidate " +
 					"because if was created before the Cluster object")

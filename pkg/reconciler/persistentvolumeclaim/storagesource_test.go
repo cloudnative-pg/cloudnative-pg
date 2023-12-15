@@ -287,7 +287,7 @@ var _ = Describe("candidate backups", func() {
 		}
 		backupList.SortByReverseCreationTime()
 
-		source := getCandidateSourceFromBackupList(ctx, time.Now().Add(-1*time.Hour), backupList)
+		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(-1*time.Hour)), backupList)
 		Expect(source).ToNot(BeNil())
 		Expect(source.DataSource.Name).To(Equal("completed-backup"))
 	})
@@ -303,7 +303,7 @@ var _ = Describe("candidate backups", func() {
 		}
 		backupList.SortByReverseCreationTime()
 
-		source := getCandidateSourceFromBackupList(ctx, time.Now().Add(1*time.Hour), backupList)
+		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(1*time.Hour)), backupList)
 		Expect(source).To(BeNil())
 	})
 })
