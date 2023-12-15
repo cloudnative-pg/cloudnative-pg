@@ -27,9 +27,10 @@ ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-image)}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
-DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
-DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
-DOCKER_PASSWORD=${DOCKER_PASSWORD:-${REGISTRY_PASSWORD:-}}
+# variable need export otherwise be invisible in e2e test case
+export DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
+export DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
+export DOCKER_PASSWORD=${DOCKER_PASSWORD:-${REGISTRY_PASSWORD:-}}
 
 notinpath () {
     case "$PATH" in
