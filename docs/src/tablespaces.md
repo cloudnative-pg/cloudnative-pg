@@ -302,7 +302,7 @@ Then it sequentially iterates through the list.
 
 Temporary tablespaces also work like regular tablespaces with regard to backups.
 
-CloudNativePG provides the `.spec.tablespaces[*].name.temporary` option to
+CloudNativePG provides the `.spec.tablespaces[*].temporary` option to
 determine whether to add a tablespace to the `temp_tablespaces`
 PostgreSQL parameter and thus become eligible to store temporary data that
 doesn't have an explicit tablespace assignment.
