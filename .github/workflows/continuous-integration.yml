@@ -757,7 +757,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download the bundle
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: bundle
 
