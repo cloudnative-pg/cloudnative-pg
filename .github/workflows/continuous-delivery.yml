@@ -659,7 +659,7 @@ jobs:
         if: (always() && !cancelled())
         uses: actions/upload-artifact@v4
         with:
-          name: testartifacts-local
+          name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
           retention-days: 7
       -
