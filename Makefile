@@ -166,7 +166,9 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	   namespace: operators\n\
 	spec:\n\
 	   sourceType: grpc\n\
-	   image: ${IMAGE_NAME}:catalog-${VERSION}" | envsubst > cloudnative-pg-catalog.yaml ;\
+	   image: ${IMAGE_NAME}:catalog-${VERSION}\n\
+	   secrets:\n\
+       - postgresql-operator-pull-secret" | envsubst > cloud-native-postgresql-catalog.yaml ;\
 
 ##@ Deployment
 install: manifests kustomize ## Install CRDs into a cluster.
