@@ -381,6 +381,7 @@ TopologyKey
 TopologySpreadConstraint
 TopologySpreadConstraints
 TypedLocalObjectReference
+UI
 UID
 UTF
 Uncomment
@@ -1170,3 +1171,4 @@ www
 xact
 xlog
 yaml
+yml
