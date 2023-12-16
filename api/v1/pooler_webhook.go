@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -89,13 +91,20 @@ func (r *Pooler) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &Pooler{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Pooler) ValidateCreate() (admission.Warnings, error) {
-	var allErrs field.ErrorList
+func (r *Pooler) ValidateCreate() (warns admission.Warnings, err error) {
 	poolerLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 
-	allErrs = r.Validate()
+	if !r.IsAutomatedIntegration() {
+		poolerLog.Info("Pooler not automatically configured, manual configuration required",
+			"name", r.Name, "namespace", r.Namespace, "cluster", r.Spec.Cluster.Name)
+		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
+			"Manually configure it as described in the docs.", r.Name, r.Spec.Cluster.Name, r.Namespace))
+	}
+
+	allErrs := r.Validate()
+
 	if len(allErrs) == 0 {
-		return nil, nil
+		return warns, nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -104,16 +113,24 @@ func (r *Pooler) ValidateCreate() (admission.Warnings, error) {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Pooler) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
-	var allErrs field.ErrorList
+func (r *Pooler) ValidateUpdate(old runtime.Object) (warns admission.Warnings, err error) {
 	poolerLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 
-	allErrs = r.Validate()
+	oldPooler := old.(*Pooler)
+
+	if oldPooler.IsAutomatedIntegration() && !r.IsAutomatedIntegration() {
+		poolerLog.Info("Pooler not automatically configured, manual configuration required",
+			"name", r.Name, "namespace", r.Namespace, "cluster", r.Spec.Cluster.Name)
+		warns = append(warns, fmt.Sprintf("The operator won't handle the Pooler %q integration with the Cluster %q (%q). "+
+			"Manually configure it as described in the docs.", r.Name, r.Spec.Cluster.Name, r.Namespace))
+	}
+
+	allErrs := r.Validate()
 	if len(allErrs) == 0 {
 		return nil, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return warns, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		r.Name, allErrs)
 }
@@ -146,7 +163,9 @@ func (r *Pooler) validatePgBouncer() field.ErrorList {
 				"", "must specify an existing auth query secret when providing an auth query secret"))
 	}
 
-	result = append(result, r.validatePgbouncerGenericParameters()...)
+	if r.Spec.PgBouncer != nil && len(r.Spec.PgBouncer.Parameters) > 0 {
+		result = append(result, r.validatePgbouncerGenericParameters()...)
+	}
 
 	return result
 }
