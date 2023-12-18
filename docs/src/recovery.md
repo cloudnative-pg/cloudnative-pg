@@ -74,7 +74,7 @@ spec:
   
   superuserSecret:
     name: superuser-secret
-
+    
   bootstrap:
     recovery:
       source: clusterBackup
@@ -129,7 +129,7 @@ metadata:
   name: cluster-restore
 spec:
   [...]
-    
+
   bootstrap:
     recovery:
       volumeSnapshots:
