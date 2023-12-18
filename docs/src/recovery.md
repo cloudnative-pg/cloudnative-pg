@@ -129,8 +129,8 @@ metadata:
   name: cluster-restore
 spec:
   [...]
-
-bootstrap:
+    
+  bootstrap:
     recovery:
       volumeSnapshots:
         storage:
@@ -150,7 +150,7 @@ metadata:
 spec:
   [...]
 
-bootstrap:
+  bootstrap:
     recovery:
       volumeSnapshots:
         storage:
