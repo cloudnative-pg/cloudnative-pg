@@ -74,7 +74,7 @@ spec:
   
   superuserSecret:
     name: superuser-secret
-    
+
   bootstrap:
     recovery:
       source: clusterBackup
