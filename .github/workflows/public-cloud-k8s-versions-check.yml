@@ -98,7 +98,7 @@ jobs:
           for baseversion in $(seq $MINIMAL_K8S 0.01 99); do
             URL="https://registry.hub.docker.com/v2/repositories/kindest/node/tags?name=${baseversion}&ordering=last_updated"
             v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | sort -Vr | head -n1)
-            if [[ -z "${v}" ]]; then
+            if [[ -z "${v}" ]] || [[ "${v}" =~ "alpha" ]]; then
                break
             fi
             echo "${v}"
