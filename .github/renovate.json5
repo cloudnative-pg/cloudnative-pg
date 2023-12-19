@@ -68,6 +68,7 @@
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
+      "allowedVersions": "!/alpha/",
       "depNameTemplate": "kindest/node",
     }, {
       // We want a PR to bump spellcheck version in the Makefile
