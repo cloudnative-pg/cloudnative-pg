@@ -298,8 +298,23 @@ var _ = Describe("candidate backups", func() {
 		}
 		backupList.SortByReverseCreationTime()
 
-		source := getCandidateSourceFromBackupList(ctx, backupList)
+		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(-1*time.Hour)), backupList)
 		Expect(source).ToNot(BeNil())
 		Expect(source.DataSource.Name).To(Equal("completed-backup"))
+	})
+
+	It("will refuse to use automatically use snapshots if they are older than the Cluster", func(ctx context.Context) {
+		backupList := apiv1.BackupList{
+			Items: []apiv1.Backup{
+				objectStoreBackup,
+				nonCompletedBackup,
+				oldCompletedBackup,
+				completedBackup,
+			},
+		}
+		backupList.SortByReverseCreationTime()
+
+		source := getCandidateSourceFromBackupList(ctx, metav1.NewTime(time.Now().Add(1*time.Hour)), backupList)
+		Expect(source).To(BeNil())
 	})
 })
