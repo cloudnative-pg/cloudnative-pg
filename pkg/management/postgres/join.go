@@ -79,9 +79,10 @@ func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 			"imageName", cluster.GetImageName(),
 			"err", err)
 	} else if pgVersion >= 120000 {
-		// We explicitly set a high-enough wal_sender_timeout for join-related pg_basebackup executions.
-		// A short timeout could not be enough in case the instance is slow to send data, like when the I/O is overloaded.
-		primaryConnInfo += " options='-c wal_sender_timeout=300s'"
+		// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.
+		// A short timeout could not be enough in case the instance is slow to send data,
+		// like when the I/O is overloaded.
+		primaryConnInfo += " options='-c wal_sender_timeout=0s'"
 	}
 
 	coredumpFilter := cluster.GetCoredumpFilter()
