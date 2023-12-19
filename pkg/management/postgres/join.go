@@ -75,7 +75,7 @@ func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 	pgVersion, err := cluster.GetPostgresqlVersion()
 	if err != nil {
 		log.Warning(
-			"Error while parsing PostgreSQL server version, defaulting to PostgreSQL 11",
+			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
 			"imageName", cluster.GetImageName(),
 			"err", err)
 	} else if pgVersion >= 120000 {
