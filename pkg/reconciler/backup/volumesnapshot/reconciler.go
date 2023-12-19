@@ -150,8 +150,6 @@ func (se *Reconciler) newExecutor(online bool) executor {
 }
 
 // Reconcile the volume snapshot of the given cluster instance
-// TODO: remove the nolint, make two implementations: cold and hot that implement the same execute interface
-// nolint: gocognit
 func (se *Reconciler) Reconcile(
 	ctx context.Context,
 	cluster *apiv1.Cluster,

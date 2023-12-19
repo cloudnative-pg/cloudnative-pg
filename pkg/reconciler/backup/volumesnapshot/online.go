@@ -29,7 +29,7 @@ import (
 )
 
 type onlineExecutor struct {
-	backupClient *webserver.BackupClient
+	backupClient webserver.BackupClient
 }
 
 func newOnlineExecutor() *onlineExecutor {
@@ -124,11 +124,6 @@ func (o *onlineExecutor) prepare(
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
-
-	if body.Error != nil {
-		return nil, fmt.Errorf("starting of the current backup failed, with code: '%s' and message: '%s'",
-			body.Error.Code, body.Error.Message)
 	}
 
 	switch status.Phase {
