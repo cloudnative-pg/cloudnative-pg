@@ -134,8 +134,8 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
       -
-        name: Docker meta UBI
-        id: docker-meta-ubi
+        name: Docker meta UBI8
+        id: docker-meta-ubi8
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGES }}
@@ -176,16 +176,16 @@ jobs:
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
       -
-        name: Build and push UBI
+        name: Build and push UBI8
         uses: docker/build-push-action@v5
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
-          file: Dockerfile-ubi
+          file: Dockerfile-ubi8
           push: true
           build-args: |
             VERSION=${{ steps.build-meta.outputs.version }}
-          tags: ${{ steps.docker-meta-ubi.outputs.tags }}
+          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -222,7 +222,7 @@ jobs:
           version="${tag#v}"
           LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
           echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi8" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${version}" >> $GITHUB_ENV
 
       - name: Create bundle
