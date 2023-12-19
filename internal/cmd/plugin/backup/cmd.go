@@ -29,6 +29,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // NewCmd creates the new "backup" subcommand
@@ -106,6 +107,7 @@ func createBackup(ctx context.Context, backupName, clusterName string, backupTar
 			Target: backupTarget,
 		},
 	}
+	utils.LabelClusterName(&backup.ObjectMeta, clusterName)
 
 	err := plugin.Client.Create(ctx, &backup)
 	if err == nil {
