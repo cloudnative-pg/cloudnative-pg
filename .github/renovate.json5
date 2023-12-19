@@ -68,7 +68,6 @@
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
-      "allowedVersions": "!/alpha/",
       "depNameTemplate": "kindest/node",
     }, {
       // We want a PR to bump spellcheck version in the Makefile
@@ -130,6 +129,12 @@
     }
   ],
   "packageRules": [
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "allowedVersions": "!/alpha/",
+    },
     {
 // We need to ignore k8s.io/client-go older versions as they switched to
 // semantic version and old tags are still available in the repo.
