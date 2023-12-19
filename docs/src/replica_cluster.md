@@ -1,6 +1,6 @@
 # Replica clusters
 
-A replica cluster is an independent CloudNativePG `Cluster` resource. It's
+A replica cluster is an independent CloudNativePG `Cluster` resource. Its
 main characteristic is that it's in a replica from another Postgres instance,
 ideally also managed by CloudNativePG. Normally, a replica cluster is in another
 Kubernetes cluster in another region. Replica clusters can be cascading, too,
@@ -34,12 +34,12 @@ for information on how to clone a PostgreSQL server using either
 
 Once the replica cluster's base backup is available, you need to define how
 changes are replicated from the origin, using PostgreSQL continuous recovery.
-There are two options:
+Two options are available:
 
 - Use streaming replication between the replica cluster and the source.
   This requires some administrative and security-related
   work to make sure that the network connection between the
-  two clusters are correctly setup.
+  two clusters is correctly set up.
 - Use the WAL archive (on an object store) to fetch the WAL files that are
   regularly shipped from the source to the object store and pulled by
   `barman-cloud-wal-restore` in the replica cluster.
@@ -88,8 +88,8 @@ file and define the following parts accordingly:
   streaming using the `pg_basebackup` section or from a volume snapshot
   or an object store using the `recovery` section.
 - The continuous recovery part (`.spec.replica`) in the replica cluster. All
-  you need to do is enable the replica mode through option `.spec.replica.enabled`
-  and set the `externalClusters` name in the option `.spec.replica.source`.
+  you need to do is enable the replica mode through the `.spec.replica.enabled` option
+  and set the `externalClusters` name in the `.spec.replica.source` option.
 
 #### Example using pg_basebackup
 
@@ -159,8 +159,8 @@ Note the `bootstrap` and `replica` sections pointing to the source cluster.
 
 In the `externalClusters` section, take care to use the right namespace in the
 `endpointURL` and the `connectionParameters.host`.
-Also ensure that the necessary secrets were copied if necessary, and that
-a backup of the source cluster was created already.
+Also ensure that the necessary secrets were copied and that
+a backup of the source cluster was created.
 
 ```yaml
   externalClusters:
