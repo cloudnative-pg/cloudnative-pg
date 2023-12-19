@@ -203,6 +203,7 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 			OnlineConfiguration: options.getOnlineConfiguration(),
 		},
 	}
+	utils.LabelClusterName(&backup.ObjectMeta, options.clusterName)
 
 	err := plugin.Client.Create(ctx, &backup)
 	if err == nil {
