@@ -69,12 +69,6 @@ func (o *onlineExecutor) finalize(
 		return nil, nil
 	}
 
-	if body.Error != nil {
-		return nil, fmt.Errorf(
-			"while processing the finalizing request, phase: %s, "+
-				"error message: %s, error code: %s", body.Data.Phase, body.Error.Message, body.Error.Code)
-	}
-
 	switch status.Phase {
 	case webserver.Started:
 		if err := o.backupClient.Stop(ctx,
