@@ -72,13 +72,25 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
 
+	pgVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		log.Warning(
+			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
+			"imageName", cluster.GetImageName(),
+			"err", err)
+	} else if pgVersion >= 120000 {
+		// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.
+		// A short timeout could not be enough in case the instance is slow to send data,
+		// like when the I/O is overloaded.
+		primaryConnInfo += " options='-c wal_sender_timeout=0s'"
+	}
+
 	coredumpFilter := cluster.GetCoredumpFilter()
 	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
 		return err
 	}
 
-	err := ClonePgData(primaryConnInfo, info.PgData, info.PgWal)
-	if err != nil {
+	if err = ClonePgData(primaryConnInfo, info.PgData, info.PgWal); err != nil {
 		return err
 	}
 
