@@ -46,14 +46,9 @@ func (re RoleError) Error() string {
 //
 // For PostgreSQL codes see https://www.postgresql.org/docs/current/errcodes-appendix.html
 func getRoleError(err error, roleName string, action roleAction) (bool, error) {
-	errPGX, ok := err.(*pgconn.PgError)
-	if !ok {
-		// before giving up, let's see if there is an un-wrapped error
-		coreErr := errors.Unwrap(err)
-		errPGX, ok = coreErr.(*pgconn.PgError)
-		if !ok {
-			return false, fmt.Errorf("while trying to %s: %w", action, err)
-		}
+	var errPGX *pgconn.PgError
+	if !errors.As(err, &errPGX) {
+		return false, fmt.Errorf("while trying to %s: %w", action, err)
 	}
 
 	knownCauses := map[string]string{
