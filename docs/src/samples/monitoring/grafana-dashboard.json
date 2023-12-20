@@ -122,7 +122,7 @@
         "content": "",
         "mode": "markdown"
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "title": "Overview",
       "type": "text"
     },
@@ -147,7 +147,7 @@
         "content": "",
         "mode": "markdown"
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "title": "Storage",
       "type": "text"
     },
@@ -172,7 +172,7 @@
         "content": "",
         "mode": "markdown"
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "title": "Backups",
       "type": "text"
     },
@@ -221,9 +221,10 @@
           "values": false
         },
         "text": {},
-        "textMode": "value"
+        "textMode": "value",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -289,9 +290,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -355,6 +357,8 @@
       "interval": "1m",
       "links": [],
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
@@ -366,7 +370,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -429,6 +433,8 @@
       "interval": "1m",
       "links": [],
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
@@ -440,7 +446,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -515,9 +521,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -589,9 +596,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -662,9 +670,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value"
+        "textMode": "value",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -788,9 +797,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -849,6 +859,8 @@
       },
       "id": 356,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -860,7 +872,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -910,6 +922,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
+      "description": "Computes the time since the last known WAL archival in the primary.\nWe ensure to ignore the metric in the replicas by using (1 - cnpg_pg_replication_in_recovery ) as a multiplicative factor. It will be 0 for replicas, 1 for the primary.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -929,13 +942,13 @@
             },
             {
               "options": {
-                "from": 0,
+                "from": -1e+22,
                 "result": {
                   "color": "text",
                   "index": 1,
                   "text": "No data"
                 },
-                "to": 1e+22
+                "to": 0
               },
               "type": "range"
             }
@@ -972,9 +985,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -983,7 +997,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "min((1 - cnpg_pg_replication_in_recovery{namespace=~\"$namespace\",pod=~\"$instances\"} + cnpg_pg_replication_is_wal_receiver_up{namespace=~\"$namespace\",pod=~\"$instances\"}) * (time() - timestamp(cnpg_pg_stat_archiver_seconds_since_last_archival{namespace=~\"$namespace\",pod=~\"$instances\"}) -\ncnpg_pg_stat_archiver_seconds_since_last_archival{namespace=~\"$namespace\",pod=~\"$instances\"}))",
+          "expr": "max((1 - cnpg_pg_replication_in_recovery{namespace=~\"$namespace\",pod=~\"$instances\"}) * (time() - timestamp(cnpg_pg_stat_archiver_seconds_since_last_archival{namespace=~\"$namespace\",pod=~\"$instances\"}) +\ncnpg_pg_stat_archiver_seconds_since_last_archival{namespace=~\"$namespace\",pod=~\"$instances\"}))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "__auto",
@@ -1039,9 +1053,10 @@
           "values": false
         },
         "text": {},
-        "textMode": "value"
+        "textMode": "value",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "repeatDirection": "v",
       "targets": [
         {
@@ -1121,9 +1136,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -1195,9 +1211,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -1268,9 +1285,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -1342,9 +1360,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -1428,9 +1447,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -1894,8 +1914,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-red",
-                    "value": null
+                    "color": "dark-red"
                   },
                   {
                     "color": "green",
@@ -1981,8 +2000,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2052,8 +2070,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2122,8 +2139,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "blue",
-                    "value": null
+                    "color": "blue"
                   }
                 ]
               }
@@ -2222,8 +2238,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -2292,8 +2307,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "#EAB839",
@@ -2365,8 +2379,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "#EAB839",
@@ -2440,8 +2453,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-blue",
-                    "value": null
+                    "color": "dark-blue"
                   }
                 ]
               },
@@ -2510,8 +2522,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-blue",
-                    "value": null
+                    "color": "dark-blue"
                   }
                 ]
               },
@@ -2966,8 +2977,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-purple",
-                    "value": null
+                    "color": "dark-purple"
                   }
                 ]
               }
@@ -3031,8 +3041,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-purple",
-                    "value": null
+                    "color": "dark-purple"
                   }
                 ]
               },
@@ -3097,8 +3106,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-purple",
-                    "value": null
+                    "color": "dark-purple"
                   }
                 ]
               },
@@ -3163,8 +3171,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-purple",
-                    "value": null
+                    "color": "dark-purple"
                   }
                 ]
               },
@@ -3228,8 +3235,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-purple",
-                    "value": null
+                    "color": "dark-purple"
                   }
                 ]
               },
@@ -3293,8 +3299,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-purple",
-                    "value": null
+                    "color": "dark-purple"
                   }
                 ]
               },
@@ -3358,8 +3363,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-purple",
-                    "value": null
+                    "color": "dark-purple"
                   }
                 ]
               },
@@ -3431,8 +3435,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-purple",
-                    "value": null
+                    "color": "dark-purple"
                   }
                 ]
               }
@@ -4349,6 +4352,8 @@
       },
       "id": 424,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -4361,7 +4366,7 @@
         "showThresholdMarkers": true,
         "text": {}
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -4437,6 +4442,8 @@
       },
       "id": 426,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -4448,7 +4455,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "10.1.5",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
@@ -4498,8 +4505,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "#EAB839",
@@ -4601,8 +4607,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4752,8 +4757,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4861,8 +4865,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -4954,8 +4957,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -6323,7 +6325,6 @@
   "refresh": "30s",
   "revision": 1,
   "schemaVersion": 38,
-  "style": "dark",
   "tags": [
     "cloudnativepg"
   ],
@@ -6350,9 +6351,10 @@
       },
       {
         "current": {
+          "isNone": true,
           "selected": false,
-          "text": "default",
-          "value": "default"
+          "text": "None",
+          "value": ""
         },
         "datasource": {
           "type": "prometheus",
@@ -6376,9 +6378,10 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": "cluster-with-metrics",
-          "value": "cluster-with-metrics"
+          "isNone": true,
+          "selected": false,
+          "text": "None",
+          "value": ""
         },
         "datasource": {
           "type": "prometheus",
