@@ -15,10 +15,10 @@ planning.
 Supported releases of CloudNativePG include releases that are in the active
 maintenance window and are patched for security and bug fixes.
 
-Subsequent patch releases on a minor release do not contain backward
-incompatible changes.
+Subsequent patch releases on a minor release don't contain changes that are not backward
+compatible.
 
-* [Support Policy](#support-policy)
+* [Support policy](#support-policy)
 * [Naming scheme](#naming-scheme)
 * [Support status of CloudNativePG releases](#support-status-of-cloudnativepg-releases)
 * [What we mean by support](#what-we-mean-by-support)
@@ -27,21 +27,21 @@ incompatible changes.
 
 We produce new builds of CloudNativePG for each commit.
 
-Roughly every two months, we build a minor release and run through several
+Approximately every two months, we build a minor release and run through several
 additional tests as well as release qualification. We release patch versions
 for issues found in minor releases.
 
 The various types of releases represent a different product quality level and
 level of assistance from the CloudNativePG community.
-For details on the support provided by the community, please refer to the
-["What we mean by support" section](#what-we-mean-by-support) below.
+For details on the support provided by the community, see
+[What we mean by support](#what-we-mean-by-support).
 
-| Type              | Support Level                                                                                                         | Quality and Recommended Use                                                                                    |
+| Type              | Support level                                                                                                         | Quality and recommended Uue                                                                                    |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| Development Build | No support                                                                                                            | Dangerous, may not be fully reliable. Useful to experiment with.                                               |
+| Development Build | No support                                                                                                            | Dangerous, might not be fully reliable. Useful to experiment with.                                               |
 | Minor Release     | Support provided until 1 month after the N+2 minor release (ex. 1.15 supported until 1 month after 1.17.0 is released)|
-| Patch             | Same as the corresponding Minor release                                                                               | Users are encouraged to adopt patch releases as soon as they are available for a given release.                |
-| Security Patch    | Same as a Patch, however, it will not contain any additional code other than the security fix from the previous patch | Given the nature of security fixes, users are **strongly** encouraged to adopt security patches after release. |
+| Patch             | Same as the corresponding minor release                                                                               | Users are encouraged to adopt patch releases as soon as they are available for a given release.                |
+| Security Patch    | Same as a patch, however, it doesn't contain any additional code other than the security fix from the previous patch | Given the nature of security fixes, users are **strongly** encouraged to adopt security patches after release. |
 
 You can find available releases on the [releases page](https://github.com/cloudnative-pg/cloudnative-pg/releases).
 
@@ -56,48 +56,48 @@ as follows:
 <major>.<minor>.<patch>
 ```
 
-where `<minor>` is increased for each release, and `<patch>` counts the number of patches for the
+Where `<minor>` is increased for each release, and `<patch>` counts the number of patches for the
 current `<minor>` release. A patch is usually a small change relative to the `<minor>` release.
 
 Git tags for versions are prepended with `v`.
 
 ## Support status of CloudNativePG releases
 
-| Version         | Currently Supported  | Release Date      | End of Life         | Supported Kubernetes Versions | Tested, but not supported | Supported Postgres Versions |
+| Version         | Currently supported  | Release date      | End of life         | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|-------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
 | 1.22.x          | Yes                  | December 21, 2023 | ~ May 21, 2024      | 1.26, 1.27, 1.28              | 1.23, 1.24, 1.25          | 12 - 16                     |
 | 1.21.x          | Yes                  | October 12, 2023  | ~ April 12, 2024    | 1.25, 1.26, 1.27, 1.28        | 1.23, 1.24                | 12 - 16                     |
 | 1.20.x          | Yes                  | April 27, 2023    | January 21, 2024    | 1.24, 1.25, 1.26, 1.27        | 1.23                      | 11 - 16                     |
 | main            | No, development only |                   |                     |                               |                           | 11 - 16                     |
 
-The list of supported Kubernetes versions in the above table depends on what
+The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
 
-At the moment, the CloudNativePG community doesn't support nor test any
+At the moment, the CloudNativePG community doesn't support or test any
 additional Kubernetes distribution, like Red Hat OpenShift. This might change
 in the future and, in that case, that would be reflected in an official policy
 written by the CloudNativePG maintainers.
 
 ### Supported PostgreSQL versions
 
-The list of supported Postgres versions in the above table generally depends on
-what PostgreSQL versions were supported by the Community at the time the minor
+The list of supported Postgres versions in the previous table generally depends on
+what PostgreSQL versions were supported by the community at the time the minor
 version of CloudNativePG was released.
 
-Please refer to the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
+See the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versioning/)
 page for more information about supported versions.
 
 !!! Info
     Starting from November 9, 2023, Postgres 11 is no longer supported.
 
-**We also recommend that you regularly update your PostgreSQL operand images and
-use the latest minor release for the major version you have in use**, as not upgrading
+We also recommend that you regularly update your PostgreSQL operand images and
+use the latest minor release for the major version you have in use, as not upgrading
 is riskier than upgrading. As a result, when opening an issue with an older minor
 version of PostgreSQL, we might not be able to help you.
 
 ## Upcoming releases
 
-| Version         | Release Date          | End of Life               | Supported Kubernetes Versions |
+| Version         | Release date          | End of life               | Supported Kubernetes versions |
 |-----------------|-----------------------|---------------------------|-------------------------------|
 | 1.23.0          | February 22, 2024     | -                         | -                             |
 | 1.24.0          | April 23, 2024        | -                         | -                             |
@@ -106,14 +106,14 @@ version of PostgreSQL, we might not be able to help you.
     Feature freeze happens one week before the release
 
 !!! Important
-    Dates in the future are uncertain and might change. This applies to Kubernetes versions too.
+    Dates in the future are uncertain and might change. This applies to Kubernetes versions, too.
     Updates and changes on the release schedule will be communicated in the
-    ["Release updates"](https://github.com/cloudnative-pg/cloudnative-pg/discussions/categories/release-updates)
+    [Release updates](https://github.com/cloudnative-pg/cloudnative-pg/discussions/categories/release-updates)
     discussion in the main GitHub repository.
 
 ## Old releases
 
-| Version         | Release Date      | End of Life              | Compatible Kubernetes Versions |
+| Version         | Release date      | End of life              | Compatible Kubernetes versions |
 |-----------------|-------------------|--------------------------|--------------------------------|
 | 1.19.x          | February 14, 2023 | November 3, 2023         | 1.23, 1.24, 1.25, 1.26         |
 | 1.18.x          | Nov 10, 2022      | June 12, 2023            | 1.23, 1.24, 1.25, 1.26, 1.27   |
@@ -127,9 +127,9 @@ Our support window is roughly five months for each release branch (latest two
 minor releases, plus an additional month), given that we produce a new final
 release every two months.
 
-In the below diagram, `release-1.16` is an example of a release branch.
+In the following diagram, `release-1.16` is an example of a release branch.
 
-For example, imagining that the latest release is `v1.16.0`, you can expect
+For example, if the latest release is `v1.16.0`, you can expect
 support for both `v1.16.0` and `v1.15.0`.
 
 Only the last patch release of each branch is supported.
@@ -163,7 +163,7 @@ Security and bug fixes
     *"Does this back-port improve `CloudNativePG`, bearing in mind that we really
     value stability for already-released versions?"*
 
-If you are looking for professional support, please refer to the
-["Support" page in the website](https://cloudnative-pg.io/support/).
+If you're looking for professional support, see the
+[Support page in the website](https://cloudnative-pg.io/support/).
 The vendors listed there might provide service level agreements that included
 extended support timeframes.
