@@ -593,8 +593,15 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 		}
 	}
 
-	certificates := cluster.Status.Certificates
+	for _, secretName := range cluster.GetExternalClusterSecrets().ToList() {
+		externalSecretVersion, err := r.getSecretResourceVersion(ctx, cluster, secretName)
+		if err != nil {
+			return err
+		}
+		versions.SetExternalClusterSecretVersion(secretName, &externalSecretVersion)
+	}
 
+	certificates := cluster.Status.Certificates
 	// Reset the content of the unused CASecretVersion field
 	cluster.Status.SecretsResourceVersion.CASecretVersion = ""
 
