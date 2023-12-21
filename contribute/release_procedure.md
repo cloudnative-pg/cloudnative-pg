@@ -142,6 +142,7 @@ request to update the
 [backport](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/workflows/backport.yml)
 and [continuous delivery](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/workflows/continuous-delivery.yml)
 workflows to support the new release branch.
+And also remember to update the [github issue template](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/.github/ISSUE_TEMPLATE/bug.yml).
 
 ## Release steps
 
