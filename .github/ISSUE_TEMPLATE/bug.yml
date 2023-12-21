@@ -1,0 +1,128 @@
+name: Bug Report
+description: File a bug report
+title: "[Bug]: "
+labels: ["triage", "bug"]
+projects: ["cloudnative-pg/cloudnative-pg"]
+assignees:
+  - gbartolini
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report for CloudNativePg!
+  - type: checkboxes
+    id: search
+    attributes:
+      label: Is there an existing issue already for this bug?
+      description: Before you submit a bug, make sure you have searched if a similar one already exists
+      options:
+        - label: I have searched for an existing issue, and could not find anything. I believe this is a new bug.
+          required: true
+  - type: checkboxes
+    id: troubleshooting
+    attributes:
+      label: I have read the troubleshooting guide
+      description: Before you submit a bug, make sure you have read the ["Common issues" section in the Troubleshooting guide](https://cloudnative-pg.io/documentation/current/troubleshooting/#some-common-issues).
+      options:
+        - label: I have read the troubleshooting guide and I think this is a new bug.
+          required: true
+  - type: checkboxes
+    id: supported
+    attributes:
+      label: I am running a supported version of CloudNativePG
+      description: Before you submit a bug, make sure you have read ["Supported releases"](https://cloudnative-pg.io/documentation/current/supported_releases/) and that you are running a supported version of CloudNativePG with the latest patch/security fixes, or you are working on the current trunk (`main` branch)
+      options:
+        - label: I have read the troubleshooting guide and I think this is a new bug.
+          required: true
+  - type: input
+    id: contact
+    attributes:
+      label: Contact Details
+      description: How can we get in touch with you if we need more info?
+      placeholder: ex. email@example.com
+    validations:
+      required: false
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version
+      description: What is the version of CloudNativePG you are running?
+      options:
+        - 1.22.0
+        - 1.21.2
+        - 1.20.5
+        - trunk (main)
+        - older in 1.20.x
+        - older in 1.21.x
+        - older minor (unsupported)
+    validations:
+      required: true
+  - type: dropdown
+    id: k8s_version
+    attributes:
+      label: What version of Kubernetes are you using?
+      options:
+        - 1.28
+        - 1.27
+        - 1.26
+        - 1.25 (unsupported)
+        - 1.24 (unsupported)
+        - other (unsupported)
+    validations:
+      required: true
+  - type: dropdown
+    id: k8s_environment
+    attributes:
+      label: What is your Kubernetes environment?
+      options:
+        - "Self-managed: kind (evaluation)"
+        - "Self-managed: k0s"
+        - "Self-managed: k3s"
+        - "Self-managed: RKE"
+        - "Cloud: Amazon EKS"
+        - "Cloud: Google GKE"
+        - "Cloud: Azure AKS"
+        - "Cloud: Other"
+        - "Other"
+    validations:
+      required: true
+  - type: dropdown
+    id: installation_method
+    attributes:
+      label: How did you install the operator?
+      options:
+        - "YAML manifest"
+        - "Helm"
+        - "OLM"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us, what did you expect to happen?
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+  - type: textarea
+    id: spec
+    attributes:
+      label: Cluster resource
+      description: Please copy and paste the CR of the cluster
+      render: shell
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
+
