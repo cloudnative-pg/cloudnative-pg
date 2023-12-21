@@ -4142,6 +4142,13 @@ managed by the operator</p>
    <p>The resource version of the Barman Endpoint CA if provided</p>
 </td>
 </tr>
+<tr><td><code>externalClusterSecretVersion</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>The resource versions of the external cluster secrets</p>
+</td>
+</tr>
 <tr><td><code>metrics</code><br/>
 <i>map[string]string</i>
 </td>

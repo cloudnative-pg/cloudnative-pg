@@ -43,7 +43,38 @@ var _ = Describe("pgpass file generation", func() {
 		})
 	})
 
-	When("we have multiple connection trings", func() {
+	When("can overwrite if the file is not empty", func() {
+		It("change the password as expected", func() {
+			err := From(
+				NewConnectionInfo(map[string]string{
+					"host":   "pgtest.com",
+					"port":   "5432",
+					"dbname": "postgres",
+					"user":   "postgres",
+				}, "password"),
+			).Write(pgPassFile)
+			Expect(err).ToNot(HaveOccurred())
+			content, err := fileutils.ReadFile(pgPassFile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(Equal(
+				"pgtest.com:5432:*:postgres:password"))
+			err = From(
+				NewConnectionInfo(map[string]string{
+					"host":   "pgtest.com",
+					"port":   "5432",
+					"dbname": "postgres",
+					"user":   "postgres",
+				}, "pwd"),
+			).Write(pgPassFile)
+			Expect(err).ToNot(HaveOccurred())
+			content, err = fileutils.ReadFile(pgPassFile)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(content)).To(Equal(
+				"pgtest.com:5432:*:postgres:pwd"))
+		})
+	})
+
+	When("we have multiple connection strings", func() {
 		It("correctly generates the content", func() {
 			err := From(
 				NewConnectionInfo(map[string]string{
