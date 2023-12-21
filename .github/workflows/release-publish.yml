@@ -206,6 +206,12 @@ jobs:
         with:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
 
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
