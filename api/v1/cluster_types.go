@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -2268,6 +2269,10 @@ type SecretsResourceVersion struct {
 	// +optional
 	BarmanEndpointCA string `json:"barmanEndpointCA,omitempty"`
 
+	// The resource versions of the external cluster secrets
+	// +optional
+	ExternalClusterSecretVersions map[string]string `json:"externalClusterSecretVersion,omitempty"`
+
 	// A map with the versions of all the secrets used to pass metrics.
 	// Map keys are the secret names, map values are the versions
 	// +optional
@@ -2293,6 +2298,23 @@ func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion
 	} else {
 		secretResourceVersion.ManagedRoleSecretVersions[secret] = *version
 	}
+}
+
+// SetExternalClusterSecretVersion Add or update or delete the resource version of the secret used in external clusters
+func (secretResourceVersion *SecretsResourceVersion) SetExternalClusterSecretVersion(
+	secretName string,
+	version *string,
+) {
+	if secretResourceVersion.ExternalClusterSecretVersions == nil {
+		secretResourceVersion.ExternalClusterSecretVersions = make(map[string]string)
+	}
+
+	if version == nil {
+		delete(secretResourceVersion.ExternalClusterSecretVersions, secretName)
+		return
+	}
+
+	secretResourceVersion.ExternalClusterSecretVersions[secretName] = *version
 }
 
 // GetImageName get the name of the image that should be used
@@ -2358,6 +2380,29 @@ func (cluster *Cluster) GetLDAPSecretName() string {
 // ContainsManagedRolesConfiguration returns true iff there are managed roles configured
 func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
 	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
+}
+
+// GetExternalClusterSecrets returns the secrets used by external Clusters
+func (cluster *Cluster) GetExternalClusterSecrets() *stringset.Data {
+	secrets := stringset.New()
+
+	if cluster.Spec.ExternalClusters != nil {
+		for _, externalCluster := range cluster.Spec.ExternalClusters {
+			if externalCluster.Password != nil {
+				secrets.Put(externalCluster.Password.Name)
+			}
+			if externalCluster.SSLKey != nil {
+				secrets.Put(externalCluster.SSLKey.Name)
+			}
+			if externalCluster.SSLCert != nil {
+				secrets.Put(externalCluster.SSLCert.Name)
+			}
+			if externalCluster.SSLRootCert != nil {
+				secrets.Put(externalCluster.SSLRootCert.Name)
+			}
+		}
+	}
+	return secrets
 }
 
 // UsesSecretInManagedRoles checks if the given secret name is used in a managed role
@@ -2865,7 +2910,8 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		}
 	}
 
-	return false
+	// watch the secrets defined in external clusters
+	return cluster.GetExternalClusterSecrets().Has(secret)
 }
 
 // UsesConfigMap checks whether a given secret is used by a Cluster

@@ -644,6 +644,7 @@ executables
 expirations
 extensibility
 externalCluster
+externalClusterSecretVersion
 externalClusters
 externalclusters
 facto

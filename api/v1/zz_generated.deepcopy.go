@@ -2143,6 +2143,13 @@ func (in *SecretsResourceVersion) DeepCopyInto(out *SecretsResourceVersion) {
 			(*out)[key] = val
 		}
 	}
+	if in.ExternalClusterSecretVersions != nil {
+		in, out := &in.ExternalClusterSecretVersions, &out.ExternalClusterSecretVersions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Metrics != nil {
 		in, out := &in.Metrics, &out.Metrics
 		*out = make(map[string]string, len(*in))
