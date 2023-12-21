@@ -158,9 +158,9 @@ Technical support
     or using [GitHub Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions).
 
 Security and bug fixes
-:   We back-port important bug fixes — including security fixes - to all
-    currently supported releases. Before back-porting a patch, we ask ourselves:
-    *"Does this back-port improve `CloudNativePG`, bearing in mind that we really
+:   We backport important bug fixes — including security fixes - to all
+    currently supported releases. Before backporting a patch, we ask ourselves:
+    *"Does this backport improve `CloudNativePG`, bearing in mind that we really
     value stability for already-released versions?"*
 
 If you're looking for professional support, see the
