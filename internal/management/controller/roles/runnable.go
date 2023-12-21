@@ -226,17 +226,18 @@ func (sr *RoleSynchronizer) applyRoleActions(
 
 	irreconcilableRoles := make(map[string][]string)
 	appliedChanges := make(map[string]apiv1.PasswordState)
-	handleRoleError := func(err error, roleName string, action roleAction) {
+	handleRoleError := func(errToEvaluate error, roleName string, action roleAction) {
 		// log unexpected errors, collect expectable PostgreSQL errors
-		if err == nil {
+		if errToEvaluate == nil {
 			return
 		}
-		isExpectable, newErr := getRoleError(err, roleName, action)
-		if isExpectable {
-			irreconcilableRoles[roleName] = append(irreconcilableRoles[roleName], newErr.Error())
-		} else {
-			contextLog.Error(newErr, "while performing "+string(action), "role", roleName)
+		roleError, err := parseRoleError(errToEvaluate, roleName, action)
+		if err != nil {
+			contextLog.Error(err, "while performing "+string(action), "role", roleName)
+			return
 		}
+
+		irreconcilableRoles[roleName] = append(irreconcilableRoles[roleName], roleError.Error())
 	}
 
 	for action, roles := range rolesByAction {
