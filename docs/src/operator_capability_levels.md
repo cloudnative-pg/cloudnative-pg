@@ -443,6 +443,7 @@ across a diverse array of storage devices. Through the transparent
 orchestration of tablespaces, CloudNativePG enhances the performance and
 scalability of PostgreSQL databases, ensuring a streamlined and optimized
 experience for managing large scale data storage in cloud-native environments.
+Support for temporary tablespaces is also included.
 
 ### Liveness and readiness probes
 

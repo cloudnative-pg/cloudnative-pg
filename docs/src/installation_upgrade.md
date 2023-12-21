@@ -259,9 +259,7 @@ PostgreSQL configuration in a database cluster controlled by CloudNativePG are
 allowed only through the Kubernetes API.
 
 At the same time, we are providing an option to enable `ALTER SYSTEM` if you
-need to use it, even temporarily.
-
-If you want to retain the existing behavior, you need to explicitly enable it
+need to use it, even temporarily, from versions 1.22.0, 1.21.2, and 1.20.5,
 by setting `.spec.postgresql.enableAlterSystem` to `true`, as in the following
 excerpt:
 
@@ -272,10 +270,18 @@ excerpt:
 ...
 ```
 
+Clusters in 1.22 will have `enableAlterSystem` set to `false` by default.
+If you want to retain the existing behavior, in 1.22, you need to explicitly
+set `enableAlterSystem` to `true` as shown above.
+
+In versions 1.21.2 and 1.20.5, and later patch releases in the 1.20 and 1.21
+branches, `enableAlterSystem` will be set to `true` by default, keeping with
+the existing behavior. If you don't need to use `ALTER SYSTEM`, we recommend
+that you set `enableAlterSystem` explicitly to `false`.
+
 !!! Important
-    You can execute this operation immediately following your upgrade to
-    version 1.22.0. Alternatively, you have the option to first upgrade to either
-    version 1.21.2 or 1.20.5 and then explicitly set it to true, as demonstrated in
+    You can set the desired value for  `enableAlterSystem` immediately
+    following your upgrade to version 1.22.0, 1.21.2, or 1.20.5, as shown in
     the example above.
 
 ### Upgrading to 1.21 from a previous minor version

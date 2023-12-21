@@ -76,7 +76,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
 * Separate volumes for WAL files and tablespaces
-* Declarative management of Postgres tablespaces
+* Declarative management of Postgres tablespaces, including temporary tablespaces
 * Rolling updates for PostgreSQL minor versions
 * In-place or rolling updates for operator upgrades
 * TLS connections and client certificate authentication
