@@ -362,6 +362,7 @@ Slonik
 SnapshotOwnerReference
 SnapshotType
 Snapshotting
+Snyk
 Stackgres
 StatefulSets
 StorageClass
@@ -372,6 +373,7 @@ SyncReplicaElectionConstraints
 Synopsys
 TCP
 TLS
+TLSv
 TOC
 TODO
 TablespaceMapFile
