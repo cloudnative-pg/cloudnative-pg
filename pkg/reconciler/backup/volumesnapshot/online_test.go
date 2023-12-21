@@ -19,13 +19,17 @@ package volumesnapshot
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -57,7 +61,7 @@ func (f *fakeBackupClient) Stop(_ context.Context, _ string, _ webserver.StopBac
 	return f.injectStopError
 }
 
-var _ = Describe("onlineExecutor", func() {
+var _ = Describe("onlineExecutor prepare", func() {
 	var (
 		ctx     context.Context
 		cluster *apiv1.Cluster
@@ -232,5 +236,111 @@ var _ = Describe("onlineExecutor", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res).ToNot(BeNil())
 		Expect(fakeBackupClient.startCalled).To(BeFalse())
+	})
+})
+
+var _ = Describe("onlineExecutor finalize", func() {
+	var (
+		ctx        context.Context
+		executor   *onlineExecutor
+		backup     *apiv1.Backup
+		targetPod  *corev1.Pod
+		fakeClient *fakeBackupClient
+	)
+
+	BeforeEach(func() {
+		ctx = context.TODO()
+		executor = &onlineExecutor{}
+		backup = &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "online-backup",
+				Namespace: "test-namespace",
+			},
+		}
+		targetPod = &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "test-pod",
+			},
+			Status: corev1.PodStatus{
+				PodIP: "0.0.0.0",
+			},
+		}
+		fakeClient = &fakeBackupClient{}
+		executor.backupClient = fakeClient
+	})
+
+	It("should return an error when getting status fails", func() {
+		expectedErr := errors.New("test-error")
+		fakeClient.injectStatusError = expectedErr
+
+		_, err := executor.finalize(ctx, nil, backup, targetPod)
+		Expect(err).To(MatchError(fmt.Sprintf("while getting status while finalizing: %s", expectedErr)))
+	})
+
+	It("should handle backup being in the Completed phase", func() {
+		fakeBeginLSN := postgres.LSN("ABCDEF00")
+		fakeEndLSN := postgres.LSN("12345678")
+		fakeLabelFile := []byte("test-label")
+		fakeSpcmapFile := []byte("test-spcamp")
+
+		fakeClient.response = &webserver.Response[webserver.BackupResultData]{
+			Data: &webserver.BackupResultData{
+				BeginLSN:   fakeBeginLSN,
+				EndLSN:     fakeEndLSN,
+				LabelFile:  fakeLabelFile,
+				SpcmapFile: fakeSpcmapFile,
+				BackupName: backup.Name,
+				Phase:      webserver.Completed,
+			},
+		}
+
+		result, err := executor.finalize(ctx, nil, backup, targetPod)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeNil())
+		Expect(backup.Status.TablespaceMapFile).To(Equal(fakeSpcmapFile))
+		Expect(backup.Status.BackupLabelFile).To(Equal(fakeLabelFile))
+		Expect(backup.Status.BeginLSN).To(BeEquivalentTo(fakeBeginLSN))
+		Expect(backup.Status.EndLSN).To(BeEquivalentTo(fakeEndLSN))
+	})
+
+	It("should handle backup being in the Closing phase", func() {
+		fakeClient.response = &webserver.Response[webserver.BackupResultData]{
+			Data: &webserver.BackupResultData{
+				BackupName: backup.Name,
+				Phase:      webserver.Closing,
+			},
+		}
+
+		result, err := executor.finalize(ctx, nil, backup, targetPod)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(Equal(&ctrl.Result{RequeueAfter: time.Second * 5}))
+	})
+
+	It("should return an error when the backup name doesn't match", func() {
+		fakeClient.response = &webserver.Response[webserver.BackupResultData]{
+			Data: &webserver.BackupResultData{
+				BackupName: "mismatched-backup-name",
+				Phase:      webserver.Started, // Adjust phase if needed
+			},
+		}
+
+		_, err := executor.finalize(ctx, nil, backup, targetPod)
+		expectedErr := fmt.Sprintf("trying to stop backup with name: %s, while reconciling backup with name: %s",
+			"mismatched-backup-name", backup.Name)
+		Expect(err).To(MatchError(expectedErr))
+	})
+
+	It("should return an error for an unexpected phase", func() {
+		fakeClient.response = &webserver.Response[webserver.BackupResultData]{
+			Data: &webserver.BackupResultData{
+				BackupName: backup.Name,
+				Phase:      "UnexpectedPhase",
+			},
+		}
+
+		_, err := executor.finalize(ctx, nil, backup, targetPod)
+		expectedErr := "found the instance in an unexpected state while finalizing the backup, phase: UnexpectedPhase"
+		Expect(err).To(MatchError(expectedErr))
 	})
 })
