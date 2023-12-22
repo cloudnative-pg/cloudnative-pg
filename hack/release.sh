@@ -88,7 +88,8 @@ sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
     -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:${release_version}\"/" \
     pkg/versions/versions.go
 
-sed -i "s/cnpg-[0-9.]*.yaml/cnpg-${release_version}.yaml/g" \
+sed -i -e "s@release-[0-9.]*/releases/cnpg-[0-9.]*.yaml@${branch}/releases/cnpg-${release_version}.yaml@g" \
+    -e "s@artifacts/release-[0-9.]*/@artifacts/${branch}/@g" \
     docs/src/installation_upgrade.md
 
 CONFIG_TMP_DIR=$(mktemp -d)
