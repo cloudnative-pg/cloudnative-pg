@@ -122,6 +122,9 @@ type PodTemplateSpec struct {
 
 	// Specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:validation:Type:=object
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Spec corev1.PodSpec `json:"spec,omitempty"`
 }
