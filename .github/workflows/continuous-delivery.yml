@@ -405,6 +405,46 @@ jobs:
           path: dist/operator-manifest.yaml
           retention-days: 7
 
+      # In order to test the case of upgrading from current version to a
+      # future version, we need to build and push an image with a different tag
+      # to make the hash of the binary different, we change the build-time
+      # variable "VERSION" to include the suffix "-upgrade-test"
+      - name: Build binary for upgrade test
+        uses: goreleaser/goreleaser-action@v5
+        if: |
+          always() && !cancelled() &&
+          needs.evaluate_options.outputs.test_level == '4' &&
+          (needs.evaluate_options.outputs.feature_type == '' ||
+           needs.evaluate_options.outputs.feature_type == 'upgrade')
+        with:
+          distribution: goreleaser
+          version: latest
+          args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
+        env:
+          DATE: ${{ env.DATE }}
+          COMMIT: ${{ env.COMMIT }}
+          VERSION: ${{ env.VERSION }}-upgrade-test
+
+      - name: Build and push image for upgrade test
+        uses: docker/build-push-action@v5
+        if: |
+          always() && !cancelled() &&
+          needs.evaluate_options.outputs.test_level == '4' &&
+          (needs.evaluate_options.outputs.feature_type == '' ||
+           needs.evaluate_options.outputs.feature_type == 'upgrade')
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          context: .
+          push: true
+          build-args: |
+            VERSION=${{ env.VERSION }}-upgrade-test
+          tags: ${{ steps.docker-meta.outputs.tags }}-upgrade-test
+          labels: ${{ env.LABELS }}
+          provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
+          cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
+          cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
+
+
   # This will only execute in cloudnative-pg org
   publish-artifacts:
     name: Publish artifacts
@@ -1480,7 +1520,7 @@ jobs:
     name: Run E2E on Google GKE
     if: |
       (always() && !cancelled()) &&
-      vars.GKE_ENABLED == 'true' && 
+      vars.GKE_ENABLED == 'true' &&
       needs.generate-jobs.outputs.gkeEnabled == 'true' &&
       needs.generate-jobs.result == 'success'
     needs:

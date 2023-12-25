@@ -79,10 +79,6 @@ echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 RC=0
 RC_GINKGO1=0
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
-  # Getting the operator images need a pull secret
-  kubectl delete namespace cnpg-system || :
-  kubectl create namespace cnpg-system
-  ensure_image_pull_secret
   # Generate a manifest for the operator after the api upgrade
   # TODO: this is almost a "make deploy". Refactor.
   make manifests kustomize

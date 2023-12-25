@@ -27,6 +27,7 @@ import (
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -94,6 +95,34 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		}
+
+		err := env.DeleteNamespace(operatorNamespace)
+		if !apierrs.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		err = env.CreateNamespace(operatorNamespace)
+		Expect(err).NotTo(HaveOccurred())
+
+		// As the 'cnpg-system' namespace is deleted after each case is completed
+		// we should create the namespace again before each case and create the
+		// create pull image secret again
+		dockerServer := os.Getenv("DOCKER_SERVER")
+		dockerUsername := os.Getenv("DOCKER_USERNAME")
+		dockerPassword := os.Getenv("DOCKER_PASSWORD")
+		if dockerServer != "" && dockerUsername != "" && dockerPassword != "" {
+			_, _, err := testsUtils.Run(fmt.Sprintf(`kubectl -n %v create secret docker-registry
+			cnpg-pull-secret
+			--docker-server="%v"
+			--docker-username="%v"
+			--docker-password="%v"`,
+				operatorNamespace,
+				dockerServer,
+				dockerUsername,
+				dockerPassword,
+			))
+			Expect(err).NotTo(HaveOccurred())
 		}
 	})
 
@@ -311,7 +340,33 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		return namespace
 	}
 
-	applyUpgrade := func(upgradeNamespace string) {
+	applyOperatorToCurrent := func() {
+		By("applying the current version", func() {
+			// Upgrade to the new version
+			_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -f %v", operatorUpgradeFile))
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment, err := env.GetOperatorDeployment()
+			Expect(err).NotTo(HaveOccurred())
+
+			timeout := 240
+			Eventually(func() error {
+				_, stderr, err := testsUtils.Run(fmt.Sprintf(
+					"kubectl -n %v rollout status deployment %v -w --timeout=%vs",
+					operatorNamespace,
+					deployment.Name,
+					timeout,
+				))
+				if err != nil {
+					GinkgoWriter.Printf("stderr: %s\n", stderr)
+				}
+
+				return err
+			}, timeout).ShouldNot(HaveOccurred())
+		})
+	}
+
+	applyUpgrade := func(upgradeNamespace string, upgradeFunc func()) {
 		// Create the secrets used by the clusters and minio
 		By("creating the postgres secrets", func() {
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
@@ -465,30 +520,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			podUIDs = append(podUIDs, pod.GetUID())
 		}
 
-		By("upgrading the operator to current version", func() {
-			timeout := 120
-			// Upgrade to the new version
-			_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -f %v", operatorUpgradeFile))
-			Expect(err).NotTo(HaveOccurred())
-			// With the new deployment, a new pod should be started. When it's
-			// ready, the old one is removed. We wait for the number of replicas
-			// to decrease to 1.
-			Eventually(func() (int32, error) {
-				deployment, err := env.GetOperatorDeployment()
-				if err != nil {
-					return 0, err
-				}
-				return deployment.Status.Replicas, err
-			}, timeout).Should(BeEquivalentTo(1))
-			// For a final check, we verify the pod is ready
-			Eventually(func() (int32, error) {
-				deployment, err := env.GetOperatorDeployment()
-				if err != nil {
-					return 0, err
-				}
-				return deployment.Status.ReadyReplicas, err
-			}, timeout).Should(BeEquivalentTo(1))
-		})
+		upgradeFunc()
 
 		operatorConfigMapNamespacedName := types.NamespacedName{
 			Namespace: operatorNamespace,
@@ -536,6 +568,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, 300).Should(BeEquivalentTo(3))
 		}
 		AssertClusterIsReady(upgradeNamespace, clusterName1, 300, env)
+
+		// the instance pods should not restart
+		By("verifying that the instance pods are not restarted", func() {
+			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range podList.Items {
+				Expect(pod.Status.ContainerStatuses[0].RestartCount).To(BeEquivalentTo(0))
+			}
+		})
 
 		AssertConfUpgrade(clusterName1, upgradeNamespace)
 
@@ -623,7 +664,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
 		upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 		DeferCleanup(cleanupNamespace, upgradeNamespace)
-		applyUpgrade(upgradeNamespace)
+		applyUpgrade(upgradeNamespace, applyOperatorToCurrent)
 	})
 
 	It("works after an upgrade with online upgrade", func() {
@@ -641,8 +682,58 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 		DeferCleanup(cleanupNamespace, upgradeNamespace)
-		applyUpgrade(upgradeNamespace)
+		applyUpgrade(upgradeNamespace, applyOperatorToCurrent)
 
 		assertManagerRollout()
+	})
+
+	It("works after upgrading from current version by online upgrade", func() {
+		changeImages := func() {
+			deployment, err := env.GetOperatorDeployment()
+			Expect(err).NotTo(HaveOccurred())
+			container := deployment.Spec.Template.Spec.Containers[0]
+			imageToUpgrade := container.Image + "-upgrade-test"
+
+			By(fmt.Sprintf("changing the image from %q to %q", container.Image, imageToUpgrade), func() {
+				container.Image = imageToUpgrade
+				for i := range container.Env {
+					if container.Env[i].Name == "OPERATOR_IMAGE_NAME" {
+						container.Env[i].Value = container.Image
+						break
+					}
+				}
+
+				deployment.Spec.Template.Spec.Containers[0] = container
+				err = env.Client.Update(env.Ctx, &deployment)
+				Expect(err).NotTo(HaveOccurred())
+
+				timeout := 240
+				Eventually(func() error {
+					_, stderr, err := testsUtils.Run(fmt.Sprintf(
+						"kubectl -n %v  rollout status deployment %v --revision=%v -w --timeout=%vs",
+						operatorNamespace,
+						deployment.Name,
+						deployment.Status.ObservedGeneration+1,
+						timeout,
+					))
+					if err != nil {
+						GinkgoWriter.Printf("stderr: %s\n", stderr)
+					}
+
+					return err
+				}, timeout).ShouldNot(HaveOccurred())
+			})
+		}
+		// set upgradeNamespace for log naming
+		upgradeNamespacePrefix := onlineUpgradeNamespace
+		By("applying environment changes for current upgrade to be performed", func() {
+			testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
+		})
+
+		applyOperatorToCurrent()
+
+		upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
+		DeferCleanup(cleanupNamespace, upgradeNamespace)
+		applyUpgrade(upgradeNamespace, changeImages)
 	})
 })
