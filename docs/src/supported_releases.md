@@ -36,7 +36,7 @@ level of assistance from the CloudNativePG community.
 For details on the support provided by the community, see
 [What we mean by support](#what-we-mean-by-support).
 
-| Type              | Support level                                                                                                         | Quality and recommended Uue                                                                                    |
+| Type              | Support level                                                                                                         | Quality and recommended Use                                                                                    |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | Development Build | No support                                                                                                            | Dangerous, might not be fully reliable. Useful to experiment with.                                               |
 | Minor Release     | Support provided until 1 month after the N+2 minor release (ex. 1.15 supported until 1 month after 1.17.0 is released)|
