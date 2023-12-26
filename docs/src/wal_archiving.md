@@ -8,16 +8,16 @@ in CloudNativePG.
     WAL archives serve for both object store backups and volume snapshot backups.
 
 The WAL archive is defined in the `.spec.backup.barmanObjectStore` stanza of
-a `Cluster` resource. Please proceed with the same instructions you find in
-the ["Backup on object stores" section](backup_barmanobjectstore.md) to set up
+a `Cluster` resource. Use the instructions in
+[Backup on object stores](backup_barmanobjectstore.md) to set up
 the WAL archive.
 
 !!! Info
-    Please refer to [`BarmanObjectStoreConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-barmanobjectstoreconfiguration)
+    See [`BarmanObjectStoreConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-barmanobjectstoreconfiguration)
     in the API reference for a full list of options.
 
-If required, you can choose to compress WAL files as soon as they
-are uploaded and/or encrypt them:
+If required, you can choose to compress WAL files as soon as they're
+uploaded or encrypt them:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -33,24 +33,24 @@ spec:
 ```
 
 You can configure the encryption directly in your bucket, and the operator
-will use it unless you override it in the cluster configuration.
+uses it unless you override it in the cluster configuration.
 
 PostgreSQL implements a sequential archiving scheme, where the
-`archive_command` will be executed sequentially for every WAL
+`archive_command` is executed sequentially for every WAL
 segment to be archived.
 
 !!! Important
     By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
     that WAL files, even in case of low workloads, are closed and archived
-    at least every 5 minutes, providing a deterministic time-based value for
-    your Recovery Point Objective (RPO). Even though you change the value
+    at least every 5 minutes. This approach provides a deterministic time-based value for
+    your recovery point objective (RPO). Even though you change the value
     of the [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
     our experience suggests that the default value set by the operator is
     suitable for most use cases.
 
 When the bandwidth between the PostgreSQL instance and the object
 store allows archiving more than one WAL file in parallel, you
-can use the parallel WAL archiving feature of the instance manager
+can use the parallel WAL archiving feature of the instance manager,
 like in the following example:
 
 ```yaml
@@ -67,10 +67,10 @@ spec:
         encryption: AES256
 ```
 
-In the previous example, the instance manager optimizes the WAL
+In this example, the instance manager optimizes the WAL
 archiving process by archiving in parallel at most eight ready
 WALs, including the one requested by PostgreSQL.
 
-When PostgreSQL will request the archiving of a WAL that has
-already been archived by the instance manager as an optimization,
-that archival request will be just dismissed with a positive status.
+When PostgreSQL requests the archiving of a WAL that was
+already archived by the instance manager as an optimization,
+that archival request is dismissed with a positive status.
