@@ -95,7 +95,7 @@ instance, with the goal of storing the `PGDATA`. It then mounts it into each pod
 
 Additionally, it supports creating clusters with:
 
-- A separate PVC on which to store PostgreSQL write-ahead log (WAL), as
+- A separate PVC on which to store PostgreSQL WAL, as
   explained in [Volume for WAL](#volume-for-wal)
 - Additional separate volumes reserved for PostgreSQL tablespaces, as explained
   in [Tablespaces](tablespaces.md)
@@ -200,7 +200,7 @@ volume has a few benefits:
   for example, `PGDATA` requires resizing.
 
 
-!!! Seealso "Write-ahead log (WAL)"
+!!! Seealso "Write-Ahead Log (WAL)"
     See [Reliability and the Write-Ahead Log](https://www.postgresql.org/docs/current/wal.html)
     in the PostgreSQL documentation for more information.
 
