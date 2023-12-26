@@ -79,6 +79,7 @@ Briefly, we recommend operating at two levels:
     performance. Knowing the theoretical maximum throughput of sequential reads or
     writes is extremely useful in those situations. This is true especially in
     shared-nothing contexts, where results don't vary due to the influence of external workloads.
+
     Know your system: benchmark it.
 
 ## Encryption at rest
