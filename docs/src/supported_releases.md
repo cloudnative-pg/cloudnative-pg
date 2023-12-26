@@ -15,8 +15,8 @@ planning.
 Supported releases of CloudNativePG include releases that are in the active
 maintenance window and are patched for security and bug fixes.
 
-Subsequent patch releases on a minor release don't contain changes that are not backward
-compatible.
+Subsequent patch releases on a minor release contain backward-compatible changes only.
+
 
 * [Support policy](#support-policy)
 * [Naming scheme](#naming-scheme)
