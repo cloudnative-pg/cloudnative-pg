@@ -74,7 +74,7 @@ Briefly, we recommend operating at two levels:
     before putting the database into production. These results
     are extremely valuable not just in the planning phase (for example, capacity planning).
     They are also valuable in the production lifecycle, especially in emergency situations
-    when you don't have time run this kind of test. Databases
+    when you don't have time to run this kind of test. Databases
     change and evolve over time, and so does the distribution of data, potentially affecting
     performance. Knowing the theoretical maximum throughput of sequential reads or
     writes is extremely useful in those situations. This is true especially in
