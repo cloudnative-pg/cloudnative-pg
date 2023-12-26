@@ -9,7 +9,7 @@ and bare metal, are also valid in container contexts managed by Kubernetes.
 !!! Important
     When it comes to dynamically provisioned storage,
     Kubernetes has its own specifics. These include *storage classes*, *persistent
-    volumes*, and *persistent volume claims*. You need to own these
+    volumes*, and *Persistent Volume Claims (PVCs)*. You need to own these
     concepts, on top of all the valuable knowledge you've built over
     the years in terms of storage for database workloads on VMs and
     physical servers.
@@ -40,7 +40,7 @@ guarantees higher and more predictable performance.
 
 !!! Info
     CloudNativePG doesn't use `StatefulSet` for managing data persistence.
-    Rather, it manages persistent volume claims (PVCs) directly. If you want
+    Rather, it manages PVCs directly. If you want
     to know more, see
     [Custom pod controller](controller.md).
 
@@ -88,9 +88,9 @@ Encryption at rest is possible with CloudNativePG. The operator delegates that
 to the underlying storage class. See the storage class for
 information about this important security feature.
 
-## Persistent volume claim
+## Persistent Volume Claim (PVC)
 
-The operator creates a persistent volume claim (PVC) for each PostgreSQL
+The operator creates a PVC for each PostgreSQL
 instance, with the goal of storing the `PGDATA`. It then mounts it into each pod.
 
 Additionally, it supports creating clusters with:
@@ -425,7 +425,7 @@ cluster-example-4              1/1     Running     0          10s
 
 CloudNativePG was designed to work with dynamic volume provisioning. This capability
 allows storage volumes to be created on demand when requested by
-users by way of storage classes and persistent volume claim templates. See [Re-creating storage](#re-creating-storage).
+users by way of storage classes and PVC templates. See [Re-creating storage](#re-creating-storage).
 
 However, in some cases, Kubernetes administrators prefer to manually create
 storage volumes and then create the related `PersistentVolume` objects for
