@@ -110,7 +110,7 @@ are defined as a *PVC group*.
     As usual, we recommend properly benchmarking the storage class
     in a controlled environment before deploying to production.
 
-The easier way to configure the storage for a PostgreSQL class is to
+The easiest way to configure the storage for a PostgreSQL class is to
 request storage of a certain size, like in the following example:
 
 ```yaml
