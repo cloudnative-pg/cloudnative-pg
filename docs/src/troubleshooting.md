@@ -130,7 +130,6 @@ kubectl exec -i new-cluster-example-1 -c postgres \
     sure you assign the right ownership. If you're not familiar with PostgreSQL,
     we recommend that you do these critical operations under the guidance of
     a professional support company.
-<!-- What is "above" referring to in this admonition? And should this note appear at the beginning of this section?-->
 
 These emergency backup steps might be integrated into the `cnpg` plugin at some stage in the future.
 
@@ -152,7 +151,6 @@ kubectl logs --help
     We recommend using the `jq` command to improve usability. For
     example, you can pipe the `kubectl logs` command with `| jq -C`.
 
-<!-- Is this note necessary? -->
 !!! Note
     Some of the following examples show how to retrieve logs
     about different resources when it comes to troubleshooting CloudNativePG.
