@@ -452,7 +452,7 @@ To use a pre-provisioned volume in CloudNativePG:
 !!! Warning
     With static provisioning, it's your responsibility to ensure that 
     Postgres pods can be correctly scheduled
-    by Kubernetes where a pre-provisioned volume exists. (This configuration is based
+    by Kubernetes where a pre-provisioned volume exists. (The scheduling configuration is based
     on the affinity rules of your cluster.) Make sure you check
     for any pods stuck in `Pending` after you deploy the cluster. 
     If the condition persists, investigate why it's happening.
