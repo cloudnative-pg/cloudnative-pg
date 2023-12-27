@@ -106,7 +106,7 @@ are defined as a *PVC group*.
 ## Configuration via a storage class
 
 !!! Important
-    CloudNativePG wasn't designed to work with a specific storage class.
+    CloudNativePG was designed to work interchangeably with all storage classes.
     As usual, we recommend properly benchmarking the storage class
     in a controlled environment before deploying to production.
 
