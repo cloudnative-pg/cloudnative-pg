@@ -394,6 +394,14 @@ func checkProjectedVolumeIsOutdated(
 		desiredProjectedVolumeConfiguration.DefaultMode = &defaultMode
 	}
 
+	// In the pod specification, setting the projected volume source as a zero-length slice
+	// results in it remaining null. Therefore, we consider a nil value to be equivalent to a zero-length slice.
+	// we do not need to raise a rollout if the desired and current projected volume source is zero-length or nil
+	if (desiredProjectedVolumeConfiguration == nil || len(desiredProjectedVolumeConfiguration.Sources) == 0) &&
+		(currentProjectedVolumeConfiguration == nil || len(currentProjectedVolumeConfiguration.Sources) == 0) {
+		desiredProjectedVolumeConfiguration = currentProjectedVolumeConfiguration
+	}
+
 	if reflect.DeepEqual(currentProjectedVolumeConfiguration, desiredProjectedVolumeConfiguration) {
 		return rollout{}, nil
 	}
