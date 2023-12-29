@@ -63,13 +63,11 @@ func (f *fakeBackupClient) Stop(_ context.Context, _ string, _ webserver.StopBac
 
 var _ = Describe("onlineExecutor prepare", func() {
 	var (
-		ctx     context.Context
 		cluster *apiv1.Cluster
 		backup  *apiv1.Backup
 		target  *corev1.Pod
 	)
-	BeforeEach(func() {
-		ctx = context.TODO()
+	BeforeEach(func(ctx SpecContext) {
 		backup = &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "online-backup",
@@ -101,7 +99,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 		}
 	})
 
-	It("should stop when encountering an error", func() {
+	It("should stop when encountering an error", func(ctx SpecContext) {
 		expectedErr := errors.New("test-error")
 		onlineExec := onlineExecutor{backupClient: &fakeBackupClient{
 			injectStatusError: expectedErr,
@@ -111,7 +109,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 		Expect(err).To(MatchError(expectedErr))
 	})
 
-	It("should stop when encountering an error inside the body", func() {
+	It("should stop when encountering an error inside the body", func(ctx SpecContext) {
 		const expectedErr = "ERROR_CODE"
 		onlineExec := onlineExecutor{backupClient: &fakeBackupClient{
 			response: &webserver.Response[webserver.BackupResultData]{
@@ -125,7 +123,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 		Expect(err).To(MatchError(ContainSubstring(expectedErr)))
 	})
 
-	It("should stop when encountering an error calling start", func() {
+	It("should stop when encountering an error calling start", func(ctx SpecContext) {
 		expectedErr := errors.New("test-error")
 		onlineExec := onlineExecutor{backupClient: &fakeBackupClient{
 			response: &webserver.Response[webserver.BackupResultData]{
@@ -140,7 +138,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 		Expect(err).To(MatchError(expectedErr))
 	})
 
-	It("should return an error when encountering an unknown phase", func() {
+	It("should return an error when encountering an unknown phase", func(ctx SpecContext) {
 		const unexpectedPhase = "UNEXPECTED_PHASE"
 		onlineExec := onlineExecutor{backupClient: &fakeBackupClient{
 			response: &webserver.Response[webserver.BackupResultData]{
@@ -155,7 +153,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 		Expect(err).To(MatchError(ContainSubstring(unexpectedPhase)))
 	})
 
-	It("should start the backup if the current backup doesn't match", func() {
+	It("should start the backup if the current backup doesn't match", func(ctx SpecContext) {
 		fakeBackupClient := &fakeBackupClient{
 			response: &webserver.Response[webserver.BackupResultData]{
 				Data: &webserver.BackupResultData{
@@ -171,26 +169,27 @@ var _ = Describe("onlineExecutor prepare", func() {
 		Expect(fakeBackupClient.startCalled).To(BeTrue())
 	})
 
-	It("should start the backup if the current backup doesn't match even if the body contains an error", func() {
-		fakeBackupClient := &fakeBackupClient{
-			response: &webserver.Response[webserver.BackupResultData]{
-				Data: &webserver.BackupResultData{
-					BackupName: "not-correct-backup",
+	It("should start the backup if the current backup doesn't match even if the body contains an error",
+		func(ctx SpecContext) {
+			fakeBackupClient := &fakeBackupClient{
+				response: &webserver.Response[webserver.BackupResultData]{
+					Data: &webserver.BackupResultData{
+						BackupName: "not-correct-backup",
+					},
+					Error: &webserver.Error{
+						Code: "RANDOM_ERROR",
+					},
 				},
-				Error: &webserver.Error{
-					Code: "RANDOM_ERROR",
-				},
-			},
-		}
-		onlineExec := onlineExecutor{backupClient: fakeBackupClient}
+			}
+			onlineExec := onlineExecutor{backupClient: fakeBackupClient}
 
-		res, err := onlineExec.prepare(ctx, cluster, backup, target)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(res).ToNot(BeNil())
-		Expect(fakeBackupClient.startCalled).To(BeTrue())
-	})
+			res, err := onlineExec.prepare(ctx, cluster, backup, target)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res).ToNot(BeNil())
+			Expect(fakeBackupClient.startCalled).To(BeTrue())
+		})
 
-	It("should execute start when no backup is pending", func() {
+	It("should execute start when no backup is pending", func(ctx SpecContext) {
 		fakeBackupClient := &fakeBackupClient{
 			response: &webserver.Response[webserver.BackupResultData]{
 				Data: &webserver.BackupResultData{},
@@ -204,7 +203,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 		Expect(fakeBackupClient.startCalled).To(BeTrue())
 	})
 
-	It("should do nothing if the backup is in started phase", func() {
+	It("should do nothing if the backup is in started phase", func(ctx SpecContext) {
 		fakeBackupClient := &fakeBackupClient{
 			response: &webserver.Response[webserver.BackupResultData]{
 				Data: &webserver.BackupResultData{
@@ -221,7 +220,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 		Expect(fakeBackupClient.startCalled).To(BeFalse())
 	})
 
-	It("should requeue in starting phase", func() {
+	It("should requeue in starting phase", func(ctx SpecContext) {
 		fakeBackupClient := &fakeBackupClient{
 			response: &webserver.Response[webserver.BackupResultData]{
 				Data: &webserver.BackupResultData{
@@ -241,15 +240,13 @@ var _ = Describe("onlineExecutor prepare", func() {
 
 var _ = Describe("onlineExecutor finalize", func() {
 	var (
-		ctx        context.Context
 		executor   *onlineExecutor
 		backup     *apiv1.Backup
 		targetPod  *corev1.Pod
 		fakeClient *fakeBackupClient
 	)
 
-	BeforeEach(func() {
-		ctx = context.TODO()
+	BeforeEach(func(ctx SpecContext) {
 		executor = &onlineExecutor{}
 		backup = &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
@@ -270,7 +267,7 @@ var _ = Describe("onlineExecutor finalize", func() {
 		executor.backupClient = fakeClient
 	})
 
-	It("should return an error when getting status fails", func() {
+	It("should return an error when getting status fails", func(ctx SpecContext) {
 		expectedErr := errors.New("test-error")
 		fakeClient.injectStatusError = expectedErr
 
@@ -278,7 +275,7 @@ var _ = Describe("onlineExecutor finalize", func() {
 		Expect(err).To(MatchError(fmt.Sprintf("while getting status while finalizing: %s", expectedErr)))
 	})
 
-	It("should handle backup being in the Completed phase", func() {
+	It("should handle backup being in the Completed phase", func(ctx SpecContext) {
 		fakeBeginLSN := postgres.LSN("ABCDEF00")
 		fakeEndLSN := postgres.LSN("12345678")
 		fakeLabelFile := []byte("test-label")
@@ -304,7 +301,7 @@ var _ = Describe("onlineExecutor finalize", func() {
 		Expect(backup.Status.EndLSN).To(BeEquivalentTo(fakeEndLSN))
 	})
 
-	It("should handle backup being in the Closing phase", func() {
+	It("should handle backup being in the Closing phase", func(ctx SpecContext) {
 		fakeClient.response = &webserver.Response[webserver.BackupResultData]{
 			Data: &webserver.BackupResultData{
 				BackupName: backup.Name,
@@ -317,7 +314,7 @@ var _ = Describe("onlineExecutor finalize", func() {
 		Expect(result).To(Equal(&ctrl.Result{RequeueAfter: time.Second * 5}))
 	})
 
-	It("should return an error when the backup name doesn't match", func() {
+	It("should return an error when the backup name doesn't match", func(ctx SpecContext) {
 		fakeClient.response = &webserver.Response[webserver.BackupResultData]{
 			Data: &webserver.BackupResultData{
 				BackupName: "mismatched-backup-name",
@@ -331,7 +328,7 @@ var _ = Describe("onlineExecutor finalize", func() {
 		Expect(err).To(MatchError(expectedErr))
 	})
 
-	It("should return an error for an unexpected phase", func() {
+	It("should return an error for an unexpected phase", func(ctx SpecContext) {
 		fakeClient.response = &webserver.Response[webserver.BackupResultData]{
 			Data: &webserver.BackupResultData{
 				BackupName: backup.Name,
