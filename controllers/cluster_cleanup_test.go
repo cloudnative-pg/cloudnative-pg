@@ -17,8 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
-
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,20 +33,18 @@ import (
 
 var _ = Describe("cluster_cleanup", func() {
 	var (
-		ctx    context.Context
 		r      ClusterReconciler
 		scheme *runtime.Scheme
 	)
 
-	BeforeEach(func() {
-		ctx = context.TODO()
+	BeforeEach(func(ctx SpecContext) {
 		scheme = schemeBuilder.BuildWithAllKnownScheme()
 		r = ClusterReconciler{
 			Scheme: scheme,
 		}
 	})
 
-	It("should delete completed jobs", func() {
+	It("should delete completed jobs", func(ctx SpecContext) {
 		jobList := &batchv1.JobList{Items: []batchv1.Job{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-1", Namespace: "test"},
