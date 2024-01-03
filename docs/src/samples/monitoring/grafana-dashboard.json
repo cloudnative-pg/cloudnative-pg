@@ -682,7 +682,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "cnpg_pg_database_size_bytes{namespace=\"$namespace\"}",
+          "expr": "cnpg_pg_database_size_bytes{datname!~\"template.*|postgres.*\", namespace=~\"$namespace\", pod=~\"$instances\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
