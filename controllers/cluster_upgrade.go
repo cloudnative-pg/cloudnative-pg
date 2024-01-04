@@ -387,19 +387,19 @@ func checkProjectedVolumeIsOutdated(
 ) (rollout, error) {
 	// Check if there is a change in the projected volume configuration
 	currentProjectedVolumeConfiguration := getProjectedVolumeConfigurationFromPod(*status.Pod)
-
 	desiredProjectedVolumeConfiguration := cluster.Spec.ProjectedVolumeTemplate.DeepCopy()
-	if desiredProjectedVolumeConfiguration != nil && desiredProjectedVolumeConfiguration.DefaultMode == nil {
-		defaultMode := corev1.ProjectedVolumeSourceDefaultMode
-		desiredProjectedVolumeConfiguration.DefaultMode = &defaultMode
-	}
 
 	// In the pod specification, setting the projected volume source as a zero-length slice
 	// results in it remaining null. Therefore, we consider a nil value to be equivalent to a zero-length slice.
 	// we do not need to raise a rollout if the desired and current projected volume source is zero-length or nil
 	if (desiredProjectedVolumeConfiguration == nil || len(desiredProjectedVolumeConfiguration.Sources) == 0) &&
 		(currentProjectedVolumeConfiguration == nil || len(currentProjectedVolumeConfiguration.Sources) == 0) {
-		desiredProjectedVolumeConfiguration = currentProjectedVolumeConfiguration
+		return rollout{}, nil
+	}
+
+	if desiredProjectedVolumeConfiguration != nil && desiredProjectedVolumeConfiguration.DefaultMode == nil {
+		defaultMode := corev1.ProjectedVolumeSourceDefaultMode
+		desiredProjectedVolumeConfiguration.DefaultMode = &defaultMode
 	}
 
 	if reflect.DeepEqual(currentProjectedVolumeConfiguration, desiredProjectedVolumeConfiguration) {
