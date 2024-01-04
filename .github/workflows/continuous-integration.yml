@@ -120,6 +120,7 @@ jobs:
               - '.goreleaser*.yml'
               - 'Dockerfile'
               - 'Dockerfile-ubi8'
+              - 'Dockerfile-ubi9'
               - 'Makefile'
               - 'go.mod'
               - 'go.sum'
@@ -391,7 +392,7 @@ jobs:
       platforms: ${{ env.PLATFORMS }}
       image_name: ${{ env.IMAGE_NAME }}
       controller_img: ${{ env.CONTROLLER_IMG }}
-      controller_img_ubi: ${{ env.CONTROLLER_IMG_UBI }}
+      controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
       bundle_img: ${{ env.BUNDLE_IMG }}
       push: ${{ env.PUSH }}
     steps:
@@ -517,6 +518,17 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
 
+      - name: Docker meta UBI9
+        id: docker-meta-ubi9
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.OPERATOR_IMAGE_NAME }}
+          flavor: |
+            suffix=-ubi9
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+
       - name: Detect platforms
         run: |
           # Keep in mind that adding more platforms (architectures) will increase the building
@@ -602,17 +614,29 @@ jobs:
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
 
+      - name: Build and push UBI9
+        uses: docker/build-push-action@v5
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          context: .
+          file: Dockerfile-ubi9
+          push: ${{ env.PUSH }}
+          build-args: |
+            VERSION=${{ env.VERSION }}
+          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
+
       - name: Output images
         env:
           TAGS: ${{ steps.docker-meta.outputs.tags }}
-          TAGS_UBI: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          TAGS_UBI8: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          TAGS_UBI9: ${{ steps.docker-meta-ubi9.outputs.tags }}
         run: |
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
-          TAG_UBI=${TAGS_UBI#*:}
+          TAG_UBI=${TAGS_UBI8#*:}
           echo "IMAGE_NAME=${LOWERCASE_OPERATOR_IMAGE_NAME}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
 
   olm-bundle:
@@ -658,7 +682,7 @@ jobs:
       - name: Create bundle
         env:
           IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
-          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
         run: |
           make olm-catalog
