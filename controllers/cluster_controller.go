@@ -526,7 +526,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Reconcile Pods
-	if res, err := r.ReconcilePods(ctx, cluster, resources, instancesStatus); err != nil {
+	if res, err := r.ReconcilePods(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
 		return res, err
 	}
 
