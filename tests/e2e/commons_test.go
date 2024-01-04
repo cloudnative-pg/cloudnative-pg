@@ -43,3 +43,9 @@ func IsGKE() bool {
 func IsLocal() bool {
 	return *testCloudVendorEnv == utils.LOCAL
 }
+
+// IsOpenshift returns true if we are running on OpenShift. We check that
+// by verifying if OCP_VERSION env exists
+func IsOpenshift() bool {
+	return *testCloudVendorEnv == utils.OCP
+}

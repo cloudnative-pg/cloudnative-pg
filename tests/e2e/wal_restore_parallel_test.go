@@ -46,7 +46,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if !IsLocal() {
+		if !IsLocal() || IsOpenshift() {
 			Skip("This test is only run on local cluster")
 		}
 	})

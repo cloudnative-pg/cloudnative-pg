@@ -79,7 +79,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				GinkgoWriter.Println("---- Testing barman backups without the name flag ----")
 				clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-legacy.yaml.template"
 			}
-			if !IsLocal() {
+			if !IsLocal() || IsOpenshift() {
 				Skip("This test is only run on local cluster")
 			}
 			const namespacePrefix = "cluster-backup-minio"
@@ -675,7 +675,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		)
 
 		BeforeAll(func() {
-			if !(IsLocal() || IsGKE()) {
+			if !(IsLocal() || IsGKE() || IsOpenshift()) {
 				Skip("This test is only executed on gke, openshift and local")
 			}
 			const namespacePrefix = "cluster-backup-azurite"
@@ -812,7 +812,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	// created by Barman Cloud, and defined via the barmanObjectStore option in the externalClusters section
 	Context("using minio as object storage", Ordered, func() {
 		BeforeAll(func() {
-			if !IsLocal() {
+			if !IsLocal() || IsOpenshift() {
 				Skip("This test is only executed on openshift and local")
 			}
 			const namespacePrefix = "recovery-barman-object-minio"
@@ -1261,7 +1261,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			restoreBackup             = fixturesDir + "/backup/backup_restore_safety/backup-cluster-2.yaml"
 		)
 		BeforeAll(func() {
-			if !IsLocal() {
+			if !IsLocal() || IsOpenshift() {
 				Skip("This test is only run on local cluster")
 			}
 			// This name is used in yaml file, keep it as const

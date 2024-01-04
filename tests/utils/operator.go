@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -262,4 +264,49 @@ func OperatorPodRestarted(operatorPod corev1.Pod) bool {
 		}
 	}
 	return restartCount != 0
+}
+
+// GetOperatorPodRestartedCount get the operator pod restart count
+func GetOperatorPodRestartedCount(operatorPod corev1.Pod) int {
+	restartCount := 0
+	for _, containerStatus := range operatorPod.Status.ContainerStatuses {
+		if containerStatus.Name == "manager" {
+			restartCount = int(containerStatus.RestartCount)
+		}
+	}
+	return restartCount
+}
+
+// GetOperatorPodName returns the name of the current operator pod
+func GetOperatorPodName(env *TestingEnvironment) (string, error) {
+	pod, err := env.GetOperatorPod()
+	if err != nil {
+		return "", err
+	}
+
+	if pod.GetDeletionTimestamp() != nil {
+		return "", fmt.Errorf("pod is being deleted")
+	}
+	return pod.GetName(), nil
+}
+
+// HasOperatorPodUpgraded returns nil if the operator pod has been upgraded
+func HasOperatorPodUpgraded(env *TestingEnvironment) error {
+	_, err := GetOperatorPodName(env)
+	return err
+}
+
+// GetOperatorVersion returns the current operator version
+func GetOperatorVersion(namespace, podName string) (string, error) {
+	out, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl -n %v exec %v -c manager -- /manager version",
+		namespace,
+		podName,
+	))
+	if err != nil {
+		return "", err
+	}
+	versionRegexp := regexp.MustCompile(`^Build: {Version:(\d+.*) Commit.*}$`)
+	ver := versionRegexp.FindStringSubmatch(strings.TrimSpace(out))[1]
+	return ver, nil
 }

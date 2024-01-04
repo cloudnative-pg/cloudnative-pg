@@ -28,6 +28,10 @@ type TestEnvVendor string
 // define a specific cloud vendor
 const testVendorEnvVarName = "TEST_CLOUD_VENDOR"
 
+// ocpVersionEnvVarName is the env variable name which
+// holds the openshift cluster version
+const ocpVersionEnvVarName = "OCP_VERSION"
+
 // AKS azure cloud cluster
 var AKS = TestEnvVendor("aks")
 
@@ -40,11 +44,15 @@ var GKE = TestEnvVendor("gke")
 // LOCAL kind or k3d cluster running locally
 var LOCAL = TestEnvVendor("local")
 
+// OCP openshift cloud cluster
+var OCP = TestEnvVendor("ocp")
+
 var vendors = map[string]*TestEnvVendor{
 	"aks":   &AKS,
 	"eks":   &EKS,
 	"gke":   &GKE,
 	"local": &LOCAL,
+	"ocp":   &OCP,
 }
 
 // TestCloudVendor creates the environment for testing
@@ -56,6 +64,11 @@ func TestCloudVendor() (*TestEnvVendor, error) {
 		}
 		return nil, fmt.Errorf("unknow cloud vendor %s", vendorEnv)
 	}
+	ocpVersion, exists := os.LookupEnv(ocpVersionEnvVarName)
+	if exists && ocpVersion != "" {
+		return &OCP, nil
+	}
+
 	// if none above, it is a local
 	return &LOCAL, nil
 }
