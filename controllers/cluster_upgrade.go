@@ -385,15 +385,16 @@ func checkProjectedVolumeIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
+	isNilOrZero := func(vs *corev1.ProjectedVolumeSource) bool {
+		return vs == nil || len(vs.Sources) == 0
+	}
+
 	// Check if there is a change in the projected volume configuration
 	currentProjectedVolumeConfiguration := getProjectedVolumeConfigurationFromPod(*status.Pod)
 	desiredProjectedVolumeConfiguration := cluster.Spec.ProjectedVolumeTemplate.DeepCopy()
 
-	// In the pod specification, setting the projected volume source as a zero-length slice
-	// results in it remaining null. Therefore, we consider a nil value to be equivalent to a zero-length slice.
-	// we do not need to raise a rollout if the desired and current projected volume source is zero-length or nil
-	if (desiredProjectedVolumeConfiguration == nil || len(desiredProjectedVolumeConfiguration.Sources) == 0) &&
-		(currentProjectedVolumeConfiguration == nil || len(currentProjectedVolumeConfiguration.Sources) == 0) {
+	// we do not need to raise a rollout if the desired and current projected volume source equal to zero-length or nil
+	if isNilOrZero(desiredProjectedVolumeConfiguration) && isNilOrZero(currentProjectedVolumeConfiguration) {
 		return rollout{}, nil
 	}
 
