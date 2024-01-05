@@ -383,10 +383,19 @@ func checkProjectedVolumeIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
+	isNilOrZero := func(vs *corev1.ProjectedVolumeSource) bool {
+		return vs == nil || len(vs.Sources) == 0
+	}
+
 	// Check if there is a change in the projected volume configuration
 	currentProjectedVolumeConfiguration := getProjectedVolumeConfigurationFromPod(*status.Pod)
-
 	desiredProjectedVolumeConfiguration := cluster.Spec.ProjectedVolumeTemplate.DeepCopy()
+
+	// we do not need to raise a rollout if the desired and current projected volume source equal to zero-length or nil
+	if isNilOrZero(desiredProjectedVolumeConfiguration) && isNilOrZero(currentProjectedVolumeConfiguration) {
+		return rollout{}, nil
+	}
+
 	if desiredProjectedVolumeConfiguration != nil && desiredProjectedVolumeConfiguration.DefaultMode == nil {
 		defaultMode := corev1.ProjectedVolumeSourceDefaultMode
 		desiredProjectedVolumeConfiguration.DefaultMode = &defaultMode
