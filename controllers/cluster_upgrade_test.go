@@ -408,6 +408,57 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.required).To(BeTrue())
 		})
 	})
+
+	When("The projected volume changed", func() {
+		It("should not require rollout if projected volume is 0 length slice in cluster",
+			func(ctx SpecContext) {
+				cluster.Spec.ProjectedVolumeTemplate = &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{},
+				}
+				pod := specs.PodWithExistingStorage(cluster, 1)
+				status := postgres.PostgresqlStatus{
+					Pod:            pod,
+					IsPodReady:     true,
+					ExecutableHash: "test",
+				}
+
+				rollout := isPodNeedingRollout(ctx, status, &cluster)
+				Expect(rollout.reason).To(BeEmpty())
+				Expect(rollout.required).To(BeFalse())
+			})
+
+		It("should not require rollout if projected volume source is nil",
+			func(ctx SpecContext) {
+				cluster.Spec.ProjectedVolumeTemplate = &corev1.ProjectedVolumeSource{
+					Sources: nil,
+				}
+				pod := specs.PodWithExistingStorage(cluster, 1)
+				status := postgres.PostgresqlStatus{
+					Pod:            pod,
+					IsPodReady:     true,
+					ExecutableHash: "test",
+				}
+
+				rollout := isPodNeedingRollout(ctx, status, &cluster)
+				Expect(rollout.reason).To(BeEmpty())
+				Expect(rollout.required).To(BeFalse())
+			})
+
+		It("should not require rollout if projected volume  is nil",
+			func(ctx SpecContext) {
+				cluster.Spec.ProjectedVolumeTemplate = nil
+				pod := specs.PodWithExistingStorage(cluster, 1)
+				status := postgres.PostgresqlStatus{
+					Pod:            pod,
+					IsPodReady:     true,
+					ExecutableHash: "test",
+				}
+
+				rollout := isPodNeedingRollout(ctx, status, &cluster)
+				Expect(rollout.reason).To(BeEmpty())
+				Expect(rollout.required).To(BeFalse())
+			})
+	})
 })
 
 var _ = Describe("Test pod rollout due to topology", func() {
