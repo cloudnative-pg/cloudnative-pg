@@ -47,7 +47,7 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   REPOSITORY_OWNER: "cloudnative-pg"
   SLACK_USERNAME: "cnpg-bot"
-  BUILD_MANAGER_RELEASE_ARGS: "build --skip-validate --rm-dist --id manager"
+  BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --rm-dist --id manager"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
   PLATFORM: "linux/amd64,linux/arm64"
@@ -405,17 +405,18 @@ jobs:
           path: dist/operator-manifest.yaml
           retention-days: 7
 
-      # In order to test the case of upgrading from current version to a
-      # future version, we need to build and push an image with a different tag
-      # to make the hash of the binary different, we change the build-time
-      # variable "VERSION" to include the suffix "-upgrade-test"
+      # In order to test the case of upgrading from the current operator
+      # to a future one, we build and push an image with a different VERSION
+      # to force a different hash for the manager binary.
+      # (Otherwise the ONLINE upgrade won't trigger)
+      #
+      # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
+      # upgrade test
       - name: Build binary for upgrade test
         uses: goreleaser/goreleaser-action@v5
         if: |
           always() && !cancelled() &&
-          needs.evaluate_options.outputs.test_level == '4' &&
-          (needs.evaluate_options.outputs.feature_type == '' ||
-           needs.evaluate_options.outputs.feature_type == 'upgrade')
+          needs.evaluate_options.outputs.test_level == '4'
         with:
           distribution: goreleaser
           version: latest
@@ -423,27 +424,32 @@ jobs:
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
-          VERSION: ${{ env.VERSION }}-upgrade-test
+          VERSION: ${{ env.VERSION }}-prime
 
+      # In order to test the case of upgrading from the current operator
+      # to a future one, we build and push an image with a different VERSION
+      # to force a different hash for the manager binary.
+      # (Otherwise the ONLINE upgrade won't trigger)
+      #
+      # We push the "prime" binary using a tag with the suffix "-prime"
+      # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
+      # upgrade test
       - name: Build and push image for upgrade test
         uses: docker/build-push-action@v5
         if: |
           always() && !cancelled() &&
-          needs.evaluate_options.outputs.test_level == '4' &&
-          (needs.evaluate_options.outputs.feature_type == '' ||
-           needs.evaluate_options.outputs.feature_type == 'upgrade')
+          needs.evaluate_options.outputs.test_level == '4'
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
           push: true
           build-args: |
-            VERSION=${{ env.VERSION }}-upgrade-test
-          tags: ${{ steps.docker-meta.outputs.tags }}-upgrade-test
+            VERSION=${{ env.VERSION }}-prime
+          tags: ${{ steps.docker-meta.outputs.tags }}-prime
           labels: ${{ env.LABELS }}
           provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
-
 
   # This will only execute in cloudnative-pg org
   publish-artifacts:
