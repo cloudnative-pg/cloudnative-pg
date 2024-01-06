@@ -1,4 +1,4 @@
-# Client TLS/SSL Connections
+# Client TLS/SSL connections
 
 !!! Seealso "Certificates"
     Please refer to the ["Certificates"](certificates.md)
