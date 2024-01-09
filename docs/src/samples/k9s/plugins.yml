@@ -91,7 +91,7 @@ plugins:
       - -c
       - "kubectl cnpg reload $NAME -n $NAMESPACE --context $CONTEXT |& less -R"
   cnpg-restart:
-    shortCut: Ctrl-R
+    shortCut: Shift-R
     description: Restart
     confirm: true
     scopes:
