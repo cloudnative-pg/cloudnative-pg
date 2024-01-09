@@ -1923,6 +1923,7 @@ jobs:
           insecure_skip_tls_verify: true
       -
         name: Run E2E tests
+        if: (always() && !cancelled())
         run: |
           # Before running on OpenShift we make sure that the catalog is created
           # in the openshift-marketplace namespace
