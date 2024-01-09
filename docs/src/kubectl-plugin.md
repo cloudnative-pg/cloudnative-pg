@@ -971,5 +971,5 @@ reachable in your `PATH` variable to correctly work.
 The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
 popular terminal based UI to interact with Kubernetes clusters.
 
-See [`k9s/plugin.yml`](samples/k9s/plugin.yml) for details.
+See [`k9s/plugins.yml`](samples/k9s/plugins.yml) for details.
 
