@@ -3,7 +3,8 @@
     "KIND": {"min": "1.23", "max": ""},
     "AKS": {"min": "1.23", "max": ""},
     "EKS": {"min": "1.23", "max": ""},
-    "GKE": {"min": "1.23", "max": ""}
+    "GKE": {"min": "1.23", "max": ""},
+    "OPENSHIFT": {"min":  "4.11", "max": ""}
   },
   "unit_test": {"min":  "1.23", "max":  "1.28"}
 }

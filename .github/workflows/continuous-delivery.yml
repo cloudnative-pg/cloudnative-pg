@@ -12,7 +12,7 @@ on:
         required: true
         default: 'main'
       limit:
-        description: 'Limit to the specified engines list (local, eks, aks, gke)'
+        description: 'Limit to the specified engines list (local, eks, aks, gke, openshift)'
         required: false
       test_level:
         description: 'Test level (0-4)'
@@ -248,6 +248,7 @@ jobs:
       pull-requests: read
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
+      image_name: ${{ env.IMAGE_NAME }}
       # 'branch_name' is used in 'GetMostRecentReleaseTag' in the Go code
       branch_name: ${{ steps.build-meta.outputs.branch_name }}
       upload_artifacts: ${{ steps.build-meta.outputs.upload_artifacts }}
@@ -255,6 +256,8 @@ jobs:
       commit_sha: ${{ steps.build-meta.outputs.commit_sha }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
+      controller_img_ubi: ${{ env.CONTROLLER_IMG_UBI }}
+      bundle_img: ${{ env.BUNDLE_IMG }}
     steps:
       -
         name: Checkout
@@ -352,6 +355,17 @@ jobs:
           tags: |
             type=raw,value=${{ steps.build-meta.outputs.tag_name }}
       -
+        name: Docker meta UBI8
+        id: docker-meta-ubi8
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGES }}
+          flavor: |
+            suffix=-ubi8
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+      -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -381,6 +395,21 @@ jobs:
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
       -
+        name: Build and push UBI8
+        uses: docker/build-push-action@v5
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          context: .
+          file: Dockerfile-ubi8
+          push: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
+          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          labels: ${{ env.LABELS }}
+          provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
+          cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
+          cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
+      -
         name: Image Meta
         id: image-meta
         env:
@@ -390,6 +419,21 @@ jobs:
           # TAGS could be separated by newlines or commas
           image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
           echo "image=${image}" >> $GITHUB_OUTPUT
+
+      -
+        name: Output images
+        env:
+          TAGS: ${{ steps.docker-meta.outputs.tags }}
+          TAGS_UBI: ${{ steps.docker-meta-ubi8.outputs.tags }}
+        run: |
+          LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
+          TAG=${TAGS#*:}
+          TAG_UBI=${TAGS_UBI#*:}
+          echo "IMAGE_NAME=${LOWERCASE_OPERATOR_IMAGE_NAME}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+
       -
         name: Generate manifest for operator deployment
         id: generate-manifest
@@ -496,6 +540,8 @@ jobs:
       gkeMatrix: ${{ steps.generate-jobs.outputs.gkeMatrix }}
       gkeEnabled: ${{ steps.generate-jobs.outputs.gkeEnabled }}
       gkeTimeout: ${{ steps.generate-jobs.outputs.gkeE2ETimeout }}
+      openshiftMatrix: ${{ steps.generate-jobs.outputs.openshiftMatrix }}
+      openshiftEnabled: ${{ steps.generate-jobs.outputs.openshiftEnabled }}
     steps:
       -
         name: Checkout code
@@ -1752,6 +1798,144 @@ jobs:
                attempt=$((attempt+1))
             done
           done
+
+
+
+  # OpenShift Secrets required
+  # secrets.AWS_EKS_ADMIN_IAM_ROLES
+  # secrets.AWS_ACCESS_KEY_ID
+  # secrets.AWS_SECRET_ACCESS_KEY
+  e2e-openshift:
+    name: Run E2E on OpenShift
+    if: | 
+      always()
+    needs:
+      - buildx
+      - generate-jobs
+      - evaluate_options
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.generate-jobs.outputs.openshiftMatrix) }}
+    runs-on: ubuntu-22.04
+    env:
+      # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
+      TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
+      # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
+      FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
+
+      K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_VERSION: ${{ matrix.postgres_version }}
+      POSTGRES_KIND: ${{ matrix.postgres_kind }}
+      MATRIX: ${{ matrix.id }}
+      POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      # The version of operator to upgrade FROM, in the rolling upgrade E2E test
+      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+      TEST_TIMEOUTS:
+      BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
+
+      DEBUG: "true"
+      BUILD_IMAGE: "false"
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
+      E2E_DEFAULT_STORAGE_CLASS: gp3-csi
+      E2E_CSI_STORAGE_CLASS: gp3-csi
+      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-aws-vsc
+
+      TEST_CLOUD_VENDOR: "openshift"
+
+      # AWS configuration
+      AWS_BASE_DOMAIN: ${{ secrets.AWS_BASE_DOMAIN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: eu-central-1
+      AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES }}
+
+      REDHAT_PULL: ${{ secrets.REDHAT_PULL }}
+      SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+
+    steps:
+      -
+        name: Set cluster name
+        run: |
+          echo "CLUSTER_NAME=ocp-${{ github.run_number}}" >> $GITHUB_ENV
+      -
+        name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.evaluate_options.outputs.git_ref }}
+          fetch-depth: 0
+      -
+        name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ needs.buildx.outputs.platforms }}
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      -
+        ## In case hack/setup-cluster.sh need pull operand image from registry
+        name: Login into docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+      -
+        name: Build and push the operator and catalog
+        env:
+          IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi }}
+          BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+        run: |
+          make olm-catalog
+      -
+        name: Install OC Installer and client
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          source: "mirror"
+          openshift-install: ${{ matrix.k8s_version }}
+          oc: ${{ matrix.k8s_version }}
+
+      -
+        name: Install OpenShift Cluster ${{ matrix.k8s_version }}
+        run: |
+          envsubst < hack/install-config.yaml.template > hack/install-config.yaml
+          openshift-install create cluster --dir hack/
+
+      -
+        name: Store OpenShift password
+        run: |
+          OPENSHIFT_PASSWORD="$(cat "$(pwd)"/hack/auth/kubeadmin-password)"
+          echo "OPENSHIFT_PASSWORD=${OPENSHIFT_PASSWORD}" >> $GITHUB_ENV
+      -
+        name: Login into OpenShift Cluster
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: "https://api.${{ env.CLUSTER_NAME }}.${{ env.AWS_BASE_DOMAIN }}:6443"
+          openshift_username: "kubeadmin"
+          openshift_password: ${{ env.OPENSHIFT_PASSWORD }}
+          insecure_skip_tls_verify: true
+      -
+        name: Run E2E tests
+        if: (always() && !cancelled())
+        run: |
+          # Before running on OpenShift we make sure that the catalog is created
+          # in the openshift-marketplace namespace
+          sed -i -e 's/namespace: operators/namespace: openshift-marketplace/' cloudnative-pg-catalog.yaml
+          find -type f -name "cloudnative-pg-catalog.yaml"
+          cat cloudnative-pg-catalog.yaml
+          KUBECONFIG=$(pwd)/hack/auth/kubeconfig bash -x hack/e2e/run-e2e-ocp.sh
+      -
+        name: Destroy OpenShift Cluster ${{ matrix.k8s_version }}
+        if: always()
+        run: |
+          openshift-install destroy cluster --dir hack/
 
   # Summarize E2E test results, display in the GitHub 'summary' view
   summarize-e2e-tests:
