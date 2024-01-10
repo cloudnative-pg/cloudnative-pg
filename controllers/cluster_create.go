@@ -968,16 +968,11 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, nil
 	}
 
-	// Generate a new node serial
-	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
-	}
-
 	var backup *apiv1.Backup
 	if cluster.Spec.Bootstrap != nil &&
 		cluster.Spec.Bootstrap.Recovery != nil &&
 		cluster.Spec.Bootstrap.Recovery.Backup != nil {
+		var err error
 		backup, err = r.getOriginBackup(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -999,6 +994,12 @@ func (r *ClusterReconciler) createPrimaryInstance(
 				RequeueAfter: time.Minute,
 			}, nil
 		}
+	}
+
+	// Generate a new node serial
+	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
 	// Get the source storage from where to create the primary instance.
