@@ -28,6 +28,7 @@ PG_VERSIONS_FILE = ".github/pg_versions.json"
 AKS_VERSIONS_FILE = ".github/aks_versions.json"
 EKS_VERSIONS_FILE = ".github/eks_versions.json"
 GKE_VERSIONS_FILE = ".github/gke_versions.json"
+OPENSHIFT_VERSIONS_FILE = ".github/openshift_versions.json"
 KIND_VERSIONS_FILE = ".github/kind_versions.json"
 VERSION_SCOPE_FILE = ".github/k8s_versions_scope.json"
 E2E_TEST_TIMEOUT = ".github/e2e_test_timeout.json"
@@ -115,6 +116,12 @@ with open(GKE_VERSIONS_FILE) as json_file:
     version_list = json.load(json_file)
     gke_versions = filter_version(version_list, SUPPORT_K8S_VERSION["GKE"])
 GKE_K8S = VersionList(gke_versions)
+
+# OpenShift version to use during the tests
+with open(OPENSHIFT_VERSIONS_FILE) as json_file:
+    version_list = json.load(json_file)
+    openshift_versions = filter_version(version_list, SUPPORT_K8S_VERSION["OPENSHIFT"])
+OPENSHIFT_K8S = VersionList(openshift_versions)
 
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
@@ -266,6 +273,14 @@ ENGINE_MODES = {
         "workflow_dispatch": lambda: build_pull_request_include_cloud(GKE_K8S),
         "main": lambda: build_main_include_cloud(GKE_K8S),
         "schedule": lambda: build_schedule_include_cloud(GKE_K8S),
+    },
+    "openshift": {
+        "push": lambda: build_push_include_cloud(OPENSHIFT_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(OPENSHIFT_K8S),
+        "issue_comment": lambda: build_pull_request_include_cloud(OPENSHIFT_K8S),
+        "workflow_dispatch": lambda: build_pull_request_include_cloud(OPENSHIFT_K8S),
+        "main": lambda: build_main_include_cloud(OPENSHIFT_K8S),
+        "schedule": lambda: build_schedule_include_cloud(OPENSHIFT_K8S),
     },
 }
 
