@@ -996,6 +996,30 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		}
 	}
 
+	if cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.Recovery != nil &&
+		cluster.Spec.Bootstrap.Recovery.VolumeSnapshots != nil {
+		volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
+		status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
+			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if status.ContainsErrors() {
+			contextLogger.Warning(
+				"Volume snapshots verification failed, retrying",
+				"status", status)
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		if status.ContainsWarnings() {
+			contextLogger.Warning("Volume snapshots verification warnings",
+				"status", status)
+		}
+	}
+
 	// Generate a new node serial
 	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
 	if err != nil {
@@ -1020,28 +1044,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	switch {
 	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil:
-		volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
-		if volumeSnapshotsRecovery != nil {
-			status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
-				ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			if status.ContainsErrors() {
-				contextLogger.Warning(
-					"Volume snapshots verification failed, retrying",
-					"status", status)
-				return ctrl.Result{
-					Requeue:      true,
-					RequeueAfter: 5 * time.Second,
-				}, nil
-			}
-			if status.ContainsWarnings() {
-				contextLogger.Warning("Volume snapshots verification warnings",
-					"status", status)
-			}
-		}
-
 		if candidateSource != nil {
 			var snapshot volumesnapshot.VolumeSnapshot
 			if err := r.Client.Get(ctx,
