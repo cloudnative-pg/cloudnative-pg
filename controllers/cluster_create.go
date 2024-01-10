@@ -970,53 +970,15 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	var backup *apiv1.Backup
 	if cluster.Spec.Bootstrap != nil &&
-		cluster.Spec.Bootstrap.Recovery != nil &&
-		cluster.Spec.Bootstrap.Recovery.Backup != nil {
+		cluster.Spec.Bootstrap.Recovery != nil {
 		var err error
 		backup, err = r.getOriginBackup(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if backup == nil {
-			contextLogger.Info("Missing backup object, can't continue full recovery",
-				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: time.Minute,
-			}, nil
-		}
-		if backup.Status.Phase != apiv1.BackupPhaseCompleted {
-			contextLogger.Info("The source backup object is not completed, can't continue full recovery",
-				"backup", cluster.Spec.Bootstrap.Recovery.Backup,
-				"backupPhase", backup.Status.Phase)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: time.Minute,
-			}, nil
-		}
-	}
 
-	if cluster.Spec.Bootstrap != nil &&
-		cluster.Spec.Bootstrap.Recovery != nil &&
-		cluster.Spec.Bootstrap.Recovery.VolumeSnapshots != nil {
-		volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
-		status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
-			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if status.ContainsErrors() {
-			contextLogger.Warning(
-				"Volume snapshots verification failed, retrying",
-				"status", status)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: 5 * time.Second,
-			}, nil
-		}
-		if status.ContainsWarnings() {
-			contextLogger.Warning("Volume snapshots verification warnings",
-				"status", status)
+		if res, err := r.checkBootstrapFromRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
+			return res, err
 		}
 	}
 
@@ -1365,4 +1327,56 @@ func findInstancePodToCreate(
 	}
 
 	return nil, nil
+}
+
+// checkBootstrapFromRecovery checks if the backup or volumeSnapshots are good for bootstrapping
+func (r *ClusterReconciler) checkBootstrapFromRecovery(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if cluster.Spec.Bootstrap.Recovery.Backup != nil {
+		if backup == nil {
+			contextLogger.Info("Missing backup object, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: time.Minute,
+			}, nil
+		}
+		if backup.Status.Phase != apiv1.BackupPhaseCompleted {
+			contextLogger.Info("The source backup object is not completed, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup,
+				"backupPhase", backup.Status.Phase)
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: time.Minute,
+			}, nil
+		}
+	}
+
+	volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
+	if volumeSnapshotsRecovery != nil {
+		status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
+			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if status.ContainsErrors() {
+			contextLogger.Warning(
+				"Volume snapshots verification failed, retrying",
+				"status", status)
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		if status.ContainsWarnings() {
+			contextLogger.Warning("Volume snapshots verification warnings",
+				"status", status)
+		}
+	}
+	return ctrl.Result{}, nil
 }
