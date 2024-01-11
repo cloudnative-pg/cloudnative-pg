@@ -42,7 +42,7 @@ Name | Description
 `ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` | when set to `true`, enables in-place updates of the instance manager after an update of the operator, avoiding rolling updates of the cluster (default `false`)
 `MONITORING_QUERIES_CONFIGMAP` | The name of a ConfigMap in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
 `MONITORING_QUERIES_SECRET` | The name of a Secret in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
-`CERTIFICATE_DURATION` | This parameter, represented as an integer,  determines the lifetime of the generated ceritificates. Default is 90. 
+`CERTIFICATE_DURATION` | This parameter, represented as an integer,  determines the lifetime of the generated certificates. Default is 90.
 `EXPIRING_CHECK_THRESHOLD` | This parameter, represented as an integer, determines the threshold for identifying a certificate as expiring. Default is 7. 
 `CREATE_ANY_SERVICE` | when set to `true`, will create `-any` service for the cluster. Default is `false`
 

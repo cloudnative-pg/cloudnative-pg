@@ -81,6 +81,7 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 		switch valueField.Kind() {
 		case reflect.Bool:
 			value = strconv.FormatBool(valueField.Bool())
+
 		case reflect.Int:
 			value = fmt.Sprintf("%v", valueField.Int())
 

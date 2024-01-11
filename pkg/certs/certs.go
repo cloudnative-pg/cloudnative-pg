@@ -26,7 +26,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"math/big"
 	"net"
 	"strings"
@@ -34,6 +33,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 const (
