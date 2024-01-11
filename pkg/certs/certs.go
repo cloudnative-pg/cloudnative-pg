@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"sort"
 	"strings"
 	"time"
 
@@ -334,6 +335,9 @@ func (pair *KeyPair) DoAltDNSNamesMatch(altDNSNames []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	sort.Strings(cert.DNSNames)
+	sort.Strings(altDNSNames)
 
 	return slices.Equal(cert.DNSNames, altDNSNames), nil
 }
