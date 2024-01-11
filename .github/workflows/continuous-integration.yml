@@ -629,7 +629,6 @@ jobs:
         env:
           TAGS: ${{ steps.docker-meta.outputs.tags }}
           TAGS_UBI8: ${{ steps.docker-meta-ubi8.outputs.tags }}
-          TAGS_UBI9: ${{ steps.docker-meta-ubi9.outputs.tags }}
         run: |
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
