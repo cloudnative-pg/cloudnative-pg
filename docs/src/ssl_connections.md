@@ -59,9 +59,8 @@ Certificate:
     Subject: CN = app
 ```
 
-As you can see, TLS client certificates by default are created with 90 days of
-validity and with a simple CN that corresponds to the username in PostgreSQL.
-This is necessary to leverage the `cert` authentication method for `hostssl`
+As you can see, TLS client certificates by default are created with 90 days of validity, and with a simple CN that
+corresponds to the username in PostgreSQL. You can specify the validity and threshold values using the EXPIRE_CHECK_THRESHOLD and CERTIFICATE_DURATION parameters. This is necessary to leverage the `cert` authentication method for `hostssl`
 entries in `pg_hba.conf`.
 
 ## Testing the connection via a TLS certificate

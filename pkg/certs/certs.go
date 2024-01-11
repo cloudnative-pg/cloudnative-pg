@@ -26,6 +26,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"math/big"
 	"net"
 	"strings"
@@ -36,17 +37,12 @@ import (
 )
 
 const (
-	// This is the lifetime of the generated certificates
-	certificateDuration = 90 * 24 * time.Hour
 
 	// This is the PEM block type of elliptic courves private key
 	ecPrivateKeyPEMBlockType = "EC PRIVATE KEY"
 
 	// This is the PEM block type for certificates
 	certificatePEMBlockType = "CERTIFICATE"
-
-	// Threshold to consider a certificate as expiring
-	expiringCheckThreshold = 7 * 24 * time.Hour
 
 	// CACertKey is the key for certificates in a CA secret
 	CACertKey = "ca.crt"
@@ -143,6 +139,7 @@ func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
 
 // CreateAndSignPair given a CA keypair, generate and sign a leaf keypair
 func (pair KeyPair) CreateAndSignPair(host string, usage CertType, altDNSNames []string) (*KeyPair, error) {
+	certificateDuration := time.Duration(configuration.Current.CertificateDuration) * time.Hour * 24
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 	return pair.createAndSignPairWithValidity(host, notBefore, notAfter, usage, altDNSNames)
@@ -267,6 +264,7 @@ func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCert
 		return err
 	}
 
+	certificateDuration := time.Duration(configuration.Current.CertificateDuration) * time.Hour * 24
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 
@@ -314,6 +312,7 @@ func (pair *KeyPair) IsExpiring() (bool, *time.Time, error) {
 	if time.Now().Before(cert.NotBefore) {
 		return true, &cert.NotAfter, nil
 	}
+	expiringCheckThreshold := time.Duration(configuration.Current.ExpiringCheckThreshold) * time.Hour * 24
 	if time.Now().Add(expiringCheckThreshold).After(cert.NotAfter) {
 		return true, &cert.NotAfter, nil
 	}
@@ -334,6 +333,7 @@ func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit strin
 		return nil, err
 	}
 
+	certificateDuration := time.Duration(configuration.Current.CertificateDuration) * time.Hour * 24
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 
@@ -342,6 +342,7 @@ func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit strin
 
 // CreateRootCA generates a CA returning its keys
 func CreateRootCA(commonName string, organizationalUnit string) (*KeyPair, error) {
+	certificateDuration := time.Duration(configuration.Current.CertificateDuration) * time.Hour * 24
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 	return createCAWithValidity(notBefore, notAfter, nil, nil, commonName, organizationalUnit)

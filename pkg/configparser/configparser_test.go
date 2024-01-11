@@ -36,6 +36,9 @@ type FakeData struct {
 	// the owning Cluster
 	InheritedLabels []string `json:"inheritedLabels" env:"INHERITED_LABELS"`
 
+	//  Threshold to consider a certificate as expiring
+	ExpiringCheckThreshold int `json:"expiringCheckThreshold" env:"EXPIRING_CHECK_THRESHOLD"`
+
 	// EnablePodDebugging enable debugging mode in new generated pods
 	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
 }
@@ -74,14 +77,16 @@ var _ = Describe("Data test suite", func() {
 	It("loads values from environment", func() {
 		config := &FakeData{}
 		fakeEnv := NewFakeEnvironment(map[string]string{
-			"WATCH_NAMESPACE":       oneNamespace,
-			"INHERITED_ANNOTATIONS": "one, two",
-			"INHERITED_LABELS":      "alpha, beta",
+			"WATCH_NAMESPACE":          oneNamespace,
+			"INHERITED_ANNOTATIONS":    "one, two",
+			"INHERITED_LABELS":         "alpha, beta",
+			"EXPIRING_CHECK_THRESHOLD": "2",
 		})
 		config.readConfigMap(nil, fakeEnv)
 		Expect(config.WatchNamespace).To(Equal(oneNamespace))
 		Expect(config.InheritedAnnotations).To(Equal([]string{"one", "two"}))
 		Expect(config.InheritedLabels).To(Equal([]string{"alpha", "beta"}))
+		Expect(config.ExpiringCheckThreshold).To(Equal(2))
 	})
 
 	It("handles correctly default values of slices", func() {
