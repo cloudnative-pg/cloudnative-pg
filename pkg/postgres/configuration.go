@@ -33,7 +33,7 @@ const (
 # FIXED RULES
 #
 
-# Grant local access (`local` user map)
+# Grant local access ('local' user map)
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
@@ -69,7 +69,7 @@ host all all all {{.DefaultAuthenticationMethod}}
 # FIXED RULES
 #
 
-# Grant local access (`local` user map)
+# Grant local access ('local' user map)
 local {{.Username}} postgres
 
 #
