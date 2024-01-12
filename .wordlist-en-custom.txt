@@ -703,6 +703,7 @@ http
 httpGet
 https
 hugepages
+ident
 imageName
 imagePullPolicy
 imagePullSecrets

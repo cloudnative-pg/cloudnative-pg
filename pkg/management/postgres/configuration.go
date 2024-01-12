@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
@@ -195,6 +196,42 @@ func quoteHbaLiteral(literal string) string {
 	literal = strings.ReplaceAll(literal, `"`, `""`)
 	literal = strings.ReplaceAll(literal, "\n", "\\\n")
 	return fmt.Sprintf(`"%s"`, literal)
+}
+
+// GeneratePostgresqlIdent generates the pg_ident.conf content
+func (instance *Instance) GeneratePostgresqlIdent(cluster *apiv1.Cluster) (string, error) {
+	var username string
+	currentUser, err := user.Current()
+	if err != nil {
+		log.Info("Unable to identify the current user. Falling back to insecure mapping.")
+		username = "/"
+	} else {
+		username = currentUser.Username
+	}
+
+	return postgres.CreateIdentRules(
+		cluster.Spec.PostgresConfiguration.PgIdent,
+		username)
+}
+
+// RefreshPGIdent generates and writes down the pg_ident.conf file
+func (instance *Instance) RefreshPGIdent(cluster *apiv1.Cluster) (postgresIdentChanged bool, err error) {
+	// Generate pg_hba.conf file
+	pgIdentContent, err := instance.GeneratePostgresqlIdent(cluster)
+	if err != nil {
+		return false, nil
+	}
+	postgresIdentChanged, err = InstallPgDataFileContent(
+		instance.PgData,
+		pgIdentContent,
+		constants.PostgresqlIdentFile)
+	if err != nil {
+		return postgresIdentChanged, fmt.Errorf(
+			"installing postgresql Ident rules: %w",
+			err)
+	}
+
+	return postgresIdentChanged, err
 }
 
 // UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
