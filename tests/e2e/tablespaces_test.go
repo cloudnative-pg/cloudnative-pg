@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -985,11 +986,23 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 							Namespace: namespace,
 							PodName:   pod.Name,
 						}, nil,
-						"stat", "-c", `'%U'`, dataDir,
+						"stat", "-c", `'%u'`, dataDir,
 					)
+
+					targetContainer := -1
+					for i, cr := range pod.Spec.Containers {
+						if cr.Name == specs.PostgresContainerName {
+							targetContainer = i
+						}
+					}
+					podUser := cluster.GetPostgresUID()
+					if pod.Spec.Containers[targetContainer].SecurityContext.RunAsUser != nil {
+						podUser = *pod.Spec.Containers[targetContainer].SecurityContext.RunAsUser
+					}
+
 					g.Expect(stdErr).To(BeEmpty())
 					g.Expect(err).ShouldNot(HaveOccurred())
-					g.Expect(owner).To(ContainSubstring("postgres"))
+					g.Expect(owner).To(ContainSubstring(strconv.FormatInt(podUser, 10)))
 				}
 			}
 		}, timeout).Should(Succeed())
