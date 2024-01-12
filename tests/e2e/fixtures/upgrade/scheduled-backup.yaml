@@ -4,5 +4,6 @@ metadata:
   name: scheduled-backup
 spec:
   schedule: "*/30 * * * * *"
+  target: primary
   cluster:
     name: cluster1
