@@ -290,6 +290,12 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 		return false, err
 	}
 
+	reloadIdent, err := r.instance.RefreshPGIdent(cluster)
+	if err != nil {
+		return false, err
+	}
+	reloadNeeded = reloadNeeded || reloadIdent
+
 	// Reconcile PostgreSQL configuration
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster, false)

@@ -333,6 +333,12 @@ manifest are added to a default `pg_hba.conf`.
 For further detail on how `pg_hba.conf` is managed by the operator, see the
 ["PostgreSQL Configuration" page](postgresql_conf.md#the-pg_hba-section) of the documentation.
 
+The administrator can also customize the content of the `pg_ident.conf` file that by default
+only maps the local postgres user to the postgres user in the database.
+
+For further detail on how `pg_ident.conf` is managed by the operator, see the
+["PostgreSQL Configuration" page](postgresql_conf.md#the-pg_ident-section) of the documentation.
+
 !!! Important
     Examples assume that the Kubernetes cluster runs in a private and secure network.
 
