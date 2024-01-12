@@ -364,6 +364,22 @@ func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.
 	})
 }
 
+// AssertCreateTestData create test data.
+func AssertCreateTestDataInTablespace(namespace, clusterName, tableName, tablespace string, pod *corev1.Pod) {
+	By(fmt.Sprintf("creating test data in tablespace %q", tablespace), func() {
+		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v TABLESPACE %v AS VALUES (1),(2);", tableName, tablespace)
+		_, _, err := env.ExecCommandWithPsqlClient(
+			namespace,
+			clusterName,
+			pod,
+			apiv1.ApplicationUserSecretSuffix,
+			testsUtils.AppDBName,
+			query,
+		)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
 // AssertCreateTestDataLargeObject create large objects with oid and data
 func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, data string, pod *corev1.Pod) {
 	By("creating large object", func() {
