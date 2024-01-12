@@ -444,7 +444,7 @@ For example:
 ``` yaml
   postgresql:
     pg_ident:
-      - "mymap /^(.*)@mydomain\.com$ \\1"
+      - "mymap /^(.*)@mydomain\\.com$ \\1"
 ```
 
 ## Changing configuration
