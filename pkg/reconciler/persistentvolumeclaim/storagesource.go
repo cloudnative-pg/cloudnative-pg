@@ -154,6 +154,11 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 			result.DataSource = reference
 		case utils.PVCRolePgWal:
 			result.WALSource = &reference
+		case utils.PVCRolePgTablespace:
+			if result.TablespaceSource == nil {
+				result.TablespaceSource = map[string]corev1.TypedLocalObjectReference{}
+			}
+			result.TablespaceSource[element.TablespaceName] = reference
 		}
 	}
 
