@@ -2806,6 +2806,12 @@ spec:
                     items:
                       type: string
                     type: array
+                  pg_ident:
+                    description: PostgreSQL User Name Maps rules (lines to be appended
+                      to the pg_ident.conf file)
+                    items:
+                      type: string
+                    type: array
                   promotionTimeout:
                     description: Specifies the maximum number of seconds to wait when
                       promoting an instance to primary. Default value is 40000000,

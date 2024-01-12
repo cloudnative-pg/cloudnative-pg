@@ -85,6 +85,18 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		Expect(err).ToNot(HaveOccurred())
 	}
 
+	updateClusterPostgresPgIdent := func(namespace string) {
+		cluster := &apiv1.Cluster{}
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			var err error
+			cluster, err = env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			cluster.Spec.PostgresConfiguration.PgIdent = []string{"email /^(.*)@example\\.com \\1"}
+			return env.Client.Update(env.Ctx, cluster)
+		})
+		Expect(err).ToNot(HaveOccurred())
+	}
+
 	checkErrorOutFixedAndBlockedConfigurationParameter := func(params map[string]string, namespace string) {
 		// Update the configuration
 		cluster := &apiv1.Cluster{}
@@ -391,6 +403,57 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 				}, timeout).Should(BeEquivalentTo(oldPrimary))
 			})
 		})
+
+	It("09. reloading Pg when pg_ident rules are modified", func() {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		stdout, _, err := env.ExecCommand(env.Ctx, podList.Items[0], specs.PostgresContainerName, &commandTimeout,
+			"psql", "-U", "postgres", "-tAc",
+			"select count(1) from pg_views where viewname = 'pg_ident_file_mappings';")
+		psqlHasIdentView := err == nil && strings.Trim(stdout, "\n") == "1"
+
+		By("check that there is only one entry in pg_ident_file_mappings", func() {
+			for _, pod := range podList.Items {
+				pod := pod // pin the variable
+				if psqlHasIdentView {
+					Eventually(func() (string, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
+							"psql", "-U", "postgres", "-tAc",
+							"select count(1) from pg_ident_file_mappings;")
+						return strings.Trim(stdout, "\n"), err
+					}, timeout).Should(BeEquivalentTo("1"))
+				}
+			}
+		})
+
+		By("apply configuration update", func() {
+			// Update the configuration
+			updateClusterPostgresPgIdent(namespace)
+			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, 300)
+		})
+
+		By("verify that there are now two entries in pg_ident_file_mappings", func() {
+			for _, pod := range podList.Items {
+				pod := pod // pin the variable
+				if psqlHasIdentView {
+					Eventually(func() (string, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
+							"psql", "-U", "postgres", "-tAc",
+							"select count(1) from pg_ident_file_mappings;")
+						return strings.Trim(stdout, "\n"), err
+					}, timeout).Should(BeEquivalentTo("2"))
+				} else {
+					// Can't check for the actual content of the file, but let's check that we can reload the config
+					Eventually(func() (string, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
+							"psql", "-U", "postgres", "-tAc", "select count(1) where pg_reload_conf();")
+						return strings.Trim(stdout, "\n"), err
+					}, timeout).Should(BeEquivalentTo("1"))
+				}
+			}
+		})
+	})
 })
 
 var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.LabelClusterMetadata), func() {

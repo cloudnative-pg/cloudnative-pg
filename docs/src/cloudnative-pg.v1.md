@@ -3522,6 +3522,14 @@ the implementation order is same as the order of each array</p>
 to the pg_hba.conf file)</p>
 </td>
 </tr>
+<tr><td><code>pg_ident</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>PostgreSQL User Name Maps rules (lines to be appended
+to the pg_ident.conf file)</p>
+</td>
+</tr>
 <tr><td><code>syncReplicaElectionConstraint</code><br/>
 <a href="#postgresql-cnpg-io-v1-SyncReplicaElectionConstraints"><i>SyncReplicaElectionConstraints</i></a>
 </td>
