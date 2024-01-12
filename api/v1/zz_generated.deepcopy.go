@@ -1826,6 +1826,11 @@ func (in *PostgresConfiguration) DeepCopyInto(out *PostgresConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.PgIdent != nil {
+		in, out := &in.PgIdent, &out.PgIdent
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	in.SyncReplicaElectionConstraint.DeepCopyInto(&out.SyncReplicaElectionConstraint)
 	if in.AdditionalLibraries != nil {
 		in, out := &in.AdditionalLibraries, &out.AdditionalLibraries

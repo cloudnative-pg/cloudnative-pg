@@ -711,6 +711,10 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	if err != nil {
 		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
 	}
+	_, err = temporaryInstance.RefreshPGIdent(cluster)
+	if err != nil {
+		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
+	}
 	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(cluster, false)
 	if err != nil {
 		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
