@@ -498,7 +498,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 
 		It(fmt.Sprintf("can create the cluster by restoring from the backup %v using volume snapshot", backupName),
 			func() {
-				os.Setenv("BACKUP_NAME", backupName)
+				err = os.Setenv("BACKUP_NAME", backupName)
+				Expect(err).ToNot(HaveOccurred())
 
 				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterVolumesnapshoRestoreManifest)
 				Expect(err).ToNot(HaveOccurred())
