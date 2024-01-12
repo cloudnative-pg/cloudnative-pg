@@ -79,7 +79,7 @@ echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 # NOTE: the ginkgo calls may have non-zero exits, with E2E tests that fail but could be 'ignore-fail'
 RC=0
 RC_GINKGO1=0
-if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; && [[ "${OPENSHIFT}" != "true" ]]; then
+if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${OPENSHIFT}" != "true" ]]; then
   # Generate a manifest for the operator so we can upgrade to it in the upgrade tests.
   # This manifest uses the default image and tag for the current operator build, and assumes
   # the image has been either:
