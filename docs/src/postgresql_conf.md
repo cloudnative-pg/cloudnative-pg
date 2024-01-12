@@ -1,16 +1,17 @@
 # PostgreSQL Configuration
 
 Users that are familiar with PostgreSQL are aware of the existence of the
-following two files to configure an instance:
+following three files to configure an instance:
 
 - `postgresql.conf`: main run-time configuration file of PostgreSQL
 - `pg_hba.conf`: clients authentication file
+- `pg_ident.conf`: map external users to internal users
 
 Due to the concepts of declarative configuration and immutability of the PostgreSQL
 containers, users are not allowed to directly touch those files. Configuration
 is possible through the `postgresql` section of the `Cluster` resource definition
-by defining custom `postgresql.conf` and `pg_hba.conf` settings via the
-`parameters` and the `pg_hba` keys.
+by defining custom `postgresql.conf`, `pg_hba.conf`, and `pg_ident.conf` settings
+via the `parameters`, the `pg_hba`, and the `pg_ident` keys.
 
 These settings are the same across all instances.
 
@@ -397,6 +398,53 @@ postgresql:
         name: 'ldapBindPassword'
         key: 'data'
       searchAttribute: 'uid'
+```
+
+## The `pg_ident` section
+
+`pg_ident` is a list of user mappings used to create the `pg_ident.conf`
+used by the pods.
+
+The `pg_ident.conf` file can be seen as composed of two sections:
+
+1. Generated rules
+2. User-defined rules
+
+Generated rules:
+
+```text
+local <postgres system user> postgres
+```
+
+The instance manager detects the user running the PostgreSQL instance and
+automatically adds a rule to map it to the `postgres` user.
+
+If the postgres user is not properly configured inside the container, the
+instance manager will allow any local user to connect and log a warning
+message like the following:
+
+```text
+Unable to identify the current user. Falling back to insecure mapping.
+```
+
+The resulting `pg_ident.conf` will look like this:
+
+```text
+local <postgres system user> postgres
+
+<user defined lines>
+```
+
+Refer to the PostgreSQL documentation for [more information on `pg_ident.conf`](https://www.postgresql.org/docs/current/auth-username-maps.html).
+
+Inside the cluster manifest, `pg_ident` lines are added as list items
+in `.spec.postgresql.pg_ident`.
+For example:
+
+``` yaml
+  postgresql:
+    pg_ident:
+      - "mymap /^(.*)@mydomain\.com$ \\1"
 ```
 
 ## Changing configuration
