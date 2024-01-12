@@ -29,7 +29,11 @@ const (
 	// hbaTemplateString is the template used to generate the pg_hba.conf
 	// configuration file
 	hbaTemplateString = `
-# Grant local access
+#
+# FIXED RULES
+#
+
+# Grant local access (`local` user map)
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
@@ -37,26 +41,41 @@ hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
 hostssl all cnpg_pooler_pgbouncer all cert
 
+#
+# USER-DEFINED RULES
+#
+
 {{ range $rule := .UserRules }}
 {{ $rule -}}
 {{ end }}
-{{ if .LDAPConfiguration }}
 
-# LDAP Configuration
+{{ if .LDAPConfiguration }}
+#
+# LDAP CONFIGURATION (optional)
+#
 {{.LDAPConfiguration}}
 {{ end }}
 
-# Otherwise use the default authentication method
+#
+# DEFAULT RULES
+#
 host all all all {{.DefaultAuthenticationMethod}}
 `
 
 	// identTemplateString is the template used to generate the pg_ident.conf
 	// configuration file
 	identTemplateString = `
-# Grant local access
+#
+# FIXED RULES
+#
+
+# Grant local access (`local` user map)
 local {{.Username}} postgres
 
-# Additional mappings
+#
+# USER-DEFINED RULES
+#
+
 {{ range $rule := .Mappings }}
 {{ $rule -}}
 {{ end }}
