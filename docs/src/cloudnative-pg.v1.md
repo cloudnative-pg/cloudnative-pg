@@ -1997,6 +1997,13 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>The hash of the binary of the operator</p>
 </td>
 </tr>
+<tr><td><code>availableArchitectures</code><br/>
+<a href="#postgresql-cnpg-io-v1-AvailableArchitectureList"><i>AvailableArchitectureList</i></a>
+</td>
+<td>
+   <p>AvailableArchitectures reports the available architectures of a cluster</p>
+</td>
+</tr>
 <tr><td><code>conditions</code><br/>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#condition-v1-meta"><i>[]meta/v1.Condition</i></a>
 </td>

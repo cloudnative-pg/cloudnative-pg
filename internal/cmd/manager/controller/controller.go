@@ -212,11 +212,19 @@ func RunController(
 		return err
 	}
 
+	// Detect the available architectures
+	if err = utils.DetectAvailableArchitectures(); err != nil {
+		setupLog.Error(err, "unable to detect the available instance's architectures")
+		return err
+	}
+
 	setupLog.Info("Kubernetes system metadata",
 		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints(),
 		"haveSeccompProfile", utils.HaveSeccompSupport(),
-		"haveVolumeSnapshot", utils.HaveVolumeSnapshot())
+		"haveVolumeSnapshot", utils.HaveVolumeSnapshot(),
+		"availableArchitectures", utils.GetAvailableArchitectures(),
+	)
 
 	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir); err != nil {
 		return err

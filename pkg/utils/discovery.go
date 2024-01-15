@@ -18,13 +18,17 @@ package utils
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 )
 
 // haveSCC stores the result of the DetectSecurityContextConstraints check
@@ -35,6 +39,14 @@ var haveVolumeSnapshot bool
 
 // supportSeccomp specifies whether we should set the SeccompProfile or not in the pods
 var supportSeccomp bool
+
+// AvailableArchitecture is a struct containing info about an available architecture
+type AvailableArchitecture struct {
+	GoArch, Hash string
+}
+
+// availableArchitectures stores the result of DetectAvailableArchitectures function
+var availableArchitectures []AvailableArchitecture
 
 // minorVersionRegexp is used to extract the minor version from
 // the Kubernetes API server version. Some providers, like AWS,
@@ -170,4 +182,29 @@ func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
 	}
 
 	return
+}
+
+// GetAvailableArchitectures returns the available instance's architectures
+func GetAvailableArchitectures() []AvailableArchitecture { return availableArchitectures }
+
+// DetectAvailableArchitectures detects the architectures available in the cluster
+func DetectAvailableArchitectures() (err error) {
+	binaries, err := filepath.Glob("bin/manager_*")
+	if err != nil {
+		return err
+	}
+
+	for _, b := range binaries {
+		goArch := strings.Split(b, "manager_")[1]
+		hash, err := executablehash.GetByName(b)
+		if err != nil {
+			return err
+		}
+		availableArchitectures = append(availableArchitectures, AvailableArchitecture{
+			GoArch: goArch,
+			Hash:   hash,
+		})
+	}
+
+	return err
 }
