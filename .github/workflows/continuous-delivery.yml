@@ -1057,7 +1057,7 @@ jobs:
         if: (always() && !cancelled())
         uses: actions/upload-artifact@v4
         with:
-          name: testartifacts-aks
+          name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
           retention-days: 7
       -
@@ -1437,7 +1437,7 @@ jobs:
         if: (always() && !cancelled())
         uses: actions/upload-artifact@v4
         with:
-          name: testartifacts-eks
+          name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
           retention-days: 7
       -
@@ -1755,7 +1755,7 @@ jobs:
         if: (always() && !cancelled())
         uses: actions/upload-artifact@v4
         with:
-          name: testartifacts-gke
+          name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
           retention-days: 7
       -
