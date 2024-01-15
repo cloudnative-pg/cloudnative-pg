@@ -55,16 +55,16 @@ We test four scenarios:
 1 and 2) the initial operator installed is the most recent tag. We upgrade to the
   current operator build. We test this with rolling and online upgrades.
 3 and 4) the initial operator installed is the current operator build. We upgrade
-  to a `prime` version made from the same code, only a slight difference to get a
-  different binary hash an image tag.
+  to a `prime` version built from the same code, only with a different image tag
+  and a different build VERSION (required to have a different binary hash).
   This `prime` version is built in the `setup-cluster.sh` script or in the
-  `buildx` phase in the continuous-delivery GH workflow.
+  `buildx` phase of the continuous-delivery GH workflow.
   We test with online and rolling upgrades.
 
 To check the soundness of the upgrade, on each of the four scenarios:
 
 * We test changing the configuration. That will induce a switchover.
-* A Backup created with the initial version is there after upgrade, and
+* A Backup created with the initial version is still there after upgrade, and
   can be used to bootstrap a cluster.
 * A ScheduledBackup created with the initial version is still scheduled
   after the upgrade.
