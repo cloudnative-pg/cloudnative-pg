@@ -36,6 +36,11 @@ func Stream() (io.ReadCloser, error) {
 	return os.Open(processBinaryFileName) // #nosec
 }
 
+// StreamByName opens a stream reading from an executable given its name
+func StreamByName(name string) (io.ReadCloser, error) {
+	return os.Open(name) // #nosec
+}
+
 // Get gets the hashcode of the executable of this binary
 func Get() (string, error) {
 	var err error
@@ -64,4 +69,28 @@ func Get() (string, error) {
 
 	processBinaryHash = fmt.Sprintf("%x", encoder.Sum(nil))
 	return processBinaryHash, err
+}
+
+// GetByName gets the hashcode of a binary given its filename
+func GetByName(name string) (string, error) {
+	var err error
+
+	mx.Lock()
+	defer mx.Unlock()
+
+	binaryFileStream, err := StreamByName(name)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		err = binaryFileStream.Close()
+	}()
+
+	encoder := sha256.New()
+	_, err = io.Copy(encoder, binaryFileStream)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", encoder.Sum(nil)), err
 }
