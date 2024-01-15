@@ -49,9 +49,33 @@ duration of a pod's life, without persisting across pod restarts.
 
 ### Volume for temporary storage
 
-An ephemeral volume used for temporary storage. You can configure an upper
-bound on the size using the `.spec.ephemeralVolumesSizeLimit.temporaryData`
+An ephemeral volume used for temporary storage. By default an `emptyDir` volume is used. To configure
+the volume use the `.spec.ephemeralVolumeSource` field in the cluster spec.
+
+This simple example shows how to set a `1Gi` ephemeral volume. Set the `storageClassName` to something
+available on your Kubernetes cluster.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-ephemeral-volume-source
+spec:
+  instances: 3
+  ephemeralVolumeSource:
+    volumeClaimTemplate:
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "scratch-storage-class"
+        resources:
+          requests:
+            storage: 1Gi
+```
+
+Alternatively you can configure an upper bound on the default volume size using the `.spec.ephemeralVolumesSizeLimit.temporaryData`
 field in the cluster spec.
+
+Both `.spec.emphemeralVolumeSource` and `.spec.ephemeralVolumesSizeLimit.temporaryData` cannot be set.
 
 ### Volume for shared memory
 
