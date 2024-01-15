@@ -966,6 +966,37 @@ reachable in your `PATH` variable to correctly work.
     Please use the [`backup` command](#requesting-a-new-backup) to request
     backups using volume snapshots.
 
+### Scaffolding a pgAdmin4 installation
+
+[pgAdmin](https://www.pgadmin.org) is an Open Source management tool for
+Postgres, designed to meet the needs of both novice and experienced Postgres
+users alike.
+
+Using the `kubectl cnpg pgadmin4` command you can quickly create a pgAdmin4
+installation for demo purposes.
+
+```
+kubectl cnpg pgadmin4 cluster-example
+
+ConfigMap/cluster-example-pgadmin4 created
+Deployment/cluster-example-pgadmin4 created
+Service/cluster-example-pgadmin4 created
+Secret/cluster-example-pgadmin4 created
+
+[...]
+```
+
+pgAdmin4 can be installed in `desktop` and `server` mode.
+
+A `desktop` installation allows the user to quickly connect to database without
+any password needed, and is useful only for demo purposes.
+
+A `server` installation will require authentication to connect and
+authentication to the target database.
+
+The output of the `kubectl cnpg pgadmin4` command contains a list of commands
+that allow the user to connect to pgAdmin4 and to destroy the deployment.
+
 ## Integration with K9s
 
 The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
