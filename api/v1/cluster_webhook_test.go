@@ -1069,56 +1069,190 @@ var _ = Describe("configuration change validation", func() {
 })
 
 var _ = Describe("validate image name change", func() {
-	It("doesn't complain with no changes", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+	Context("using image name", func() {
+		It("doesn't complain with no changes", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+
+		It("complains if it can't upgrade between mayor versions", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:12.0",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:11.0",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+
+		It("doesn't complain if image change is valid", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:12.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:12.0",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+	})
+	Context("using image catalog", func() {
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       15,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+	})
+	Context("changing from imageName to imageCatalogRef", func() {
+		It("doesn't complain when the major is the same", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(0))
+		})
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:15.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("complains going from default imageName to different major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       14,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(0))
+		})
 	})
 
-	It("complains if versions are wrong", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "12:1",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
-	})
-
-	It("complains if can't upgrade between mayor versions", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:11.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
-	})
-
-	It("doesn't complain if image change it's valid", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.1",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+	Context("changing from imageCatalogRef to imageName", func() {
+		It("doesn't complain when the major is the same", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       16,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.1",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(0))
+		})
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       15,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.1",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("complains going from default imageName to different major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       14,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						CatalogName: "test",
+						Major:       16,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(0))
+		})
 	})
 })
 

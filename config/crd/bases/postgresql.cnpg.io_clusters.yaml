@@ -2688,6 +2688,32 @@ spec:
                   to be unhealthy
                 format: int32
                 type: integer
+              imageCatalogRef:
+                description: Defines the major PostgreSQL version we want to use within
+                  an ImageCatalog
+                properties:
+                  catalogName:
+                    description: The name of the ImageCatalog
+                    type: string
+                  kind:
+                    default: ImageCatalog
+                    description: ImageCatalog or ClusterImageCatalog. Defaults to
+                      ImageCatalog.
+                    enum:
+                    - ImageCatalog
+                    - ClusterImageCatalog
+                    type: string
+                  major:
+                    description: The major version of PostgreSQL we want to use from
+                      the ImageCatalog
+                    type: integer
+                    x-kubernetes-validations:
+                    - message: Major is immutable
+                      rule: self == oldSelf
+                required:
+                - catalogName
+                - major
+                type: object
               imageName:
                 description: |-
                   Name of the container image, supporting both tags (`<image>:<tag>`)
@@ -4739,6 +4765,9 @@ spec:
             required:
             - instances
             type: object
+            x-kubernetes-validations:
+            - message: imageName and imageCatalogRef are mutually exclusive
+              rule: '!(has(self.imageCatalogRef) && has(self.imageName))'
           status:
             description: |-
               Most recently observed status of the cluster. This data may not be up
@@ -4948,6 +4977,9 @@ spec:
                 items:
                   type: string
                 type: array
+              image:
+                description: Image contains the image name used by the pods
+                type: string
               initializingPVC:
                 description: List of all the PVCs that are being initialized by this
                   cluster

@@ -40,10 +40,13 @@ that work with CloudNativePG, and publishes them on
 
 ## Image tag requirements
 
-While the image name can be anything valid for Docker, the CloudNativePG
-operator relies on the *image tag* to detect the Postgres major
-version contained in the image.
+To guarantee that the operator is able to take the right choices, it
+is necessary for it to be able to detect the PostgreSQL major version.
+This can happen in two ways:
+* using the `major` field of the `imageCatalogRef`, if defined
+* autodetecting the major version from the image tag of the `imageName`, otherwise
 
+To use the autodetection, the image tag must follow a specific format.
 The image tag must start with a valid PostgreSQL major version number (e.g.
 14.5 or 15) optionally followed by a dot and the patch level.
 
@@ -61,3 +64,6 @@ Examples of accepted image tags:
 
 !!! Warning
     `latest` is not considered a valid tag for the image.
+
+!!! Note
+    Image tag requirements do no apply for images defined in a catalog.

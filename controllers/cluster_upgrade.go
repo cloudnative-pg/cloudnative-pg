@@ -197,7 +197,8 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 	contextLogger := log.FromContext(ctx)
 	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok &&
 		(primaryPod.Annotations == nil || primaryPod.Annotations[utils.ClusterRestartAnnotationName] != clusterRestart) {
-		contextLogger.Info("Setting restart annotation on primary pod as needed", "label", utils.ClusterRestartAnnotationName)
+		contextLogger.Info("Setting restart annotation on primary pod as needed", "label",
+			utils.ClusterRestartAnnotationName)
 		original := primaryPod.DeepCopy()
 		if primaryPod.Annotations == nil {
 			primaryPod.Annotations = make(map[string]string)
@@ -441,20 +442,9 @@ func checkPodImageIsOutdated(
 		return rollout{}, nil
 	}
 
-	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
-	if err != nil {
-		return rollout{}, err
-	}
-
-	// We do not report anything here. The webhook should prevent the user to
-	// set an invalid target image
-	if !canUpgradeImage {
-		return rollout{}, nil
-	}
-
 	return rollout{
 		required: true,
-		reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
+		reason: fmt.Sprintf("the instance is using a different image: %s -> %s",
 			pgCurrentImageName, targetImageName),
 	}, nil
 }
@@ -489,7 +479,10 @@ func checkHasMissingPVCs(
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
-		return rollout{required: true, primaryForceRecreate: true, reason: "attaching a new PVC to the instance Pod"}, nil
+		return rollout{
+			required: true, primaryForceRecreate: true,
+			reason: "attaching a new PVC to the instance Pod",
+		}, nil
 	}
 	return rollout{}, nil
 }

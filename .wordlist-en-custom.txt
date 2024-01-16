@@ -58,6 +58,8 @@ CSV
 CSVs
 CannotReconcile
 Canovai
+CatalogImage
+CatalogImages
 Cecchi
 Ceph
 CertificatesConfiguration
@@ -71,6 +73,7 @@ CloudNativePG
 CloudNativePG's
 ClusterCondition
 ClusterConditionType
+ClusterImageCatalog
 ClusterIP
 ClusterIsNotReady
 ClusterList
@@ -166,6 +169,9 @@ IPv
 IRSA
 Ibryam
 IfNotPresent
+ImageCatalog
+ImageCatalogRef
+ImageCatalogSpec
 ImportSource
 InfoSec
 Innocenti
@@ -520,6 +526,7 @@ bypassrls
 bzip
 cGFzc
 caSecretVersion
+catalogName
 cannotReconcile
 cb
 cd
@@ -725,6 +732,8 @@ https
 hugepages
 ident
 imageName
+imageCatalogRef
+imagecatalogs
 imagePullPolicy
 imagePullSecrets
 img

@@ -54,17 +54,6 @@ var _ = Describe("PostgreSQL version handling", func() {
 			_, err = GetPostgresVersionFromTag("10.old")
 			Expect(err).To(HaveOccurred())
 		})
-
-		It("should correctly detect major version from tag", func() {
-			Expect(GetPostgresMajorVersionFromTag("9.5.3")).To(Equal(9))
-			Expect(GetPostgresMajorVersionFromTag("14.1.0")).To(Equal(14))
-		})
-
-		It("should return error if major version is not well-formed in the tag", func() {
-			res, err := GetPostgresMajorVersionFromTag("test.5.3")
-			Expect(res).To(Equal(0))
-			Expect(err).To(HaveOccurred())
-		})
 	})
 
 	Describe("major version extraction", func() {
@@ -88,34 +77,6 @@ var _ = Describe("PostgreSQL version handling", func() {
 			Expect(IsUpgradePossible(100003, 110003)).To(BeFalse())
 			Expect(IsUpgradePossible(90604, 100000)).To(BeFalse())
 			Expect(IsUpgradePossible(90503, 900604)).To(BeFalse())
-		})
-	})
-
-	Describe("detect whenever a version upgrade is possible using the image tag", func() {
-		It("succeed when the major version is the same", func() {
-			Expect(CanUpgrade("postgres:10.0", "postgres:10.3")).To(BeTrue())
-			Expect(CanUpgrade("postgres:9.3.2", "postgres:9.3.3")).To(BeTrue())
-		})
-
-		It("prevent using 'latest'", func() {
-			Expect(CanUpgrade("postgres:latest", "postgres:10.3")).To(BeFalse())
-			Expect(CanUpgrade("postgres:10.0", "postgres:latest")).To(BeFalse())
-		})
-
-		It("prevent upgrading to a different major version", func() {
-			Expect(CanUpgrade("postgres:10.3", "postgres:11.3")).To(BeFalse())
-			Expect(CanUpgrade("postgres:9.6.4", "postgres:10")).To(BeFalse())
-			Expect(CanUpgrade("postgres:9.5.3", "postgres:9.6.4")).To(BeFalse())
-		})
-
-		It("raise errors when the image tag can't be parsed", func() {
-			status, err1 := CanUpgrade("postgres:ten_dot_three", "postgres:11.3")
-			Expect(err1).To(HaveOccurred())
-			Expect(status).To(BeFalse())
-
-			status, err2 := CanUpgrade("postgres:10.3", "postgres:eleven_dot_tree")
-			Expect(err2).To(HaveOccurred())
-			Expect(status).To(BeFalse())
 		})
 	})
 })

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -224,6 +225,22 @@ func (o OnlineConfiguration) GetImmediateCheckpoint() bool {
 	return *o.ImmediateCheckpoint
 }
 
+// ImageCatalogRef defines the reference to a major version in an ImageCatalog
+type ImageCatalogRef struct {
+	// +kubebuilder:validation:Enum:=ImageCatalog;ClusterImageCatalog
+	// +kubebuilder:default:=ImageCatalog
+	// +optional
+	// ImageCatalog or ClusterImageCatalog. Defaults to ImageCatalog.
+	Kind string `json:"kind,omitempty"`
+	// The name of the ImageCatalog
+	CatalogName string `json:"catalogName"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Major is immutable"
+	// The major version of PostgreSQL we want to use from the ImageCatalog
+	Major int `json:"major"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!(has(self.imageCatalogRef) && has(self.imageName))",message="imageName and imageCatalogRef are mutually exclusive"
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
@@ -239,6 +256,10 @@ type ClusterSpec struct {
 	// (`<image>:<tag>@sha256:<digestValue>`)
 	// +optional
 	ImageName string `json:"imageName,omitempty"`
+
+	// Defines the major PostgreSQL version we want to use within an ImageCatalog
+	// +optional
+	ImageCatalogRef *ImageCatalogRef `json:"imageCatalogRef,omitempty"`
 
 	// Image pull policy.
 	// One of `Always`, `Never` or `IfNotPresent`.
@@ -870,6 +891,10 @@ type ClusterStatus struct {
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
 	// +optional
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
+
+	// Image contains the image name used by the pods
+	// +optional
+	Image string `json:"image,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -2520,24 +2545,49 @@ func (secretResourceVersion *SecretsResourceVersion) SetExternalClusterSecretVer
 // GetImageName get the name of the image that should be used
 // to create the pods
 func (cluster *Cluster) GetImageName() string {
+	// If the image is specified in the status, use that one
+	// It should be there since the first reconciliation
+	if len(cluster.Status.Image) > 0 {
+		return cluster.Status.Image
+	}
+
+	// Fallback to the information we have in the spec
 	if len(cluster.Spec.ImageName) > 0 {
 		return cluster.Spec.ImageName
 	}
 
+	// TODO: check: does a scenario exists in which we do have an imageCatalog
+	//   and no status.image? In that case this should probably error out, not
+	//   returning the default image name.
 	return configuration.Current.PostgresImageName
 }
 
 // GetPostgresqlVersion gets the PostgreSQL image version detecting it from the
-// image name.
+// image name or from the ImageCatalogRef.
 // Example:
 //
 // ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version 140000
 // ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version 130002
 // ghcr.io/cloudnative-pg/postgresql:9.6.3 corresponds to version 90603
 func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
-	image := cluster.GetImageName()
-	tag := utils.GetImageTag(image)
-	return postgres.GetPostgresVersionFromTag(tag)
+	if cluster.Spec.ImageCatalogRef != nil {
+		return postgres.GetPostgresVersionFromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
+	}
+	if cluster.Spec.ImageName != "" {
+		image := cluster.GetImageName()
+		tag := utils.GetImageTag(image)
+		return postgres.GetPostgresVersionFromTag(tag)
+	}
+	return postgres.GetPostgresVersionFromTag(utils.GetImageTag(configuration.Current.PostgresImageName))
+}
+
+// GetPostgresqlMajorVersion gets the PostgreSQL image major version used in the Cluster
+func (cluster *Cluster) GetPostgresqlMajorVersion() (int, error) {
+	version, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		return 0, err
+	}
+	return postgres.GetPostgresMajorVersion(version), nil
 }
 
 // GetImagePullSecret get the name of the pull secret to use

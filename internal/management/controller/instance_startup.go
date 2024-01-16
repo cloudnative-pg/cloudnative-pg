@@ -69,7 +69,8 @@ func (r *InstanceReconciler) refreshServerCertificateFiles(ctx context.Context, 
 
 // refreshReplicationUserCertificate gets the latest replication certificates from the
 // secrets. Returns true if configuration has been changed
-func (r *InstanceReconciler) refreshReplicationUserCertificate(ctx context.Context,
+func (r *InstanceReconciler) refreshReplicationUserCertificate(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (bool, error) {
 	var secret corev1.Secret
@@ -214,8 +215,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			return err
 		}
 
-		tag := pkgUtils.GetImageTag(cluster.GetImageName())
-		pgMajorVersion, err := postgresSpec.GetPostgresMajorVersionFromTag(tag)
+		pgMajorVersion, err := cluster.GetPostgresqlMajorVersion()
 		if err != nil {
 			return err
 		}

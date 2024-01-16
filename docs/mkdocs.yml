@@ -19,6 +19,7 @@ nav:
   - architecture.md
   - installation_upgrade.md
   - quickstart.md
+  - image_catalog.md
   - bootstrap.md
   - database_import.md
   - security.md
