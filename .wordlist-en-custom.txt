@@ -893,6 +893,7 @@ pgBouncer
 pgBouncerIntegration
 pgBouncerSecrets
 pgSQL
+pgadmin
 pgaudit
 pgbarman
 pgbasebackup

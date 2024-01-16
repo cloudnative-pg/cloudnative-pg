@@ -43,24 +43,27 @@ const pgadminExample = `
 
 var usageExampleTemplate = template.Must(template.New("pgadmin-example").Parse(`
 {{ if eq .Mode "server" }}
-To connect to this pgadmin instance, use the following credentials:
+To access this pgAdmin instance, use the following credentials:
 
 username: {{ .PgadminUsername }}
 password: {{ .PgadminPassword }}
 
-To open a connection to the database server you'll need the password of
-the '{{ .ApplicationDatabaseOwnerName }}' user. You can get that with:
+
+To establish a connection to the database server, you'll need the password for
+the '{{ .ApplicationDatabaseOwnerName }}' user. Retrieve it with the following
+command:
 
 kubectl get secret {{ .ApplicationDatabaseSecretName }} -o 'jsonpath={.data.password}' | base64 -d; echo ""
 {{ end }}
-You can easily reach the new pgAdmin4 instance by forwarding your local 8080 port with:
+
+Easily reach the new pgAdmin4 instance by forwarding your local 8080 port using:
 
 kubectl rollout status deployment {{ .DeploymentName }}
 kubectl port-forward deployment/{{ .DeploymentName }} 8080:80
 
-And then browse to http://localhost:8080.
+Then, navigate to http://localhost:8080 in your browser.
 
-To remove this pgadmin deployment execute:
+To remove this pgAdmin deployment, execute:
 
 kubectl cnpg pgadmin4 {{ .ClusterName }} --dry-run | kubectl delete -f -
 `))
