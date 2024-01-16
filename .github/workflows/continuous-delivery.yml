@@ -1216,9 +1216,9 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
-      E2E_DEFAULT_STORAGE_CLASS: gp3
-      E2E_CSI_STORAGE_CLASS: gp3
-      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: ebs-csi-snapclass
+      E2E_DEFAULT_STORAGE_CLASS: gp3-csi
+      E2E_CSI_STORAGE_CLASS: gp3-csi
+      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-aws-vsc
 
       AWS_REGION: eu-central-1
       AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES }}
