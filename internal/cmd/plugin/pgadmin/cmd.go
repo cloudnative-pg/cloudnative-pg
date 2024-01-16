@@ -86,25 +86,24 @@ func NewCmd() *cobra.Command {
 
 			// Get the Cluster object
 			var cluster apiv1.Cluster
-			err := plugin.Client.Get(
+			if err := plugin.Client.Get(
 				ctx,
 				client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName},
-				&cluster)
-			if err != nil {
+				&cluster); err != nil {
 				return fmt.Errorf("could not get cluster: %v", err)
 			}
 
-			pgadminCommand, err := newPgAdminCommand(&cluster, Mode(mode), dryRun)
+			pgAdminCmd, err := newPgAdminCommand(&cluster, Mode(mode), dryRun)
 			if err != nil {
 				return err
 			}
 
-			if err := pgadminCommand.execute(ctx); err != nil {
+			if err := pgAdminCmd.execute(ctx); err != nil {
 				return err
 			}
 
-			if !pgadminCommand.dryRun {
-				_ = usageExampleTemplate.Execute(os.Stdout, pgadminCommand)
+			if !pgAdminCmd.dryRun {
+				_ = usageExampleTemplate.Execute(os.Stdout, pgAdminCmd)
 			}
 
 			return nil
