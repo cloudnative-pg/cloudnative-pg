@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,8 +39,9 @@ func (env TestingEnvironment) CreateUniqueNamespace(
 }
 
 // CreateNamespace creates a namespace.
-// Deprecated.
-// Use CreateUniqueNamespace instead
+// Prefer CreateUniqueNamespace instead, unless you need a
+// specific namespace name. If so, make sure there is no collision
+// potential
 func (env TestingEnvironment) CreateNamespace(name string, opts ...client.CreateOption) error {
 	// Exit immediately if the name is empty
 	if name == "" {
@@ -55,6 +57,22 @@ func (env TestingEnvironment) CreateNamespace(name string, opts ...client.Create
 	})
 	_, err := CreateObject(&env, u, opts...)
 	return err
+}
+
+// EnsureNamespace checks for the presence of a namespace, and if it does not
+// exist, creates it
+func (env TestingEnvironment) EnsureNamespace(namespace string) error {
+	var nsList corev1.NamespaceList
+	err := GetObjectList(&env, &nsList)
+	if err != nil {
+		return err
+	}
+	for _, ns := range nsList.Items {
+		if ns.Name == namespace {
+			return nil
+		}
+	}
+	return env.CreateNamespace(namespace)
 }
 
 // DeleteNamespace deletes a namespace if existent
