@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	"encoding/json"
+	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -825,8 +827,57 @@ var _ = Describe("PodSpec drift detection", func() {
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
 		Expect(diff).To(ContainSubstring(
-			"containers: container postgres differs in resources"))
+			"containers: container postgres differs in resource-limits"))
 		Expect(specsMatch).To(BeFalse())
+	})
+
+	It("detects if resource quantities for containers are equivalent", func() {
+		podSpec1 := `{
+			"containers": [
+				{
+					"name": "postgres",
+					"resources": {
+						"limits": {
+							"cpu": "1000m",
+							"memory": "3Gi"
+						},
+						"requests": {
+							"cpu": "850m"
+						}
+					}
+				}
+			]
+		}`
+		var storedPodSpec1, podSpec2 corev1.PodSpec
+		err := json.Unmarshal([]byte(podSpec1), &storedPodSpec1)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(storedPodSpec1.Containers).To(HaveLen(1))
+
+		podSpec2 = corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "postgres",
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("1"),
+							"memory": resource.MustParse("3Gi"),
+						},
+						Requests: corev1.ResourceList{
+							"cpu": resource.MustParse("850m"),
+						},
+					},
+				},
+			},
+		}
+
+		// NOTE: the object representations of the specs are different, even
+		// though they represent equivalent quantities
+		Expect(reflect.DeepEqual(podSpec2, storedPodSpec1)).To(BeFalse())
+
+		// Let's make sure the comparison function can recognize equivalent quantities
+		specsMatch, diff := ComparePodSpecs(storedPodSpec1, podSpec2)
+		Expect(diff).To(Equal(""))
+		Expect(specsMatch).To(BeTrue())
 	})
 })
 

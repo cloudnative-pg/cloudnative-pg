@@ -258,7 +258,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
-			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
+			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resource-limits"))
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
 			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
@@ -274,7 +274,10 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
-			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
+			// NOTE: whether we find drift in limits or requests first does not matter
+			Expect(rollout.reason).To(Or(
+				ContainSubstring("container postgres differs in resource-limits"),
+				ContainSubstring("container postgres differs in resource-requests")))
 		})
 	})
 
