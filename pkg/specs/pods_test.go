@@ -18,7 +18,6 @@ package specs
 
 import (
 	"encoding/json"
-	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -842,7 +841,8 @@ var _ = Describe("PodSpec drift detection", func() {
 							"memory": "3Gi"
 						},
 						"requests": {
-							"cpu": "850m"
+							"cpu": "850m",
+							"memory": "3072Mi"
 						}
 					}
 				}
@@ -863,7 +863,8 @@ var _ = Describe("PodSpec drift detection", func() {
 							"memory": resource.MustParse("3Gi"),
 						},
 						Requests: corev1.ResourceList{
-							"cpu": resource.MustParse("850m"),
+							"cpu":    resource.MustParse("850m"),
+							"memory": resource.MustParse("3Gi"),
 						},
 					},
 				},
@@ -872,8 +873,7 @@ var _ = Describe("PodSpec drift detection", func() {
 
 		// NOTE: the object representations of the specs are different, even
 		// though they represent equivalent quantities
-		Expect(reflect.DeepEqual(podSpec2, storedPodSpec1)).To(BeFalse())
-
+		// i.e. reflect.DeepEqual(podSpec2, storedPodSpec1) is likely false
 		// Let's make sure the comparison function can recognize equivalent quantities
 		specsMatch, diff := ComparePodSpecs(storedPodSpec1, podSpec2)
 		Expect(diff).To(Equal(""))

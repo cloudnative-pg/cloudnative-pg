@@ -141,8 +141,7 @@ func compareVolumeMounts(currentMounts, targetMounts []corev1.VolumeMount) (bool
 	return compareMaps(current, target)
 }
 
-// compareResourceRequirements returns true if the resource requirement lists are
-// equivalent.
+// compareResourceLists returns true if the resource lists are equivalent.
 // NOTE: the memory objects describing two resource.Quantity can be different and yet
 // represent the same quantity. The K8s client library offers a predicate `Equal` to help
 func compareResourceLists(rl1, rl2 corev1.ResourceList) bool {
