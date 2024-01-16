@@ -191,7 +191,7 @@ func (cmd *command) generateDeployment() *appsv1.Deployment {
 
 	return &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
 			Kind:       "Deployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -311,7 +311,7 @@ func (cmd *command) generateDeployment() *appsv1.Deployment {
 func (cmd *command) generateService() *corev1.Service {
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
+			APIVersion: corev1.SchemeGroupVersion.String(),
 			Kind:       "Service",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -323,7 +323,7 @@ func (cmd *command) generateService() *corev1.Service {
 				{
 					Port:       80,
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 				},
 			},
 			Selector: map[string]string{
