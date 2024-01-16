@@ -86,6 +86,9 @@ help: ## Display this help.
 
 ##@ Development
 
+print-version:
+	echo ${VERSION}
+
 ENVTEST_ASSETS_DIR=$$(pwd)/testbin
 test: generate fmt vet manifests envtest ## Run tests.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
@@ -117,7 +120,7 @@ run: generate fmt vet manifests ## Run against the configured Kubernetes cluster
 
 docker-build: go-releaser ## Build the docker image.
 	GOOS=linux GOARCH=${ARCH} GOPATH=$(go env GOPATH) DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
-	  $(GO_RELEASER) build --skip-validate --clean --single-target $(if $(VERSION),,--snapshot)
+	  $(GO_RELEASER) build --skip=validate --clean --single-target $(if $(VERSION),,--snapshot)
 	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
 
 docker-push: ## Push the docker image.

@@ -38,6 +38,10 @@ NODES=${NODES:-3}
 # In M1/M2,  if enable amd64 emulation then we keep it as linux/amd64.
 # if did not enable amd64 emulation we need keep it as linux/arm64,  otherwise,  kind will not start success
 DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-}
+# Testing the upgrade will require generating a second operator image, `-prime`
+# The `load()` function will build and push this second image by default.
+# The TEST_UPGRADE_TO_V1 can be set to false to skip this part of `load()`
+TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 
 # Define the directories used by the script
 ROOT_DIR=$(cd "$(dirname "$0")/../"; pwd)
@@ -548,6 +552,13 @@ load_helper_images() {
 }
 
 load() {
+  # NOTE: this function will build the operator from the current source
+  # tree and push it either to the local registry or the cluster nodes.
+  # It will do the same with a `prime` version for test purposes.
+  #
+  # This code will NEVER run in the cloud CI/CD workflows, as there we do
+  # the build and push (into GH test registry) once in `builds`, before
+  # the strategy matrix blows up the number of executables
   if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_${ENGINE}"; then
     ENABLE_REGISTRY=true
   fi
@@ -562,6 +573,25 @@ load() {
   load_image "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
 
   echo "${bright}Done loading new operator image on cluster ${CLUSTER_NAME}${reset}"
+
+  if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
+    # In order to test the case of upgrading from the current operator
+    # to a future one, we build and push an image with a different VERSION
+    # to force a different hash for the manager binary.
+    # (Otherwise the ONLINE upgrade won't trigger)
+    
+    echo "${bright}Building a 'prime' operator from current worktree${reset}"
+
+    PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
+    CURRENT_VERSION=$(make -s print-version)
+    PRIME_VERSION="${CURRENT_VERSION}-prime"
+    make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}"  VERSION="${PRIME_VERSION}" \
+      ARCH="${ARCH}" docker-build
+
+    load_image "${CLUSTER_NAME}" "${PRIME_CONTROLLER_IMG}"
+
+    echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
+  fi
 }
 
 deploy() {

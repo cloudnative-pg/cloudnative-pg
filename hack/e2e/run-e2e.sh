@@ -79,26 +79,29 @@ echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 RC=0
 RC_GINKGO1=0
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
-  # Getting the operator images need a pull secret
-  kubectl delete namespace cnpg-system || :
-  kubectl create namespace cnpg-system
-  ensure_image_pull_secret
-  # Generate a manifest for the operator after the api upgrade
-  # TODO: this is almost a "make deploy". Refactor.
-  make manifests kustomize
-  KUSTOMIZE="${ROOT_DIR}/bin/kustomize"
-  CONFIG_TMP_DIR=$(mktemp -d)
-  cp -r "${ROOT_DIR}/config"/* "${CONFIG_TMP_DIR}"
-  (
-      cd "${CONFIG_TMP_DIR}/default"
-      "${KUSTOMIZE}" edit add patch --path manager_image_pull_secret.yaml
-      cd "${CONFIG_TMP_DIR}/manager"
-      "${KUSTOMIZE}" edit set image "controller=${CONTROLLER_IMG}"
-      "${KUSTOMIZE}" edit add patch --path env_override.yaml
-      "${KUSTOMIZE}" edit add configmap controller-manager-env \
-        --from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMG}"
-  )
-  "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml"
+  # Generate a manifest for the operator so we can upgrade to it in the upgrade tests.
+  # This manifest uses the default image and tag for the current operator build, and assumes
+  # the image has been either:
+  #   - built and pushed to nodes or the local registry (by setup-cluster.sh)
+  #   - built by the `buildx` step in continuous delivery and pushed to the test registry
+  make CONTROLLER_IMG="${CONTROLLER_IMG}" POSTGRES_IMG="${POSTGRES_IMG}" \
+   OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml" \
+   generate-manifest
+  # In order to test the case of upgrading from the current operator
+  # to a future one, we build and push an image with a different VERSION
+  # to force a different hash for the manager binary.
+  # (Otherwise the ONLINE upgrade won't trigger)
+  #
+  # We build and push the new image in the setup-cluster.sh `load` function, or
+  # in the `buildx` phase if we're running in the cloud CI/CD workflow.
+  #
+  # Here we build a manifest for the new controller, with the `-prime` suffix
+  # added to the tag by convention, which assumes the image is in place.
+  # This manifest is used to upgrade into in the upgrade_test E2E.
+  make CONTROLLER_IMG="${CONTROLLER_IMG}-prime" POSTGRES_IMG="${POSTGRES_IMG}" \
+   OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" \
+   generate-manifest
+   
   # Run the upgrade tests
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages

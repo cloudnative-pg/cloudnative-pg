@@ -719,9 +719,10 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				return enrichedError
 			}
 
-			message := fmt.Sprintf("Instance manager has been upgraded on %s (hash: %s)",
+			message := fmt.Sprintf("Instance manager has been upgraded on %s (hash: %s — previous hash: %s)",
 				postgresqlStatus.Pod.Name,
-				operatorHash[:6])
+				operatorHash[:6],
+				instanceManagerHash[:6])
 
 			r.Recorder.Event(cluster, "Normal", "InstanceManagerUpgraded", message)
 			contextLogger.Info(message)
