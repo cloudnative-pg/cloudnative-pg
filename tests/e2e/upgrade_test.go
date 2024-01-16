@@ -44,25 +44,40 @@ import (
 )
 
 /*
-This test affects the operator itself, so it must be run isolated from the
-others.
+This test includes deleting the `cnpg-system` namespace and deploying different
+operator versions.
+It therefore must be run isolated from the other E2E tests.
 
-We test the following:
-* A cluster created with the previous (most recent release tag before the actual one) version
-  is moved to the current one.
-  We test this changing the configuration. That will also perform a switchover.
-* A Backup created with the previous version is moved to the current one and
+In summary: a cluster is created with an initial version of the operator.
+Then the operator is upgraded to a later version.
+We test four scenarios:
+
+1 and 2) the initial operator installed is the most recent tag. We upgrade to the
+  current operator build. We test this with rolling and online upgrades.
+3 and 4) the initial operator installed is the current operator build. We upgrade
+  to a `prime` version built from the same code, only with a different image tag
+  and a different build VERSION (required to have a different binary hash).
+  This `prime` version is built in the `setup-cluster.sh` script or in the
+  `buildx` phase of the continuous-delivery GH workflow.
+  We test with online and rolling upgrades.
+
+To check the soundness of the upgrade, on each of the four scenarios:
+
+* We test changing the configuration. That will induce a switchover.
+* A Backup created with the initial version is still there after upgrade, and
   can be used to bootstrap a cluster.
-* A ScheduledBackup created with the previous version is still scheduled after the upgrade.
-* A cluster with the previous version is created as a current version one after the upgrade.
-* We reply all the previous tests, but we enable the online upgrade in the final CLuster.
+* A ScheduledBackup created with the initial version is still scheduled
+  after the upgrade.
+* All the cluster pods should have their instance manager updated.
+
 */
 
 var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), Ordered, Serial, func() {
 	const (
-		operatorNamespace   = "cnpg-system"
-		configName          = "cnpg-controller-manager-config"
-		operatorUpgradeFile = fixturesDir + "/upgrade/current-manifest.yaml"
+		operatorNamespace       = "cnpg-system"
+		configName              = "cnpg-controller-manager-config"
+		currentOperatorManifest = fixturesDir + "/upgrade/current-manifest.yaml"
+		primeOperatorManifest   = fixturesDir + "/upgrade/current-manifest-prime.yaml"
 
 		rollingUpgradeNamespace = "rolling-upgrade"
 		onlineUpgradeNamespace  = "online-upgrade"
@@ -88,12 +103,44 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		level               = tests.Lowest
 	)
 
+	BeforeAll(func() {
+		misingManifestsMessage := "MISSING the test operator manifests.\n" +
+			"They should have been produced by calling the hack/run-e2e.sh script"
+		_, err := os.Stat(currentOperatorManifest)
+		Expect(err).NotTo(HaveOccurred(), misingManifestsMessage)
+		_, err = os.Stat(primeOperatorManifest)
+		Expect(err).NotTo(HaveOccurred(), misingManifestsMessage)
+	})
+
 	BeforeEach(func() {
 		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
 			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
 		}
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		}
+
+		// Since the 'cnpg-system' namespace is deleted after each spec is completed,
+		// we should create it and then create the pull image secret
+
+		err := env.EnsureNamespace(operatorNamespace)
+		Expect(err).NotTo(HaveOccurred())
+
+		dockerServer := os.Getenv("DOCKER_SERVER")
+		dockerUsername := os.Getenv("DOCKER_USERNAME")
+		dockerPassword := os.Getenv("DOCKER_PASSWORD")
+		if dockerServer != "" && dockerUsername != "" && dockerPassword != "" {
+			_, _, err := testsUtils.Run(fmt.Sprintf(`kubectl -n %v create secret docker-registry
+			cnpg-pull-secret
+			--docker-server="%v"
+			--docker-username="%v"
+			--docker-password="%v"`,
+				operatorNamespace,
+				dockerServer,
+				dockerUsername,
+				dockerPassword,
+			))
+			Expect(err).NotTo(HaveOccurred())
 		}
 	})
 
@@ -311,7 +358,35 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		return namespace
 	}
 
-	applyUpgrade := func(upgradeNamespace string) {
+	deployOperator := func(operatorManifestFile string) {
+		By(fmt.Sprintf("applying manager manifest %s", operatorManifestFile), func() {
+			// Upgrade to the new version
+			_, stderr, err := testsUtils.Run(fmt.Sprintf("kubectl apply -f %v", operatorManifestFile))
+			Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+		})
+
+		By("waiting for the deployment to be rolled out", func() {
+			deployment, err := env.GetOperatorDeployment()
+			Expect(err).NotTo(HaveOccurred())
+
+			timeout := 240
+			Eventually(func() error {
+				_, stderr, err := testsUtils.Run(fmt.Sprintf(
+					"kubectl -n %v rollout status deployment %v -w --timeout=%vs",
+					operatorNamespace,
+					deployment.Name,
+					timeout,
+				))
+				if err != nil {
+					GinkgoWriter.Printf("stderr: %s\n", stderr)
+				}
+
+				return err
+			}, timeout).ShouldNot(HaveOccurred())
+		})
+	}
+
+	assertClustersWorkAfterOperatorUpgrade := func(upgradeNamespace, operatorManifest string) {
 		// Create the secrets used by the clusters and minio
 		By("creating the postgres secrets", func() {
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
@@ -465,30 +540,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			podUIDs = append(podUIDs, pod.GetUID())
 		}
 
-		By("upgrading the operator to current version", func() {
-			timeout := 120
-			// Upgrade to the new version
-			_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -f %v", operatorUpgradeFile))
-			Expect(err).NotTo(HaveOccurred())
-			// With the new deployment, a new pod should be started. When it's
-			// ready, the old one is removed. We wait for the number of replicas
-			// to decrease to 1.
-			Eventually(func() (int32, error) {
-				deployment, err := env.GetOperatorDeployment()
-				if err != nil {
-					return 0, err
-				}
-				return deployment.Status.Replicas, err
-			}, timeout).Should(BeEquivalentTo(1))
-			// For a final check, we verify the pod is ready
-			Eventually(func() (int32, error) {
-				deployment, err := env.GetOperatorDeployment()
-				if err != nil {
-					return 0, err
-				}
-				return deployment.Status.ReadyReplicas, err
-			}, timeout).Should(BeEquivalentTo(1))
-		})
+		deployOperator(operatorManifest)
 
 		operatorConfigMapNamespacedName := types.NamespacedName{
 			Namespace: operatorNamespace,
@@ -536,6 +588,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, 300).Should(BeEquivalentTo(3))
 		}
 		AssertClusterIsReady(upgradeNamespace, clusterName1, 300, env)
+
+		// the instance pods should not restart
+		By("verifying that the instance pods are not restarted", func() {
+			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range podList.Items {
+				Expect(pod.Status.ContainerStatuses[0].RestartCount).To(BeEquivalentTo(0))
+			}
+		})
 
 		AssertConfUpgrade(clusterName1, upgradeNamespace)
 
@@ -613,36 +674,65 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	It("works after an upgrade with rolling upgrade ", func() {
-		// set upgradeNamespace for log naming
-		upgradeNamespacePrefix := rollingUpgradeNamespace
-		mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
-		Expect(err).NotTo(HaveOccurred())
+	When("upgrading from the most recent tag to the current operator", func() {
+		It("keeps clusters working after a rolling upgrade", func() {
+			upgradeNamespacePrefix := rollingUpgradeNamespace
+			mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
+			Expect(err).NotTo(HaveOccurred())
 
-		GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
-		upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-		DeferCleanup(cleanupNamespace, upgradeNamespace)
-		applyUpgrade(upgradeNamespace)
-	})
+			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
+			testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
+			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
+			DeferCleanup(cleanupNamespace, upgradeNamespace)
 
-	It("works after an upgrade with online upgrade", func() {
-		// set upgradeNamespace for log naming
-		upgradeNamespacePrefix := onlineUpgradeNamespace
-		By("applying environment changes for current upgrade to be performed", func() {
-			testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
+			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
 		})
 
-		mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
-		Expect(err).NotTo(HaveOccurred())
+		It("keeps clusters working after an online upgrade", func() {
+			upgradeNamespacePrefix := onlineUpgradeNamespace
+			By("applying environment changes for current upgrade to be performed", func() {
+				testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
+			})
 
-		GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-		testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
+			mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
+			Expect(err).NotTo(HaveOccurred())
 
-		upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-		DeferCleanup(cleanupNamespace, upgradeNamespace)
-		applyUpgrade(upgradeNamespace)
+			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
+			testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
 
-		assertManagerRollout()
+			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
+			DeferCleanup(cleanupNamespace, upgradeNamespace)
+			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
+			assertManagerRollout()
+		})
+	})
+
+	When("upgrading from the current operator to a `prime` operator with a new hash", func() {
+		It("keeps clusters working after an online upgrade", func() {
+			upgradeNamespacePrefix := onlineUpgradeNamespace
+			By("applying environment changes for current upgrade to be performed", func() {
+				testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
+			})
+
+			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
+			deployOperator(currentOperatorManifest)
+
+			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
+			DeferCleanup(cleanupNamespace, upgradeNamespace)
+
+			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest)
+		})
+
+		It("keeps clusters working after a rolling upgrade", func() {
+			upgradeNamespacePrefix := rollingUpgradeNamespace
+
+			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
+			deployOperator(currentOperatorManifest)
+
+			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
+			DeferCleanup(cleanupNamespace, upgradeNamespace)
+
+			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest)
+		})
 	})
 })
