@@ -276,7 +276,7 @@ func (cmd *command) generateDeployment() *appsv1.Deployment {
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Path: "/",
-										Port: intstr.FromInt(80),
+										Port: intstr.FromInt32(80),
 									},
 								},
 							},
