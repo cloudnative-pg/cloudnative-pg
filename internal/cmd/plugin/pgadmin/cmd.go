@@ -93,7 +93,7 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("could not get cluster: %v", err)
 			}
 
-			pgAdminCmd, err := newPgAdminCommand(&cluster, Mode(mode), dryRun)
+			pgAdminCmd, err := newCommand(&cluster, Mode(mode), dryRun)
 			if err != nil {
 				return err
 			}

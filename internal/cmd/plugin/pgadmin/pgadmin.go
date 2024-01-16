@@ -35,7 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-var pgAdminConfigurationTemplate = template.Must(template.New("servers.json").Parse(`
+var configurationTemplate = template.Must(template.New("servers.json").Parse(`
 {
 	"Servers": {
 		"1": {
@@ -76,7 +76,7 @@ const (
 	ModeDesktop = Mode("desktop")
 )
 
-type pgadminCommand struct {
+type command struct {
 	ClusterName                   string
 	ApplicationDatabaseSecretName string
 	ApplicationDatabaseOwnerName  string
@@ -92,16 +92,16 @@ type pgadminCommand struct {
 	dryRun bool
 }
 
-// newPgAdminCommand initialize fio deployment options
-func newPgAdminCommand(
+// newCommand initialize fio deployment options
+func newCommand(
 	cluster *apiv1.Cluster,
 	mode Mode,
 	dryRun bool,
-) (*pgadminCommand, error) {
+) (*command, error) {
 	const defaultPgadminUsername = "user@pgadmin.com"
 
 	clusterName := cluster.Name
-	result := &pgadminCommand{
+	result := &command{
 		ClusterName:                   clusterName,
 		ApplicationDatabaseSecretName: cluster.GetApplicationSecretName(),
 		ApplicationDatabaseOwnerName:  cluster.GetApplicationDatabaseOwner(),
@@ -124,7 +124,7 @@ func newPgAdminCommand(
 	return result, nil
 }
 
-func (cmd *pgadminCommand) execute(ctx context.Context) error {
+func (cmd *command) execute(ctx context.Context) error {
 	configMap, err := cmd.generateConfigMap()
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (cmd *pgadminCommand) execute(ctx context.Context) error {
 	return plugin.CreateAndGenerateObjects(ctx, objectList, cmd.dryRun)
 }
 
-func (cmd *pgadminCommand) generateSecret() *corev1.Secret {
+func (cmd *command) generateSecret() *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -154,9 +154,9 @@ func (cmd *pgadminCommand) generateSecret() *corev1.Secret {
 	}
 }
 
-func (cmd *pgadminCommand) generateConfigMap() (*corev1.ConfigMap, error) {
+func (cmd *command) generateConfigMap() (*corev1.ConfigMap, error) {
 	buffer := new(bytes.Buffer)
-	if err := pgAdminConfigurationTemplate.Execute(buffer, cmd); err != nil {
+	if err := configurationTemplate.Execute(buffer, cmd); err != nil {
 		return nil, err
 	}
 
@@ -175,7 +175,7 @@ func (cmd *pgadminCommand) generateConfigMap() (*corev1.ConfigMap, error) {
 	}, nil
 }
 
-func (cmd *pgadminCommand) generateDeployment() *appsv1.Deployment {
+func (cmd *command) generateDeployment() *appsv1.Deployment {
 	const (
 		pgAdminCfgVolumeName      = "pgadmin-cfg"
 		pgAdminCfgVolumePath      = "/config"
@@ -308,7 +308,7 @@ func (cmd *pgadminCommand) generateDeployment() *appsv1.Deployment {
 	}
 }
 
-func (cmd *pgadminCommand) generateService() *corev1.Service {
+func (cmd *command) generateService() *corev1.Service {
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
