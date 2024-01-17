@@ -2953,6 +2953,25 @@ spec:
                       up again) or not (recreate it elsewhere - when `instances` >1)
                     type: boolean
                 type: object
+              plugins:
+                description: The plugins configuration, containing any plugin to be
+                  loaded with the corresponding configuration
+                items:
+                  description: PluginConfiguration specifies a plugin that need to
+                    be loaded for this cluster to be reconciled
+                  properties:
+                    name:
+                      description: Name is the plugin name
+                      type: string
+                    parameters:
+                      additionalProperties:
+                        type: string
+                      description: Parameters is the configuration of the plugin
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
               postgresGID:
                 default: 26
                 description: The GID of the `postgres` user inside the image, defaults
@@ -4746,6 +4765,35 @@ spec:
               phaseReason:
                 description: Reason for the current phase
                 type: string
+              pluginStatus:
+                description: PluginStatus is the status of the loaded plugins
+                items:
+                  description: PluginStatus is the status of a loaded plugin
+                  properties:
+                    capabilities:
+                      description: Capabilities are the list of capabilities of the
+                        plugin
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      description: Name is the name of the plugin
+                      type: string
+                    operatorCapabilities:
+                      description: OperatorCapabilities are the list of capabilities
+                        of the plugin regarding the reconciler
+                      items:
+                        type: string
+                      type: array
+                    version:
+                      description: Version is the version of the plugin loaded by
+                        the latest reconciliation loop
+                      type: string
+                  required:
+                  - name
+                  - version
+                  type: object
+                type: array
               poolerIntegrations:
                 description: The integration needed by poolers referencing the cluster
                 properties:
