@@ -116,6 +116,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
 			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
 		}
+		if IsOpenshift() {
+			Skip("This test case is not applicable on OpenShift clusters")
+		}
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}

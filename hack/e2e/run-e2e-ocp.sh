@@ -45,6 +45,7 @@ export E2E_RUN_UPGRADE_TESTS=${E2E_RUN_UPGRADE_TESTS:-false}
 OCP_VERSION=${OCP_VERSION:-latest}
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
 
+
 # create the catalog source
 oc apply -f cloudnative-pg-catalog.yaml
 
@@ -133,5 +134,6 @@ done
 E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=$(kubectl get vsclass -o=jsonpath='{.items[?(@.metadata.annotations.snapshot\.storage\.kubernetes\.io/is-default-class=="true")].metadata.name}')
 export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS
 export OPENSHIFT="true"
+export FEATURE_TYPE=${FEATURE_TYPE:-}
 echo "Running the e2e tests"
 "${ROOT_DIR}/hack/e2e/run-e2e.sh"

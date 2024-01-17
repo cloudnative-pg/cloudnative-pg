@@ -102,7 +102,7 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${OPENSHIFT}" != "true" ]]; t
   make CONTROLLER_IMG="${CONTROLLER_IMG}-prime" POSTGRES_IMG="${POSTGRES_IMG}" \
    OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" \
    generate-manifest
-   
+
   # Run the upgrade tests
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages
