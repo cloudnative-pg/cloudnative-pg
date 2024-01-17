@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,9 +31,9 @@ import (
 	. "github.com/onsi/gomega"    // nolint
 )
 
-// EnableOnlineUpgradeForInstanceManager creates the operator namespace and enables tho online upgrade for
+// CreateOperatorConfigurationMap creates the operator namespace and enables/disable the online upgrade for
 // the instance manager
-func EnableOnlineUpgradeForInstanceManager(pgOperatorNamespace, configName string, env *TestingEnvironment) {
+func CreateOperatorConfigurationMap(pgOperatorNamespace, configName string, isOnline bool, env *TestingEnvironment) {
 	By("creating operator namespace", func() {
 		// Create a upgradeNamespace for all the resources
 		namespacedName := types.NamespacedName{
@@ -47,13 +49,17 @@ func EnableOnlineUpgradeForInstanceManager(pgOperatorNamespace, configName strin
 		}
 	})
 
-	By("ensuring 'ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES' is set to true", func() {
+	By(fmt.Sprintf("ensuring 'ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES' is set to %v", isOnline), func() {
+		enable := "false"
+		if isOnline {
+			enable = "true"
+		}
 		configMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: pgOperatorNamespace,
 				Name:      configName,
 			},
-			Data: map[string]string{"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES": "true"},
+			Data: map[string]string{"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES": enable},
 		}
 		_, err := CreateObject(env, configMap)
 		Expect(err).NotTo(HaveOccurred())
