@@ -1479,10 +1479,10 @@ func (r *Cluster) validateWalStorageSize() field.ErrorList {
 func (r *Cluster) validateEphemeralVolumeSource() field.ErrorList {
 	var result field.ErrorList
 
-	if r.Spec.EphemeralVolumeSource != nil && (r.Spec.EphemeralVolumesSizeLimit != nil && r.Spec.EphemeralVolumesSizeLimit.TemporaryData != nil) {
+	if r.Spec.EphemeralVolumeSource != nil && r.Spec.EphemeralVolumesSizeLimit != nil {
 		result = append(result, field.Duplicate(
 			field.NewPath("spec", "ephemeralVolumeSource"),
-			"ephemeralVolumeSource and ephemeralVolumesSizeLimit.temporaryData are in conflict, set one only",
+			"Conflicting settings: provide either ephemeralVolumeSource or ephemeralVolumesSizeLimit, not both.",
 		))
 	}
 

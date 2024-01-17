@@ -47,13 +47,12 @@ CloudNativePG relies on [ephemeral volumes](https://kubernetes.io/docs/concepts/
 for part of the internal activities. Ephemeral volumes exist for the sole
 duration of a pod's life, without persisting across pod restarts.
 
-### Volume for temporary storage
+# Volume Claim Template for Temporary Storage
 
-An ephemeral volume used for temporary storage. By default an `emptyDir` volume is used. To configure
-the volume use the `.spec.ephemeralVolumeSource` field in the cluster spec.
+The operator uses  by default an `emptyDir` volume, which can be customized by using the `.spec.ephemeralVolumesSizeLimit field`.
+This can be overridden by specifying a volume claim template in the `.spec.ephemeralVolumeSource` field.
 
-This simple example shows how to set a `1Gi` ephemeral volume. Set the `storageClassName` to something
-available on your Kubernetes cluster.
+In the following example, a `1Gi` ephemeral volume is set.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -66,16 +65,14 @@ spec:
     volumeClaimTemplate:
       spec:
         accessModes: ["ReadWriteOnce"]
+        # example storageClassName, replace with one existing in your Kubernetes cluster
         storageClassName: "scratch-storage-class"
         resources:
           requests:
             storage: 1Gi
 ```
 
-Alternatively you can configure an upper bound on the default volume size using the `.spec.ephemeralVolumesSizeLimit.temporaryData`
-field in the cluster spec.
-
-Both `.spec.emphemeralVolumeSource` and `.spec.ephemeralVolumesSizeLimit.temporaryData` cannot be set.
+Both `.spec.emphemeralVolumeSource` and `.spec.ephemeralVolumesSizeLimit.temporaryData` cannot be specified simultaneously.
 
 ### Volume for shared memory
 

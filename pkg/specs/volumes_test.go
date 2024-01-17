@@ -18,6 +18,8 @@ package specs
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -472,3 +474,47 @@ var _ = DescribeTable("test creation of volumes",
 			},
 		}),
 )
+
+var _ = Describe("createEphemeralVolume", func() {
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{}
+	})
+
+	It("should create an emptyDir volume by default", func() {
+		ephemeralVolume := createEphemeralVolume(cluster)
+		Expect(ephemeralVolume.Name).To(Equal("scratch-data"))
+		Expect(ephemeralVolume.VolumeSource.EmptyDir).NotTo(BeNil())
+	})
+
+	It("should create an ephemeral volume when specified in the cluster", func() {
+		const storageClass = "test-storageclass"
+		cluster.Spec.EphemeralVolumeSource = &corev1.EphemeralVolumeSource{
+			VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+				Spec: corev1.PersistentVolumeClaimSpec{
+					StorageClassName: ptr.To(storageClass),
+				},
+			},
+		}
+
+		ephemeralVolume := createEphemeralVolume(cluster)
+
+		Expect(ephemeralVolume.Name).To(Equal("scratch-data"))
+		Expect(ephemeralVolume.EmptyDir).To(BeNil())
+		Expect(ephemeralVolume.VolumeSource.Ephemeral).NotTo(BeNil())
+		Expect(*ephemeralVolume.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.StorageClassName).To(Equal(storageClass))
+	})
+
+	It("should set size limit when specified in the cluster", func() {
+		quantity := resource.MustParse("1Gi")
+		cluster.Spec.EphemeralVolumesSizeLimit = &apiv1.EphemeralVolumesSizeLimitConfiguration{
+			TemporaryData: &quantity,
+		}
+
+		ephemeralVolume := createEphemeralVolume(cluster)
+
+		Expect(ephemeralVolume.Name).To(Equal("scratch-data"))
+		Expect(*ephemeralVolume.VolumeSource.EmptyDir.SizeLimit).To(Equal(quantity))
+	})
+})
