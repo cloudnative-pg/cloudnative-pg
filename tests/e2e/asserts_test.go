@@ -364,13 +364,21 @@ func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.
 	})
 }
 
+type TableLocator struct {
+	Namespace   string
+	ClusterName string
+	TableName   string
+	Tablespace  string
+}
+
 // AssertCreateTestData create test data.
-func AssertCreateTestDataInTablespace(namespace, clusterName, tableName, tablespace string, pod *corev1.Pod) {
-	By(fmt.Sprintf("creating test data in tablespace %q", tablespace), func() {
-		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v TABLESPACE %v AS VALUES (1),(2);", tableName, tablespace)
+func AssertCreateTestDataInTablespace(tl TableLocator, pod *corev1.Pod) {
+	By(fmt.Sprintf("creating test data in tablespace %q", tl.Tablespace), func() {
+		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v TABLESPACE %v AS VALUES (1),(2);",
+			tl.TableName, tl.Tablespace)
 		_, _, err := env.ExecCommandWithPsqlClient(
-			namespace,
-			clusterName,
+			tl.Namespace,
+			tl.ClusterName,
 			pod,
 			apiv1.ApplicationUserSecretSuffix,
 			testsUtils.AppDBName,

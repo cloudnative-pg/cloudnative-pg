@@ -442,8 +442,20 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 		It("can create the volume snapshot backup using the plugin and verify the backup", func() {
 			By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 				// Create a table and insert data 1,2 in each tablespace
-				AssertCreateTestDataInTablespace(namespace, clusterName, table1, tablespace1, psqlClientPod)
-				AssertCreateTestDataInTablespace(namespace, clusterName, table2, tablespace2, psqlClientPod)
+				tl1 := TableLocator{
+					Namespace:   namespace,
+					ClusterName: clusterName,
+					TableName:   table1,
+					Tablespace:  tablespace1,
+				}
+				AssertCreateTestDataInTablespace(tl1, psqlClientPod)
+				tl2 := TableLocator{
+					Namespace:   namespace,
+					ClusterName: clusterName,
+					TableName:   table2,
+					Tablespace:  tablespace2,
+				}
+				AssertCreateTestDataInTablespace(tl2, psqlClientPod)
 
 				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
