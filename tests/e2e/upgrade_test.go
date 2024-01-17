@@ -413,7 +413,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// We'll use it to check if everything is archived correctly
 		By("setting up minio client pod", func() {
 			minioClient := testsUtils.MinioDefaultClient(upgradeNamespace)
-			err := testsUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
+			err := testsUtils.PodCreateAndWaitForReady(env, &minioClient, uint(testTimeouts[testsUtils.MinioInstallation]))
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -677,6 +677,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	When("upgrading from the most recent tag to the current operator", func() {
 		It("keeps clusters working after a rolling upgrade", func() {
 			upgradeNamespacePrefix := rollingUpgradeNamespace
+			By("applying environment changes for current upgrade to be performed", func() {
+				testsUtils.CreateOperatorConfigurationMap(operatorNamespace, configName, false, env)
+			})
 			mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
 			Expect(err).NotTo(HaveOccurred())
 
@@ -691,7 +694,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		It("keeps clusters working after an online upgrade", func() {
 			upgradeNamespacePrefix := onlineUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
-				testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
+				testsUtils.CreateOperatorConfigurationMap(operatorNamespace, configName, true, env)
 			})
 
 			mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
@@ -711,7 +714,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		It("keeps clusters working after an online upgrade", func() {
 			upgradeNamespacePrefix := onlineUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
-				testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
+				testsUtils.CreateOperatorConfigurationMap(operatorNamespace, configName, true, env)
 			})
 
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
@@ -725,7 +728,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		It("keeps clusters working after a rolling upgrade", func() {
 			upgradeNamespacePrefix := rollingUpgradeNamespace
-
+			By("applying environment changes for current upgrade to be performed", func() {
+				testsUtils.CreateOperatorConfigurationMap(operatorNamespace, configName, false, env)
+			})
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
 
