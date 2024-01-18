@@ -1483,7 +1483,8 @@ func (r *Cluster) validateEphemeralVolumeSource() field.ErrorList {
 		r.Spec.EphemeralVolumesSizeLimit.TemporaryData != nil) {
 		result = append(result, field.Duplicate(
 			field.NewPath("spec", "ephemeralVolumeSource"),
-			"Conflicting settings: provide either ephemeralVolumeSource or ephemeralVolumesSizeLimit, not both.",
+			"Conflicting settings: provide either ephemeralVolumeSource "+
+				"or ephemeralVolumesSizeLimit.TemporaryData, not both.",
 		))
 	}
 
