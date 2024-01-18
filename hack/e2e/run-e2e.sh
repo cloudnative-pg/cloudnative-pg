@@ -27,7 +27,6 @@ ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-image)}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
-OPENSHIFT=${OPENSHIFT:-false}
 # variable need export otherwise be invisible in e2e test case
 export DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
 export DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
@@ -79,7 +78,7 @@ echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 # NOTE: the ginkgo calls may have non-zero exits, with E2E tests that fail but could be 'ignore-fail'
 RC=0
 RC_GINKGO1=0
-if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${OPENSHIFT}" != "true" ]]; then
+if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   # Generate a manifest for the operator so we can upgrade to it in the upgrade tests.
   # This manifest uses the default image and tag for the current operator build, and assumes
   # the image has been either:
@@ -116,7 +115,7 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${OPENSHIFT}" != "true" ]]; t
   jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/upgrade_report.json" || RC=$?
 fi
 
-if [[ "${OPENSHIFT}" != "true" ]]; then
+if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
   # Getting the operator images need a pull secret
   kubectl delete namespace cnpg-system || :
   kubectl create namespace cnpg-system

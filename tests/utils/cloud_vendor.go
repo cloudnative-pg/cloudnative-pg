@@ -62,7 +62,7 @@ func TestCloudVendor() (*TestEnvVendor, error) {
 		if vendor, ok := vendors[vendorEnv]; ok {
 			return vendor, nil
 		}
-		return nil, fmt.Errorf("unknow cloud vendor %s", vendorEnv)
+		return nil, fmt.Errorf("unknown cloud vendor %s", vendorEnv)
 	}
 	ocpVersion, exists := os.LookupEnv(ocpVersionEnvVarName)
 	if exists && ocpVersion != "" {

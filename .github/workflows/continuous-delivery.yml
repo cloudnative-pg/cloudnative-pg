@@ -1888,7 +1888,7 @@ jobs:
       E2E_CSI_STORAGE_CLASS: gp3-csi
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-aws-vsc
 
-      TEST_CLOUD_VENDOR: "openshift"
+      TEST_CLOUD_VENDOR: "ocp"
 
       # AWS configuration
       AWS_BASE_DOMAIN: ${{ secrets.AWS_BASE_DOMAIN }}
