@@ -47,7 +47,7 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   REPOSITORY_OWNER: "cloudnative-pg"
   SLACK_USERNAME: "cnpg-bot"
-  BUILD_MANAGER_RELEASE_ARGS: "build --skip-validate --rm-dist --id manager"
+  BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --rm-dist --id manager"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
   PLATFORM: "linux/amd64,linux/arm64"
@@ -448,6 +448,52 @@ jobs:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
           retention-days: 7
+
+      # In order to test the case of upgrading from the current operator
+      # to a future one, we build and push an image with a different VERSION
+      # to force a different hash for the manager binary.
+      # (Otherwise the ONLINE upgrade won't trigger)
+      #
+      # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
+      # upgrade test
+      - name: Build binary for upgrade test
+        uses: goreleaser/goreleaser-action@v5
+        if: |
+          always() && !cancelled() &&
+          needs.evaluate_options.outputs.test_level == '4'
+        with:
+          distribution: goreleaser
+          version: latest
+          args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
+        env:
+          DATE: ${{ env.DATE }}
+          COMMIT: ${{ env.COMMIT }}
+          VERSION: ${{ env.VERSION }}-prime
+
+      # In order to test the case of upgrading from the current operator
+      # to a future one, we build and push an image with a different VERSION
+      # to force a different hash for the manager binary.
+      # (Otherwise the ONLINE upgrade won't trigger)
+      #
+      # We push the "prime" binary using a tag with the suffix "-prime"
+      # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
+      # upgrade test
+      - name: Build and push image for upgrade test
+        uses: docker/build-push-action@v5
+        if: |
+          always() && !cancelled() &&
+          needs.evaluate_options.outputs.test_level == '4'
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          context: .
+          push: true
+          build-args: |
+            VERSION=${{ env.VERSION }}-prime
+          tags: ${{ steps.docker-meta.outputs.tags }}-prime
+          labels: ${{ env.LABELS }}
+          provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
+          cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
+          cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
 
   # This will only execute in cloudnative-pg org
   publish-artifacts:
@@ -1011,7 +1057,7 @@ jobs:
         if: (always() && !cancelled())
         uses: actions/upload-artifact@v4
         with:
-          name: testartifacts-aks
+          name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
           retention-days: 7
       -
@@ -1170,9 +1216,9 @@ jobs:
       DEBUG: "true"
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
-      E2E_DEFAULT_STORAGE_CLASS: gp3
-      E2E_CSI_STORAGE_CLASS: gp3
-      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: ebs-csi-snapclass
+      E2E_DEFAULT_STORAGE_CLASS: gp3-csi
+      E2E_CSI_STORAGE_CLASS: gp3-csi
+      E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-aws-vsc
 
       AWS_REGION: eu-central-1
       AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES }}
@@ -1391,7 +1437,7 @@ jobs:
         if: (always() && !cancelled())
         uses: actions/upload-artifact@v4
         with:
-          name: testartifacts-eks
+          name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
           retention-days: 7
       -
@@ -1526,7 +1572,7 @@ jobs:
     name: Run E2E on Google GKE
     if: |
       (always() && !cancelled()) &&
-      vars.GKE_ENABLED == 'true' && 
+      vars.GKE_ENABLED == 'true' &&
       needs.generate-jobs.outputs.gkeEnabled == 'true' &&
       needs.generate-jobs.result == 'success'
     needs:
@@ -1709,7 +1755,7 @@ jobs:
         if: (always() && !cancelled())
         uses: actions/upload-artifact@v4
         with:
-          name: testartifacts-gke
+          name: testartifacts-${{ env.MATRIX }}
           path: testartifacts-${{ env.MATRIX }}/
           retention-days: 7
       -

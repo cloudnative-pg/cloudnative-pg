@@ -248,6 +248,23 @@ var _ = Describe("pg_hba.conf generation", func() {
 	})
 })
 
+var _ = Describe("pg_ident.conf generation", func() {
+	specRules := []string{
+		"test someone else",
+	}
+
+	It("contains the default map when no mappings are added", func() {
+		Expect(CreateIdentRules(make([]string, 0), "someone")).To(
+			ContainSubstring("\nlocal someone postgres\n"))
+	})
+
+	It("contains the default map and additional mappings when added", func() {
+		rules, _ := CreateIdentRules(specRules, "someone")
+		Expect(rules).To(ContainSubstring("\nlocal someone postgres\n"))
+		Expect(rules).To(ContainSubstring("\ntest someone else\n"))
+	})
+})
+
 var _ = Describe("pgaudit", func() {
 	var pgaudit *ManagedExtension
 	BeforeEach(func() {
