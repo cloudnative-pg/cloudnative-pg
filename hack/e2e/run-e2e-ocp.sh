@@ -47,6 +47,7 @@ OCP_VERSION=${OCP_VERSION:-latest}
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
 export TEST_TIMEOUTS=${TEST_TIMEOUTS:-}
 export FEATURE_TYPE=${FEATURE_TYPE:-}
+export TEST_CLOUD_VENDOR="openshift"
 
 # create the catalog source
 oc apply -f cloudnative-pg-catalog.yaml
