@@ -983,6 +983,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	// Generate a new node serial
+	// Move the node serial generation after the checkBootstrapFromRecovery to ensure
+	// the retry can continue without error when the cluster is bootstrapped from recovery
 	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
