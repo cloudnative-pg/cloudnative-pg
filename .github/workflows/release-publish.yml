@@ -144,6 +144,16 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
       -
+        name: Docker meta UBI9
+        id: docker-meta-ubi9
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGES }}
+          flavor: |
+            suffix=-ubi9
+          tags: |
+            type=semver,pattern={{version}}
+      -
         name: Detect platforms
         run: |
           # Keep in mind that adding more platforms (architectures) will increase the building
@@ -186,6 +196,17 @@ jobs:
           build-args: |
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
+      -
+        name: Build and push UBI9
+        uses: docker/build-push-action@v5
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          context: .
+          file: Dockerfile-ubi9
+          push: true
+          build-args: |
+            VERSION=${{ steps.build-meta.outputs.version }}
+          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
 
   olm-bundle:
     name: Create OLM bundle and catalog
