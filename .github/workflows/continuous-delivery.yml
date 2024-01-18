@@ -588,6 +588,7 @@ jobs:
       gkeTimeout: ${{ steps.generate-jobs.outputs.gkeE2ETimeout }}
       openshiftMatrix: ${{ steps.generate-jobs.outputs.openshiftMatrix }}
       openshiftEnabled: ${{ steps.generate-jobs.outputs.openshiftEnabled }}
+      openshiftTimeout: ${{ steps.generate-jobs.outputs.openshiftE2ETimeout }}
     steps:
       -
         name: Checkout code
@@ -1877,7 +1878,7 @@ jobs:
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       # The version of operator to upgrade FROM, in the rolling upgrade E2E test
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-      TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.openshiftE2ETimeout }}
+      TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.openshiftTimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
       DEBUG: "true"
