@@ -38,13 +38,15 @@ function wait_for() {
 
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 SUBPROJECT_ROOT_DIR="${ROOT_DIR}/cloudnative-pg"
+# we need export defined in workflow and used in run-e2e.sh script
 export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${SUBPROJECT_ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG}.0}
 export E2E_ENABLE_REDWOOD=${E2E_ENABLE_REDWOOD:-}
 export E2E_RUN_UPGRADE_TESTS=${E2E_RUN_UPGRADE_TESTS:-false}
 OCP_VERSION=${OCP_VERSION:-latest}
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
-
+export TEST_TIMEOUTS=${TEST_TIMEOUTS:-}
+export FEATURE_TYPE=${FEATURE_TYPE:-}
 
 # create the catalog source
 oc apply -f cloudnative-pg-catalog.yaml
@@ -134,6 +136,5 @@ done
 E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=$(kubectl get vsclass -o=jsonpath='{.items[?(@.metadata.annotations.snapshot\.storage\.kubernetes\.io/is-default-class=="true")].metadata.name}')
 export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS
 export OPENSHIFT="true"
-export FEATURE_TYPE=${FEATURE_TYPE:-}
 echo "Running the e2e tests"
 "${ROOT_DIR}/hack/e2e/run-e2e.sh"
