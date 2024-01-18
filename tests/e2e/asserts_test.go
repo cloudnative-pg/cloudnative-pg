@@ -2731,28 +2731,31 @@ func AssertReplicationSlotsOnPod(
 	namespace,
 	clusterName string,
 	pod corev1.Pod,
+	expectedSlots []string,
+	isActiveOnPrimary bool,
+	isActiveOnReplica bool,
 ) {
-	expectedSlots, err := testsUtils.GetExpectedReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
-	Expect(err).ToNot(HaveOccurred())
-
+	GinkgoWriter.Println("checking contain slots:", expectedSlots, "for pod:", pod.Name)
 	Eventually(func() ([]string, error) {
 		currentSlots, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
 		return currentSlots, err
-	}, 300).Should(BeEquivalentTo(expectedSlots),
+	}, 300).Should(ContainElements(expectedSlots),
 		func() string {
 			return testsUtils.PrintReplicationSlots(namespace, clusterName, env)
 		})
 
+	GinkgoWriter.Println("executing replication slot assertion query on pod", pod.Name)
+
 	for _, slot := range expectedSlots {
 		query := fmt.Sprintf(
 			"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
-				"WHERE slot_name = '%v' AND active = 'f' "+
-				"AND temporary = 'f' AND slot_type = 'physical')", slot)
+				"WHERE slot_name = '%v' AND active = '%t' "+
+				"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnReplica)
 		if specs.IsPodPrimary(pod) {
 			query = fmt.Sprintf(
 				"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
-					"WHERE slot_name = '%v' AND active = 't' "+
-					"AND temporary = 'f' AND slot_type = 'physical')", slot)
+					"WHERE slot_name = '%v' AND active = '%t' "+
+					"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnPrimary)
 		}
 		Eventually(func() (string, error) {
 			stdout, _, err := testsUtils.RunQueryFromPod(&pod, testsUtils.PGLocalSocketDir,
@@ -2787,14 +2790,16 @@ func AssertClusterReplicationSlotsAligned(
 		})
 }
 
-// AssertClusterReplicationSlots will verify if the replication slots of each pod
+// AssertClusterHAReplicationSlots will verify if the replication slots of each pod
 // of the cluster exist and are aligned.
-func AssertClusterReplicationSlots(namespace, clusterName string) {
+func AssertClusterHAReplicationSlots(namespace, clusterName string) {
 	By("verifying all cluster's replication slots exist and are aligned", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
-			AssertReplicationSlotsOnPod(namespace, clusterName, pod)
+			expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+			Expect(err).ToNot(HaveOccurred())
+			AssertReplicationSlotsOnPod(namespace, clusterName, pod, expectedSlots, true, false)
 		}
 		AssertClusterReplicationSlotsAligned(namespace, clusterName)
 	})

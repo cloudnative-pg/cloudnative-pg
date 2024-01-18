@@ -40,13 +40,15 @@ func ReconcileReplicationSlots(
 		return reconcile.Result{}, nil
 	}
 
+	isPrimary := cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName
+
 	// if the replication slots feature was deactivated, ensure any existing
 	// replication slots get cleaned up
 	if !cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
-		return dropReplicationSlots(ctx, manager, cluster)
+		return dropReplicationSlots(ctx, manager, cluster, isPrimary)
 	}
 
-	if cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName {
+	if isPrimary {
 		return reconcilePrimaryReplicationSlots(ctx, manager, cluster)
 	}
 
@@ -122,6 +124,7 @@ func dropReplicationSlots(
 	ctx context.Context,
 	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
+	isPrimary bool,
 ) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -133,6 +136,11 @@ func dropReplicationSlots(
 
 	needToReschedule := false
 	for _, slot := range slots.Items {
+		// we only want to drop the HA replication slots on the primary
+		if !slot.IsHA && isPrimary {
+			continue
+		}
+
 		if slot.Active {
 			contextLogger.Trace("Skipping deletion of replication slot because it is active",
 				"slot", slot)

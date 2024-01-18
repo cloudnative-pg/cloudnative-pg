@@ -372,6 +372,8 @@ StorageConfiguration
 Storages
 SuccessfullyExtracted
 SyncReplicaElectionConstraints
+SynchronizeReplicas
+SynchronizeReplicasConfiguration
 Synopsys
 TCP
 TLS
@@ -653,6 +655,7 @@ env
 envFrom
 ephemeralVolumeSource
 ephemeralVolumesSizeLimit
+excludePatterns
 executables
 expirations
 extensibility
@@ -1101,6 +1104,8 @@ svc
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint
+synchronizeReplicas
+synchronizeReplicasCache
 sys
 syslog
 systemd

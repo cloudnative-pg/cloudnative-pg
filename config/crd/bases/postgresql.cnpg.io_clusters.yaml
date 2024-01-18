@@ -3409,6 +3409,25 @@ spec:
                         pattern: ^[0-9a-z_]*$
                         type: string
                     type: object
+                  synchronizeReplicas:
+                    description: Replication of the user created physical replication
+                      slots
+                    properties:
+                      enabled:
+                        default: true
+                        description: when set to true, every replication slot that
+                          is on the primary is synchronized on each standby
+                        type: boolean
+                      excludePatterns:
+                        description: list of regular expression patterns to match
+                          the names of replication slots to be excluded (by default
+                          empty)
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - enabled
+                    type: object
                   updateInterval:
                     default: 30
                     description: Standby will update the status of the local replication

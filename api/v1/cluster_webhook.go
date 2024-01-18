@@ -153,6 +153,11 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 			SlotPrefix: "_cnpg_",
 		}
 	}
+	if r.Spec.ReplicationSlots.SynchronizeReplicas == nil {
+		r.Spec.ReplicationSlots.SynchronizeReplicas = &SynchronizeReplicasConfiguration{
+			Enabled: ptr.To(true),
+		}
+	}
 
 	if len(r.Spec.Tablespaces) > 0 {
 		r.defaultTablespaces()
@@ -1998,16 +2003,27 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		return nil
 	}
 
-	if psqlVersion >= 110000 {
-		return nil
+	if psqlVersion < 110000 {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
+				replicationSlots.HighAvailability.GetEnabled(),
+				"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+		}
 	}
 
-	return field.ErrorList{
-		field.Invalid(
-			field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
-			replicationSlots.HighAvailability.GetEnabled(),
-			"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+	if r.Spec.ReplicationSlots.SynchronizeReplicas != nil {
+		if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
+			return field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
+					errs,
+					"Cannot enable synchronizeReplicas. Invalid regexes were found"),
+			}
+		}
 	}
+
+	return nil
 }
 
 func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {

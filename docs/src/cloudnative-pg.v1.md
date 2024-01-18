@@ -3755,6 +3755,13 @@ of replication slots</p>
 every <code>updateInterval</code> seconds (default 30).</p>
 </td>
 </tr>
+<tr><td><code>synchronizeReplicas</code><br/>
+<a href="#postgresql-cnpg-io-v1-SynchronizeReplicasConfiguration"><i>SynchronizeReplicasConfiguration</i></a>
+</td>
+<td>
+   <p>Replication of the user created physical replication slots</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -4459,6 +4466,43 @@ if all the labels values match.</p>
 <td>
    <p>This flag enables the constraints for sync replicas</p>
 </td>
+</tr>
+</tbody>
+</table>
+
+## SynchronizeReplicasConfiguration     {#postgresql-cnpg-io-v1-SynchronizeReplicasConfiguration}
+
+
+**Appears in:**
+
+- [ReplicationSlotsConfiguration](#postgresql-cnpg-io-v1-ReplicationSlotsConfiguration)
+
+
+<p>SynchronizeReplicasConfiguration contains the configuration for the synchronization of the physical replication slots</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>enabled</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>when set to true, every replication slot that is on the primary is synchronized on each standby</p>
+</td>
+</tr>
+<tr><td><code>excludePatterns</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>list of regular expression patterns to match the names of replication slots to be excluded (by default empty)</p>
+</td>
+</tr>
+<tr><td><code>-</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-synchronizeReplicasCache"><i>synchronizeReplicasCache</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
 </tr>
 </tbody>
 </table>
