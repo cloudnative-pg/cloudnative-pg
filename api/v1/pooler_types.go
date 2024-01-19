@@ -166,7 +166,7 @@ type PgBouncerSpec struct {
 	Paused *bool `json:"paused,omitempty"`
 }
 
-// IsPaused returns whether all database should be paused or not
+// IsPaused returns whether all database should be paused or not.
 func (in PgBouncerSpec) IsPaused() bool {
 	return in.Paused != nil && *in.Paused
 }
@@ -273,4 +273,19 @@ func (in *Pooler) GetAuthQuery() string {
 	}
 
 	return DefaultPgBouncerPoolerAuthQuery
+}
+
+// IsAutomatedIntegration returns whether the Pooler integration with the
+// Cluster is automated or not.
+func (in *Pooler) IsAutomatedIntegration() bool {
+	if in.Spec.PgBouncer == nil {
+		return true
+	}
+	// If the user specified an AuthQuerySecret or an AuthQuery, the integration
+	// is not going to be handled by the operator.
+	if (in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
+		in.Spec.PgBouncer.AuthQuery != "" {
+		return false
+	}
+	return true
 }
