@@ -418,13 +418,6 @@ func (r *ClusterReconciler) getPoolerIntegrationsNeeded(ctx context.Context,
 	}
 
 	pgbouncerPoolerIntegrations, err := r.getPgbouncerIntegrationStatus(ctx, cluster, poolers)
-
-	for _, pooler := range poolers.Items {
-		if !slices.Contains(pgbouncerPoolerIntegrations.Secrets, pooler.Name) {
-			log.Info("pooler not automatically configured, manual configuration required",
-				"cluster", pooler.Spec.Cluster.Name, "pooler", pooler.Name)
-		}
-	}
 	if err != nil {
 		return nil, fmt.Errorf("while getting integration status for pgbouncer poolers in cluster %s: %w",
 			cluster.Name, err)
@@ -464,11 +457,7 @@ func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 		// We skip secrets which were directly setup by the user with
 		// the authQuery and authQuerySecret parameters inside the
 		// pooler
-		if pooler.Spec.PgBouncer.AuthQuery != "" {
-			continue
-		}
-
-		if pooler.Spec.PgBouncer.AuthQuerySecret != nil && pooler.Spec.PgBouncer.AuthQuerySecret.Name != "" {
+		if !pooler.IsAutomatedIntegration() {
 			continue
 		}
 
