@@ -17,6 +17,7 @@ limitations under the License.
 package pgpass
 
 import "fmt"
+import "strings"
 
 // ConnectionInfo contains the information identifying
 // a PostgreSQL server whom credentials need to be included
@@ -55,14 +56,16 @@ func NewConnectionInfo(
 	return result
 }
 
+var fieldEscaper = strings.NewReplacer("\\", "\\\\", ":", "\\:")
+
 // BuildLine builds a pgPass configuration file line
 func (info ConnectionInfo) BuildLine() string {
 	return fmt.Sprintf(
 		"%v:%v:%v:%v:%v",
-		info.host,
-		info.port,
-		info.dbname,
-		info.user,
-		info.password,
+		fieldEscaper.Replace(info.host),
+		fieldEscaper.Replace(info.port),
+		fieldEscaper.Replace(info.dbname),
+		fieldEscaper.Replace(info.user),
+		fieldEscaper.Replace(info.password),
 	)
 }
