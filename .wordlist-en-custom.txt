@@ -13,6 +13,8 @@ Armando
 AuthQuery
 AuthQuerySecret
 Autoscaler
+AvailableArchitectureList
+AvailableArchitectures
 AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
@@ -464,6 +466,7 @@ authn
 authz
 autoscaler
 autovacuum
+availableArchitectures
 aws
 az
 azureCredentials
