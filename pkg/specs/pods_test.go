@@ -826,7 +826,7 @@ var _ = Describe("PodSpec drift detection", func() {
 
 		specsMatch, diff := ComparePodSpecs(podSpec1, podSpec2)
 		Expect(diff).To(ContainSubstring(
-			"containers: container postgres differs in resource"))
+			"containers: container postgres differs in resources"))
 		Expect(specsMatch).To(BeFalse())
 	})
 

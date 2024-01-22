@@ -274,7 +274,6 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			rollout := isPodNeedingRollout(ctx, status, &clusterWithResources)
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.reason).To(ContainSubstring("original and target PodSpec differ in containers"))
-			// NOTE: whether we find drift in limits or requests first does not matter
 			Expect(rollout.reason).To(ContainSubstring("container postgres differs in resources"))
 		})
 	})
