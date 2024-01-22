@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 // ComparePodSpecs compares two pod specs, returns true iff they are equivalent, and
@@ -141,28 +142,6 @@ func compareVolumeMounts(currentMounts, targetMounts []corev1.VolumeMount) (bool
 	return compareMaps(current, target)
 }
 
-// compareResourceLists returns true if the resource lists are equivalent.
-// NOTE: the memory objects describing two resource.Quantity can be different and yet
-// represent the same quantity. The K8s client library offers a predicate `Equal` to help
-func compareResourceLists(rl1, rl2 corev1.ResourceList) bool {
-	for resourceName, quantity1 := range rl1 {
-		quantity2, ok := rl2[resourceName]
-		if !ok {
-			return false
-		}
-		if !quantity1.Equal(quantity2) {
-			return false
-		}
-	}
-	for resourceName := range rl2 {
-		_, ok := rl1[resourceName]
-		if !ok {
-			return false
-		}
-	}
-	return true
-}
-
 // doContainersMatch checks if the containers match. They are assumed to be for the same name.
 // If they don't match, the first diff found is returned
 func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool, string) {
@@ -185,14 +164,12 @@ func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool
 		"command": func() bool {
 			return reflect.DeepEqual(currentContainer.Command, targetContainer.Command)
 		},
-		"resource-limits": func() bool {
-			return compareResourceLists(currentContainer.Resources.Limits, targetContainer.Resources.Limits)
-		},
-		"resource-requests": func() bool {
-			return compareResourceLists(currentContainer.Resources.Requests, targetContainer.Resources.Requests)
-		},
-		"resource-claims": func() bool {
-			return reflect.DeepEqual(currentContainer.Resources.Claims, targetContainer.Resources.Claims)
+		"resources": func() bool {
+			// semantic equality will compare the two objects semantically, not only numbers
+			return equality.Semantic.Equalities.DeepEqual(
+				currentContainer.Resources,
+				targetContainer.Resources,
+			)
 		},
 		"ports": func() bool {
 			return reflect.DeepEqual(currentContainer.Ports, targetContainer.Ports)
