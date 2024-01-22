@@ -879,6 +879,45 @@ var _ = Describe("PodSpec drift detection", func() {
 		Expect(diff).To(Equal(""))
 		Expect(specsMatch).To(BeTrue())
 	})
+
+	It("detects if resource quantities for containers are equivalent if one is nil and one is empty", func() {
+		// empty map
+		podSpec1 := `{
+			"containers": [
+				{
+					"name": "postgres",
+					"resources": {
+						"limits": {},
+						"requests": {}
+					}
+				}
+			]
+		}`
+		var storedPodSpec1, podSpec2 corev1.PodSpec
+		err := json.Unmarshal([]byte(podSpec1), &storedPodSpec1)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(storedPodSpec1.Containers).To(HaveLen(1))
+
+		podSpec2 = corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "postgres",
+					Resources: corev1.ResourceRequirements{
+						Limits:   nil,
+						Requests: nil,
+					},
+				},
+			},
+		}
+
+		// NOTE: the object representations of the specs are different, even
+		// though they represent equivalent quantities
+		// i.e. reflect.DeepEqual(podSpec2, storedPodSpec1) is likely false
+		// Let's make sure the comparison function can recognize equivalent quantities
+		specsMatch, diff := ComparePodSpecs(storedPodSpec1, podSpec2)
+		Expect(diff).To(Equal(""))
+		Expect(specsMatch).To(BeTrue())
+	})
 })
 
 var _ = Describe("Compute startup probe failure threshold", func() {
