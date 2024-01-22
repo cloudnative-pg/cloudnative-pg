@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
@@ -200,18 +199,8 @@ func quoteHbaLiteral(literal string) string {
 
 // GeneratePostgresqlIdent generates the pg_ident.conf content
 func (instance *Instance) GeneratePostgresqlIdent(cluster *apiv1.Cluster) (string, error) {
-	var username string
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Info("Unable to identify the current user. Falling back to insecure mapping.")
-		username = "/"
-	} else {
-		username = currentUser.Username
-	}
-
-	return postgres.CreateIdentRules(
-		cluster.Spec.PostgresConfiguration.PgIdent,
-		username)
+	return postgres.CreateIdentRules(cluster.Spec.PostgresConfiguration.PgIdent,
+		getCurrentUserOrDefaultToInsecureMapping())
 }
 
 // RefreshPGIdent generates and writes down the pg_ident.conf file

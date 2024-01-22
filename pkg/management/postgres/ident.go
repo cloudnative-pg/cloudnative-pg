@@ -29,21 +29,27 @@ import (
 // WritePostgresUserMaps creates a pg_ident.conf file containing only one map called "local" that
 // maps the current user to "postgres" user.
 func WritePostgresUserMaps(pgData string) error {
-	var username string
-
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Info("Unable to identify the current user. Falling back to insecure mapping.")
-		username = "/"
-	} else {
-		username = currentUser.Username
-	}
-
-	_, err = fileutils.WriteStringToFile(filepath.Join(pgData, constants.PostgresqlIdentFile),
+	username := getCurrentUserOrDefaultToInsecureMapping()
+	_, err := fileutils.WriteStringToFile(filepath.Join(pgData, constants.PostgresqlIdentFile),
 		fmt.Sprintf("local %s postgres\n", username))
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// getCurrentUserOrDefaultToInsecureMapping retrieves the current system user's username.
+// If the retrieval fails, it falls back to an insecure mapping using the root ("/") as the default username.
+//
+// Returns:
+// - string: The current system user's username or the default insecure mapping if retrieval fails.
+func getCurrentUserOrDefaultToInsecureMapping() string {
+	currentUser, err := user.Current()
+	if err != nil {
+		log.Info("Unable to identify the current user. Falling back to insecure mapping.")
+		return "/"
+	}
+
+	return currentUser.Username
 }
