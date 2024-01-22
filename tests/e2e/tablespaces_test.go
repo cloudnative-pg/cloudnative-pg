@@ -380,8 +380,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			snapshotDataEnv       = "SNAPSHOT_PITR_PGDATA"
 			snapshotWalEnv        = "SNAPSHOT_PITR_PGWAL"
 			snapshotTbsEnv        = "SNAPSHOT_PITR_PGTABLESPACE"
-			tableName             = "online_test"
 			recoveryTargetTimeEnv = "SNAPSHOT_PITR"
+			tablespace1           = "tbs1"
+			table1                = "test_tbs1"
+			tablespace2           = "tbs2"
+			table2                = "test_tbs2"
 		)
 		checkPointTimeout := time.Second * 10
 		JustAfterEach(func() {
@@ -438,8 +441,21 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 
 		It("can create the volume snapshot backup using the plugin and verify the backup", func() {
 			By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
-				// Create a "test" table with values 1,2
-				AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+				// Create a table and insert data 1,2 in each tablespace
+				tl1 := TableLocator{
+					Namespace:   namespace,
+					ClusterName: clusterName,
+					TableName:   table1,
+					Tablespace:  tablespace1,
+				}
+				AssertCreateTestDataInTablespace(tl1, psqlClientPod)
+				tl2 := TableLocator{
+					Namespace:   namespace,
+					ClusterName: clusterName,
+					TableName:   table2,
+					Tablespace:  tablespace2,
+				}
+				AssertCreateTestDataInTablespace(tl2, psqlClientPod)
 
 				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
@@ -492,21 +508,10 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			})
 		})
 
-		It(fmt.Sprintf("can create the cluster by restoring from a volume snapshot backup %v", backupName),
+		It(fmt.Sprintf("can create the cluster by restoring from the backup %v using volume snapshot", backupName),
 			func() {
-				By("fetching the volume snapshots", func() {
-					snapshotList, err := getSnapshots(backupName, clusterName, namespace)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(snapshotList.Items).To(HaveLen(len(backupObject.Status.BackupSnapshotStatus.Elements)))
-
-					envVars := testUtils.EnvVarsForSnapshots{
-						DataSnapshot:             snapshotDataEnv,
-						WalSnapshot:              snapshotWalEnv,
-						TablespaceSnapshotPrefix: snapshotTbsEnv,
-					}
-					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backupObject, envVars)
-					Expect(err).ToNot(HaveOccurred())
-				})
+				err = os.Setenv("BACKUP_NAME", backupName)
+				Expect(err).ToNot(HaveOccurred())
 
 				clusterToRestoreName, err := env.GetResourceNameFromYAML(clusterVolumesnapshoRestoreManifest)
 				Expect(err).ToNot(HaveOccurred())
@@ -529,7 +534,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				By("verifying the correct data exists in the restored cluster", func() {
 					restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
 					Expect(err).ToNot(HaveOccurred())
-					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, restoredPrimary)
+
+					AssertDataExpectedCount(namespace, clusterToRestoreName, table1, 2, restoredPrimary)
+					AssertDataExpectedCount(namespace, clusterToRestoreName, table2, 2, restoredPrimary)
 				})
 			})
 
@@ -537,8 +544,12 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 			func() {
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(namespace, clusterName, tableName, 3, psqlClientPod)
-					insertRecordIntoTable(namespace, clusterName, tableName, 4, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterName, table1, 3, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterName, table1, 4, psqlClientPod)
+
+					insertRecordIntoTable(namespace, clusterName, table2, 3, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterName, table2, 4, psqlClientPod)
+
 					// Because GetCurrentTimestamp() rounds down to the second and is executed
 					// right after the creation of the test data, we wait for 1s to avoid not
 					// including the newly created data within the recovery_target_time
@@ -550,8 +561,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 					Expect(err).ToNot(HaveOccurred())
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(namespace, clusterName, tableName, 5, psqlClientPod)
-					insertRecordIntoTable(namespace, clusterName, tableName, 6, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterName, table1, 5, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterName, table1, 6, psqlClientPod)
+
+					insertRecordIntoTable(namespace, clusterName, table2, 5, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterName, table2, 6, psqlClientPod)
 
 					// Close and archive the current WAL file
 					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
@@ -591,7 +605,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
 				By("verifying the correct data exists in the restored cluster", func() {
 					recoveryPrimary, err := env.GetClusterPrimary(namespace, clusterToPITRName)
 					Expect(err).ToNot(HaveOccurred())
-					AssertDataExpectedCount(namespace, clusterToPITRName, tableName, 4, recoveryPrimary)
+					AssertDataExpectedCount(namespace, clusterToPITRName, table1, 4, recoveryPrimary)
+					AssertDataExpectedCount(namespace, clusterToPITRName, table2, 4, recoveryPrimary)
 				})
 			})
 	})
