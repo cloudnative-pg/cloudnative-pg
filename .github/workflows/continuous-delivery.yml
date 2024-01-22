@@ -353,8 +353,8 @@ jobs:
         with:
           images: ${{ env.IMAGES }}
           tags: |
-            type=raw,value=${{ steps.build-meta.outputs.tag_name }}
             type=raw,value=${{ steps.build-meta.outputs.tag_name }},suffix=-prime
+            type=raw,value=${{ steps.build-meta.outputs.tag_name }}
       -
         name: Docker meta UBI8
         id: docker-meta-ubi8
@@ -428,7 +428,8 @@ jobs:
           TAGS_UBI: ${{ steps.docker-meta-ubi8.outputs.tags }}
         run: |
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
-          TAG=${TAGS#*:}
+          tmp=${TAGS#*:}
+          TAG=${tmp#*:}
           TAG_UBI=${TAGS_UBI#*:}
           echo "IMAGE_NAME=${LOWERCASE_OPERATOR_IMAGE_NAME}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
