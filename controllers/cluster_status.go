@@ -320,10 +320,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// Set the available architectures inside the status.
 	architectures := utils.GetAvailableArchitectures()
 	availableArchitectures := apiv1.AvailableArchitectureList{}
-	for _, arch := range architectures {
+	for _, a := range architectures {
 		availableArchitectures = append(availableArchitectures, apiv1.AvailableArchitecture{
-			GoArch: arch.GoArch,
-			Hash:   arch.Hash,
+			GoArch: a.GoArch,
+			Hash:   a.GetHash(),
 		})
 	}
 	cluster.Status.AvailableArchitectures = availableArchitectures

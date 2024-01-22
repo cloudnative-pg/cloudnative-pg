@@ -73,11 +73,6 @@ func Get() (string, error) {
 
 // GetByName gets the hashcode of a binary given its filename
 func GetByName(name string) (string, error) {
-	var err error
-
-	mx.Lock()
-	defer mx.Unlock()
-
 	binaryFileStream, err := StreamByName(name)
 	if err != nil {
 		return "", err

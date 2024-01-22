@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/version"
@@ -29,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // haveSCC stores the result of the DetectSecurityContextConstraints check
@@ -42,11 +44,39 @@ var supportSeccomp bool
 
 // AvailableArchitecture is a struct containing info about an available architecture
 type AvailableArchitecture struct {
-	GoArch, Hash string
+	GoArch, hash string
+	mx           sync.Mutex
+}
+
+// GetHash retrieves the hash for a given AvailableArchitecture
+func (arch *AvailableArchitecture) GetHash() string {
+	arch.mx.Lock()
+	defer arch.mx.Unlock()
+
+	return arch.hash
+}
+
+// calculateHash calculates the hash for a given AvailableArchitecture
+func (arch *AvailableArchitecture) calculateHash() error {
+	arch.mx.Lock()
+	defer arch.mx.Unlock()
+
+	if arch.hash != "" {
+		return nil
+	}
+
+	binaryName := fmt.Sprintf("bin/manager_%s", arch.GoArch)
+	hash, err := executablehash.GetByName(binaryName)
+	if err != nil {
+		return err
+	}
+	arch.hash = hash
+
+	return nil
 }
 
 // availableArchitectures stores the result of DetectAvailableArchitectures function
-var availableArchitectures []AvailableArchitecture
+var availableArchitectures []*AvailableArchitecture
 
 // minorVersionRegexp is used to extract the minor version from
 // the Kubernetes API server version. Some providers, like AWS,
@@ -185,7 +215,7 @@ func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
 }
 
 // GetAvailableArchitectures returns the available instance's architectures
-func GetAvailableArchitectures() []AvailableArchitecture { return availableArchitectures }
+func GetAvailableArchitectures() []*AvailableArchitecture { return availableArchitectures }
 
 // DetectAvailableArchitectures detects the architectures available in the cluster
 func DetectAvailableArchitectures() (err error) {
@@ -196,14 +226,17 @@ func DetectAvailableArchitectures() (err error) {
 
 	for _, b := range binaries {
 		goArch := strings.Split(b, "manager_")[1]
-		hash, err := executablehash.GetByName(b)
-		if err != nil {
-			return err
-		}
-		availableArchitectures = append(availableArchitectures, AvailableArchitecture{
+		arch := AvailableArchitecture{
 			GoArch: goArch,
-			Hash:   hash,
-		})
+		}
+		availableArchitectures = append(availableArchitectures, &arch)
+
+		go func() {
+			err = arch.calculateHash()
+			if err != nil {
+				log.Error(err, "failed to calculate binary hash for architecture %s", arch.GoArch)
+			}
+		}()
 	}
 
 	return err
