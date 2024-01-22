@@ -11,7 +11,7 @@ You can install the [latest operator manifest](https://raw.githubusercontent.com
 for this minor release as follows:
 
 ```sh
-kubectl apply -f \
+kubectl apply --server-side -f \
   https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.22/releases/cnpg-1.22.1.yaml
 ```
 
@@ -64,7 +64,7 @@ For example, you can install the latest snapshot of the operator with:
 ```sh
 curl -sSfL \
   https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
-  kubectl apply -f -
+  kubectl apply --server-side -f -
 ```
 
 If you are instead looking for the latest snapshot of the operator for this
@@ -73,7 +73,7 @@ specific minor release, you can just run:
 ```sh
 curl -sSfL \
   https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.22/manifests/operator-manifest.yaml | \
-  kubectl apply -f -
+  kubectl apply --server-side -f -
 ```
 
 !!! Important
