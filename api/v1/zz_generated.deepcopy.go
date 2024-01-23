@@ -635,6 +635,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(StorageConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.EphemeralVolumeSource != nil {
+		in, out := &in.EphemeralVolumeSource, &out.EphemeralVolumeSource
+		*out = new(corev1.EphemeralVolumeSource)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Affinity.DeepCopyInto(&out.Affinity)
 	if in.TopologySpreadConstraints != nil {
 		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints

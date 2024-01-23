@@ -1417,6 +1417,13 @@ user by setting it to <code>NULL</code>. Enabled by default.</p>
    <p>Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)</p>
 </td>
 </tr>
+<tr><td><code>ephemeralVolumeSource</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#ephemeralvolumesource-v1-core"><i>core/v1.EphemeralVolumeSource</i></a>
+</td>
+<td>
+   <p>EphemeralVolumeSource allows the user to configure the source of ephemeral volumes.</p>
+</td>
+</tr>
 <tr><td><code>startDelay</code><br/>
 <i>int32</i>
 </td>
