@@ -35,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/install"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgadmin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/psql"
@@ -92,6 +93,7 @@ func main() {
 	rootCmd.AddCommand(psql.NewCmd())
 	rootCmd.AddCommand(snapshot.NewCmd())
 	rootCmd.AddCommand(logs.NewCmd())
+	rootCmd.AddCommand(pgadmin.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
