@@ -888,10 +888,12 @@ pc
 pdf
 persistentvolumeclaim
 persistentvolumeclaims
+pgAdmin
 pgBouncer
 pgBouncerIntegration
 pgBouncerSecrets
 pgSQL
+pgadmin
 pgaudit
 pgbarman
 pgbasebackup
