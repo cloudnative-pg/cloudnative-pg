@@ -309,6 +309,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateMaxSyncReplicas,
 		r.validateStorageSize,
 		r.validateWalStorageSize,
+		r.validateEphemeralVolumeSource,
 		r.validateTablespaceStorageSize,
 		r.validateName,
 		r.validateTablespaceNames,
@@ -1470,6 +1471,21 @@ func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	if r.ShouldCreateWalArchiveVolume() {
 		result = append(result,
 			validateStorageConfigurationSize(*field.NewPath("spec", "walStorage"), *r.Spec.WalStorage)...)
+	}
+
+	return result
+}
+
+func (r *Cluster) validateEphemeralVolumeSource() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.EphemeralVolumeSource != nil && (r.Spec.EphemeralVolumesSizeLimit != nil &&
+		r.Spec.EphemeralVolumesSizeLimit.TemporaryData != nil) {
+		result = append(result, field.Duplicate(
+			field.NewPath("spec", "ephemeralVolumeSource"),
+			"Conflicting settings: provide either ephemeralVolumeSource "+
+				"or ephemeralVolumesSizeLimit.TemporaryData, not both.",
+		))
 	}
 
 	return result
