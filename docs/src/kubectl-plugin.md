@@ -966,10 +966,84 @@ reachable in your `PATH` variable to correctly work.
     Please use the [`backup` command](#requesting-a-new-backup) to request
     backups using volume snapshots.
 
+### Using pgAdmin4 for evaluation/demonstration purposes only
+
+[pgAdmin](https://www.pgadmin.org/) stands as the most popular and feature-rich
+open-source administration and development platform for PostgreSQL.
+For more information on the project, please refer to the official
+[documentation](https://www.pgadmin.org/docs/).
+
+Given that the pgAdmin Development Team maintains official Docker container
+images, you can install pgAdmin in your environment as a standard
+Kubernetes deployment.
+
+!!! Important
+    Deployment of pgAdmin in Kubernetes production environments is beyond the
+    scope of this document and, more broadly, of the CloudNativePG project.
+
+However, **for the purposes of demonstration and evaluation**, CloudNativePG
+offers a suitable solution. The `cnpg` plugin implements the `pgadmin4`
+command, providing a straightforward method to connect to a given database
+`Cluster` and navigate its content in a local environment such as `kind`.
+
+For example, you can install a demo deployment of pgAdmin4 for the
+`cluster-example` cluster as follows:
+
+```sh
+kubectl cnpg pgadmin4 cluster-example
+```
+
+This command will produce:
+
+```output
+ConfigMap/cluster-example-pgadmin4 created
+Deployment/cluster-example-pgadmin4 created
+Service/cluster-example-pgadmin4 created
+Secret/cluster-example-pgadmin4 created
+
+[...]
+```
+
+After deploying pgAdmin, forward the port using kubectl and connect
+through your browser by following the on-screen instructions.
+
+![Screenshot of desktop installation of pgAdmin](images/pgadmin4.png)
+
+As usual, you can use the `--dry-run` option to generate the YAML file:
+
+```sh
+kubectl cnpg pgadmin4 --dry-run cluster-example
+```
+
+pgAdmin4 can be installed in either desktop or server mode, with the default
+being server.
+
+In `server` mode, authentication is required using a randomly generated password,
+and users must manually specify the database to connect to.
+
+On the other hand, `desktop` mode initiates a pgAdmin web interface without
+requiring authentication. It automatically connects to the `app` database as the
+`app` user, making it ideal for quick demos, such as on a local deployment using
+`kind`:
+
+```sh
+kubectl cnpg pgadmin4 --mode desktop cluster-example
+```
+
+After concluding your demo, ensure the termination of the pgAdmin deployment by
+executing:
+
+```sh
+kubectl cnpg pgadmin4 --dry-run cluster-example | kubectl delete -f -
+```
+
+!!! Warning
+    Never deploy pgAdmin in production using the plugin.
+
 ## Integration with K9s
 
 The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
-popular terminal based UI to interact with Kubernetes clusters.
+popular terminal-based UI to interact with Kubernetes clusters.
 
 See [`k9s/plugin.yml`](samples/k9s/plugin.yml) for details.
 
