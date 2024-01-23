@@ -15,7 +15,7 @@
 # Namespace actions:
 #   Shift-H   Wake up Hibernated cluster in this namespace (assumes cluster name equals namespace name)
 
-plugin:
+plugins:
   cnpg-backup:
     shortCut: b
     description: Backup
@@ -59,7 +59,6 @@ plugin:
     args:
       - -c
       - "kubectl cnpg hibernate off $NAME -n $NAME --context $CONTEXT |& less -R"
-
   cnpg-logs:
     shortCut: l
     description: Logs
@@ -92,7 +91,7 @@ plugin:
       - -c
       - "kubectl cnpg reload $NAME -n $NAMESPACE --context $CONTEXT |& less -R"
   cnpg-restart:
-    shortCut: Ctrl-R
+    shortCut: Shift-R
     description: Restart
     confirm: true
     scopes:
