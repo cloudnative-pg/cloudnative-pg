@@ -968,13 +968,13 @@ reachable in your `PATH` variable to correctly work.
 
 ### Using pgAdmin4 for evaluation/demonstration purposes only
 
-[pgAdmin](https://www.pgadmin.org/) stands as the most popular and feature rich
-open source administration and development platform for PostgreSQL. For more
-information on the project, please refer to the official
+[pgAdmin](https://www.pgadmin.org/) stands as the most popular and feature-rich
+open-source administration and development platform for PostgreSQL.
+For more information on the project, please refer to the official
 [documentation](https://www.pgadmin.org/docs/).
 
 Given that the pgAdmin Development Team maintains official Docker container
-images for it, you can install pgAdmin in your environment as a standard
+images, you can install pgAdmin in your environment as a standard
 Kubernetes deployment.
 
 !!! Important
@@ -993,7 +993,7 @@ For example, you can install a demo deployment of pgAdmin4 for the
 kubectl cnpg pgadmin4 cluster-example
 ```
 
-This will produce:
+This command will produce:
 
 ```output
 ConfigMap/cluster-example-pgadmin4 created
@@ -1004,12 +1004,12 @@ Secret/cluster-example-pgadmin4 created
 [...]
 ```
 
-After deploying pgAdmin, simply forward the port using kubectl and connect
+After deploying pgAdmin, forward the port using kubectl and connect
 through your browser by following the on-screen instructions.
 
 ![Screenshot of desktop installation of pgAdmin](images/pgadmin4.png)
 
-As usual, you can use the `--dry-run` option to just generate the YAML file:
+As usual, you can use the `--dry-run` option to generate the YAML file:
 
 ```sh
 kubectl cnpg pgadmin4 --dry-run cluster-example
@@ -1043,7 +1043,7 @@ kubectl cnpg pgadmin4 --dry-run cluster-example | kubectl delete -f -
 ## Integration with K9s
 
 The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
-popular terminal based UI to interact with Kubernetes clusters.
+popular terminal-based UI to interact with Kubernetes clusters.
 
 See [`k9s/plugin.yml`](samples/k9s/plugin.yml) for details.
 

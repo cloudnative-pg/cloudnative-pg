@@ -68,7 +68,7 @@ To remove this pgAdmin deployment, execute:
 kubectl cnpg pgadmin4 {{ .ClusterName }} --dry-run | kubectl delete -f -
 `))
 
-// NewCmd initializes the fio command
+// NewCmd initializes the pgadmin command
 func NewCmd() *cobra.Command {
 	var dryRun bool
 	var mode string

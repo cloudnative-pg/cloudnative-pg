@@ -67,11 +67,11 @@ var configurationTemplate = template.Must(template.New("servers.json").Parse(`
 type Mode string
 
 const (
-	// ModeServer means server mode, that is password protected
+	// ModeServer means server mode; this is password protected
 	// with no secrets included
 	ModeServer = Mode("server")
 
-	// ModeDesktop means desktop mode, this is not password protected
+	// ModeDesktop means desktop mode; this is not password protected,
 	// and the `app` secret is mounted within the Pod
 	ModeDesktop = Mode("desktop")
 )
@@ -92,7 +92,7 @@ type command struct {
 	dryRun bool
 }
 
-// newCommand initialize fio deployment options
+// newCommand initialize pgadmin deployment options
 func newCommand(
 	cluster *apiv1.Cluster,
 	mode Mode,
