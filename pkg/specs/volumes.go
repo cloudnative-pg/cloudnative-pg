@@ -98,14 +98,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 				},
 			},
 		},
-		{
-			Name: "scratch-data",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: cluster.Spec.EphemeralVolumesSizeLimit.GetTemporaryDataLimit(),
-				},
-			},
-		},
+		createEphemeralVolume(cluster),
 		{
 			Name: "shm",
 			VolumeSource: corev1.VolumeSource{
@@ -323,6 +316,21 @@ func getSortedTablespaceList(cluster apiv1.Cluster) []string {
 	}
 	sort.Strings(tbsNames)
 	return tbsNames
+}
+
+func createEphemeralVolume(cluster apiv1.Cluster) corev1.Volume {
+	scratchVolumeSource := corev1.VolumeSource{}
+	if cluster.Spec.EphemeralVolumeSource != nil {
+		scratchVolumeSource.Ephemeral = cluster.Spec.EphemeralVolumeSource
+	} else {
+		scratchVolumeSource.EmptyDir = &corev1.EmptyDirVolumeSource{
+			SizeLimit: cluster.Spec.EphemeralVolumesSizeLimit.GetTemporaryDataLimit(),
+		}
+	}
+	return corev1.Volume{
+		Name:         "scratch-data",
+		VolumeSource: scratchVolumeSource,
+	}
 }
 
 func createProjectedVolume(cluster apiv1.Cluster) corev1.Volume {
