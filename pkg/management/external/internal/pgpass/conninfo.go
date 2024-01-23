@@ -56,16 +56,17 @@ func NewConnectionInfo(
 	return result
 }
 
-var fieldEscaper = strings.NewReplacer("\\", "\\\\", ":", "\\:")
+// Ref: https://www.postgresql.org/docs/current/libpq-pgpass.html
+var pgPassFieldEscaper = strings.NewReplacer("\\", "\\\\", ":", "\\:")
 
 // BuildLine builds a pgPass configuration file line
 func (info ConnectionInfo) BuildLine() string {
 	return fmt.Sprintf(
 		"%v:%v:%v:%v:%v",
-		fieldEscaper.Replace(info.host),
-		fieldEscaper.Replace(info.port),
-		fieldEscaper.Replace(info.dbname),
-		fieldEscaper.Replace(info.user),
-		fieldEscaper.Replace(info.password),
+		pgPassFieldEscaper.Replace(info.host),
+		pgPassFieldEscaper.Replace(info.port),
+		pgPassFieldEscaper.Replace(info.dbname),
+		pgPassFieldEscaper.Replace(info.user),
+		pgPassFieldEscaper.Replace(info.password),
 	)
 }
