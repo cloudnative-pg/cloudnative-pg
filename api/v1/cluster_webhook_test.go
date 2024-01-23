@@ -2824,6 +2824,62 @@ var _ = Describe("Storage configuration validation", func() {
 	})
 })
 
+var _ = Describe("Ephemeral volume configuration validation", func() {
+	It("succeeds if no ephemeral configuration is present", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(BeEmpty())
+	})
+
+	It("succeeds if ephemeralVolumeSource is set", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				EphemeralVolumeSource: &corev1.EphemeralVolumeSource{},
+			},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(BeEmpty())
+	})
+
+	It("succeeds if ephemeralVolumesSizeLimit.temporaryData is set", func() {
+		onegi := resource.MustParse("1Gi")
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				EphemeralVolumesSizeLimit: &EphemeralVolumesSizeLimitConfiguration{
+					TemporaryData: &onegi,
+				},
+			},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(BeEmpty())
+	})
+
+	It("succeeds if ephemeralVolumeSource and ephemeralVolumesSizeLimit.shm are set", func() {
+		onegi := resource.MustParse("1Gi")
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				EphemeralVolumeSource: &corev1.EphemeralVolumeSource{},
+				EphemeralVolumesSizeLimit: &EphemeralVolumesSizeLimitConfiguration{
+					Shm: &onegi,
+				},
+			},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(BeEmpty())
+	})
+
+	It("produces one error if conflicting ephemeral storage options are set", func() {
+		onegi := resource.MustParse("1Gi")
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				EphemeralVolumeSource: &corev1.EphemeralVolumeSource{},
+				EphemeralVolumesSizeLimit: &EphemeralVolumesSizeLimitConfiguration{
+					TemporaryData: &onegi,
+				},
+			},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(HaveLen(1))
+	})
+})
+
 var _ = Describe("Role management validation", func() {
 	It("should succeed if there is no management stanza", func() {
 		cluster := Cluster{

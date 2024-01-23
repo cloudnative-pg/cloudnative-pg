@@ -125,6 +125,7 @@ EnterpriseDB's
 EnvFrom
 EnvFromSource
 EnvVar
+EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
@@ -641,6 +642,7 @@ endpointURL
 enterprisedb
 env
 envFrom
+ephemeralVolumeSource
 ephemeralVolumesSizeLimit
 executables
 expirations

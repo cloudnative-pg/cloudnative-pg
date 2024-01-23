@@ -330,6 +330,10 @@ type ClusterSpec struct {
 	// +optional
 	WalStorage *StorageConfiguration `json:"walStorage,omitempty"`
 
+	// EphemeralVolumeSource allows the user to configure the source of ephemeral volumes.
+	// +optional
+	EphemeralVolumeSource *corev1.EphemeralVolumeSource `json:"ephemeralVolumeSource,omitempty"`
+
 	// The time in seconds that is allowed for a PostgreSQL instance to
 	// successfully start up (default 3600).
 	// The startup probe failure threshold is derived from this value using the formula:
