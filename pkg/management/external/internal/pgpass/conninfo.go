@@ -16,8 +16,10 @@ limitations under the License.
 
 package pgpass
 
-import "fmt"
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // ConnectionInfo contains the information identifying
 // a PostgreSQL server whom credentials need to be included
