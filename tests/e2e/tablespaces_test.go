@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -938,6 +939,24 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 	})
 }
 
+func getPostgresContainer(pod corev1.Pod) *corev1.Container {
+	for _, cr := range pod.Spec.Containers {
+		if cr.Name == specs.PostgresContainerName {
+			return &cr
+		}
+	}
+	return nil
+}
+
+// if there's a security context with a specific UID to use for the DB, use it,
+// otherwise use the default postgres UID
+func getDatabasUserUID(cluster *apiv1.Cluster, dbContainer *corev1.Container) int64 {
+	if dbContainer.SecurityContext.RunAsUser != nil {
+		return *dbContainer.SecurityContext.RunAsUser
+	}
+	return cluster.GetPostgresUID()
+}
+
 func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeout int) {
 	namespace := cluster.ObjectMeta.Namespace
 	clusterName := cluster.ObjectMeta.Name
@@ -985,11 +1004,16 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 							Namespace: namespace,
 							PodName:   pod.Name,
 						}, nil,
-						"stat", "-c", `'%U'`, dataDir,
+						"stat", "-c", `'%u'`, dataDir,
 					)
+
+					targetContainer := getPostgresContainer(pod)
+					Expect(targetContainer).NotTo(BeNil())
+					dbUser := getDatabasUserUID(cluster, targetContainer)
+
 					g.Expect(stdErr).To(BeEmpty())
 					g.Expect(err).ShouldNot(HaveOccurred())
-					g.Expect(owner).To(ContainSubstring("postgres"))
+					g.Expect(owner).To(ContainSubstring(strconv.FormatInt(dbUser, 10)))
 				}
 			}
 		}, timeout).Should(Succeed())
