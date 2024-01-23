@@ -38,4 +38,15 @@ var _ = Describe("pgpass lines generation", func() {
 			}, "password").BuildLine()).To(Equal("pgtest.com:5432:*:postgres:password"))
 		})
 	})
+
+	When("the connection string contains chars that need escaping", func() {
+		It("correctly generates the content", func() {
+			Expect(NewConnectionInfo(map[string]string{
+				"host":   "pgtest.com:\\",
+				"port":   "5432:\\",
+				"dbname": "postgres",
+				"user":   "postgres:\\",
+			}, "pass:wo\\rd").BuildLine()).To(Equal("pgtest.com\\:\\\\:5432\\:\\\\:*:postgres\\:\\\\:pass\\:wo\\\\rd"))
+		})
+	})
 })
