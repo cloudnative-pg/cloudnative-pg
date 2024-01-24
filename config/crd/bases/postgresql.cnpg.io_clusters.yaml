@@ -3410,8 +3410,8 @@ spec:
                         type: string
                     type: object
                   synchronizeReplicas:
-                    description: Replication of the user created physical replication
-                      slots
+                    description: Configures the synchronization of the user defined
+                      physical replication slots
                     properties:
                       enabled:
                         default: true

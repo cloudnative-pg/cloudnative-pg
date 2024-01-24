@@ -1186,7 +1186,6 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(Equal("error parsing regexp: missing closing ): `([a-zA-Z]+`"))
 				Expect(isExcludedByUser).To(BeFalse())
-
 			})
 		})
 	})

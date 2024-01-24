@@ -990,7 +990,8 @@ const DefaultReplicationSlotsUpdateInterval = 30
 // DefaultReplicationSlotsHASlotPrefix is the default prefix for names of replication slots used for HA.
 const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
 
-// SynchronizeReplicasConfiguration contains the configuration for the synchronization of the physical replication slots
+// SynchronizeReplicasConfiguration contains the configuration for the synchronization of user defined
+// physical replication slots
 type SynchronizeReplicasConfiguration struct {
 	// when set to true, every replication slot that is on the primary is synchronized on each standby
 	// +kubebuilder:default:=true
@@ -1084,7 +1085,7 @@ type ReplicationSlotsConfiguration struct {
 	// +optional
 	UpdateInterval int `json:"updateInterval,omitempty"`
 
-	// Replication of the user created physical replication slots
+	// Configures the synchronization of the user defined physical replication slots
 	// +optional
 	SynchronizeReplicas *SynchronizeReplicasConfiguration `json:"synchronizeReplicas,omitempty"`
 }

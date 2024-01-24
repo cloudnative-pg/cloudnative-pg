@@ -3759,7 +3759,7 @@ every <code>updateInterval</code> seconds (default 30).</p>
 <a href="#postgresql-cnpg-io-v1-SynchronizeReplicasConfiguration"><i>SynchronizeReplicasConfiguration</i></a>
 </td>
 <td>
-   <p>Replication of the user created physical replication slots</p>
+   <p>Configures the synchronization of the user defined physical replication slots</p>
 </td>
 </tr>
 </tbody>
@@ -4478,7 +4478,8 @@ if all the labels values match.</p>
 - [ReplicationSlotsConfiguration](#postgresql-cnpg-io-v1-ReplicationSlotsConfiguration)
 
 
-<p>SynchronizeReplicasConfiguration contains the configuration for the synchronization of the physical replication slots</p>
+<p>SynchronizeReplicasConfiguration contains the configuration for the synchronization of user defined
+physical replication slots</p>
 
 
 <table class="table">

@@ -329,3 +329,31 @@ when replication slots support is enabled. For example:
       max_slot_wal_keep_size: "10GB"
   # ...
 ```
+
+## Synchronization of User-Defined Physical Replication Slots
+The operator can manage the synchronization of user managed physical replication slots between the primary and standbys.
+
+The feature is enabled by default, but can be disabled or further customized by editing the `synchronizeReplicas` stanza:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  replicationSlots:
+    synchronizeReplicas:
+      enabled: true
+      excludePatterns:
+      - "^foo"
+```
+
+`enabled`: When true or not specified, every user-defined replication slot on the primary is synchronized on each standby.
+If changed to false, the operator will remove any replication slot previously created by itself on each standby.
+
+`excludePatterns`: A list of regular expression patterns to match the names of user-defined replication slots to be
+excluded from synchronization. This can be useful to exclude specific slots based on naming conventions.
+
+Users utilizing this feature should carefully monitor user-defined replication slots to ensure they align with their
+operational requirements and do not interfere with the failover process.
