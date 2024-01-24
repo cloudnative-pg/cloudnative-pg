@@ -77,8 +77,10 @@ func (sm PostgresManager) List(
 		}
 
 		slot.IsHA = strings.HasPrefix(slot.SlotName, config.HighAvailability.GetSlotPrefix())
-		isFilteredByUser := config.SynchronizeReplicas.IsExcludedByUser(ctx, slot.SlotName)
-
+		isFilteredByUser, err := config.SynchronizeReplicas.IsExcludedByUser(slot.SlotName)
+		if err != nil {
+			return status, err
+		}
 		if !slot.IsHA && isFilteredByUser {
 			continue
 		}

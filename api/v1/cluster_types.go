@@ -18,7 +18,6 @@ package v1
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -1051,28 +1050,23 @@ func (r *SynchronizeReplicasConfiguration) GetEnabled() bool {
 }
 
 // IsExcludedByUser returns if a replication slot should not be reconciled on the replicas
-func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(ctx context.Context, slotName string) bool {
+func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(slotName string) (bool, error) {
 	if r == nil {
-		return false
+		return false, nil
 	}
 
 	// this is an unexpected issue, validation should happen at webhook level
 	if errs := r.compileRegex(); len(errs) > 0 {
-		contextLogger := log.FromContext(ctx)
-		contextLogger.Error(
-			errors.New("synchronizeReplicas.excludePatterns contains regex errors"),
-			"skipping user excluded patterns evaluation",
-			"errors", errs)
-		return false
+		return false, errs[0]
 	}
 
 	for _, re := range r.compiledPatterns {
 		if re.MatchString(slotName) {
-			return true
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 // ReplicationSlotsConfiguration encapsulates the configuration

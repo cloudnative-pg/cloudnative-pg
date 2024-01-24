@@ -1089,7 +1089,7 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 		synchronizeReplicas = &SynchronizeReplicasConfiguration{}
 	})
 
-	Context("compile", func() {
+	Context("compileRegex", func() {
 		It("should return no errors when SynchronizeReplicasConfiguration is nil", func() {
 			synchronizeReplicas = nil
 			Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
@@ -1147,10 +1147,12 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 		})
 	})
 
-	Context("IsExcludedByUser", func(ctx SpecContext) {
+	Context("IsExcludedByUser", func() {
 		It("should return false when SynchronizeReplicasConfiguration is nil", func() {
 			synchronizeReplicas = nil
-			Expect(synchronizeReplicas.IsExcludedByUser(ctx, "someSlot")).To(BeFalse())
+			isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("someSlot")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(isExcludedByUser).To(BeFalse())
 		})
 
 		Context("when SynchronizeReplicasConfiguration is not nil", func() {
@@ -1159,17 +1161,32 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 			})
 
 			It("should return false if no patterns match", func() {
-				Expect(synchronizeReplicas.IsExcludedByUser(ctx, "nonMatchingSlot")).To(BeFalse())
+				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("nonMatchingSlot")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(isExcludedByUser).To(BeFalse())
 			})
 
 			It("should return true if a pattern matches", func() {
-				Expect(synchronizeReplicas.IsExcludedByUser(ctx, "pattern1MatchingSlot")).To(BeTrue())
+				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("pattern1MatchingSlot")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(isExcludedByUser).To(BeTrue())
 			})
 
 			It("should compile patterns before checking for exclusion when compile is not called", func() {
 				Expect(synchronizeReplicas.compiledPatterns).To(BeEmpty())
-				Expect(synchronizeReplicas.IsExcludedByUser(ctx, "pattern1MatchingSlot")).To(BeTrue())
+				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("pattern1MatchingSlot")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(isExcludedByUser, err).To(BeTrue())
 				Expect(synchronizeReplicas.compiledPatterns).To(HaveLen(2))
+			})
+
+			It("should return an error in case of an invalid pattern", func() {
+				synchronizeReplicas.ExcludePatterns = []string{"([a-zA-Z]+"}
+				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("test")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal("error parsing regexp: missing closing ): `([a-zA-Z]+`"))
+				Expect(isExcludedByUser).To(BeFalse())
+
 			})
 		})
 	})
