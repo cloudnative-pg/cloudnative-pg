@@ -44,8 +44,7 @@ import (
 )
 
 var _ = Describe("cluster_create unit tests", func() {
-	It("should make sure that reconcilePostgresSecrets works correctly", func() {
-		ctx := context.Background()
+	It("should make sure that reconcilePostgresSecrets works correctly", func(ctx SpecContext) {
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
@@ -100,8 +99,7 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 	})
 
-	It("should make sure that superUser secret is created if EnableSuperuserAccess is enabled", func() {
-		ctx := context.Background()
+	It("should make sure that superUser secret is created if EnableSuperuserAccess is enabled", func(ctx SpecContext) {
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
 		cluster.Spec.EnableSuperuserAccess = ptr.To(true)
@@ -125,8 +123,7 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 	})
 
-	It("should make sure that reconcilePostgresServices works correctly", func() {
-		ctx := context.Background()
+	It("should make sure that reconcilePostgresServices works correctly", func(ctx SpecContext) {
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
 
@@ -142,116 +139,115 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 	})
 
-	It("should make sure that reconcilePostgresServices works correctly if create any service is enabled", func() {
-		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		configuration.Current.CreateAnyService = true
+	It("should make sure that reconcilePostgresServices works correctly if create any service is enabled",
+		func(ctx SpecContext) {
+			namespace := newFakeNamespace()
+			cluster := newFakeCNPGCluster(namespace)
+			configuration.Current.CreateAnyService = true
 
-		By("executing reconcilePostgresServices", func() {
-			err := clusterReconciler.reconcilePostgresServices(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
+			By("executing reconcilePostgresServices", func() {
+				err := clusterReconciler.reconcilePostgresServices(ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("making sure that the services have been created", func() {
+				expectResourceExistsWithDefaultClient(cluster.GetServiceAnyName(), namespace, &corev1.Service{})
+				expectResourceExistsWithDefaultClient(cluster.GetServiceReadOnlyName(), namespace, &corev1.Service{})
+				expectResourceExistsWithDefaultClient(cluster.GetServiceReadWriteName(), namespace, &corev1.Service{})
+				expectResourceExistsWithDefaultClient(cluster.GetServiceReadName(), namespace, &corev1.Service{})
+			})
 		})
 
-		By("making sure that the services have been created", func() {
-			expectResourceExistsWithDefaultClient(cluster.GetServiceAnyName(), namespace, &corev1.Service{})
-			expectResourceExistsWithDefaultClient(cluster.GetServiceReadOnlyName(), namespace, &corev1.Service{})
-			expectResourceExistsWithDefaultClient(cluster.GetServiceReadWriteName(), namespace, &corev1.Service{})
-			expectResourceExistsWithDefaultClient(cluster.GetServiceReadName(), namespace, &corev1.Service{})
-		})
-	})
+	It("should make sure that reconcilePostgresServices can update the selectors on existing services",
+		func(ctx SpecContext) {
+			namespace := newFakeNamespace()
+			cluster := newFakeCNPGCluster(namespace)
+			configuration.Current.CreateAnyService = true
 
-	It("should make sure that reconcilePostgresServices can update the selectors on existing services", func() {
-		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		configuration.Current.CreateAnyService = true
-
-		createOutdatedService := func(svc *corev1.Service) {
-			cluster.SetInheritedDataAndOwnership(&svc.ObjectMeta)
-			svc.Spec.Selector = map[string]string{
-				"outdated": "selector",
+			createOutdatedService := func(svc *corev1.Service) {
+				cluster.SetInheritedDataAndOwnership(&svc.ObjectMeta)
+				svc.Spec.Selector = map[string]string{
+					"outdated": "selector",
+				}
+				err := clusterReconciler.Client.Create(ctx, svc)
+				Expect(err).ToNot(HaveOccurred())
 			}
-			err := clusterReconciler.Client.Create(ctx, svc)
-			Expect(err).ToNot(HaveOccurred())
-		}
 
-		checkService := func(before *corev1.Service, expectedLabels map[string]string) {
-			var afterChangesService corev1.Service
-			err := clusterReconciler.Client.Get(ctx, types.NamespacedName{
-				Name:      before.Name,
-				Namespace: before.Namespace,
-			}, &afterChangesService)
-			Expect(err).ToNot(HaveOccurred())
+			checkService := func(before *corev1.Service, expectedLabels map[string]string) {
+				var afterChangesService corev1.Service
+				err := clusterReconciler.Client.Get(ctx, types.NamespacedName{
+					Name:      before.Name,
+					Namespace: before.Namespace,
+				}, &afterChangesService)
+				Expect(err).ToNot(HaveOccurred())
 
-			Expect(afterChangesService.Spec.Selector).ToNot(Equal(before.Spec.Selector))
-			Expect(afterChangesService.Spec.Selector).To(Equal(expectedLabels))
-			Expect(afterChangesService.Labels).To(Equal(before.Labels))
-			Expect(afterChangesService.Annotations).To(Equal(before.Annotations))
-		}
+				Expect(afterChangesService.Spec.Selector).ToNot(Equal(before.Spec.Selector))
+				Expect(afterChangesService.Spec.Selector).To(Equal(expectedLabels))
+				Expect(afterChangesService.Labels).To(Equal(before.Labels))
+				Expect(afterChangesService.Annotations).To(Equal(before.Annotations))
+			}
 
-		var readOnlyService, readWriteService, readService, anyService *corev1.Service
-		By("creating the resources with outdated selectors", func() {
-			By("creating any service", func() {
-				svc := specs.CreateClusterAnyService(*cluster)
-				createOutdatedService(svc)
-				anyService = svc.DeepCopy()
+			var readOnlyService, readWriteService, readService, anyService *corev1.Service
+			By("creating the resources with outdated selectors", func() {
+				By("creating any service", func() {
+					svc := specs.CreateClusterAnyService(*cluster)
+					createOutdatedService(svc)
+					anyService = svc.DeepCopy()
+				})
+
+				By("creating read service", func() {
+					svc := specs.CreateClusterReadService(*cluster)
+					createOutdatedService(svc)
+					readService = svc.DeepCopy()
+				})
+
+				By("creating read-write service", func() {
+					svc := specs.CreateClusterReadWriteService(*cluster)
+					createOutdatedService(svc)
+					readWriteService = svc.DeepCopy()
+				})
+				By("creating read only service", func() {
+					svc := specs.CreateClusterReadOnlyService(*cluster)
+					createOutdatedService(svc)
+					readOnlyService = svc.DeepCopy()
+				})
 			})
 
-			By("creating read service", func() {
-				svc := specs.CreateClusterReadService(*cluster)
-				createOutdatedService(svc)
-				readService = svc.DeepCopy()
+			By("executing reconcilePostgresServices", func() {
+				err := clusterReconciler.reconcilePostgresServices(ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("creating read-write service", func() {
-				svc := specs.CreateClusterReadWriteService(*cluster)
-				createOutdatedService(svc)
-				readWriteService = svc.DeepCopy()
+			By("checking any service", func() {
+				checkService(anyService, map[string]string{
+					"cnpg.io/podRole": "instance",
+					"cnpg.io/cluster": cluster.Name,
+				})
 			})
-			By("creating read only service", func() {
-				svc := specs.CreateClusterReadOnlyService(*cluster)
-				createOutdatedService(svc)
-				readOnlyService = svc.DeepCopy()
+
+			By("checking read-write service", func() {
+				checkService(readWriteService, map[string]string{
+					"cnpg.io/cluster": cluster.Name,
+					"role":            "primary",
+				})
 			})
-		})
 
-		By("executing reconcilePostgresServices", func() {
-			err := clusterReconciler.reconcilePostgresServices(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("checking any service", func() {
-			checkService(anyService, map[string]string{
-				"cnpg.io/podRole": "instance",
-				"cnpg.io/cluster": cluster.Name,
+			By("checking read service", func() {
+				checkService(readService, map[string]string{
+					"cnpg.io/cluster": cluster.Name,
+					"cnpg.io/podRole": "instance",
+				})
 			})
-		})
 
-		By("checking read-write service", func() {
-			checkService(readWriteService, map[string]string{
-				"cnpg.io/cluster": cluster.Name,
-				"role":            "primary",
-			})
-		})
-
-		By("checking read service", func() {
-			checkService(readService, map[string]string{
-				"cnpg.io/cluster": cluster.Name,
-				"cnpg.io/podRole": "instance",
-			})
-		})
-
-		By("checking read only service", func() {
-			checkService(readOnlyService, map[string]string{
-				"cnpg.io/cluster": cluster.Name,
-				"role":            "replica",
+			By("checking read only service", func() {
+				checkService(readOnlyService, map[string]string{
+					"cnpg.io/cluster": cluster.Name,
+					"role":            "replica",
+				})
 			})
 		})
-	})
 
-	It("should make sure that createOrPatchServiceAccount works correctly", func() {
-		ctx := context.Background()
+	It("should make sure that createOrPatchServiceAccount works correctly", func(ctx SpecContext) {
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
 
@@ -323,8 +319,7 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 	})
 
-	It("should make sure that reconcilePodDisruptionBudget works correctly", func() {
-		ctx := context.Background()
+	It("should make sure that reconcilePodDisruptionBudget works correctly", func(ctx SpecContext) {
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
 		pdbReplicaName := specs.BuildReplicasPodDisruptionBudget(cluster).Name

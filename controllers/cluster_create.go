@@ -968,7 +968,16 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, nil
 	}
 
-	var backup *apiv1.Backup
+	var (
+		backup           *apiv1.Backup
+		recoverySnapshot *persistentvolumeclaim.StorageSource
+	)
+	// if the cluster is bootstrapping in recovery, it may do so from
+	//  1 - a backup object, which may be done with volume snapshots or object storage
+	//  2 - volume snapshots
+	// We need to check that whichever alternative is used, the backup/snapshot is completed.
+	// If not completed, we requeue.
+	// If completed, we are sure that either backup or recoverySnapshot (perhaps both) are non-nil
 	if cluster.Spec.Bootstrap != nil &&
 		cluster.Spec.Bootstrap.Recovery != nil {
 		var err error
@@ -977,27 +986,26 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			return ctrl.Result{}, err
 		}
 
-		if res, err := r.checkBootstrapFromRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
+		if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
 			return res, err
 		}
+
+		recoverySnapshot = persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
 	}
 
 	// Generate a new node serial
-	// Move the node serial generation after the checkBootstrapFromRecovery to ensure
-	// the retry can continue without error when the cluster is bootstrapped from recovery
 	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	// Get the source storage from where to create the primary instance.
-	candidateSource := persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
-
+	// Create the PVCs from the cluster definition, and if bootstrapping from
+	// recoverySnapshot, use that as the source
 	if err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
-		candidateSource,
+		recoverySnapshot,
 		nodeSerial,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
@@ -1006,25 +1014,28 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	// We are bootstrapping a cluster and in need to create the first node
 	var job *batchv1.Job
 
-	switch {
-	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil:
-		if candidateSource != nil {
-			var snapshot volumesnapshot.VolumeSnapshot
-			if err := r.Client.Get(ctx,
-				types.NamespacedName{Name: candidateSource.DataSource.Name, Namespace: cluster.Namespace},
-				&snapshot); err != nil {
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-			job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, snapshot, backup)
-			break
-		}
+	isBootstrappingFromRecovery := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil
+	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
 
+	switch {
+	case isBootstrappingFromRecovery && recoverySnapshot != nil:
+		var snapshot volumesnapshot.VolumeSnapshot
+		if err := r.Client.Get(ctx,
+			types.NamespacedName{Name: recoverySnapshot.DataSource.Name, Namespace: cluster.Namespace},
+			&snapshot); err != nil {
+			return ctrl.Result{}, err
+		}
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
+		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, snapshot, backup)
+
+	case isBootstrappingFromRecovery:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
 		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
-	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil:
+
+	case isBootstrappingFromBaseBackup:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
 		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
+
 	default:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
 		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
@@ -1331,8 +1342,9 @@ func findInstancePodToCreate(
 	return nil, nil
 }
 
-// checkBootstrapFromRecovery checks if the backup or volumeSnapshots are good for bootstrapping
-func (r *ClusterReconciler) checkBootstrapFromRecovery(
+// checkReadyForRecovery checks if the backup or volumeSnapshots are ready, and
+// returns for requeue if not
+func (r *ClusterReconciler) checkReadyForRecovery(
 	ctx context.Context,
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
