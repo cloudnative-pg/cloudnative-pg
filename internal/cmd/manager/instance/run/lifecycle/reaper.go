@@ -18,16 +18,16 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
 
-	"github.com/mitchellh/go-ps"
-
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PostgresOrphansReaper implements the Runnable interface and handles orphaned
@@ -91,22 +91,22 @@ func (z *PostgresOrphansReaper) handleSignal(contextLogger log.Logger) error {
 	if !z.instance.MightBeUnavailable() {
 		return nil
 	}
-	processes, err := ps.Processes()
+	processes, err := utils.GetAllProcesses()
 	if err != nil {
 		return fmt.Errorf("unable to retrieve processes: %w", err)
 	}
 	pidFile := path.Join(z.instance.PgData, postgres.PostgresqlPidFile)
 	_, postMasterPid, _ := z.instance.GetPostmasterPidFromFile(pidFile)
 	for _, p := range processes {
-		if p.PPid() == 1 && p.Executable() == "postgres" {
-			pid := p.Pid()
+		if p.Ppid == 1 && p.Name == "postgres" {
+			pid := p.Pid
 			if pid == postMasterPid {
 				continue
 			}
 			var ws syscall.WaitStatus
 			var ru syscall.Rusage
 			wpid, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, &ru)
-			if wpid <= 0 || err == nil || err == syscall.ECHILD {
+			if wpid <= 0 || err == nil || errors.Is(err, syscall.ECHILD) {
 				continue
 			}
 			contextLogger.Info("reaped orphaned child process", "pid", pid, "err", err, "wpid", wpid)

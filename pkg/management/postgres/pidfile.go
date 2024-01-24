@@ -22,11 +22,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mitchellh/go-ps"
 	"k8s.io/utils/strings/slices"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PostgresqlPidFile is the name of the file which contains
@@ -64,7 +64,7 @@ func (instance *Instance) CheckForExistingPostmaster(postgresExecutables ...stri
 		return nil, instance.CleanUpStalePid()
 	}
 
-	process, err := ps.FindProcess(pid)
+	process, err := utils.GetProcessByPid(pid)
 	if err != nil {
 		// We cannot find this PID, so we can't really tell if this
 		// process exists or not
@@ -76,10 +76,10 @@ func (instance *Instance) CheckForExistingPostmaster(postgresExecutables ...stri
 		return nil, instance.CleanUpStalePid()
 	}
 
-	if !slices.Contains(postgresExecutables, process.Executable()) {
+	if !slices.Contains(postgresExecutables, process.Name) {
 		// The process is not running PostgreSQL and this PID file is stale
 		contextLog.Info("The PID file is stale (executable mismatch), deleting it",
-			"pidFileContents", pidFileContents, "postgresExecutable", process.Executable())
+			"pidFileContents", pidFileContents, "postgresExecutable", process.Name)
 		return nil, instance.CleanUpStalePid()
 	}
 

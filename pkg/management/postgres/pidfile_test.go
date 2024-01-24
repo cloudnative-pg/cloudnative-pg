@@ -21,9 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mitchellh/go-ps"
-
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -90,9 +89,9 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 			filepath.Join(pgdata, PostgresqlPidFile),
 			[]byte(fmt.Sprintf("%v", myPid)), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
-		myProcess, err := ps.FindProcess(myPid)
+		myProcess, err := utils.GetProcessByPid(myPid)
 		Expect(err).ShouldNot(HaveOccurred())
-		myExecutable := myProcess.Executable()
+		myExecutable := myProcess.Name
 
 		process, err := instance.CheckForExistingPostmaster(myExecutable)
 		Expect(err).ShouldNot(HaveOccurred())
