@@ -33,6 +33,7 @@ import (
 type fakeSlot struct {
 	name   string
 	active bool
+	isHA   bool
 }
 
 type fakeReplicationSlotManager struct {
@@ -75,6 +76,7 @@ func (fk fakeReplicationSlotManager) List(
 			RestartLSN: "",
 			Type:       infrastructure.SlotTypePhysical,
 			Active:     slot.active,
+			IsHA:       slot.isHA,
 		})
 	}
 	return slotList, nil
@@ -176,7 +178,7 @@ var _ = Describe("dropReplicationSlots", func() {
 	It("skips deletion of active slots and reschedules", func() {
 		fakeManager := &fakeReplicationSlotManager{
 			replicationSlots: map[fakeSlot]bool{
-				{name: "slot1", active: true}: true,
+				{name: "slot1", active: true, isHA: true}: true,
 			},
 		}
 		cluster := makeClusterWithInstanceNames([]string{}, "")
@@ -186,10 +188,24 @@ var _ = Describe("dropReplicationSlots", func() {
 		Expect(res.RequeueAfter).To(Equal(time.Second))
 	})
 
+	It("skips the deletion of user defined replication slots on the primary", func() {
+		fakeManager := &fakeReplicationSlotManager{
+			replicationSlots: map[fakeSlot]bool{
+				{name: "slot1", active: true}: true,
+			},
+		}
+		cluster := makeClusterWithInstanceNames([]string{}, "")
+
+		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Duration(0)))
+		Expect(res.IsZero()).To(BeTrue())
+	})
+
 	It("returns error when deleting a slot fails", func() {
 		fakeManager := &fakeReplicationSlotManager{
 			replicationSlots: map[fakeSlot]bool{
-				{name: "slot1", active: false}: true,
+				{name: "slot1", active: false, isHA: true}: true,
 			},
 			triggerDeleteError: true,
 		}
@@ -203,7 +219,7 @@ var _ = Describe("dropReplicationSlots", func() {
 	It("deletes inactive slots and does not reschedule", func() {
 		fakeManager := &fakeReplicationSlotManager{
 			replicationSlots: map[fakeSlot]bool{
-				{name: "slot1", active: false}: true,
+				{name: "slot1", active: false, isHA: true}: true,
 			},
 		}
 		cluster := makeClusterWithInstanceNames([]string{}, "")
