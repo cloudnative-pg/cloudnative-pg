@@ -400,7 +400,6 @@ var _ = Describe("check if bootstrap recovery can proceed", func() {
 		namespace = newFakeNamespace()
 		clusterName = "awesomeCluster"
 		name = "foo"
-
 	})
 
 	_ = DescribeTable("from backup",
@@ -456,6 +455,7 @@ var _ = Describe("check if bootstrap recovery can proceed", func() {
 			nil, true),
 	)
 })
+
 var _ = Describe("check if bootstrap recovery can proceed from volume snapshot", func() {
 	var namespace, clusterName string
 	var cluster *apiv1.Cluster
