@@ -194,7 +194,7 @@ As you can imagine, the availability zone is just an example, but you could
 customize this behavior based on other labels that describe the node, such
 as storage, CPU, or memory.
 
-## Replication slots for High Availability
+## Replication slots
 
 [Replication slots](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS)
 are a native PostgreSQL feature introduced in 9.4 that provides an automated way
@@ -206,9 +206,19 @@ standby is (temporarily) disconnected.
 A replication slot exists solely on the instance that created it, and PostgreSQL
 does not replicate it on the standby servers. As a result, after a failover
 or a switchover, the new primary does not contain the replication slot from
-the old primary. This can create problems for
-the streaming replication clients that were connected to the old
-primary and have lost their slot.
+the old primary. This can create problems for the streaming replication clients
+that were connected to the old primary and have lost their slot.
+
+CloudNativePG provides a turn-key solution to synchronize the content of
+physical replication slots from the primary to each standby, addressing two use
+cases:
+
+- the replication slots automatically created for the High Availability of the
+  Postgres cluster (see ["Replication slots for High Availability" below](#replication-slots-for-high-availability) for details)
+- [user-defined replication slots](#user-defined-replication-slots) created on
+  the primary
+
+### Replication slots for High Availability
 
 CloudNativePG fills this gap by introducing the concept of cluster-managed
 replication slots, starting with high availability clusters. This feature
@@ -226,13 +236,13 @@ In CloudNativePG, we use the terms:
   content of the `pg_replication_slots` view in the primary, and updated at regular
   intervals using `pg_replication_slot_advance()`.
 
-This feature, introduced in CloudNativePG 1.18, is now enabled by default and
-can be disabled via configuration. For details, please refer to the
+This feature is enabled by default and can be disabled via configuration.
+For details, please refer to the
 ["replicationSlots" section in the API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ReplicationSlotsConfiguration).
 Here follows a brief description of the main options:
 
 `.spec.replicationSlots.highAvailability.enabled`
-: if true, the feature is enabled (`true` is the default since 1.21)
+: if `true`, the feature is enabled (`true` is the default since 1.21)
 
 `.spec.replicationSlots.highAvailability.slotPrefix`
 : the prefix that identifies replication slots managed by the operator
@@ -276,6 +286,56 @@ spec:
     size: 1Gi
 ```
 
+### User-Defined Replication slots
+
+Although CloudNativePG doesn't support a way to declaratively define physical
+replication slots, you can still [create your own slots via SQL](https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-REPLICATION).
+
+CloudNativePG can manage the synchronization of any user managed physical
+replication slots between the primary and standbys, similarly to what it does
+for the HA replication slots explained above (the only difference is that you
+need to create the replication slot).
+
+This feature is enabled by default (meaning that any replication slot is
+synchronized), but you can disable it or further customize its behavior (for
+example by excluding some slots using regular expressions) through the
+`synchronizeReplicas` stanza. For example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  replicationSlots:
+    synchronizeReplicas:
+      enabled: true
+      excludePatterns:
+      - "^foo"
+```
+
+For details, please refer to the
+["replicationSlots" section in the API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ReplicationSlotsConfiguration).
+Here follows a brief description of the main options:
+
+`.spec.replicationSlots.synchronizeReplicas.enabled`
+: When true or not specified, every user-defined replication slot on the
+  primary is synchronized on each standby. If changed to false, the operator will
+  remove any replication slot previously created by itself on each standby.
+
+`.spec.replicationSlots.synchronizeReplicas.excludePatterns`
+: A list of regular expression patterns to match the names of user-defined
+  replication slots to be excluded from synchronization. This can be useful to
+  exclude specific slots based on naming conventions.
+
+!!! Warning
+    Users utilizing this feature should carefully monitor user-defined replication
+    slots to ensure they align with their operational requirements and do not
+    interfere with the failover process.
+
+### Synchronization frequency
+
 You can also control the frequency with which a standby queries the
 `pg_replication_slots` view on the primary, and updates its local copy of
 the replication slots, like in this example:
@@ -289,22 +349,11 @@ spec:
   instances: 3
   # Reduce the frequency of standby HA slots updates to once every 5 minutes
   replicationSlots:
-    highAvailability:
-      enabled: true
     updateInterval: 300
 
   storage:
     size: 1Gi
 ```
-
-Replication slots must be carefully monitored in your infrastructure. By default,
-we provide the `pg_replication_slots` metric in our Prometheus exporter with
-key information such as the name of the slot, the type, whether it is active,
-the lag from the primary.
-
-!!! Seealso "Monitoring"
-    Please refer to the ["Monitoring" section](monitoring.md) for details on
-    how to monitor a CloudNativePG deployment.
 
 ### Capping the WAL size retained for replication slots
 
@@ -330,30 +379,14 @@ when replication slots support is enabled. For example:
   # ...
 ```
 
-## Synchronization of User-Defined Physical Replication Slots
-The operator can manage the synchronization of user managed physical replication slots between the primary and standbys.
+### Monitoring replication slots
 
-The feature is enabled by default, but can be disabled or further customized by editing the `synchronizeReplicas` stanza:
+Replication slots must be carefully monitored in your infrastructure. By default,
+we provide the `pg_replication_slots` metric in our Prometheus exporter with
+key information such as the name of the slot, the type, whether it is active,
+the lag from the primary.
 
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  instances: 3
-  replicationSlots:
-    synchronizeReplicas:
-      enabled: true
-      excludePatterns:
-      - "^foo"
-```
+!!! Seealso "Monitoring"
+    Please refer to the ["Monitoring" section](monitoring.md) for details on
+    how to monitor a CloudNativePG deployment.
 
-`enabled`: When true or not specified, every user-defined replication slot on the primary is synchronized on each standby.
-If changed to false, the operator will remove any replication slot previously created by itself on each standby.
-
-`excludePatterns`: A list of regular expression patterns to match the names of user-defined replication slots to be
-excluded from synchronization. This can be useful to exclude specific slots based on naming conventions.
-
-Users utilizing this feature should carefully monitor user-defined replication slots to ensure they align with their
-operational requirements and do not interfere with the failover process.
