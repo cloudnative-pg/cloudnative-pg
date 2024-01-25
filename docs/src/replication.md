@@ -291,6 +291,13 @@ spec:
 Although CloudNativePG doesn't support a way to declaratively define physical
 replication slots, you can still [create your own slots via SQL](https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-REPLICATION).
 
+!!! Information
+    At the moment, we don't have any plans to manage replication slots
+    in a declarative way, but it might change depending on the feedback
+    we receive from users. The reason is that replication slots exist
+    for a specific purpose and each should be managed by a specific application
+    the oversees the entire lifecycle of the slot on the primary.
+
 CloudNativePG can manage the synchronization of any user managed physical
 replication slots between the primary and standbys, similarly to what it does
 for the HA replication slots explained above (the only difference is that you
