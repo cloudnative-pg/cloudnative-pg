@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -33,11 +34,13 @@ import (
 	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -387,6 +390,208 @@ var _ = Describe("cluster_create unit tests", func() {
 				&policyv1.PodDisruptionBudget{},
 			)
 		})
+	})
+})
+
+var _ = Describe("check if bootstrap recovery can proceed", func() {
+	var namespace, clusterName, name string
+
+	BeforeEach(func() {
+		namespace = newFakeNamespace()
+		clusterName = "awesomeCluster"
+		name = "foo"
+
+	})
+
+	_ = DescribeTable("from backup",
+		func(backup *apiv1.Backup, expectRequeue bool) {
+			cluster := &apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      clusterName,
+					Namespace: namespace,
+				},
+				Spec: apiv1.ClusterSpec{
+					StorageConfiguration: apiv1.StorageConfiguration{
+						Size: "1G",
+					},
+					Bootstrap: &apiv1.BootstrapConfiguration{
+						Recovery: &apiv1.BootstrapRecovery{
+							Backup: &apiv1.BackupSource{
+								LocalObjectReference: apiv1.LocalObjectReference{
+									Name: name,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			ctx := context.Background()
+			res, err := clusterReconciler.checkReadyForRecovery(ctx, backup, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			if expectRequeue {
+				Expect(res).ToNot(BeNil())
+				Expect(res).ToNot(Equal(reconcile.Result{}))
+			} else {
+				Expect(res).To(Or(BeNil(), Equal(reconcile.Result{})))
+			}
+		},
+		Entry(
+			"when bootstrapping from a completed backup",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					Phase: apiv1.BackupPhaseCompleted,
+				},
+			},
+			false),
+		Entry(
+			"when bootstrapping from an incomplete backup",
+			&apiv1.Backup{
+				Status: apiv1.BackupStatus{
+					Phase: apiv1.BackupPhaseRunning,
+				},
+			},
+			true),
+		Entry("when bootstrapping a backup that is not there",
+			nil, true),
+	)
+})
+var _ = Describe("check if bootstrap recovery can proceed from volume snapshot", func() {
+	var namespace, clusterName string
+	var cluster *apiv1.Cluster
+
+	BeforeEach(func() {
+		namespace = newFakeNamespace()
+		clusterName = "awesomeCluster"
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      clusterName,
+				Namespace: namespace,
+			},
+			Spec: apiv1.ClusterSpec{
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size: "1G",
+				},
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					Recovery: &apiv1.BootstrapRecovery{
+						VolumeSnapshots: &apiv1.DataSource{
+							Storage: corev1.TypedLocalObjectReference{
+								APIGroup: ptr.To(volumesnapshot.GroupName),
+								Kind:     apiv1.VolumeSnapshotKind,
+								Name:     "pgdata",
+							},
+						},
+					},
+				},
+			},
+		}
+	})
+
+	It("should not requeue if bootstrapping from a valid volume snapshot", func(ctx SpecContext) {
+		snapshots := volumesnapshot.VolumeSnapshotList{
+			Items: []volumesnapshot.VolumeSnapshot{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pgdata",
+						Namespace: namespace,
+						Labels: map[string]string{
+							utils.BackupNameLabelName: "backup-one",
+						},
+						Annotations: map[string]string{
+							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+						},
+					},
+				},
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithLists(&snapshots).
+			Build()
+
+		newClusterReconciler := &ClusterReconciler{
+			Client:          mockClient,
+			Scheme:          scheme,
+			Recorder:        record.NewFakeRecorder(120),
+			DiscoveryClient: discoveryClient,
+		}
+
+		res, err := newClusterReconciler.checkReadyForRecovery(ctx, nil, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(Or(BeNil(), Equal(reconcile.Result{})))
+	})
+
+	It("should requeue if bootstrapping from an invalid volume snapshot", func(ctx SpecContext) {
+		snapshots := volumesnapshot.VolumeSnapshotList{
+			Items: []volumesnapshot.VolumeSnapshot{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pgdata",
+						Namespace: namespace,
+						Labels: map[string]string{
+							utils.BackupNameLabelName: "backup-one",
+						},
+						Annotations: map[string]string{
+							utils.PvcRoleLabelName: string(utils.PVCRolePgTablespace),
+						},
+					},
+				},
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithLists(&snapshots).
+			Build()
+
+		newClusterReconciler := &ClusterReconciler{
+			Client:          mockClient,
+			Scheme:          scheme,
+			Recorder:        record.NewFakeRecorder(120),
+			DiscoveryClient: discoveryClient,
+		}
+
+		res, err := newClusterReconciler.checkReadyForRecovery(ctx, nil, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).ToNot(BeNil())
+		Expect(res).ToNot(Equal(reconcile.Result{}))
+	})
+
+	It("should requeue if bootstrapping from a snapshot that isn't there", func(ctx SpecContext) {
+		snapshots := volumesnapshot.VolumeSnapshotList{
+			Items: []volumesnapshot.VolumeSnapshot{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foobar",
+						Namespace: namespace,
+						Labels: map[string]string{
+							utils.BackupNameLabelName: "backup-one",
+						},
+						Annotations: map[string]string{
+							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+						},
+					},
+				},
+			},
+		}
+
+		mockClient := fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithLists(&snapshots).
+			Build()
+
+		newClusterReconciler := &ClusterReconciler{
+			Client:          mockClient,
+			Scheme:          scheme,
+			Recorder:        record.NewFakeRecorder(120),
+			DiscoveryClient: discoveryClient,
+		}
+
+		res, err := newClusterReconciler.checkReadyForRecovery(ctx, nil, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).ToNot(BeNil())
+		Expect(res).ToNot(Equal(reconcile.Result{}))
 	})
 })
 
