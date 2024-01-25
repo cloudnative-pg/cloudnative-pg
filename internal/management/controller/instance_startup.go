@@ -226,6 +226,14 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			return err
 		}
 
+		// Set permission of postgres.auto.conf to 0600 to allow pg_rewind to write to it
+		// the mode will be later reset by the reconciliation again, skip the error as
+		// rewind may be not needed
+		err = r.instance.SetAlterSystemEnabled(true)
+		if err != nil {
+			contextLogger.Error(
+				err, "Error while changing mode of the postgresql.auto.conf file before pg_rewind, skipped")
+		}
 		// pg_rewind could require a clean shutdown of the old primary to
 		// work. Unfortunately, if the old primary is already clean starting
 		// it up may make it advance in respect to the new one.
@@ -250,6 +258,15 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			err = r.instance.Rewind(ctx, pgMajorVersion)
 			if err != nil {
 				return err
+			}
+		}
+
+		// Change back the mode of the postgresql.auto.conf file
+		if !cluster.Spec.PostgresConfiguration.EnableAlterSystem {
+			err = r.instance.SetAlterSystemEnabled(cluster.Spec.PostgresConfiguration.EnableAlterSystem)
+			if err != nil {
+				contextLogger.Error(
+					err, "Error while changing mode of the postgresql.auto.conf file after pg_rewind, skipped")
 			}
 		}
 
