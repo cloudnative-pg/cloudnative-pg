@@ -182,7 +182,7 @@ jobs:
           # Set the defaults for schedule dispatch
           if [[ ${{ github.event_name }} == 'schedule' ]]; then
             DEPTH="schedule"
-            LIMIT="local"
+            LIMIT=""
             TEST_LEVEL="4"
             FEATURE_TYPE=""
             LOG_LEVEL="debug"
