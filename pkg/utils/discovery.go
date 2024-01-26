@@ -44,16 +44,30 @@ var supportSeccomp bool
 
 // AvailableArchitecture is a struct containing info about an available architecture
 type AvailableArchitecture struct {
-	GoArch, hash string
-	mx           sync.Mutex
+	GoArch         string
+	hash           string
+	mx             sync.Mutex
+	hashCalculator func(name string) (hash string, err error)
+	cachedError    error
+}
+
+func newAvailableArchitecture(goArch string) *AvailableArchitecture {
+	return &AvailableArchitecture{
+		GoArch:         goArch,
+		hashCalculator: executablehash.GetByName,
+	}
 }
 
 // GetHash retrieves the hash for a given AvailableArchitecture
-func (arch *AvailableArchitecture) GetHash() string {
+func (arch *AvailableArchitecture) GetHash() (string, error) {
+	if arch.hash == "" {
+		if err := arch.calculateHash(); err != nil {
+			return "", err
+		}
+	}
 	arch.mx.Lock()
 	defer arch.mx.Unlock()
-
-	return arch.hash
+	return arch.hash, nil
 }
 
 // calculateHash calculates the hash for a given AvailableArchitecture
@@ -65,9 +79,14 @@ func (arch *AvailableArchitecture) calculateHash() error {
 		return nil
 	}
 
+	if arch.cachedError != nil {
+		return arch.cachedError
+	}
+
 	binaryName := fmt.Sprintf("bin/manager_%s", arch.GoArch)
-	hash, err := executablehash.GetByName(binaryName)
+	hash, err := arch.hashCalculator(binaryName)
 	if err != nil {
+		arch.cachedError = err
 		return err
 	}
 	arch.hash = hash
@@ -226,10 +245,8 @@ func DetectAvailableArchitectures() (err error) {
 
 	for _, b := range binaries {
 		goArch := strings.Split(b, "manager_")[1]
-		arch := AvailableArchitecture{
-			GoArch: goArch,
-		}
-		availableArchitectures = append(availableArchitectures, &arch)
+		arch := newAvailableArchitecture(goArch)
+		availableArchitectures = append(availableArchitectures, arch)
 
 		go func() {
 			err = arch.calculateHash()

@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 	discoveryFake "k8s.io/client-go/discovery/fake"
@@ -151,5 +153,108 @@ var _ = Describe("Detect resources properly when", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(HaveVolumeSnapshot()).To(BeTrue())
+	})
+})
+
+var _ = Describe("AvailableArchitecture", func() {
+	var (
+		mockHashCalculator func(name string) (hash string, err error)
+		arch               *AvailableArchitecture
+	)
+
+	BeforeEach(func() {
+		mockHashCalculator = func(name string) (hash string, err error) {
+			return "mockedHash", nil
+		}
+		arch = newAvailableArchitecture("amd64")
+		arch.hashCalculator = mockHashCalculator
+	})
+
+	Describe("GetHash", func() {
+		Context("when hash is not calculated yet", func() {
+			It("should calculate the hash", func() {
+				hash, err := arch.GetHash()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(hash).To(Equal("mockedHash"))
+			})
+		})
+
+		Context("when hash is already calculated", func() {
+			BeforeEach(func() {
+				arch.hash = "precalculatedHash"
+			})
+
+			It("should return the precalculated hash", func() {
+				hash, err := arch.GetHash()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(hash).To(Equal("precalculatedHash"))
+			})
+		})
+
+		Context("when hash calculation returns an error", func() {
+			fakeErr := fmt.Errorf("fake error")
+
+			BeforeEach(func() {
+				mockHashCalculator = func(_ string) (hash string, err error) {
+					return "", fakeErr
+				}
+				arch.hashCalculator = mockHashCalculator
+			})
+
+			It("should return the error", func() {
+				hash, err := arch.GetHash()
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(Equal(fakeErr))
+				Expect(hash).To(Equal(""))
+			})
+		})
+	})
+
+	Describe("calculateHash", func() {
+		Context("when hash is not calculated yet", func() {
+			It("should calculate the hash", func() {
+				err := arch.calculateHash()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(arch.hash).To(Equal("mockedHash"))
+			})
+		})
+
+		Context("when hash is already calculated", func() {
+			BeforeEach(func() {
+				arch.hash = "precalculatedHash"
+			})
+
+			It("does not recalculate the hash on subsequent calls", func() {
+				err := arch.calculateHash()
+				Expect(err).NotTo(HaveOccurred())
+				hash1 := arch.hash
+
+				arch.hashCalculator = func(name string) (hash string, err error) {
+					return "should-not-return-this", nil
+				}
+
+				err = arch.calculateHash()
+				Expect(err).NotTo(HaveOccurred())
+				hash2 := arch.hash
+
+				Expect(hash1).To(Equal(hash2))
+			})
+		})
+
+		Context("when hash calculation returns an error", func() {
+			BeforeEach(func() {
+				mockHashCalculator = func(name string) (hash string, err error) {
+					return "", fmt.Errorf("fake error")
+				}
+				arch.hashCalculator = mockHashCalculator
+			})
+
+			It("should set the cached error", func() {
+				err := arch.calculateHash()
+				Expect(err).To(HaveOccurred())
+				Expect(arch.cachedError).To(HaveOccurred())
+				Expect(arch.hash).To(Equal(""))
+			})
+		})
 	})
 })
