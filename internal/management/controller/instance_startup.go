@@ -261,15 +261,6 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			}
 		}
 
-		// Change back the mode of the postgresql.auto.conf file
-		if !cluster.Spec.PostgresConfiguration.EnableAlterSystem {
-			err = r.instance.SetAlterSystemEnabled(cluster.Spec.PostgresConfiguration.EnableAlterSystem)
-			if err != nil {
-				contextLogger.Error(
-					err, "Error while changing mode of the postgresql.auto.conf file after pg_rewind, skipped")
-			}
-		}
-
 		// Now I can demote myself
 		return r.instance.Demote(ctx, cluster)
 	}
