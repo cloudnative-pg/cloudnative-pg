@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -58,6 +59,7 @@ const (
 // NewCmd creates a new cobra command
 func NewCmd() *cobra.Command {
 	var podName string
+	var pgData string
 
 	cmd := cobra.Command{
 		Use:           "wal-restore [name]",
@@ -66,7 +68,7 @@ func NewCmd() *cobra.Command {
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			contextLog := log.WithName("wal-restore")
 			ctx := log.IntoContext(cobraCmd.Context(), contextLog)
-			err := run(ctx, podName, args)
+			err := run(ctx, pgData, podName, args)
 			if err == nil {
 				return nil
 			}
@@ -93,11 +95,12 @@ func NewCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
 		"current pod in k8s")
+	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be used")
 
 	return &cmd
 }
 
-func run(ctx context.Context, podName string, args []string) error {
+func run(ctx context.Context, pgData string, podName string, args []string) error {
 	contextLog := log.FromContext(ctx)
 	startTime := time.Now()
 	walName := args[0]
@@ -109,6 +112,10 @@ func run(ctx context.Context, podName string, args []string) error {
 	cluster, err = cacheClient.GetCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	if err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath)); err != nil {
+		return err
 	}
 
 	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
@@ -223,6 +230,29 @@ func run(ctx context.Context, podName string, args []string) error {
 		"totalTime", time.Since(startTime))
 
 	return nil
+}
+
+// restoreWALViaPlugins requests every capable plugin to restore the passed
+// WAL file, and returns an error if every plugin failed. It will not return
+// an error if there's no plugin capable of WAL archiving too
+func restoreWALViaPlugins(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	walName string,
+	destinationPathName string,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	pluginClient, err := cluster.LoadPlugin(ctx)
+	if err != nil {
+		contextLogger.Error(err, "Error loading plugins while archiving a WAL")
+		return err
+	}
+	defer func() {
+		pluginClient.Close(ctx)
+	}()
+
+	return pluginClient.RestoreWAL(ctx, cluster, walName, destinationPathName)
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
