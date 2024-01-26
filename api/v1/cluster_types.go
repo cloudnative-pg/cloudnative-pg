@@ -681,9 +681,6 @@ type AvailableArchitecture struct {
 	Hash string `json:"hash"`
 }
 
-// AvailableArchitectureList represents the state of a cluster's available architectures
-type AvailableArchitectureList []AvailableArchitecture
-
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -843,7 +840,7 @@ type ClusterStatus struct {
 
 	// AvailableArchitectures reports the available architectures of a cluster
 	// +optional
-	AvailableArchitectures AvailableArchitectureList `json:"availableArchitectures,omitempty"`
+	AvailableArchitectures []AvailableArchitecture `json:"availableArchitectures,omitempty"`
 
 	// Conditions for cluster object
 	// +optional

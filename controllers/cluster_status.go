@@ -317,20 +317,17 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return err
 	}
 
-	// Set the available architectures inside the status.
-	architectures := utils.GetAvailableArchitectures()
-	availableArchitectures := apiv1.AvailableArchitectureList{}
-	for _, a := range architectures {
+	for _, a := range utils.GetAvailableArchitectures() {
 		hash, err := a.GetHash()
 		if err != nil {
 			return err
 		}
-		availableArchitectures = append(availableArchitectures, apiv1.AvailableArchitecture{
-			GoArch: a.GoArch,
-			Hash:   hash,
-		})
+		cluster.Status.AvailableArchitectures = append(cluster.Status.AvailableArchitectures,
+			apiv1.AvailableArchitecture{
+				GoArch: a.GoArch,
+				Hash:   hash,
+			})
 	}
-	cluster.Status.AvailableArchitectures = availableArchitectures
 
 	// refresh expiration dates of certifications
 	if err := r.refreshCertsExpirations(ctx, cluster); err != nil {
