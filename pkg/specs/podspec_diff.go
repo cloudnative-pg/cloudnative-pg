@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 // ComparePodSpecs compares two pod specs, returns true iff they are equivalent, and
@@ -164,7 +165,11 @@ func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool
 			return reflect.DeepEqual(currentContainer.Command, targetContainer.Command)
 		},
 		"resources": func() bool {
-			return reflect.DeepEqual(currentContainer.Resources, targetContainer.Resources)
+			// semantic equality will compare the two objects semantically, not only numbers
+			return equality.Semantic.Equalities.DeepEqual(
+				currentContainer.Resources,
+				targetContainer.Resources,
+			)
 		},
 		"ports": func() bool {
 			return reflect.DeepEqual(currentContainer.Ports, targetContainer.Ports)
