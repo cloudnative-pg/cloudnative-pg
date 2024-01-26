@@ -45,13 +45,13 @@ var supportSeccomp bool
 // AvailableArchitecture is a struct containing info about an available architecture
 type AvailableArchitecture struct {
 	GoArch, hash string
-	mx           sync.Mutex
+	mx           sync.RWMutex
 }
 
 // GetHash retrieves the hash for a given AvailableArchitecture
 func (arch *AvailableArchitecture) GetHash() string {
-	arch.mx.Lock()
-	defer arch.mx.Unlock()
+	arch.mx.RLock()
+	defer arch.mx.RUnlock()
 
 	return arch.hash
 }
