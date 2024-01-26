@@ -173,8 +173,7 @@ var _ = Describe("AvailableArchitecture", func() {
 	Describe("GetHash", func() {
 		Context("when hash is not calculated yet", func() {
 			It("should calculate the hash", func() {
-				hash, err := arch.GetHash()
-				Expect(err).ToNot(HaveOccurred())
+				hash := arch.GetHash()
 				Expect(hash).To(Equal("mockedHash"))
 			})
 		})
@@ -185,27 +184,8 @@ var _ = Describe("AvailableArchitecture", func() {
 			})
 
 			It("should return the precalculated hash", func() {
-				hash, err := arch.GetHash()
-				Expect(err).ToNot(HaveOccurred())
+				hash := arch.GetHash()
 				Expect(hash).To(Equal("precalculatedHash"))
-			})
-		})
-
-		Context("when hash calculation returns an error", func() {
-			fakeErr := fmt.Errorf("fake error")
-
-			BeforeEach(func() {
-				mockHashCalculator = func(_ string) (hash string, err error) {
-					return "", fakeErr
-				}
-				arch.hashCalculator = mockHashCalculator
-			})
-
-			It("should return the error", func() {
-				hash, err := arch.GetHash()
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(Equal(fakeErr))
-				Expect(hash).To(Equal(""))
 			})
 		})
 	})
@@ -213,8 +193,7 @@ var _ = Describe("AvailableArchitecture", func() {
 	Describe("calculateHash", func() {
 		Context("when hash is not calculated yet", func() {
 			It("should calculate the hash", func() {
-				err := arch.calculateHash()
-				Expect(err).ToNot(HaveOccurred())
+				arch.calculateHash()
 				Expect(arch.hash).To(Equal("mockedHash"))
 			})
 		})
@@ -224,17 +203,15 @@ var _ = Describe("AvailableArchitecture", func() {
 				arch.hash = "precalculatedHash"
 			})
 
-			It("does not recalculate the hash on subsequent calls", func() {
-				err := arch.calculateHash()
-				Expect(err).NotTo(HaveOccurred())
+			It("should not recalculate the hash on subsequent calls", func() {
+				arch.calculateHash()
 				hash1 := arch.hash
 
 				arch.hashCalculator = func(name string) (hash string, err error) {
 					return "should-not-return-this", nil
 				}
 
-				err = arch.calculateHash()
-				Expect(err).NotTo(HaveOccurred())
+				arch.calculateHash()
 				hash2 := arch.hash
 
 				Expect(hash1).To(Equal(hash2))
@@ -249,11 +226,8 @@ var _ = Describe("AvailableArchitecture", func() {
 				arch.hashCalculator = mockHashCalculator
 			})
 
-			It("should set the cached error", func() {
-				err := arch.calculateHash()
-				Expect(err).To(HaveOccurred())
-				Expect(arch.cachedError).To(HaveOccurred())
-				Expect(arch.hash).To(Equal(""))
+			It("should panic with an error", func() {
+				Expect(arch.calculateHash).To(Panic())
 			})
 		})
 	})

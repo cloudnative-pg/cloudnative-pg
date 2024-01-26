@@ -674,8 +674,8 @@ const (
 
 // AvailableArchitecture represents the state of a cluster's architecture
 type AvailableArchitecture struct {
-	// GoArch is the name of the executable's architecture
-	GoArch string `json:"goarch"`
+	// GoArch is the name of the executable architecture
+	GoArch string `json:"goArch"`
 
 	// Hash is the hash of the executable
 	Hash string `json:"hash"`

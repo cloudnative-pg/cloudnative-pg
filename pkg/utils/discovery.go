@@ -30,7 +30,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // haveSCC stores the result of the DetectSecurityContextConstraints check
@@ -48,7 +47,6 @@ type AvailableArchitecture struct {
 	hash           string
 	mx             sync.Mutex
 	hashCalculator func(name string) (hash string, err error)
-	cachedError    error
 }
 
 func newAvailableArchitecture(goArch string) *AvailableArchitecture {
@@ -59,39 +57,31 @@ func newAvailableArchitecture(goArch string) *AvailableArchitecture {
 }
 
 // GetHash retrieves the hash for a given AvailableArchitecture
-func (arch *AvailableArchitecture) GetHash() (string, error) {
+func (arch *AvailableArchitecture) GetHash() string {
 	if arch.hash == "" {
-		if err := arch.calculateHash(); err != nil {
-			return "", err
-		}
+		arch.calculateHash()
 	}
 	arch.mx.Lock()
 	defer arch.mx.Unlock()
-	return arch.hash, nil
+	return arch.hash
 }
 
 // calculateHash calculates the hash for a given AvailableArchitecture
-func (arch *AvailableArchitecture) calculateHash() error {
+func (arch *AvailableArchitecture) calculateHash() {
 	arch.mx.Lock()
 	defer arch.mx.Unlock()
 
 	if arch.hash != "" {
-		return nil
-	}
-
-	if arch.cachedError != nil {
-		return arch.cachedError
+		return
 	}
 
 	binaryName := fmt.Sprintf("bin/manager_%s", arch.GoArch)
 	hash, err := arch.hashCalculator(binaryName)
 	if err != nil {
-		arch.cachedError = err
-		return err
+		panic(fmt.Errorf("while calculating architecture hash: %w", err))
 	}
-	arch.hash = hash
 
-	return nil
+	arch.hash = hash
 }
 
 // availableArchitectures stores the result of DetectAvailableArchitectures function
@@ -247,13 +237,7 @@ func DetectAvailableArchitectures() (err error) {
 		goArch := strings.Split(b, "manager_")[1]
 		arch := newAvailableArchitecture(goArch)
 		availableArchitectures = append(availableArchitectures, arch)
-
-		go func() {
-			err = arch.calculateHash()
-			if err != nil {
-				log.Error(err, "failed to calculate binary hash for architecture %s", arch.GoArch)
-			}
-		}()
+		go arch.calculateHash()
 	}
 
 	return err

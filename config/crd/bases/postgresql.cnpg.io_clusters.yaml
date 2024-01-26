@@ -4488,14 +4488,14 @@ spec:
                   description: AvailableArchitecture represents the state of a cluster's
                     architecture
                   properties:
-                    goarch:
-                      description: GoArch is the name of the executable's architecture
+                    goArch:
+                      description: GoArch is the name of the executable architecture
                       type: string
                     hash:
                       description: Hash is the hash of the executable
                       type: string
                   required:
-                  - goarch
+                  - goArch
                   - hash
                   type: object
                 type: array

@@ -318,14 +318,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 	}
 
 	for _, a := range utils.GetAvailableArchitectures() {
-		hash, err := a.GetHash()
-		if err != nil {
-			return err
-		}
 		cluster.Status.AvailableArchitectures = append(cluster.Status.AvailableArchitectures,
 			apiv1.AvailableArchitecture{
 				GoArch: a.GoArch,
-				Hash:   hash,
+				Hash:   a.GetHash(),
 			})
 	}
 

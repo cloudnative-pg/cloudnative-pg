@@ -13,6 +13,7 @@ Armando
 AuthQuery
 AuthQuerySecret
 Autoscaler
+AvailableArchitecture
 AvailableArchitectureList
 AvailableArchitectures
 AzureCredentials
@@ -148,6 +149,7 @@ GUCs
 Gabriele
 GaugeVec
 Gi
+GoArch
 Golang
 GolangCI
 GoogleCredentials
@@ -695,6 +697,7 @@ ghcr
 github
 gkeEnvironment
 gmail
+goArch
 golangci
 goodwithtech
 googleCredentials
