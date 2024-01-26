@@ -170,7 +170,7 @@ var _ = Describe("dropReplicationSlots", func() {
 		}
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		_, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true)
+		_, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true, true)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("triggered list error"))
 	})
@@ -183,7 +183,7 @@ var _ = Describe("dropReplicationSlots", func() {
 		}
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true)
+		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true, true)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.RequeueAfter).To(Equal(time.Second))
 	})
@@ -196,7 +196,7 @@ var _ = Describe("dropReplicationSlots", func() {
 		}
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true)
+		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true, true)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.RequeueAfter).To(Equal(time.Duration(0)))
 		Expect(res.IsZero()).To(BeTrue())
@@ -211,7 +211,7 @@ var _ = Describe("dropReplicationSlots", func() {
 		}
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		_, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true)
+		_, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true, true)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("triggered delete error"))
 	})
@@ -224,7 +224,7 @@ var _ = Describe("dropReplicationSlots", func() {
 		}
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true)
+		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster, true, true)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.RequeueAfter).To(Equal(time.Duration(0)))
 		Expect(fakeManager.replicationSlots).NotTo(HaveKey(fakeSlot{name: "slot1", active: false}))

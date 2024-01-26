@@ -42,10 +42,15 @@ func ReconcileReplicationSlots(
 
 	isPrimary := cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName
 
-	// if the both replication slots feature was deactivated, ensure any existing
-	// replication slots get cleaned up
-	if !cluster.Spec.ReplicationSlots.GetEnabled() {
-		return dropReplicationSlots(ctx, manager, cluster, isPrimary)
+	// if the ha replication slot is disabled, we drop all the HA replication slots
+	// on both primary and standby
+	// notes: if HA slots is enabled and user slot is disabled, drop user slot
+	// is handled in the runner.go
+	if !cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
+		// if at the sametime, user replication slot is disabled too
+		// we drop all the replication slots except the user replication slot on primary
+		dropUserSlots := !cluster.Spec.ReplicationSlots.SynchronizeReplicas.GetEnabled()
+		return dropReplicationSlots(ctx, manager, cluster, isPrimary, dropUserSlots)
 	}
 
 	if isPrimary {
@@ -120,11 +125,15 @@ func reconcilePrimaryReplicationSlots(
 	return reconcile.Result{}, nil
 }
 
+// drop the replication slots if HA or User replication slots is disabled.
+// if HA replication slot is disabled, we drop all the HA replication slots on both primary and standby
+// if User replication slot is disabled, we drop all the replication slots except the user replication slot on primary
 func dropReplicationSlots(
 	ctx context.Context,
 	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
 	isPrimary bool,
+	dropUserSlot bool,
 ) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -136,8 +145,13 @@ func dropReplicationSlots(
 
 	needToReschedule := false
 	for _, slot := range slots.Items {
-		// we skip the non-HA replication slots on the primary, which is user created
+		// we always skip the user replication slots on the primary, which is user created
 		if !slot.IsHA && isPrimary {
+			continue
+		}
+
+		// if dropUserSlot is false, we skip the user replication slots
+		if !slot.IsHA && !dropUserSlot {
 			continue
 		}
 
