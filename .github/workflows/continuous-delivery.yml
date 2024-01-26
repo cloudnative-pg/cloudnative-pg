@@ -1851,7 +1851,7 @@ jobs:
   e2e-openshift:
     name: Run E2E on OpenShift
     if: | 
-      (always() && !cancelled()) &&
+      always() && !cancelled() &&
       vars.OPENSHIFT_ENABLED == 'true' &&
       needs.generate-jobs.outputs.openshiftEnabled == 'true' &&
       needs.generate-jobs.result == 'success'
