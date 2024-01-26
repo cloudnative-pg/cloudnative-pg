@@ -1988,11 +1988,15 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 			HighAvailability: &ReplicationSlotsHAConfiguration{
 				Enabled: ptr.To(true),
 			},
+			SynchronizeReplicas: &SynchronizeReplicasConfiguration{
+				Enabled: ptr.To(true),
+			},
 		}
 	}
 	replicationSlots := r.Spec.ReplicationSlots
 
-	if !replicationSlots.HighAvailability.GetEnabled() {
+	// if both are disabled, skip the validation
+	if !replicationSlots.HighAvailability.GetEnabled() && !replicationSlots.SynchronizeReplicas.GetEnabled() {
 		return nil
 	}
 
@@ -2004,15 +2008,26 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 	}
 
 	if psqlVersion < 110000 {
-		return field.ErrorList{
-			field.Invalid(
-				field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
-				replicationSlots.HighAvailability.GetEnabled(),
-				"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+		if replicationSlots.HighAvailability.GetEnabled() {
+			return field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
+					replicationSlots.HighAvailability.GetEnabled(),
+					"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+			}
+		}
+
+		if replicationSlots.SynchronizeReplicas.GetEnabled() {
+			return field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "enabled"),
+					replicationSlots.SynchronizeReplicas.GetEnabled(),
+					"Cannot enable replication slot synchronize replicas. It requires PostgreSQL 11 or above"),
+			}
 		}
 	}
 
-	if r.Spec.ReplicationSlots.SynchronizeReplicas != nil {
+	if replicationSlots.SynchronizeReplicas.GetEnabled() {
 		if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
 			return field.ErrorList{
 				field.Invalid(

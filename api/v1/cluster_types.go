@@ -1042,7 +1042,7 @@ func (r *SynchronizeReplicasConfiguration) compileRegex() []error {
 	return errs
 }
 
-// GetEnabled returns false if SynchronizeReplicasConfiguration is nil, otherwise defaults to true
+// GetEnabled returns false if synchronized replication slots are disabled, defaults to true
 func (r *SynchronizeReplicasConfiguration) GetEnabled() bool {
 	if r != nil && r.Enabled != nil {
 		return *r.Enabled
