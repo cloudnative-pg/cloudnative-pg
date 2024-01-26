@@ -419,7 +419,6 @@ jobs:
           # TAGS could be separated by newlines or commas
           image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
           echo "image=${image}" >> $GITHUB_OUTPUT
-
       -
         name: Output images
         env:
@@ -433,7 +432,6 @@ jobs:
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG_UBI=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
-
       -
         name: Generate manifest for operator deployment
         id: generate-manifest
@@ -448,7 +446,7 @@ jobs:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
           retention-days: 7
-
+      -
       # In order to test the case of upgrading from the current operator
       # to a future one, we build and push an image with a different VERSION
       # to force a different hash for the manager binary.
@@ -456,7 +454,7 @@ jobs:
       #
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
-      - name: Build binary for upgrade test
+        name: Build binary for upgrade test
         uses: goreleaser/goreleaser-action@v5
         if: |
           always() && !cancelled() &&
@@ -469,7 +467,7 @@ jobs:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
           VERSION: ${{ env.VERSION }}-prime
-
+      -
       # In order to test the case of upgrading from the current operator
       # to a future one, we build and push an image with a different VERSION
       # to force a different hash for the manager binary.
@@ -478,7 +476,7 @@ jobs:
       # We push the "prime" binary using a tag with the suffix "-prime"
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
-      - name: Build and push image for upgrade test
+        name: Build and push image for upgrade test
         uses: docker/build-push-action@v5
         if: |
           always() && !cancelled() &&
@@ -1845,16 +1843,18 @@ jobs:
             done
           done
 
-
-
   # OpenShift Secrets required
   # secrets.AWS_EKS_ADMIN_IAM_ROLES
   # secrets.AWS_ACCESS_KEY_ID
   # secrets.AWS_SECRET_ACCESS_KEY
+
   e2e-openshift:
     name: Run E2E on OpenShift
     if: | 
-      always()
+      (always() && !cancelled()) &&
+      vars.OPENSHIFT_ENABLED == 'true' &&
+      needs.generate-jobs.outputs.openshiftEnabled == 'true' &&
+      needs.generate-jobs.result == 'success'
     needs:
       - buildx
       - generate-jobs
@@ -1877,7 +1877,7 @@ jobs:
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       # The version of operator to upgrade FROM, in the rolling upgrade E2E test
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-      TEST_TIMEOUTS:
+      TEST_TIMEOUTS: ${{ needs.generate-jobs.outputs.openshiftE2ETimeout }}
       BRANCH_NAME: ${{ needs.buildx.outputs.branch_name }}
 
       DEBUG: "true"
@@ -1947,17 +1947,16 @@ jobs:
           source: "mirror"
           openshift-install: ${{ matrix.k8s_version }}
           oc: ${{ matrix.k8s_version }}
-
       -
         name: Install OpenShift Cluster ${{ matrix.k8s_version }}
         run: |
           envsubst < hack/install-config.yaml.template > hack/install-config.yaml
           openshift-install create cluster --dir hack/
-
       -
         name: Store OpenShift password
         run: |
           OPENSHIFT_PASSWORD="$(cat "$(pwd)"/hack/auth/kubeadmin-password)"
+          echo "::add-mask::$OPENSHIFT_PASSWORD"
           echo "OPENSHIFT_PASSWORD=${OPENSHIFT_PASSWORD}" >> $GITHUB_ENV
       -
         name: Login into OpenShift Cluster
