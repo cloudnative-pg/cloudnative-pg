@@ -164,7 +164,7 @@ The flags in the above command have the following meaning:
 - `-n king` install the CNPG operator into the `king` namespace
 - `--version 1.17` install the latest patch version for minor version 1.17
 - `--replicas 3` install the operator with 3 replicas
-- `--watch-namespaces "albert, bb, freddie"` have the operator watch for
+- `--watch-namespace "albert, bb, freddie"` have the operator watch for
   changes in the `albert`, `bb` and `freddie` namespaces only
 
 ### Status
