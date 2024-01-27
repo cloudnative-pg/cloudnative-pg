@@ -31,7 +31,7 @@ namespaces to only be a specific namespace, you could run:
 
 ```shell
 kubectl cnpg install generate \
-  --watch-namespaces "specific-namespace" \
+  --watch-namespace "specific-namespace" \
   > cnpg_for_specific_namespace.yaml
 ```
 
