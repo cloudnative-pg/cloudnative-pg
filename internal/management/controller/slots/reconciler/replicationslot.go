@@ -47,10 +47,7 @@ func ReconcileReplicationSlots(
 	// notes: if HA slots is enabled and user slot is disabled, drop user slot
 	// is handled in the runner.go
 	if !cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
-		// if at the sametime, user replication slot is disabled too
-		// we drop all the replication slots except the user replication slot on primary
-		dropUserSlots := !cluster.Spec.ReplicationSlots.SynchronizeReplicas.GetEnabled()
-		return dropReplicationSlots(ctx, manager, cluster, isPrimary, dropUserSlots)
+		return dropReplicationSlots(ctx, manager, cluster, isPrimary)
 	}
 
 	if isPrimary {
@@ -140,9 +137,12 @@ func dropReplicationSlots(
 	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
 	isPrimary bool,
-	dropUserSlot bool,
 ) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	// if at the sametime, user replication slot is disabled too
+	// we drop all the replication slots except the user replication slot on primary
+	dropUserSlots := !cluster.Spec.ReplicationSlots.SynchronizeReplicas.GetEnabled()
 
 	// we fetch all replication slots
 	slots, err := manager.List(ctx, cluster.Spec.ReplicationSlots)
@@ -158,7 +158,7 @@ func dropReplicationSlots(
 		}
 
 		// if dropUserSlot is false, we skip the user replication slots
-		if !slot.IsHA && !dropUserSlot {
+		if !slot.IsHA && !dropUserSlots {
 			continue
 		}
 
