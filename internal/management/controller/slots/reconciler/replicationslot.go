@@ -60,6 +60,7 @@ func ReconcileReplicationSlots(
 	return reconcile.Result{}, nil
 }
 
+// reconcilePrimaryReplicationSlots reconciles the HA replication slots of the primary instance
 func reconcilePrimaryReplicationSlots(
 	ctx context.Context,
 	manager infrastructure.Manager,
@@ -72,7 +73,7 @@ func reconcilePrimaryReplicationSlots(
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("reconciling primary replication slots: %w", err)
 	}
-
+	// expectedSlots is a map define the expected HA replication slots
 	expectedSlots := make(map[string]bool)
 
 	// Add every slot that is missing
@@ -88,7 +89,7 @@ func reconcilePrimaryReplicationSlots(
 			continue
 		}
 
-		// at this point, the cluster instance does not have a replication slot
+		// at this point, the cluster instance does not have a HA replication slot
 		if err := manager.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotName}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("creating primary HA replication slots: %w", err)
 		}
@@ -98,10 +99,16 @@ func reconcilePrimaryReplicationSlots(
 		"currentSlots", currentSlots,
 		"expectedSlots", expectedSlots)
 
-	// Delete any replication slots in the instance that is not from an existing cluster instance
+	// Delete any HA replication slots in the instance that is not from an existing cluster instance
 	needToReschedule := false
 	for _, slot := range currentSlots.Items {
 		if !expectedSlots[slot.SlotName] {
+			// Avoid user-defined slot
+			if !slot.IsHA {
+				contextLogger.Trace("Skipping the user-defined replication slot",
+					"slot", slot)
+				continue
+			}
 			// Avoid deleting active slots.
 			// It would trow an error on Postgres side.
 			if slot.Active {
