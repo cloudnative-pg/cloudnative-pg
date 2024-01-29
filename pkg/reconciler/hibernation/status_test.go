@@ -87,8 +87,11 @@ var _ = Describe("Status enrichment", func() {
 		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonWrongAnnotationValue))
 	})
 
-	It("removes the hibernation condition when hibernation is turned off", func(ctx SpecContext) {
+	It("change the hibernation condition to resume reason when hibernation is turned off", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
 					utils.HibernationAnnotationName: HibernationOff,
@@ -98,6 +101,7 @@ var _ = Describe("Status enrichment", func() {
 				Conditions: []metav1.Condition{
 					{
 						Type:   HibernationConditionType,
+						Reason: HibernationConditionReasonHibernated,
 						Status: metav1.ConditionTrue,
 					},
 				},
@@ -106,6 +110,54 @@ var _ = Describe("Status enrichment", func() {
 		}
 
 		EnrichStatus(ctx, &cluster, nil)
+		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
+		Expect(hibernationCondition).NotTo(BeNil())
+		Expect(hibernationCondition.Reason).To(BeEquivalentTo(HibernationConditionReasonResumingPods))
+	})
+
+	It("Resuming condition should not be changed if not all pod ready", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+			},
+			Status: apiv1.ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   HibernationConditionType,
+						Status: metav1.ConditionFalse,
+						Reason: HibernationConditionReasonResumingPods,
+					},
+				},
+				Phase:          apiv1.PhaseHealthy,
+				ReadyInstances: 3,
+			},
+		}
+
+		EnrichStatus(ctx, &cluster, []corev1.Pod{{}, {}})
+		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
+		Expect(hibernationCondition).NotTo(BeNil())
+		Expect(hibernationCondition.Reason).To(BeEquivalentTo(HibernationConditionReasonResumingPods))
+	})
+
+	It("removes the hibernation condition when hibernation is turned off and all pods are ready", func(ctx SpecContext) {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Instances: 3,
+			},
+			Status: apiv1.ClusterStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   HibernationConditionType,
+						Status: metav1.ConditionFalse,
+						Reason: HibernationConditionReasonResumingPods,
+					},
+				},
+				Phase:          apiv1.PhaseHealthy,
+				ReadyInstances: 3,
+			},
+		}
+
+		EnrichStatus(ctx, &cluster, []corev1.Pod{{}, {}, {}})
 		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
 		Expect(hibernationCondition).To(BeNil())
 	})

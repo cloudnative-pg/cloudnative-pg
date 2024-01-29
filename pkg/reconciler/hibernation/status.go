@@ -60,6 +60,10 @@ const (
 	// hibernation condition that is used when the operator is waiting for a Pod
 	// to be deleted
 	HibernationConditionReasonWaitingPodsDeletion = "WaitingPodsDeletion"
+
+	// HibernationConditionReasonResumingPods is the value of the hibernation
+	// condition that is used when the operator is resuming the hibernated cluster
+	HibernationConditionReasonResumingPods = "ResumingPods"
 )
 
 // ErrInvalidHibernationValue is raised when the hibernation annotation has
@@ -91,7 +95,27 @@ func EnrichStatus(
 	}
 
 	if !hibernationRequested {
-		meta.RemoveStatusCondition(&cluster.Status.Conditions, HibernationConditionType)
+		condition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
+		// if there is no hibernation condition, we don't need to do anything
+		if condition == nil {
+			return
+		}
+
+		switch condition.Reason {
+		case HibernationConditionReasonResumingPods:
+			// we remove the condition only when the cluster is healthy and all pods are ready
+			if cluster.Status.Phase == apiv1.PhaseHealthy && cluster.Spec.Instances == len(podList) {
+				meta.RemoveStatusCondition(&cluster.Status.Conditions, HibernationConditionType)
+			}
+		case HibernationConditionReasonHibernated:
+			// we update the hibernate status to resuming if hibernation annotation is removed (resuming request)
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    HibernationConditionType,
+				Status:  metav1.ConditionFalse,
+				Reason:  HibernationConditionReasonResumingPods,
+				Message: "Resuming is in progress",
+			})
+		}
 		return
 	}
 

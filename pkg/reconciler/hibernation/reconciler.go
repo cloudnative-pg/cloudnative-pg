@@ -46,9 +46,10 @@ func Reconcile(
 	switch hibernationCondition.Reason {
 	case HibernationConditionReasonDeletingPods:
 		return reconcileDeletePods(ctx, c, instances)
-
 	case HibernationConditionReasonWaitingPodsDeletion:
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case HibernationConditionReasonResumingPods:
+		return nil, nil
 
 	default:
 		return &ctrl.Result{}, nil
