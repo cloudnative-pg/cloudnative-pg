@@ -783,14 +783,9 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 		return err
 	}
 
-	majorVersion, err := postgresutils.GetMajorVersion(info.PgData)
-	if err != nil {
-		return fmt.Errorf("cannot detect major version: %w", err)
-	}
-
 	// This will start the recovery of WALs taken during the backup
 	// and, after that, the server will start in a new timeline
-	if err = instance.WithActiveInstance(func() error {
+	if err := instance.WithActiveInstance(func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
 			return err
@@ -807,13 +802,11 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 		return err
 	}
 
-	if majorVersion >= 12 {
-		primaryConnInfo := info.GetPrimaryConnInfo()
-		slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-		_, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName)
-		if err != nil {
-			return fmt.Errorf("while configuring replica: %w", err)
-		}
+	primaryConnInfo := info.GetPrimaryConnInfo()
+	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
+	_, err := configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName)
+	if err != nil {
+		return fmt.Errorf("while configuring replica: %w", err)
 	}
 
 	if info.ApplicationUser == "" || info.ApplicationDatabase == "" {

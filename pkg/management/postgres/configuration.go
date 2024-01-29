@@ -226,6 +226,11 @@ func (instance *Instance) RefreshPGIdent(cluster *apiv1.Cluster) (postgresIdentC
 // UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
+	if err !=  nil {
+		return changed, err
+	}
+
 	major, err := postgresutils.GetMajorVersion(pgData)
 	if err != nil {
 		return false, err
@@ -235,11 +240,7 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 		return configureRecoveryConfFile(pgData, primaryConnInfo, slotName)
 	}
 
-	if err := createStandbySignal(pgData); err != nil {
-		return false, err
-	}
-
-	return configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
+	return changed, createStandbySignal(pgData)
 }
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
@@ -284,16 +285,24 @@ func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (change
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
-	options := map[string]string{
-		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
-		"recovery_target_timeline": "latest",
-		"primary_slot_name":        slotName,
+	major, err := postgresutils.GetMajorVersion(pgData)
+	if err != nil {
+		return false, err
 	}
 
-	if primaryConnInfo != "" {
-		options["primary_conninfo"] = primaryConnInfo
+	var options map[string]string
+
+	if major >= 12 {
+		options = map[string]string{
+			"restore_command": fmt.Sprintf(
+				"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+				postgres.LogPath, postgres.LogFileName),
+			"recovery_target_timeline": "latest",
+			"primary_slot_name":        slotName,
+		}
+		if primaryConnInfo != "" {
+			options["primary_conninfo"] = primaryConnInfo
+		}
 	}
 
 	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
@@ -440,4 +449,28 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 
 	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
 	return conf, sha256, nil
+}
+
+// configurePostgresForImport configures Postgres to be optimized for the firt import
+// process, by writing dedicated options the override.conf file just for this phase
+func configurePostgresForImport(pgData string) (changed bool, err error) {
+	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
+
+	options := map[string]string{
+		"archive_mode": "off",
+		"fsync": "off",
+		"wal_level": "minimal",
+		"full_page_writes": "off",
+	}
+
+	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	if err != nil {
+		return false, err
+	}
+
+	if changed {
+		log.Info("Updated replication settings", "filename", constants.PostgresqlOverrideConfigurationFile)
+	}
+
+	return changed, nil
 }

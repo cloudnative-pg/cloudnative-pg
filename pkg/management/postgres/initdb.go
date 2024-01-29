@@ -353,22 +353,26 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 	instance := info.GetInstance()
 
+	// Detect an initdb bootstrap with import
+	isImportBootstrap := cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.InitDB != nil &&
+		cluster.Spec.Bootstrap.InitDB.Import != nil
+
 	if applied, err := instance.RefreshConfigurationFilesFromCluster(cluster, true); err != nil {
 		return fmt.Errorf("while writing the config: %w", err)
 	} else if !applied {
 		return fmt.Errorf("could not apply the config")
 	}
 
-	postgresVersion, err := cluster.GetPostgresqlVersion()
-	if err != nil {
-		return fmt.Errorf("while reading the PostgreSQL version: %w", err)
-	}
-
-	if postgresVersion >= 120000 {
-		primaryConnInfo := info.GetPrimaryConnInfo()
-		slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-		_, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName)
-		if err != nil {
+	primaryConnInfo := info.GetPrimaryConnInfo()
+	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
+	// Write a special configuration for the import phase
+	if isImportBootstrap {
+		if _, err := configurePostgresForImport(info.PgData); err != nil {
+			return fmt.Errorf("while configuring Postgres for import: %w", err)
+		}
+	} else {
+		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}
 	}
@@ -379,12 +383,17 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}
 
-		if cluster.Spec.Bootstrap != nil &&
-			cluster.Spec.Bootstrap.InitDB != nil &&
-			cluster.Spec.Bootstrap.InitDB.Import != nil {
-			err = executeLogicalImport(ctx, typedClient, instance, cluster)
-			if err != nil {
+		if isImportBootstrap {
+			if err := executeLogicalImport(ctx, typedClient, instance, cluster); err != nil {
 				return fmt.Errorf("while executing logical import: %w", err)
+			}
+			// Restore the configuration file
+			if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+				return fmt.Errorf("while removing Postgres configuration for import: %w", err)
+			}
+			// Run fsync
+			if err := info.initdbSyncOnly(); err != nil {
+				return err
 			}
 		}
 
@@ -444,3 +453,21 @@ func getConnectionPoolerForExternalCluster(
 
 	return pool.NewPostgresqlConnectionPool(sourceDBConnectionString), nil
 }
+
+// initdbSyncOnly Run initdb with --sync-only option after a database import
+func (info InitInfo) initdbSyncOnly() error {
+	// Invoke initdb to generate a data directory
+	options := []string{
+		"-D",
+		info.PgData,
+		"--sync-only",
+	}
+	log.Info("Running initdb --sync-only",
+		"pgdata", info.PgData)
+	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
+	if err := execlog.RunBuffering(initdbCmd, constants.InitdbName); err != nil {
+		return fmt.Errorf("error while running initdb --sync-only: %w", err)
+	}
+	return nil
+}
+
