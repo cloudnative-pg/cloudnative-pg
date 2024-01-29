@@ -22,14 +22,19 @@ import (
 	"io"
 	"path"
 	"slices"
+	"time"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
+
+// defaultTimeout is the timeout applied by default to every GRPC call
+const defaultTimeout = 30 * time.Second
 
 type protocol interface {
 	dial(ctx context.Context, path string) (connectionHandler, error)
@@ -51,6 +56,9 @@ func (p protocolUnix) dial(ctx context.Context, path string) (connectionHandler,
 	return grpc.Dial(
 		dialPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(
+			timeout.UnaryClientInterceptor(defaultTimeout),
+		),
 	)
 }
 
