@@ -240,3 +240,30 @@ There are a few things you need to be aware of when using the `monolith` type:
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
 - `postImportApplicationSQL` field is not supported
+
+## Import optimizations
+
+During the logical import of a database, CloudNativePG optimizes the
+configuration of PostgreSQL in order to prioritize speed versus data
+durability, by forcing:
+
+- `archive_mode` to `off`
+- `fsync` to `off`
+- `full_page_writes` to `off`
+- `wal_level` to `minimal`
+
+Before completing the import job, CloudNativePG restores the expected
+configuration, then runs `initdb --sync-only` to ensure that data is
+permanently written on disk.
+
+!!! Important
+    WAL archiving, if requested, and WAL level will be honored after the
+    database import process has completed. Similarly, replicas will be cloned
+    after the bootstrap phase, when the actual cluster resource starts.
+
+There are other optimizations you can do during the import phase. Although this
+topic is beyond the scope of CloudNativePG, we recommend that you reduce
+unnecessary writes in the checkpoint area by tuning Postgres GUCs like
+`shared_buffers`, `max_wal_size`, `checkpoint_timeout` directly in the
+`Cluster` configuration.
+
