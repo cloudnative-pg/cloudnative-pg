@@ -460,6 +460,7 @@ func configurePostgresForImport(ctx context.Context, pgData string) (changed boo
 		"fsync":            "off",
 		"wal_level":        "minimal",
 		"full_page_writes": "off",
+		"max_wal_senders":  "0",
 	}
 
 	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)

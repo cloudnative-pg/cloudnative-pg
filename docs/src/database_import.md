@@ -250,6 +250,7 @@ durability, by forcing:
 - `archive_mode` to `off`
 - `fsync` to `off`
 - `full_page_writes` to `off`
+- `max_wal_senders` to `0`
 - `wal_level` to `minimal`
 
 Before completing the import job, CloudNativePG restores the expected
