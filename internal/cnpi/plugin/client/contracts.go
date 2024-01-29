@@ -43,8 +43,10 @@ type Client interface {
 type Connection interface {
 	// Load connect to the plugin with the specified name
 	Load(ctx context.Context, name string) error
+
 	// Close closes the connection to every loaded plugin
 	Close(ctx context.Context)
+
 	// MetadataList exposes the metadata of the loaded plugins
 	MetadataList() []Metadata
 }
@@ -65,13 +67,19 @@ type PodCapabilities interface {
 type ClusterCapabilities interface {
 	// MutateCluster calls the loaded plugisn to help to enhance
 	// a cluster definition
-	MutateCluster(ctx context.Context, object client.Object, mutatedObject client.Object) error
+	MutateCluster(
+		ctx context.Context,
+		object client.Object,
+		mutatedObject client.Object,
+	) error
+
 	// ValidateClusterCreate calls all the loaded plugin to check if a cluster definition
 	// is correct
 	ValidateClusterCreate(
 		ctx context.Context,
 		object client.Object,
 	) (field.ErrorList, error)
+
 	// ValidateClusterUpdate calls all the loaded plugin to check if a cluster can
 	// be changed from a value to another
 	ValidateClusterUpdate(
