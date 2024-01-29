@@ -197,14 +197,19 @@ type Instance struct {
 	tablespaceSynchronizerChan chan map[string]apiv1.TablespaceConfiguration
 }
 
-// SetAlterSystemEnabled allows or deny writes to the
-// `postgresql.auto.conf` file in PGDATA, allowing and denying the
-// usage of the ALTER SYSTEM SQL command
+// SetAlterSystemEnabled allows or deny the usage of the
+// ALTER SYSTEM SQL command
 func (instance *Instance) SetAlterSystemEnabled(enabled bool) error {
+	return instance.SetPostgreSQLAutoConfWritable(enabled)
+}
+
+// SetPostgreSQLAutoConfWritable allows or deny writes to the
+// `postgresql.auto.conf` file in PGDATA
+func (instance *Instance) SetPostgreSQLAutoConfWritable(writeable bool) error {
 	autoConfFileName := path.Join(instance.PgData, "postgresql.auto.conf")
 
 	mode := fs.FileMode(0o600)
-	if !enabled {
+	if !writeable {
 		mode = 0o400
 	}
 	return os.Chmod(autoConfFileName, mode)

@@ -133,9 +133,6 @@ func (r *InstanceReconciler) Reconcile(
 	}
 	reloadNeeded = reloadNeeded || reloadConfigNeeded
 
-	// Reconcile postgresql.auto.conf file
-	r.reconcileAutoConf(ctx, cluster)
-
 	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
 	if !r.firstReconcileDone.Load() {
 		if err = r.initialize(ctx, cluster); err != nil {
@@ -143,6 +140,10 @@ func (r *InstanceReconciler) Reconcile(
 		}
 		r.firstReconcileDone.Store(true)
 	}
+
+	// Reconcile postgresql.auto.conf file. This operation must be after the initialize() call
+	// because it could interfere with pg_rewind execution
+	r.reconcileAutoConf(ctx, cluster)
 
 	// Reconcile cluster role without DB
 	reloadClusterRoleConfig, err := r.reconcileClusterRoleWithoutDB(ctx, cluster)
