@@ -278,6 +278,7 @@ func GetOperatorPodRestartedCount(operatorPod corev1.Pod) int {
 }
 
 // GetOperatorPodName returns the name of the current operator pod
+// NOTE: will return an error if the pod is being deleted
 func GetOperatorPodName(env *TestingEnvironment) (string, error) {
 	pod, err := env.GetOperatorPod()
 	if err != nil {
@@ -290,10 +291,11 @@ func GetOperatorPodName(env *TestingEnvironment) (string, error) {
 	return pod.GetName(), nil
 }
 
-// HasOperatorPodUpgraded returns nil if the operator pod has been upgraded
-func HasOperatorPodUpgraded(env *TestingEnvironment) error {
+// HasOperatorBeenUpgraded determines if the operator has been upgraded by checking
+// if there is a deletion timestamp. If there isn't, it returns true
+func HasOperatorBeenUpgraded(env *TestingEnvironment) bool {
 	_, err := GetOperatorPodName(env)
-	return err
+	return err == nil
 }
 
 // GetOperatorVersion returns the current operator version

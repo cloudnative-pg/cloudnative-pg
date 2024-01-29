@@ -97,9 +97,9 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 
 	assertClusterIsAligned := func(namespace, clusterName string) {
 		By("Verifying the cluster pods have been upgraded", func() {
-			Eventually(func() error {
-				return testsUtils.HasOperatorPodUpgraded(env)
-			}).ShouldNot(HaveOccurred())
+			Eventually(func() bool {
+				return testsUtils.HasOperatorBeenUpgraded(env)
+			}).Should(BeTrue())
 
 			operatorPodName, err := testsUtils.GetOperatorPodName(env)
 			Expect(err).ToNot(HaveOccurred())
