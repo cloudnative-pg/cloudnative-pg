@@ -489,7 +489,15 @@ type ClusterSpec struct {
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
+
+	// The plugins configuration, containing
+	// any plugin to be loaded with the corresponding configuration
+	Plugins PluginConfigurationList `json:"plugins,omitempty"`
 }
+
+// PluginConfigurationList represent a set of plugin with their
+// configuration parameters
+type PluginConfigurationList []PluginConfiguration
 
 const (
 	// PhaseSwitchover when a cluster is changing the primary node
@@ -896,6 +904,9 @@ type ClusterStatus struct {
 	// Image contains the image name used by the pods
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// PluginStatus is the status of the loaded plugins
+	PluginStatus []PluginStatus `json:"pluginStatus,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -2341,6 +2352,34 @@ type ManagedConfiguration struct {
 	// Database roles managed by the `Cluster`
 	// +optional
 	Roles []RoleConfiguration `json:"roles,omitempty"`
+}
+
+// PluginConfiguration specifies a plugin that need to be loaded for this
+// cluster to be reconciled
+type PluginConfiguration struct {
+	// Name is the plugin name
+	Name string `json:"name"`
+
+	// Parameters is the configuration of the plugin
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// PluginStatus is the status of a loaded plugin
+type PluginStatus struct {
+	// Name is the name of the plugin
+	Name string `json:"name"`
+
+	// Version is the version of the plugin loaded by the
+	// latest reconciliation loop
+	Version string `json:"version"`
+
+	// Capabilities are the list of capabilities of the
+	// plugin
+	Capabilities []string `json:"capabilities,omitempty"`
+
+	// OperatorCapabilities are the list of capabilities of the
+	// plugin regarding the reconciler
+	OperatorCapabilities []string `json:"operatorCapabilities,omitempty"`
 }
 
 // RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
