@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+    storageClass: csi-hostpath-sc
+  walStorage:
+    size: 1Gi
+    storageClass: csi-hostpath-sc
+
+  bootstrap:
+    recovery:
+      volumeSnapshots:
+        storage:
+          name: cluster-example-20231031161103
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+        walStorage:
+          name: cluster-example-20231031161103-wal
+          kind: VolumeSnapshot
+          apiGroup: snapshot.storage.k8s.io
+

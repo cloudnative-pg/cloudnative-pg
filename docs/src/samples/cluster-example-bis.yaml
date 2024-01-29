@@ -1,0 +1,29 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  imageName: registry.dev:5000/postgresql:16
+
+  backup:
+    volumeSnapshot:
+      className: csi-hostpath-groupsnapclass
+        #className: csi-hostpath-snapclass
+      groupSnapshot: true
+
+  storage:
+    storageClass: csi-hostpath-sc
+    size: 1Gi
+  walStorage:
+    storageClass: csi-hostpath-sc
+    size: 1Gi
+      #  tablespaces:
+      #    first:
+      #      storage:
+      #        storageClass: csi-hostpath-sc
+      #        size: 1Gi
+      #    second:
+      #      storage:
+      #        storageClass: csi-hostpath-sc
+      #        size: 1Gi

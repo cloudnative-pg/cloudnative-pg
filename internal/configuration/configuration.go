@@ -32,12 +32,19 @@ var configurationLog = log.WithName("configuration")
 // DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
 const DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
 
+// DefaultPluginSocketDir is the default directory where the plugin sockets are located.
+const DefaultPluginSocketDir = "/plugins"
+
 // Data is the struct containing the configuration of the operator.
 // Usually the operator code will use the "Current" configuration.
 type Data struct {
 	// WebhookCertDir is the directory where the certificates for the webhooks
 	// need to written. This is different between plain Kubernetes and OpenShift
 	WebhookCertDir string `json:"webhookCertDir" env:"WEBHOOK_CERT_DIR"`
+
+	// PluginSocketDir is the directory where the plugins sockets are to be
+	// found
+	PluginSocketDir string `json:"pluginSocketDir" env:"PLUGIN_SOCKET_DIR"`
 
 	// WatchNamespace is the namespace where the operator should watch and
 	// is configurable via environment variables in the OpenShift console.
@@ -99,6 +106,7 @@ func newDefaultConfig() *Data {
 		OperatorPullSecretName: DefaultOperatorPullSecretName,
 		OperatorImageName:      versions.DefaultOperatorImageName,
 		PostgresImageName:      versions.DefaultImageName,
+		PluginSocketDir:        DefaultPluginSocketDir,
 		CreateAnyService:       false,
 	}
 }
