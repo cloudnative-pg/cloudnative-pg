@@ -227,7 +227,7 @@ func (instance *Instance) RefreshPGIdent(cluster *apiv1.Cluster) (postgresIdentC
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
-	if err !=  nil {
+	if err != nil {
 		return changed, err
 	}
 
@@ -290,7 +290,7 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 		return false, err
 	}
 
-	var options map[string]string
+	options := make(map[string]string)
 
 	if major >= 12 {
 		options = map[string]string{
@@ -299,9 +299,7 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 				postgres.LogPath, postgres.LogFileName),
 			"recovery_target_timeline": "latest",
 			"primary_slot_name":        slotName,
-		}
-		if primaryConnInfo != "" {
-			options["primary_conninfo"] = primaryConnInfo
+			"primary_conninfo":         primaryConnInfo,
 		}
 	}
 
@@ -453,13 +451,14 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 
 // configurePostgresForImport configures Postgres to be optimized for the firt import
 // process, by writing dedicated options the override.conf file just for this phase
-func configurePostgresForImport(pgData string) (changed bool, err error) {
+func configurePostgresForImport(ctx context.Context, pgData string) (changed bool, err error) {
+	contextLogger := log.FromContext(ctx)
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
 	options := map[string]string{
-		"archive_mode": "off",
-		"fsync": "off",
-		"wal_level": "minimal",
+		"archive_mode":     "off",
+		"fsync":            "off",
+		"wal_level":        "minimal",
 		"full_page_writes": "off",
 	}
 
@@ -469,7 +468,8 @@ func configurePostgresForImport(pgData string) (changed bool, err error) {
 	}
 
 	if changed {
-		log.Info("Updated replication settings", "filename", constants.PostgresqlOverrideConfigurationFile)
+		contextLogger.Info("Configuration optimized for import",
+			"filename", constants.PostgresqlOverrideConfigurationFile)
 	}
 
 	return changed, nil

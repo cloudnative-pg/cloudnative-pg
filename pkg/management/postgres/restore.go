@@ -804,8 +804,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 
 	primaryConnInfo := info.GetPrimaryConnInfo()
 	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-	_, err := configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName)
-	if err != nil {
+	if _, err := configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
 		return fmt.Errorf("while configuring replica: %w", err)
 	}
 
@@ -816,8 +815,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 
 	// Configure the application database information for restored instance
 	return instance.WithActiveInstance(func() error {
-		err = info.ConfigureNewInstance(instance)
-		if err != nil {
+		if err := info.ConfigureNewInstance(instance); err != nil {
 			return fmt.Errorf("while configuring restored instance: %w", err)
 		}
 
