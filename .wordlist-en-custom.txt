@@ -236,6 +236,7 @@ OnlineUpgrading
 OpenSSL
 OpenShift
 Openshift
+OperatorCapabilities
 OperatorGroup
 OperatorHub
 PGAudit
@@ -262,6 +263,8 @@ PgBouncerSecrets
 PgBouncerSecretsVersions
 PgBouncerSpec
 Philippe
+PluginConfigurationList
+PluginStatus
 PoLA
 PodAffinity
 PodAntiAffinity
@@ -875,6 +878,7 @@ openldap
 openshift
 operability
 operativity
+operatorCapabilities
 operatorframework
 operatorgorup
 operatorgroup
@@ -913,6 +917,7 @@ pid
 pitr
 plpgsql
 pluggable
+pluginStatus
 png
 podAffinityTerm
 podAntiAffinity
@@ -972,6 +977,7 @@ readService
 readinessProbe
 readthedocs
 readyInstances
+reconciler
 reconciliationLoop
 recoverability
 recoveredCluster

@@ -1717,6 +1717,14 @@ Defaults to: <code>RuntimeDefault</code></p>
    <p>The tablespaces configuration</p>
 </td>
 </tr>
+<tr><td><code>plugins</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PluginConfigurationList"><i>PluginConfigurationList</i></a>
+</td>
+<td>
+   <p>The plugins configuration, containing
+any plugin to be loaded with the corresponding configuration</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2023,6 +2031,13 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 </td>
 <td>
    <p>AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster</p>
+</td>
+</tr>
+<tr><td><code>pluginStatus</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PluginStatus"><i>[]PluginStatus</i></a>
+</td>
+<td>
+   <p>PluginStatus is the status of the loaded plugins</p>
 </td>
 </tr>
 </tbody>
@@ -3184,6 +3199,54 @@ to the pg_hba.conf file)</p>
 server, first waiting for all queries to complete, and pause all new
 client connections until this value is set to <code>false</code> (default). Internally,
 the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> commands.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PluginStatus     {#postgresql-cnpg-io-v1-PluginStatus}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>PluginStatus is the status of a loaded plugin</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the name of the plugin</p>
+</td>
+</tr>
+<tr><td><code>version</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Version is the version of the plugin loaded by the
+latest reconciliation loop</p>
+</td>
+</tr>
+<tr><td><code>capabilities</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Capabilities are the list of capabilities of the
+plugin</p>
+</td>
+</tr>
+<tr><td><code>operatorCapabilities</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>OperatorCapabilities are the list of capabilities of the
+plugin regarding the reconciler</p>
 </td>
 </tr>
 </tbody>
