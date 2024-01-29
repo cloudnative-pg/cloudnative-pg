@@ -34,7 +34,7 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"
 	)
 
-	var ocp410 semver.Version
+	var ocp412 semver.Version
 	var ocpVersion semver.Version
 	var err error
 
@@ -50,7 +50,7 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 			Skip("This test case is only applicable on OpenShift clusters")
 		}
 		// Setup OpenShift Versions
-		ocp410, err = semver.Make("4.12.0")
+		ocp412, err = semver.Make("4.12.0")
 		Expect(err).ToNot(HaveOccurred())
 		// Get current OpenShift Versions
 		ocpVersion, err = testsUtils.GetOpenshiftVersion(env)
@@ -59,7 +59,7 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 
 	cleanupOperator := func() error {
 		// Cleanup the Operator
-		err = testsUtils.DeleteCNPCRDs(env)
+		err = testsUtils.DeleteOperatorCRDs(env)
 		if err != nil {
 			return err
 		}
@@ -165,7 +165,7 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 	}
 
 	It("stable-v1 to alpha, currently version 1.22", func() {
-		if ocpVersion.GT(ocp410) {
+		if ocpVersion.GT(ocp412) {
 			Skip("This test runs only on OCP 4.12 or lower")
 		}
 		DeferCleanup(cleanupOpenshift)

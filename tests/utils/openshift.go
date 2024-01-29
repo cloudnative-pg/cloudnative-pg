@@ -64,7 +64,7 @@ func GetSubscriptionVersion(env *TestingEnvironment) (string, error) {
 	return ver, nil
 }
 
-// PatchStatusCondition Removes status conditions on a given Cluster
+// PatchStatusCondition removes status conditions on a given Cluster
 func PatchStatusCondition(namespace, clusterName string, env *TestingEnvironment) error {
 	cluster := &apiv1.Cluster{}
 	var err error
@@ -83,7 +83,7 @@ func PatchStatusCondition(namespace, clusterName string, env *TestingEnvironment
 	return nil
 }
 
-// GetOpenshiftVersion returns the current OCP version taken from env variables
+// GetOpenshiftVersion returns the current openshift version
 func GetOpenshiftVersion(env *TestingEnvironment) (semver.Version, error) {
 	client, err := dynamic.NewForConfig(env.RestClientConfig)
 	if err != nil {
@@ -135,7 +135,7 @@ func CreateSubscription(env *TestingEnvironment, channel string) error {
 	return err
 }
 
-// DeleteSubscription deletes the cloud-native-postgresql subscription
+// DeleteSubscription deletes the operator's subscription object
 func DeleteSubscription(env *TestingEnvironment) error {
 	u := &unstructured.Unstructured{}
 	u.SetName("cloudnative-pg")
@@ -154,8 +154,8 @@ func DeleteSubscription(env *TestingEnvironment) error {
 	return err
 }
 
-// DeleteCNPCRDs deletes the CRD's associated with cloud-native-postgresql
-func DeleteCNPCRDs(env *TestingEnvironment) error {
+// DeleteOperatorCRDs deletes the CRDs associated with the operator
+func DeleteOperatorCRDs(env *TestingEnvironment) error {
 	u := &unstructured.Unstructured{}
 	u.SetName("clusters.postgresql.cnpg.io")
 	u.SetGroupVersionKind(schema.GroupVersionKind{
@@ -185,7 +185,7 @@ func DeleteCNPCRDs(env *TestingEnvironment) error {
 	return err
 }
 
-// DeleteCSV will delete all cloud-native-postgresql CSVs
+// DeleteCSV will delete all operator's CSVs
 func DeleteCSV(env *TestingEnvironment) error {
 	ol := &unstructured.UnstructuredList{}
 	ol.SetGroupVersionKind(schema.GroupVersionKind{

@@ -266,17 +266,6 @@ func OperatorPodRestarted(operatorPod corev1.Pod) bool {
 	return restartCount != 0
 }
 
-// GetOperatorPodRestartedCount get the operator pod restart count
-func GetOperatorPodRestartedCount(operatorPod corev1.Pod) int {
-	restartCount := 0
-	for _, containerStatus := range operatorPod.Status.ContainerStatuses {
-		if containerStatus.Name == "manager" {
-			restartCount = int(containerStatus.RestartCount)
-		}
-	}
-	return restartCount
-}
-
 // GetOperatorPodName returns the name of the current operator pod
 // NOTE: will return an error if the pod is being deleted
 func GetOperatorPodName(env *TestingEnvironment) (string, error) {

@@ -43,7 +43,7 @@ func getOpenShiftResource(
 
 	list, err := client.Resource(resource).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("could note get resource: %v, %v", resource, err)
+		return nil, fmt.Errorf("could not get resource: %v, %v", resource, err)
 	}
 	return list, err
 }

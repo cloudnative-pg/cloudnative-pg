@@ -28,10 +28,6 @@ type TestEnvVendor string
 // define a specific cloud vendor
 const testVendorEnvVarName = "TEST_CLOUD_VENDOR"
 
-// ocpVersionEnvVarName is the env variable name which
-// holds the openshift cluster version
-const ocpVersionEnvVarName = "OCP_VERSION"
-
 // AKS azure cloud cluster
 var AKS = TestEnvVendor("aks")
 
@@ -63,10 +59,6 @@ func TestCloudVendor() (*TestEnvVendor, error) {
 			return vendor, nil
 		}
 		return nil, fmt.Errorf("unknown cloud vendor %s", vendorEnv)
-	}
-	ocpVersion, exists := os.LookupEnv(ocpVersionEnvVarName)
-	if exists && ocpVersion != "" {
-		return &OCP, nil
 	}
 
 	// if none above, it is a local
