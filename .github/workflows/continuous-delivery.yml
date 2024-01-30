@@ -1952,21 +1952,7 @@ jobs:
         name: Install OpenShift Cluster ${{ matrix.k8s_version }}
         run: |
           envsubst < hack/install-config.yaml.template > hack/install-config.yaml
-          openshift-install create cluster --dir hack/
-      -
-        name: Store OpenShift password
-        run: |
-          OPENSHIFT_PASSWORD="$(cat "$(pwd)"/hack/auth/kubeadmin-password)"
-          echo "::add-mask::$OPENSHIFT_PASSWORD"
-          echo "OPENSHIFT_PASSWORD=${OPENSHIFT_PASSWORD}" >> $GITHUB_ENV
-      -
-        name: Login into OpenShift Cluster
-        uses: redhat-actions/oc-login@v1
-        with:
-          openshift_server_url: "https://api.${{ env.CLUSTER_NAME }}.${{ env.AWS_BASE_DOMAIN }}:6443"
-          openshift_username: "kubeadmin"
-          openshift_password: ${{ env.OPENSHIFT_PASSWORD }}
-          insecure_skip_tls_verify: true
+          openshift-install create cluster --dir hack/ --log-level warn
       -
         name: Run E2E tests
         if: (always() && !cancelled())
