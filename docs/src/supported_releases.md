@@ -127,10 +127,10 @@ Our support window is roughly five months for each release branch (latest two
 minor releases, plus an additional month), given that we produce a new final
 release every two months.
 
-In the following diagram, `release-1.16` is an example of a release branch.
+In the following diagram, `release-1.22` is an example of a release branch.
 
-For example, if the latest release is `v1.16.0`, you can expect
-support for both `v1.16.0` and `v1.15.0`.
+For example, if the latest release is `v1.22.0`, you can expect
+support for both `v1.22.0` and `v1.21.0`.
 
 Only the last patch release of each branch is supported.
 
@@ -138,14 +138,14 @@ Only the last patch release of each branch is supported.
 ------+---------------------------------------------> main (trunk development)
        \             \
         \             \
-         \             \             v1.16.0
-          \             \            Jul 7, 2022                    ^
-           \             \----------+---------------> release-1.16  |
+         \             \             v1.22.0
+          \             \            Dec 21, 2023                   ^
+           \             \----------+---------------> release-1.22  |
             \                                                       | SUPPORTED
              \                                                      | RELEASES
-              \   v1.15.0                                           | = the two
-               \  Apr 21, 2022                                      |   last
-                +-------------------+---------------> release-1.15  |   releases
+              \   v1.21.0                                           | = the two
+               \  Oct 12, 2023                                      |   last
+                +-------------------+---------------> release-1.21  |   releases
                                                                     v
 ```
 
