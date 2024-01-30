@@ -115,8 +115,7 @@ func (data *data) RestoreWAL(
 			"sourceWALName", sourceWALName,
 			"destinationFileName", destinationFileName,
 		)
-		_, err := plugin.walClient.Restore(ctx, &request)
-		if err != nil {
+		if _, err := plugin.walClient.Restore(ctx, &request); err != nil {
 			contextLogger.Trace("WAL restore via plugin failed, trying next one", "err", err)
 			errorCollector = multierr.Append(errorCollector, err)
 		} else {
