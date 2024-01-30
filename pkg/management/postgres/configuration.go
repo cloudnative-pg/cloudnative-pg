@@ -280,8 +280,8 @@ func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (change
 	return changed, nil
 }
 
-// configurePostgresOverrideConfFile configures replication in the override.conf file
-// for PostgreSQL 12 and newer
+// configurePostgresOverrideConfFile writes the content of override.conf file, including
+// replication information
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
@@ -304,7 +304,7 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 		}
 	}
 
-	// Truncate the override file
+	// Ensure that override.conf file contains just the above options
 	err = fileutils.TruncateFile(targetFile)
 	if err != nil {
 		return false, err
@@ -470,6 +470,11 @@ func configurePostgresForImport(ctx context.Context, pgData string) (changed boo
 		"max_wal_senders":  "0",
 	}
 
+	// Ensure that override.conf file contains just the above options
+	err = fileutils.TruncateFile(targetFile)
+	if err != nil {
+		return false, err
+	}
 	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
 	if err != nil {
 		return false, err
