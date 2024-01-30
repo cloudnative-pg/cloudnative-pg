@@ -101,6 +101,7 @@ func reconcilePrimaryReplicationSlots(
 				contextLogger.Trace("Skipping deletion of replication slot because it is active",
 					"slot", slot)
 				needToReschedule = true
+				continue
 			}
 			contextLogger.Trace("Attempt to delete replication slot",
 				"slot", slot)
