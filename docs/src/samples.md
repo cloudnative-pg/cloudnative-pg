@@ -1,25 +1,30 @@
 # Examples
 
-In this section, you can find some examples of configuration files to set up
-your PostgreSQL Cluster.
+The examples show configuration files for setting up
+your PostgreSQL cluster.
 
 !!! Important
-    These are here for demonstration and experimentation
-    purposes, and can be executed on a personal Kubernetes cluster with Minikube
-    or Kind as described in the ["Quickstart"](quickstart.md).
+    These examples are for demonstration and experimentation
+    purposes. You can execute them on a personal Kubernetes cluster with Minikube
+    or Kind, as described in [Quick start](quickstart.md).
+
+!!! Seealso "Reference"
+    For a list of available options, see [API reference](cloudnative-pg.v1.md).
+
+## Basics
 
 Basic cluster
 :  [`cluster-example.yaml`](samples/cluster-example.yaml)
-   a basic example of  a cluster.
+   A basic example of a cluster.
 
 Custom cluster
 :  [`cluster-example-custom.yaml`](samples/cluster-example-custom.yaml)
-   a basic cluster that uses the default storage class and custom parameters for
+   A basic cluster that uses the default storage class and custom parameters for
    the `postgresql.conf` and `pg_hba.conf` files.
 
 Customized storage class
 : [`cluster-storage-class.yaml`](samples/cluster-storage-class.yaml):
-   a basic cluster that uses a specified storage class of `standard`.
+   A basic cluster that uses a specified storage class of `standard`.
 
 Customized storage class and backups
 :   **Prerequisites**: bucket storage should be available. The sample config is for AWS,
@@ -31,7 +36,7 @@ Backup
 :   **Prerequisites**: [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml)
     applied and Healthy
 : [`backup-example.yaml`](samples/backup-example.yaml):
-  an example of a backup that runs against the previous sample
+  An example of a backup that runs against the previous sample.
 
 Cluster with PVC (Persistent Volume Claim) configured
 : [`cluster-pvc-template.yaml`](samples/cluster-pvc-template.yaml):
@@ -54,16 +59,16 @@ Simple cluster with backup configured
 :   **Prerequisites**: The configuration assumes `minio` is running and working.
     Please update `backup.barmanObjectStore` with your `minio` parameters or your cloud solution
 :  [`cluster-example-with-backup.yaml`](samples/cluster-example-with-backup.yaml)
-   a basic cluster with backups configured.
+   A basic cluster with backups configured.
 
 Replica cluster via backup
 :   **Prerequisites**:
     [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml) applied and Healthy.
     And a backup
     [`cluster-example-trigger-backup.yaml`](samples/cluster-example-trigger-backup.yaml)
-    applied and Completed.
+    applied and completed.
 : [`cluster-example-replica-from-backup-simple.yaml`](samples/cluster-example-replica-from-backup-simple.yaml):
-   a replica cluster following a cluster with backup configured.
+   A replica cluster following a cluster with backup configured.
 
 Bootstrap cluster with SQL files
 : [`cluster-example-initdb-sql-refs.yaml`](samples/cluster-example-initdb-sql-refs.yaml):
@@ -79,7 +84,7 @@ Sample cluster with Secret and Configmap mounted using projected volume template
 
 Cluster with declarative role management
 : [`cluster-example-with-roles.yaml`](samples/cluster-example-with-roles.yaml):
-  declares a role with the `managed` stanza, includes password management with
-  kubernetes secrets
+  Declares a role with the `managed` stanza. Includes password management with
+  Kubernetes secrets.
 
-For a list of available options, please refer to the ["API Reference" page](cloudnative-pg.v1.md).
+For a list of available options, see [API reference](cloudnative-pg.v1.md).
