@@ -5,7 +5,7 @@ PostgreSQL can face on a Kubernetes cluster during its lifetime.
 
 !!! Important
     In case the failure scenario you are experiencing is not covered by this
-    section, please immediately contact EDB for support and assistance.
+    section, please immediately seek for [professional support](https://cloudnative-pg.io/support/).
 
 !!! Seealso "Postgres instance manager"
     Please refer to the ["Postgres instance manager" section](instance_manager.md)
@@ -173,8 +173,8 @@ In the case of undocumented failure, it might be necessary to intervene
 to solve the problem manually.
 
 !!! Important
-    In such cases, please do not perform any manual operation without the
-    support and assistance of EDB engineering team.
+    In such cases, please do not perform any manual operation without
+    [professional support](https://cloudnative-pg.io/support/).
 
 From version 1.11.0 of the operator, you can use the
 `cnpg.io/reconciliationLoop` annotation to temporarily disable the
