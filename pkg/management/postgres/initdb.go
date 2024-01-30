@@ -364,41 +364,53 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		return fmt.Errorf("could not apply the config")
 	}
 
+	// Prepare the managed configuration file (override.conf)
 	primaryConnInfo := info.GetPrimaryConnInfo()
 	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
+
 	// Write a special configuration for the import phase
 	if isImportBootstrap {
 		if _, err := configurePostgresForImport(ctx, info.PgData); err != nil {
 			return fmt.Errorf("while configuring Postgres for import: %w", err)
 		}
 	} else {
+		// Write standard configuration file
 		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}
 	}
 
-	return instance.WithActiveInstance(func() error {
+	// Configure the instance and run the logical import process
+	if err := instance.WithActiveInstance(func() error {
 		err = info.ConfigureNewInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}
-
 		if isImportBootstrap {
-			if err := executeLogicalImport(ctx, typedClient, instance, cluster); err != nil {
+			err = executeLogicalImport(ctx, typedClient, instance, cluster)
+			if err != nil {
 				return fmt.Errorf("while executing logical import: %w", err)
 			}
-			// Restore the configuration file
-			if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
-				return fmt.Errorf("while removing Postgres configuration for import: %w", err)
-			}
-			// Run fsync
-			if err := info.initdbSyncOnly(ctx); err != nil {
-				return err
-			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	// In case of import bootstrap, we restore the standard configuration file content
+	if isImportBootstrap {
+		// Restore the configuration file
+		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+			return fmt.Errorf("while removing Postgres configuration for import: %w", err)
 		}
 
-		return nil
-	})
+		// ... and then run fsync
+		if err := info.initdbSyncOnly(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func executeLogicalImport(

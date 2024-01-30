@@ -292,6 +292,7 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 
 	options := make(map[string]string)
 
+	// Write replication control as GUCs (from PostgreSQL 12 or above)
 	if major >= 12 {
 		options = map[string]string{
 			"restore_command": fmt.Sprintf(
@@ -303,6 +304,11 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 		}
 	}
 
+	// Truncate the override file
+	err = fileutils.TruncateFile(targetFile)
+	if err != nil {
+		return false, err
+	}
 	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
 	if err != nil {
 		return false, err
@@ -455,6 +461,7 @@ func configurePostgresForImport(ctx context.Context, pgData string) (changed boo
 	contextLogger := log.FromContext(ctx)
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
+	// Force the following GUCs to optmize the loading process
 	options := map[string]string{
 		"archive_mode":     "off",
 		"fsync":            "off",

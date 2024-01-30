@@ -286,6 +286,12 @@ func CreateEmptyFile(fileName string) error {
 	return file.Close()
 }
 
+// TruncateFile create an empty file or truncate it if exists
+func TruncateFile(fileName string) error {
+	_, err := WriteFileAtomic(fileName, []byte{}, 0o600)
+	return err
+}
+
 // EnsureParentDirectoryExist check if the directory containing a certain file
 // exist or not, and if is not existent will create the directory using
 // 0700 as permissions bits
