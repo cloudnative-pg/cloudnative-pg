@@ -43,7 +43,7 @@ Within the pipelines, images are scanned with:
 !!! Important
     All operand images are automatically rebuilt once a day by our pipelines in case
     of security updates at the base image and package level, providing **patch level updates**
-    for the container images that EDB distributes.
+    for the container images that the community distributes.
 
 The following guidelines and frameworks have been taken into account for container-level security:
 

@@ -636,4 +636,4 @@ before migrating to the target database in Kubernetes.
     Before you attempt a migration, you must test both the procedure
     and the applications. In particular, it is fundamental that you run the migration
     procedure as many times as needed to systematically measure the downtime of your
-    applications in production. Feel free to contact EDB for assistance.
+    applications in production.
