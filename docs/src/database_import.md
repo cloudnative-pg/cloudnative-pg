@@ -267,4 +267,3 @@ topic is beyond the scope of CloudNativePG, we recommend that you reduce
 unnecessary writes in the checkpoint area by tuning Postgres GUCs like
 `shared_buffers`, `max_wal_size`, `checkpoint_timeout` directly in the
 `Cluster` configuration.
-

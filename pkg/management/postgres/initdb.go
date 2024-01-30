@@ -368,15 +368,15 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 	primaryConnInfo := info.GetPrimaryConnInfo()
 	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
 
-	// Write a special configuration for the import phase
 	if isImportBootstrap {
+		// Write a special configuration for the import phase
 		if _, err := configurePostgresForImport(ctx, info.PgData); err != nil {
 			return fmt.Errorf("while configuring Postgres for import: %w", err)
 		}
 	} else {
-		// Write standard configuration file
+		// Write standard replication configuration
 		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
-			return fmt.Errorf("while configuring replica: %w", err)
+			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
 	}
 
@@ -386,12 +386,14 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}
+
 		if isImportBootstrap {
 			err = executeLogicalImport(ctx, typedClient, instance, cluster)
 			if err != nil {
 				return fmt.Errorf("while executing logical import: %w", err)
 			}
 		}
+
 		return nil
 	}); err != nil {
 		return err
@@ -399,14 +401,14 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 	// In case of import bootstrap, we restore the standard configuration file content
 	if isImportBootstrap {
-		// Restore the configuration file
+		/// Write standard replication configuration
 		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
-			return fmt.Errorf("while removing Postgres configuration for import: %w", err)
+			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
 
 		// ... and then run fsync
 		if err := info.initdbSyncOnly(ctx); err != nil {
-			return err
+			return fmt.Errorf("while flushing write cache to disk: %w", err)
 		}
 	}
 

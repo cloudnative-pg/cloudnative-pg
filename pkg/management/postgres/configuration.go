@@ -305,11 +305,7 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 	}
 
 	// Ensure that override.conf file contains just the above options
-	err = fileutils.TruncateFile(targetFile)
-	if err != nil {
-		return false, err
-	}
-	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.WritePostgresConfigurationFile(targetFile, options)
 	if err != nil {
 		return false, err
 	}
@@ -471,11 +467,7 @@ func configurePostgresForImport(ctx context.Context, pgData string) (changed boo
 	}
 
 	// Ensure that override.conf file contains just the above options
-	err = fileutils.TruncateFile(targetFile)
-	if err != nil {
-		return false, err
-	}
-	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.WritePostgresConfigurationFile(targetFile, options)
 	if err != nil {
 		return false, err
 	}
