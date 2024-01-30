@@ -57,9 +57,9 @@ solution, especially if you manage very large databases.
 
 ## Benchmarking CloudNativePG
 
-Before deploying the database in production, we recommend that you benchmark 
-CloudNativePG in a controlled Kubernetes environment. Follow
-the guidelines in [Benchmarking](benchmarking.md).
+Before deploying the database in production, we recommend that you benchmark
+CloudNativePG in a controlled Kubernetes environment. Follow the guidelines in
+[Benchmarking](benchmarking.md).
 
 Briefly, we recommend operating at two levels:
 
@@ -70,15 +70,15 @@ Briefly, we recommend operating at two levels:
   distributed with PostgreSQL
 
 !!! Important
-    You must measure both the storage and database performance
-    before putting the database into production. These results
-    are extremely valuable not just in the planning phase (for example, capacity planning).
-    They are also valuable in the production lifecycle, especially in emergency situations
-    when you don't have time to run this kind of test. Databases
-    change and evolve over time, and so does the distribution of data, potentially affecting
-    performance. Knowing the theoretical maximum throughput of sequential reads or
-    writes is extremely useful in those situations. This is true especially in
-    shared-nothing contexts, where results don't vary due to the influence of external workloads.
+    You must measure both the storage and database performance before putting
+    the database into production. These results are extremely valuable not just in
+    the planning phase (for example, capacity planning). They are also valuable in
+    the production lifecycle, particularly in emergency situations when you don't
+    have time to run this kind of test. Databases change and evolve over time, and
+    so does the distribution of data, potentially affecting performance. Knowing
+    the theoretical maximum throughput of sequential reads or writes is extremely
+    useful in those situations. This is true especially in shared-nothing contexts,
+    where results don't vary due to the influence of external workloads.
 
     Know your system: benchmark it.
 
@@ -90,28 +90,28 @@ information about this important security feature.
 
 ## Persistent Volume Claim (PVC)
 
-The operator creates a PVC for each PostgreSQL
-instance, with the goal of storing the `PGDATA`. It then mounts it into each pod.
+The operator creates a PVC for each PostgreSQL instance, with the goal of
+storing the `PGDATA`. It then mounts it into each pod.
 
 Additionally, it supports creating clusters with:
 
-- A separate PVC on which to store PostgreSQL WAL, as
-  explained in [Volume for WAL](#volume-for-wal)
+- A separate PVC on which to store PostgreSQL WAL, as explained in
+  [Volume for WAL](#volume-for-wal)
 - Additional separate volumes reserved for PostgreSQL tablespaces, as explained
   in [Tablespaces](tablespaces.md)
 
-In CloudNativePG, the volumes attached to a single PostgreSQL instance
-are defined as a *PVC group*.
+In CloudNativePG, the volumes attached to a single PostgreSQL instance are
+defined as a *PVC group*.
 
 ## Configuration via a storage class
 
 !!! Important
     CloudNativePG was designed to work interchangeably with all storage classes.
-    As usual, we recommend properly benchmarking the storage class
-    in a controlled environment before deploying to production.
+    As usual, we recommend properly benchmarking the storage class in a
+    controlled environment before deploying to production.
 
-The easiest way to configure the storage for a PostgreSQL class is to
-request storage of a certain size, like in the following example:
+The easiest way to configure the storage for a PostgreSQL class is to request
+storage of a certain size, like in the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -124,9 +124,10 @@ spec:
     size: 1Gi
 ```
 
-Using the previous configuration, the generated PVCs are satisfied by the default storage
-class. If the target Kubernetes cluster has no default storage class, or even if you need your PVCs
-to be satisfied by a known storage class, you can set it into the custom resource:
+Using the previous configuration, the generated PVCs are satisfied by the
+default storage class. If the target Kubernetes cluster has no default storage
+class, or even if you need your PVCs to be satisfied by a known storage class,
+you can set it into the custom resource:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -166,15 +167,17 @@ spec:
 
 ## Volume for WAL
 
-By default, PostgreSQL stores all its data in the so-called `PGDATA` (a directory).
-One of the core directories inside `PGDATA` is `pg_wal`, which contains the log of transactional
-changes that occurred in the database, in the form of segment files. (`pq_wal` is historically
-known as `pg_xlog` in PostgreSQL.)
+By default, PostgreSQL stores all its data in the so-called `PGDATA` (a
+directory). One of the core directories inside `PGDATA` is `pg_wal`, which
+contains the log of transactional changes that occurred in the database, in the
+form of segment files. (`pg_wal` is historically known as `pg_xlog` in
+PostgreSQL.)
 
 !!! Info
     Normally, each segment is 16MB in size, but you can configure the size
-    using the `walSegmentSize` option. This option is applied at cluster initialization time, as
-    described in [Bootstrap an empty cluster](bootstrap.md#bootstrap-an-empty-cluster-initdb).
+    using the `walSegmentSize` option. This option is applied at cluster
+    initialization time, as described in
+    [Bootstrap an empty cluster](bootstrap.md#bootstrap-an-empty-cluster-initdb).
 
 In most cases, having `pg_wal` on the same volume where `PGDATA`
 resides is fine. However, having WALs stored in a separate
@@ -198,7 +201,6 @@ volume has a few benefits:
 - **Better I/O monitoring** – You can constantly monitor the load and disk usage
   on both `PGDATA` and `pg_wal`. You can also set alerts that notify you in case,
   for example, `PGDATA` requires resizing.
-
 
 !!! Seealso "Write-Ahead Log (WAL)"
     See [Reliability and the Write-Ahead Log](https://www.postgresql.org/docs/current/wal.html)
@@ -246,19 +248,19 @@ true
 
 ### Using the volume expansion Kubernetes feature
 
-Given the storage class supports volume expansion, you can change the size requirement
-of the `Cluster`, and the operator applies the change to every PVC.
+Given the storage class supports volume expansion, you can change the size
+requirement of the `Cluster`, and the operator applies the change to every PVC.
 
 If the `StorageClass` supports [online volume resizing](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#resizing-an-in-use-persistentvolumeclaim),
-the change is immediately applied to the pods. If the underlying storage class doesn't support
-that, you must delete the pod to trigger the resize.
+the change is immediately applied to the pods. If the underlying storage class
+doesn't support that, you must delete the pod to trigger the resize.
 
-The best way to proceed is to delete one pod at a time, starting from replicas and waiting
-for each pod to be back up.
+The best way to proceed is to delete one pod at a time, starting from replicas
+and waiting for each pod to be back up.
 
 ### Expanding PVC volumes on AKS
 
-Currently, [Azure can't resize the PVC's volume without restarting the pod](https://github.com/Azure/AKS/issues/1477).
+Currently, [Azure can resize the PVC's volume without restarting the pod only on specific regions](https://learn.microsoft.com/en-us/azure/aks/azure-disk-csi#resize-a-persistent-volume-without-downtime).
 CloudNativePG has overcome this limitation through the
 `ENABLE_AZURE_PVC_UPDATES` environment variable in the
 [operator configuration](operator_conf.md#available-options).
@@ -270,8 +272,8 @@ volume in AKS.
 
 #### Workaround for volume expansion on AKS
 
-You can manually resize a PVC on AKS.
-As an example, suppose you have a cluster with three replicas:
+You can manually resize a PVC on AKS. As an example, suppose you have a cluster
+with three replicas:
 
 ```
 $ kubectl get pods
@@ -283,11 +285,14 @@ cluster-example-3   1/1     Running   0          2m10s
 
 An Azure disk can be expanded only while in "unattached" state, as described in the
 [Kubernetes documentation](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/known-issues/sizegrow.md).  <!-- wokeignore:rule=master -->
-This means that, to resize a disk used by a PostgreSQL cluster, you need to perform a manual rollout,
-first cordoning the node that hosts the pod using the PVC bound to the disk. This prevents the operator
-from re-creating the pod and immediately reattaching it to its PVC before the background disk resizing is complete.
+This means that, to resize a disk used by a PostgreSQL cluster, you need to
+perform a manual rollout, first cordoning the node that hosts the pod using the
+PVC bound to the disk. This prevents the operator from re-creating the pod and
+immediately reattaching it to its PVC before the background disk resizing is
+complete.
 
-First, edit the cluster definition, applying the new size. In this example, the new size is `2Gi`.
+First, edit the cluster definition, applying the new size. In this example, the
+new size is `2Gi`.
 
 ```
 apiVersion: postgresql.cnpg.io/v1
@@ -302,8 +307,9 @@ spec:
     size: 2Gi
 ```
 
-Assuming the `cluster-example-1` pod is the cluster's primary, you can proceed with the replicas first.
-For example, start with cordoning the Kubernetes node that hosts the `cluster-example-3` pod:
+Assuming the `cluster-example-1` pod is the cluster's primary, you can proceed
+with the replicas first. For example, start with cordoning the Kubernetes node
+that hosts the `cluster-example-3` pod:
 
 ```
 kubectl cordon <node of cluster-example-3>
@@ -341,7 +347,8 @@ cluster-example-3   0/1     Init:0/1   0          12m
 cluster-example-3   1/1     Running   0          12m
 ```
 
-Verify the PVC expansion by running the following command, which returns `2Gi` as configured:
+Verify the PVC expansion by running the following command, which returns `2Gi`
+as configured:
 
 ```
 kubectl get pvc cluster-example-3 -o=jsonpath='{.status.capacity.storage}'
@@ -350,18 +357,20 @@ kubectl get pvc cluster-example-3 -o=jsonpath='{.status.capacity.storage}'
 You can repeat these steps for the remaining pods.
 
 !!! Important
-    Leave the resizing of the disk associated with the primary instance as the last disk,
-    after promoting through a switchover a new resized pod, using `kubectl cnpg promote`.
-    For example, use `kubectl cnpg promote cluster-example 3` to promote `cluster-example-3` to primary.
+    Leave the resizing of the disk associated with the primary instance as the
+    last disk, after promoting through a switchover a new resized pod, using
+    `kubectl cnpg promote`. For example, use `kubectl cnpg promote cluster-example 3`
+    to promote `cluster-example-3` to primary.
 
 ### Re-creating storage
 
-If the storage class doesn't support volume expansion, you can still regenerate your cluster
-on different PVCs. Allocate new PVCs with increased storage and then move the
-database there. This operation is feasible only when the cluster contains more than one node.
+If the storage class doesn't support volume expansion, you can still regenerate
+your cluster on different PVCs. Allocate new PVCs with increased storage and
+then move the database there. This operation is feasible only when the cluster
+contains more than one node.
 
-While you do that, you need to prevent the operator from changing the existing PVC
-by disabling the `resizeInUseVolumes` flag, like in the following example:
+While you do that, you need to prevent the operator from changing the existing
+PVC by disabling the `resizeInUseVolumes` flag, like in the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -377,9 +386,9 @@ spec:
     resizeInUseVolumes: False
 ```
 
-To move the entire cluster to a different storage area, you need to re-create all the PVCs and
-all the pods. Suppose you have a cluster with three replicas, like in the following
-example:
+To move the entire cluster to a different storage area, you need to re-create
+all the PVCs and all the pods. Suppose you have a cluster with three replicas,
+like in the following example:
 
 ```
 $ kubectl get pods
@@ -389,8 +398,9 @@ cluster-example-2   1/1     Running   0          2m22s
 cluster-example-3   1/1     Running   0          2m10s
 ```
 
-To re-create the cluster using different PVCs, you can edit the cluster definition to disable
-`resizeInUseVolumes`. Then re-create every instance in a different PVC.
+To re-create the cluster using different PVCs, you can edit the cluster
+definition to disable `resizeInUseVolumes`. Then re-create every instance in a
+different PVC.
 
 For example, re-create the storage for `cluster-example-3`:
 
@@ -399,9 +409,10 @@ $ kubectl delete pvc/cluster-example-3 pod/cluster-example-3
 ```
 
 !!! Important
-    If you created a dedicated WAL volume, both PVCs must be deleted during this process.
-    The same procedure applies if you want to regenerate the WAL volume PVC. You can do this
-    by also disabling `resizeInUseVolumes` for the `.spec.walStorage` section.
+    If you created a dedicated WAL volume, both PVCs must be deleted during
+    this process. The same procedure applies if you want to regenerate the WAL
+    volume PVC. You can do this by also disabling `resizeInUseVolumes` for the
+    `.spec.walStorage` section.
 
 For example, if a PVC dedicated to WAL storage is present:
 
@@ -423,9 +434,10 @@ cluster-example-4              1/1     Running     0          10s
 
 ## Static provisioning of persistent volumes
 
-CloudNativePG was designed to work with dynamic volume provisioning. This capability
-allows storage volumes to be created on demand when requested by
-users by way of storage classes and PVC templates. See [Re-creating storage](#re-creating-storage).
+CloudNativePG was designed to work with dynamic volume provisioning. This
+capability allows storage volumes to be created on demand when requested by
+users by way of storage classes and PVC templates.
+See [Re-creating storage](#re-creating-storage).
 
 However, in some cases, Kubernetes administrators prefer to manually create
 storage volumes and then create the related `PersistentVolume` objects for
@@ -433,11 +445,10 @@ their representation inside the Kubernetes cluster. This is also known as
 *pre-provisioning* of volumes.
 
 !!! Important
-    We recommend that you avoid pre-provisioning volumes, as it
-    has an effect on the high availability and self-healing capabilities
-    of the operator. It breaks the fully declarative model on which
-    CloudNativePG was built.
-
+    We recommend that you avoid pre-provisioning volumes, as it has an effect
+    on the high availability and self-healing capabilities of the operator. It
+    breaks the fully declarative model on which CloudNativePG was built.
+    
 To use a pre-provisioned volume in CloudNativePG:
 
 1. Manually create the volume outside Kubernetes.
@@ -450,21 +461,22 @@ To use a pre-provisioned volume in CloudNativePG:
    and enable CloudNativePG to create the needed `PersistentVolumeClaim`.
 
 !!! Warning
-    With static provisioning, it's your responsibility to ensure that 
-    Postgres pods can be correctly scheduled
-    by Kubernetes where a pre-provisioned volume exists. (The scheduling configuration is based
-    on the affinity rules of your cluster.) Make sure you check
-    for any pods stuck in `Pending` after you deploy the cluster. 
-    If the condition persists, investigate why it's happening.
+    With static provisioning, it's your responsibility to ensure that Postgres
+    pods can be correctly scheduled by Kubernetes where a pre-provisioned volume
+    exists. (The scheduling configuration is based on the affinity rules of your
+    cluster.) Make sure you check for any pods stuck in `Pending` after you deploy
+    the cluster. If the condition persists, investigate why it's happening.
 
 ## Block storage considerations (Ceph/ Longhorn)
 
-Most block storage solutions in Kubernetes recommend having multiple replicas of a volume
-to improve resiliency. This works well for workloads that don't have resiliency built into the 
-application. However, CloudNativePG has this resiliency built directly into the Postgres `Cluster`
-through the number of instances and the persistent volumes that are attached to them. 
+Most block storage solutions in Kubernetes recommend having multiple replicas
+of a volume to improve resiliency. This works well for workloads that don't
+have resiliency built into the application. However, CloudNativePG has this
+resiliency built directly into the Postgres `Cluster` through the number of
+instances and the persistent volumes that are attached to them. 
 
-In these cases, it makes sense to define the storage class used by the Postgres clusters
-as one replica. By having additional replicas defined in the storage solution (like 
-Longhorn and Ceph), you might incur what's known as write amplification, unnecessarily
-increasing disk I/O and space used.
+In these cases, it makes sense to define the storage class used by the Postgres
+clusters as one replica. By having additional replicas defined in the storage
+solution (like Longhorn and Ceph), you might incur what's known as write
+amplification, unnecessarily increasing disk I/O and space used.
+
