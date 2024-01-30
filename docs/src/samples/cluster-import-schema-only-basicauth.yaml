@@ -20,8 +20,8 @@ spec:
     - name: cluster-example
       connectionParameters:
         host: cluster-example-rw.default.svc
-        user: postgres
-        dbname: postgres
+        user: app
+        dbname: app
       password:
-        name: cluster-example-superuser
+        name: cluster-example-app
         key: password
