@@ -95,6 +95,19 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 	return lines, nil
 }
 
+// WritePostgresConfigurationFile replaces the content of a Postgres configuration file
+// with the provide options
+func WritePostgresConfigurationFile(
+	fileName string,
+	options map[string]string,
+) (changed bool, err error) {
+	lines, err := UpdateConfigurationContents(nil, options)
+	if err != nil {
+		return false, fmt.Errorf("error while writing configuration to %v: %w", fileName, err)
+	}
+	return fileutils.WriteLinesToFile(fileName, lines)
+}
+
 // RemoveOptionsFromConfigurationContents deletes all the lines containing one of the given options
 // from the provided configuration content
 func RemoveOptionsFromConfigurationContents(lines []string, options ...string) []string {
