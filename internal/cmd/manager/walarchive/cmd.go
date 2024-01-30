@@ -255,9 +255,7 @@ func archiveWALViaPlugins(
 		contextLogger.Error(err, "Error loading plugins while archiving a WAL")
 		return err
 	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
+	defer pluginClient.Close(ctx)
 
 	return pluginClient.ArchiveWAL(ctx, cluster, walName)
 }
