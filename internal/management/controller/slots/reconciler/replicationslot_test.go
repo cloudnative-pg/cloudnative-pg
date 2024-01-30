@@ -52,7 +52,7 @@ func (fk fakeReplicationSlotManager) Delete(_ context.Context, slot infrastructu
 	if fk.triggerDeleteError {
 		return errors.New("triggered delete error")
 	}
-	delete(fk.replicationSlots, fakeSlot{name: slot.SlotName})
+	delete(fk.replicationSlots, fakeSlot{name: slot.SlotName, active: slot.Active})
 	return nil
 }
 
