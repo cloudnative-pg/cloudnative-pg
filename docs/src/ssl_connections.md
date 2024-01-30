@@ -4,16 +4,19 @@
     See [Certificates](certificates.md)
     for more details on how CloudNativePG supports TLS certificates.
 
-The CloudNativePG operator was designed to work with TLS/SSL for both encryption in transit and
-authentication on the server and client sides. Clusters created using the CNPG operator come with a certification
-authority (CA) to create and sign TLS client certificates. Using the cnpg plugin for kubectl, you can
-issue a new TLS client certificate for authenticating a user instead of using passwords.
+The CloudNativePG operator was designed to work with TLS/SSL for both
+encryption in transit and authentication on the server and client sides.
+Clusters created using the CNPG operator come with a certification authority
+(CA) to create and sign TLS client certificates. Using the cnpg plugin for
+kubectl, you can issue a new TLS client certificate for authenticating a user
+instead of using passwords.
 
 These instructions for authenticating using TLS/SSL certificates assume you
-installed a cluster using the [cluster-example-pg-hba.yaml](samples/cluster-example-pg-hba.yaml)
-manifest. According to the convention-over-configuration paradigm, that file creates an `app`
-database that's owned by a user called app. (You can change this convention by way of the `initdb`
-configuration in the `bootstrap` section.)
+installed a cluster using the
+[cluster-example-pg-hba.yaml](samples/cluster-example-pg-hba.yaml) manifest.
+According to the convention-over-configuration paradigm, that file creates an
+`app` database that's owned by a user called app. (You can change this
+convention by way of the `initdb` configuration in the `bootstrap` section.)
 
 ## Issuing a new certificate
 
@@ -21,7 +24,8 @@ configuration in the `bootstrap` section.)
     See the [Certificates in the CloudNativePG plugin](kubectl-plugin.md#certificates)
     content for details on how to use the plugin for kubectl.
 
-You can create a certificate for the app user in the `cluster-example` PostgreSQL cluster as follows:
+You can create a certificate for the app user in the `cluster-example`
+PostgreSQL cluster as follows:
 
 ```shell
 kubectl cnpg certificate cluster-app \
@@ -55,17 +59,18 @@ Certificate:
     Subject: CN = app
 ```
 
-As you can see, TLS client certificates by default are created with 90 days of validity and with a simple CN that
-corresponds to the username in PostgreSQL. This is necessary to leverage the `cert` authentication method for `hostssl`
+As you can see, TLS client certificates by default are created with 90 days of
+validity and with a simple CN that corresponds to the username in PostgreSQL.
+This is necessary to leverage the `cert` authentication method for `hostssl`
 entries in `pg_hba.conf`.
 
 ## Testing the connection via a TLS certificate
 
-Next, test this client certificate by configuring a demo client application that connects to your CloudNativePG
-cluster.
+Next, test this client certificate by configuring a demo client application
+that connects to your CloudNativePG cluster.
 
-The following manifest, called `cert-test.yaml`, creates a demo pod with a test application
-in the same namespace where your database cluster is running:
+The following manifest, called `cert-test.yaml`, creates a demo pod with a test
+application in the same namespace where your database cluster is running:
 
 ```yaml
 apiVersion: apps/v1
@@ -126,13 +131,15 @@ This pod mounts secrets managed by the CloudNativePG operator, including:
 * `sslrootcert` – The TLS CA certificate that signed the certificate on
   the server to use to verify the identity of the instances.
 
-They're used to create the default resources that psql (and other libpq-based applications, like pgbench)
-requires to establish a TLS-encrypted connection to the Postgres database.
+They're used to create the default resources that psql (and other libpq-based
+applications, like pgbench) requires to establish a TLS-encrypted connection to
+the Postgres database.
 
-By default, psql searches for certificates in the `~/.postgresql` directory of the current user, but you can use
-the `sslkey`, `sslcert`, and `sslrootcert` options to point libpq to the actual location of the cryptographic material.
-The content of these files is gathered from the secrets that were previously created by using the cnpg plugin for
-kubectl.
+By default, psql searches for certificates in the `~/.postgresql` directory of
+the current user, but you can use the `sslkey`, `sslcert`, and `sslrootcert`
+options to point libpq to the actual location of the cryptographic material.
+The content of these files is gathered from the secrets that were previously
+created by using the cnpg plugin for kubectl.
 
 Deploy the application:
 
@@ -140,14 +147,15 @@ Deploy the application:
 kubectl create -f cert-test.yaml
 ```
 
-Then use the created pod as the PostgreSQL client to validate the SSL connection and
-authentication using the TLS certificates you just created.
+Then use the created pod as the PostgreSQL client to validate the SSL
+connection and authentication using the TLS certificates you just created.
 
-A readiness probe was configured to ensure that the application is ready when the database server can be
-reached.
+A readiness probe was configured to ensure that the application is ready when
+the database server can be reached.
 
-You can verify that the connection works. To do so, execute an interactive `bash` inside the pod's container to run psql
-using the necessary options. The PostgreSQL server is exposed through the read-write Kubernetes service. Point
+You can verify that the connection works. To do so, execute an interactive
+`bash` inside the pod's container to run psql using the necessary options. The
+PostgreSQL server is exposed through the read-write Kubernetes service. Point
 the psql command to connect to this service:
 
 ```shell
@@ -179,6 +187,7 @@ to `TLSv1.3`.
     these values aren't set,  and the default values are used.
 
 This assumes that the PostgreSQL operand images include an OpenSSL library that
-supports the `TLSv1.3` version. If not, or if your client applications need a lower version number, you need to
-manually configure it in the PostgreSQL configuration as any other Postgres
-GUC.
+supports the `TLSv1.3` version. If not, or if your client applications need a
+lower version number, you need to manually configure it in the PostgreSQL
+configuration as any other Postgres GUC.
+

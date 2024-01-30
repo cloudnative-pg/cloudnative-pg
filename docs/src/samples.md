@@ -36,15 +36,17 @@ your PostgreSQL cluster.
 
 **Bootstrap cluster with SQL files**
 : [`cluster-example-initdb-sql-refs.yaml`](samples/cluster-example-initdb-sql-refs.yaml):
-   A cluster example that executes a set of queries defined in a secret and a ConfigMap right after the database is created.
+   A cluster example that executes a set of queries defined in a secret and a
+   `ConfigMap` right after the database is created.
 
 **Sample cluster with customized `pg_hba` configuration**
 : [`cluster-example-pg-hba.yaml`](samples/cluster-example-pg-hba.yaml):
   A basic cluster that enables the user app to authenticate using certificates.
 
-**Sample cluster with Secret and Configmap mounted using projected volume template**
+**Sample cluster with Secret and ConfigMap mounted using projected volume template**
 : [`cluster-example-projected-volume.yaml`](samples/cluster-example-projected-volume.yaml)
-  A basic cluster with the existing secret and ConfigMap mounted into Postgres pod using projected volume mount.
+  A basic cluster with the existing `Secret` and `ConfigMap` mounted into Postgres
+  pod using projected volume mount.
 
 ## Backups
 
@@ -70,8 +72,8 @@ your PostgreSQL cluster.
 
 **Replica cluster by way of backup from an object store**
 :   *Prerequisites*:
-    [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml) applied and healthy
-    and a backup
+    [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml)
+    applied and healthy, and a backup
     [`cluster-example-trigger-backup.yaml`](samples/cluster-example-trigger-backup.yaml)
     applied and completed.
 : [`cluster-example-replica-from-backup-simple.yaml`](samples/cluster-example-replica-from-backup-simple.yaml):
@@ -79,8 +81,8 @@ your PostgreSQL cluster.
 
 **Replica cluster by way of volume snapshot**
 :   *Prerequisites*:
-    [`cluster-example-with-volume-snapshot.yaml`](samples/cluster-example-with-volume-snapshot.yaml) applied and healthy
-    and a volume snapshot
+    [`cluster-example-with-volume-snapshot.yaml`](samples/cluster-example-with-volume-snapshot.yaml)
+    applied and healthy, and a volume snapshot
     [`backup-with-volume-snapshot.yaml`](samples/backup-with-volume-snapshot.yaml)
     applied and completed.
 : [`cluster-example-replica-from-volume-snapshot.yaml`](samples/cluster-example-replica-from-volume-snapshot.yaml):
