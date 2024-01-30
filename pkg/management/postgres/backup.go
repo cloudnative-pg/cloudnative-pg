@@ -68,8 +68,9 @@ type BackupCommand struct {
 	Capabilities *barmanCapabilities.Capabilities
 }
 
-// NewBackupCommand initializes a BackupCommand object
-func NewBackupCommand(
+// NewBarmanBackupCommand initializes a BackupCommand object, taking a physical
+// backup using Barman Cloud
+func NewBarmanBackupCommand(
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 	client client.Client,

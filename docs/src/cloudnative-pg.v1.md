@@ -406,6 +406,41 @@ the selected PostgreSQL instance</p>
 
 
 
+## BackupPluginConfiguration     {#postgresql-cnpg-io-v1-BackupPluginConfiguration}
+
+
+**Appears in:**
+
+- [BackupSpec](#postgresql-cnpg-io-v1-BackupSpec)
+
+- [ScheduledBackupSpec](#postgresql-cnpg-io-v1-ScheduledBackupSpec)
+
+
+<p>BackupPluginConfiguration contains the backup configuration used by
+the backup plugin</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the name of the plugin managing this backup</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Parameters are the configuration parameters passed to the backup
+plugin for this backup</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## BackupSnapshotElementStatus     {#postgresql-cnpg-io-v1-BackupSnapshotElementStatus}
 
 
@@ -539,8 +574,15 @@ standby, if available.</p>
 <a href="#postgresql-cnpg-io-v1-BackupMethod"><i>BackupMethod</i></a>
 </td>
 <td>
-   <p>The backup method to be used, possible options are <code>barmanObjectStore</code>
-and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
+   <p>The backup method to be used, possible options are <code>barmanObjectStore</code>,
+<code>volumeSnapshot</code> or <code>plugin</code>. Defaults to: <code>barmanObjectStore</code>.</p>
+</td>
+</tr>
+<tr><td><code>pluginConfiguration</code><br/>
+<a href="#postgresql-cnpg-io-v1-BackupPluginConfiguration"><i>BackupPluginConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration parameters passed to the plugin managing this backup</p>
 </td>
 </tr>
 <tr><td><code>online</code><br/>
@@ -3249,6 +3291,22 @@ plugin</p>
 plugin regarding the reconciler</p>
 </td>
 </tr>
+<tr><td><code>walCapabilities</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>WalCapabilities are the list of capabilities of the
+plugin regarding the WAL management</p>
+</td>
+</tr>
+<tr><td><code>backupCapabilities</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>BackupCapabilities are the list of capabilities of the
+plugin regarding the Backup management</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -4157,6 +4215,13 @@ standby, if available.</p>
 <td>
    <p>The backup method to be used, possible options are <code>barmanObjectStore</code>
 and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
+</td>
+</tr>
+<tr><td><code>pluginConfiguration</code><br/>
+<a href="#postgresql-cnpg-io-v1-BackupPluginConfiguration"><i>BackupPluginConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration parameters passed to the plugin managing this backup</p>
 </td>
 </tr>
 <tr><td><code>online</code><br/>

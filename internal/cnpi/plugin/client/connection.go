@@ -24,6 +24,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/cloudnative-pg/cnpg-i/pkg/backup"
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
@@ -77,6 +78,7 @@ type pluginData struct {
 	operatorClient  operator.OperatorClient
 	lifecycleClient lifecycle.LifecycleClient
 	walClient       wal.WALClient
+	backupClient    backup.BackupClient
 
 	name                  string
 	version               string
@@ -84,6 +86,7 @@ type pluginData struct {
 	operatorCapabilities  []operator.OperatorCapability_RPC_Type
 	walCapabilities       []wal.WALCapability_RPC_Type
 	lifecycleCapabilities []*lifecycle.LifecycleCapabilities
+	backupCapabilities    []backup.BackupCapability_RPC_Type
 }
 
 // NewUnixSocketClient creates a new CNPI client discovering plugins
@@ -170,6 +173,14 @@ func (data *data) loadPlugin(ctx context.Context, name string) (pluginData, erro
 		}
 	}
 
+	// If the plugin implements the backup service, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_BACKUP_SERVICE) {
+		if err = result.loadBackupCapabilities(ctx); err != nil {
+			return pluginData{}, err
+		}
+	}
+
 	return result, nil
 }
 
@@ -209,6 +220,7 @@ func newPluginDataFromConnection(ctx context.Context, connection connectionHandl
 	result.operatorClient = operator.NewOperatorClient(connection)
 	result.lifecycleClient = lifecycle.NewLifecycleClient(connection)
 	result.walClient = wal.NewWALClient(connection)
+	result.backupClient = backup.NewBackupClient(connection)
 
 	return result, err
 }
@@ -287,7 +299,28 @@ func (pluginData *pluginData) loadWALCapabilities(ctx context.Context) error {
 	return nil
 }
 
-// Metadata extracts the plugin metadata reading from
+func (pluginData *pluginData) loadBackupCapabilities(ctx context.Context) error {
+	var backupCapabilitiesResponse *backup.BackupCapabilitiesResult
+	var err error
+
+	if backupCapabilitiesResponse, err = pluginData.backupClient.GetCapabilities(
+		ctx,
+		&backup.BackupCapabilitiesRequest{},
+	); err != nil {
+		return fmt.Errorf("while querying plugin operator capabilities: %w", err)
+	}
+
+	pluginData.backupCapabilities = make(
+		[]backup.BackupCapability_RPC_Type,
+		len(backupCapabilitiesResponse.Capabilities))
+	for i := range pluginData.backupCapabilities {
+		pluginData.backupCapabilities[i] = backupCapabilitiesResponse.Capabilities[i].GetRpc().Type
+	}
+
+	return nil
+}
+
+// Metadata extracts the plugin plugin metadata reading from
 // the internal metadata
 func (pluginData *pluginData) Metadata() Metadata {
 	result := Metadata{
@@ -296,6 +329,7 @@ func (pluginData *pluginData) Metadata() Metadata {
 		Capabilities:         make([]string, len(pluginData.capabilities)),
 		OperatorCapabilities: make([]string, len(pluginData.operatorCapabilities)),
 		WALCapabilities:      make([]string, len(pluginData.walCapabilities)),
+		BackupCapabilities:   make([]string, len(pluginData.backupCapabilities)),
 	}
 
 	for i := range pluginData.capabilities {
@@ -308,6 +342,10 @@ func (pluginData *pluginData) Metadata() Metadata {
 
 	for i := range pluginData.walCapabilities {
 		result.WALCapabilities[i] = pluginData.walCapabilities[i].String()
+	}
+
+	for i := range pluginData.backupCapabilities {
+		result.BackupCapabilities[i] = pluginData.backupCapabilities[i].String()
 	}
 
 	return result

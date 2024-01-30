@@ -4789,6 +4789,12 @@ spec:
                 items:
                   description: PluginStatus is the status of a loaded plugin
                   properties:
+                    backupCapabilities:
+                      description: BackupCapabilities are the list of capabilities
+                        of the plugin regarding the Backup management
+                      items:
+                        type: string
+                      type: array
                     capabilities:
                       description: Capabilities are the list of capabilities of the
                         plugin
@@ -4810,7 +4816,7 @@ spec:
                       type: string
                     walCapabilities:
                       description: WALCapabilities are the list of capabilities of
-                        the plugin regarding the reconciler
+                        the plugin regarding the WAL management
                       items:
                         type: string
                       type: array

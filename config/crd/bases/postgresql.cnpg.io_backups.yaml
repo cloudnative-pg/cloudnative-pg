@@ -62,11 +62,12 @@ spec:
                 type: object
               method:
                 default: barmanObjectStore
-                description: 'The backup method to be used, possible options are `barmanObjectStore`
-                  and `volumeSnapshot`. Defaults to: `barmanObjectStore`.'
+                description: 'The backup method to be used, possible options are `barmanObjectStore`,
+                  `volumeSnapshot` or `plugin`. Defaults to: `barmanObjectStore`.'
                 enum:
                 - barmanObjectStore
                 - volumeSnapshot
+                - plugin
                 type: string
               online:
                 description: Whether the default type of backup with volume snapshots
@@ -99,6 +100,22 @@ spec:
                       useful to run pg_switch_wal on the primary in order to trigger
                       an immediate segment switch.
                     type: boolean
+                type: object
+              pluginConfiguration:
+                description: Configuration parameters passed to the plugin managing
+                  this backup
+                properties:
+                  name:
+                    description: Name is the name of the plugin managing this backup
+                    type: string
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: Parameters are the configuration parameters passed
+                      to the backup plugin for this backup
+                    type: object
+                required:
+                - name
                 type: object
               target:
                 description: The policy to decide which instance should perform this
