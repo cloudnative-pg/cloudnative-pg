@@ -775,3 +775,17 @@ For example:
 Please remember that you must have enough hugepages memory available to schedule
 every Pod in the Cluster (in the example above, at least 512MiB per Pod must be
 free).
+
+### Error `metadata.annotations: Too long` while applying the operator manifest
+
+To support Kubernetes 1.29 or greater, since v1.23 CloudNativePG requires to
+specify the `--server-side` option when installing the operator manifest.
+
+Note that, the first time migrating from client-side to a server-side installation
+method, there could be conflicts similar to the one below:
+
+``` text
+Apply failed with 1 conflict: conflict with "kubectl-client-side-apply" using..
+```
+
+In case this happens, you can force the conflicts by using `--force-conflicts`.
