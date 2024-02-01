@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("Available Architectures", func() {
+var _ = Describe("Available Architectures", func() {
 	const (
 		clusterManifest = fixturesDir + "/architectures/cluster-architectures.yaml.template"
 		namespacePrefix = "cluster-arch-e2e"
@@ -40,9 +40,9 @@ var _ = FDescribe("Available Architectures", func() {
 		}
 	})
 
+	// getImageArchitectures fetches the current image architectures via the
+	// PLATFORMS env variable. If not present, we assume the image to be built for just amd64
 	getImageArchitectures := func() []string {
-		// Fetching PLATFORMS env variable.
-		// If not present, we assume the image to be built for just amd64
 		imageArchitectures := []string{"amd64"}
 		if architecturesFromUser, exist := os.LookupEnv("PLATFORMS"); exist {
 			s := strings.ReplaceAll(architecturesFromUser, "linux/", "")
@@ -53,6 +53,8 @@ var _ = FDescribe("Available Architectures", func() {
 		return imageArchitectures
 	}
 
+	// verifyArchitectureStatus checks that a given expectedValue (e.g. amd64)
+	// is present in the Cluster's status AvailableArchitecture entries
 	verifyArchitectureStatus := func(
 		architectureStatus []apiv1.AvailableArchitecture,
 		expectedValue string,
@@ -66,6 +68,8 @@ var _ = FDescribe("Available Architectures", func() {
 		return found
 	}
 
+	// verifyArchitecturesAreUnique checks that each Cluster's status
+	// AvailableArchitecture entry is unique
 	verifyArchitecturesAreUnique := func(
 		architectureStatus []apiv1.AvailableArchitecture,
 	) bool {
