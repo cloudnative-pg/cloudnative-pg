@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/k8s"
 	"reflect"
 	goruntime "runtime"
 	"time"
@@ -48,7 +49,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
@@ -81,7 +81,7 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 	return &ClusterReconciler{
 		StatusClient:    instance.NewStatusClient(),
 		DiscoveryClient: discoveryClient,
-		Client:          resources.NewExtendedClient(mgr.GetClient()),
+		Client:          k8s.NewExtendedClient(mgr.GetClient()),
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
 	}
