@@ -39,6 +39,9 @@ var haveSCC bool
 // haveVolumeSnapshot stores the result of the VolumeSnapshotExist function
 var haveVolumeSnapshot bool
 
+// olmPlatform specifies whethere we are running on a platform with OLM support
+var olmPlatform bool
+
 // AvailableArchitecture is a struct containing info about an available architecture
 type AvailableArchitecture struct {
 	GoArch         string
@@ -227,4 +230,17 @@ func detectAvailableArchitectures(filepathGlob string) error {
 // DetectAvailableArchitectures detects the architectures available in the cluster
 func DetectAvailableArchitectures() error {
 	return detectAvailableArchitectures("bin/manager_*")
+}
+
+// DetectOLM looks for the operators.coreos.com operators resource in the current
+// Kubernetes cluster
+func DetectOLM(client discovery.DiscoveryInterface) (err error) {
+	olmPlatform = false
+	olmPlatform, err = resourceExist(client, "operators.coreos.com/v1", "operators")
+	return
+}
+
+// RunningOnOLM returns if we're running over a Kubernetes cluster with OLM support
+func RunningOnOLM() bool {
+	return olmPlatform
 }
