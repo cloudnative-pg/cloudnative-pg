@@ -82,7 +82,6 @@ defines a simple `Cluster` using the default storage class to allocate
 disk space:
 
 ```yaml
-# Example of PostgreSQL cluster
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -90,14 +89,6 @@ metadata:
 spec:
   instances: 3
 
-  # Example of rolling update strategy:
-  # - unsupervised: automated update of the primary once all
-  #                 replicas have been upgraded (default)
-  # - supervised: requires manual supervision to perform
-  #               the switchover of the primary
-  primaryUpdateStrategy: unsupervised
-
-  # Require 1Gi of space
   storage:
     size: 1Gi
 ```
