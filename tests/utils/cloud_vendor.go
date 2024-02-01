@@ -40,11 +40,15 @@ var GKE = TestEnvVendor("gke")
 // LOCAL kind or k3d cluster running locally
 var LOCAL = TestEnvVendor("local")
 
+// OCP openshift cloud cluster
+var OCP = TestEnvVendor("ocp")
+
 var vendors = map[string]*TestEnvVendor{
 	"aks":   &AKS,
 	"eks":   &EKS,
 	"gke":   &GKE,
 	"local": &LOCAL,
+	"ocp":   &OCP,
 }
 
 // TestCloudVendor creates the environment for testing
@@ -54,8 +58,9 @@ func TestCloudVendor() (*TestEnvVendor, error) {
 		if vendor, ok := vendors[vendorEnv]; ok {
 			return vendor, nil
 		}
-		return nil, fmt.Errorf("unknow cloud vendor %s", vendorEnv)
+		return nil, fmt.Errorf("unknown cloud vendor %s", vendorEnv)
 	}
+
 	// if none above, it is a local
 	return &LOCAL, nil
 }

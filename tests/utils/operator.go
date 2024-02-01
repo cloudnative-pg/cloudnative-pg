@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -262,4 +264,40 @@ func OperatorPodRestarted(operatorPod corev1.Pod) bool {
 		}
 	}
 	return restartCount != 0
+}
+
+// GetOperatorPodName returns the name of the current operator pod
+// NOTE: will return an error if the pod is being deleted
+func GetOperatorPodName(env *TestingEnvironment) (string, error) {
+	pod, err := env.GetOperatorPod()
+	if err != nil {
+		return "", err
+	}
+
+	if pod.GetDeletionTimestamp() != nil {
+		return "", fmt.Errorf("pod is being deleted")
+	}
+	return pod.GetName(), nil
+}
+
+// HasOperatorBeenUpgraded determines if the operator has been upgraded by checking
+// if there is a deletion timestamp. If there isn't, it returns true
+func HasOperatorBeenUpgraded(env *TestingEnvironment) bool {
+	_, err := GetOperatorPodName(env)
+	return err == nil
+}
+
+// GetOperatorVersion returns the current operator version
+func GetOperatorVersion(namespace, podName string) (string, error) {
+	out, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl -n %v exec %v -c manager -- /manager version",
+		namespace,
+		podName,
+	))
+	if err != nil {
+		return "", err
+	}
+	versionRegexp := regexp.MustCompile(`^Build: {Version:(\d+.*) Commit.*}$`)
+	ver := versionRegexp.FindStringSubmatch(strings.TrimSpace(out))[1]
+	return ver, nil
 }

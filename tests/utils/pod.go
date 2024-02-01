@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -134,6 +136,21 @@ func (env TestingEnvironment) GetPodList(namespace string) (*corev1.PodList, err
 		&env, podList, client.InNamespace(namespace),
 	)
 	return podList, err
+}
+
+// GetManagerVersion returns the current manager version of a given pod
+func GetManagerVersion(namespace, podName string) (string, error) {
+	out, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl -n %v exec %v -c postgres -- /controller/manager version",
+		namespace,
+		podName,
+	))
+	if err != nil {
+		return "", err
+	}
+	versionRegexp := regexp.MustCompile(`^Build: {Version:(\d+.*) Commit.*}$`)
+	ver := versionRegexp.FindStringSubmatch(strings.TrimSpace(out))[1]
+	return ver, nil
 }
 
 // GetPod gets a pod by namespace and name

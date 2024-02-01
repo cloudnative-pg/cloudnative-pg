@@ -104,6 +104,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	)
 
 	BeforeAll(func() {
+		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
+			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
+		}
+		if IsOpenshift() {
+			Skip("This test case is not applicable on OpenShift clusters")
+		}
 		misingManifestsMessage := "MISSING the test operator manifests.\n" +
 			"They should have been produced by calling the hack/run-e2e.sh script"
 		_, err := os.Stat(currentOperatorManifest)
@@ -113,9 +119,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	})
 
 	BeforeEach(func() {
-		if os.Getenv("TEST_SKIP_UPGRADE") != "" {
-			Skip("Skipping upgrade test because TEST_SKIP_UPGRADE variable is defined")
-		}
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
