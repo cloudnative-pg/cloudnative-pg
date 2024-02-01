@@ -88,3 +88,12 @@ type ClusterCapabilities interface {
 		newObject client.Object,
 	) (field.ErrorList, error)
 }
+
+type LifecycleCapabilities interface {
+	LifecycleHook(
+		ctx context.Context,
+		operationType string,
+		cluster client.Object,
+		object client.Object,
+	) error
+}
