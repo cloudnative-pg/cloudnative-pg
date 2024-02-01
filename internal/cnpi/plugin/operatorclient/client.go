@@ -79,9 +79,16 @@ func (e *extendedClient) Delete(
 	obj client.Object,
 	opts ...client.DeleteOption,
 ) error {
+	contextLogger := log.FromContext(ctx).WithName("extended_client_delete")
+
+	origObj := obj.DeepCopyObject().(client.Object)
 	var err error
-	obj, err = e.invokePlugin(ctx, plugin.OperationVerbDelete, obj)
+	obj, err = e.invokePlugin(ctx, plugin.OperationVerbUpdate, obj)
 	if err != nil {
+		return err
+	}
+	if err := e.Client.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
+		contextLogger.Error(err, "while patching before delete")
 		return err
 	}
 	return e.Client.Delete(ctx, obj, opts...)
