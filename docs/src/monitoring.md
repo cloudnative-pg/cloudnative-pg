@@ -745,15 +745,12 @@ section for context:
   NOTE: this does not include inter-operation with notification services. Please refer
   to the [Prometheus documentation](https://prometheus.io/docs/alerting/latest/alertmanager/).
 - `podmonitor.yaml`: a `PodMonitor` for the CloudNativePG Operator deployment.
-- `grafana-configmap.yaml`: a ConfigMap containing the definition of the sample
-  CloudNativePG Dashboard. Note the labels in the definition, which ensure that
-  the Grafana deployment will find the ConfigMap.
 
-In addition, we provide the "raw" sources for the Grafana dashboard and the
-Prometheus alert rules, for your reference:
+In addition, we provide the "raw" sources for the Prometheus alert rules in the
+`alerts.yaml` file.
 
-- `alerts.yaml`: Prometheus rules with alerts
-- `grafana-dashboard.json`: the CloudNativePG dashboard as a native Grafana JSON.
+The [Grafana dashboard](https://github.com/cloudnative-pg/charts/blob/main/charts/cloudnative-pg/monitoring/grafana-dashboard.json)
+is now part of the official Helm Chart project.
 
 Note that, for the configuration of `kube-prometheus-stack`, other fields and
 settings are available over what we provide in `kube-stack-config.yaml`.
