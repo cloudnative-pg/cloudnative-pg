@@ -14,11 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package k8s
+package operatorclient
 
 import (
 	"context"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	pluginclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 type extendedClient struct {
@@ -32,42 +37,83 @@ func NewExtendedClient(c client.Client) client.Client {
 	}
 }
 
+func (e *extendedClient) invokePlugin(
+	ctx context.Context,
+	operationVerb plugin.OperationVerb,
+	obj client.Object,
+) (client.Object, error) {
+	contextLogger := log.FromContext(ctx)
+	pClient, ok := ctx.Value("plugin_client").(pluginclient.Client)
+	if !ok || pClient == nil {
+		contextLogger.Trace("skipping invokePlugin, cannot find the plugin client inside the context")
+		return nil, nil
+	}
+
+	cluster, ok := ctx.Value("cluster").(client.Object)
+	if !ok || cluster == nil {
+		contextLogger.Trace("skipping invokePlugin, cannot find the cluster inside the context")
+		return nil, nil
+	}
+
+	return pClient.LifecycleHook(ctx, operationVerb, cluster, obj)
+}
+
 // Create saves the object obj in the Kubernetes cluster. obj must be a
 // struct pointer so that obj can be updated with the content returned by the Server.
-func (e extendedClient) Create(
+func (e *extendedClient) Create(
 	ctx context.Context,
 	obj client.Object,
 	opts ...client.CreateOption,
 ) error {
+	var err error
+	obj, err = e.invokePlugin(ctx, plugin.OperationVerbCreate, obj)
+	if err != nil {
+		return err
+	}
 	return e.Client.Create(ctx, obj, opts...)
 }
 
 // Delete deletes the given obj from Kubernetes cluster.
-func (e extendedClient) Delete(
+func (e *extendedClient) Delete(
 	ctx context.Context,
 	obj client.Object,
 	opts ...client.DeleteOption,
 ) error {
+	var err error
+	obj, err = e.invokePlugin(ctx, plugin.OperationVerbDelete, obj)
+	if err != nil {
+		return err
+	}
 	return e.Client.Delete(ctx, obj, opts...)
 }
 
 // Update updates the given obj in the Kubernetes cluster. obj must be a
 // struct pointer so that obj can be updated with the content returned by the Server.
-func (e extendedClient) Update(
+func (e *extendedClient) Update(
 	ctx context.Context,
 	obj client.Object,
 	opts ...client.UpdateOption,
 ) error {
+	var err error
+	obj, err = e.invokePlugin(ctx, plugin.OperationVerbUpdate, obj)
+	if err != nil {
+		return err
+	}
 	return e.Client.Update(ctx, obj, opts...)
 }
 
 // Patch patches the given obj in the Kubernetes cluster. obj must be a
 // struct pointer so that obj can be updated with the content returned by the Server.
-func (e extendedClient) Patch(
+func (e *extendedClient) Patch(
 	ctx context.Context,
 	obj client.Object,
 	patch client.Patch,
 	opts ...client.PatchOption,
 ) error {
+	var err error
+	obj, err = e.invokePlugin(ctx, plugin.OperationVerbPatch, obj)
+	if err != nil {
+		return err
+	}
 	return e.Client.Patch(ctx, obj, patch, opts...)
 }

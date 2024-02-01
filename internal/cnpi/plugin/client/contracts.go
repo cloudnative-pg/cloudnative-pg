@@ -21,6 +21,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 )
 
 // Metadata expose the metadata as discovered
@@ -37,6 +39,7 @@ type Client interface {
 	Connection
 	ClusterCapabilities
 	PodCapabilities
+	LifecycleCapabilities
 }
 
 // Connection describes a set of behaviour needed to properly handle the plugin connections
@@ -89,11 +92,13 @@ type ClusterCapabilities interface {
 	) (field.ErrorList, error)
 }
 
+// LifecycleCapabilities describes a set of behaviour needed to implement the Lifecycle capabilities
 type LifecycleCapabilities interface {
+	// LifecycleHook notifies the registered plugins of a given event for a given object
 	LifecycleHook(
 		ctx context.Context,
-		operationType string,
+		operationVerb plugin.OperationVerb,
 		cluster client.Object,
 		object client.Object,
-	) error
+	) (client.Object, error)
 }
