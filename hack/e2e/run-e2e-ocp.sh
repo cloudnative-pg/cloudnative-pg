@@ -37,13 +37,12 @@ function wait_for() {
 }
 
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
-SUBPROJECT_ROOT_DIR="${ROOT_DIR}/cloudnative-pg"
-export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${SUBPROJECT_ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
-export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG}.0}
-export E2E_ENABLE_REDWOOD=${E2E_ENABLE_REDWOOD:-}
-export E2E_RUN_UPGRADE_TESTS=${E2E_RUN_UPGRADE_TESTS:-false}
-OCP_VERSION=${OCP_VERSION:-latest}
+# we need to export ENVs defined in the workflow and used in run-e2e.sh script
+export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
+export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-}
+export TEST_CLOUD_VENDOR="ocp"
 
 # create the catalog source
 oc apply -f cloudnative-pg-catalog.yaml
@@ -85,16 +84,6 @@ oc patch -n openshift-operators "$(oc get csv -n openshift-operators -o name)" -
   {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/0\", \"value\": { \"name\": \"POSTGRES_IMAGE_NAME\", \"value\": \"${POSTGRES_IMG}\"}}
 ]"
 
-if [ -z "${TESTING_LICENSE+x}" ]; then
-  echo "no license set, skipping step"
-else
-  oc patch -n openshift-operators "$(oc get csv -n openshift-operators -o name)" --type='json' -p \
-"[
-  {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/0\", \"value\": { \"name\": \"EDB_LICENSE_KEY\", \"value\": \"${TESTING_LICENSE}\"}},
-  {\"op\": \"add\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/0\", \"value\": { \"name\": \"ENABLE_REDWOOD_BY_DEFAULT\", \"value\": \"${E2E_ENABLE_REDWOOD}\"}}
-]"
-fi
-
 # After patching, we need some time to propagate the change to the deployment and the pod.
 ITER=0
 while true; do
@@ -129,9 +118,5 @@ while true; do
   break
 done
 
-
-E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=$(kubectl get vsclass -o=jsonpath='{.items[?(@.metadata.annotations.snapshot\.storage\.kubernetes\.io/is-default-class=="true")].metadata.name}')
-export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS
-export OPENSHIFT="true"
 echo "Running the e2e tests"
 "${ROOT_DIR}/hack/e2e/run-e2e.sh"

@@ -675,7 +675,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		)
 
 		BeforeAll(func() {
-			if !(IsLocal() || IsGKE()) {
+			if !(IsLocal() || IsGKE() || IsOpenshift()) {
 				Skip("This test is only executed on gke, openshift and local")
 			}
 			const namespacePrefix = "cluster-backup-azurite"
@@ -813,7 +813,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	Context("using minio as object storage", Ordered, func() {
 		BeforeAll(func() {
 			if !IsLocal() {
-				Skip("This test is only executed on openshift and local")
+				Skip("This test is only executed on local")
 			}
 			const namespacePrefix = "recovery-barman-object-minio"
 			var err error
