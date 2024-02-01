@@ -302,15 +302,10 @@ kubectl port-forward svc/prometheus-community-grafana 3000:80
 And access Grafana locally at [`http://localhost:3000/`](http://localhost:3000/)
 providing the credentials `admin` as username, `prom-operator` as password (defined in `kube-stack-config.yaml`).
 
-We can now install our sample Grafana dashboard:
-
-``` sh
-kubectl apply -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring/grafana-configmap.yaml
-```
-
-Which will be picked up by the Grafana page in a few seconds. You should now
-see the `CloudNativePG` dashboard.
+CloudNativePG provides a default dashboard for Grafana as part of the official
+[Helm chart](https://github.com/cloudnative-pg/charts). You can download the
+[grafana-dashboard.json](https://github.com/cloudnative-pg/charts/blob/main/charts/cloudnative-pg/monitoring/grafana-dashboard.json)
+file and manually importing it via the GUI.
 
 !!! Warning
     Some graphs in the previous dashboard make use of metrics that are in alpha stage by the time

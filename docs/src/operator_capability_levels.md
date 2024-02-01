@@ -530,6 +530,11 @@ or `Secret` objects using a syntax that's compatible with
 CloudNativePG provides a set of basic monitoring queries for
 PostgreSQL that can be integrated and adapted to your context.
 
+### Grafana dashboard
+
+CloudNativePG comes with a Grafana dashboard that you can use as a base to
+monitor all critical aspects of a PostgreSQL cluster, and customize.
+
 ### Standard output logging of PostgreSQL error messages in JSON format
 
 Every log message is delivered to standard output in JSON format. The first level is the
