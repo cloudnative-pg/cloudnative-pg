@@ -37,7 +37,7 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	// TODO: Remove this code when enough time has passed since 1.21 release
 	//       This is due to the operator switching from postgresql.auto.conf
 	//       to override.conf for coordinating replication configuration
-	changed, err = migratePostgresAutoConfFile(ctx, instance, false)
+	changed, err = instance.migratePostgresAutoConfFile(ctx)
 	if err != nil {
 		return changed, err
 	}
