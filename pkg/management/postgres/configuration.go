@@ -362,13 +362,13 @@ func (instance *Instance) migratePostgresAutoConfFile(ctx context.Context) (bool
 		return false, fmt.Errorf("error while reading postgresql.auto.conf file: %w", readLinesErr)
 	}
 
+	overrideConfExists, _ := fileutils.FileExists(overrideConfPath)
 	options := configfile.ReadLinesFromConfigurationContents(autoConfContent, migrateAutoConfOptions...)
-	if len(options) == 0 {
+	if len(options) == 0 && overrideConfExists {
 		contextLogger.Trace("no action taken, options slice is empty")
 		return false, nil
 	}
 
-	overrideConfExists, _ := fileutils.FileExists(overrideConfPath)
 	contextLogger.Info("Start to migrate replication settings",
 		"filename", constants.PostgresqlOverrideConfigurationFile,
 		"targetFileExists", overrideConfExists,
