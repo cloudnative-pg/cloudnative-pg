@@ -373,6 +373,9 @@ func migratePostgresAutoConfFile(ctx context.Context, instance *Instance) (bool,
 		"options", options,
 	)
 
+	// We create the override.conf file only if it doesn't exist (first-time migration).
+	// The instance manager manages the content of this file, and it will be overwritten
+	// later during the configuration update. We create it here just as a precaution.
 	if !targetFileExists {
 		_, err = fileutils.WriteLinesToFile(targetFile, options)
 		if err != nil {
