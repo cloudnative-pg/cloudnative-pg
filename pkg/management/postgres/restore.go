@@ -263,7 +263,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	// we recover from a base which has postgresql.auto.conf
 	// the override.conf and include statement is present, what we need to do is to
 	// migrate the content
-	if _, err := migratePostgresAutoConfFile(ctx, info.GetInstance(), true); err != nil {
+	if _, err := migratePostgresAutoConfFile(ctx, info.GetInstance()); err != nil {
 		return err
 	}
 	if cluster.IsReplica() {
