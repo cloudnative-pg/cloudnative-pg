@@ -43,6 +43,7 @@ var _ = Describe("Available Architectures", func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
+		// TODO: we should have a manager command which retrieves all the architectures available in the current image
 		// fetches the current image architectures via the
 		// PLATFORMS env variable.
 		if architecturesFromUser, exist := os.LookupEnv("PLATFORMS"); exist {

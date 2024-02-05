@@ -41,18 +41,23 @@ var haveVolumeSnapshot bool
 // supportSeccomp specifies whether we should set the SeccompProfile or not in the pods
 var supportSeccomp bool
 
+// the directory containing each manager's binary
+const binPath = "bin"
+
 // AvailableArchitecture is a struct containing info about an available architecture
 type AvailableArchitecture struct {
 	GoArch         string
 	hash           string
 	mx             sync.Mutex
 	hashCalculator func(name string) (hash string, err error)
+	binPath        string
 }
 
-func newAvailableArchitecture(goArch string) *AvailableArchitecture {
+func newAvailableArchitecture(goArch, binPath string) *AvailableArchitecture {
 	return &AvailableArchitecture{
 		GoArch:         goArch,
 		hashCalculator: executablehash.GetByName,
+		binPath:        binPath,
 	}
 }
 
@@ -75,8 +80,8 @@ func (arch *AvailableArchitecture) calculateHash() {
 		return
 	}
 
-	binaryName := fmt.Sprintf("bin/manager_%s", arch.GoArch)
-	hash, err := arch.hashCalculator(binaryName)
+	hash, err := arch.hashCalculator(filepath.Join(arch.binPath,
+		fmt.Sprintf("manager_%s", arch.GoArch)))
 	if err != nil {
 		panic(fmt.Errorf("while calculating architecture hash: %w", err))
 	}
@@ -234,7 +239,7 @@ func detectAvailableArchitectures(filepathGlob string) error {
 	}
 	for _, b := range binaries {
 		goArch := strings.Split(b, "manager_")[1]
-		arch := newAvailableArchitecture(goArch)
+		arch := newAvailableArchitecture(goArch, filepath.Dir(filepathGlob))
 		availableArchitectures = append(availableArchitectures, arch)
 		go arch.calculateHash()
 	}

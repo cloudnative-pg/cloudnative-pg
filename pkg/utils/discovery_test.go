@@ -18,6 +18,9 @@ package utils
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
@@ -166,7 +169,7 @@ var _ = Describe("AvailableArchitecture", func() {
 		mockHashCalculator = func(name string) (hash string, err error) {
 			return "mockedHash", nil
 		}
-		arch = newAvailableArchitecture("amd64")
+		arch = newAvailableArchitecture("amd64", binPath)
 		arch.hashCalculator = mockHashCalculator
 	})
 
@@ -229,6 +232,52 @@ var _ = Describe("AvailableArchitecture", func() {
 			It("should panic with an error", func() {
 				Expect(arch.calculateHash).To(Panic())
 			})
+		})
+	})
+
+	Describe("detectAvailableArchitectures", func() {
+		var tempDir string
+		var err error
+
+		BeforeEach(func() {
+			tempDir, err = os.MkdirTemp("", "test")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			Expect(os.RemoveAll(tempDir)).To(Succeed())
+		})
+
+		It("shouldn't find available architectures", func() {
+			// Create some sample files
+			Expect(os.WriteFile(filepath.Join(tempDir, "test1"), []byte("amd64"), 0o600)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(tempDir, "test2"), []byte("arm64"), 0o600)).To(Succeed())
+
+			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
+			Expect(err).ToNot(HaveOccurred())
+
+			architectures := GetAvailableArchitectures()
+			Expect(architectures).To(BeEmpty())
+		})
+
+		It("should find available architectures", func() {
+			expectedArchitectures := []string{"amd64", "arm64"}
+
+			// Create some sample files
+			Expect(os.WriteFile(filepath.Join(tempDir, "manager_amd64"), []byte("amd64"), 0o600)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(tempDir, "manager_arm64"), []byte("arm64"), 0o600)).To(Succeed())
+
+			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				architectures := GetAvailableArchitectures()
+				Expect(architectures).NotTo(BeEmpty())
+				for _, a := range architectures {
+					g.Expect(slices.Contains(expectedArchitectures, a.GoArch)).To(BeTrue())
+					g.Expect(a.GetHash()).ToNot(BeEmpty())
+				}
+			}).Should(Succeed())
 		})
 	})
 })
