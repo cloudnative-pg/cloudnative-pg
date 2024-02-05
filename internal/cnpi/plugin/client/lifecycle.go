@@ -45,8 +45,8 @@ func (data *data) LifecycleHook(
 
 	gvk := object.GetObjectKind().GroupVersionKind()
 	var invokablePlugin []pluginData
-	for _, plugin := range data.plugins {
-		for _, capability := range plugin.lifecycleCapabilities {
+	for _, plg := range data.plugins {
+		for _, capability := range plg.lifecycleCapabilities {
 			if capability.Group != gvk.Group || capability.Kind != gvk.Kind {
 				continue
 			}
@@ -59,7 +59,7 @@ func (data *data) LifecycleHook(
 				continue
 			}
 
-			invokablePlugin = append(invokablePlugin, plugin)
+			invokablePlugin = append(invokablePlugin, plg)
 		}
 	}
 
@@ -81,7 +81,7 @@ func (data *data) LifecycleHook(
 		)
 	}
 
-	for _, plugin := range invokablePlugin {
+	for _, plg := range invokablePlugin {
 		req := &lifecycle.LifecycleRequest{
 			OperationType: &lifecycle.OperationType{
 				Type: typedOperationType,
@@ -89,7 +89,7 @@ func (data *data) LifecycleHook(
 			ClusterDefinition: serializedCluster,
 			ObjectDefinition:  serializedObject,
 		}
-		result, err := plugin.lifecycleClient.LifecycleHook(ctx, req)
+		result, err := plg.lifecycleClient.LifecycleHook(ctx, req)
 		if err != nil {
 			contextLogger.Error(err, "Error while calling LifecycleHook")
 			return nil, err
