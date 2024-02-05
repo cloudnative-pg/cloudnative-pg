@@ -226,13 +226,12 @@ func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
 // GetAvailableArchitectures returns the available instance's architectures
 func GetAvailableArchitectures() []*AvailableArchitecture { return availableArchitectures }
 
-// DetectAvailableArchitectures detects the architectures available in the cluster
-func DetectAvailableArchitectures() (err error) {
-	binaries, err := filepath.Glob("bin/manager_*")
+// detectAvailableArchitectures detects the architectures available in a given path
+func detectAvailableArchitectures(filepathGlob string) error {
+	binaries, err := filepath.Glob(filepathGlob)
 	if err != nil {
 		return err
 	}
-
 	for _, b := range binaries {
 		goArch := strings.Split(b, "manager_")[1]
 		arch := newAvailableArchitecture(goArch)
@@ -241,4 +240,9 @@ func DetectAvailableArchitectures() (err error) {
 	}
 
 	return err
+}
+
+// DetectAvailableArchitectures detects the architectures available in the cluster
+func DetectAvailableArchitectures() error {
+	return detectAvailableArchitectures("bin/manager_*")
 }
