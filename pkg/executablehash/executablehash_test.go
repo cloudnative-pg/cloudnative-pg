@@ -17,6 +17,9 @@ limitations under the License.
 package executablehash
 
 import (
+	"os"
+	"path/filepath"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -27,4 +30,24 @@ var _ = Describe("Executable hash detection", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(result).To(HaveLen(64))
 	})
+
+	It("retrieves a hash from a given filename", func() {
+		const expectedHash = "d6672ee3a93d0d6e3c30bdef89f310799c2f3ab781098a9792040d5541ce3ed3"
+		const fileName = "test-hash"
+		var tempDir string
+
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tempDir)).To(Succeed())
+		})
+
+		tempDir, err := os.MkdirTemp("", "test")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(os.WriteFile(filepath.Join(tempDir, fileName), []byte(fileName), 0o600)).To(Succeed())
+
+		result, err := GetByName(filepath.Join(tempDir, fileName))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(HaveLen(64))
+		Expect(result).To(BeEquivalentTo(expectedHash))
+	})
+
 })

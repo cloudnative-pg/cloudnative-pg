@@ -169,7 +169,7 @@ var _ = Describe("AvailableArchitecture", func() {
 		mockHashCalculator = func(name string) (hash string, err error) {
 			return "mockedHash", nil
 		}
-		arch = newAvailableArchitecture("amd64", binPath)
+		arch = newAvailableArchitecture("amd64", filepath.Join("bin", "manager_amd64"))
 		arch.hashCalculator = mockHashCalculator
 	})
 
