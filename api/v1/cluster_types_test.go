@@ -1123,7 +1123,7 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 	})
 
 	Context("GetEnabled", func() {
-		It("should return false when SynchronizeReplicasConfiguration is nil", func() {
+		It("should return true when SynchronizeReplicasConfiguration is nil", func() {
 			synchronizeReplicas = nil
 			Expect(synchronizeReplicas.GetEnabled()).To(BeTrue())
 		})
@@ -1140,8 +1140,7 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 			})
 
 			It("should return false when Enabled is false", func() {
-				enabled := false
-				synchronizeReplicas.Enabled = &enabled
+				synchronizeReplicas.Enabled = ptr.To(false)
 				Expect(synchronizeReplicas.GetEnabled()).To(BeFalse())
 			})
 		})

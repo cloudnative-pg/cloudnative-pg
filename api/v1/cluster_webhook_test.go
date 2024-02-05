@@ -2767,7 +2767,7 @@ var _ = Describe("validation of replication slots configuration", func() {
 		}
 		errors := cluster.validateReplicationSlots()
 		Expect(errors).To(HaveLen(1))
-		Expect(errors[0].Detail).To(Equal("Cannot enable synchronizeReplicas. Invalid regexes were found"))
+		Expect(errors[0].Detail).To(Equal("Cannot configure synchronizeReplicas. Invalid regexes were found"))
 	})
 
 	It("should not return an error when SynchronizeReplicasConfiguration is not nil and regex is valid", func() {

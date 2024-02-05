@@ -2031,7 +2031,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
 				errs,
-				"Cannot enable synchronizeReplicas. Invalid regexes were found"),
+				"Cannot configure synchronizeReplicas. Invalid regexes were found"),
 		}
 	}
 
