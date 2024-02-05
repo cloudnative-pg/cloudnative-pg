@@ -42,23 +42,24 @@ func ReconcileReplicationSlots(
 
 	isPrimary := cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName
 
-	// if the ha replication slot is disabled, we drop all the HA replication slots
-	// on both primary and standby
-	// notes: if HA slots is enabled and user slot is disabled, drop user slot
-	// is handled in the runner.go
+	// If the HA replication slot feature is turned off, we will remove all the HA
+	// replication slots on both the primary and standby servers.
+	// NOTE: If both the HA replication slot and the replica synchronization features are disabled,
+	// we also clean up the slots that fall under the replica synchronization feature here.
+	// TODO: split-out replica synchronization slots code
 	if !cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
 		return dropReplicationSlots(ctx, manager, cluster, isPrimary)
 	}
 
 	if isPrimary {
-		return reconcilePrimaryReplicationSlots(ctx, manager, cluster)
+		return reconcilePrimaryHAReplicationSlots(ctx, manager, cluster)
 	}
 
 	return reconcile.Result{}, nil
 }
 
-// reconcilePrimaryReplicationSlots reconciles the HA replication slots of the primary instance
-func reconcilePrimaryReplicationSlots(
+// reconcilePrimaryHAReplicationSlots reconciles the HA replication slots of the primary instance
+func reconcilePrimaryHAReplicationSlots(
 	ctx context.Context,
 	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
@@ -70,7 +71,7 @@ func reconcilePrimaryReplicationSlots(
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("reconciling primary replication slots: %w", err)
 	}
-	// expectedSlots is a map define the expected HA replication slots
+	// expectedSlots the set of the expected HA replication slots names
 	expectedSlots := make(map[string]bool)
 
 	// Add every slot that is missing
@@ -86,7 +87,7 @@ func reconcilePrimaryReplicationSlots(
 			continue
 		}
 
-		// at this point, the cluster instance does not have a HA replication slot
+		// At this point, the cluster instance does not have a HA replication slot
 		if err := manager.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotName}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("creating primary HA replication slots: %w", err)
 		}
@@ -99,13 +100,12 @@ func reconcilePrimaryReplicationSlots(
 	// Delete any HA replication slots in the instance that is not from an existing cluster instance
 	needToReschedule := false
 	for _, slot := range currentSlots.Items {
+		if !slot.IsHA {
+			contextLogger.Trace("Skipping non-HA replication slot",
+				"slot", slot)
+			continue
+		}
 		if !expectedSlots[slot.SlotName] {
-			// Avoid user-defined slot
-			if !slot.IsHA {
-				contextLogger.Trace("Skipping the user-defined replication slot",
-					"slot", slot)
-				continue
-			}
 			// Avoid deleting active slots.
 			// It would trow an error on Postgres side.
 			if slot.Active {
@@ -129,9 +129,9 @@ func reconcilePrimaryReplicationSlots(
 	return reconcile.Result{}, nil
 }
 
-// drop the replication slots if HA or User replication slots is disabled.
-// if HA replication slot is disabled, we drop all the HA replication slots on both primary and standby
-// if User replication slot is disabled, we drop all the replication slots except the user replication slot on primary
+// dropReplicationSlots cleans up the HA replication slots when the feature is disabled.
+// If both the HA replication slot and the replica synchronization features are disabled,
+// we also clean up the slots that fall under the replica synchronization feature here.
 func dropReplicationSlots(
 	ctx context.Context,
 	manager infrastructure.Manager,
@@ -140,8 +140,8 @@ func dropReplicationSlots(
 ) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// if at the sametime, user replication slot is disabled too
-	// we drop all the replication slots except the user replication slot on primary
+	// If, at the same time, the HA replication slot and the replica synchronization features are disabled,
+	// we must clean up all the replication slots on the standbys.
 	dropUserSlots := !cluster.Spec.ReplicationSlots.SynchronizeReplicas.GetEnabled()
 
 	// we fetch all replication slots
@@ -152,12 +152,12 @@ func dropReplicationSlots(
 
 	needToReschedule := false
 	for _, slot := range slots.Items {
-		// we always skip the user replication slots on the primary, which is user created
+		// On the primary,  we only drop the HA replication slots
 		if !slot.IsHA && isPrimary {
 			continue
 		}
 
-		// if dropUserSlot is false, we skip the user replication slots
+		// Non-HA slots are only considered if dropUserSlots is true
 		if !slot.IsHA && !dropUserSlots {
 			continue
 		}

@@ -1995,8 +1995,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 	}
 	replicationSlots := r.Spec.ReplicationSlots
 
-	// if both are disabled, skip the validation
-	if !replicationSlots.HighAvailability.GetEnabled() && !replicationSlots.SynchronizeReplicas.GetEnabled() {
+	if !replicationSlots.GetEnabled() {
 		return nil
 	}
 
@@ -2027,14 +2026,12 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		}
 	}
 
-	if replicationSlots.SynchronizeReplicas.GetEnabled() {
-		if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
-			return field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
-					errs,
-					"Cannot enable synchronizeReplicas. Invalid regexes were found"),
-			}
+	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
+				errs,
+				"Cannot enable synchronizeReplicas. Invalid regexes were found"),
 		}
 	}
 
