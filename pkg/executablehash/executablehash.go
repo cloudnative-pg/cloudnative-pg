@@ -36,8 +36,8 @@ func Stream() (io.ReadCloser, error) {
 	return os.Open(processBinaryFileName) // #nosec
 }
 
-// StreamByName opens a stream reading from an executable given its name
-func StreamByName(name string) (io.ReadCloser, error) {
+// streamByName opens a stream reading from an executable given its name
+func streamByName(name string) (io.ReadCloser, error) {
 	return os.Open(name) // #nosec
 }
 
@@ -73,7 +73,7 @@ func Get() (string, error) {
 
 // GetByName gets the hashcode of a binary given its filename
 func GetByName(name string) (string, error) {
-	binaryFileStream, err := StreamByName(name)
+	binaryFileStream, err := streamByName(name)
 	if err != nil {
 		return "", err
 	}
