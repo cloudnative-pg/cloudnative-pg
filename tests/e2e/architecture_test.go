@@ -34,24 +34,23 @@ var _ = Describe("Available Architectures", func() {
 		level           = tests.Low
 	)
 
+	// we assume the image to be built for just amd64 as default. We try to calculate other envs inside the beforeEach
+	// block
+	imageArchitectures := []string{"amd64"}
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-	})
 
-	// getImageArchitectures fetches the current image architectures via the
-	// PLATFORMS env variable. If not present, we assume the image to be built for just amd64
-	getImageArchitectures := func() []string {
-		imageArchitectures := []string{"amd64"}
+		// fetches the current image architectures via the
+		// PLATFORMS env variable.
 		if architecturesFromUser, exist := os.LookupEnv("PLATFORMS"); exist {
 			s := strings.ReplaceAll(architecturesFromUser, "linux/", "")
 			arches := strings.Split(s, ",")
 			imageArchitectures = arches
 		}
-
-		return imageArchitectures
-	}
+	})
 
 	// verifyArchitectureStatus checks that a given expectedValue (e.g. amd64)
 	// is present in the Cluster's status AvailableArchitecture entries
@@ -98,9 +97,6 @@ var _ = Describe("Available Architectures", func() {
 		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
-
-		// Fetch the image's architectures
-		imageArchitectures := getImageArchitectures()
 
 		// Fetch the Cluster status
 		cluster, err := env.GetCluster(namespace, clusterName)
