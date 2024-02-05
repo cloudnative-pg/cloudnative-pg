@@ -102,7 +102,7 @@ jobs:
                break
             fi
             echo "${v}"
-          done | jq -Rs 'split("\n") | map(select(length>0))' | tee .github/kind_versions.json
+          done | jq -Rs 'split("\n") | map(select(length>0)) | sort | reverse' | tee .github/kind_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'kind'
       -
         name: Create Pull Request if versions have been updated
