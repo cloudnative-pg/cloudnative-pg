@@ -49,5 +49,4 @@ var _ = Describe("Executable hash detection", func() {
 		Expect(result).To(HaveLen(64))
 		Expect(result).To(BeEquivalentTo(expectedHash))
 	})
-
 })
