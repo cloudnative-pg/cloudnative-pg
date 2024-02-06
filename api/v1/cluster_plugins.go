@@ -23,13 +23,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
-// NewLoader creates a new plugin client, loading the plugins that are required
+// NewPluginLoader creates a new plugin client, loading the plugins that are required
 // by this cluster
-func (plugins PluginConfigurationList) NewLoader(ctx context.Context) (client.Client, error) {
+func (cluster *Cluster) NewPluginLoader(ctx context.Context) (client.Client, error) {
 	pluginLoader := client.NewUnixSocketClient(configuration.Current.PluginSocketDir)
 
 	// Load the plugins
-	for _, pluginDeclaration := range plugins {
+	for _, pluginDeclaration := range cluster.Spec.Plugins {
 		if err := pluginLoader.Load(ctx, pluginDeclaration.Name); err != nil {
 			return nil, err
 		}

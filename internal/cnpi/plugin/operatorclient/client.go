@@ -24,6 +24,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	pluginclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type extendedClient struct {
@@ -42,18 +43,27 @@ func (e *extendedClient) invokePlugin(
 	operationVerb plugin.OperationVerb,
 	obj client.Object,
 ) (client.Object, error) {
-	contextLogger := log.FromContext(ctx)
-	pClient, ok := ctx.Value("plugin_client").(pluginclient.Client)
-	if !ok || pClient == nil {
-		contextLogger.Trace("skipping invokePlugin, cannot find the plugin client inside the context")
-		return nil, nil
-	}
+	contextLogger := log.FromContext(ctx).WithName("invokePlugin")
 
-	cluster, ok := ctx.Value("cluster").(client.Object)
+	cluster, ok := ctx.Value(utils.ContextKey("cluster")).(client.Object)
 	if !ok || cluster == nil {
 		contextLogger.Trace("skipping invokePlugin, cannot find the cluster inside the context")
 		return nil, nil
 	}
+
+	loader, ok := cluster.(pluginclient.Loader)
+	if !ok {
+		contextLogger.Trace("skipping invokePlugin, cluster does not adhere to Loader interface")
+		return nil, nil
+	}
+
+	pClient, err := loader.NewPluginLoader(ctx)
+	if err != nil {
+		contextLogger.Trace("skipping invokePlugin, cannot load the plugin client")
+		return nil, nil
+	}
+
+	contextLogger.Debug("correctly loaded the plugin client")
 
 	return pClient.LifecycleHook(ctx, operationVerb, cluster, obj)
 }

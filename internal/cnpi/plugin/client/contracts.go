@@ -34,6 +34,11 @@ type Metadata struct {
 	OperatorCapabilities []string
 }
 
+// Loader describes a struct capable of generating a plugin Client
+type Loader interface {
+	NewPluginLoader(ctx context.Context) (Client, error)
+}
+
 // Client describes a set of behaviour needed to properly handle all the plugin client expected features
 type Client interface {
 	Connection
