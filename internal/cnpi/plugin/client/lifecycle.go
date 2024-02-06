@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
@@ -64,6 +65,10 @@ func (data *data) LifecycleHook(
 		}
 	}
 
+	if len(invokablePlugin) == 0 {
+		return object, nil
+	}
+
 	serializedCluster, err := json.Marshal(cluster)
 	if err != nil {
 		return nil, fmt.Errorf("while serializing %s %s/%s to JSON: %w",
@@ -82,6 +87,8 @@ func (data *data) LifecycleHook(
 		)
 	}
 
+	serializedObjectOrig := make([]byte, len(serializedObject))
+	copy(serializedObjectOrig, serializedObject)
 	for _, plg := range invokablePlugin {
 		req := &lifecycle.LifecycleRequest{
 			OperationType: &lifecycle.OperationType{
@@ -110,7 +117,7 @@ func (data *data) LifecycleHook(
 		serializedObject = responseObj
 	}
 
-	if len(serializedObject) == 0 {
+	if reflect.DeepEqual(serializedObject, serializedObjectOrig) {
 		return object, nil
 	}
 
