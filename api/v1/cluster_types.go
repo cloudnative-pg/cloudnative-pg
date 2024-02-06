@@ -993,11 +993,11 @@ const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
 // SynchronizeReplicasConfiguration contains the configuration for the synchronization of user defined
 // physical replication slots
 type SynchronizeReplicasConfiguration struct {
-	// when set to true, every replication slot that is on the primary is synchronized on each standby
+	// When set to true, every replication slot that is on the primary is synchronized on each standby
 	// +kubebuilder:default:=true
 	Enabled *bool `json:"enabled"`
 
-	//  list of regular expression patterns to match the names of replication slots to be excluded (by default empty)
+	// List of regular expression patterns to match the names of replication slots to be excluded (by default empty)
 	// +optional
 	ExcludePatterns []string `json:"excludePatterns,omitempty"`
 
