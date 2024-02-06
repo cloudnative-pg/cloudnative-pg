@@ -2012,7 +2012,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 				field.Invalid(
 					field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
 					replicationSlots.HighAvailability.GetEnabled(),
-					"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+					"Cannot enable HA replication slots synchronization. PostgreSQL 11 or above required"),
 			}
 		}
 
@@ -2021,7 +2021,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 				field.Invalid(
 					field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "enabled"),
 					replicationSlots.SynchronizeReplicas.GetEnabled(),
-					"Cannot enable replication slot synchronize replicas. It requires PostgreSQL 11 or above"),
+					"Cannot enable user defined replication slots synchronization. PostgreSQL 11 or above required"),
 			}
 		}
 	}
