@@ -89,6 +89,7 @@ try:
     TIMEOUT_LIST = timeout_list
 except:
     print(f"Failed opening file: {E2E_TEST_TIMEOUT}")
+    exit(1)
 
 # Minimum support k8s version (include) in different cloud vendor
 try:
@@ -98,6 +99,7 @@ try:
     print(SUPPORT_K8S_VERSION)
 except:
     print(f"Failed opening file: {VERSION_SCOPE_FILE}")
+    exit(1)
 
 # Kubernetes versions on kind to use during the tests
 try:
@@ -107,6 +109,7 @@ try:
     KIND_K8S = VersionList(kind_versions)
 except:
     print(f"Failed opening file: {KIND_VERSIONS_FILE}")
+    exit(1)
 
 # Kubernetes versions on EKS to use during the tests
 try:
@@ -116,6 +119,7 @@ try:
     EKS_K8S = VersionList(eks_versions)
 except:
     print(f"Failed opening file: {EKS_VERSIONS_FILE}")
+    exit(1)
 
 # Kubernetes versions on AKS to use during the tests
 try:
@@ -125,6 +129,7 @@ try:
     AKS_K8S = VersionList(aks_versions)
 except:
     print(f"Failed opening file: {AKS_VERSIONS_FILE}")
+    exit(1)
 
 # Kubernetes versions on GKE to use during the tests
 try:
@@ -134,6 +139,7 @@ try:
     GKE_K8S = VersionList(gke_versions)
 except:
     print(f"Failed opening file: {GKE_VERSIONS_FILE}")
+    exit(1)
 
 # OpenShift version to use during the tests
 try:
@@ -145,6 +151,7 @@ try:
     OPENSHIFT_K8S = VersionList(openshift_versions)
 except:
     print(f"Failed opening file: {OPENSHIFT_VERSIONS_FILE}")
+    exit(1)
 
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
@@ -158,6 +165,7 @@ try:
     POSTGRES = MajorVersionList(postgres_versions)
 except:
     print(f"Failed opening file: {PG_VERSIONS_FILE}")
+    exit(1)
 
 
 class E2EJob(dict):
