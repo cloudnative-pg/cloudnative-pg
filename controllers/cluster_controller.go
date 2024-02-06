@@ -143,7 +143,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		return ctrl.Result{}, err
 	}
-	ctx = context.WithValue(ctx, utils.ContextKey("cluster"), cluster)
+	ctx = cluster.SetInContext(ctx)
 	// Run the inner reconcile loop. Translate any ErrNextLoop to an errorless return
 	result, err := r.reconcile(ctx, cluster)
 	if errors.Is(err, ErrNextLoop) {

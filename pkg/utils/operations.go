@@ -16,9 +16,6 @@ limitations under the License.
 
 package utils
 
-// ContextKey a type used to assign values inside the context
-type ContextKey string
-
 // CollectDifferencesFromMaps returns a map of the differences (as slice of strings) of the values of two given maps.
 // Map result values are added when a key is present just in one of the input maps, or if the values are different
 // given the same key

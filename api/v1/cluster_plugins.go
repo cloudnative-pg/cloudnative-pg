@@ -21,6 +21,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // LoadPlugin creates a new plugin client, loading the plugins that are required
@@ -36,4 +37,9 @@ func (cluster *Cluster) LoadPlugin(ctx context.Context) (client.Client, error) {
 	}
 
 	return pluginLoader, nil
+}
+
+// SetInContext records the cluster in the given context
+func (cluster *Cluster) SetInContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, utils.ContextKeyCluster, cluster)
 }

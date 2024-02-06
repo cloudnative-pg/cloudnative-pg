@@ -45,7 +45,7 @@ func (e *extendedClient) invokePlugin(
 ) (client.Object, error) {
 	contextLogger := log.FromContext(ctx).WithName("invokePlugin")
 
-	cluster, ok := ctx.Value(utils.ContextKey("cluster")).(client.Object)
+	cluster, ok := ctx.Value(utils.ContextKeyCluster).(client.Object)
 	if !ok || cluster == nil {
 		contextLogger.Trace("skipping invokePlugin, cannot find the cluster inside the context")
 		return nil, nil
@@ -93,7 +93,7 @@ func (e *extendedClient) Delete(
 
 	origObj := obj.DeepCopyObject().(client.Object)
 	var err error
-	obj, err = e.invokePlugin(ctx, plugin.OperationVerbUpdate, obj)
+	obj, err = e.invokePlugin(ctx, plugin.OperationVerbDelete, obj)
 	if err != nil {
 		return err
 	}
