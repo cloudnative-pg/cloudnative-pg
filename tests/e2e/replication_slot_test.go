@@ -164,21 +164,22 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			pods, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range pods.Items {
-				Eventually(func() (bool, error) {
+				Eventually(func(g Gomega) error {
 					slotOnPod, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
 					if err != nil {
-						return false, err
+						return err
 					}
 
 					// on the primary we should retain the user created slot
 					if specs.IsPodPrimary(pod) {
-						Expect(slotOnPod).To(HaveLen(1))
-						Expect(slotOnPod).To(ContainElement(userPhysicalSlot))
-						return true, nil
+						g.Expect(slotOnPod).To(HaveLen(1))
+						g.Expect(slotOnPod).To(ContainElement(userPhysicalSlot))
+						return nil
 					}
 					// on replicas instead we should clean up everything
-					return len(slotOnPod) == 0, nil
-				}, 90, 2).Should(BeEquivalentTo(true))
+					g.Expect(slotOnPod).To(BeEmpty())
+					return nil
+				}, 90, 2).ShouldNot(HaveOccurred())
 			}
 		})
 	})
