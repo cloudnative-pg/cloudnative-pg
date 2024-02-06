@@ -197,12 +197,6 @@ class E2EJob(dict):
 
 def build_push_include_local():
     """Build the list of tests running on push"""
-    try:
-        KIND_K8S
-    except:
-        print(f"Variable KIND_K8S is not defined look for errors above")
-        exit(1)
-
     return {
         E2EJob(KIND_K8S.latest, POSTGRES.latest, "pg"),
         E2EJob(KIND_K8S.oldest, POSTGRES.oldest, "pg"),
