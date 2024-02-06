@@ -18,12 +18,13 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	jsonpatch "github.com/evanphx/json-patch/v5"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
@@ -113,8 +114,9 @@ func (data *data) LifecycleHook(
 		return object, nil
 	}
 
-	mutatedObject := object.DeepCopyObject().(client.Object)
-	if err := json.Unmarshal(serializedObject, mutatedObject); err != nil {
+	decoder := scheme.Codecs.UniversalDeserializer()
+	mutatedObject, _, err := decoder.Decode(serializedObject, nil, nil)
+	if err != nil {
 		return nil, fmt.Errorf("while deserializing %s %s/%s to JSON: %w",
 			object.GetObjectKind().GroupVersionKind().Kind,
 			object.GetNamespace(), object.GetName(),
@@ -122,5 +124,5 @@ func (data *data) LifecycleHook(
 		)
 	}
 
-	return mutatedObject, nil
+	return mutatedObject.(client.Object), nil
 }

@@ -194,7 +194,8 @@ var _ = Describe("LifecycleHook", func() {
 
 		pod := &corev1.Pod{
 			TypeMeta: metav1.TypeMeta{
-				Kind: "Pod",
+				APIVersion: "v1",
+				Kind:       "Pod",
 			},
 			ObjectMeta: metav1.ObjectMeta{},
 		}
@@ -207,14 +208,15 @@ var _ = Describe("LifecycleHook", func() {
 	})
 
 	// TODO: not currently passing
-	XIt("should correctly remove the values in the passed object", func(ctx SpecContext) {
+	It("should correctly remove the values in the passed object", func(ctx SpecContext) {
 		mapInjector := map[string]string{"test": "test"}
 		f := newFakeLifecycleClient(capabilities, mapInjector, nil, nil)
 		f.set(&d.plugins[0])
 
 		pod := &corev1.Pod{
 			TypeMeta: metav1.TypeMeta{
-				Kind: "Pod",
+				APIVersion: "v1",
+				Kind:       "Pod",
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -228,6 +230,6 @@ var _ = Describe("LifecycleHook", func() {
 		Expect(obj).ToNot(BeNil())
 		podModified, ok := obj.(*corev1.Pod)
 		Expect(ok).To(BeTrue())
-		Expect(podModified.Labels).To(BeEmpty())
+		Expect(podModified.Labels).To(Equal(map[string]string{"other": "stuff"}))
 	})
 })
