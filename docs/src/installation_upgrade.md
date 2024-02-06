@@ -236,19 +236,56 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.22.0, 1.21.2 or 1.20.5
+<!--
+### Upgrading to 1.23.0, 1.22.2 or 1.21.4
 
 !!! Important
     We encourage all existing users of CloudNativePG to upgrade to version
-    1.22.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.21.2 or 1.20.5).
+    1.23.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.22.2 or 1.21.4).
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
     go through the release notes and upgrade instructions of all the
     intermediate minor releases. For example, if you want to move
-    from 1.20.x to 1.22, make sure you go through the release notes
-    and upgrade instructions for 1.21 and 1.22.
+    from 1.21.x to 1.23, make sure you go through the release notes
+    and upgrade instructions for 1.22 and 1.23.
+
+#### User defined replication slots
+
+CloudNativePG now offers automated synchronization of all replication slots
+defined on the primary to any standby within the High Availability (HA)
+cluster.
+
+If you manually manage replication slots on a standby, it is essential to
+exclude those replication slots from synchronization. Failure to do so may
+result in CloudNativePG removing them from the standby. To implement this
+exclusion, utilize the following YAML configuration. In this example,
+replication slots with a name starting with 'foo' are prevented from
+synchronization:
+
+```yaml
+...
+  replicationSlots:
+    synchronizeReplicas:
+      enabled: true
+      excludePatterns:
+      - "^foo"
+```
+
+Alternatively, if you prefer to disable the synchronization mechanism entirely,
+use the following configuration:
+
+```yaml
+...
+  replicationSlots:
+    synchronizeReplicas:
+      enabled: false
+```
+
+-->
+
+### Upgrading to 1.22 from a previous minor version
 
 CloudNativePG continues to adhere to the security-by-default approach. As of
 version 1.22, the usage of the `ALTER SYSTEM` command is now disabled by
