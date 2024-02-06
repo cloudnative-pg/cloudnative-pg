@@ -57,7 +57,7 @@ func (e *extendedClient) invokePlugin(
 		return nil, nil
 	}
 
-	pClient, err := loader.NewPluginLoader(ctx)
+	pClient, err := loader.LoadPlugin(ctx)
 	if err != nil {
 		contextLogger.Trace("skipping invokePlugin, cannot load the plugin client")
 		return nil, nil

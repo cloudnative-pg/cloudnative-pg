@@ -163,7 +163,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 
 	// Call the plugins to help with defaulting this cluster
 	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.NewPluginLoader(ctx)
+	pluginClient, err := r.LoadPlugin(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error invoking plugin in the defaulting webhook, skipping")
 		return
@@ -307,7 +307,7 @@ func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	// Call the plugins to help validating this cluster creation
 	ctx := context.Background()
 	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.NewPluginLoader(ctx)
+	pluginClient, err := r.LoadPlugin(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error invoking plugin in the validate/create webhook")
 		return nil, err
@@ -396,7 +396,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 	// Call the plugins to help validating this cluster update
 	ctx := context.Background()
 	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.NewPluginLoader(ctx)
+	pluginClient, err := r.LoadPlugin(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error invoking plugin in the validate/create webhook")
 		return nil, err

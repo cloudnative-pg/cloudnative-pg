@@ -23,9 +23,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
-// NewPluginLoader creates a new plugin client, loading the plugins that are required
+// LoadPlugin creates a new plugin client, loading the plugins that are required
 // by this cluster
-func (cluster *Cluster) NewPluginLoader(ctx context.Context) (client.Client, error) {
+func (cluster *Cluster) LoadPlugin(ctx context.Context) (client.Client, error) {
 	pluginLoader := client.NewUnixSocketClient(configuration.Current.PluginSocketDir)
 
 	// Load the plugins

@@ -32,7 +32,7 @@ func (r *ClusterReconciler) preReconcilePlugins(ctx context.Context, cluster *ap
 	contextLogger := log.FromContext(ctx)
 
 	// Load the plugins
-	pluginClient, err := cluster.NewPluginLoader(ctx)
+	pluginClient, err := cluster.LoadPlugin(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
 		return err

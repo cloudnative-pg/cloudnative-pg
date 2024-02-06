@@ -1297,7 +1297,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
 	// Call the plugins to enrich this Pod definition
-	pluginClient, err := cluster.NewPluginLoader(ctx)
+	pluginClient, err := cluster.LoadPlugin(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error invoking plugin meanwhile creating Pods")
 		return ctrl.Result{}, err

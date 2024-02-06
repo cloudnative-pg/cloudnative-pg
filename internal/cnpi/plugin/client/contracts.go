@@ -36,7 +36,9 @@ type Metadata struct {
 
 // Loader describes a struct capable of generating a plugin Client
 type Loader interface {
-	NewPluginLoader(ctx context.Context) (Client, error)
+	// LoadPlugin creates a new plugin client, loading the plugins that are required
+	// by this cluster
+	LoadPlugin(ctx context.Context) (Client, error)
 }
 
 // Client describes a set of behaviour needed to properly handle all the plugin client expected features
