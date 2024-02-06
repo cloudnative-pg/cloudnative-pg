@@ -54,7 +54,7 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 			AssertSwitchover(namespace, clusterName, env)
 			AssertPvcHasLabels(namespace, clusterName)
-			AssertClusterReplicationSlots(namespace, clusterName)
+			AssertClusterHAReplicationSlots(namespace, clusterName)
 		})
 	})
 	Context("without HA Replication slots", func() {

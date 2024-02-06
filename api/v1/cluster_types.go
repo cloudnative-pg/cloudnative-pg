@@ -990,6 +990,86 @@ const DefaultReplicationSlotsUpdateInterval = 30
 // DefaultReplicationSlotsHASlotPrefix is the default prefix for names of replication slots used for HA.
 const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
 
+// SynchronizeReplicasConfiguration contains the configuration for the synchronization of user defined
+// physical replication slots
+type SynchronizeReplicasConfiguration struct {
+	// When set to true, every replication slot that is on the primary is synchronized on each standby
+	// +kubebuilder:default:=true
+	Enabled *bool `json:"enabled"`
+
+	// List of regular expression patterns to match the names of replication slots to be excluded (by default empty)
+	// +optional
+	ExcludePatterns []string `json:"excludePatterns,omitempty"`
+
+	synchronizeReplicasCache `json:"-"`
+}
+
+// synchronizeReplicasCache contains the result of the regex compilation
+// +kubebuilder:object:generate:=false
+type synchronizeReplicasCache struct {
+	compiledPatterns []regexp.Regexp `json:"-"`
+
+	compiled bool `json:"-"`
+
+	compileErrors []error `json:"-"`
+}
+
+// DeepCopyInto needs to be manually added for the controller-gen compiler to work correctly, given that it cannot
+// generate the DeepCopyInto for the regexp type.
+// The method is empty because we don't want to transfer the cache when invoking DeepCopyInto
+func (receiver synchronizeReplicasCache) DeepCopyInto(*synchronizeReplicasCache) {}
+
+func (r *SynchronizeReplicasConfiguration) compileRegex() []error {
+	if r == nil {
+		return nil
+	}
+	if r.compiled {
+		return r.compileErrors
+	}
+
+	var errs []error
+	for _, pattern := range r.ExcludePatterns {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		r.compiledPatterns = append(r.compiledPatterns, *re)
+	}
+
+	r.compiled = true
+	r.compileErrors = errs
+	return errs
+}
+
+// GetEnabled returns false if synchronized replication slots are disabled, defaults to true
+func (r *SynchronizeReplicasConfiguration) GetEnabled() bool {
+	if r != nil && r.Enabled != nil {
+		return *r.Enabled
+	}
+	return true
+}
+
+// IsExcludedByUser returns if a replication slot should not be reconciled on the replicas
+func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(slotName string) (bool, error) {
+	if r == nil {
+		return false, nil
+	}
+
+	// this is an unexpected issue, validation should happen at webhook level
+	if errs := r.compileRegex(); len(errs) > 0 {
+		return false, errs[0]
+	}
+
+	for _, re := range r.compiledPatterns {
+		if re.MatchString(slotName) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // ReplicationSlotsConfiguration encapsulates the configuration
 // of replication slots
 type ReplicationSlotsConfiguration struct {
@@ -1004,6 +1084,15 @@ type ReplicationSlotsConfiguration struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	UpdateInterval int `json:"updateInterval,omitempty"`
+
+	// Configures the synchronization of the user defined physical replication slots
+	// +optional
+	SynchronizeReplicas *SynchronizeReplicasConfiguration `json:"synchronizeReplicas,omitempty"`
+}
+
+// GetEnabled returns false if replication slots are disabled, default is true
+func (r *ReplicationSlotsConfiguration) GetEnabled() bool {
+	return r.SynchronizeReplicas.GetEnabled() || r.HighAvailability.GetEnabled()
 }
 
 // GetUpdateInterval returns the update interval, defaulting to DefaultReplicationSlotsUpdateInterval if empty

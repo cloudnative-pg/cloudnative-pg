@@ -90,6 +90,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Hibernation of a PostgreSQL cluster in a declarative way
 * Support for Synchronous Replicas
 * Support for HA physical replication slots at cluster level
+* Synchronization of user defined physical replication slots
 * Backup from a standby
 * Backup retention policies (based on recovery window, only on object stores)
 * Parallel WAL archiving and restore to allow the database to keep up with WAL

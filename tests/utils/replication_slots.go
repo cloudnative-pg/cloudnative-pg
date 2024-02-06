@@ -26,6 +26,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -84,9 +85,9 @@ func AreSameLsn(lsnList []string) bool {
 	return true
 }
 
-// GetExpectedReplicationSlotsOnPod returns a slice of replication slot names which should be present
+// GetExpectedHAReplicationSlotsOnPod returns a slice of replication slot names which should be present
 // in a given pod
-func GetExpectedReplicationSlotsOnPod(
+func GetExpectedHAReplicationSlotsOnPod(
 	namespace, clusterName, podName string,
 	env *TestingEnvironment,
 ) ([]string, error) {
@@ -147,7 +148,7 @@ func GetReplicationSlotLsnsOnPod(
 	pod corev1.Pod,
 	env *TestingEnvironment,
 ) ([]string, error) {
-	slots, err := GetExpectedReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+	slots, err := GetExpectedHAReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
 	if err != nil {
 		return nil, err
 	}
@@ -166,14 +167,45 @@ func GetReplicationSlotLsnsOnPod(
 	return lsnList, err
 }
 
-// ToggleReplicationSlots sets the HA Replication Slot feature on/off depending on `enable`
-func ToggleReplicationSlots(namespace, clusterName string, enable bool, env *TestingEnvironment) error {
+// ToggleHAReplicationSlots sets the HA Replication Slot feature on/off depending on `enable`
+func ToggleHAReplicationSlots(namespace, clusterName string, enable bool, env *TestingEnvironment) error {
 	cluster, err := env.GetCluster(namespace, clusterName)
 	if err != nil {
 		return err
 	}
 	clusterToggle := cluster.DeepCopy()
+	if clusterToggle.Spec.ReplicationSlots == nil {
+		clusterToggle.Spec.ReplicationSlots = &apiv1.ReplicationSlotsConfiguration{}
+	}
+
+	if clusterToggle.Spec.ReplicationSlots.HighAvailability == nil {
+		clusterToggle.Spec.ReplicationSlots.HighAvailability = &apiv1.ReplicationSlotsHAConfiguration{}
+	}
+
 	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(enable)
+	err = env.Client.Patch(env.Ctx, clusterToggle, ctrlclient.MergeFrom(cluster))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// ToggleSynchronizeReplicationSlots sets the Synchronize Replication Slot feature on/off depending on `enable`
+func ToggleSynchronizeReplicationSlots(namespace, clusterName string, enable bool, env *TestingEnvironment) error {
+	cluster, err := env.GetCluster(namespace, clusterName)
+	if err != nil {
+		return err
+	}
+	clusterToggle := cluster.DeepCopy()
+	if clusterToggle.Spec.ReplicationSlots == nil {
+		clusterToggle.Spec.ReplicationSlots = &apiv1.ReplicationSlotsConfiguration{}
+	}
+
+	if clusterToggle.Spec.ReplicationSlots.SynchronizeReplicas == nil {
+		clusterToggle.Spec.ReplicationSlots.SynchronizeReplicas = &apiv1.SynchronizeReplicasConfiguration{}
+	}
+
+	clusterToggle.Spec.ReplicationSlots.SynchronizeReplicas.Enabled = ptr.To(enable)
 	err = env.Client.Patch(env.Ctx, clusterToggle, ctrlclient.MergeFrom(cluster))
 	if err != nil {
 		return err

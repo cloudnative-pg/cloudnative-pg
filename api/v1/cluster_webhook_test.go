@@ -2753,6 +2753,50 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(false)
 		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
 	})
+
+	It("should return an error when SynchronizeReplicasConfiguration is not nil and has invalid regex", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					SynchronizeReplicas: &SynchronizeReplicasConfiguration{
+						ExcludePatterns: []string{"([a-zA-Z]+"},
+					},
+				},
+			},
+		}
+		errors := cluster.validateReplicationSlots()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Cannot configure synchronizeReplicas. Invalid regexes were found"))
+	})
+
+	It("should not return an error when SynchronizeReplicasConfiguration is not nil and regex is valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					SynchronizeReplicas: &SynchronizeReplicasConfiguration{
+						ExcludePatterns: []string{"validpattern"},
+					},
+				},
+			},
+		}
+		errors := cluster.validateReplicationSlots()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("should not return an error when SynchronizeReplicasConfiguration is nil", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					SynchronizeReplicas: nil,
+				},
+			},
+		}
+		errors := cluster.validateReplicationSlots()
+		Expect(errors).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Environment variables validation", func() {

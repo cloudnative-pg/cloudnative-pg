@@ -18,6 +18,7 @@ package infrastructure
 
 import (
 	"context"
+	"strings"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -53,8 +54,7 @@ func (sm PostgresManager) List(
 	rows, err := db.QueryContext(
 		ctx,
 		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn FROM pg_replication_slots
-            WHERE NOT temporary AND slot_name ^@ $1 AND slot_type = 'physical'`,
-		config.HighAvailability.GetSlotPrefix(),
+            WHERE NOT temporary AND slot_type = 'physical'`,
 	)
 	if err != nil {
 		return ReplicationSlotList{}, err
@@ -74,6 +74,15 @@ func (sm PostgresManager) List(
 		)
 		if err != nil {
 			return ReplicationSlotList{}, err
+		}
+
+		slot.IsHA = strings.HasPrefix(slot.SlotName, config.HighAvailability.GetSlotPrefix())
+		isFilteredByUser, err := config.SynchronizeReplicas.IsExcludedByUser(slot.SlotName)
+		if err != nil {
+			return status, err
+		}
+		if !slot.IsHA && isFilteredByUser {
+			continue
 		}
 
 		status.Items = append(status.Items, slot)

@@ -17,10 +17,12 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -30,10 +32,11 @@ import (
 
 var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 	const (
-		namespacePrefix = "replication-slot-e2e"
-		clusterName     = "cluster-pg-replication-slot"
-		sampleFile      = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
-		level           = tests.High
+		namespacePrefix  = "replication-slot-e2e"
+		clusterName      = "cluster-pg-replication-slot"
+		sampleFile       = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
+		level            = tests.High
+		userPhysicalSlot = "test_slot"
 	)
 	var namespace string
 	BeforeEach(func() {
@@ -55,7 +58,7 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("enabling replication slot on cluster", func() {
-			err := testsUtils.ToggleReplicationSlots(namespace, clusterName, true, env)
+			err := testsUtils.ToggleHAReplicationSlots(namespace, clusterName, true, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Replication slots should be Enabled
@@ -78,7 +81,14 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 		By("checking Primary HA slots exist and are active", func() {
 			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertReplicationSlotsOnPod(namespace, clusterName, *primaryPod)
+			expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(
+				namespace,
+				clusterName,
+				primaryPod.GetName(),
+				env,
+			)
+			Expect(err).ToNot(HaveOccurred())
+			AssertReplicationSlotsOnPod(namespace, clusterName, *primaryPod, expectedSlots, true, false)
 		})
 
 		By("checking standbys HA slots exist", func() {
@@ -91,7 +101,9 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			}, 90, 2).Should(Succeed())
 			GinkgoWriter.Println("standby slot check succeeded in", time.Since(before))
 			for _, pod := range replicaPods.Items {
-				AssertReplicationSlotsOnPod(namespace, clusterName, pod)
+				expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+				Expect(err).ToNot(HaveOccurred())
+				AssertReplicationSlotsOnPod(namespace, clusterName, pod, expectedSlots, true, false)
 			}
 		})
 
@@ -99,8 +111,36 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			AssertClusterReplicationSlotsAligned(namespace, clusterName)
 		})
 
+		By("creating a physical replication slots on the primary", func() {
+			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, _, err = testsUtils.RunQueryFromPod(primaryPod, testsUtils.PGLocalSocketDir,
+				"app", "postgres", "''",
+				fmt.Sprintf("SELECT pg_create_physical_replication_slot('%s');", userPhysicalSlot),
+				env)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("ensuring that the new physical replication slot is found on the replicas", func() {
+			var replicaPods *corev1.PodList
+			var err error
+			before := time.Now()
+			Eventually(func(g Gomega) {
+				replicaPods, err = env.GetClusterReplicas(namespace, clusterName)
+				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
+			}, 90, 2).Should(Succeed())
+			GinkgoWriter.Println("standby slot check succeeded in", time.Since(before))
+			for _, pod := range replicaPods.Items {
+				GinkgoWriter.Println("checking replica pod:", pod.Name)
+				AssertReplicationSlotsOnPod(namespace, clusterName, pod, []string{userPhysicalSlot}, false, false)
+			}
+		})
+
 		By("disabling replication slot from running cluster", func() {
-			err := testsUtils.ToggleReplicationSlots(namespace, clusterName, false, env)
+			err := testsUtils.ToggleHAReplicationSlots(namespace, clusterName, false, env)
+			Expect(err).ToNot(HaveOccurred())
+			err = testsUtils.ToggleSynchronizeReplicationSlots(namespace, clusterName, false, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Replication slots should be Disabled
@@ -109,7 +149,7 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 				if err != nil {
 					return false, err
 				}
-				return cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled(), nil
+				return cluster.Spec.ReplicationSlots.GetEnabled(), nil
 			}, 10, 2).Should(BeFalse())
 		})
 
@@ -124,13 +164,22 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			pods, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range pods.Items {
-				Eventually(func() (int, error) {
+				Eventually(func(g Gomega) error {
 					slotOnPod, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
 					if err != nil {
-						return -1, err
+						return err
 					}
-					return len(slotOnPod), nil
-				}, 90, 2).Should(BeEquivalentTo(0))
+
+					// on the primary we should retain the user created slot
+					if specs.IsPodPrimary(pod) {
+						g.Expect(slotOnPod).To(HaveLen(1))
+						g.Expect(slotOnPod).To(ContainElement(userPhysicalSlot))
+						return nil
+					}
+					// on replicas instead we should clean up everything
+					g.Expect(slotOnPod).To(BeEmpty())
+					return nil
+				}, 90, 2).ShouldNot(HaveOccurred())
 			}
 		})
 	})

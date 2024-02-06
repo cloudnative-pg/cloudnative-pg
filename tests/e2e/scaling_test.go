@@ -54,7 +54,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
-			AssertClusterReplicationSlots(clusterName, namespace)
+			AssertClusterHAReplicationSlots(clusterName, namespace)
 			// Add a node to the cluster and verify the cluster has one more
 			// element
 			By("adding an instance to the cluster", func() {
@@ -64,7 +64,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
 			AssertPvcHasLabels(namespace, clusterName)
-			AssertClusterReplicationSlots(clusterName, namespace)
+			AssertClusterHAReplicationSlots(clusterName, namespace)
 
 			// Remove a node from the cluster and verify the cluster has one
 			// element less
@@ -74,7 +74,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				timeout := 60
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
-			AssertClusterReplicationSlots(clusterName, namespace)
+			AssertClusterHAReplicationSlots(clusterName, namespace)
 
 			By("verify pvc pgWal and pgData are deleted after scale down", func() {
 				AssertPVCCount(namespace, clusterName, expectedPvcCount, 60)

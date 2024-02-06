@@ -88,33 +88,33 @@ var _ = Describe("PostgresManager", func() {
 
 		It("should successfully list replication slots", func() {
 			rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn"}).
-				AddRow("slot1", string(SlotTypePhysical), true, "lsn1").
+				AddRow("_cnpg_slot1", string(SlotTypePhysical), true, "lsn1").
 				AddRow("slot2", string(SlotTypePhysical), true, "lsn2")
 
 			mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
-				WithArgs(config.HighAvailability.SlotPrefix).
 				WillReturnRows(rows)
 
 			result, err := manager.List(context.Background(), config)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Items).To(HaveLen(2))
-			Expect(result.Has("slot1")).To(BeTrue())
+			Expect(result.Has("_cnpg_slot1")).To(BeTrue())
 			Expect(result.Has("slot2")).To(BeTrue())
 
-			slot1 := result.Get("slot1")
+			slot1 := result.Get("_cnpg_slot1")
 			Expect(slot1.Type).To(Equal(SlotTypePhysical))
 			Expect(slot1.Active).To(BeTrue())
 			Expect(slot1.RestartLSN).To(Equal("lsn1"))
+			Expect(slot1.IsHA).To(BeTrue())
 
 			slot2 := result.Get("slot2")
 			Expect(slot2.Type).To(Equal(SlotTypePhysical))
 			Expect(slot2.Active).To(BeTrue())
 			Expect(slot2.RestartLSN).To(Equal("lsn2"))
+			Expect(slot2.IsHA).To(BeFalse())
 		})
 
 		It("should return error when database query fails", func() {
 			mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
-				WithArgs(config.HighAvailability.SlotPrefix).
 				WillReturnError(errors.New("mock error"))
 
 			_, err := manager.List(context.Background(), config)

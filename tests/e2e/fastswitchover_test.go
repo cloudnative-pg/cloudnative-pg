@@ -88,7 +88,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 				return env.DeleteNamespace(namespace)
 			})
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
-			AssertClusterReplicationSlots(namespace, clusterName)
+			AssertClusterHAReplicationSlots(namespace, clusterName)
 		})
 	})
 })

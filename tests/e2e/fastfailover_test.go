@@ -106,7 +106,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			})
 			AssertFastFailOver(namespace, sampleFileWithReplicationSlots,
 				clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
-			AssertClusterReplicationSlots(namespace, clusterName)
+			AssertClusterHAReplicationSlots(namespace, clusterName)
 		})
 	})
 

@@ -112,7 +112,8 @@ switchover operations.
 CloudNativePG manages replication slots for all the replicas
 in the HA cluster. The implementation is inspired by the previously
 proposed patch for PostgreSQL, called
-[failover slots](https://wiki.postgresql.org/wiki/Failover_slots).
+[failover slots](https://wiki.postgresql.org/wiki/Failover_slots), and
+also supports user defined physical replication slots on the primary.
 
 ### Database configuration
 

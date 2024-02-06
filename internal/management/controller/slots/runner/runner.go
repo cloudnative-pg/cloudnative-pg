@@ -63,7 +63,7 @@ func (sr *Replicator) Start(ctx context.Context) error {
 
 			// If replication is disabled stop the timer,
 			// the process will resume through the wakeUp channel if necessary
-			if config == nil || config.HighAvailability == nil || !config.HighAvailability.GetEnabled() {
+			if config == nil || !config.GetEnabled() {
 				ticker.Stop()
 				// we set updateInterval to 0 to make sure the Ticker will be reset
 				// if the feature is enabled again
@@ -118,6 +118,7 @@ func (sr *Replicator) reconcile(ctx context.Context, config *apiv1.ReplicationSl
 }
 
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary
+// nolint: gocognit
 func synchronizeReplicationSlots(
 	ctx context.Context,
 	primarySlotManager infrastructure.Manager,
@@ -150,9 +151,20 @@ func synchronizeReplicationSlots(
 		if slot.SlotName == mySlotName {
 			continue
 		}
-		if slot.RestartLSN == "" {
+
+		if slot.IsHA {
+			if slot.RestartLSN == "" {
+				continue
+			}
+			if !config.HighAvailability.GetEnabled() {
+				continue
+			}
+		}
+
+		if !slot.IsHA && !config.SynchronizeReplicas.GetEnabled() {
 			continue
 		}
+
 		if !slotsInLocal.Has(slot.SlotName) {
 			err := localSlotManager.Create(ctx, slot)
 			if err != nil {
@@ -165,9 +177,16 @@ func synchronizeReplicationSlots(
 		}
 	}
 	for _, slot := range slotsInLocal.Items {
+		// We delete the slots not present on the primary or old HA replication slots.
 		if !slotsInPrimary.Has(slot.SlotName) || slot.SlotName == mySlotName {
-			err := localSlotManager.Delete(ctx, slot)
-			if err != nil {
+			if err := localSlotManager.Delete(ctx, slot); err != nil {
+				return err
+			}
+		}
+
+		// when the user turns off the feature we should delete all the created replication slots that aren't from HA
+		if !slot.IsHA && !config.SynchronizeReplicas.GetEnabled() {
+			if err := localSlotManager.Delete(ctx, slot); err != nil {
 				return err
 			}
 		}

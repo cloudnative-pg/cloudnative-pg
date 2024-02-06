@@ -153,6 +153,11 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 			SlotPrefix: "_cnpg_",
 		}
 	}
+	if r.Spec.ReplicationSlots.SynchronizeReplicas == nil {
+		r.Spec.ReplicationSlots.SynchronizeReplicas = &SynchronizeReplicasConfiguration{
+			Enabled: ptr.To(true),
+		}
+	}
 
 	if len(r.Spec.Tablespaces) > 0 {
 		r.defaultTablespaces()
@@ -1983,11 +1988,14 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 			HighAvailability: &ReplicationSlotsHAConfiguration{
 				Enabled: ptr.To(true),
 			},
+			SynchronizeReplicas: &SynchronizeReplicasConfiguration{
+				Enabled: ptr.To(true),
+			},
 		}
 	}
 	replicationSlots := r.Spec.ReplicationSlots
 
-	if !replicationSlots.HighAvailability.GetEnabled() {
+	if !replicationSlots.GetEnabled() {
 		return nil
 	}
 
@@ -1998,16 +2006,36 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		return nil
 	}
 
-	if psqlVersion >= 110000 {
-		return nil
+	if psqlVersion < 110000 {
+		if replicationSlots.HighAvailability.GetEnabled() {
+			return field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
+					replicationSlots.HighAvailability.GetEnabled(),
+					"Cannot enable HA replication slots synchronization. PostgreSQL 11 or above required"),
+			}
+		}
+
+		if replicationSlots.SynchronizeReplicas.GetEnabled() {
+			return field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "enabled"),
+					replicationSlots.SynchronizeReplicas.GetEnabled(),
+					"Cannot enable user defined replication slots synchronization. PostgreSQL 11 or above required"),
+			}
+		}
 	}
 
-	return field.ErrorList{
-		field.Invalid(
-			field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
-			replicationSlots.HighAvailability.GetEnabled(),
-			"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
+				errs,
+				"Cannot configure synchronizeReplicas. Invalid regexes were found"),
+		}
 	}
+
+	return nil
 }
 
 func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {

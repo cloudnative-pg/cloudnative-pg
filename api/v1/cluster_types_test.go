@@ -1081,3 +1081,111 @@ var _ = Describe("Tablespaces", func() {
 		})
 	})
 })
+
+var _ = Describe("SynchronizeReplicasConfiguration", func() {
+	var synchronizeReplicas *SynchronizeReplicasConfiguration
+
+	BeforeEach(func() {
+		synchronizeReplicas = &SynchronizeReplicasConfiguration{}
+	})
+
+	Context("compileRegex", func() {
+		It("should return no errors when SynchronizeReplicasConfiguration is nil", func() {
+			synchronizeReplicas = nil
+			Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
+		})
+
+		Context("when SynchronizeReplicasConfiguration is not nil", func() {
+			BeforeEach(func() {
+				synchronizeReplicas.ExcludePatterns = []string{"pattern1", "pattern2"}
+			})
+
+			It("should compile patterns without errors", func() {
+				Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
+			})
+
+			Context("when a pattern fails to compile", func() {
+				BeforeEach(func() {
+					synchronizeReplicas.ExcludePatterns = []string{"([a-zA-Z]+", "validpattern"}
+				})
+
+				It("should return errors for the invalid pattern", func() {
+					errors := synchronizeReplicas.compileRegex()
+					Expect(errors).To(HaveLen(1))
+				})
+			})
+		})
+
+		It("should return no errors on subsequent calls when compile is called multiple times", func() {
+			Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
+			Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
+		})
+	})
+
+	Context("GetEnabled", func() {
+		It("should return true when SynchronizeReplicasConfiguration is nil", func() {
+			synchronizeReplicas = nil
+			Expect(synchronizeReplicas.GetEnabled()).To(BeTrue())
+		})
+
+		Context("when SynchronizeReplicasConfiguration is not nil", func() {
+			It("should default to true when Enabled is nil", func() {
+				synchronizeReplicas.Enabled = nil
+				Expect(synchronizeReplicas.GetEnabled()).To(BeTrue())
+			})
+
+			It("should return true when Enabled is true", func() {
+				synchronizeReplicas.Enabled = ptr.To(true)
+				Expect(synchronizeReplicas.GetEnabled()).To(BeTrue())
+			})
+
+			It("should return false when Enabled is false", func() {
+				synchronizeReplicas.Enabled = ptr.To(false)
+				Expect(synchronizeReplicas.GetEnabled()).To(BeFalse())
+			})
+		})
+	})
+
+	Context("IsExcludedByUser", func() {
+		It("should return false when SynchronizeReplicasConfiguration is nil", func() {
+			synchronizeReplicas = nil
+			isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("someSlot")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(isExcludedByUser).To(BeFalse())
+		})
+
+		Context("when SynchronizeReplicasConfiguration is not nil", func() {
+			BeforeEach(func() {
+				synchronizeReplicas.ExcludePatterns = []string{"pattern1", "pattern2"}
+			})
+
+			It("should return false if no patterns match", func() {
+				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("nonMatchingSlot")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(isExcludedByUser).To(BeFalse())
+			})
+
+			It("should return true if a pattern matches", func() {
+				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("pattern1MatchingSlot")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(isExcludedByUser).To(BeTrue())
+			})
+
+			It("should compile patterns before checking for exclusion when compile is not called", func() {
+				Expect(synchronizeReplicas.compiledPatterns).To(BeEmpty())
+				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("pattern1MatchingSlot")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(isExcludedByUser, err).To(BeTrue())
+				Expect(synchronizeReplicas.compiledPatterns).To(HaveLen(2))
+			})
+
+			It("should return an error in case of an invalid pattern", func() {
+				synchronizeReplicas.ExcludePatterns = []string{"([a-zA-Z]+"}
+				isExcludedByUser, err := synchronizeReplicas.IsExcludedByUser("test")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal("error parsing regexp: missing closing ): `([a-zA-Z]+`"))
+				Expect(isExcludedByUser).To(BeFalse())
+			})
+		})
+	})
+})
