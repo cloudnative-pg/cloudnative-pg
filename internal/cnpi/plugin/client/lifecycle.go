@@ -95,7 +95,7 @@ func (data *data) LifecycleHook(
 			return nil, err
 		}
 
-		if len(result.JsonPatch) == 0 {
+		if result == nil || len(result.JsonPatch) == 0 {
 			// There's nothing to mutate
 			continue
 		}
