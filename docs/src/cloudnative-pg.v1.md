@@ -4489,14 +4489,14 @@ physical replication slots</p>
 <i>bool</i>
 </td>
 <td>
-   <p>when set to true, every replication slot that is on the primary is synchronized on each standby</p>
+   <p>When set to true, every replication slot that is on the primary is synchronized on each standby</p>
 </td>
 </tr>
 <tr><td><code>excludePatterns</code><br/>
 <i>[]string</i>
 </td>
 <td>
-   <p>list of regular expression patterns to match the names of replication slots to be excluded (by default empty)</p>
+   <p>List of regular expression patterns to match the names of replication slots to be excluded (by default empty)</p>
 </td>
 </tr>
 <tr><td><code>-</code> <B>[Required]</B><br/>
