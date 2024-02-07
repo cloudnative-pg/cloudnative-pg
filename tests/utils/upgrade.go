@@ -73,7 +73,7 @@ func InstallLatestCNPGOperator(releaseTag string, env *TestingEnvironment) {
 	Eventually(func() error {
 		GinkgoWriter.Printf("installing: %s\n", mostRecentReleasePath)
 
-		_, stderr, err := RunUnchecked("kubectl apply -f " + mostRecentReleasePath)
+		_, stderr, err := RunUnchecked("kubectl apply --server-side -f " + mostRecentReleasePath)
 		if err != nil {
 			GinkgoWriter.Printf("stderr: %s\n", stderr)
 		}
