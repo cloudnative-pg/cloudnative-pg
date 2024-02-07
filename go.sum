@@ -24,8 +24,8 @@ github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWR
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/cloudnative-pg/cnpg-i v0.0.0-20240122164555-5215ff219c8f h1:ypwPq45y8ezzwxUTHL0VkzkT2+pcHnE4yRoeGTP8fp8=
-github.com/cloudnative-pg/cnpg-i v0.0.0-20240122164555-5215ff219c8f/go.mod h1:0G5GXQVj09KvONIcYURyroL74zOFGjv4eI5OXz7/G/0=
+github.com/cloudnative-pg/cnpg-i v0.0.0-20240201130629-5869c644788b h1:2uO/nDtBBErg+rUncTh87QTWqgNqc0sKuKYiqeCjkY4=
+github.com/cloudnative-pg/cnpg-i v0.0.0-20240201130629-5869c644788b/go.mod h1:0G5GXQVj09KvONIcYURyroL74zOFGjv4eI5OXz7/G/0=
 github.com/cpuguy83/go-md2man/v2 v2.0.3/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
