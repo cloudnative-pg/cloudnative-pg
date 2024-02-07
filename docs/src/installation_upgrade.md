@@ -306,7 +306,7 @@ kubectl apply --server-side --force-conflicts -f <OPERATOR_MANIFEST>
 ```
 
 Henceforth, `kube-apiserver` will be automatically acknowledged as a recognized
-manager for the CRD, eliminating the need for any further manual intervention
+manager for the CRDs, eliminating the need for any further manual intervention
 on this matter.
 
 -->
