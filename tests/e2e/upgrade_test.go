@@ -357,7 +357,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	deployOperator := func(operatorManifestFile string) {
 		By(fmt.Sprintf("applying manager manifest %s", operatorManifestFile), func() {
 			// Upgrade to the new version
-			_, stderr, err := testsUtils.Run(fmt.Sprintf("kubectl apply -f %v", operatorManifestFile))
+			_, stderr, err := testsUtils.Run(
+				fmt.Sprintf("kubectl apply --server-side -f %v", operatorManifestFile))
 			Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
 		})
 

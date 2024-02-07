@@ -11,7 +11,7 @@ You can install the [latest operator manifest](https://raw.githubusercontent.com
 for this minor release as follows:
 
 ```sh
-kubectl apply -f \
+kubectl apply --server-side -f \
   https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.22/releases/cnpg-1.22.1.yaml
 ```
 
@@ -64,7 +64,7 @@ For example, you can install the latest snapshot of the operator with:
 ```sh
 curl -sSfL \
   https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
-  kubectl apply -f -
+  kubectl apply --server-side -f -
 ```
 
 If you are instead looking for the latest snapshot of the operator for this
@@ -73,7 +73,7 @@ specific minor release, you can just run:
 ```sh
 curl -sSfL \
   https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.22/manifests/operator-manifest.yaml | \
-  kubectl apply -f -
+  kubectl apply --server-side -f -
 ```
 
 !!! Important
@@ -236,12 +236,13 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.22.0, 1.21.2 or 1.20.5
+### Upgrading to 1.22 from a previous minor version
 
 !!! Important
-    We encourage all existing users of CloudNativePG to upgrade to version
-    1.22.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.21.2 or 1.20.5).
+    If you are transitioning from a prior minor version to version 1.22, please
+    ensure that you are using the latest available patch version, which is
+    currently 1.22.2. This guarantees that you benefit from the most recent bug
+    fixes, security updates, and improvements associated with the 1.22 series.
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
@@ -283,6 +284,32 @@ that you set `enableAlterSystem` explicitly to `false`.
     You can set the desired value for  `enableAlterSystem` immediately
     following your upgrade to version 1.22.0, 1.21.2, or 1.20.5, as shown in
     the example above.
+
+#### Server-side apply of manifests
+
+To ensure compatibility with Kubernetes 1.29 and upcoming versions,
+CloudNativePG now mandates the utilization of
+["Server-side apply"](https://kubernetes.io/docs/reference/using-api/server-side-apply/)
+when deploying the operator manifest.
+
+While employing this installation method poses no challenges for new
+deployments, updating existing operator manifests using the `--server-side`
+option may result in errors resembling the example below:
+
+``` text
+Apply failed with 1 conflict: conflict with "kubectl-client-side-apply" using..
+```
+
+If such errors arise, they can be resolved by explicitly specifying the
+`--force-conflicts` option to enforce conflict resolution:
+
+```sh
+kubectl apply --server-side --force-conflicts -f <OPERATOR_MANIFEST>
+```
+
+Henceforth, `kube-apiserver` will be automatically acknowledged as a recognized
+manager for the CRDs, eliminating the need for any further manual intervention
+on this matter.
 
 ### Upgrading to 1.21 from a previous minor version
 
