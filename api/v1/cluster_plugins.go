@@ -21,19 +21,25 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// NewLoader creates a new plugin client, loading the plugins that are required
+// LoadPluginClient creates a new plugin client, loading the plugins that are required
 // by this cluster
-func (plugins PluginConfigurationList) NewLoader(ctx context.Context) (client.Client, error) {
+func (cluster *Cluster) LoadPluginClient(ctx context.Context) (client.Client, error) {
 	pluginLoader := client.NewUnixSocketClient(configuration.Current.PluginSocketDir)
 
 	// Load the plugins
-	for _, pluginDeclaration := range plugins {
+	for _, pluginDeclaration := range cluster.Spec.Plugins {
 		if err := pluginLoader.Load(ctx, pluginDeclaration.Name); err != nil {
 			return nil, err
 		}
 	}
 
 	return pluginLoader, nil
+}
+
+// SetInContext records the cluster in the given context
+func (cluster *Cluster) SetInContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, utils.ContextKeyCluster, cluster)
 }
