@@ -299,7 +299,11 @@ Apply failed with 1 conflict: conflict with "kubectl-client-side-apply" using..
 ```
 
 If such errors arise, they can be resolved by explicitly specifying the
-`--force-conflicts` option to enforce conflict resolution.
+`--force-conflicts` option to enforce conflict resolution:
+
+```sh
+kubectl apply --server-side --force-conflicts -f <OPERATOR_MANIFEST>
+```
 
 -->
 
