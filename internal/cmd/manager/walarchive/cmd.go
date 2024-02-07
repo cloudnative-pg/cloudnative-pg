@@ -250,7 +250,7 @@ func archiveWALViaPlugins(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pluginClient, err := cluster.LoadPlugin(ctx)
+	pluginClient, err := cluster.LoadPluginClient(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins while archiving a WAL")
 		return err
