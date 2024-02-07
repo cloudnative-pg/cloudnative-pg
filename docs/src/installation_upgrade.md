@@ -305,6 +305,10 @@ If such errors arise, they can be resolved by explicitly specifying the
 kubectl apply --server-side --force-conflicts -f <OPERATOR_MANIFEST>
 ```
 
+Henceforth, `kube-apiserver` will be automatically acknowledged as a recognized
+manager for the CRD, eliminating the need for any further manual intervention
+on this matter.
+
 -->
 
 ### Upgrading to 1.22 from a previous minor version
