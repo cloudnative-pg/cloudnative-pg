@@ -175,13 +175,13 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 
 ##@ Deployment
 install: manifests kustomize ## Install CRDs into a cluster.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	$(KUSTOMIZE) build config/crd | kubectl apply --server-side -f -
 
 uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
-	kubectl apply -f ${OPERATOR_MANIFEST_PATH}
+	kubectl apply --server-side -f ${OPERATOR_MANIFEST_PATH}
 
 generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	set -e ;\
