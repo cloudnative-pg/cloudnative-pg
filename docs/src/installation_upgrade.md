@@ -283,6 +283,24 @@ use the following configuration:
       enabled: false
 ```
 
+#### Server-side apply of manifests
+
+To ensure compatibility with Kubernetes 1.29 and upcoming versions,
+CloudNativePG now mandates the utilization of
+["Server-side apply"](https://kubernetes.io/docs/reference/using-api/server-side-apply/)
+when deploying the operator manifest.
+
+While employing this installation method poses no challenges for new
+deployments, updating existing operator manifests using the `--server-side`
+option may result in errors resembling the example below:
+
+``` text
+Apply failed with 1 conflict: conflict with "kubectl-client-side-apply" using..
+```
+
+If such errors arise, they can be resolved by explicitly specifying the
+`--force-conflicts` option to enforce conflict resolution.
+
 -->
 
 ### Upgrading to 1.22 from a previous minor version
