@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
+	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
@@ -70,14 +71,15 @@ type data struct {
 }
 
 type pluginData struct {
-	connection     connectionHandler
-	identityClient identity.IdentityClient
-	operatorClient operator.OperatorClient
-
-	name                 string
-	version              string
-	capabilities         []identity.PluginCapability_Service_Type
-	operatorCapabilities []operator.OperatorCapability_RPC_Type
+	connection            connectionHandler
+	identityClient        identity.IdentityClient
+	operatorClient        operator.OperatorClient
+	lifecycleClient       lifecycle.LifecycleClient
+	name                  string
+	version               string
+	capabilities          []identity.PluginCapability_Service_Type
+	operatorCapabilities  []operator.OperatorCapability_RPC_Type
+	lifecycleCapabilities []*lifecycle.LifecycleCapabilities
 }
 
 // NewUnixSocketClient creates a new CNPI client discovering plugins
@@ -148,6 +150,12 @@ func (data *data) loadPlugin(ctx context.Context, name string) (pluginData, erro
 		}
 	}
 
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_LIFECYCLE_SERVICE) {
+		if err = result.loadLifecycleCapabilities(ctx); err != nil {
+			return pluginData{}, err
+		}
+	}
+
 	return result, nil
 }
 
@@ -185,6 +193,7 @@ func newPluginDataFromConnection(ctx context.Context, connection connectionHandl
 	result.version = pluginInfoResponse.Version
 	result.identityClient = identity.NewIdentityClient(connection)
 	result.operatorClient = operator.NewOperatorClient(connection)
+	result.lifecycleClient = lifecycle.NewLifecycleClient(connection)
 
 	return result, err
 }
@@ -225,6 +234,21 @@ func (pluginData *pluginData) loadOperatorCapabilities(ctx context.Context) erro
 	for i := range pluginData.operatorCapabilities {
 		pluginData.operatorCapabilities[i] = operatorCapabilitiesResponse.Capabilities[i].GetRpc().Type
 	}
+
+	return nil
+}
+
+func (pluginData *pluginData) loadLifecycleCapabilities(ctx context.Context) error {
+	var lifecycleCapabilitiesResponse *lifecycle.LifecycleCapabilitiesResponse
+	var err error
+	if lifecycleCapabilitiesResponse, err = pluginData.lifecycleClient.GetCapabilities(
+		ctx,
+		&lifecycle.LifecycleCapabilitiesRequest{},
+	); err != nil {
+		return fmt.Errorf("while querying plugin lifecycle capabilities: %w", err)
+	}
+
+	pluginData.lifecycleCapabilities = lifecycleCapabilitiesResponse.LifecycleCapabilities
 
 	return nil
 }
