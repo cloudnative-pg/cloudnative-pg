@@ -32,6 +32,7 @@ type Metadata struct {
 	Version              string
 	Capabilities         []string
 	OperatorCapabilities []string
+	WALCapabilities      []string
 }
 
 // Loader describes a struct capable of generating a plugin Client

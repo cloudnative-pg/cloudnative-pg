@@ -295,6 +295,7 @@ func (pluginData *pluginData) Metadata() Metadata {
 		Version:              pluginData.version,
 		Capabilities:         make([]string, len(pluginData.capabilities)),
 		OperatorCapabilities: make([]string, len(pluginData.operatorCapabilities)),
+		WALCapabilities:      make([]string, len(pluginData.walCapabilities)),
 	}
 
 	for i := range pluginData.capabilities {
@@ -303,6 +304,10 @@ func (pluginData *pluginData) Metadata() Metadata {
 
 	for i := range pluginData.operatorCapabilities {
 		result.OperatorCapabilities[i] = pluginData.operatorCapabilities[i].String()
+	}
+
+	for i := range pluginData.walCapabilities {
+		result.WALCapabilities[i] = pluginData.walCapabilities[i].String()
 	}
 
 	return result
