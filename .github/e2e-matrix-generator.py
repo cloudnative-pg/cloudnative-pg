@@ -268,10 +268,6 @@ def build_schedule_include_cloud(engine_version_list):
             E2EJob(k8s_version, POSTGRES.latest, "pg"),
         }
 
-    # Iterate over PostgreSQL versions
-    for postgres_version in POSTGRES.values():
-        result |= {E2EJob(engine_version_list.latest, postgres_version, "pg")}
-
     return result
 
 
