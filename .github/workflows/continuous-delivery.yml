@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.20, release-1.21, release-1.22]
+        branch: [release-1.21, release-1.22]
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@v1
