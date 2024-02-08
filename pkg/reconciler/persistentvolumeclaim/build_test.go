@@ -53,7 +53,7 @@ var _ = Describe("PVC Creation", func() {
 				Storage: apiv1.StorageConfiguration{
 					StorageClass: &storageClass,
 					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
 						},
 					},
@@ -75,7 +75,7 @@ var _ = Describe("PVC Creation", func() {
 					Size:         "2Gi",
 					StorageClass: &storageClass,
 					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
 						},
 					},
