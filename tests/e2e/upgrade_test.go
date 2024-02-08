@@ -78,8 +78,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		configName              = "cnpg-controller-manager-config"
 		currentOperatorManifest = fixturesDir + "/upgrade/current-manifest.yaml"
 		primeOperatorManifest   = fixturesDir + "/upgrade/current-manifest-prime.yaml"
-		missingManifestsMessage = "MISSING the test operator manifest.\n" +
-			"It should have been produced by calling the hack/run-e2e.sh script"
 		rollingUpgradeNamespace = "rolling-upgrade"
 		onlineUpgradeNamespace  = "online-upgrade"
 
@@ -673,10 +671,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
+	assertManifestPresent := func(path string) {
+		const missingManifestsMessage = "MISSING the test operator manifest.\n" +
+			"It should have been produced by calling the hack/run-e2e.sh script"
+		_, err := os.Stat(path)
+		Expect(err).NotTo(HaveOccurred(), missingManifestsMessage)
+	}
+
 	When("upgrading from the most recent tag to the current operator", func() {
 		JustBeforeEach(func() {
-			_, err := os.Stat(currentOperatorManifest)
-			Expect(err).NotTo(HaveOccurred(), missingManifestsMessage)
+			assertManifestPresent(currentOperatorManifest)
 		})
 
 		It("keeps clusters working after a rolling upgrade", func() {
@@ -716,10 +720,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 	When("upgrading from the current operator to a `prime` operator with a new hash", func() {
 		JustBeforeEach(func() {
-			_, err := os.Stat(currentOperatorManifest)
-			Expect(err).NotTo(HaveOccurred(), missingManifestsMessage)
-			_, err = os.Stat(primeOperatorManifest)
-			Expect(err).NotTo(HaveOccurred(), missingManifestsMessage)
+			assertManifestPresent(currentOperatorManifest)
+			assertManifestPresent(primeOperatorManifest)
 		})
 
 		It("keeps clusters working after an online upgrade", func() {
