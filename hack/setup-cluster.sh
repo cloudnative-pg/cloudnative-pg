@@ -583,7 +583,7 @@ load() {
     echo "${bright}Building a 'prime' operator from current worktree${reset}"
 
     PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
-    CURRENT_VERSION=$(make -s print-version)
+    CURRENT_VERSION=$(make -C "${ROOT_DIR}" -s print-version)
     PRIME_VERSION="${CURRENT_VERSION}-prime"
     make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}"  VERSION="${PRIME_VERSION}" \
       ARCH="${ARCH}" docker-build
