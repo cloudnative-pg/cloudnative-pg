@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -71,14 +72,17 @@ type data struct {
 }
 
 type pluginData struct {
-	connection            connectionHandler
-	identityClient        identity.IdentityClient
-	operatorClient        operator.OperatorClient
-	lifecycleClient       lifecycle.LifecycleClient
+	connection      connectionHandler
+	identityClient  identity.IdentityClient
+	operatorClient  operator.OperatorClient
+	lifecycleClient lifecycle.LifecycleClient
+	walClient       wal.WALClient
+
 	name                  string
 	version               string
 	capabilities          []identity.PluginCapability_Service_Type
 	operatorCapabilities  []operator.OperatorCapability_RPC_Type
+	walCapabilities       []wal.WALCapability_RPC_Type
 	lifecycleCapabilities []*lifecycle.LifecycleCapabilities
 }
 
@@ -150,8 +154,18 @@ func (data *data) loadPlugin(ctx context.Context, name string) (pluginData, erro
 		}
 	}
 
+	// If the plugin implements the lifecycle service, load its
+	// capabilities
 	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_LIFECYCLE_SERVICE) {
 		if err = result.loadLifecycleCapabilities(ctx); err != nil {
+			return pluginData{}, err
+		}
+	}
+
+	// If the plugin implements the WAL service, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_WAL_SERVICE) {
+		if err = result.loadWALCapabilities(ctx); err != nil {
 			return pluginData{}, err
 		}
 	}
@@ -194,6 +208,7 @@ func newPluginDataFromConnection(ctx context.Context, connection connectionHandl
 	result.identityClient = identity.NewIdentityClient(connection)
 	result.operatorClient = operator.NewOperatorClient(connection)
 	result.lifecycleClient = lifecycle.NewLifecycleClient(connection)
+	result.walClient = wal.NewWALClient(connection)
 
 	return result, err
 }
@@ -249,6 +264,25 @@ func (pluginData *pluginData) loadLifecycleCapabilities(ctx context.Context) err
 	}
 
 	pluginData.lifecycleCapabilities = lifecycleCapabilitiesResponse.LifecycleCapabilities
+	return nil
+}
+func (pluginData *pluginData) loadWALCapabilities(ctx context.Context) error {
+	var walCapabilitiesResponse *wal.WALCapabilitiesResult
+	var err error
+
+	if walCapabilitiesResponse, err = pluginData.walClient.GetCapabilities(
+		ctx,
+		&wal.WALCapabilitiesRequest{},
+	); err != nil {
+		return fmt.Errorf("while querying plugin operator capabilities: %w", err)
+	}
+
+	pluginData.walCapabilities = make(
+		[]wal.WALCapability_RPC_Type,
+		len(walCapabilitiesResponse.Capabilities))
+	for i := range pluginData.walCapabilities {
+		pluginData.walCapabilities[i] = walCapabilitiesResponse.Capabilities[i].GetRpc().Type
+	}
 
 	return nil
 }
@@ -261,6 +295,7 @@ func (pluginData *pluginData) Metadata() Metadata {
 		Version:              pluginData.version,
 		Capabilities:         make([]string, len(pluginData.capabilities)),
 		OperatorCapabilities: make([]string, len(pluginData.operatorCapabilities)),
+		WALCapabilities:      make([]string, len(pluginData.walCapabilities)),
 	}
 
 	for i := range pluginData.capabilities {
@@ -269,6 +304,10 @@ func (pluginData *pluginData) Metadata() Metadata {
 
 	for i := range pluginData.operatorCapabilities {
 		result.OperatorCapabilities[i] = pluginData.operatorCapabilities[i].String()
+	}
+
+	for i := range pluginData.walCapabilities {
+		result.WALCapabilities[i] = pluginData.walCapabilities[i].String()
 	}
 
 	return result

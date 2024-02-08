@@ -5102,6 +5102,12 @@ spec:
                       description: Version is the version of the plugin loaded by
                         the latest reconciliation loop
                       type: string
+                    walCapabilities:
+                      description: WALCapabilities are the list of capabilities of
+                        the plugin regarding the reconciler
+                      items:
+                        type: string
+                      type: array
                   required:
                   - name
                   - version

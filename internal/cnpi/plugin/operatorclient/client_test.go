@@ -37,7 +37,7 @@ type fakeClusterCRD struct {
 	pluginClient *fakePluginClient
 }
 
-func (f *fakeClusterCRD) LoadPlugin(_ context.Context) (pluginclient.Client, error) {
+func (f *fakeClusterCRD) LoadPluginClient(_ context.Context) (pluginclient.Client, error) {
 	return f.pluginClient, nil
 }
 

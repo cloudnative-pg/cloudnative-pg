@@ -2308,6 +2308,10 @@ type PluginStatus struct {
 	// OperatorCapabilities are the list of capabilities of the
 	// plugin regarding the reconciler
 	OperatorCapabilities []string `json:"operatorCapabilities,omitempty"`
+
+	// WALCapabilities are the list of capabilities of the
+	// plugin regarding the reconciler
+	WALCapabilities []string `json:"walCapabilities,omitempty"`
 }
 
 // RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role

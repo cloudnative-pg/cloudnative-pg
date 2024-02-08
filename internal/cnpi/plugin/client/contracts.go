@@ -32,11 +32,12 @@ type Metadata struct {
 	Version              string
 	Capabilities         []string
 	OperatorCapabilities []string
+	WALCapabilities      []string
 }
 
 // Loader describes a struct capable of generating a plugin Client
 type Loader interface {
-	// LoadPlugin creates a new plugin client, loading the plugins that are required
+	// LoadPluginClient creates a new plugin client, loading the plugins that are required
 	// by this cluster
 	LoadPluginClient(ctx context.Context) (Client, error)
 }
@@ -47,6 +48,7 @@ type Client interface {
 	ClusterCapabilities
 	PodCapabilities
 	LifecycleCapabilities
+	WalCapabilities
 }
 
 // Connection describes a set of behaviour needed to properly handle the plugin connections
@@ -108,4 +110,24 @@ type LifecycleCapabilities interface {
 		cluster client.Object,
 		object client.Object,
 	) (client.Object, error)
+}
+
+// WalCapabilities describes a set of behavior needed to archive and recover WALs
+type WalCapabilities interface {
+	// ArchiveWAL calls the loaded plugins to archive a WAL file.
+	// This call is a no-op if there's no plugin implementing WAL archiving
+	ArchiveWAL(
+		ctx context.Context,
+		cluster client.Object,
+		sourceFileName string,
+	) error
+
+	// RestoreWAL calls the loaded plugins to archive a WAL file.
+	// This call is a no-op if there's no plugin implementing WAL archiving
+	RestoreWAL(
+		ctx context.Context,
+		cluster client.Object,
+		sourceWALName string,
+		destinationFileName string,
+	) error
 }
