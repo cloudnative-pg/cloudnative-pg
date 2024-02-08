@@ -1785,12 +1785,13 @@ jobs:
         name: Clean up
         if: always()
         run: |
-          # Wait until all the PVs provisioned are actually reclaimed
-          kubectl wait --for delete pv --selector=topology.kubernetes.io/zone=${{ env.ZONE }} --timeout=60s || true
           # Attempt to remove any leftover resource
           kubectl delete cluster --all --all-namespaces --now --timeout=30s || true
           kubectl delete pdb --all --all-namespaces --now --timeout=30s || true
           kubectl delete pvc --all --all-namespaces --now --timeout=30s || true
+
+          # Wait until all the PVs provisioned are actually reclaimed
+          kubectl wait --for delete pv --timeout=60s || true
 
           attempt=1
           max_attempts=3
