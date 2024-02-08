@@ -50,6 +50,7 @@ func (r *ClusterReconciler) preReconcilePlugins(ctx context.Context, cluster *ap
 		cluster.Status.PluginStatus[i].Version = entry.Version
 		cluster.Status.PluginStatus[i].Capabilities = entry.Capabilities
 		cluster.Status.PluginStatus[i].OperatorCapabilities = entry.OperatorCapabilities
+		cluster.Status.PluginStatus[i].WALCapabilities = entry.WALCapabilities
 	}
 
 	return r.Client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
