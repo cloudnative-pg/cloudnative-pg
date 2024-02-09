@@ -851,7 +851,7 @@ func AssertTablespaceReconciled(
 	By(fmt.Sprintf("checking if tablespace %v is in reconciled status", tablespaceName), func() {
 		Eventually(func(g Gomega) bool {
 			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred())
 			for _, state := range cluster.Status.TablespacesStatus {
 				if state.State == apiv1.TablespaceStatusReconciled && state.Name == tablespaceName {
 					return true
@@ -870,7 +870,7 @@ func AssertRoleReconciled(
 	By(fmt.Sprintf("checking if role %v is in reconciled status", roleName), func() {
 		Eventually(func(g Gomega) bool {
 			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred())
 			for state, names := range cluster.Status.ManagedRolesStatus.ByStatus {
 				if state == apiv1.RoleStatusReconciled {
 					return len(names) > 0 && slices.Contains(names, roleName)
