@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package postgres
 
 import (
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -24,7 +25,7 @@ import (
 // GetSyncReplicasData computes the actual number of required synchronous replicas and the names of
 // the electable sync replicas given the requested min, max, the number of ready replicas in the cluster and the sync
 // replicas constraints (if any)
-func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncReplicas []string) {
+func GetSyncReplicasData(cluster *apiv1.Cluster) (syncReplicas int, electableSyncReplicas []string) {
 	// We start with the number of healthy replicas (healthy pods minus one)
 	// and verify it is greater than 0 and between minSyncReplicas and maxSyncReplicas.
 	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
@@ -49,7 +50,7 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas)
 	}
 
-	electableSyncReplicas = cluster.getElectableSyncReplicas()
+	electableSyncReplicas = getElectableSyncReplicas(cluster)
 	numberOfElectableSyncReplicas := len(electableSyncReplicas)
 	if numberOfElectableSyncReplicas < syncReplicas {
 		log.Warning("lowering sync replicas due to not enough electable instances for sync replication "+
@@ -64,7 +65,7 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 }
 
 // getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
-func (cluster *Cluster) getElectableSyncReplicas() []string {
+func getElectableSyncReplicas(cluster *apiv1.Cluster) []string {
 	var nonPrimaryInstances []string
 	for _, instance := range cluster.Status.InstancesStatus[utils.PodHealthy] {
 		if cluster.Status.CurrentPrimary != instance {
@@ -87,7 +88,7 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 		return nonPrimaryInstances
 	}
 
-	currentPrimary := PodName(cluster.Status.CurrentPrimary)
+	currentPrimary := apiv1.PodName(cluster.Status.CurrentPrimary)
 	// given that the constraints are based off the primary instance if we still don't have one we cannot continue
 	if currentPrimary == "" {
 		log.Warning("no primary elected, cannot compute electable sync replicas")
@@ -103,7 +104,7 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 
 	electableReplicas := make([]string, 0, len(nonPrimaryInstances))
 	for _, name := range nonPrimaryInstances {
-		name := PodName(name)
+		name := apiv1.PodName(name)
 
 		instanceTopology, ok := topology.Instances[name]
 		// if we still don't have the topology data for the node we skip it from inserting it in the electable pool
@@ -112,10 +113,22 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 			continue
 		}
 
-		if !currentPrimaryTopology.matchesTopology(instanceTopology) {
+		if !matchesTopology(currentPrimaryTopology, instanceTopology) {
 			electableReplicas = append(electableReplicas, string(name))
 		}
 	}
 
 	return electableReplicas
+}
+
+// matchesTopology checks if the two topologies have
+// the same label values (labels are specified in SyncReplicaElectionConstraints.NodeLabelsAntiAffinity)
+func matchesTopology(topologyLabels, instanceTopology apiv1.PodTopologyLabels) bool {
+	log.Debug("matching topology", "main", topologyLabels, "second", instanceTopology)
+	for mainLabelName, mainLabelValue := range topologyLabels {
+		if mainLabelValue != instanceTopology[mainLabelName] {
+			return false
+		}
+	}
+	return true
 }

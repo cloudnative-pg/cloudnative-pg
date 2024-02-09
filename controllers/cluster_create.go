@@ -181,7 +181,7 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			"*",
 			"postgres",
 			postgresPassword)
-		cluster.SetInheritedDataAndOwnership(&postgresSecret.ObjectMeta)
+		specs.SetInheritedDataAndOwnership(cluster, &postgresSecret.ObjectMeta)
 
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, postgresSecret)
 	}
@@ -222,7 +222,7 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 			cluster.GetApplicationDatabaseOwner(),
 			appPassword)
 
-		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta)
+		specs.SetInheritedDataAndOwnership(cluster, &appSecret.ObjectMeta)
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, appSecret)
 	}
 	return nil
@@ -300,7 +300,7 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
 	if configuration.Current.CreateAnyService {
 		anyService := specs.CreateClusterAnyService(*cluster)
-		cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
+		specs.SetInheritedDataAndOwnership(cluster, &anyService.ObjectMeta)
 
 		if err := r.serviceReconciler(ctx, anyService); err != nil {
 			return err
@@ -308,21 +308,21 @@ func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, clust
 	}
 
 	readService := specs.CreateClusterReadService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, &readService.ObjectMeta)
 
 	if err := r.serviceReconciler(ctx, readService); err != nil {
 		return err
 	}
 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, &readOnlyService.ObjectMeta)
 
 	if err := r.serviceReconciler(ctx, readOnlyService); err != nil {
 		return err
 	}
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, &readWriteService.ObjectMeta)
 
 	return r.serviceReconciler(ctx, readWriteService)
 }
@@ -484,7 +484,7 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 		return fmt.Errorf("while generating service account: %w", err)
 	}
 	// we add the ownerMetadata only when creating the SA
-	cluster.SetInheritedData(&sa.ObjectMeta)
+	specs.SetInheritedData(cluster, &sa.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
 
 	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
@@ -517,7 +517,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		return fmt.Errorf("while creating new ServiceAccount: %w", err)
 	}
 
-	cluster.SetInheritedDataAndOwnership(&serviceAccount.ObjectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, &serviceAccount.ObjectMeta)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(serviceAccount)
 
 	err = r.Create(ctx, serviceAccount)
@@ -586,7 +586,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 		Data: operatorSecret.Data,
 		Type: operatorSecret.Type,
 	}
-	cluster.SetInheritedDataAndOwnership(&secret.ObjectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, &secret.ObjectMeta)
 
 	// Another sync loop may have already created the service. Let's check that
 	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
@@ -906,7 +906,7 @@ func createOrPatchPodMonitor(
 // createRole creates the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
 	role := specs.CreateRole(*cluster, backupOrigin)
-	cluster.SetInheritedDataAndOwnership(&role.ObjectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, &role.ObjectMeta)
 
 	err := r.Create(ctx, &role)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -920,7 +920,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 // createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
 	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
-	cluster.SetInheritedDataAndOwnership(&roleBinding.ObjectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, &roleBinding.ObjectMeta)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {

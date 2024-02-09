@@ -52,7 +52,7 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 		},
 	}
 
-	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+	SetInheritedDataAndOwnership(cluster, &pdb.ObjectMeta)
 
 	return pdb
 }
@@ -81,7 +81,7 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 		},
 	}
 
-	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+	SetInheritedDataAndOwnership(cluster, &pdb.ObjectMeta)
 
 	return pdb
 }

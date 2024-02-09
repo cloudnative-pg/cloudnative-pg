@@ -314,7 +314,7 @@ func generateFakeClusterPods(
 	for idx < cluster.Spec.Instances {
 		idx++
 		pod := specs.PodWithExistingStorage(*cluster, idx)
-		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
+		specs.SetInheritedDataAndOwnership(cluster, &pod.ObjectMeta)
 
 		err := c.Create(context.Background(), pod)
 		Expect(err).ToNot(HaveOccurred())
@@ -347,7 +347,7 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	for idx < cluster.Spec.Instances {
 		idx++
 		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
-		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
+		specs.SetInheritedDataAndOwnership(cluster, &job.ObjectMeta)
 
 		err := c.Create(context.Background(), job)
 		Expect(err).ToNot(HaveOccurred())
@@ -390,7 +390,7 @@ func newFakePVC(
 			Storage:    cluster.Spec.StorageConfiguration,
 		})
 	Expect(err).ToNot(HaveOccurred())
-	cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, &pvc.ObjectMeta)
 
 	err = c.Create(context.Background(), pvc)
 	Expect(err).ToNot(HaveOccurred())
@@ -407,7 +407,7 @@ func newFakePVC(
 			},
 		)
 		Expect(err).ToNot(HaveOccurred())
-		cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta)
+		specs.SetInheritedDataAndOwnership(cluster, &pvcWal.ObjectMeta)
 		err = c.Create(context.Background(), pvcWal)
 		Expect(err).ToNot(HaveOccurred())
 		pvcGroup = append(pvcGroup, *pvcWal)

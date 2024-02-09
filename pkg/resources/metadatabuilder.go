@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -78,7 +79,7 @@ func (builder *ResourceMetadataBuilder[T]) WithHash(hashValue string) *ResourceM
 
 // WithClusterInheritance adds the cluster inherited data and ownership to the object
 func (builder *ResourceMetadataBuilder[T]) WithClusterInheritance(cluster *apiv1.Cluster) *ResourceMetadataBuilder[T] {
-	cluster.SetInheritedDataAndOwnership(builder.objectMeta)
+	specs.SetInheritedDataAndOwnership(cluster, builder.objectMeta)
 	return builder
 }
 

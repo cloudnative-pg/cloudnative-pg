@@ -34,6 +34,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -247,7 +248,7 @@ func createBackup(
 		); err != nil {
 			return ctrl.Result{}, err
 		}
-		cluster.SetInheritedDataAndOwnership(&backup.ObjectMeta)
+		specs.SetInheritedDataAndOwnership(&cluster, &backup.ObjectMeta)
 	case "self":
 		utils.SetAsOwnedBy(&backup.ObjectMeta, scheduledBackup.ObjectMeta, scheduledBackup.TypeMeta)
 	default:

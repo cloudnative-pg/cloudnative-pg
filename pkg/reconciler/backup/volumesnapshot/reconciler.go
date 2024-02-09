@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -87,7 +88,7 @@ func (se *Reconciler) enrichSnapshot(
 
 	switch snapshotConfig.SnapshotOwnerReference {
 	case apiv1.SnapshotOwnerReferenceCluster:
-		cluster.SetInheritedDataAndOwnership(&vs.ObjectMeta)
+		specs.SetInheritedDataAndOwnership(cluster, &vs.ObjectMeta)
 	case apiv1.SnapshotOwnerReferenceBackup:
 		utils.SetAsOwnedBy(&vs.ObjectMeta, backup.ObjectMeta, backup.TypeMeta)
 	default:

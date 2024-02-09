@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -29,12 +28,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 const (
@@ -568,18 +565,6 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 
 // PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
 type PodTopologyLabels map[string]string
-
-// matchesTopology checks if the two topologies have
-// the same label values (labels are specified in SyncReplicaElectionConstraints.NodeLabelsAntiAffinity)
-func (topologyLabels PodTopologyLabels) matchesTopology(instanceTopology PodTopologyLabels) bool {
-	log.Debug("matching topology", "main", topologyLabels, "second", instanceTopology)
-	for mainLabelName, mainLabelValue := range topologyLabels {
-		if mainLabelValue != instanceTopology[mainLabelName] {
-			return false
-		}
-	}
-	return true
-}
 
 // PodName is the name of a Pod
 type PodName string
@@ -3117,87 +3102,6 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 	}
 
 	return true
-}
-
-// LogTimestampsWithMessage prints useful information about timestamps in stdout
-func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage string) {
-	contextLogger := log.FromContext(ctx)
-
-	currentTimestamp := utils.GetCurrentTimestamp()
-	keysAndValues := []interface{}{
-		"phase", cluster.Status.Phase,
-		"currentTimestamp", currentTimestamp,
-		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
-		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
-	}
-
-	var errs []string
-
-	// Elapsed time since the last request of promotion (TargetPrimaryTimestamp)
-	if diff, err := utils.DifferenceBetweenTimestamps(
-		currentTimestamp,
-		cluster.Status.TargetPrimaryTimestamp,
-	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceTargetPrimaryTimestamp",
-			diff.Milliseconds(),
-		)
-	} else {
-		errs = append(errs, err.Error())
-	}
-
-	// Elapsed time since the last promotion (CurrentPrimaryTimestamp)
-	if currentPrimaryDifference, err := utils.DifferenceBetweenTimestamps(
-		currentTimestamp,
-		cluster.Status.CurrentPrimaryTimestamp,
-	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceCurrentPrimaryTimestamp",
-			currentPrimaryDifference.Milliseconds(),
-		)
-	} else {
-		errs = append(errs, err.Error())
-	}
-
-	// Difference between the last promotion and the last request of promotion
-	// When positive, it is the amount of time required in the last promotion
-	// of a standby to a primary. If negative, it means we have a failover/switchover
-	// in progress, and the value represents the last measured uptime of the primary.
-	if currentPrimaryTargetDifference, err := utils.DifferenceBetweenTimestamps(
-		cluster.Status.CurrentPrimaryTimestamp,
-		cluster.Status.TargetPrimaryTimestamp,
-	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msDifferenceBetweenCurrentAndTargetPrimary",
-			currentPrimaryTargetDifference.Milliseconds(),
-		)
-	} else {
-		errs = append(errs, err.Error())
-	}
-
-	if len(errs) > 0 {
-		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
-	}
-
-	contextLogger.Info(logMessage, keysAndValues...)
-}
-
-// SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
-// sets all the needed annotations and labels
-func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
-	cluster.SetInheritedData(obj)
-	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
-}
-
-// SetInheritedData sets all the needed annotations and labels
-func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta) {
-	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.LabelClusterName(obj, cluster.GetName())
-	utils.SetOperatorVersion(obj, versions.Version)
 }
 
 // ShouldForceLegacyBackup if present takes a backup without passing the name argument even on barman version 3.3.0+.

@@ -19,7 +19,7 @@ package controllers
 import (
 	"context"
 
-	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -168,7 +168,7 @@ var _ = Describe("cluster_create unit tests", func() {
 		configuration.Current.CreateAnyService = true
 
 		createOutdatedService := func(svc *corev1.Service) {
-			cluster.SetInheritedDataAndOwnership(&svc.ObjectMeta)
+			specs.SetInheritedDataAndOwnership(cluster, &svc.ObjectMeta)
 			svc.Spec.Selector = map[string]string{
 				"outdated": "selector",
 			}
@@ -434,14 +434,14 @@ var _ = Describe("Set cluster metadata of service account", func() {
 
 type mockPodMonitorManager struct {
 	isEnabled  bool
-	podMonitor *v1.PodMonitor
+	podMonitor *monitoringv1.PodMonitor
 }
 
 func (m *mockPodMonitorManager) IsPodMonitorEnabled() bool {
 	return m.isEnabled
 }
 
-func (m *mockPodMonitorManager) BuildPodMonitor() *v1.PodMonitor {
+func (m *mockPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	return m.podMonitor
 }
 
@@ -457,7 +457,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		ctx = context.Background()
 		manager = &mockPodMonitorManager{}
 		manager.isEnabled = true
-		manager.podMonitor = &v1.PodMonitor{
+		manager.podMonitor = &monitoringv1.PodMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
@@ -470,7 +470,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 			Fake: &testing.Fake{
 				Resources: []*metav1.APIResourceList{
 					{
-						GroupVersion: "monitoring.coreos.com/v1",
+						GroupVersion: "monitoring.coreos.com/monitoringv1",
 						APIResources: []metav1.APIResource{
 							{
 								Name:       "podmonitors",
@@ -488,7 +488,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		err := createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
 		Expect(err).ToNot(HaveOccurred())
 
-		podMonitor := &v1.PodMonitor{}
+		podMonitor := &monitoringv1.PodMonitor{}
 		err = fakeCli.Get(
 			ctx,
 			types.NamespacedName{
@@ -518,7 +518,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// Ensure the PodMonitor doesn't exist anymore
-		podMonitor := &v1.PodMonitor{}
+		podMonitor := &monitoringv1.PodMonitor{}
 		err = fakeCli.Get(
 			ctx,
 			types.NamespacedName{
@@ -549,7 +549,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
 		Expect(err).ToNot(HaveOccurred())
 
-		podMonitor := &v1.PodMonitor{}
+		podMonitor := &monitoringv1.PodMonitor{}
 		err = fakeCli.Get(
 			ctx,
 			types.NamespacedName{
@@ -623,7 +623,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 				},
 				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
 			}
-			cluster.SetInheritedDataAndOwnership(&existingSecret.ObjectMeta)
+			specs.SetInheritedDataAndOwnership(&cluster, &existingSecret.ObjectMeta)
 			Expect(cli.Create(ctx, existingSecret)).To(Succeed())
 		})
 

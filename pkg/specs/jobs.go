@@ -354,7 +354,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 		job.Spec.Template.Spec.Subdomain = cluster.GetServiceAnyName()
 	}
 
-	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
+	SetInheritedDataAndOwnership(&cluster, &job.ObjectMeta)
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(&job.Spec.Template.Spec, cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, &job.Spec.Template.Spec, cluster.Annotations)
