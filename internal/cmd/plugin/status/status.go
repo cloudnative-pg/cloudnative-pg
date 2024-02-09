@@ -504,7 +504,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
 	fullStatus.printReplicaStatusTableHeader(status, verbose)
 
 	// print Replication Slots columns only if the cluster has replication slots enabled
-	addReplicationSlotsColumns := func(applicationName string, columns *[]interface{}) {}
+	addReplicationSlotsColumns := func(_ string, _ *[]interface{}) {}
 	if fullStatus.areReplicationSlotsEnabled() {
 		addReplicationSlotsColumns = func(applicationName string, columns *[]interface{}) {
 			fullStatus.addReplicationSlotsColumns(applicationName, columns, verbose)

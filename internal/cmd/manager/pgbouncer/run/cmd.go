@@ -54,7 +54,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "run",
 		SilenceErrors: true,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(_ *cobra.Command, args []string) error {
 			if poolerNamespacedName.Name == "" || poolerNamespacedName.Namespace == "" {
 				log.Info(
 					"pooler object key not set",

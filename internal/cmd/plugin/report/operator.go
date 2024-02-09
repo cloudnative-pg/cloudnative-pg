@@ -37,7 +37,7 @@ func operatorCmd() *cobra.Command {
 		Use:   "operator",
 		Short: "Report operator deployment, pod, events, logs (opt-in)",
 		Long:  "Collects combined information on the operator in a Zip file",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			now := time.Now().UTC()
 			if file == filePlaceholder {
 				file = reportName("operator", now) + ".zip"
