@@ -50,7 +50,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
@@ -134,8 +133,8 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	if postgresImageFromUser, exist := os.LookupEnv("POSTGRES_IMG"); exist {
 		postgresImage = postgresImageFromUser
 	}
-	imageReference := utils.NewReference(postgresImage)
-	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+	imageReference := apiv1.NewReference(postgresImage)
+	postgresImageVersion, err := apiv1.GetPostgresVersionFromTag(imageReference.Tag)
 	if err != nil {
 		return nil, err
 	}

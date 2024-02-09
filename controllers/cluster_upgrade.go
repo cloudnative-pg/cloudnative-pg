@@ -442,7 +442,7 @@ func checkPodImageIsOutdated(
 		return rollout{}, nil
 	}
 
-	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
+	canUpgradeImage, err := apiv1.CanUpgrade(pgCurrentImageName, targetImageName)
 	if err != nil {
 		return rollout{}, err
 	}

@@ -470,7 +470,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 			Fake: &testing.Fake{
 				Resources: []*metav1.APIResourceList{
 					{
-						GroupVersion: "monitoring.coreos.com/monitoringv1",
+						GroupVersion: "monitoring.coreos.com/v1",
 						APIResources: []metav1.APIResource{
 							{
 								Name:       "podmonitors",
@@ -484,7 +484,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		}
 	})
 
-	It("should create the PodMonitor  when it is enabled and doesn't already exists", func() {
+	It("should create the PodMonitor when it is enabled and doesn't already exists", func() {
 		err := createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
 		Expect(err).ToNot(HaveOccurred())
 

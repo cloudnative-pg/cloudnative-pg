@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -2495,8 +2494,8 @@ func (cluster *Cluster) GetImageName() string {
 // ghcr.io/cloudnative-pg/postgresql:9.6.3 corresponds to version 90603
 func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
 	image := cluster.GetImageName()
-	tag := utils.GetImageTag(image)
-	return postgres.GetPostgresVersionFromTag(tag)
+	tag := GetImageTag(image)
+	return GetPostgresVersionFromTag(tag)
 }
 
 // GetImagePullSecret get the name of the pull secret to use
