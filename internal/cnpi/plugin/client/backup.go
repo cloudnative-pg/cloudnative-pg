@@ -116,21 +116,10 @@ func (data *data) Backup(
 		)
 	}
 
-	selectedPluginIdx := -1
-	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
-
-		if plugin.name == pluginName {
-			selectedPluginIdx = idx
-			break
-		}
+	plugin, err := data.getPlugin(pluginName)
+	if err != nil {
+		return nil, err
 	}
-
-	if selectedPluginIdx == -1 {
-		return nil, ErrPluginNotLoaded
-	}
-
-	plugin := &data.plugins[selectedPluginIdx]
 
 	if !slices.Contains(plugin.capabilities, identity.PluginCapability_Service_TYPE_BACKUP_SERVICE) {
 		return nil, ErrPluginNotSupportBackup
@@ -149,10 +138,12 @@ func (data *data) Backup(
 		BackupDefinition:  serializedBackup,
 		Parameters:        parameters,
 	}
+
 	contextLogger.Trace(
 		"Calling Backup endpoint",
 		"clusterDefinition", request.ClusterDefinition,
 		"parameters", parameters)
+
 	result, err := plugin.backupClient.Backup(ctx, &request)
 	if err != nil {
 		contextLogger.Error(err, "Error while calling Backup, failing")

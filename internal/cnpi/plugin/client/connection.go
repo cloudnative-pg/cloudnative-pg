@@ -72,6 +72,24 @@ type data struct {
 	plugins    []pluginData
 }
 
+func (data *data) getPlugin(pluginName string) (*pluginData, error) {
+	selectedPluginIdx := -1
+	for idx := range data.plugins {
+		plugin := &data.plugins[idx]
+
+		if plugin.name == pluginName {
+			selectedPluginIdx = idx
+			break
+		}
+	}
+
+	if selectedPluginIdx == -1 {
+		return nil, ErrPluginNotLoaded
+	}
+
+	return &data.plugins[selectedPluginIdx], nil
+}
+
 type pluginData struct {
 	connection      connectionHandler
 	identityClient  identity.IdentityClient

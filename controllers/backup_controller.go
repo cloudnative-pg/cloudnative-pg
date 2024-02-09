@@ -169,7 +169,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	origBackup := backup.DeepCopy()
 
-	// From now on, we differenciate backups managed by the instance manager (barman and plugins)
+	// From now on, we differentiate backups managed by the instance manager (barman and plugins)
 	// from the ones managed directly by the operator (VolumeSnapshot)
 
 	switch backup.Spec.Method {
@@ -210,7 +210,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("encountered an error while taking the backup: %w", err))
 			return ctrl.Result{}, nil
 		}
-
 	case apiv1.BackupMethodVolumeSnapshot:
 		if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
 			tryFlagBackupAsFailed(ctx, r.Client, &backup,
@@ -225,7 +224,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if res != nil {
 			return *res, nil
 		}
-
 	default:
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
 	}
