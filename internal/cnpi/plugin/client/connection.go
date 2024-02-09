@@ -296,6 +296,7 @@ func (pluginData *pluginData) loadLifecycleCapabilities(ctx context.Context) err
 	pluginData.lifecycleCapabilities = lifecycleCapabilitiesResponse.LifecycleCapabilities
 	return nil
 }
+
 func (pluginData *pluginData) loadWALCapabilities(ctx context.Context) error {
 	var walCapabilitiesResponse *wal.WALCapabilitiesResult
 	var err error

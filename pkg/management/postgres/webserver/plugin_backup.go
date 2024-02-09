@@ -22,9 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -164,21 +162,9 @@ func (b *PluginBackupCommand) markBackupAsFailed(ctx context.Context, failure er
 	}
 }
 
-// LEO: unfortunately this is a copy of the relative function
-// in pkg/management/postgres/backup.go.
-// I feel this function doesn't belong to the `postgres` package nor to this one
 func (b *PluginBackupCommand) retryWithRefreshedCluster(
 	ctx context.Context,
 	cb func() error,
 ) error {
-	return retry.OnError(retry.DefaultBackoff, resources.RetryAlways, func() error {
-		if err := b.Client.Get(ctx, types.NamespacedName{
-			Namespace: b.Cluster.Namespace,
-			Name:      b.Cluster.Name,
-		}, b.Cluster); err != nil {
-			return err
-		}
-
-		return cb()
-	})
+	return resources.RetryWithRefreshedResource(ctx, b.Client, b.Cluster, cb)
 }

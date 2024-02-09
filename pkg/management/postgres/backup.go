@@ -250,16 +250,7 @@ func (b *BackupCommand) retryWithRefreshedCluster(
 	ctx context.Context,
 	cb func() error,
 ) error {
-	return retry.OnError(retry.DefaultBackoff, resources.RetryAlways, func() error {
-		if err := b.Client.Get(ctx, types.NamespacedName{
-			Namespace: b.Cluster.Namespace,
-			Name:      b.Cluster.Name,
-		}, b.Cluster); err != nil {
-			return err
-		}
-
-		return cb()
-	})
+	return resources.RetryWithRefreshedResource(ctx, b.Client, b.Cluster, cb)
 }
 
 // run executes the barman-cloud-backup command and updates the status

@@ -418,6 +418,7 @@ VolumeSnapshots
 WAL
 WAL's
 WALBackupConfiguration
+WALCapabilities
 WALs
 Wadle
 WalBackupConfiguration

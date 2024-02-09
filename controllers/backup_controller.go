@@ -578,7 +578,6 @@ func startInstanceManagerBackup(
 		)
 		return err
 	})
-
 	if err != nil {
 		log.FromContext(ctx).Error(err, "executing backup", "stdout", stdout, "stderr", stderr)
 		status.SetAsFailed(fmt.Errorf("can't execute backup: %w", err))

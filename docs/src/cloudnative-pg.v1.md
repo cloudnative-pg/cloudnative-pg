@@ -3295,7 +3295,7 @@ plugin regarding the reconciler</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>WalCapabilities are the list of capabilities of the
+   <p>WALCapabilities are the list of capabilities of the
 plugin regarding the WAL management</p>
 </td>
 </tr>
