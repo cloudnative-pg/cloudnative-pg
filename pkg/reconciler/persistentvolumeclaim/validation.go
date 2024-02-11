@@ -26,7 +26,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // ValidationStatus is the result of the validation of a cluster
@@ -89,7 +88,7 @@ func (status *ValidationStatus) validateVolumeSnapshot(
 		status.addErrorf(
 			name,
 			"Expected role '%s', found '%s'",
-			utils.PVCRolePgData,
+			resources.PVCRolePgData,
 			pvcRoleLabel)
 	}
 

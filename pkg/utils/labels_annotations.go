@@ -44,18 +44,6 @@ const (
 	PodRolePooler PodRole = "pooler"
 )
 
-// PVCRole describes the role of a PVC
-type PVCRole string
-
-const (
-	// PVCRolePgData the label value for the data PVC role
-	PVCRolePgData PVCRole = "PG_DATA"
-	// PVCRolePgWal the label value for the wal PVC role
-	PVCRolePgWal PVCRole = "PG_WAL"
-	// PVCRolePgTablespace the label value for the tablespace PVC role
-	PVCRolePgTablespace PVCRole = "PG_TABLESPACE"
-)
-
 // LabelClusterName labels the object with the cluster name
 func LabelClusterName(object *metav1.ObjectMeta, name string) {
 	if object.Labels == nil {

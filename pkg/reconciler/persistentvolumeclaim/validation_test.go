@@ -25,7 +25,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -110,7 +109,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							resources.PvcRoleLabelName: string(utils.PVCRolePgData),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 						},
 					},
 				},
@@ -122,7 +121,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							resources.BackupNameLabelName: "backup-two",
 						},
 						Annotations: map[string]string{
-							resources.PvcRoleLabelName: string(utils.PVCRolePgWal),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgWal),
 						},
 					},
 				},
@@ -164,7 +163,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							resources.PvcRoleLabelName: string(utils.PVCRolePgData),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 						},
 					},
 				},
@@ -176,7 +175,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							resources.PvcRoleLabelName: string(utils.PVCRolePgWal),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgWal),
 						},
 					},
 				},
@@ -211,7 +210,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							resources.PvcRoleLabelName: string(utils.PVCRolePgData),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 						},
 					},
 				},
@@ -243,7 +242,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							resources.PvcRoleLabelName: string(utils.PVCRolePgData),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 						},
 					},
 				},

@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // GetSnapshotsBackupTimes gets the time of the oldest and newest snapshots for the cluster
@@ -48,7 +47,7 @@ func GetSnapshotsBackupTimes(
 
 	dataVolSnapshots := make([]storagesnapshotv1.VolumeSnapshot, 0, len(list.Items))
 	for _, snapshot := range list.Items {
-		if snapshot.Annotations[resources.PvcRoleLabelName] == string(utils.PVCRolePgData) {
+		if snapshot.Annotations[resources.PvcRoleLabelName] == string(resources.PVCRolePgData) {
 			dataVolSnapshots = append(dataVolSnapshots, snapshot)
 		}
 	}

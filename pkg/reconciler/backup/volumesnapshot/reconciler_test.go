@@ -94,7 +94,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 					Name:      clusterName + "-2",
 					Namespace: namespace,
 					Labels: map[string]string{
-						resources.PvcRoleLabelName: string(utils.PVCRolePgData),
+						resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 					},
 				},
 			},
@@ -103,7 +103,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 					Name:      clusterName + "-2-wal",
 					Namespace: namespace,
 					Labels: map[string]string{
-						resources.PvcRoleLabelName: string(utils.PVCRolePgWal),
+						resources.PvcRoleLabelName: string(resources.PVCRolePgWal),
 					},
 				},
 			},

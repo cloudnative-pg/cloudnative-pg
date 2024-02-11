@@ -25,7 +25,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -62,7 +61,7 @@ var _ = Describe("BackupStatus structure", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-1",
 					Annotations: map[string]string{
-						resources.PvcRoleLabelName: string(utils.PVCRolePgData),
+						resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 					},
 				},
 			},
@@ -70,16 +69,16 @@ var _ = Describe("BackupStatus structure", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-2",
 					Annotations: map[string]string{
-						resources.PvcRoleLabelName: string(utils.PVCRolePgWal),
+						resources.PvcRoleLabelName: string(resources.PVCRolePgWal),
 					},
 				},
 			},
 		})
 		Expect(status.BackupSnapshotStatus.Elements).To(HaveLen(2))
 		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
-			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-1", Type: string(utils.PVCRolePgData)}))
+			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-1", Type: string(resources.PVCRolePgData)}))
 		Expect(status.BackupSnapshotStatus.Elements).To(ContainElement(
-			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-2", Type: string(utils.PVCRolePgWal)}))
+			BackupSnapshotElementStatus{Name: "cluster-example-snapshot-2", Type: string(resources.PVCRolePgWal)}))
 	})
 
 	Context("backup phases", func() {

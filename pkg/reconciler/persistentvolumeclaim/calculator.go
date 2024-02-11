@@ -26,7 +26,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Meta is an object capable of describing the metadata of a pvc
@@ -75,12 +74,12 @@ type ExpectedObjectCalculator interface {
 func GetExpectedObjectCalculator(labels map[string]string) (ExpectedObjectCalculator, error) {
 	roleName := labels[resources.PvcRoleLabelName]
 	tbsName := labels[resources.TablespaceNameLabelName]
-	switch utils.PVCRole(roleName) {
-	case utils.PVCRolePgData:
+	switch resources.PVCRole(roleName) {
+	case resources.PVCRolePgData:
 		return NewPgDataCalculator(), nil
-	case utils.PVCRolePgWal:
+	case resources.PVCRolePgWal:
 		return NewPgWalCalculator(), nil
-	case utils.PVCRolePgTablespace:
+	case resources.PVCRolePgTablespace:
 		return NewPgTablespaceCalculator(tbsName), nil
 	default:
 		return nil, fmt.Errorf("unknown pvc role name: %s", roleName)
@@ -121,7 +120,7 @@ func NewPgTablespaceCalculator(tbsName string) ExpectedObjectCalculator {
 func (r pgDataCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
 		resources.InstanceNameLabelName: instanceName,
-		resources.PvcRoleLabelName:      string(utils.PVCRolePgData),
+		resources.PvcRoleLabelName:      string(resources.PVCRolePgData),
 	}
 	return labels
 }
@@ -147,7 +146,7 @@ func (r pgDataCalculator) GetSource(source *StorageSource) (*corev1.TypedLocalOb
 
 // GetRoleName return the role name in string
 func (r pgDataCalculator) GetRoleName() string {
-	return string(utils.PVCRolePgData)
+	return string(resources.PVCRolePgData)
 }
 
 // GetInitialStatus returns the status the PVC should be first created with
@@ -172,7 +171,7 @@ func (r pgDataCalculator) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnap
 // GetSourceFromBackup implements the Role interface
 func (r pgDataCalculator) GetSourceFromBackup(backup *apiv1.Backup) *corev1.TypedLocalObjectReference {
 	for _, element := range backup.Status.BackupSnapshotStatus.Elements {
-		if element.Type == string(utils.PVCRolePgData) {
+		if element.Type == string(resources.PVCRolePgData) {
 			return &corev1.TypedLocalObjectReference{
 				APIGroup: ptr.To(volumesnapshot.GroupName),
 				Kind:     apiv1.VolumeSnapshotKind,
@@ -188,7 +187,7 @@ func (r pgDataCalculator) GetSourceFromBackup(backup *apiv1.Backup) *corev1.Type
 func (r pgWalCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
 		resources.InstanceNameLabelName: instanceName,
-		resources.PvcRoleLabelName:      string(utils.PVCRolePgWal),
+		resources.PvcRoleLabelName:      string(resources.PVCRolePgWal),
 	}
 	return labels
 }
@@ -217,7 +216,7 @@ func (r pgWalCalculator) GetSource(source *StorageSource) (*corev1.TypedLocalObj
 
 // GetRoleName return the role name in string
 func (r pgWalCalculator) GetRoleName() string {
-	return string(utils.PVCRolePgWal)
+	return string(resources.PVCRolePgWal)
 }
 
 // GetInitialStatus returns the status the PVC should be first created with
@@ -247,7 +246,7 @@ func (r pgWalCalculator) GetVolumeSnapshotClass(configuration *apiv1.VolumeSnaps
 func (r pgTablespaceCalculator) GetLabels(instanceName string) map[string]string {
 	labels := map[string]string{
 		resources.InstanceNameLabelName: instanceName,
-		resources.PvcRoleLabelName:      string(utils.PVCRolePgTablespace),
+		resources.PvcRoleLabelName:      string(resources.PVCRolePgTablespace),
 	}
 	// we need empty check here as we don't want to impact the label filter with empty value
 	if r.tablespaceName != "" {
@@ -277,7 +276,7 @@ func (r pgTablespaceCalculator) GetStorageConfiguration(cluster *apiv1.Cluster) 
 		return apiv1.StorageConfiguration{},
 			fmt.Errorf(
 				"storage configuration doesn't exist for the given PVC role: %s and label %s",
-				utils.PVCRolePgTablespace,
+				resources.PVCRolePgTablespace,
 				r.tablespaceName,
 			)
 	}
@@ -297,7 +296,7 @@ func (r pgTablespaceCalculator) GetSource(source *StorageSource) (*corev1.TypedL
 
 // GetRoleName return the role name in string
 func (r pgTablespaceCalculator) GetRoleName() string {
-	return string(utils.PVCRolePgTablespace)
+	return string(resources.PVCRolePgTablespace)
 }
 
 // GetInitialStatus returns the status the PVC should be first created with

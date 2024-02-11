@@ -33,7 +33,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -458,7 +457,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 	It("Without the proper storage configuration it should always fail", func() {
 		pvc.Labels = map[string]string{
-			resources.PvcRoleLabelName: string(utils.PVCRolePgData),
+			resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 		}
 
 		err := reconcilePVCQuantity(
@@ -483,7 +482,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 	It("It should not fail it's everything is ok", func() {
 		pvc.Labels = map[string]string{
-			resources.PvcRoleLabelName: string(utils.PVCRolePgData),
+			resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 		}
 		cluster.Spec.StorageConfiguration.Size = "1Gi"
 

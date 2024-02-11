@@ -29,7 +29,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -283,7 +282,7 @@ var _ = Describe("update snapshot backup metadata", func() {
 					Namespace: namespace,
 					Annotations: map[string]string{
 						resources.BackupEndTimeAnnotationName: threeHoursAgo.Format(time.RFC3339),
-						resources.PvcRoleLabelName:            string(utils.PVCRolePgData),
+						resources.PvcRoleLabelName:            string(resources.PVCRolePgData),
 					},
 					Labels: map[string]string{
 						resources.ClusterLabelName: "DIFFERENT-CLUSTER",
@@ -294,7 +293,7 @@ var _ = Describe("update snapshot backup metadata", func() {
 					Namespace: namespace,
 					Annotations: map[string]string{
 						resources.BackupEndTimeAnnotationName: threeHoursAgo.Format(time.RFC3339),
-						resources.PvcRoleLabelName:            string(utils.PVCRolePgWal),
+						resources.PvcRoleLabelName:            string(resources.PVCRolePgWal),
 					},
 					Labels: map[string]string{
 						resources.ClusterLabelName: cluster.Name,
@@ -305,7 +304,7 @@ var _ = Describe("update snapshot backup metadata", func() {
 					Namespace: namespace,
 					Annotations: map[string]string{
 						resources.BackupEndTimeAnnotationName: twoHoursAgo.Format(time.RFC3339),
-						resources.PvcRoleLabelName:            string(utils.PVCRolePgData),
+						resources.PvcRoleLabelName:            string(resources.PVCRolePgData),
 					},
 					Labels: map[string]string{
 						resources.ClusterLabelName: cluster.Name,
@@ -316,7 +315,7 @@ var _ = Describe("update snapshot backup metadata", func() {
 					Namespace: namespace,
 					Annotations: map[string]string{
 						resources.BackupEndTimeAnnotationName: oneHourAgo.Format(time.RFC3339),
-						resources.PvcRoleLabelName:            string(utils.PVCRolePgData),
+						resources.PvcRoleLabelName:            string(resources.PVCRolePgData),
 					},
 					Labels: map[string]string{
 						resources.ClusterLabelName: cluster.Name,

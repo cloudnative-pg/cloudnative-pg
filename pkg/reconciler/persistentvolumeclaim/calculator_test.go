@@ -21,7 +21,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,7 +31,7 @@ var _ = Describe("pvc role test", func() {
 		instanceName := "instance1"
 		backupName := "backup1"
 		expectedLabel := map[string]string{
-			resources.PvcRoleLabelName:      string(utils.PVCRolePgData),
+			resources.PvcRoleLabelName:      string(resources.PVCRolePgData),
 			resources.InstanceNameLabelName: instanceName,
 		}
 		cluster := apiv1.Cluster{
@@ -51,7 +50,7 @@ var _ = Describe("pvc role test", func() {
 		}
 
 		role := NewPgDataCalculator()
-		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgData))
+		Expect(role.GetRoleName()).To(BeEquivalentTo(resources.PVCRolePgData))
 		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusInitializing))
@@ -69,7 +68,7 @@ var _ = Describe("pvc role test", func() {
 		instanceName := "instance1"
 		backupName := "backup1"
 		expectedLabel := map[string]string{
-			resources.PvcRoleLabelName:      string(utils.PVCRolePgWal),
+			resources.PvcRoleLabelName:      string(resources.PVCRolePgWal),
 			resources.InstanceNameLabelName: instanceName,
 		}
 		cluster := apiv1.Cluster{
@@ -88,7 +87,7 @@ var _ = Describe("pvc role test", func() {
 		}
 
 		role := NewPgWalCalculator()
-		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgWal))
+		Expect(role.GetRoleName()).To(BeEquivalentTo(resources.PVCRolePgWal))
 		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.WalArchiveVolumeSuffix))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusReady))
@@ -108,7 +107,7 @@ var _ = Describe("pvc role test", func() {
 		backupName := "backup1"
 		tbsName := "tbs1"
 		expectedLabel := map[string]string{
-			resources.PvcRoleLabelName:        string(utils.PVCRolePgTablespace),
+			resources.PvcRoleLabelName:        string(resources.PVCRolePgTablespace),
 			resources.InstanceNameLabelName:   instanceName,
 			resources.TablespaceNameLabelName: tbsName,
 		}
@@ -141,7 +140,7 @@ var _ = Describe("pvc role test", func() {
 		}
 
 		role := NewPgTablespaceCalculator(tbsName)
-		Expect(role.GetRoleName()).To(BeEquivalentTo(utils.PVCRolePgTablespace))
+		Expect(role.GetRoleName()).To(BeEquivalentTo(resources.PVCRolePgTablespace))
 		Expect(role.GetName(instanceName)).To(BeIdenticalTo(instanceName + apiv1.TablespaceVolumeInfix + tbsName))
 		Expect(role.GetLabels(instanceName)).To(BeEquivalentTo(expectedLabel))
 		Expect(role.GetInitialStatus()).To(BeIdenticalTo(StatusReady))

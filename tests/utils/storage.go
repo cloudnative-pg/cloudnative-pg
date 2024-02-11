@@ -27,7 +27,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // GetStorageAllowExpansion returns the boolean value of the 'AllowVolumeExpansion' value of the storage class
@@ -111,18 +110,18 @@ func SetSnapshotNameAsEnv(
 	}
 
 	for _, item := range snapshotList.Items {
-		switch utils.PVCRole(item.Annotations[resources.PvcRoleLabelName]) {
-		case utils.PVCRolePgData:
+		switch resources.PVCRole(item.Annotations[resources.PvcRoleLabelName]) {
+		case resources.PVCRolePgData:
 			err := os.Setenv(envVars.DataSnapshot, item.Name)
 			if err != nil {
 				return err
 			}
-		case utils.PVCRolePgWal:
+		case resources.PVCRolePgWal:
 			err := os.Setenv(envVars.WalSnapshot, item.Name)
 			if err != nil {
 				return err
 			}
-		case utils.PVCRolePgTablespace:
+		case resources.PVCRolePgTablespace:
 			tbsName := item.Labels[resources.TablespaceNameLabelName]
 			err := os.Setenv(envVars.TablespaceSnapshotPrefix+"_"+tbsName, item.Name)
 			if err != nil {

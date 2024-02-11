@@ -78,3 +78,17 @@ const (
 	// IsOnlineBackupLabelName is the name of the label used to specify whether a backup was online
 	IsOnlineBackupLabelName = MetadataNamespace + "/onlineBackup"
 )
+
+// PVCRole describes the role of a PVC
+type PVCRole string
+
+const (
+	// PVCRolePgData the label value for the data PVC role
+	PVCRolePgData PVCRole = "PG_DATA"
+
+	// PVCRolePgWal the label value for the wal PVC role
+	PVCRolePgWal PVCRole = "PG_WAL"
+
+	// PVCRolePgTablespace the label value for the tablespace PVC role
+	PVCRolePgTablespace PVCRole = "PG_TABLESPACE"
+)
