@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1resources "github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -84,7 +85,7 @@ func (se *Reconciler) enrichSnapshot(
 	contextLogger := log.FromContext(ctx)
 	snapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
-	vs.Labels[utils.BackupNameLabelName] = backup.Name
+	vs.Labels[apiv1resources.BackupNameLabelName] = backup.Name
 
 	switch snapshotConfig.SnapshotOwnerReference {
 	case apiv1.SnapshotOwnerReferenceCluster:
@@ -97,33 +98,33 @@ func (se *Reconciler) enrichSnapshot(
 
 	// we grab the pg_controldata just before creating the snapshot
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
-		vs.Annotations[utils.PgControldataAnnotationName] = data
+		vs.Annotations[apiv1resources.PgControldataAnnotationName] = data
 		pgControlData := utils.ParsePgControldataOutput(data)
 		timelineID, ok := pgControlData["Latest checkpoint's TimeLineID"]
 		if ok {
-			vs.Labels[utils.BackupTimelineLabelName] = timelineID
+			vs.Labels[apiv1resources.BackupTimelineLabelName] = timelineID
 		}
 		startWal, ok := pgControlData["Latest checkpoint's REDO WAL file"]
 		if ok {
-			vs.Annotations[utils.BackupStartWALAnnotationName] = startWal
+			vs.Annotations[apiv1resources.BackupStartWALAnnotationName] = startWal
 			// TODO: once we have online volumesnapshot backups, this should change
-			vs.Annotations[utils.BackupEndWALAnnotationName] = startWal
+			vs.Annotations[apiv1resources.BackupEndWALAnnotationName] = startWal
 		}
 	} else {
 		contextLogger.Error(err, "while querying for pg_controldata")
 	}
 
-	vs.Labels[utils.BackupDateLabelName] = time.Now().Format("20060102")
-	vs.Labels[utils.BackupMonthLabelName] = time.Now().Format("200601")
-	vs.Labels[utils.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
-	vs.Annotations[utils.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
+	vs.Labels[apiv1resources.BackupDateLabelName] = time.Now().Format("20060102")
+	vs.Labels[apiv1resources.BackupMonthLabelName] = time.Now().Format("200601")
+	vs.Labels[apiv1resources.BackupYearLabelName] = strconv.Itoa(time.Now().Year())
+	vs.Annotations[apiv1resources.IsOnlineBackupLabelName] = strconv.FormatBool(backup.Status.GetOnline())
 
 	rawCluster, err := json.Marshal(cluster)
 	if err != nil {
 		return err
 	}
 
-	vs.Annotations[utils.ClusterManifestAnnotationName] = string(rawCluster)
+	vs.Annotations[apiv1resources.ClusterManifestAnnotationName] = string(rawCluster)
 
 	return nil
 }
@@ -289,16 +290,16 @@ func annotateSnapshotsWithBackupData(
 	for idx := range snapshots {
 		snapshot := &snapshots[idx]
 		oldSnapshot := snapshot.DeepCopy()
-		snapshot.Annotations[utils.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
-		snapshot.Annotations[utils.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
+		snapshot.Annotations[apiv1resources.BackupStartTimeAnnotationName] = backupStatus.StartedAt.Format(time.RFC3339)
+		snapshot.Annotations[apiv1resources.BackupEndTimeAnnotationName] = backupStatus.StoppedAt.Format(time.RFC3339)
 
 		if len(backupStatus.BackupLabelFile) > 0 {
-			snapshot.Annotations[utils.BackupLabelFileAnnotationName] = base64.StdEncoding.EncodeToString(
+			snapshot.Annotations[apiv1resources.BackupLabelFileAnnotationName] = base64.StdEncoding.EncodeToString(
 				backupStatus.BackupLabelFile)
 		}
 
 		if len(backupStatus.TablespaceMapFile) > 0 {
-			snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName] = base64.StdEncoding.EncodeToString(
+			snapshot.Annotations[apiv1resources.BackupTablespaceMapFileAnnotationName] = base64.StdEncoding.EncodeToString(
 				backupStatus.TablespaceMapFile)
 		}
 
@@ -491,10 +492,10 @@ func transferLabelsToAnnotations(labels map[string]string, annotations map[strin
 	}
 
 	labelsToBeTransferred := []string{
-		utils.InstanceNameLabelName,
-		utils.ClusterInstanceRoleLabelName,
-		utils.ClusterRoleLabelName,
-		utils.PvcRoleLabelName,
+		apiv1resources.InstanceNameLabelName,
+		apiv1resources.ClusterInstanceRoleLabelName,
+		apiv1resources.ClusterRoleLabelName,
+		apiv1resources.PvcRoleLabelName,
 	}
 
 	for _, key := range labelsToBeTransferred {
@@ -534,13 +535,14 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	_, hasTimeAnnotation := snapshot.Annotations[utils.SnapshotEndTimeAnnotationName]
+	_, hasTimeAnnotation := snapshot.Annotations[apiv1resources.SnapshotEndTimeAnnotationName]
 	if !hasTimeAnnotation {
 		oldSnapshot := snapshot.DeepCopy()
 		// as soon as the volume snapshot has stopped running, we should update its
 		// snapshotEndTime annotation
-		snapshot.Annotations[utils.SnapshotEndTimeAnnotationName] = metav1.Now().Format(time.RFC3339)
-		snapshot.Annotations[utils.SnapshotStartTimeAnnotationName] = snapshot.Status.CreationTime.Format(time.RFC3339)
+		snapshot.Annotations[apiv1resources.SnapshotEndTimeAnnotationName] = metav1.Now().Format(time.RFC3339)
+		snapshot.Annotations[apiv1resources.SnapshotStartTimeAnnotationName] = snapshot.Status.CreationTime.
+			Format(time.RFC3339)
 		if err := se.cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
 			contextLogger.Error(err, "while adding time annotations to volume snapshot",
 				"snapshot", snapshot.Name)

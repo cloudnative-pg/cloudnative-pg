@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -38,7 +39,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type rolloutReason = string
@@ -196,14 +196,16 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 	primaryPod corev1.Pod,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok &&
-		(primaryPod.Annotations == nil || primaryPod.Annotations[utils.ClusterRestartAnnotationName] != clusterRestart) {
-		contextLogger.Info("Setting restart annotation on primary pod as needed", "label", utils.ClusterRestartAnnotationName)
+	if clusterRestart, ok := cluster.Annotations[resources.ClusterRestartAnnotationName]; ok &&
+		(primaryPod.Annotations == nil ||
+			primaryPod.Annotations[resources.ClusterRestartAnnotationName] != clusterRestart) {
+		contextLogger.Info("Setting restart annotation on primary pod as needed",
+			"label", resources.ClusterRestartAnnotationName)
 		original := primaryPod.DeepCopy()
 		if primaryPod.Annotations == nil {
 			primaryPod.Annotations = make(map[string]string)
 		}
-		primaryPod.Annotations[utils.ClusterRestartAnnotationName] = clusterRestart
+		primaryPod.Annotations[resources.ClusterRestartAnnotationName] = clusterRestart
 		if err := r.Client.Patch(ctx, &primaryPod, client.MergeFrom(original)); err != nil {
 			return err
 		}
@@ -304,7 +306,7 @@ func isPodNeedingRollout(
 
 // check if the pod has a valid podSpec
 func hasValidPodSpec(status postgres.PostgresqlStatus) bool {
-	podSpecAnnotation, hasStoredPodSpec := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
+	podSpecAnnotation, hasStoredPodSpec := status.Pod.ObjectMeta.Annotations[resources.PodSpecAnnotationName]
 	if !hasStoredPodSpec {
 		return false
 	}
@@ -504,8 +506,8 @@ func checkClusterHasNewerRestartAnnotation(
 	// If the cluster has been restarted and we are working with a Pod
 	// which has not been restarted yet, or restarted at a different
 	// time, let's restart it.
-	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok {
-		podRestart := status.Pod.Annotations[utils.ClusterRestartAnnotationName]
+	if clusterRestart, ok := cluster.Annotations[resources.ClusterRestartAnnotationName]; ok {
+		podRestart := status.Pod.Annotations[resources.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
 			return rollout{
 				required:     true,
@@ -543,7 +545,7 @@ func checkPodEnvironmentIsOutdated(
 	// Use the hash to detect if the environment needs a refresh
 	// Deprecated: the PodEnvHashAnnotationName is marked deprecated. When it is
 	// eliminated, the fallback code below can still be useful
-	podEnvHash, hasPodEnvhash := status.Pod.Annotations[utils.PodEnvHashAnnotationName]
+	podEnvHash, hasPodEnvhash := status.Pod.Annotations[resources.PodEnvHashAnnotationName]
 	if hasPodEnvhash {
 		if podEnvHash != envConfig.Hash {
 			return rollout{
@@ -585,7 +587,7 @@ func checkPodSpecIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
-	podSpecAnnotation, ok := status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName]
+	podSpecAnnotation, ok := status.Pod.ObjectMeta.Annotations[resources.PodSpecAnnotationName]
 	if !ok {
 		return rollout{}, nil
 	}

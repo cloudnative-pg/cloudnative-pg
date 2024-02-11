@@ -30,9 +30,9 @@ import (
 	"sigs.k8s.io/yaml"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -114,7 +114,7 @@ func (t *textStatusOutputManager) addPVCGroupInformation(
 	}
 
 	// there is no need to iterate the pvc group, it is either all valid or none
-	value, ok := pvcs[0].Annotations[utils.HibernatePgControlDataAnnotationName]
+	value, ok := pvcs[0].Annotations[resources.HibernatePgControlDataAnnotationName]
 	if !ok {
 		return
 	}
@@ -179,7 +179,7 @@ func (t *structuredStatusOutputManager) addPVCGroupInformation(
 	contextLogger := log.FromContext(t.ctx)
 
 	// there is no need to iterate the pvc group, it is either all valid or none
-	value, ok := pvcs[0].Annotations[utils.HibernatePgControlDataAnnotationName]
+	value, ok := pvcs[0].Annotations[resources.HibernatePgControlDataAnnotationName]
 	if !ok {
 		return
 	}

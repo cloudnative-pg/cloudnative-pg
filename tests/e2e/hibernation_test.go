@@ -27,8 +27,8 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -207,15 +207,15 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			Expect(pvcUid).Should(BeEquivalentTo(pvcInfo.GetUID()))
 			// pvc should be attached annotation with pgControlData and Cluster manifesto
 			expectedAnnotationKeyPresent := []string{
-				utils.HibernatePgControlDataAnnotationName,
-				utils.HibernateClusterManifestAnnotationName,
-				utils.PgControldataAnnotationName,
-				utils.ClusterManifestAnnotationName,
+				resources.HibernatePgControlDataAnnotationName,
+				resources.HibernateClusterManifestAnnotationName,
+				resources.PgControldataAnnotationName,
+				resources.ClusterManifestAnnotationName,
 			}
 			testsUtils.ObjectHasAnnotations(&pvcInfo, expectedAnnotationKeyPresent)
 			expectedAnnotation := map[string]string{
-				utils.HibernateClusterManifestAnnotationName: string(clusterManifest),
-				utils.ClusterManifestAnnotationName:          string(clusterManifest),
+				resources.HibernateClusterManifestAnnotationName: string(clusterManifest),
+				resources.ClusterManifestAnnotationName:          string(clusterManifest),
 			}
 			testsUtils.ObjectMatchesAnnotations(&pvcInfo, expectedAnnotation)
 		}

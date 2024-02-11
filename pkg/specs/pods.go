@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -41,22 +42,22 @@ import (
 const (
 	// ClusterSerialAnnotationName is the name of the annotation containing the
 	// serial number of the node
-	ClusterSerialAnnotationName = utils.ClusterSerialAnnotationName
+	ClusterSerialAnnotationName = resources.ClusterSerialAnnotationName
 
 	// ClusterRestartAnnotationName is the name of the annotation containing the
 	// latest required restart time
-	ClusterRestartAnnotationName = utils.ClusterRestartAnnotationName
+	ClusterRestartAnnotationName = resources.ClusterRestartAnnotationName
 
 	// ClusterReloadAnnotationName is the name of the annotation containing the
 	// latest required restart time
-	ClusterReloadAnnotationName = utils.ClusterReloadAnnotationName
+	ClusterReloadAnnotationName = resources.ClusterReloadAnnotationName
 
 	// ClusterRoleLabelName label is applied to Pods to mark primary ones
 	// Deprecated: Use utils.ClusterInstanceRoleLabelName
-	ClusterRoleLabelName = utils.ClusterRoleLabelName
+	ClusterRoleLabelName = resources.ClusterRoleLabelName
 
 	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
-	WatchedLabelName = utils.WatchedLabelName
+	WatchedLabelName = resources.WatchedLabelName
 
 	// ClusterRoleLabelPrimary is written in labels to represent primary servers
 	ClusterRoleLabelPrimary = "primary"
@@ -320,7 +321,7 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 		LabelSelector: &metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
-					Key:      utils.ClusterLabelName,
+					Key:      resources.ClusterLabelName,
 					Operator: metav1.LabelSelectorOpIn,
 					Values: []string{
 						clusterName,
@@ -386,13 +387,13 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				utils.ClusterLabelName:      cluster.Name,
-				utils.InstanceNameLabelName: podName,
-				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
+				resources.ClusterLabelName:      cluster.Name,
+				resources.InstanceNameLabelName: podName,
+				resources.PodRoleLabelName:      string(utils.PodRoleInstance),
 			},
 			Annotations: map[string]string{
-				utils.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
-				utils.PodEnvHashAnnotationName:    envConfig.Hash,
+				resources.ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
+				resources.PodEnvHashAnnotationName:    envConfig.Hash,
 			},
 			Name:      podName,
 			Namespace: cluster.Namespace,
@@ -401,7 +402,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	}
 
 	if podSpecMarshaled, err := json.Marshal(podSpec); err == nil {
-		pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecMarshaled)
+		pod.Annotations[resources.PodSpecAnnotationName] = string(podSpecMarshaled)
 	}
 
 	if cluster.Spec.PriorityClassName != "" {

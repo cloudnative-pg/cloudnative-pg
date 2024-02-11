@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -77,7 +78,7 @@ func newPsqlCommand(
 	if err := plugin.Client.List(
 		ctx,
 		&pods,
-		client.MatchingLabels{utils.ClusterLabelName: options.name},
+		client.MatchingLabels{resources.ClusterLabelName: options.name},
 		client.InNamespace(plugin.Namespace),
 	); err != nil {
 		return nil, err

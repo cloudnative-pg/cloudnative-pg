@@ -27,7 +27,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 )
 
 // BackupPhase is the phase of the backup
@@ -321,8 +321,8 @@ func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volu
 	for idx, volumeSnapshot := range snapshots {
 		snapshotNames[idx] = BackupSnapshotElementStatus{
 			Name:           volumeSnapshot.Name,
-			Type:           volumeSnapshot.Annotations[utils.PvcRoleLabelName],
-			TablespaceName: volumeSnapshot.Labels[utils.TablespaceNameLabelName],
+			Type:           volumeSnapshot.Annotations[resources.PvcRoleLabelName],
+			TablespaceName: volumeSnapshot.Labels[resources.TablespaceNameLabelName],
 		}
 	}
 	snapshotStatus.Elements = snapshotNames

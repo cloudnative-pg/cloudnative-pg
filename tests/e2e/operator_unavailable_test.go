@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -107,7 +108,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					err := env.Client.List(
 						env.Ctx, podList,
 						ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{utils.ClusterLabelName: clusterName},
+						ctrlclient.MatchingLabels{resources.ClusterLabelName: clusterName},
 					)
 					Expect(err).ToNot(HaveOccurred())
 					return int32(len(podList.Items))
@@ -119,7 +120,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					err := env.Client.List(
 						env.Ctx, podList,
 						ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{utils.ClusterLabelName: clusterName},
+						ctrlclient.MatchingLabels{resources.ClusterLabelName: clusterName},
 					)
 					Expect(err).ToNot(HaveOccurred())
 					return int32(len(podList.Items))
@@ -222,7 +223,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					podList := &corev1.PodList{}
 					err := env.Client.List(
 						env.Ctx, podList, ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{utils.ClusterLabelName: "operator-unavailable"},
+						ctrlclient.MatchingLabels{resources.ClusterLabelName: "operator-unavailable"},
 					)
 					Expect(err).ToNot(HaveOccurred())
 					return int32(len(utils.FilterActivePods(podList.Items)))

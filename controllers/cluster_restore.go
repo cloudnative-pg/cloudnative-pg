@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -124,7 +125,7 @@ func getOrphanPVCs(
 		ctx,
 		&pvcList,
 		client.InNamespace(cluster.Namespace),
-		client.MatchingLabels{utils.ClusterLabelName: cluster.Name},
+		client.MatchingLabels{resources.ClusterLabelName: cluster.Name},
 	); err != nil {
 		return nil, err
 	}
@@ -136,7 +137,7 @@ func getOrphanPVCs(
 				"pvcName", pvc.Name)
 			continue
 		}
-		if _, ok := pvc.Annotations[utils.ClusterSerialAnnotationName]; !ok {
+		if _, ok := pvc.Annotations[resources.ClusterSerialAnnotationName]; !ok {
 			contextLogger.Warning("skipping pvc because it doesn't have serial annotation",
 				"pvcName", pvc.Name)
 			continue
@@ -187,12 +188,12 @@ func restoreOrphanPVCs(
 
 		pvcOrig := pvc.DeepCopy()
 		specs.SetInheritedDataAndOwnership(cluster, &pvc.ObjectMeta)
-		pvc.Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusReady
+		pvc.Annotations[resources.PVCStatusAnnotationName] = persistentvolumeclaim.StatusReady
 		// we clean hibernation metadata if it exists
-		delete(pvc.Annotations, utils.HibernateClusterManifestAnnotationName)
-		delete(pvc.Annotations, utils.HibernatePgControlDataAnnotationName)
-		delete(pvc.Annotations, utils.ClusterManifestAnnotationName)
-		delete(pvc.Annotations, utils.PgControldataAnnotationName)
+		delete(pvc.Annotations, resources.HibernateClusterManifestAnnotationName)
+		delete(pvc.Annotations, resources.HibernatePgControlDataAnnotationName)
+		delete(pvc.Annotations, resources.ClusterManifestAnnotationName)
+		delete(pvc.Annotations, resources.PgControldataAnnotationName)
 
 		if err := c.Patch(ctx, pvc, client.MergeFrom(pvcOrig)); err != nil {
 			return err

@@ -21,6 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/strings/slices"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -50,12 +52,12 @@ var _ = Describe("Operator version annotation management", func() {
 
 	It("must annotate empty objects", func() {
 		SetOperatorVersion(&pod.ObjectMeta, "2.3.2")
-		Expect(pod.ObjectMeta.Annotations[OperatorVersionAnnotationName]).To(Equal("2.3.2"))
+		Expect(pod.ObjectMeta.Annotations[resources.OperatorVersionAnnotationName]).To(Equal("2.3.2"))
 	})
 
 	It("must not forget existing annotations", func() {
 		SetOperatorVersion(&podTwo.ObjectMeta, "2.3.3")
-		Expect(podTwo.ObjectMeta.Annotations[OperatorVersionAnnotationName]).To(Equal("2.3.3"))
+		Expect(podTwo.ObjectMeta.Annotations[resources.OperatorVersionAnnotationName]).To(Equal("2.3.3"))
 		Expect(podTwo.ObjectMeta.Annotations["test"]).To(Equal("toast"))
 	})
 })
@@ -121,18 +123,18 @@ var _ = Describe("Label cluster name management", func() {
 
 	It("must label empty objects", func() {
 		LabelClusterName(&pod.ObjectMeta, "test-label")
-		Expect(pod.ObjectMeta.Labels[ClusterLabelName]).To(Equal("test-label"))
+		Expect(pod.ObjectMeta.Labels[resources.ClusterLabelName]).To(Equal("test-label"))
 	})
 
 	It("must not forget existing labels", func() {
 		LabelClusterName(&podTwo.ObjectMeta, "test-label")
-		Expect(podTwo.ObjectMeta.Labels[ClusterLabelName]).To(Equal("test-label"))
+		Expect(podTwo.ObjectMeta.Labels[resources.ClusterLabelName]).To(Equal("test-label"))
 		Expect(podTwo.ObjectMeta.Labels["test"]).To(Equal("toast"))
 	})
 })
 
 var _ = Describe("Annotate pods management", func() {
-	const appArmorPostgres = AppArmorAnnotationPrefix + "/postgres"
+	const appArmorPostgres = resources.AppArmorAnnotationPrefix + "/postgres"
 	annotations := map[string]string{
 		appArmorPostgres: "unconfined",
 	}

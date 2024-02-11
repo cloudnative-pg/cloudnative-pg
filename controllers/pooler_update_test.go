@@ -32,10 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -84,8 +84,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 			afterDep := getPoolerDeployment(ctx, pooler)
 			Expect(beforeDep.ResourceVersion).To(Equal(afterDep.ResourceVersion))
-			Expect(beforeDep.Annotations[utils.PoolerSpecHashAnnotationName]).
-				To(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
+			Expect(beforeDep.Annotations[resources.PoolerSpecHashAnnotationName]).
+				To(Equal(afterDep.Annotations[resources.PoolerSpecHashAnnotationName]))
 		})
 
 		By("making sure that the deployments gets updated if the pooler.spec changes", func() {
@@ -101,8 +101,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			afterDep := getPoolerDeployment(ctx, poolerUpdate)
 
 			Expect(beforeDep.ResourceVersion).ToNot(Equal(afterDep.ResourceVersion))
-			Expect(beforeDep.Annotations[utils.PoolerSpecHashAnnotationName]).
-				ToNot(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
+			Expect(beforeDep.Annotations[resources.PoolerSpecHashAnnotationName]).
+				ToNot(Equal(afterDep.Annotations[resources.PoolerSpecHashAnnotationName]))
 			Expect(*afterDep.Spec.Replicas).To(Equal(instancesNumber))
 		})
 	})
@@ -244,8 +244,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(expectedSVC.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
-			Expect(expectedSVC.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
+			Expect(expectedSVC.Labels[resources.ClusterLabelName]).To(Equal(cluster.Name))
+			Expect(expectedSVC.Labels[resources.PgbouncerNameLabel]).To(Equal(pooler.Name))
 			Expect(expectedSVC.Spec.Selector).To(Equal(svc.Spec.Selector))
 			Expect(expectedSVC.Spec.Ports).To(Equal(svc.Spec.Ports))
 			Expect(expectedSVC.Spec.Type).To(Equal(svc.Spec.Type))
@@ -278,8 +278,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(previousResourceVersion).ToNot(Equal(svc.ResourceVersion))
-			Expect(expectedSVC.Labels[utils.ClusterLabelName]).ToNot(Equal(previousName))
-			Expect(expectedSVC.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
+			Expect(expectedSVC.Labels[resources.ClusterLabelName]).ToNot(Equal(previousName))
+			Expect(expectedSVC.Labels[resources.ClusterLabelName]).To(Equal(cluster.Name))
 		})
 	})
 })

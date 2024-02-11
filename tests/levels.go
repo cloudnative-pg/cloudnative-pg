@@ -28,7 +28,7 @@ import (
 // if the test can be skipped.
 type Level int
 
-// Declare constants for each level
+// Declare resources for each level
 const (
 	Highest Level = iota
 	High

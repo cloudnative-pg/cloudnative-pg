@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // clusterReport contains the data to be printed by the `report cluster` plugin
@@ -97,7 +97,7 @@ func cluster(ctx context.Context, clusterName, namespace string, format plugin.O
 	}
 
 	matchClusterName := client.MatchingLabels{
-		utils.ClusterLabelName: clusterName,
+		resources.ClusterLabelName: clusterName,
 	}
 
 	var pods corev1.PodList

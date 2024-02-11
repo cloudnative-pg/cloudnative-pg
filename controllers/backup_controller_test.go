@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -281,44 +282,44 @@ var _ = Describe("update snapshot backup metadata", func() {
 					Name:      "snapshot-0",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						utils.BackupEndTimeAnnotationName: threeHoursAgo.Format(time.RFC3339),
-						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
+						resources.BackupEndTimeAnnotationName: threeHoursAgo.Format(time.RFC3339),
+						resources.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName: "DIFFERENT-CLUSTER",
+						resources.ClusterLabelName: "DIFFERENT-CLUSTER",
 					},
 				}},
 				{ObjectMeta: metav1.ObjectMeta{
 					Name:      "snapshot-01",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						utils.BackupEndTimeAnnotationName: threeHoursAgo.Format(time.RFC3339),
-						utils.PvcRoleLabelName:            string(utils.PVCRolePgWal),
+						resources.BackupEndTimeAnnotationName: threeHoursAgo.Format(time.RFC3339),
+						resources.PvcRoleLabelName:            string(utils.PVCRolePgWal),
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName: cluster.Name,
+						resources.ClusterLabelName: cluster.Name,
 					},
 				}},
 				{ObjectMeta: metav1.ObjectMeta{
 					Name:      "snapshot-1",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						utils.BackupEndTimeAnnotationName: twoHoursAgo.Format(time.RFC3339),
-						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
+						resources.BackupEndTimeAnnotationName: twoHoursAgo.Format(time.RFC3339),
+						resources.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName: cluster.Name,
+						resources.ClusterLabelName: cluster.Name,
 					},
 				}},
 				{ObjectMeta: metav1.ObjectMeta{
 					Name:      "snapshot-2",
 					Namespace: namespace,
 					Annotations: map[string]string{
-						utils.BackupEndTimeAnnotationName: oneHourAgo.Format(time.RFC3339),
-						utils.PvcRoleLabelName:            string(utils.PVCRolePgData),
+						resources.BackupEndTimeAnnotationName: oneHourAgo.Format(time.RFC3339),
+						resources.PvcRoleLabelName:            string(utils.PVCRolePgData),
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName: cluster.Name,
+						resources.ClusterLabelName: cluster.Name,
 					},
 				}},
 			},

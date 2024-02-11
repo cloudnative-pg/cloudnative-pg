@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,7 +53,7 @@ var _ = Describe("backup_controller volumeSnapshots predicates", func() {
 			snapshot := storagesnapshotv1.VolumeSnapshot{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						utils.BackupNameLabelName: "test",
+						resources.BackupNameLabelName: "test",
 					},
 				},
 			}
@@ -81,7 +81,7 @@ var _ = Describe("backup_controller volumeSnapshots predicates", func() {
 					Name:      "snapshot-1",
 					Namespace: "default",
 					Labels: map[string]string{
-						utils.BackupNameLabelName: "backup",
+						resources.BackupNameLabelName: "backup",
 					},
 				},
 			}

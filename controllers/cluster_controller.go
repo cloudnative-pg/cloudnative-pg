@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -730,13 +731,13 @@ func (r *ClusterReconciler) reconcilePods(ctx context.Context, cluster *apiv1.Cl
 func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	resources *managedResources,
+	mr *managedResources,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Make sure that all healthy PVCs are marked as ready
 	for _, pvcName := range cluster.Status.HealthyPVC {
-		pvc := resources.getPVC(pvcName)
+		pvc := mr.getPVC(pvcName)
 		if pvc == nil {
 			return fmt.Errorf(
 				"could not find the pvc: %s, from the list of managed pvc",
@@ -744,7 +745,7 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 			)
 		}
 
-		if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
+		if pvc.Annotations[resources.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
 			continue
 		}
 
@@ -1108,8 +1109,8 @@ func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 			client.MatchingFields{".spec.nodeName": node.Name},
 			client.MatchingLabels{
 				// TODO: eventually migrate to the new label
-				utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
-				utils.PodRoleLabelName:     string(utils.PodRoleInstance),
+				resources.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+				resources.PodRoleLabelName:     string(utils.PodRoleInstance),
 			},
 		)
 		if err != nil {
@@ -1136,23 +1137,23 @@ func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 
 func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	ctx context.Context,
-	resources *managedResources,
+	mr *managedResources,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	completeJobs := utils.FilterJobsWithOneCompletion(resources.jobs.Items)
+	completeJobs := utils.FilterJobsWithOneCompletion(mr.jobs.Items)
 	if len(completeJobs) == 0 {
 		return nil
 	}
 
 	for _, job := range completeJobs {
-		for _, pvc := range resources.pvcs.Items {
+		for _, pvc := range mr.pvcs.Items {
 			pvc := pvc
 			if !persistentvolumeclaim.IsUsedByPodSpec(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
 
-			roleName := job.Labels[utils.JobRoleLabelName]
+			roleName := job.Labels[resources.JobRoleLabelName]
 			contextLogger.Info("job has been finished, setting PVC as ready",
 				"pvcName", pvc.Name,
 				"role", roleName,
@@ -1205,7 +1206,7 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 	// if we found it, we check the annotation the operator should have set to be sure it was created by us
 	if err == nil { // nolint:nestif
 		// if it was, we delete it and proceed to remove it from the cluster monitoring spec
-		if _, ok := oldCm.Annotations[utils.OperatorVersionAnnotationName]; ok {
+		if _, ok := oldCm.Annotations[resources.OperatorVersionAnnotationName]; ok {
 			err = r.Delete(ctx, &oldCm)
 			// if there is any error except the cm was already deleted, we return
 			if err != nil && !apierrs.IsNotFound(err) {

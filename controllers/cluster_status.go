@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -210,7 +211,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
+	if pvc.Annotations[resources.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
 		return nil
 	}
 
@@ -221,7 +222,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 	if pvc.Annotations == nil {
 		pvc.Annotations = make(map[string]string, 1)
 	}
-	pvc.Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusReady
+	pvc.Annotations[resources.PVCStatusAnnotationName] = persistentvolumeclaim.StatusReady
 
 	return r.Patch(ctx, pvc, client.MergeFrom(oldPvc))
 }

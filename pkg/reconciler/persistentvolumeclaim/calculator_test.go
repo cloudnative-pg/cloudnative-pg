@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,8 +32,8 @@ var _ = Describe("pvc role test", func() {
 		instanceName := "instance1"
 		backupName := "backup1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:      string(utils.PVCRolePgData),
-			utils.InstanceNameLabelName: instanceName,
+			resources.PvcRoleLabelName:      string(utils.PVCRolePgData),
+			resources.InstanceNameLabelName: instanceName,
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -68,8 +69,8 @@ var _ = Describe("pvc role test", func() {
 		instanceName := "instance1"
 		backupName := "backup1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:      string(utils.PVCRolePgWal),
-			utils.InstanceNameLabelName: instanceName,
+			resources.PvcRoleLabelName:      string(utils.PVCRolePgWal),
+			resources.InstanceNameLabelName: instanceName,
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
@@ -107,9 +108,9 @@ var _ = Describe("pvc role test", func() {
 		backupName := "backup1"
 		tbsName := "tbs1"
 		expectedLabel := map[string]string{
-			utils.PvcRoleLabelName:        string(utils.PVCRolePgTablespace),
-			utils.InstanceNameLabelName:   instanceName,
-			utils.TablespaceNameLabelName: tbsName,
+			resources.PvcRoleLabelName:        string(utils.PVCRolePgTablespace),
+			resources.InstanceNameLabelName:   instanceName,
+			resources.TablespaceNameLabelName: tbsName,
 		}
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{

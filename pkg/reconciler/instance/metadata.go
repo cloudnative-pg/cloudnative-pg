@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -97,7 +98,7 @@ func updateClusterAnnotations(
 		// the debug log will get clogged
 		podAnnotations := make(map[string]string, len(instance.Annotations))
 		for k, v := range instance.Annotations {
-			if k == utils.PodSpecAnnotationName {
+			if k == resources.PodSpecAnnotationName {
 				continue
 			}
 			podAnnotations[k] = v
@@ -182,8 +183,8 @@ func updateRoleLabels(
 		instance.Labels = make(map[string]string)
 	}
 
-	podRole, hasRole := instance.ObjectMeta.Labels[utils.ClusterRoleLabelName]
-	newPodRole, newHasRole := instance.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName]
+	podRole, hasRole := instance.ObjectMeta.Labels[resources.ClusterRoleLabelName]
+	newPodRole, newHasRole := instance.ObjectMeta.Labels[resources.ClusterInstanceRoleLabelName]
 
 	switch {
 	case instance.Name == cluster.Status.CurrentPrimary:
@@ -221,15 +222,15 @@ func updateOperatorLabels(
 	}
 
 	var modified bool
-	if instance.Labels[utils.InstanceNameLabelName] != instance.Name {
+	if instance.Labels[resources.InstanceNameLabelName] != instance.Name {
 		contextLogger.Info("Setting instance label name", "pod", instance.Name)
-		instance.Labels[utils.InstanceNameLabelName] = instance.Name
+		instance.Labels[resources.InstanceNameLabelName] = instance.Name
 		modified = true
 	}
 
-	if instance.Labels[utils.PodRoleLabelName] != string(utils.PodRoleInstance) {
+	if instance.Labels[resources.PodRoleLabelName] != string(utils.PodRoleInstance) {
 		contextLogger.Info("Setting pod role label name", "pod", instance.Name)
-		instance.Labels[utils.PodRoleLabelName] = string(utils.PodRoleInstance)
+		instance.Labels[resources.PodRoleLabelName] = string(utils.PodRoleInstance)
 		modified = true
 	}
 

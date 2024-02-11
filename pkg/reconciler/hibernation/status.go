@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 )
 
 const (
@@ -133,7 +133,7 @@ func EnrichStatus(
 }
 
 func getHibernationAnnotationValue(cluster *apiv1.Cluster) (bool, error) {
-	value, ok := cluster.Annotations[utils.HibernationAnnotationName]
+	value, ok := cluster.Annotations[resources.HibernationAnnotationName]
 	if !ok {
 		return false, nil
 	}

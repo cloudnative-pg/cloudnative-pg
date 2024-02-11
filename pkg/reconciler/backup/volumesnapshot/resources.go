@@ -24,7 +24,7 @@ import (
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 )
 
 // volumeSnapshotInfo host information about a volume snapshot
@@ -97,7 +97,7 @@ type slice []storagesnapshotv1.VolumeSnapshot
 // getControldata retrieves the pg_controldata stored as an annotation in VolumeSnapshots
 func (s slice) getControldata() (string, error) {
 	for _, volumeSnapshot := range s {
-		pgControlData, ok := volumeSnapshot.Annotations[utils.PgControldataAnnotationName]
+		pgControlData, ok := volumeSnapshot.Annotations[resources.PgControldataAnnotationName]
 		if !ok {
 			continue
 		}
@@ -120,7 +120,7 @@ func getBackupVolumeSnapshots(
 		ctx,
 		&list,
 		client.InNamespace(namespace),
-		client.MatchingLabels{utils.BackupNameLabelName: backupLabelName},
+		client.MatchingLabels{resources.BackupNameLabelName: backupLabelName},
 	); err != nil {
 		return nil, err
 	}

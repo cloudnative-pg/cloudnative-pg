@@ -26,8 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
@@ -92,7 +92,7 @@ func streamClusterLogsToZip(
 	}
 
 	matchClusterName := client.MatchingLabels{
-		utils.ClusterLabelName: clusterName,
+		resources.ClusterLabelName: clusterName,
 	}
 
 	podLogOptions := &corev1.PodLogOptions{
@@ -146,7 +146,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 	}
 
 	matchClusterName := client.MatchingLabels{
-		utils.ClusterLabelName: clusterName,
+		resources.ClusterLabelName: clusterName,
 	}
 
 	podLogOptions := &corev1.PodLogOptions{

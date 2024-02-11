@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -61,7 +62,7 @@ var _ = Describe("BackupStatus structure", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-1",
 					Annotations: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+						resources.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				},
 			},
@@ -69,7 +70,7 @@ var _ = Describe("BackupStatus structure", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-example-snapshot-2",
 					Annotations: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+						resources.PvcRoleLabelName: string(utils.PVCRolePgWal),
 					},
 				},
 			},

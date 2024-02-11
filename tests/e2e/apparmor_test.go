@@ -19,8 +19,8 @@ package e2e
 import (
 	"fmt"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -63,7 +63,7 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 			// Gathers the pod list using annotations
 			podList, _ := env.GetClusterPodList(namespace, clusterName)
 			for _, pod := range podList.Items {
-				annotation := pod.ObjectMeta.Annotations[pkgutils.AppArmorAnnotationPrefix+"/"+specs.PostgresContainerName]
+				annotation := pod.ObjectMeta.Annotations[resources.AppArmorAnnotationPrefix+"/"+specs.PostgresContainerName]
 				Expect(annotation).ShouldNot(BeEmpty(),
 					fmt.Sprintf("annotation for apparmor is not on pod %v", specs.PostgresContainerName))
 				Expect(annotation).Should(BeEquivalentTo("runtime/default"),

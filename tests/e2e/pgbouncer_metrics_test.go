@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -77,7 +77,7 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 			Expect(err).ToNot(HaveOccurred())
 			podList := &corev1.PodList{}
 			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
-				ctrlclient.MatchingLabels{pkgutils.PgbouncerNameLabel: poolerName})
+				ctrlclient.MatchingLabels{resources.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
 			promMetrics := []string{

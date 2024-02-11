@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -69,9 +70,9 @@ var _ = Describe("testing create function", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(expectedPVC.Annotations).To(Equal(map[string]string{
-				utils.ClusterSerialAnnotationName:   "1",
-				utils.OperatorVersionAnnotationName: versions.Version,
-				utils.PVCStatusAnnotationName:       "ready",
+				resources.ClusterSerialAnnotationName:   "1",
+				resources.OperatorVersionAnnotationName: versions.Version,
+				resources.PVCStatusAnnotationName:       "ready",
 			}))
 			Expect(expectedPVC.Spec.AccessModes).To(Equal([]corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}))
 			Expect(expectedPVC.Spec.Resources.Requests).To(Equal(corev1.ResourceList{

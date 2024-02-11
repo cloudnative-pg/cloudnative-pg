@@ -27,8 +27,8 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -301,7 +301,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("fetching the volume snapshots", func() {
 				snapshotList := volumesnapshot.VolumeSnapshotList{}
 				err := env.Client.List(env.Ctx, &snapshotList, k8client.MatchingLabels{
-					utils.ClusterLabelName: clusterName,
+					resources.ClusterLabelName: clusterName,
 				})
 				Expect(err).ToNot(HaveOccurred())
 				Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))

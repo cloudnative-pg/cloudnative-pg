@@ -21,8 +21,8 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -72,7 +72,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 				cluster.Annotations = make(map[string]string)
 			}
 			originCluster := cluster.DeepCopy()
-			cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOn
+			cluster.Annotations[resources.HibernationAnnotationName] = hibernation.HibernationOn
 
 			Expect(env.Client.Patch(ctx, cluster, ctrlclient.MergeFrom(originCluster))).To(Succeed())
 		})
@@ -97,7 +97,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 				cluster.Annotations = make(map[string]string)
 			}
 			originCluster := cluster.DeepCopy()
-			cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOff
+			cluster.Annotations[resources.HibernationAnnotationName] = hibernation.HibernationOff
 			Expect(env.Client.Patch(ctx, cluster, ctrlclient.MergeFrom(originCluster))).To(Succeed())
 		})
 

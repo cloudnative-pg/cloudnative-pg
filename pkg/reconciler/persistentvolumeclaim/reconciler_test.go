@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -76,10 +77,10 @@ var _ = Describe("Reconcile Resources", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clusterName + "-3",
 						Labels: map[string]string{
-							utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
+							resources.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
 						},
 						Annotations: map[string]string{
-							utils.ClusterSerialAnnotationName: "3",
+							resources.ClusterSerialAnnotationName: "3",
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -99,10 +100,10 @@ var _ = Describe("Reconcile Resources", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clusterName + "-2",
 						Labels: map[string]string{
-							utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
+							resources.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
 						},
 						Annotations: map[string]string{
-							utils.ClusterSerialAnnotationName: "2",
+							resources.ClusterSerialAnnotationName: "2",
 						},
 					},
 				},
@@ -110,10 +111,10 @@ var _ = Describe("Reconcile Resources", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clusterName + "-1",
 						Labels: map[string]string{
-							utils.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
+							resources.ClusterRoleLabelName: specs.ClusterRoleLabelReplica,
 						},
 						Annotations: map[string]string{
-							utils.ClusterSerialAnnotationName: "1",
+							resources.ClusterSerialAnnotationName: "1",
 						},
 					},
 				},
@@ -142,7 +143,7 @@ var _ = Describe("Reconcile Resources", func() {
 
 			Expect(pvc.Labels).Should(HaveKey("label1"))
 			Expect(pvc.Labels).Should(HaveKey("label2"))
-			Expect(pvc.Labels).Should(HaveKey(utils.ClusterInstanceRoleLabelName), fmt.Sprintf("PVC NAME: %s", pvc.Name))
+			Expect(pvc.Labels).Should(HaveKey(resources.ClusterInstanceRoleLabelName), fmt.Sprintf("PVC NAME: %s", pvc.Name))
 			Expect(pvc.Annotations).Should(HaveKey("annotation1"))
 			Expect(pvc.Annotations).Should(HaveKey("annotation2"))
 		}
@@ -234,10 +235,10 @@ var _ = Describe("PVC reconciliation", func() {
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvcs.Items[2].Labels).To(BeEquivalentTo(map[string]string{
-			utils.InstanceNameLabelName: clusterName + "-3-wal",
-			utils.PvcRoleLabelName:      "PG_DATA",
-			"label1":                    "value",
-			"label2":                    "value",
+			resources.InstanceNameLabelName: clusterName + "-3-wal",
+			resources.PvcRoleLabelName:      "PG_DATA",
+			"label1":                        "value",
+			"label2":                        "value",
 		}))
 
 		configuration.Current.InheritedAnnotations = []string{"annotation1"}
@@ -252,10 +253,10 @@ var _ = Describe("PVC reconciliation", func() {
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvcs.Items[2].Annotations).To(BeEquivalentTo(map[string]string{
-			utils.PVCStatusAnnotationName:     "ready",
-			utils.ClusterSerialAnnotationName: "3-wal",
-			"annotation1":                     "value",
-			"annotation2":                     "value",
+			resources.PVCStatusAnnotationName:     "ready",
+			resources.ClusterSerialAnnotationName: "3-wal",
+			"annotation1":                         "value",
+			"annotation2":                         "value",
 		}))
 	})
 
@@ -307,26 +308,26 @@ var _ = Describe("PVC reconciliation", func() {
 		patchedPvc2 := fetchPVC(cl, pvc2)
 
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-2",
-			utils.PvcRoleLabelName:      "PG_DATA",
-			"label1":                    "value",
-			"label2":                    "value",
+			resources.InstanceNameLabelName: "cluster-pvc-reconciliation-2",
+			resources.PvcRoleLabelName:      "PG_DATA",
+			"label1":                        "value",
+			"label2":                        "value",
 		}))
 
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
-			utils.PvcRoleLabelName:      "PG_WAL",
-			"label1":                    "value",
-			"label2":                    "value",
+			resources.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
+			resources.PvcRoleLabelName:      "PG_WAL",
+			"label1":                        "value",
+			"label2":                        "value",
 		}))
 
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
-			utils.PvcRoleLabelName:      "PG_DATA",
-			"label1":                    "value",
-			"label2":                    "value",
+			resources.InstanceNameLabelName: "cluster-pvc-reconciliation-3",
+			resources.PvcRoleLabelName:      "PG_DATA",
+			"label1":                        "value",
+			"label2":                        "value",
 		}))
 	})
 
@@ -367,34 +368,34 @@ var _ = Describe("PVC reconciliation", func() {
 
 		patchedPvc := fetchPVC(cl, pvc)
 		Expect(patchedPvc.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName:        clusterName + "-1",
-			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "primary",
-			utils.ClusterInstanceRoleLabelName: "primary",
+			resources.InstanceNameLabelName:        clusterName + "-1",
+			resources.PvcRoleLabelName:             "PG_DATA",
+			resources.ClusterRoleLabelName:         "primary",
+			resources.ClusterInstanceRoleLabelName: "primary",
 		}))
 
 		patchedPvc2 := fetchPVC(cl, pvc2)
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName:        clusterName + "-2",
-			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "replica",
-			utils.ClusterInstanceRoleLabelName: "replica",
+			resources.InstanceNameLabelName:        clusterName + "-2",
+			resources.PvcRoleLabelName:             "PG_DATA",
+			resources.ClusterRoleLabelName:         "replica",
+			resources.ClusterInstanceRoleLabelName: "replica",
 		}))
 
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName:        clusterName + "-3-wal",
-			utils.PvcRoleLabelName:             "PG_WAL",
-			utils.ClusterRoleLabelName:         "replica",
-			utils.ClusterInstanceRoleLabelName: "replica",
+			resources.InstanceNameLabelName:        clusterName + "-3-wal",
+			resources.PvcRoleLabelName:             "PG_WAL",
+			resources.ClusterRoleLabelName:         "replica",
+			resources.ClusterInstanceRoleLabelName: "replica",
 		}))
 
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
-			utils.InstanceNameLabelName:        clusterName + "-3",
-			utils.PvcRoleLabelName:             "PG_DATA",
-			utils.ClusterRoleLabelName:         "replica",
-			utils.ClusterInstanceRoleLabelName: "replica",
+			resources.InstanceNameLabelName:        clusterName + "-3",
+			resources.PvcRoleLabelName:             "PG_DATA",
+			resources.ClusterRoleLabelName:         "replica",
+			resources.ClusterInstanceRoleLabelName: "replica",
 		}))
 	})
 })
@@ -457,7 +458,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 	It("Without the proper storage configuration it should always fail", func() {
 		pvc.Labels = map[string]string{
-			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+			resources.PvcRoleLabelName: string(utils.PVCRolePgData),
 		}
 
 		err := reconcilePVCQuantity(
@@ -482,7 +483,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 
 	It("It should not fail it's everything is ok", func() {
 		pvc.Labels = map[string]string{
-			utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+			resources.PvcRoleLabelName: string(utils.PVCRolePgData),
 		}
 		cluster.Spec.StorageConfiguration.Size = "1Gi"
 

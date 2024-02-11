@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -110,7 +111,7 @@ func SetSnapshotNameAsEnv(
 	}
 
 	for _, item := range snapshotList.Items {
-		switch utils.PVCRole(item.Annotations[utils.PvcRoleLabelName]) {
+		switch utils.PVCRole(item.Annotations[resources.PvcRoleLabelName]) {
 		case utils.PVCRolePgData:
 			err := os.Setenv(envVars.DataSnapshot, item.Name)
 			if err != nil {
@@ -122,14 +123,14 @@ func SetSnapshotNameAsEnv(
 				return err
 			}
 		case utils.PVCRolePgTablespace:
-			tbsName := item.Labels[utils.TablespaceNameLabelName]
+			tbsName := item.Labels[resources.TablespaceNameLabelName]
 			err := os.Setenv(envVars.TablespaceSnapshotPrefix+"_"+tbsName, item.Name)
 			if err != nil {
 				return err
 			}
 		default:
 			return fmt.Errorf("unrecognized PVC snapshot role: %s, name: %s",
-				item.Annotations[utils.PvcRoleLabelName],
+				item.Annotations[resources.PvcRoleLabelName],
 				item.Name,
 			)
 		}

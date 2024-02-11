@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1resources "github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	pluginresources "github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
@@ -314,8 +315,8 @@ func annotatePVCs(
 
 			// IMPORTANT: do not use utils.ClusterManifestAnnotationName, utils.PgControlDataAnnotationName here for backwards
 			// compatibility
-			_, hasHibernateAnnotation := currentPVC.Annotations[utils.HibernateClusterManifestAnnotationName]
-			_, hasPgControlDataAnnotation := currentPVC.Annotations[utils.HibernatePgControlDataAnnotationName]
+			_, hasHibernateAnnotation := currentPVC.Annotations[apiv1resources.HibernateClusterManifestAnnotationName]
+			_, hasPgControlDataAnnotation := currentPVC.Annotations[apiv1resources.HibernatePgControlDataAnnotationName]
 			if hasHibernateAnnotation || hasPgControlDataAnnotation {
 				return fmt.Errorf("the PVC already contains Hibernation annotations. Erroring out")
 			}
@@ -325,10 +326,10 @@ func annotatePVCs(
 				return err
 			}
 
-			currentPVC.Annotations[utils.HibernateClusterManifestAnnotationName] = string(bytes)
-			currentPVC.Annotations[utils.HibernatePgControlDataAnnotationName] = pgControlData
-			currentPVC.Annotations[utils.ClusterManifestAnnotationName] = string(bytes)
-			currentPVC.Annotations[utils.PgControldataAnnotationName] = pgControlData
+			currentPVC.Annotations[apiv1resources.HibernateClusterManifestAnnotationName] = string(bytes)
+			currentPVC.Annotations[apiv1resources.HibernatePgControlDataAnnotationName] = pgControlData
+			currentPVC.Annotations[apiv1resources.ClusterManifestAnnotationName] = string(bytes)
+			currentPVC.Annotations[apiv1resources.PgControldataAnnotationName] = pgControlData
 
 			return plugin.Client.Patch(ctx, &currentPVC, client.MergeFrom(origPVC))
 		}); err != nil {
@@ -359,10 +360,10 @@ func removePVCannotations(
 			}
 			origPVC := currentPVC.DeepCopy()
 
-			delete(currentPVC.Annotations, utils.HibernateClusterManifestAnnotationName)
-			delete(currentPVC.Annotations, utils.HibernatePgControlDataAnnotationName)
-			delete(currentPVC.Annotations, utils.ClusterManifestAnnotationName)
-			delete(currentPVC.Annotations, utils.PgControldataAnnotationName)
+			delete(currentPVC.Annotations, apiv1resources.HibernateClusterManifestAnnotationName)
+			delete(currentPVC.Annotations, apiv1resources.HibernatePgControlDataAnnotationName)
+			delete(currentPVC.Annotations, apiv1resources.ClusterManifestAnnotationName)
+			delete(currentPVC.Annotations, apiv1resources.PgControldataAnnotationName)
 
 			return plugin.Client.Patch(ctx, &currentPVC, client.MergeFrom(origPVC))
 		}); err != nil {

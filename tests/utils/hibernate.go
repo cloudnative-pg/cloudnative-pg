@@ -22,8 +22,8 @@ import (
 
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // HibernationMethod will be one of the supported ways to trigger an instance fencing
@@ -60,7 +60,7 @@ func HibernateOn(
 			cluster.Annotations = make(map[string]string)
 		}
 		originCluster := cluster.DeepCopy()
-		cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOn
+		cluster.Annotations[resources.HibernationAnnotationName] = hibernation.HibernationOn
 
 		err = env.Client.Patch(context.Background(), cluster, ctrlclient.MergeFrom(originCluster))
 		return err
@@ -93,7 +93,7 @@ func HibernateOff(
 			cluster.Annotations = make(map[string]string)
 		}
 		originCluster := cluster.DeepCopy()
-		cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOff
+		cluster.Annotations[resources.HibernationAnnotationName] = hibernation.HibernationOff
 
 		err = env.Client.Patch(context.Background(), cluster, ctrlclient.MergeFrom(originCluster))
 		return err

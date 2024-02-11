@@ -28,8 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var clustersWithBackupPredicate = predicate.Funcs{
@@ -136,7 +136,7 @@ func (r *BackupReconciler) mapVolumeSnapshotsToBackups() handler.MapFunc {
 		}
 
 		var requests []reconcile.Request
-		if backupName, ok := volumeSnapshot.Labels[utils.BackupNameLabelName]; ok {
+		if backupName, ok := volumeSnapshot.Labels[resources.BackupNameLabelName]; ok {
 			requests = append(requests,
 				reconcile.Request{
 					NamespacedName: types.NamespacedName{
@@ -151,6 +151,6 @@ func (r *BackupReconciler) mapVolumeSnapshotsToBackups() handler.MapFunc {
 }
 
 func volumeSnapshotHasBackuplabel(volumeSnapshot *storagesnapshotv1.VolumeSnapshot) bool {
-	_, ok := volumeSnapshot.Labels[utils.BackupNameLabelName]
+	_, ok := volumeSnapshot.Labels[resources.BackupNameLabelName]
 	return ok
 }

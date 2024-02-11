@@ -21,6 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -36,33 +38,35 @@ var _ = Describe("Fencing annotation handling", func() {
 		It("should correctly remove it when unfenced", func() {
 			clusterMeta := metav1.ObjectMeta{
 				Annotations: map[string]string{
-					FencedInstanceAnnotation: jsonMarshal("cluster-example-1"),
+					resources.FencedInstanceAnnotation: jsonMarshal("cluster-example-1"),
 				},
 			}
 			err := RemoveFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(clusterMeta.Annotations).NotTo(HaveKey(FencedInstanceAnnotation))
+			Expect(clusterMeta.Annotations).NotTo(HaveKey(resources.FencedInstanceAnnotation))
 		})
 		It("should correctly remove only that instance when unfenced", func() {
 			clusterMeta := metav1.ObjectMeta{
 				Annotations: map[string]string{
-					FencedInstanceAnnotation: jsonMarshal("cluster-example-1", "cluster-example-2"),
+					resources.FencedInstanceAnnotation: jsonMarshal("cluster-example-1", "cluster-example-2"),
 				},
 			}
 			err := RemoveFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(clusterMeta.Annotations).To(HaveKeyWithValue(FencedInstanceAnnotation, jsonMarshal("cluster-example-2")))
+			Expect(clusterMeta.Annotations).
+				To(HaveKeyWithValue(resources.FencedInstanceAnnotation, jsonMarshal("cluster-example-2")))
 		})
 		It("should return an error if tried to fence again", func() {
 			clusterMeta := metav1.ObjectMeta{
 				Annotations: map[string]string{
-					FencedInstanceAnnotation: jsonMarshal("cluster-example-1", "cluster-example-2"),
+					resources.FencedInstanceAnnotation: jsonMarshal("cluster-example-1", "cluster-example-2"),
 				},
 			}
 			err := AddFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).To(HaveOccurred())
 			Expect(clusterMeta.Annotations).
-				To(HaveKeyWithValue(FencedInstanceAnnotation, jsonMarshal("cluster-example-1", "cluster-example-2")))
+				To(HaveKeyWithValue(resources.FencedInstanceAnnotation,
+					jsonMarshal("cluster-example-1", "cluster-example-2")))
 		})
 	})
 	When("An instance is not yet fenced", func() {
@@ -72,29 +76,31 @@ var _ = Describe("Fencing annotation handling", func() {
 			}
 			err := AddFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(clusterMeta.Annotations).To(HaveKeyWithValue(FencedInstanceAnnotation, jsonMarshal("cluster-example-1")))
+			Expect(clusterMeta.Annotations).
+				To(HaveKeyWithValue(resources.FencedInstanceAnnotation, jsonMarshal("cluster-example-1")))
 		})
 		It("should correctly add it to other fenced instances", func() {
 			clusterMeta := metav1.ObjectMeta{
 				Annotations: map[string]string{
-					FencedInstanceAnnotation: jsonMarshal("cluster-example-2"),
+					resources.FencedInstanceAnnotation: jsonMarshal("cluster-example-2"),
 				},
 			}
 			err := AddFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(clusterMeta.Annotations).
-				To(HaveKeyWithValue(FencedInstanceAnnotation, jsonMarshal("cluster-example-1", "cluster-example-2")))
+				To(HaveKeyWithValue(resources.FencedInstanceAnnotation,
+					jsonMarshal("cluster-example-1", "cluster-example-2")))
 		})
 		It("should return an error if tried to unfence again", func() {
 			clusterMeta := metav1.ObjectMeta{
 				Annotations: map[string]string{
-					FencedInstanceAnnotation: jsonMarshal("cluster-example-2"),
+					resources.FencedInstanceAnnotation: jsonMarshal("cluster-example-2"),
 				},
 			}
 			err := RemoveFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).To(HaveOccurred())
 			Expect(clusterMeta.Annotations).
-				To(HaveKeyWithValue(FencedInstanceAnnotation, jsonMarshal("cluster-example-2")))
+				To(HaveKeyWithValue(resources.FencedInstanceAnnotation, jsonMarshal("cluster-example-2")))
 		})
 	})
 	When("An instance has no annotations", func() {
@@ -102,7 +108,8 @@ var _ = Describe("Fencing annotation handling", func() {
 			clusterMeta := metav1.ObjectMeta{}
 			err := AddFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(clusterMeta.Annotations).To(HaveKeyWithValue(FencedInstanceAnnotation, jsonMarshal("cluster-example-1")))
+			Expect(clusterMeta.Annotations).
+				To(HaveKeyWithValue(resources.FencedInstanceAnnotation, jsonMarshal("cluster-example-1")))
 		})
 	})
 })

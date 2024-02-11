@@ -26,10 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Destroy implements the destroy subcommand
@@ -53,8 +53,8 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 			}
 
 			pvcs[i].OwnerReferences = removeOwnerReference(pvcs[i].OwnerReferences, clusterName)
-			pvcs[i].Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusDetached
-			pvcs[i].Labels[utils.InstanceNameLabelName] = instanceName
+			pvcs[i].Annotations[resources.PVCStatusAnnotationName] = persistentvolumeclaim.StatusDetached
+			pvcs[i].Labels[resources.InstanceNameLabelName] = instanceName
 			err = plugin.Client.Update(ctx, &pvcs[i])
 			if err != nil {
 				return fmt.Errorf("error updating metadata for persistent volume claim %s: %v",
@@ -75,8 +75,8 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		// We will only skip the iteration and not delete the pvc if it is not owned by the cluster, and it does not have
 		// the annotation or label
 		if isOwned ||
-			(pvcs[i].Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusDetached &&
-				pvcs[i].Labels[utils.InstanceNameLabelName] == instanceName) {
+			(pvcs[i].Annotations[resources.PVCStatusAnnotationName] == persistentvolumeclaim.StatusDetached &&
+				pvcs[i].Labels[resources.InstanceNameLabelName] == instanceName) {
 			if err = plugin.Client.Delete(ctx, &pvcs[i]); err != nil {
 				return fmt.Errorf("error deleting pvc %s: %v", pvcs[i].Name, err)
 			}

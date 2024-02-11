@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -86,10 +87,10 @@ func reconcileMetadataComingFromInstance(
 		instanceReconciler := metadataReconciler{
 			name: "instance-inheritance",
 			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] != podRole {
+				if podHasRole && pvc.ObjectMeta.Labels[resources.ClusterRoleLabelName] != podRole {
 					return false
 				}
-				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName] != podRole {
+				if podHasRole && pvc.ObjectMeta.Labels[resources.ClusterInstanceRoleLabelName] != podRole {
 					return false
 				}
 
@@ -106,7 +107,7 @@ func reconcileMetadataComingFromInstance(
 					pvc.Annotations = map[string]string{}
 				}
 
-				pvc.Annotations[utils.ClusterSerialAnnotationName] = strconv.Itoa(podSerial)
+				pvc.Annotations[resources.ClusterSerialAnnotationName] = strconv.Itoa(podSerial)
 			},
 		}
 
@@ -169,7 +170,7 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 				return false
 			}
 
-			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
+			pvcRole := pvc.Labels[resources.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
 				if pvc.Name == NewPgDataCalculator().GetName(instanceName) {
@@ -193,13 +194,13 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 							return false
 						}
 
-						if pvc.Labels[utils.TablespaceNameLabelName] != tbsConfig.Name {
+						if pvc.Labels[resources.TablespaceNameLabelName] != tbsConfig.Name {
 							return false
 						}
 					}
 				}
 
-				if found && pvc.Labels[utils.InstanceNameLabelName] != instanceName {
+				if found && pvc.Labels[resources.InstanceNameLabelName] != instanceName {
 					return false
 				}
 			}
@@ -209,20 +210,20 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 		update: func(pvc *corev1.PersistentVolumeClaim) {
 			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 
-			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
+			pvcRole := pvc.Labels[resources.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {
 				var found bool
 				if pvc.Name == NewPgDataCalculator().GetName(instanceName) {
 					found = true
 					if pvcRole != string(utils.PVCRolePgData) {
-						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgData)
+						pvc.Labels[resources.PvcRoleLabelName] = string(utils.PVCRolePgData)
 					}
 				}
 
 				if pvc.Name == NewPgWalCalculator().GetName(instanceName) {
 					found = true
 					if pvcRole != string(utils.PVCRolePgWal) {
-						pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgWal)
+						pvc.Labels[resources.PvcRoleLabelName] = string(utils.PVCRolePgWal)
 					}
 				}
 
@@ -230,17 +231,17 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 					if NewPgTablespaceCalculator(tbsConfig.Name).GetName(instanceName) == pvc.Name {
 						found = true
 						if pvcRole != string(utils.PVCRolePgTablespace) {
-							pvc.Labels[utils.PvcRoleLabelName] = string(utils.PVCRolePgTablespace)
+							pvc.Labels[resources.PvcRoleLabelName] = string(utils.PVCRolePgTablespace)
 						}
 
-						if pvc.Labels[utils.TablespaceNameLabelName] != tbsConfig.Name {
-							pvc.Labels[utils.TablespaceNameLabelName] = tbsConfig.Name
+						if pvc.Labels[resources.TablespaceNameLabelName] != tbsConfig.Name {
+							pvc.Labels[resources.TablespaceNameLabelName] = tbsConfig.Name
 						}
 					}
 				}
 
 				if found {
-					pvc.Labels[utils.InstanceNameLabelName] = instanceName
+					pvc.Labels[resources.InstanceNameLabelName] = instanceName
 					break
 				}
 			}

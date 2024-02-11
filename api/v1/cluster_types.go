@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
@@ -3106,7 +3107,7 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 // ShouldForceLegacyBackup if present takes a backup without passing the name argument even on barman version 3.3.0+.
 // This is needed to test both backup system in the E2E suite
 func (cluster *Cluster) ShouldForceLegacyBackup() bool {
-	return cluster.Annotations[utils.LegacyBackupAnnotationName] == "true"
+	return cluster.Annotations[resources.LegacyBackupAnnotationName] == "true"
 }
 
 // GetSeccompProfile return the proper SeccompProfile set in the cluster for Pods and Containers
@@ -3122,7 +3123,7 @@ func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
 
 // GetCoredumpFilter get the coredump filter value from the cluster annotation
 func (cluster *Cluster) GetCoredumpFilter() string {
-	value, ok := cluster.Annotations[utils.CoredumpFilter]
+	value, ok := cluster.Annotations[resources.CoredumpFilter]
 	if ok {
 		return value
 	}

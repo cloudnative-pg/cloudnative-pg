@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -42,7 +43,7 @@ func Reload(ctx context.Context, clusterName string) error {
 	if clusterRestarted.Annotations == nil {
 		clusterRestarted.Annotations = make(map[string]string)
 	}
-	clusterRestarted.Annotations[utils.ClusterReloadAnnotationName] = utils.GetCurrentTimestamp()
+	clusterRestarted.Annotations[resources.ClusterReloadAnnotationName] = utils.GetCurrentTimestamp()
 	clusterRestarted.ManagedFields = nil
 
 	err = plugin.Client.Patch(ctx, clusterRestarted, client.MergeFrom(&cluster))

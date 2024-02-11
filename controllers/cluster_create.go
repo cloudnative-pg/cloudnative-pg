@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -287,7 +288,7 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 				&clientCaSecret,
 				certs.CertTypeClient,
 				nil,
-				map[string]string{utils.WatchedLabelName: "true"})
+				map[string]string{resources.WatchedLabelName: "true"})
 			if err != nil {
 				return err
 			}
@@ -684,7 +685,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 				Name:      apiv1.DefaultMonitoringConfigMapName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					utils.WatchedLabelName: "true",
+					resources.WatchedLabelName: "true",
 				},
 			},
 			Data: map[string]string{
@@ -696,10 +697,10 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 	}
 
 	// we check that we own the existing configmap
-	if _, ok := targetConfigMap.Annotations[utils.OperatorVersionAnnotationName]; !ok {
+	if _, ok := targetConfigMap.Annotations[resources.OperatorVersionAnnotationName]; !ok {
 		contextLogger.Warning("A configmap with the same name as the one the operator would have created for "+
 			"default metrics already exists, without the required annotation",
-			"configmap", targetConfigMap.Name, "annotation", utils.OperatorVersionAnnotationName)
+			"configmap", targetConfigMap.Name, "annotation", resources.OperatorVersionAnnotationName)
 		return nil
 	}
 
@@ -771,7 +772,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 				Name:      apiv1.DefaultMonitoringSecretName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
-					utils.WatchedLabelName: "true",
+					resources.WatchedLabelName: "true",
 				},
 			},
 			Data: map[string][]byte{
@@ -783,10 +784,10 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 	}
 
 	// We check that we own the existing configmap
-	if _, ok := targetSecret.Annotations[utils.OperatorVersionAnnotationName]; !ok {
+	if _, ok := targetSecret.Annotations[resources.OperatorVersionAnnotationName]; !ok {
 		contextLogger.Warning("A secret with the same name as the one the operator would have created for "+
 			"default metrics already exists, without the required annotation",
-			"secret", targetSecret.Name, "annotation", utils.OperatorVersionAnnotationName)
+			"secret", targetSecret.Name, "annotation", resources.OperatorVersionAnnotationName)
 		return nil
 	}
 
@@ -1164,7 +1165,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		"job", job.Name,
 		"primary", false,
 		"storageSource", storageSource,
-		"role", job.Spec.Template.ObjectMeta.Labels[utils.JobRoleLabelName],
+		"role", job.Spec.Template.ObjectMeta.Labels[resources.JobRoleLabelName],
 	)
 
 	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
@@ -1219,12 +1220,12 @@ func (r *ClusterReconciler) joinReplicaInstance(
 func (r *ClusterReconciler) ensureInstancesAreCreated(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	resources *managedResources,
+	mr *managedResources,
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	instanceToCreate, err := findInstancePodToCreate(cluster, instancesStatus, resources.pvcs.Items)
+	instanceToCreate, err := findInstancePodToCreate(cluster, instancesStatus, mr.pvcs.Items)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1246,11 +1247,11 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	}
 
 	// TODO: this logic eventually should be moved elsewhere
-	instancePVCs := persistentvolumeclaim.FilterByPodSpec(resources.pvcs.Items, instanceToCreate.Spec)
+	instancePVCs := persistentvolumeclaim.FilterByPodSpec(mr.pvcs.Items, instanceToCreate.Spec)
 	for _, instancePVC := range instancePVCs {
 		// This should not happen. However, we put this guard here
 		// as an assertion to catch unexpected events.
-		pvcStatus := instancePVC.Annotations[utils.PVCStatusAnnotationName]
+		pvcStatus := instancePVC.Annotations[resources.PVCStatusAnnotationName]
 		if pvcStatus != persistentvolumeclaim.StatusReady {
 			contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
 				"pvc", instancePVC.Name,
@@ -1275,11 +1276,11 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	}
 
 	// If this cluster has been restarted, mark the Pod with the latest restart time
-	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok {
+	if clusterRestart, ok := cluster.Annotations[resources.ClusterRestartAnnotationName]; ok {
 		if instanceToCreate.Annotations == nil {
 			instanceToCreate.Annotations = make(map[string]string)
 		}
-		instanceToCreate.Annotations[utils.ClusterRestartAnnotationName] = clusterRestart
+		instanceToCreate.Annotations[resources.ClusterRestartAnnotationName] = clusterRestart
 	}
 
 	contextLogger.Info("Creating new Pod to reattach a PVC",

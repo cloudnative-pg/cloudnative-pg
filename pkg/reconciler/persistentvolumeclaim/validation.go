@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -81,7 +82,7 @@ func (status *ValidationStatus) validateVolumeSnapshot(
 		return
 	}
 
-	pvcRoleLabel := snapshot.GetAnnotations()[utils.PvcRoleLabelName]
+	pvcRoleLabel := snapshot.GetAnnotations()[resources.PvcRoleLabelName]
 	if len(pvcRoleLabel) == 0 {
 		status.addWarningf(name, "Empty PVC role annotation")
 	} else if pvcRoleLabel != expectedMeta.GetRoleName() {
@@ -92,7 +93,7 @@ func (status *ValidationStatus) validateVolumeSnapshot(
 			pvcRoleLabel)
 	}
 
-	backupNameLabel := snapshot.GetLabels()[utils.BackupNameLabelName]
+	backupNameLabel := snapshot.GetLabels()[resources.BackupNameLabelName]
 	if len(backupNameLabel) == 0 {
 		status.addWarningf(
 			name,
@@ -142,8 +143,8 @@ func VerifyDataSourceCoherence(
 	}
 
 	if pgDataSnapshot != nil && pgWalSnapshot != nil {
-		pgDataBackupName := pgDataSnapshot.GetLabels()[utils.BackupNameLabelName]
-		pgWalBackupName := pgWalSnapshot.GetLabels()[utils.BackupNameLabelName]
+		pgDataBackupName := pgDataSnapshot.GetLabels()[resources.BackupNameLabelName]
+		pgWalBackupName := pgWalSnapshot.GetLabels()[resources.BackupNameLabelName]
 
 		if pgDataBackupName != pgWalBackupName {
 			result.addErrorf(

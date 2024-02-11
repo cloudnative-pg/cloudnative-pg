@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -148,7 +149,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 			podList := &corev1.PodList{}
 			listError := env.Client.List(
 				env.Ctx, podList, client.InNamespace(namespace),
-				client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "replica"},
+				client.MatchingLabels{resources.ClusterLabelName: clusterName, "role": "replica"},
 			)
 			Expect(listError).ToNot(HaveOccurred())
 

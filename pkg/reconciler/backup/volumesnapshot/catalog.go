@@ -23,6 +23,7 @@ import (
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -39,7 +40,7 @@ func GetSnapshotsBackupTimes(
 		&list,
 		client.InNamespace(namespace),
 		client.MatchingLabels{
-			utils.ClusterLabelName: clusterName,
+			resources.ClusterLabelName: clusterName,
 		},
 	); err != nil {
 		return nil, nil, err
@@ -47,7 +48,7 @@ func GetSnapshotsBackupTimes(
 
 	dataVolSnapshots := make([]storagesnapshotv1.VolumeSnapshot, 0, len(list.Items))
 	for _, snapshot := range list.Items {
-		if snapshot.Annotations[utils.PvcRoleLabelName] == string(utils.PVCRolePgData) {
+		if snapshot.Annotations[resources.PvcRoleLabelName] == string(utils.PVCRolePgData) {
 			dataVolSnapshots = append(dataVolSnapshots, snapshot)
 		}
 	}
@@ -57,7 +58,7 @@ func GetSnapshotsBackupTimes(
 	}
 	var oldestSnapshot, newestSnapshot *time.Time
 	for _, volumeSnapshot := range dataVolSnapshots {
-		endTimeStr, hasTime := volumeSnapshot.Annotations[utils.BackupEndTimeAnnotationName]
+		endTimeStr, hasTime := volumeSnapshot.Annotations[resources.BackupEndTimeAnnotationName]
 		if hasTime {
 			endTime, err := time.Parse(time.RFC3339, endTimeStr)
 			if err != nil {

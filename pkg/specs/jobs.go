@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -149,13 +150,13 @@ func CreatePrimaryJobViaRestoreSnapshot(
 		"restoresnapshot",
 	}
 
-	if snapshot.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--backuplabel=%s", snapshot.Annotations[utils.BackupLabelFileAnnotationName])
+	if snapshot.Annotations[resources.BackupLabelFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--backuplabel=%s", snapshot.Annotations[resources.BackupLabelFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 
-	if snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--tablespacemap=%s", snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName])
+	if snapshot.Annotations[resources.BackupTablespaceMapFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--tablespacemap=%s", snapshot.Annotations[resources.BackupTablespaceMapFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 
@@ -302,17 +303,17 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			Name:      jobName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.InstanceNameLabelName: instanceName,
-				utils.ClusterLabelName:      cluster.Name,
+				resources.InstanceNameLabelName: instanceName,
+				resources.ClusterLabelName:      cluster.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						utils.InstanceNameLabelName: instanceName,
-						utils.ClusterLabelName:      cluster.Name,
-						utils.JobRoleLabelName:      string(role),
+						resources.InstanceNameLabelName: instanceName,
+						resources.ClusterLabelName:      cluster.Name,
+						resources.JobRoleLabelName:      string(role),
 					},
 				},
 				Spec: corev1.PodSpec{

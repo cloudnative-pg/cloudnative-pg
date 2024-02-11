@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -113,12 +114,12 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			if len(content) == 0 {
-				Expect(cluster.Annotations).To(Or(Not(HaveKey(utils.FencedInstanceAnnotation)),
-					HaveKeyWithValue(utils.FencedInstanceAnnotation, "")))
+				Expect(cluster.Annotations).To(Or(Not(HaveKey(resources.FencedInstanceAnnotation)),
+					HaveKeyWithValue(resources.FencedInstanceAnnotation, "")))
 				return
 			}
 			fencedInstances := make([]string, 0, len(content))
-			Expect(json.Unmarshal([]byte(cluster.Annotations[utils.FencedInstanceAnnotation]), &fencedInstances)).
+			Expect(json.Unmarshal([]byte(cluster.Annotations[resources.FencedInstanceAnnotation]), &fencedInstances)).
 				NotTo(HaveOccurred())
 			Expect(fencedInstances).To(BeEquivalentTo(content))
 		})

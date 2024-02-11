@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -93,7 +94,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 					Name:      clusterName + "-2",
 					Namespace: namespace,
 					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+						resources.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 				},
 			},
@@ -102,7 +103,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 					Name:      clusterName + "-2-wal",
 					Namespace: namespace,
 					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+						resources.PvcRoleLabelName: string(utils.PVCRolePgWal),
 					},
 				},
 			},
@@ -161,7 +162,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 						Name:        backup.Name,
 						Annotations: map[string]string{},
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
+							resources.BackupNameLabelName: backup.Name,
 						},
 					},
 				},
@@ -171,7 +172,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 						Name:        backup.Name + "-wal",
 						Annotations: map[string]string{},
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
+							resources.BackupNameLabelName: backup.Name,
 						},
 					},
 				},
@@ -212,7 +213,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 						Namespace: namespace,
 						Name:      backup.Name,
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
+							resources.BackupNameLabelName: backup.Name,
 						},
 						Annotations: map[string]string{
 							"avoid": "nil",
@@ -230,7 +231,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 						Namespace: namespace,
 						Name:      backup.Name + "-wal",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
+							resources.BackupNameLabelName: backup.Name,
 						},
 						Annotations: map[string]string{
 							"avoid": "nil",
@@ -246,7 +247,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			},
 		}
 
-		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
+		cluster.Annotations[resources.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
@@ -288,7 +289,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 						Namespace: namespace,
 						Name:      backup.Name,
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
+							resources.BackupNameLabelName: backup.Name,
 						},
 						Annotations: map[string]string{
 							"avoid": "nil",
@@ -306,7 +307,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 						Namespace: namespace,
 						Name:      backup.Name + "-wal",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: backup.Name,
+							resources.BackupNameLabelName: backup.Name,
 						},
 						Annotations: map[string]string{
 							"avoid": "nil",
@@ -322,7 +323,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			},
 		}
 
-		cluster.Annotations[utils.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
+		cluster.Annotations[resources.FencedInstanceAnnotation] = fmt.Sprintf(`["%s"]`, targetPod.Name)
 
 		mockClient := fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
@@ -374,33 +375,33 @@ var _ = Describe("transferLabelsToAnnotations", func() {
 	})
 
 	It("should transfer specified labels to annotations", func() {
-		labels[utils.ClusterInstanceRoleLabelName] = exampleValueOne
-		labels[utils.InstanceNameLabelName] = exampleValueTwo
-		labels[utils.ClusterRoleLabelName] = "value3"
+		labels[resources.ClusterInstanceRoleLabelName] = exampleValueOne
+		labels[resources.InstanceNameLabelName] = exampleValueTwo
+		labels[resources.ClusterRoleLabelName] = "value3"
 		labels["extraLabel"] = "value4" // This should not be transferred
 
 		transferLabelsToAnnotations(labels, annotations)
 
-		Expect(annotations[utils.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
-		Expect(annotations[utils.InstanceNameLabelName]).To(Equal(exampleValueTwo))
-		Expect(annotations[utils.ClusterRoleLabelName]).To(Equal("value3"))
+		Expect(annotations[resources.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
+		Expect(annotations[resources.InstanceNameLabelName]).To(Equal(exampleValueTwo))
+		Expect(annotations[resources.ClusterRoleLabelName]).To(Equal("value3"))
 		Expect(annotations).ToNot(HaveKey("extraLabel"))
 
-		Expect(labels).ToNot(HaveKey(utils.ClusterInstanceRoleLabelName))
-		Expect(labels).ToNot(HaveKey(utils.InstanceNameLabelName))
+		Expect(labels).ToNot(HaveKey(resources.ClusterInstanceRoleLabelName))
+		Expect(labels).ToNot(HaveKey(resources.InstanceNameLabelName))
 		Expect(labels).ToNot(HaveKey("role"))
 		Expect(labels["extraLabel"]).To(Equal("value4"))
 	})
 
 	It("should not modify annotations if label is not present", func() {
-		labels[utils.ClusterInstanceRoleLabelName] = exampleValueOne
-		labels[utils.ClusterRoleLabelName] = "value3"
+		labels[resources.ClusterInstanceRoleLabelName] = exampleValueOne
+		labels[resources.ClusterRoleLabelName] = "value3"
 
 		transferLabelsToAnnotations(labels, annotations)
 
-		Expect(annotations[utils.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
-		Expect(annotations).ToNot(HaveKey(utils.InstanceNameLabelName))
-		Expect(annotations[utils.ClusterRoleLabelName]).To(Equal("value3"))
+		Expect(annotations[resources.ClusterInstanceRoleLabelName]).To(Equal(exampleValueOne))
+		Expect(annotations).ToNot(HaveKey(resources.InstanceNameLabelName))
+		Expect(annotations[resources.ClusterRoleLabelName]).To(Equal("value3"))
 	})
 
 	It("should leave annotations unchanged if no matching labels are found", func() {
@@ -446,8 +447,10 @@ var _ = Describe("annotateSnapshotsWithBackupData", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		for _, snapshot := range snapshots.Items {
-			Expect(snapshot.Annotations[utils.BackupStartTimeAnnotationName]).To(BeEquivalentTo(startedAt.Format(time.RFC3339)))
-			Expect(snapshot.Annotations[utils.BackupEndTimeAnnotationName]).To(BeEquivalentTo(stoppedAt.Format(time.RFC3339)))
+			Expect(snapshot.Annotations[resources.BackupStartTimeAnnotationName]).
+				To(BeEquivalentTo(startedAt.Format(time.RFC3339)))
+			Expect(snapshot.Annotations[resources.BackupEndTimeAnnotationName]).
+				To(BeEquivalentTo(stoppedAt.Format(time.RFC3339)))
 		}
 	})
 })

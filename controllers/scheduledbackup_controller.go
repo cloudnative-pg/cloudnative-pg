@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -43,11 +44,11 @@ const (
 
 	// ImmediateBackupLabelName label is applied to backups to tell if a backup
 	// is immediate or not
-	ImmediateBackupLabelName = utils.ImmediateBackupLabelName
+	ImmediateBackupLabelName = resources.ImmediateBackupLabelName
 
 	// ParentScheduledBackupLabelName label is applied to backups to easily tell the scheduled backup
 	// it was created from.
-	ParentScheduledBackupLabelName = utils.ParentScheduledBackupLabelName
+	ParentScheduledBackupLabelName = resources.ParentScheduledBackupLabelName
 )
 
 // ScheduledBackupReconciler reconciles a ScheduledBackup object
@@ -234,9 +235,9 @@ func createBackup(
 	if metadata.Labels == nil {
 		metadata.Labels = make(map[string]string)
 	}
-	metadata.Labels[utils.ClusterLabelName] = scheduledBackup.Spec.Cluster.Name
-	metadata.Labels[utils.ImmediateBackupLabelName] = strconv.FormatBool(immediate)
-	metadata.Labels[utils.ParentScheduledBackupLabelName] = scheduledBackup.GetName()
+	metadata.Labels[resources.ClusterLabelName] = scheduledBackup.Spec.Cluster.Name
+	metadata.Labels[resources.ImmediateBackupLabelName] = strconv.FormatBool(immediate)
+	metadata.Labels[resources.ParentScheduledBackupLabelName] = scheduledBackup.GetName()
 
 	switch scheduledBackup.Spec.BackupOwnerReference {
 	case "cluster":

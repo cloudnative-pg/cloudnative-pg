@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	k8scheme "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -92,7 +93,7 @@ var _ = Describe("ensureClusterIsNotFenced", func() {
 		It("should patch the cluster and remove fenced instances", func() {
 			origCluster, err := getCluster(k8client.ObjectKeyFromObject(cluster))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(origCluster.Annotations).To(HaveKey(utils.FencedInstanceAnnotation))
+			Expect(origCluster.Annotations).To(HaveKey(resources.FencedInstanceAnnotation))
 
 			err = ensureClusterIsNotFenced(ctx, mockCli, cluster)
 			Expect(err).ToNot(HaveOccurred())
@@ -101,7 +102,7 @@ var _ = Describe("ensureClusterIsNotFenced", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(remoteCluster.ObjectMeta).ToNot(Equal(origCluster.ObjectMeta))
-			Expect(remoteCluster.Annotations).ToNot(HaveKey(utils.FencedInstanceAnnotation))
+			Expect(remoteCluster.Annotations).ToNot(HaveKey(resources.FencedInstanceAnnotation))
 		})
 	})
 })
@@ -171,11 +172,11 @@ var _ = Describe("getOrphanPVCs", func() {
 					Name:      "test-1",
 					Namespace: "default",
 					Annotations: map[string]string{
-						utils.ClusterSerialAnnotationName: "1",
+						resources.ClusterSerialAnnotationName: "1",
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName:             cluster.Name,
-						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
+						resources.ClusterLabelName:             cluster.Name,
+						resources.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
 					},
 				},
 			},
@@ -184,11 +185,11 @@ var _ = Describe("getOrphanPVCs", func() {
 					Name:      "test-2",
 					Namespace: "default",
 					Annotations: map[string]string{
-						utils.ClusterSerialAnnotationName: "2",
+						resources.ClusterSerialAnnotationName: "2",
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName:             cluster.Name,
-						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
+						resources.ClusterLabelName:             cluster.Name,
+						resources.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
 					},
 				},
 			},
@@ -197,11 +198,11 @@ var _ = Describe("getOrphanPVCs", func() {
 					Name:      "test-3",
 					Namespace: "default",
 					Annotations: map[string]string{
-						utils.ClusterSerialAnnotationName: "3",
+						resources.ClusterSerialAnnotationName: "3",
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName:             cluster.Name,
-						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
+						resources.ClusterLabelName:             cluster.Name,
+						resources.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
 					},
 				},
 			},
@@ -214,7 +215,7 @@ var _ = Describe("getOrphanPVCs", func() {
 					Name:      "test-4",
 					Namespace: "default",
 					Labels: map[string]string{
-						utils.ClusterLabelName: cluster.Name,
+						resources.ClusterLabelName: cluster.Name,
 					},
 				},
 			},
@@ -232,10 +233,10 @@ var _ = Describe("getOrphanPVCs", func() {
 						},
 					},
 					Annotations: map[string]string{
-						utils.ClusterSerialAnnotationName: "55",
+						resources.ClusterSerialAnnotationName: "55",
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName: cluster.Name,
+						resources.ClusterLabelName: cluster.Name,
 					},
 				},
 			},
@@ -245,10 +246,10 @@ var _ = Describe("getOrphanPVCs", func() {
 					Name:      "random-1",
 					Namespace: "default",
 					Annotations: map[string]string{
-						utils.ClusterSerialAnnotationName: "1",
+						resources.ClusterSerialAnnotationName: "1",
 					},
 					Labels: map[string]string{
-						utils.ClusterLabelName: "random",
+						resources.ClusterLabelName: "random",
 					},
 				},
 			},
@@ -294,7 +295,7 @@ var _ = Describe("getOrphanPVCs", func() {
 
 		for _, pvc := range goodPvcs {
 			Expect(pvc.OwnerReferences).ToNot(BeEmpty())
-			Expect(pvc.Annotations[utils.PVCStatusAnnotationName]).To(Equal(persistentvolumeclaim.StatusReady))
+			Expect(pvc.Annotations[resources.PVCStatusAnnotationName]).To(Equal(persistentvolumeclaim.StatusReady))
 		}
 	})
 })
