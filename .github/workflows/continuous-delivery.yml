@@ -1902,7 +1902,7 @@ jobs:
       -
         name: Set cluster name
         run: |
-          echo "CLUSTER_NAME=ocp-${{ github.run_number}}" >> $GITHUB_ENV
+          echo "CLUSTER_NAME=${{ env.E2E_SUFFIX }}-ocp-${{ github.run_number}}-$( echo ${{ matrix.k8s_version }} | tr -d '.' )" >> $GITHUB_ENV
       -
         name: Checkout code
         uses: actions/checkout@v4
