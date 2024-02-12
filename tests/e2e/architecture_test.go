@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Available Architectures", func() {
+var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 	const (
 		clusterManifest = fixturesDir + "/architectures/cluster-architectures.yaml.template"
 		namespacePrefix = "cluster-arch-e2e"
