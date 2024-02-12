@@ -1089,46 +1089,44 @@ jobs:
       -
         name: Clean up
         if: always()
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
-            attempt=1
-            max_attempts=3
-            while [ "${attempt}" -le "${max_attempts}" ]; do
-               echo "Deleting cluster. Attempt ${attempt} of ${max_attempts}"
-               az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y  --name ${{ env.AZURE_AKS }}
-               status=$?
-               if [[ $status == 0 ]]; then
-                  echo "AKS cluster deleted"
-                  break
-               fi
-               echo "Failed deleting cluster ${{ env.AZURE_AKS }}, retrying"
-               sleep 5
-               attempt=$((attempt+1))
-            done
-            attempt=1
-            AZURE_RESOURCEGROUP_LOCATION="$( az group show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query location -o tsv --only-show-errors )"
-            DATA_COLL_RULE_NAME="MSCI-${AZURE_RESOURCEGROUP_LOCATION}-${{ env.AZURE_AKS }}"
-            while [ "${attempt}" -le "${max_attempts}" ]; do
-               echo "Deleting data-collection rule ${DATA_COLL_RULE_NAME}. Attempt ${attempt} of ${max_attempts}"
-               az monitor data-collection rule show --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query name
-               # if not found, let it go
-               status=$?
-               if [[ $status != 0 ]]; then
-                  echo "AKS data-collection rule not found"
-                  break
-               fi
-               az monitor data-collection rule delete -y --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }}
-               status=$?
-               if [[ $status == 0 ]]; then
-                  echo "AKS data-collection rule deleted"
-                  break
-               fi
-               echo "Failed deleting data-collection rule ${ DATA_COLL_RULE_NAME }, retrying"
-               sleep 5
-               attempt=$((attempt+1))
-            done
+        run: |
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
+          attempt=1
+          max_attempts=3
+          while [ "${attempt}" -le "${max_attempts}" ]; do
+              echo "Deleting cluster. Attempt ${attempt} of ${max_attempts}"
+              az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y  --name ${{ env.AZURE_AKS }}
+              status=$?
+              if [[ $status == 0 ]]; then
+                echo "AKS cluster deleted"
+                break
+              fi
+              echo "Failed deleting cluster ${{ env.AZURE_AKS }}, retrying"
+              sleep 5
+              attempt=$((attempt+1))
+          done
+          attempt=1
+          AZURE_RESOURCEGROUP_LOCATION="$( az group show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query location -o tsv --only-show-errors )"
+          DATA_COLL_RULE_NAME="MSCI-${AZURE_RESOURCEGROUP_LOCATION}-${{ env.AZURE_AKS }}"
+          while [ "${attempt}" -le "${max_attempts}" ]; do
+              echo "Deleting data-collection rule ${DATA_COLL_RULE_NAME}. Attempt ${attempt} of ${max_attempts}"
+              az monitor data-collection rule show --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --query name
+              # if not found, let it go
+              status=$?
+              if [[ $status != 0 ]]; then
+                echo "AKS data-collection rule not found"
+                break
+              fi
+              az monitor data-collection rule delete -y --name ${DATA_COLL_RULE_NAME} --resource-group ${{ secrets.AZURE_RESOURCEGROUP }}
+              status=$?
+              if [[ $status == 0 ]]; then
+                echo "AKS data-collection rule deleted"
+                break
+              fi
+              echo "Failed deleting data-collection rule ${ DATA_COLL_RULE_NAME }, retrying"
+              sleep 5
+              attempt=$((attempt+1))
+          done
 
   e2e-aks-teardown:
     name: Teardown Microsoft AKS shared resources
@@ -1156,24 +1154,22 @@ jobs:
       -
         name: Teardown AKS shared resources
         if: always()
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
-            attempt=1
-            max_attempts=3
-            while [ "${attempt}" -le "${max_attempts}" ]; do
-               echo "Deleting storage account. Attempt ${attempt} of ${max_attempts}"
-               az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
-               status=$?
-               if [[ $status == 0 ]]; then
-                  echo "Storage account deleted"
-                  break
-               fi
-               echo "Failed deleting storage account ${{ env.AZURE_STORAGE_ACCOUNT }}, retrying"
-               sleep 5
-               attempt=$((attempt+1))
-            done
+        run: |
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
+          attempt=1
+          max_attempts=3
+          while [ "${attempt}" -le "${max_attempts}" ]; do
+              echo "Deleting storage account. Attempt ${attempt} of ${max_attempts}"
+              az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
+              status=$?
+              if [[ $status == 0 ]]; then
+                echo "Storage account deleted"
+                break
+              fi
+              echo "Failed deleting storage account ${{ env.AZURE_STORAGE_ACCOUNT }}, retrying"
+              sleep 5
+              attempt=$((attempt+1))
+          done
 
   # EKS Secrets required
   # secrets.AWS_EKS_ADMIN_IAM_ROLES
@@ -1483,8 +1479,8 @@ jobs:
           # Attempt to remove any leftover PDB (and Cluster that would recreate it)
           # that could prevent the EKS cluster deletion
           kubectl delete cluster --all --all-namespaces --now --timeout=30s || true
-          kubectl delete pvc --all --all-namespaces --now --timeout=30s || true
           kubectl delete pdb --all --all-namespaces --now --timeout=30s || true
+          kubectl delete pvc --all --all-namespaces --now --timeout=30s || true
           # Remove any LoadBalancer service
           kubectl get service --all-namespaces -o json | jq -r '.items[] | select(.spec.type=="LoadBalancer") | .metadata | "kubectl delete service --now --timeout=30s -n " + .namespace + " " + .name' | xargs -rI X bash -c X || true
 
@@ -1495,6 +1491,7 @@ jobs:
           max_attempts=3
 
           # Attempting three times to remove the Velero S3 bucket
+          VELERO_BUCKET_NAME=${VELERO_BUCKET_NAME:-"${CLUSTER_NAME,,}-velero"}
           while [ "${bucket_attempt}" -le "${max_attempts}" ]; do
               echo "Deleting S3 Bucket. Attempt ${bucket_attempt} of ${max_attempts}"
               output=$( aws s3api delete-bucket --bucket "${VELERO_BUCKET_NAME}" --region "${AWS_REGION}" 2>&1 )
@@ -1788,12 +1785,13 @@ jobs:
         name: Clean up
         if: always()
         run: |
-          # Wait until all the PVs provisioned are actually reclaimed
-          kubectl wait --for delete pv --selector=topology.kubernetes.io/zone=${{ env.ZONE }} --timeout=60s || true
           # Attempt to remove any leftover resource
           kubectl delete cluster --all --all-namespaces --now --timeout=30s || true
-          kubectl delete pvc --all --all-namespaces --now --timeout=30s || true
           kubectl delete pdb --all --all-namespaces --now --timeout=30s || true
+          kubectl delete pvc --all --all-namespaces --now --timeout=30s || true
+
+          # Wait until all the PVs provisioned are actually reclaimed
+          kubectl wait --for delete pv --timeout=60s || true
 
           attempt=1
           max_attempts=3
