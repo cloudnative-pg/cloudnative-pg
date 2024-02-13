@@ -118,6 +118,23 @@ spec:
                       an immediate segment switch.
                     type: boolean
                 type: object
+              pluginConfiguration:
+                description: Configuration parameters passed to the plugin managing
+                  this backup
+                properties:
+                  name:
+                    description: Name is the name of the plugin managing this backup
+                    type: string
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Parameters are the configuration parameters passed to the backup
+                      plugin for this backup
+                    type: object
+                required:
+                - name
+                type: object
               schedule:
                 description: |-
                   The schedule does not follow the same format used in Kubernetes CronJobs

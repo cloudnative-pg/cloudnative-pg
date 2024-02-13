@@ -73,6 +73,10 @@ const (
 	// BackupMethodBarmanObjectStore means using barman to backup the
 	// PostgreSQL cluster
 	BackupMethodBarmanObjectStore BackupMethod = "barmanObjectStore"
+
+	// BackupMethodPlugin means that this backup should be handled by
+	// a plugin
+	BackupMethodPlugin BackupMethod = "plugin"
 )
 
 // BackupSpec defines the desired state of Backup
@@ -90,12 +94,16 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Enum=primary;prefer-standby
 	Target BackupTarget `json:"target,omitempty"`
 
-	// The backup method to be used, possible options are `barmanObjectStore`
-	// and `volumeSnapshot`. Defaults to: `barmanObjectStore`.
+	// The backup method to be used, possible options are `barmanObjectStore`,
+	// `volumeSnapshot` or `plugin`. Defaults to: `barmanObjectStore`.
 	// +optional
-	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
+	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot;plugin
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
+
+	// Configuration parameters passed to the plugin managing this backup
+	// +optional
+	PluginConfiguration *BackupPluginConfiguration `json:"pluginConfiguration,omitempty"`
 
 	// Whether the default type of backup with volume snapshots is
 	// online/hot (`true`, default) or offline/cold (`false`)
@@ -107,6 +115,18 @@ type BackupSpec struct {
 	// Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
 	// +optional
 	OnlineConfiguration *OnlineConfiguration `json:"onlineConfiguration,omitempty"`
+}
+
+// BackupPluginConfiguration contains the backup configuration used by
+// the backup plugin
+type BackupPluginConfiguration struct {
+	// Name is the name of the plugin managing this backup
+	Name string `json:"name"`
+
+	// Parameters are the configuration parameters passed to the backup
+	// plugin for this backup
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // BackupSnapshotStatus the fields exclusive to the volumeSnapshot method backup
@@ -477,6 +497,11 @@ func (backup *Backup) GetVolumeSnapshotConfiguration(
 	}
 
 	return config
+}
+
+// IsEmpty checks if the plugin configuration is empty or not
+func (configuration *BackupPluginConfiguration) IsEmpty() bool {
+	return configuration == nil || len(configuration.Name) == 0
 }
 
 func init() {
