@@ -26,9 +26,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-// reconcilePlugins ensures that we load the plugins that are required to reconcile
+// updatePluginsStatus ensures that we load the plugins that are required to reconcile
 // this cluster
-func (r *ClusterReconciler) preReconcilePlugins(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Load the plugins

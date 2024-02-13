@@ -28,6 +28,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
@@ -91,20 +92,22 @@ func (data *data) getPlugin(pluginName string) (*pluginData, error) {
 }
 
 type pluginData struct {
-	connection      connectionHandler
-	identityClient  identity.IdentityClient
-	operatorClient  operator.OperatorClient
-	lifecycleClient lifecycle.LifecycleClient
-	walClient       wal.WALClient
-	backupClient    backup.BackupClient
+	connection            connectionHandler
+	identityClient        identity.IdentityClient
+	operatorClient        operator.OperatorClient
+	lifecycleClient       lifecycle.OperatorLifecycleClient
+	walClient             wal.WALClient
+	backupClient          backup.BackupClient
+	reconcilerHooksClient reconciler.ReconcilerHooksClient
 
-	name                  string
-	version               string
-	capabilities          []identity.PluginCapability_Service_Type
-	operatorCapabilities  []operator.OperatorCapability_RPC_Type
-	walCapabilities       []wal.WALCapability_RPC_Type
-	lifecycleCapabilities []*lifecycle.LifecycleCapabilities
-	backupCapabilities    []backup.BackupCapability_RPC_Type
+	name                   string
+	version                string
+	capabilities           []identity.PluginCapability_Service_Type
+	operatorCapabilities   []operator.OperatorCapability_RPC_Type
+	walCapabilities        []wal.WALCapability_RPC_Type
+	lifecycleCapabilities  []*lifecycle.OperatorLifecycleCapabilities
+	backupCapabilities     []backup.BackupCapability_RPC_Type
+	reconcilerCapabilities []reconciler.ReconcilerHooksCapability_Kind
 }
 
 // NewUnixSocketClient creates a new CNPI client discovering plugins
@@ -199,6 +202,14 @@ func (data *data) loadPlugin(ctx context.Context, name string) (pluginData, erro
 		}
 	}
 
+	// If the plugin implements the reconciler hooks, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_RECONCILER_HOOKS) {
+		if err = result.loadReconcilerHooksCapabilities(ctx); err != nil {
+			return pluginData{}, err
+		}
+	}
+
 	return result, nil
 }
 
@@ -236,9 +247,10 @@ func newPluginDataFromConnection(ctx context.Context, connection connectionHandl
 	result.version = pluginInfoResponse.Version
 	result.identityClient = identity.NewIdentityClient(connection)
 	result.operatorClient = operator.NewOperatorClient(connection)
-	result.lifecycleClient = lifecycle.NewLifecycleClient(connection)
+	result.lifecycleClient = lifecycle.NewOperatorLifecycleClient(connection)
 	result.walClient = wal.NewWALClient(connection)
 	result.backupClient = backup.NewBackupClient(connection)
+	result.reconcilerHooksClient = reconciler.NewReconcilerHooksClient(connection)
 
 	return result, err
 }
@@ -284,16 +296,36 @@ func (pluginData *pluginData) loadOperatorCapabilities(ctx context.Context) erro
 }
 
 func (pluginData *pluginData) loadLifecycleCapabilities(ctx context.Context) error {
-	var lifecycleCapabilitiesResponse *lifecycle.LifecycleCapabilitiesResponse
+	var lifecycleCapabilitiesResponse *lifecycle.OperatorLifecycleCapabilitiesResponse
 	var err error
 	if lifecycleCapabilitiesResponse, err = pluginData.lifecycleClient.GetCapabilities(
 		ctx,
-		&lifecycle.LifecycleCapabilitiesRequest{},
+		&lifecycle.OperatorLifecycleCapabilitiesRequest{},
 	); err != nil {
 		return fmt.Errorf("while querying plugin lifecycle capabilities: %w", err)
 	}
 
 	pluginData.lifecycleCapabilities = lifecycleCapabilitiesResponse.LifecycleCapabilities
+	return nil
+}
+
+func (pluginData *pluginData) loadReconcilerHooksCapabilities(ctx context.Context) error {
+	var reconcilerHooksCapabilitiesResult *reconciler.ReconcilerHooksCapabilitiesResult
+	var err error
+	if reconcilerHooksCapabilitiesResult, err = pluginData.reconcilerHooksClient.GetCapabilities(
+		ctx,
+		&reconciler.ReconcilerHooksCapabilitiesRequest{},
+	); err != nil {
+		return fmt.Errorf("while querying plugin lifecycle capabilities: %w", err)
+	}
+
+	pluginData.reconcilerCapabilities = make(
+		[]reconciler.ReconcilerHooksCapability_Kind,
+		len(reconcilerHooksCapabilitiesResult.ReconcilerCapabilities))
+
+	for i := range pluginData.reconcilerCapabilities {
+		pluginData.reconcilerCapabilities[i] = reconcilerHooksCapabilitiesResult.ReconcilerCapabilities[i].Kind
+	}
 	return nil
 }
 

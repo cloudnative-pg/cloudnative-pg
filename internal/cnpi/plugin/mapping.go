@@ -35,17 +35,17 @@ const (
 
 // ToOperationType_Type converts an OperationVerb into a lifecycle.OperationType_Type
 // nolint: revive,stylecheck
-func (o OperationVerb) ToOperationType_Type() (lifecycle.OperationType_Type, error) {
+func (o OperationVerb) ToOperationType_Type() (lifecycle.OperatorOperationType_Type, error) {
 	switch o {
 	case OperationVerbPatch:
-		return lifecycle.OperationType_TYPE_PATCH, nil
+		return lifecycle.OperatorOperationType_TYPE_PATCH, nil
 	case OperationVerbDelete:
-		return lifecycle.OperationType_TYPE_DELETE, nil
+		return lifecycle.OperatorOperationType_TYPE_DELETE, nil
 	case OperationVerbCreate:
-		return lifecycle.OperationType_TYPE_CREATE, nil
+		return lifecycle.OperatorOperationType_TYPE_CREATE, nil
 	case OperationVerbUpdate:
-		return lifecycle.OperationType_TYPE_UPDATE, nil
+		return lifecycle.OperatorOperationType_TYPE_UPDATE, nil
 	}
 
-	return lifecycle.OperationType_Type(0), fmt.Errorf("unknown operation type: '%s'", o)
+	return lifecycle.OperatorOperationType_Type(0), fmt.Errorf("unknown operation type: '%s'", o)
 }
