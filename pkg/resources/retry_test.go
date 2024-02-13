@@ -90,7 +90,7 @@ var _ = Describe("RetryWithRefreshedResource", func() {
 
 			// ensure that now the deployment contains the new value
 			err := RetryWithRefreshedResource(ctx, fakeClient, testResource, cb)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(*testResource.Spec.Replicas).To(Equal(int32(10)))
 		})
 	})
