@@ -33,6 +33,7 @@ type Metadata struct {
 	Capabilities         []string
 	OperatorCapabilities []string
 	WALCapabilities      []string
+	BackupCapabilities   []string
 }
 
 // Loader describes a struct capable of generating a plugin Client
@@ -49,6 +50,7 @@ type Client interface {
 	PodCapabilities
 	LifecycleCapabilities
 	WalCapabilities
+	BackupCapabilities
 }
 
 // Connection describes a set of behaviour needed to properly handle the plugin connections
@@ -130,4 +132,17 @@ type WalCapabilities interface {
 		sourceWALName string,
 		destinationFileName string,
 	) error
+}
+
+// BackupCapabilities describes a set of behaviour needed to backup
+// a PostgreSQL cluster
+type BackupCapabilities interface {
+	// Backup takes a backup via a cnpg-i plugin
+	Backup(
+		ctx context.Context,
+		cluster client.Object,
+		backupObject client.Object,
+		pluginName string,
+		parameters map[string]string,
+	) (*BackupResponse, error)
 }

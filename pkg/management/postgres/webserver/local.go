@@ -161,38 +161,72 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
-		http.Error(w, "Backup not configured in the cluster", http.StatusConflict)
-		return
-	}
+	switch backup.Spec.Method {
+	case apiv1.BackupMethodBarmanObjectStore:
+		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+			http.Error(w, "Barman backup not configured in the cluster", http.StatusConflict)
+			return
+		}
 
+		if err := ws.startBarmanBackup(ctx, &cluster, &backup); err != nil {
+			http.Error(
+				w,
+				fmt.Sprintf("error while requesting backup: %v", err.Error()),
+				http.StatusInternalServerError)
+			return
+		}
+		_, _ = fmt.Fprint(w, "OK")
+
+	case apiv1.BackupMethodPlugin:
+		if backup.Spec.PluginConfiguration.IsEmpty() {
+			http.Error(w, "Plugin backup not configured in the cluster", http.StatusConflict)
+			return
+		}
+
+		ws.startPluginBackup(ctx, &cluster, &backup)
+		_, _ = fmt.Fprint(w, "OK")
+
+	default:
+		http.Error(
+			w,
+			fmt.Sprintf("Unknown backup method: %v", backup.Spec.Method),
+			http.StatusBadRequest)
+	}
+}
+
+func (ws *localWebserverEndpoints) startBarmanBackup(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) error {
 	backupLog := log.WithValues(
 		"backupName", backup.Name,
 		"backupNamespace", backup.Name)
 
-	backupCommand, err := postgres.NewBackupCommand(
-		&cluster,
-		&backup,
+	backupCommand, err := postgres.NewBarmanBackupCommand(
+		cluster,
+		backup,
 		ws.typedClient,
 		ws.eventRecorder,
 		ws.instance,
 		backupLog,
 	)
 	if err != nil {
-		http.Error(
-			w,
-			fmt.Sprintf("error while initializing backup: %v", err.Error()),
-			http.StatusInternalServerError)
-		return
+		return fmt.Errorf("while initializing backup: %w", err)
 	}
 
 	if err := backupCommand.Start(ctx); err != nil {
-		http.Error(
-			w,
-			fmt.Sprintf("error while starting backup: %v", err.Error()),
-			http.StatusInternalServerError)
-		return
+		return fmt.Errorf("while starting backup: %w", err)
 	}
 
-	_, _ = fmt.Fprint(w, "OK")
+	return nil
+}
+
+func (ws *localWebserverEndpoints) startPluginBackup(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) {
+	cmd := NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder)
+	cmd.Start(ctx)
 }

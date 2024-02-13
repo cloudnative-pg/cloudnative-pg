@@ -126,16 +126,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	if cluster.Spec.Backup == nil {
-		message := fmt.Sprintf(
-			"cannot proceed with the backup because cluster '%s' has no backup section defined",
-			clusterName)
-		contextLogger.Warning(message)
-		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupConfig", message)
-		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
-		return ctrl.Result{}, nil
-	}
-
 	// This check is still needed for when the backup resource creation is forced through the webhook
 	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
 		message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
@@ -154,6 +144,21 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if backup.Spec.Method == apiv1.BackupMethodBarmanObjectStore {
+		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+			tryFlagBackupAsFailed(ctx, r.Client, &backup,
+				errors.New("no barmanObjectStore section defined on the target cluster"))
+			return ctrl.Result{}, nil
+		}
+
+		if isRunning {
+			return ctrl.Result{}, nil
+		}
+
+		r.Recorder.Eventf(&backup, "Normal", "Starting",
+			"Starting backup for cluster %v", cluster.Name)
+	}
+
+	if backup.Spec.Method == apiv1.BackupMethodPlugin {
 		if isRunning {
 			return ctrl.Result{}, nil
 		}
@@ -163,8 +168,12 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	origBackup := backup.DeepCopy()
+
+	// From now on, we differentiate backups managed by the instance manager (barman and plugins)
+	// from the ones managed directly by the operator (VolumeSnapshot)
+
 	switch backup.Spec.Method {
-	case apiv1.BackupMethodBarmanObjectStore:
+	case apiv1.BackupMethodBarmanObjectStore, apiv1.BackupMethodPlugin:
 		// If no good running backups are found we elect a pod for the backup
 		pod, err := r.getBackupTargetPod(ctx, &cluster, &backup)
 		if apierrs.IsNotFound(err) {
@@ -195,19 +204,14 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			"cluster", cluster.Name,
 			"pod", pod.Name)
 
-		if cluster.Spec.Backup.BarmanObjectStore == nil {
-			tryFlagBackupAsFailed(ctx, r.Client, &backup,
-				errors.New("no barmanObjectStore section defined on the target cluster"))
-			return ctrl.Result{}, nil
-		}
 		// This backup has been started
-		if err := startBarmanBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
+		if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
 			r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("encountered an error while taking the backup: %w", err))
 			return ctrl.Result{}, nil
 		}
 	case apiv1.BackupMethodVolumeSnapshot:
-		if cluster.Spec.Backup.VolumeSnapshot == nil {
+		if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
 			tryFlagBackupAsFailed(ctx, r.Client, &backup,
 				errors.New("no volumeSnapshot section defined on the target cluster"))
 			return ctrl.Result{}, nil
@@ -539,9 +543,9 @@ func (r *BackupReconciler) getBackupTargetPod(ctx context.Context,
 	return &pod, err
 }
 
-// startBarmanBackup request a backup in a Pod and marks the backup started
+// startInstanceManagerBackup request a backup in a Pod and marks the backup started
 // or failed if needed
-func startBarmanBackup(
+func startInstanceManagerBackup(
 	ctx context.Context,
 	client client.Client,
 	backup *apiv1.Backup,
@@ -550,7 +554,7 @@ func startBarmanBackup(
 ) error {
 	// This backup has been started
 	status := backup.GetStatus()
-	status.SetAsStarted(pod, apiv1.BackupMethodBarmanObjectStore)
+	status.SetAsStarted(pod, backup.Spec.Method)
 
 	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
 		return err

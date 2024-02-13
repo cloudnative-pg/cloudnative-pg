@@ -3211,11 +3211,13 @@ spec:
                     type: boolean
                 type: object
               plugins:
-                description: The plugins configuration, containing any plugin to be
-                  loaded with the corresponding configuration
+                description: |-
+                  The plugins configuration, containing
+                  any plugin to be loaded with the corresponding configuration
                 items:
-                  description: PluginConfiguration specifies a plugin that need to
-                    be loaded for this cluster to be reconciled
+                  description: |-
+                    PluginConfiguration specifies a plugin that need to be loaded for this
+                    cluster to be reconciled
                   properties:
                     name:
                       description: Name is the plugin name
@@ -5165,8 +5167,16 @@ spec:
                 items:
                   description: PluginStatus is the status of a loaded plugin
                   properties:
+                    backupCapabilities:
+                      description: |-
+                        BackupCapabilities are the list of capabilities of the
+                        plugin regarding the Backup management
+                      items:
+                        type: string
+                      type: array
                     capabilities:
-                      description: Capabilities are the list of capabilities of the
+                      description: |-
+                        Capabilities are the list of capabilities of the
                         plugin
                       items:
                         type: string
@@ -5175,18 +5185,21 @@ spec:
                       description: Name is the name of the plugin
                       type: string
                     operatorCapabilities:
-                      description: OperatorCapabilities are the list of capabilities
-                        of the plugin regarding the reconciler
+                      description: |-
+                        OperatorCapabilities are the list of capabilities of the
+                        plugin regarding the reconciler
                       items:
                         type: string
                       type: array
                     version:
-                      description: Version is the version of the plugin loaded by
-                        the latest reconciliation loop
+                      description: |-
+                        Version is the version of the plugin loaded by the
+                        latest reconciliation loop
                       type: string
                     walCapabilities:
-                      description: WALCapabilities are the list of capabilities of
-                        the plugin regarding the reconciler
+                      description: |-
+                        WALCapabilities are the list of capabilities of the
+                        plugin regarding the WAL management
                       items:
                         type: string
                       type: array
