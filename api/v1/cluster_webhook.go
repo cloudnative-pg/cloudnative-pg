@@ -79,7 +79,31 @@ var _ webhook.Defaulter = &Cluster{}
 func (r *Cluster) Default() {
 	clusterLog.Info("default", "name", r.Name, "namespace", r.Namespace)
 
+	r.handleDeprecations()
 	r.setDefaults(true)
+}
+
+// handleDeprecations warns of deprecated fields and may take an action like
+// converting to a new field or ignoring
+func (r *Cluster) handleDeprecations() {
+	if r.Spec.SmartStopDelay > 0 {
+		clusterLog.Warning("DEPRECATED field", "name", "smartStopDelay",
+			"clusterName", r.Name, "namespace", r.Namespace,
+			"detail", "the field smartStopDelay has been deprecated. Please use SmartShutdownTimeout")
+
+		if r.Spec.SmartShutdownTimeout <= 0 {
+			clusterLog.Warning("DEPRECATIION action", "name", "smartStopDelay",
+				"clusterName", r.Name, "namespace", r.Namespace,
+				"detail", "the value has been applied to SmartShutdownTimeout")
+			r.Spec.SmartShutdownTimeout = r.Spec.SmartStopDelay
+		} else {
+			clusterLog.Warning("DEPRECATION action", "name", "smartStopDelay",
+				"clusterName", r.Name, "namespace", r.Namespace,
+				"detail", "smartStopDelay conflicts with SmartShutdownTimeout will be ignored",
+				"smartStopDelay", r.Spec.SmartStopDelay,
+				"smartShutdownTimeout", r.Spec.SmartShutdownTimeout)
+		}
+	}
 }
 
 // SetDefaults apply the defaults to undefined values in a Cluster

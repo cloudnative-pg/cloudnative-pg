@@ -3547,6 +3547,14 @@ spec:
                   of Postgres (that is: `stopDelay` - `smartShutdownTimeout`).'
                 format: int32
                 type: integer
+              smartStopDelay:
+                description: 'Deprecated: please use SmartShutdownTimeout instead
+                  The time in seconds that controls the window of time reserved for
+                  the smart shutdown of Postgres to complete. Make sure you reserve
+                  enough time for the operator to request a fast shutdown of Postgres
+                  (that is: `stopDelay` - `smartShutdownTimeout`).'
+                format: int32
+                type: integer
               startDelay:
                 default: 3600
                 description: 'The time in seconds that is allowed for a PostgreSQL

@@ -356,6 +356,13 @@ type ClusterSpec struct {
 	// +optional
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`
 
+	// Deprecated: please use SmartShutdownTimeout instead
+	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
+	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
+	// (that is: `stopDelay` - `smartShutdownTimeout`).
+	// +optional
+	SmartStopDelay int32 `json:"smartStopDelay,omitempty"`
+
 	// The time in seconds that controls the window of time reserved for the smart shutdown of Postgres to complete.
 	// Make sure you reserve enough time for the operator to request a fast shutdown of Postgres
 	// (that is: `stopDelay` - `smartShutdownTimeout`).
@@ -2757,6 +2764,9 @@ func (cluster *Cluster) GetMaxStopDelay() int32 {
 func (cluster *Cluster) GetSmartShutdownTimeout() int32 {
 	if cluster.Spec.SmartShutdownTimeout > 0 {
 		return cluster.Spec.SmartShutdownTimeout
+	}
+	if cluster.Spec.SmartStopDelay > 0 {
+		return cluster.Spec.SmartStopDelay
 	}
 	return 180
 }
