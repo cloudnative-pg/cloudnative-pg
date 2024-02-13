@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
@@ -47,6 +48,7 @@ type Loader interface {
 type Client interface {
 	Connection
 	ClusterCapabilities
+	ClusterReconcilerHooks
 	PodCapabilities
 	LifecycleCapabilities
 	WalCapabilities
@@ -63,18 +65,6 @@ type Connection interface {
 
 	// MetadataList exposes the metadata of the loaded plugins
 	MetadataList() []Metadata
-}
-
-// PodCapabilities describes a set of behaviour needed to implement the Pod capabilities
-type PodCapabilities interface {
-	// MutatePod calls the loaded plugins to help to enhance
-	// a PostgreSQL instance Pod definition
-	MutatePod(
-		ctx context.Context,
-		cluster client.Object,
-		object client.Object,
-		mutatedObject client.Object,
-	) error
 }
 
 // ClusterCapabilities describes a set of behaviour needed to implement the Cluster capabilities
@@ -101,6 +91,34 @@ type ClusterCapabilities interface {
 		oldObject client.Object,
 		newObject client.Object,
 	) (field.ErrorList, error)
+}
+
+// ClusterReconcilerHooks decsribes a set of behavior needed to enhance
+// the login of the Cluster reconcicliation loop
+type ClusterReconcilerHooks interface {
+	// PreReconcile is executed after we get the resources and update the status
+	PreReconcile(
+		ctx context.Context,
+		cluster client.Object,
+	) (ctrl.Result, error)
+
+	// PostReconcile is executed at the end of the reconciliation loop
+	PostReconcile(
+		ctx context.Context,
+		cluster client.Object,
+	) (ctrl.Result, error)
+}
+
+// PodCapabilities describes a set of behaviour needed to implement the Pod capabilities
+type PodCapabilities interface {
+	// MutatePod calls the loaded plugins to help to enhance
+	// a PostgreSQL instance Pod definition
+	MutatePod(
+		ctx context.Context,
+		cluster client.Object,
+		object client.Object,
+		mutatedObject client.Object,
+	) error
 }
 
 // LifecycleCapabilities describes a set of behaviour needed to implement the Lifecycle capabilities
