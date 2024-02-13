@@ -1054,6 +1054,7 @@ sigs
 singlenamespace
 slotPrefix
 smartShutdownTimeout
+smartStopDelay
 snapshotBackupStatus
 snapshotOwnerReference
 snapshotted
