@@ -228,5 +228,5 @@ func (ws *localWebserverEndpoints) startPluginBackup(
 	backup *apiv1.Backup,
 ) {
 	cmd := NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder)
-	go cmd.Start(ctx)
+	cmd.Start(ctx)
 }

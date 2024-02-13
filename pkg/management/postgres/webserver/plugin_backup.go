@@ -51,7 +51,7 @@ func NewPluginBackupCommand(
 	client client.Client,
 	recorder record.EventRecorder,
 ) *PluginBackupCommand {
-	log := log.WithValues(
+	logger := log.WithValues(
 		"pluginConfiguration", backup.Spec.PluginConfiguration,
 		"backupName", backup.Name,
 		"backupNamespace", backup.Name)
@@ -60,7 +60,7 @@ func NewPluginBackupCommand(
 		Backup:   backup,
 		Client:   client,
 		Recorder: recorder,
-		Log:      log,
+		Log:      logger,
 	}
 }
 
@@ -74,7 +74,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		"backupName", b.Backup.Name,
 		"backupNamespace", b.Backup.Name)
 
-	client, err := b.Cluster.LoadPluginClient(ctx)
+	cli, err := b.Cluster.LoadPluginClient(ctx)
 	if err != nil {
 		b.markBackupAsFailed(ctx, err)
 		return
@@ -84,7 +84,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	backupLog.Info("Plugin backup started")
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
-	response, err := client.Backup(
+	response, err := cli.Backup(
 		ctx,
 		b.Cluster,
 		b.Backup,
@@ -101,7 +101,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	// Set the status to completed
 	b.Backup.Status.SetAsCompleted()
 
-	// Fill the backup status from the blugin
+	// Fill the backup status from the plugin
 	// Note: the InstanceID field is set by the operator backup controller
 	b.Backup.Status.BackupID = response.BackupID
 	b.Backup.Status.BackupName = response.BackupName

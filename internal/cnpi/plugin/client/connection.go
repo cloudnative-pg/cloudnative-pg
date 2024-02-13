@@ -339,7 +339,7 @@ func (pluginData *pluginData) loadBackupCapabilities(ctx context.Context) error 
 	return nil
 }
 
-// Metadata extracts the plugin plugin metadata reading from
+// Metadata extracts the plugin metadata reading from
 // the internal metadata
 func (pluginData *pluginData) Metadata() Metadata {
 	result := Metadata{
