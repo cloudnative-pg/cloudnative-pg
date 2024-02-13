@@ -422,7 +422,6 @@ WALCapabilities
 WALs
 Wadle
 WalBackupConfiguration
-WalCapabilities
 WalClassName
 XXu
 YXBw

@@ -143,8 +143,7 @@ func (b *PluginBackupCommand) markBackupAsFailed(ctx context.Context, failure er
 	backupStatus.SetAsFailed(failure)
 	if err := postgres.PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 		b.Log.Error(err, "Can't mark backup as failed")
-		// We do not terminate here because we still want to do the maintenance
-		// activity on the backups and to set the condition on the cluster.
+		// We do not terminate here because we still want to set the condition on the cluster.
 	}
 
 	// add backup failed condition to the cluster
@@ -157,8 +156,6 @@ func (b *PluginBackupCommand) markBackupAsFailed(ctx context.Context, failure er
 		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 	}); failErr != nil {
 		b.Log.Error(failErr, "while setting cluster condition for failed backup")
-		// We do not terminate here because it's more important to properly handle
-		// the backup maintenance activity than putting a condition in the cluster
 	}
 }
 
