@@ -126,6 +126,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// Plugin pre-hooks
+	if hookResult := preReconcilePluginHooks(ctx, &cluster, &backup); hookResult.StopReconciliation {
+		return hookResult.Result, hookResult.Err
+	}
+
 	// This check is still needed for when the backup resource creation is forced through the webhook
 	if backup.Spec.Method == apiv1.BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
 		message := "cannot proceed with the backup as the Kubernetes cluster has no VolumeSnapshot support"
@@ -228,8 +233,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("unrecognized method: %s", backup.Spec.Method)
 	}
 
+	// plugin post hooks
 	contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
-	return ctrl.Result{}, nil
+
+	hookResult := postReconcilePluginHooks(ctx, &cluster, &backup)
+	return hookResult.Result, hookResult.Err
 }
 
 func (r *BackupReconciler) isValidBackupRunning(

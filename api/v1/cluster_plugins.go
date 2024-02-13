@@ -24,19 +24,43 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// LoadPluginClient creates a new plugin client, loading the plugins that are required
-// by this cluster
+// LoadPluginClient creates a new plugin client, loading the plugins that are
+// required by this cluster
 func (cluster *Cluster) LoadPluginClient(ctx context.Context) (client.Client, error) {
+	pluginNames := make([]string, len(cluster.Spec.Plugins))
+	for i, pluginDeclaration := range cluster.Spec.Plugins {
+		pluginNames[i] = pluginDeclaration.Name
+	}
+
+	return cluster.LoadSelectedPluginsClient(ctx, pluginNames)
+}
+
+// LoadSelectedPluginsClient creates a new plugin client, loading the requested
+// plugins
+func (cluster *Cluster) LoadSelectedPluginsClient(ctx context.Context, pluginNames []string) (client.Client, error) {
 	pluginLoader := client.NewUnixSocketClient(configuration.Current.PluginSocketDir)
 
 	// Load the plugins
-	for _, pluginDeclaration := range cluster.Spec.Plugins {
-		if err := pluginLoader.Load(ctx, pluginDeclaration.Name); err != nil {
+	for _, name := range pluginNames {
+		if err := pluginLoader.Load(ctx, name); err != nil {
 			return nil, err
 		}
 	}
 
 	return pluginLoader, nil
+}
+
+// GetWALPluginNames gets the list of all the plugin names capable of handling
+// the WAL service
+func (cluster *Cluster) GetWALPluginNames() (result []string) {
+	result = make([]string, 0, len(cluster.Status.PluginStatus))
+	for _, entry := range cluster.Status.PluginStatus {
+		if len(entry.WALCapabilities) > 0 {
+			result = append(result, entry.Name)
+		}
+	}
+
+	return result
 }
 
 // SetInContext records the cluster in the given context

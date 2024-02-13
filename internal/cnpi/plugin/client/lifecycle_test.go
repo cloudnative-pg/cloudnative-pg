@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
-	jsonpatch "github.com/evanphx/json-patch/v5"
 	"google.golang.org/grpc"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,11 +40,11 @@ type fakeLifecycleClient struct {
 	capabilitiesError  error
 	lifecycleHookError error
 	labelInjector      map[string]string
-	capabilities       []*lifecycle.LifecycleCapabilities
+	capabilities       []*lifecycle.OperatorLifecycleCapabilities
 }
 
 func newFakeLifecycleClient(
-	capabilities []*lifecycle.LifecycleCapabilities,
+	capabilities []*lifecycle.OperatorLifecycleCapabilities,
 	labelInjector map[string]string,
 	capabilitiesError error,
 	lifecycleHookError error,
@@ -60,18 +59,18 @@ func newFakeLifecycleClient(
 
 func (f *fakeLifecycleClient) GetCapabilities(
 	_ context.Context,
-	_ *lifecycle.LifecycleCapabilitiesRequest,
+	_ *lifecycle.OperatorLifecycleCapabilitiesRequest,
 	_ ...grpc.CallOption,
-) (*lifecycle.LifecycleCapabilitiesResponse, error) {
-	return &lifecycle.LifecycleCapabilitiesResponse{LifecycleCapabilities: f.capabilities}, f.capabilitiesError
+) (*lifecycle.OperatorLifecycleCapabilitiesResponse, error) {
+	return &lifecycle.OperatorLifecycleCapabilitiesResponse{LifecycleCapabilities: f.capabilities}, f.capabilitiesError
 }
 
 func (f *fakeLifecycleClient) LifecycleHook(
 	_ context.Context,
-	in *lifecycle.LifecycleRequest,
+	in *lifecycle.OperatorLifecycleRequest,
 	_ ...grpc.CallOption,
-) (*lifecycle.LifecycleResponse, error) {
-	defRes := &lifecycle.LifecycleResponse{
+) (*lifecycle.OperatorLifecycleResponse, error) {
+	defRes := &lifecycle.OperatorLifecycleResponse{
 		JsonPatch: nil,
 	}
 
@@ -100,11 +99,8 @@ func (f *fakeLifecycleClient) LifecycleHook(
 	}
 
 	switch in.OperationType.Type {
-	case lifecycle.OperationType_TYPE_CREATE:
-		rawInstance, err := json.Marshal(instance)
-		if err != nil {
-			return defRes, fmt.Errorf("(create) while serializing the instance: %w", err)
-		}
+	case lifecycle.OperatorOperationType_TYPE_CREATE:
+		originalInstance := instance.DeepCopy()
 		if instance.Labels == nil {
 			instance.Labels = map[string]string{}
 		}
@@ -112,27 +108,15 @@ func (f *fakeLifecycleClient) LifecycleHook(
 			instance.Labels[key] = value
 		}
 
-		modifiedInstance, err := json.Marshal(instance)
-		if err != nil {
-			return defRes, fmt.Errorf("(create) while serializing the modifiedinstance: %w", err)
-		}
-
-		res, err := jsonpatch.CreateMergePatch(rawInstance, modifiedInstance)
-		return &lifecycle.LifecycleResponse{JsonPatch: res}, err
-	case lifecycle.OperationType_TYPE_DELETE:
-		rawInstance, err := json.Marshal(instance)
-		if err != nil {
-			return defRes, fmt.Errorf("(delete) while serializing the instance: %w", err)
-		}
+		res, err := createJSONPatchForLabels(originalInstance, &instance)
+		return &lifecycle.OperatorLifecycleResponse{JsonPatch: res}, err
+	case lifecycle.OperatorOperationType_TYPE_DELETE:
+		originalInstance := instance.DeepCopy()
 		for key := range f.labelInjector {
 			delete(instance.Labels, key)
 		}
-		modifiedInstance, err := json.Marshal(instance)
-		if err != nil {
-			return defRes, fmt.Errorf("(delete) while serializing the modifiedinstance: %w", err)
-		}
-		res, err := jsonpatch.CreateMergePatch(rawInstance, modifiedInstance)
-		return &lifecycle.LifecycleResponse{JsonPatch: res}, err
+		res, err := createJSONPatchForLabels(originalInstance, &instance)
+		return &lifecycle.OperatorLifecycleResponse{JsonPatch: res}, err
 	default:
 		return defRes, nil
 	}
@@ -157,16 +141,16 @@ var _ = Describe("LifecycleHook", func() {
 	var (
 		d            *data
 		clusterObj   k8client.Object
-		capabilities = []*lifecycle.LifecycleCapabilities{
+		capabilities = []*lifecycle.OperatorLifecycleCapabilities{
 			{
 				Group: "",
 				Kind:  "Pod",
-				OperationType: []*lifecycle.OperationType{
+				OperationTypes: []*lifecycle.OperatorOperationType{
 					{
-						Type: lifecycle.OperationType_TYPE_CREATE,
+						Type: lifecycle.OperatorOperationType_TYPE_CREATE,
 					},
 					{
-						Type: lifecycle.OperationType_TYPE_DELETE,
+						Type: lifecycle.OperatorOperationType_TYPE_DELETE,
 					},
 				},
 			},
@@ -233,3 +217,25 @@ var _ = Describe("LifecycleHook", func() {
 		Expect(podModified.Labels).To(Equal(map[string]string{"other": "stuff"}))
 	})
 })
+
+func createJSONPatchForLabels(originalInstance, instance *corev1.Pod) ([]byte, error) {
+	type patch []struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}
+
+	op := "replace"
+	if len(originalInstance.Labels) == 0 {
+		op = "add"
+	}
+	p := patch{
+		{
+			Op:    op,
+			Path:  "/metadata/labels",
+			Value: instance.Labels,
+		},
+	}
+
+	return json.Marshal(p)
+}

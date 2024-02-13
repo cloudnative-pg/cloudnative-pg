@@ -1271,23 +1271,6 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 	utils.InheritLabels(&instanceToCreate.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 
-	// Call the plugins to enrich this Pod definition
-	pluginClient, err := cluster.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin meanwhile creating Pods")
-		return ctrl.Result{}, err
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
-	var mutatedPod corev1.Pod
-	if err := pluginClient.MutatePod(ctx, cluster, instanceToCreate, &mutatedPod); err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the defaulting webhook, skipping")
-		return ctrl.Result{}, err
-	}
-	mutatedPod.DeepCopyInto(instanceToCreate)
-
 	if err := r.Create(ctx, instanceToCreate); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.

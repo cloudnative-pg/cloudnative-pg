@@ -158,7 +158,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
-// nolint:gocognit
+// nolint:gocognit,gocyclo
 func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -197,8 +197,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Ensure we load all the plugins that are required to reconcile this cluster
-	if err := r.preReconcilePlugins(ctx, cluster); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot reconciled required plugins: %w", err)
+	if err := r.updatePluginsStatus(ctx, cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile required plugins: %w", err)
 	}
 
 	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
@@ -228,6 +228,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
+	}
+
+	// Calls pre-reconcile hooks
+	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
+		return hookResult.Result, hookResult.Err
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
@@ -369,7 +374,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Updates all the objects managed by the controller
-	return r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	res, err := r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	if err != nil || !res.IsZero() {
+		return res, err
+	}
+
+	// Calls post-reconcile hooks
+	hookResult := postReconcilePluginHooks(ctx, cluster, cluster)
+	return hookResult.Result, hookResult.Err
 }
 
 func (r *ClusterReconciler) handleSwitchover(
