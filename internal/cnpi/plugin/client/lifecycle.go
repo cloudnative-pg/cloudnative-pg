@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/scheme"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -38,7 +37,7 @@ import (
 var runtimeScheme = runtime.NewScheme()
 
 func init() {
-	_ = clientgoscheme.AddToScheme(runtimeScheme)
+	_ = scheme.AddToScheme(runtimeScheme)
 }
 
 func (data *data) LifecycleHook(
@@ -53,11 +52,14 @@ func (data *data) LifecycleHook(
 	if err != nil {
 		return nil, err
 	}
-
-	gvk, err := apiutil.GVKForObject(object, runtimeScheme)
-	if err != nil {
-		// Skip unknown object
-		return nil, nil
+	gvk := object.GetObjectKind().GroupVersionKind()
+	if gvk.Kind == "" || gvk.Version == "" {
+		gvk, err = apiutil.GVKForObject(object, runtimeScheme)
+		if err != nil {
+			contextLogger.Trace("skipping unknown object", "object", object)
+			// Skip unknown object
+			return nil, nil
+		}
 	}
 	object.GetObjectKind().SetGroupVersionKind(gvk)
 
