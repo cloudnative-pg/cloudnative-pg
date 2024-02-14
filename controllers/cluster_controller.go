@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	goruntime "runtime"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -50,7 +49,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -252,21 +250,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 	}
 
-	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
-	// field in the status
-	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
-	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
-	if err != nil {
-		contextLogger.Error(err, "while getting fenced instances")
-		return ctrl.Result{}, err
-	}
-
-	isArchitectureConsistent := r.checkPodsArchitecture(ctx, fencedInstances, &instancesStatus)
-	if !isArchitectureConsistent && onlineUpdateEnabled {
-		contextLogger.Info("Architecture mismatch detected, disabling instance manager online updates")
-		onlineUpdateEnabled = false
-	}
-
 	// The instance list is sorted and will present the primary as the first
 	// element, followed by the replicas, the most updated coming first.
 	// Pods that are not responding will be at the end of the list. We use
@@ -320,6 +303,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// We cannot merge this code with updateResourceStatus because
 	// it needs to run after retrieving the status from the pods,
 	// which is a time-expensive operation.
+	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
 	if err = r.updateOnlineUpdateEnabled(ctx, cluster, onlineUpdateEnabled); err != nil {
 		if apierrs.IsConflict(err) {
 			// Requeue a new reconciliation cycle, as in this point we need
@@ -613,47 +597,6 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Cont
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 	return nil, nil
-}
-
-// checkPodsArchitecture checks whether the architecture of the instances is consistent with the runtime one
-func (r *ClusterReconciler) checkPodsArchitecture(
-	ctx context.Context,
-	fencedInstances *stringset.Data,
-	status *postgres.PostgresqlStatusList,
-) bool {
-	contextLogger := log.FromContext(ctx)
-	isConsistent := true
-
-	if fencedInstances.Has(utils.FenceAllServers) {
-		return isConsistent
-	}
-
-	for _, podStatus := range status.Items {
-		// Ignore architecture in podStatus with errors or that are fenced
-		if podStatus.Error != nil || fencedInstances.Has(podStatus.Pod.Name) {
-			continue
-		}
-
-		switch podStatus.InstanceArch {
-		case goruntime.GOARCH:
-			// architecture matches, everything ok for this pod
-
-		case "":
-			// an empty podStatus.InstanceArch should be due to an old version of the instance manager
-			contextLogger.Info("ignoring empty architecture from the instance",
-				"pod", podStatus.Pod.Name)
-
-		default:
-			contextLogger.Info("Warning: mismatch architecture between controller and instances. "+
-				"This is an unsupported configuration.",
-				"controllerArch", goruntime.GOARCH,
-				"instanceArch", podStatus.InstanceArch,
-				"pod", podStatus.Pod.Name)
-			isConsistent = false
-		}
-	}
-
-	return isConsistent
 }
 
 // reconcilePods decides when to create, scale up/down or wait for pods
