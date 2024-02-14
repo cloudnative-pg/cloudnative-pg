@@ -24,13 +24,21 @@ import (
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	jsonpatch "github.com/evanphx/json-patch/v5"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
+
+var runtimeScheme = runtime.NewScheme()
+
+func init() {
+	_ = scheme.AddToScheme(runtimeScheme)
+}
 
 func (data *data) LifecycleHook(
 	ctx context.Context,
@@ -44,8 +52,17 @@ func (data *data) LifecycleHook(
 	if err != nil {
 		return nil, err
 	}
-
 	gvk := object.GetObjectKind().GroupVersionKind()
+	if gvk.Kind == "" || gvk.Version == "" {
+		gvk, err = apiutil.GVKForObject(object, runtimeScheme)
+		if err != nil {
+			contextLogger.Trace("skipping unknown object", "object", object)
+			// Skip unknown object
+			return nil, nil
+		}
+	}
+	object.GetObjectKind().SetGroupVersionKind(gvk)
+
 	var invokablePlugin []pluginData
 	for _, plg := range data.plugins {
 		for _, capability := range plg.lifecycleCapabilities {
