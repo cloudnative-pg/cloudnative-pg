@@ -44,9 +44,9 @@ To guarantee that the operator is able to take the right choices, it
 is necessary for it to be able to detect the PostgreSQL major version.
 This can happen in two ways:
 * using the `major` field of the `imageCatalogRef`, if defined
-* autodetecting the major version from the image tag of the `imageName`, otherwise
+* auto-detecting the major version from the image tag of the `imageName`, otherwise
 
-To use the autodetection, the image tag must follow a specific format.
+To use the auto-detection, the image tag must follow a specific format.
 The image tag must start with a valid PostgreSQL major version number (e.g.
 14.5 or 15) optionally followed by a dot and the patch level.
 

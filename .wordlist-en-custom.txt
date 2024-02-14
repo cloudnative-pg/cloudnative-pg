@@ -551,6 +551,7 @@ cloudNativePGOperatorHash
 cloudnative
 cloudnativepg
 clusterBackup
+clusterimagecatalogs
 clusterName
 clusterlist
 clusterrole
