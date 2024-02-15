@@ -24,7 +24,7 @@ env:
   SLACK_USERNAME: "cnpg-bot"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
-  PLATFORM: "linux/amd64,linux/arm64"
+  PLATFORM: "linux/amd64,linux/arm64/v8"
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
   BUILD_PUSH_CACHE_TO: ""
@@ -533,7 +533,7 @@ jobs:
         run: |
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
-          platforms="linux/amd64,linux/arm64"
+          platforms="linux/amd64,linux/arm64/v8"
           echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
 
       - name: Set up QEMU

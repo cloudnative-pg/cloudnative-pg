@@ -50,7 +50,7 @@ env:
   BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --rm-dist --id manager"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
-  PLATFORM: "linux/amd64,linux/arm64"
+  PLATFORM: "linux/amd64,linux/arm64/v8"
   E2E_SUFFIX: "cnpge2e"
 
 defaults:
