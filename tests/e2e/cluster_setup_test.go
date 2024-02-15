@@ -48,7 +48,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		}
 	})
 
-	It("sets up a cluster", func(ctx SpecContext) {
+	It("sets up a cluster", func(_ SpecContext) {
 		const namespacePrefix = "cluster-storageclass-e2e"
 		var err error
 
@@ -74,7 +74,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
 			}
 		}()
-		DeferCleanup(func(ctx SpecContext) {
+		DeferCleanup(func(_ SpecContext) {
 			if CurrentSpecReport().Failed() {
 				specName := CurrentSpecReport().FullText()
 				capLines := 10

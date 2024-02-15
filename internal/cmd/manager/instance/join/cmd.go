@@ -45,14 +45,14 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "join [options]",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := context.Background()
+			ctx := cmd.Context()
 			instance := postgres.NewInstance()
 
 			// The following are needed to correctly
@@ -71,7 +71,7 @@ func NewCmd() *cobra.Command {
 
 			return joinSubCommand(ctx, instance, info)
 		},
-		PostRunE: func(cmd *cobra.Command, args []string) error {
+		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}

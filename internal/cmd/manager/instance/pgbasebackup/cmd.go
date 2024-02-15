@@ -57,7 +57,7 @@ func NewCmd() *cobra.Command {
 				Namespace: namespace,
 			})
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			client, err := management.NewControllerRuntimeClient()
 			if err != nil {
 				return err

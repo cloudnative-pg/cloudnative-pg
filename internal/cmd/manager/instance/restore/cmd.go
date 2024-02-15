@@ -47,7 +47,7 @@ func NewCmd() *cobra.Command {
 				Namespace: namespace,
 			})
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 
 			info := postgres.InitInfo{
@@ -59,7 +59,7 @@ func NewCmd() *cobra.Command {
 
 			return restoreSubCommand(ctx, info)
 		},
-		PostRunE: func(cmd *cobra.Command, args []string) error {
+		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}
