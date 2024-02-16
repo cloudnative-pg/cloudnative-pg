@@ -59,7 +59,7 @@
       // We want a PR to bump kind node version in the Makefile
       "fileMatch": [
         "^hack/setup-cluster\.sh$",
-        "^hack/e2e/run-e2e.*\.sh$",
+        "^hack/e2e/run-e2e-kind\.sh$",
       ],
 
       "matchStrings": [
