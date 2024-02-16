@@ -42,12 +42,18 @@ function get_default_storage_class() {
   kubectl get storageclass -o json | jq  -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)'
 }
 
+function get_default_snapshot_class() {
+  local STORAGE_CLASS=${1:-${1:?STORAGE_CLASS is required}}
+  kubectl get storageclass "$STORAGE_CLASS" -o json | jq -r '.metadata.annotations["storage.kubernetes.io/default-snapshot-class"]'
+}
+
 function get_postgres_image() {
   grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
 }
 
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_storage_class)}
-export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-}
+export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-csi-hostpath-sc}
+export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS:-$(get_default_snapshot_class $E2E_CSI_STORAGE_CLASS)}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
 
 # Ensure GOBIN is in path, we'll use this to install and execute ginkgo

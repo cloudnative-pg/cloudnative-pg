@@ -58,12 +58,11 @@
     }, {
       // We want a PR to bump kind node version in the Makefile
       "fileMatch": [
-        "^Makefile$",
-        "^hack/setup-cluster.sh$",
+        "^hack/setup-cluster\.sh$",
+        "^hack/e2e/run-e2e.*\.sh$",
       ],
 
       "matchStrings": [
-        "KIND_CLUSTER_VERSION \\?= (?<currentValue>.*?)\\n",
         "K8S_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
       ],
       "datasourceTemplate": "docker",
