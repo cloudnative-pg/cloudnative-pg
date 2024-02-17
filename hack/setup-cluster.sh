@@ -218,7 +218,7 @@ create_cluster_k3d() {
   local latest_k3s_tag
   latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
 
-  local volumes=()
+  local options=()
   if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
     config_file="${TEMP_DIR}/k3d-registries.yaml"
     cat >"${config_file}" <<-EOF
@@ -241,7 +241,7 @@ EOF
 EOF
     fi
 
-    volumes=(--volume "${config_file}:/etc/rancher/k3s/registries.yaml")
+    options+=(--registry-config "${config_file}")
   fi
 
   local agents=()
@@ -249,7 +249,7 @@ EOF
     agents=(-a "${NODES}")
   fi
 
-  K3D_FIX_MOUNTS=1 k3d cluster create "${volumes[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
+  K3D_FIX_MOUNTS=1 k3d cluster create "${options[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
     --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
 
