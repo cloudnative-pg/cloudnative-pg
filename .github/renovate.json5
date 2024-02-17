@@ -56,18 +56,31 @@
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "kubernetes-sigs/kind",
     }, {
-      // We want a PR to bump kind node version in the Makefile
+      // We want a PR to bump kind node version
       "fileMatch": [
         "^hack/setup-cluster\.sh$",
         "^hack/e2e/run-e2e-kind\.sh$",
       ],
 
       "matchStrings": [
-        "K8S_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
+        "KIND_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
       "depNameTemplate": "kindest/node",
+    }, {
+      // We want a PR to bump k3d node version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+        "^hack/e2e/run-e2e-k3d\.sh$",
+      ],
+
+      "matchStrings": [
+        "K3D_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "versioningTemplate": "regex:^v(?<major>\\d+)(\\\\.(?<minor>\\d+))?(\\\\.(?<patch>\\\\d+))\\\\+k3s?((?<build>\\\\d+))$",
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "k3s-io/k3s",
     }, {
       // We want a PR to bump spellcheck version in the Makefile
       "fileMatch": [

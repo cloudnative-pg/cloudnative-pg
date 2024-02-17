@@ -24,9 +24,10 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-K8S_DEFAULT_VERSION=v1.28.6
+KIND_NODE_DEFAULT_VERSION=v1.28.6
+K3D_NODE_DEFAULT_VERSION=v1.28.4
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.11.0
-K8S_VERSION=${K8S_VERSION:-$K8S_DEFAULT_VERSION}
+K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
 ENGINE=${CLUSTER_ENGINE:-kind}
@@ -699,6 +700,17 @@ main() {
     echo "ERROR: you must specify a command" >&2
     echo >&2
     usage
+  fi
+
+  if [ -z "${K8S_VERSION}" ]; then
+    case "${ENGINE}" in
+    kind)
+      K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
+      ;;
+    k3d)
+      K8S_VERSION=${K3D_NODE_DEFAULT_VERSION}
+      ;;
+    esac
   fi
 
   # Only here the K8S_VERSION veriable contains its final value
