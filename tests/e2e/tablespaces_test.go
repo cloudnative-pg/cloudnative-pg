@@ -44,7 +44,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Tablespaces tests", Label(tests.LabelSmoke,
+var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
+	tests.LabelSmoke,
 	tests.LabelStorage,
 	tests.LabelBasic,
 	tests.LabelSnapshot,
