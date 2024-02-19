@@ -27,7 +27,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -111,13 +110,11 @@ func EnrichStatus(
 			continue
 		}
 
-		// Detect the instance serial number.
-		// If it returns an error the PVC is ill-formed and we ignore it
-		serial, err := specs.GetNodeSerial(pvc.ObjectMeta)
+		// we are keeping the instance name as a label in PVC's
+		instanceName, err := GetInstanceName(pvc)
 		if err != nil {
 			continue
 		}
-		instanceName := specs.GetInstanceName(cluster.Name, serial)
 		instancesPVCs[instanceName] = append(instancesPVCs[instanceName], pvc)
 	}
 

@@ -18,6 +18,7 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -27,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // CreateInstancePVCs creates the expected pvcs for the instance
@@ -109,4 +111,14 @@ func reconcileSingleInstanceMissingPVCs(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// GetInstanceName gets the pvc's instance name from the instanceName label,
+// and errors if the label is not present
+func GetInstanceName(pvc corev1.PersistentVolumeClaim) (string, error) {
+	instanceName, found := pvc.Labels[utils.InstanceNameLabelName]
+	if !found {
+		return "", errors.New("pvc does not contain the instanceName label")
+	}
+	return instanceName, nil
 }

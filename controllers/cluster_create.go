@@ -1332,12 +1332,10 @@ func findInstancePodToCreate(
 			return nil, fmt.Errorf("programmatic error, pvc not found")
 		}
 
-		serial, err := specs.GetNodeSerial(pvcs[idx].ObjectMeta)
+		instanceName, err := persistentvolumeclaim.GetInstanceName(pvcs[idx])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can't find instance name: %w", err)
 		}
-
-		instanceName := specs.GetInstanceName(cluster.Name, serial)
 		if k8slices.Contains(instanceThatHavePods, instanceName) {
 			continue
 		}
