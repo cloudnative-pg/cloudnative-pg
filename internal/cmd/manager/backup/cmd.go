@@ -33,7 +33,7 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use: "backup [backup_name]",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			backupURL := url.Local(url.PathPgBackup, url.LocalPort)
 			resp, err := http.Get(backupURL + "?name=" + args[0])
 			if err != nil {

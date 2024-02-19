@@ -36,7 +36,7 @@ func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use:           "controller [flags]",
 		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return RunController(
 				metricsAddr,
 				configMapName,

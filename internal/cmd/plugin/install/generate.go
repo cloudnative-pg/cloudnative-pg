@@ -64,7 +64,7 @@ func newGenerateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "generates the YAML manifests needed to install the CloudNativePG operator",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// we consider the namespace only if explicitly passed for this command
 			namespace := ""
 			if plugin.NamespaceExplicitlyPassed {

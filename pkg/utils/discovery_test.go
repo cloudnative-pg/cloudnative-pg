@@ -161,12 +161,12 @@ var _ = Describe("Detect resources properly when", func() {
 
 var _ = Describe("AvailableArchitecture", func() {
 	var (
-		mockHashCalculator func(name string) (hash string, err error)
+		mockHashCalculator func(_ string) (hash string, err error)
 		arch               *AvailableArchitecture
 	)
 
 	BeforeEach(func() {
-		mockHashCalculator = func(name string) (hash string, err error) {
+		mockHashCalculator = func(_ string) (hash string, err error) {
 			return "mockedHash", nil
 		}
 		arch = newAvailableArchitecture("amd64", filepath.Join("bin", "manager_amd64"))
@@ -203,6 +203,9 @@ var _ = Describe("AvailableArchitecture", func() {
 
 		Context("when hash is already calculated", func() {
 			BeforeEach(func() {
+				mockHashCalculator = func(_ string) (hash string, err error) {
+					return "should-not-return-this", nil
+				}
 				arch.hash = "precalculatedHash"
 			})
 
@@ -210,9 +213,7 @@ var _ = Describe("AvailableArchitecture", func() {
 				arch.calculateHash()
 				hash1 := arch.hash
 
-				arch.hashCalculator = func(name string) (hash string, err error) {
-					return "should-not-return-this", nil
-				}
+				arch.hashCalculator = mockHashCalculator
 
 				arch.calculateHash()
 				hash2 := arch.hash
@@ -223,7 +224,7 @@ var _ = Describe("AvailableArchitecture", func() {
 
 		Context("when hash calculation returns an error", func() {
 			BeforeEach(func() {
-				mockHashCalculator = func(name string) (hash string, err error) {
+				mockHashCalculator = func(_ string) (hash string, err error) {
 					return "", fmt.Errorf("fake error")
 				}
 				arch.hashCalculator = mockHashCalculator

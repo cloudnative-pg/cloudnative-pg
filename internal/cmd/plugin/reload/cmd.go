@@ -29,7 +29,7 @@ func NewCmd() *cobra.Command {
 		Short: `Reload the cluster`,
 		Long:  `Triggers a reconciliation loop for all the cluster's instances, rolling out new configurations if present.`,
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]
 			return Reload(ctx, clusterName)
