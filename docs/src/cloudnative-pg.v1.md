@@ -250,6 +250,37 @@ by the operator if EnablePodAntiAffinity is set to true (default) or to be used 
 </tbody>
 </table>
 
+## AvailableArchitecture     {#postgresql-cnpg-io-v1-AvailableArchitecture}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>AvailableArchitecture represents the state of a cluster's architecture</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>goArch</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>GoArch is the name of the executable architecture</p>
+</td>
+</tr>
+<tr><td><code>hash</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Hash is the hash of the executable</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## AzureCredentials     {#postgresql-cnpg-io-v1-AzureCredentials}
 
 
@@ -1995,6 +2026,13 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 </td>
 <td>
    <p>The hash of the binary of the operator</p>
+</td>
+</tr>
+<tr><td><code>availableArchitectures</code><br/>
+<a href="#postgresql-cnpg-io-v1-AvailableArchitecture"><i>[]AvailableArchitecture</i></a>
+</td>
+<td>
+   <p>AvailableArchitectures reports the available architectures of a cluster</p>
 </td>
 </tr>
 <tr><td><code>conditions</code><br/>

@@ -50,7 +50,7 @@ env:
   BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --rm-dist --id manager"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
-  PLATFORM: "linux/amd64,linux/arm64"
+  PLATFORMS: "linux/amd64,linux/arm64"
   E2E_SUFFIX: "cnpge2e"
 
 defaults:
@@ -1919,7 +1919,7 @@ jobs:
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: ${{ needs.buildx.outputs.platforms }}
+          platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
