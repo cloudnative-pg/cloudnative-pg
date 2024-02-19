@@ -1874,6 +1874,10 @@ spec:
                       created using the provided CA.
                     type: string
                 type: object
+              createPDB:
+                default: true
+                description: Do we create PDB or not?
+                type: boolean
               description:
                 description: Description of this PostgreSQL cluster
                 type: string

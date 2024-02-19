@@ -489,6 +489,11 @@ type ClusterSpec struct {
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
+
+	// Do we create PDB or not?
+	// +kubebuilder:default:=true
+	// +optional
+	CreatePDB bool `json:"createPDB,omitempty"`
 }
 
 const (
