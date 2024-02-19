@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -106,7 +107,7 @@ func (z *PostgresOrphansReaper) handleSignal(contextLogger log.Logger) error {
 			var ws syscall.WaitStatus
 			var ru syscall.Rusage
 			wpid, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, &ru)
-			if wpid <= 0 || err == nil || err == syscall.ECHILD {
+			if wpid <= 0 || err == nil || errors.Is(err, syscall.ECHILD) {
 				continue
 			}
 			contextLogger.Info("reaped orphaned child process", "pid", pid, "err", err, "wpid", wpid)
