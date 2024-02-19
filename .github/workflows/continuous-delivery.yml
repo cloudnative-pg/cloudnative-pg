@@ -386,6 +386,7 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
+          file: Dockerfile
           push: true
           build-args: |
             VERSION=${{ env.VERSION }}
@@ -484,6 +485,7 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
+          file: Dockerfile
           push: true
           build-args: |
             VERSION=${{ env.VERSION }}-prime

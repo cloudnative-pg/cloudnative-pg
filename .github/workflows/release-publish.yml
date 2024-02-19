@@ -181,6 +181,7 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
+          file: Dockerfile
           push: true
           build-args: |
             VERSION=${{ steps.build-meta.outputs.version }}

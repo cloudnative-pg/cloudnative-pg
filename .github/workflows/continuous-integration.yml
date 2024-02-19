@@ -543,21 +543,66 @@ jobs:
           username: ${{ env.REGISTRY_USER }}
           password:  ${{ env.REGISTRY_PASSWORD }}
 
-      - name: Build for scan
+      - name: Build for scan distroless image
         uses: docker/build-push-action@v5
         with:
           platforms: "linux/amd64"
           context: .
+          file: Dockerfile
           push: false
           load: true
           build-args: |
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
 
-      - name: Dockle scan
+      - name: Dockle scan distroless image
         uses: erzz/dockle-action@v1
         with:
           image: ${{ steps.docker-meta.outputs.tags }}
+          exit-code: '1'
+          failure-threshold: WARN
+          accept-keywords: key
+
+      - name: Build for scan UBI8 image
+        uses: docker/build-push-action@v5
+        with:
+          platforms: "linux/amd64"
+          context: .
+          file: Dockerfile-ubi8
+          push: false
+          load: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
+          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
+
+      - name: Dockle scan UBI8 image
+        uses: erzz/dockle-action@v1
+        env:
+          DOCKLE_IGNORES: CIS-DI-0009
+        with:
+          image: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          exit-code: '1'
+          failure-threshold: WARN
+          accept-keywords: key
+
+      - name: Build for scan UBI9 image
+        uses: docker/build-push-action@v5
+        with:
+          platforms: "linux/amd64"
+          context: .
+          file: Dockerfile-ubi9
+          push: false
+          load: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
+          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
+
+      - name: Dockle scan UBI9 image
+        uses: erzz/dockle-action@v1
+        env:
+          DOCKLE_IGNORES: CIS-DI-0009
+        with:
+          image: ${{ steps.docker-meta-ubi9.outputs.tags }}
           exit-code: '1'
           failure-threshold: WARN
           accept-keywords: key
@@ -587,6 +632,7 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
+          file: Dockerfile
           push: ${{ env.PUSH }}
           build-args: |
             VERSION=${{ env.VERSION }}
