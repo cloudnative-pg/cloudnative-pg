@@ -129,7 +129,7 @@ var volumeSnapshotsPredicate = predicate.Funcs{
 }
 
 func (r *BackupReconciler) mapVolumeSnapshotsToBackups() handler.MapFunc {
-	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+	return func(_ context.Context, obj client.Object) []reconcile.Request {
 		volumeSnapshot, ok := obj.(*storagesnapshotv1.VolumeSnapshot)
 		if !ok {
 			return nil

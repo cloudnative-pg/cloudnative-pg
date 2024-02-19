@@ -37,7 +37,7 @@ var _ = Describe("cluster_cleanup", func() {
 		scheme *runtime.Scheme
 	)
 
-	BeforeEach(func(ctx SpecContext) {
+	BeforeEach(func() {
 		scheme = schemeBuilder.BuildWithAllKnownScheme()
 		r = ClusterReconciler{
 			Scheme: scheme,

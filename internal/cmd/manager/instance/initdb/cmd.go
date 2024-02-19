@@ -50,13 +50,13 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "init [options]",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 
 			initDBFlags, err := shellquote.Split(initDBFlagsString)
@@ -103,7 +103,7 @@ func NewCmd() *cobra.Command {
 
 			return initSubCommand(ctx, info)
 		},
-		PostRunE: func(cmd *cobra.Command, args []string) error {
+		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}

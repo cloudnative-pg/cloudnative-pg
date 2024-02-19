@@ -69,7 +69,7 @@ var _ = Describe("pooler_predicates unit tests", func() {
 
 		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: rand.String(10), Namespace: namespace}}
 		utils.SetAsOwnedBy(&secret.ObjectMeta, pooler.ObjectMeta, pooler.TypeMeta)
-		isOwnedByPoolerOrSatisfiesPredicate(secret, func(object client.Object) bool {
+		isOwnedByPoolerOrSatisfiesPredicate(secret, func(_ client.Object) bool {
 			return false
 		})
 	})

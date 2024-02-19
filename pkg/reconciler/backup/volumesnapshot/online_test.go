@@ -67,7 +67,7 @@ var _ = Describe("onlineExecutor prepare", func() {
 		backup  *apiv1.Backup
 		target  *corev1.Pod
 	)
-	BeforeEach(func(ctx SpecContext) {
+	BeforeEach(func(_ SpecContext) {
 		backup = &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "online-backup",
@@ -246,7 +246,7 @@ var _ = Describe("onlineExecutor finalize", func() {
 		fakeClient *fakeBackupClient
 	)
 
-	BeforeEach(func(ctx SpecContext) {
+	BeforeEach(func(_ SpecContext) {
 		executor = &onlineExecutor{}
 		backup = &apiv1.Backup{
 			ObjectMeta: metav1.ObjectMeta{

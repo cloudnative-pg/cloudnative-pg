@@ -76,13 +76,13 @@ var (
 			newNode, newOk := e.ObjectNew.(*corev1.Node)
 			return oldOk && newOk && oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable
 		},
-		CreateFunc: func(createEvent event.CreateEvent) bool {
+		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
 		},
-		DeleteFunc: func(createEvent event.DeleteEvent) bool {
+		DeleteFunc: func(_ event.DeleteEvent) bool {
 			return false
 		},
-		GenericFunc: func(genericEvent event.GenericEvent) bool {
+		GenericFunc: func(_ event.GenericEvent) bool {
 			return false
 		},
 	}

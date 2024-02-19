@@ -209,7 +209,7 @@ var _ = BeforeEach(func() {
 			_, _ = fmt.Fprintf(&buf, "Error tailing logs, dumping operator logs: %v\n", err)
 		}
 	}()
-	DeferCleanup(func(ctx SpecContext) {
+	DeferCleanup(func(_ SpecContext) {
 		if CurrentSpecReport().Failed() {
 			specName := CurrentSpecReport().FullText()
 			capLines := 10
