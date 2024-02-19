@@ -155,7 +155,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.canBeInPlace).To(BeFalse())
 	})
 
-	It("checkPodSpecIsOutdated should not return any error", func(ctx SpecContext) {
+	It("checkPodSpecIsOutdated should not return any error", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,

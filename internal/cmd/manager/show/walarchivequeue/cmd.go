@@ -32,7 +32,7 @@ func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "wal-archive-queue",
 		Short: "Lists all .ready wal files in " + specs.PgWalArchiveStatusPath,
-		RunE: func(cobraCmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := run(); err != nil {
 				log.Error(err, "Error while extracting the list of .ready files")
 			}

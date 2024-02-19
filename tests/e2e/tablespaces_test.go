@@ -95,7 +95,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 		}()
 
-		DeferCleanup(func(ctx SpecContext) {
+		DeferCleanup(func(_ SpecContext) {
 			if CurrentSpecReport().Failed() {
 				specName := CurrentSpecReport().FullText()
 				capLines := 10

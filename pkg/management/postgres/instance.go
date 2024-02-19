@@ -1123,7 +1123,7 @@ func (instance *Instance) requestFencingOff() {
 // waitForInstanceRestarted waits until the instance reports being started
 // after the given time
 func (instance *Instance) waitForInstanceRestarted(after time.Time) error {
-	retryOnEveryError := func(err error) bool {
+	retryOnEveryError := func(_ error) bool {
 		return true
 	}
 	return retry.OnError(RetryUntilServerAvailable, retryOnEveryError, func() error {

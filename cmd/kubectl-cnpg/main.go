@@ -58,7 +58,7 @@ func main() {
 		Use:          "kubectl-cnpg",
 		Short:        "A plugin to manage your CloudNativePG clusters",
 		SilenceUsage: true,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			logFlags.ConfigureLogging()
 
 			// If we're invoking the completion command we shouldn't try to create

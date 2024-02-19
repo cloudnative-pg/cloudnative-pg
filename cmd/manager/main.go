@@ -44,7 +44,7 @@ func main() {
 	cmd := &cobra.Command{
 		Use:          "manager [cmd]",
 		SilenceUsage: true,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			logFlags.ConfigureLogging()
 		},
 	}
