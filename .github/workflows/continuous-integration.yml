@@ -24,7 +24,7 @@ env:
   SLACK_USERNAME: "cnpg-bot"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
-  PLATFORM: "linux/amd64,linux/arm64"
+  PLATFORMS: "linux/amd64,linux/arm64"
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
   BUILD_PUSH_CACHE_TO: ""
@@ -389,7 +389,6 @@ jobs:
     outputs:
       commit_version: ${{ env.VERSION }}
       commit: ${{ env.COMMIT_SHA }}
-      platforms: ${{ env.PLATFORMS }}
       image_name: ${{ env.IMAGE_NAME }}
       controller_img: ${{ env.CONTROLLER_IMG }}
       controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
@@ -529,13 +528,6 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
 
-      - name: Detect platforms
-        run: |
-          # Keep in mind that adding more platforms (architectures) will increase the building
-          # time even if we use the ghcache for the building process.
-          platforms="linux/amd64,linux/arm64"
-          echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -660,7 +652,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: ${{ needs.buildx.outputs.platforms }}
+          platforms: ${{ env.PLATFORMS }}
 
       - name: Install Go
         uses: actions/setup-go@v5
@@ -719,7 +711,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: ${{ needs.buildx.outputs.platforms }}
+          platforms: ${{ env.PLATFORMS }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

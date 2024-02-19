@@ -4462,6 +4462,24 @@ spec:
               may not be up to date. Populated by the system. Read-only. More info:
               https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
             properties:
+              availableArchitectures:
+                description: AvailableArchitectures reports the available architectures
+                  of a cluster
+                items:
+                  description: AvailableArchitecture represents the state of a cluster's
+                    architecture
+                  properties:
+                    goArch:
+                      description: GoArch is the name of the executable architecture
+                      type: string
+                    hash:
+                      description: Hash is the hash of the executable
+                      type: string
+                  required:
+                  - goArch
+                  - hash
+                  type: object
+                type: array
               azurePVCUpdateEnabled:
                 description: AzurePVCUpdateEnabled shows if the PVC online upgrade
                   is enabled for this cluster

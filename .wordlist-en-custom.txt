@@ -13,6 +13,9 @@ Armando
 AuthQuery
 AuthQuerySecret
 Autoscaler
+AvailableArchitecture
+AvailableArchitectureList
+AvailableArchitectures
 AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
@@ -146,6 +149,7 @@ GUCs
 Gabriele
 GaugeVec
 Gi
+GoArch
 Golang
 GolangCI
 GoogleCredentials
@@ -462,6 +466,7 @@ authn
 authz
 autoscaler
 autovacuum
+availableArchitectures
 aws
 az
 azureCredentials
@@ -689,6 +694,7 @@ ghcr
 github
 gkeEnvironment
 gmail
+goArch
 golangci
 goodwithtech
 googleCredentials
