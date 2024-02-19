@@ -127,7 +127,7 @@ var _ = Describe("Storage source", func() {
 	When("bootstrapping from a VolumeSnapshot", func() {
 		When("we don't have backups", func() {
 			When("there's no source WAL archive", func() {
-				It("should fail when looking for a wrong role", func(ctx context.Context) {
+				It("should fail when looking for a wrong role", func(_ context.Context) {
 					_, err := ptr.To(StorageSource{}).ForRole("NoRol")
 					Expect(err).To(HaveOccurred())
 				})
