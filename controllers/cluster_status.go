@@ -317,6 +317,17 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return err
 	}
 
+	architectures := utils.GetAvailableArchitectures()
+	availableArchitectures := make([]apiv1.AvailableArchitecture, 0, len(architectures))
+	for _, a := range architectures {
+		availableArchitectures = append(availableArchitectures,
+			apiv1.AvailableArchitecture{
+				GoArch: a.GoArch,
+				Hash:   a.GetHash(),
+			})
+	}
+	cluster.Status.AvailableArchitectures = availableArchitectures
+
 	// refresh expiration dates of certifications
 	if err := r.refreshCertsExpirations(ctx, cluster); err != nil {
 		return err

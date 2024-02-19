@@ -632,6 +632,15 @@ type ManagedRoles struct {
 	PasswordStatus map[string]PasswordState `json:"passwordStatus,omitempty"`
 }
 
+// AvailableArchitecture represents the state of a cluster's architecture
+type AvailableArchitecture struct {
+	// GoArch is the name of the executable architecture
+	GoArch string `json:"goArch"`
+
+	// Hash is the hash of the executable
+	Hash string `json:"hash"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -784,6 +793,10 @@ type ClusterStatus struct {
 	// The hash of the binary of the operator
 	// +optional
 	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
+
+	// AvailableArchitectures reports the available architectures of a cluster
+	// +optional
+	AvailableArchitectures []AvailableArchitecture `json:"availableArchitectures,omitempty"`
 
 	// Conditions for cluster object
 	// +optional
