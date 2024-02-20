@@ -41,11 +41,11 @@ type fakeLifecycleClient struct {
 	capabilitiesError  error
 	lifecycleHookError error
 	labelInjector      map[string]string
-	capabilities       []*lifecycle.LifecycleCapabilities
+	capabilities       []*lifecycle.OperatorLifecycleCapabilities
 }
 
 func newFakeLifecycleClient(
-	capabilities []*lifecycle.LifecycleCapabilities,
+	capabilities []*lifecycle.OperatorLifecycleCapabilities,
 	labelInjector map[string]string,
 	capabilitiesError error,
 	lifecycleHookError error,
@@ -60,18 +60,18 @@ func newFakeLifecycleClient(
 
 func (f *fakeLifecycleClient) GetCapabilities(
 	_ context.Context,
-	_ *lifecycle.LifecycleCapabilitiesRequest,
+	_ *lifecycle.OperatorLifecycleCapabilitiesRequest,
 	_ ...grpc.CallOption,
-) (*lifecycle.LifecycleCapabilitiesResponse, error) {
-	return &lifecycle.LifecycleCapabilitiesResponse{LifecycleCapabilities: f.capabilities}, f.capabilitiesError
+) (*lifecycle.OperatorLifecycleCapabilitiesResponse, error) {
+	return &lifecycle.OperatorLifecycleCapabilitiesResponse{LifecycleCapabilities: f.capabilities}, f.capabilitiesError
 }
 
 func (f *fakeLifecycleClient) LifecycleHook(
 	_ context.Context,
-	in *lifecycle.LifecycleRequest,
+	in *lifecycle.OperatorLifecycleRequest,
 	_ ...grpc.CallOption,
-) (*lifecycle.LifecycleResponse, error) {
-	defRes := &lifecycle.LifecycleResponse{
+) (*lifecycle.OperatorLifecycleResponse, error) {
+	defRes := &lifecycle.OperatorLifecycleResponse{
 		JsonPatch: nil,
 	}
 
@@ -100,7 +100,7 @@ func (f *fakeLifecycleClient) LifecycleHook(
 	}
 
 	switch in.OperationType.Type {
-	case lifecycle.OperationType_TYPE_CREATE:
+	case lifecycle.OperatorOperationType_TYPE_CREATE:
 		rawInstance, err := json.Marshal(instance)
 		if err != nil {
 			return defRes, fmt.Errorf("(create) while serializing the instance: %w", err)
@@ -118,8 +118,8 @@ func (f *fakeLifecycleClient) LifecycleHook(
 		}
 
 		res, err := jsonpatch.CreateMergePatch(rawInstance, modifiedInstance)
-		return &lifecycle.LifecycleResponse{JsonPatch: res}, err
-	case lifecycle.OperationType_TYPE_DELETE:
+		return &lifecycle.OperatorLifecycleResponse{JsonPatch: res}, err
+	case lifecycle.OperatorOperationType_TYPE_DELETE:
 		rawInstance, err := json.Marshal(instance)
 		if err != nil {
 			return defRes, fmt.Errorf("(delete) while serializing the instance: %w", err)
@@ -132,7 +132,7 @@ func (f *fakeLifecycleClient) LifecycleHook(
 			return defRes, fmt.Errorf("(delete) while serializing the modifiedinstance: %w", err)
 		}
 		res, err := jsonpatch.CreateMergePatch(rawInstance, modifiedInstance)
-		return &lifecycle.LifecycleResponse{JsonPatch: res}, err
+		return &lifecycle.OperatorLifecycleResponse{JsonPatch: res}, err
 	default:
 		return defRes, nil
 	}
@@ -157,16 +157,16 @@ var _ = Describe("LifecycleHook", func() {
 	var (
 		d            *data
 		clusterObj   k8client.Object
-		capabilities = []*lifecycle.LifecycleCapabilities{
+		capabilities = []*lifecycle.OperatorLifecycleCapabilities{
 			{
 				Group: "",
 				Kind:  "Pod",
-				OperationType: []*lifecycle.OperationType{
+				OperationTypes: []*lifecycle.OperatorOperationType{
 					{
-						Type: lifecycle.OperationType_TYPE_CREATE,
+						Type: lifecycle.OperatorOperationType_TYPE_CREATE,
 					},
 					{
-						Type: lifecycle.OperationType_TYPE_DELETE,
+						Type: lifecycle.OperatorOperationType_TYPE_DELETE,
 					},
 				},
 			},

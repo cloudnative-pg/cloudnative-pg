@@ -70,7 +70,7 @@ func (data *data) LifecycleHook(
 				continue
 			}
 
-			contained := slices.ContainsFunc(capability.OperationType, func(ot *lifecycle.OperationType) bool {
+			contained := slices.ContainsFunc(capability.OperationTypes, func(ot *lifecycle.OperatorOperationType) bool {
 				return ot.GetType() == typedOperationType
 			})
 
@@ -107,8 +107,8 @@ func (data *data) LifecycleHook(
 	serializedObjectOrig := make([]byte, len(serializedObject))
 	copy(serializedObjectOrig, serializedObject)
 	for _, plg := range invokablePlugin {
-		req := &lifecycle.LifecycleRequest{
-			OperationType: &lifecycle.OperationType{
+		req := &lifecycle.OperatorLifecycleRequest{
+			OperationType: &lifecycle.OperatorOperationType{
 				Type: typedOperationType,
 			},
 			ClusterDefinition: serializedCluster,

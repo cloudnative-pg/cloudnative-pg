@@ -217,7 +217,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Calls pre-reconcile hooks
-	preReconcileResult, err := r.preReconcilePluginHooks(ctx, cluster)
+	preReconcileResult, err := preReconcilePluginHooks(ctx, cluster, cluster)
 	if err != nil || !preReconcileResult.IsZero() {
 		return preReconcileResult, err
 	}
@@ -357,7 +357,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Calls post-reconcile hooks
-	return r.postReconcilePluginHooks(ctx, cluster)
+	return postReconcilePluginHooks(ctx, cluster, cluster)
 }
 
 func (r *ClusterReconciler) handleSwitchover(

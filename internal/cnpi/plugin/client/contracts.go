@@ -49,7 +49,6 @@ type Client interface {
 	Connection
 	ClusterCapabilities
 	ClusterReconcilerHooks
-	PodCapabilities
 	LifecycleCapabilities
 	WalCapabilities
 	BackupCapabilities
@@ -100,25 +99,15 @@ type ClusterReconcilerHooks interface {
 	PreReconcile(
 		ctx context.Context,
 		cluster client.Object,
+		object client.Object,
 	) (ctrl.Result, error)
 
 	// PostReconcile is executed at the end of the reconciliation loop
 	PostReconcile(
 		ctx context.Context,
 		cluster client.Object,
-	) (ctrl.Result, error)
-}
-
-// PodCapabilities describes a set of behaviour needed to implement the Pod capabilities
-type PodCapabilities interface {
-	// MutatePod calls the loaded plugins to help to enhance
-	// a PostgreSQL instance Pod definition
-	MutatePod(
-		ctx context.Context,
-		cluster client.Object,
 		object client.Object,
-		mutatedObject client.Object,
-	) error
+	) (ctrl.Result, error)
 }
 
 // LifecycleCapabilities describes a set of behaviour needed to implement the Lifecycle capabilities
