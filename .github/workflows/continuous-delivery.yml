@@ -1973,6 +1973,7 @@ jobs:
   summarize-e2e-tests:
     name: E2E test suite
     needs:
+      - evaluate_options
       - e2e-local
       - e2e-eks
       - e2e-aks
@@ -2035,7 +2036,10 @@ jobs:
         if: |
           steps.generate-summary.outputs.alerts &&
           github.repository_owner == env.REPOSITORY_OWNER &&
-          github.ref == 'refs/heads/main'
+          (
+            github.event_name == 'schedule' ||
+            startsWith(needs.evaluate_options.outputs.git_ref, 'refs/heads/release-')
+          )
         env:
           SLACK_COLOR: "danger"
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
