@@ -688,12 +688,11 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	// We start upgrading the instance managers we have
 	for i := len(podList.Items) - 1; i >= 0; i-- {
 		postgresqlStatus := podList.Items[i]
-		instanceManagerArch := postgresqlStatus.InstanceArch
 		instanceManagerHash := postgresqlStatus.ExecutableHash
 		instanceManagerIsUpgrading := postgresqlStatus.IsInstanceManagerUpgrading
 
 		// Gather the hash of the operator's manager using the current pod architecture
-		targetManager, err := utils.GetAvailableArchitecture(instanceManagerArch)
+		targetManager, err := utils.GetAvailableArchitecture(postgresqlStatus.InstanceArch)
 		if err != nil {
 			return err
 		}
@@ -712,7 +711,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				}
 			}
 
-			err = upgradeInstanceManagerOnPod(ctx, *postgresqlStatus.Pod, targetManager)
+			err = upgradeInstanceManagerOnPod(ctx, postgresqlStatus.Pod, targetManager)
 			if err != nil {
 				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
 					postgresqlStatus.Pod.Name,
@@ -740,7 +739,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 // upgradeInstanceManagerOnPod upgrades an instance manager of a Pod via an HTTP PUT request.
 func upgradeInstanceManagerOnPod(
 	ctx context.Context,
-	pod corev1.Pod,
+	pod *corev1.Pod,
 	targetManager *utils.AvailableArchitecture,
 ) error {
 	binaryFileStream, err := targetManager.FileStream()
