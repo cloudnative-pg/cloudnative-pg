@@ -127,9 +127,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Plugin pre-hooks
-	preReconcileResult, err := preReconcilePluginHooks(ctx, &cluster, &backup)
-	if err != nil || !preReconcileResult.IsZero() {
-		return preReconcileResult, err
+	if hookResult := preReconcilePluginHooks(ctx, &cluster, &backup); hookResult.StopReconciliation {
+		return hookResult.Result, hookResult.Err
 	}
 
 	// This check is still needed for when the backup resource creation is forced through the webhook
@@ -237,7 +236,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// plugin post hooks
 	contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
 
-	return postReconcilePluginHooks(ctx, &cluster, &backup)
+	hookResult := postReconcilePluginHooks(ctx, &cluster, &backup)
+	return hookResult.Result, hookResult.Err
 }
 
 func (r *BackupReconciler) isValidBackupRunning(

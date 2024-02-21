@@ -19,10 +19,10 @@ package controllers
 import (
 	"context"
 
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
@@ -31,14 +31,17 @@ func preReconcilePluginHooks(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	object client.Object,
-) (ctrl.Result, error) {
+) cnpiClient.ReconcilerHookResult {
 	contextLogger := log.FromContext(ctx)
 
 	// Load the plugins
 	pluginClient, err := cluster.LoadPluginClient(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
-		return ctrl.Result{}, err
+		return cnpiClient.ReconcilerHookResult{
+			Err:                err,
+			StopReconciliation: true,
+		}
 	}
 	defer func() {
 		pluginClient.Close(ctx)
@@ -52,14 +55,17 @@ func postReconcilePluginHooks(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	object client.Object,
-) (ctrl.Result, error) {
+) cnpiClient.ReconcilerHookResult {
 	contextLogger := log.FromContext(ctx)
 
 	// Load the plugins
 	pluginClient, err := cluster.LoadPluginClient(ctx)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
-		return ctrl.Result{}, err
+		return cnpiClient.ReconcilerHookResult{
+			Err:                err,
+			StopReconciliation: true,
+		}
 	}
 	defer func() {
 		pluginClient.Close(ctx)
