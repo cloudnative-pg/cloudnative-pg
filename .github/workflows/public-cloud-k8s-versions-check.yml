@@ -47,7 +47,7 @@ jobs:
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'eks'
       -
         name: Azure Login
-        uses: azure/login@v1.5.1
+        uses: azure/login@v1.6.1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
