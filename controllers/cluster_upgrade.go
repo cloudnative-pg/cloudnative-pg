@@ -694,7 +694,17 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 		// Gather the hash of the operator's manager using the current pod architecture
 		targetManager, err := utils.GetAvailableArchitecture(postgresqlStatus.InstanceArch)
 		if err != nil {
-			return err
+			contextLogger.Error(err, "encountered an error while upgrading the instance manager")
+			if regErr := r.RegisterPhase(
+				ctx,
+				cluster,
+				apiv1.PhaseUnrecoverable,
+				"requested an invalid architecture, please schedule the instance on an available architecture",
+			); regErr != nil {
+				return regErr
+			}
+
+			return utils.ErrTerminateLoop
 		}
 		operatorHash := targetManager.GetHash()
 

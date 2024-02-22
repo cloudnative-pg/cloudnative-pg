@@ -146,6 +146,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errors.Is(err, ErrNextLoop) {
 		return result, nil
 	}
+	if errors.Is(err, utils.ErrTerminateLoop) {
+		return ctrl.Result{}, nil
+	}
 	return result, err
 }
 
