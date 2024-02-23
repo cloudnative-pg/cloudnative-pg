@@ -684,6 +684,16 @@ type AvailableArchitecture struct {
 	Hash string `json:"hash"`
 }
 
+// GetAvailableArchitecture returns an AvailableArchitecture given it's name. It returns nil if it's not found.
+func (status *ClusterStatus) GetAvailableArchitecture(archName string) *AvailableArchitecture {
+	for _, architecture := range status.AvailableArchitectures {
+		if architecture.GoArch == archName {
+			return &architecture
+		}
+	}
+	return nil
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.

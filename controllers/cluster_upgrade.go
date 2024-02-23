@@ -656,7 +656,7 @@ func (r *ClusterReconciler) upgradePod(
 	return nil
 }
 
-// upgradeInstanceManager upgrades the instance managers of the Pod running in this cluster
+// upgradeInstanceManager upgrades the instance managers of each Pod running in this cluster
 func (r *ClusterReconciler) upgradeInstanceManager(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -670,7 +670,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	// 1. an instance manager which doesn't support automatic update
 	// 2. an instance manager which isn't working
 	//
-	// In both ways, we are skipping this automatic update and we rely
+	// In both ways, we are skipping this automatic update and relying
 	// on the rollout strategy
 	for i := len(podList.Items) - 1; i >= 0; i-- {
 		postgresqlStatus := podList.Items[i]
