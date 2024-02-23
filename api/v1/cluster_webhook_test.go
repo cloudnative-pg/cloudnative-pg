@@ -2302,6 +2302,90 @@ var _ = Describe("Backup validation", func() {
 		err := cluster.validateBackupConfiguration()
 		Expect(err).To(HaveLen(2))
 	})
+
+	It("complain if minChunkSize is not correct", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{
+								InheritFromIAMRole: true,
+							},
+						},
+						Data: &DataBackupConfiguration{
+							MinChunkSize: "5MB",
+						},
+					},
+				},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(err).To(HaveLen(1))
+	})
+
+	It("not complain if minChunkSize is using integer", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{
+								InheritFromIAMRole: true,
+							},
+						},
+						Data: &DataBackupConfiguration{
+							MinChunkSize: "5",
+						},
+					},
+				},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(err).To(BeEmpty())
+	})
+
+	It("not complain if minChunkSize is using 1000 based integer", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{
+								InheritFromIAMRole: true,
+							},
+						},
+						Data: &DataBackupConfiguration{
+							MinChunkSize: "5M",
+						},
+					},
+				},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(err).To(BeEmpty())
+	})
+
+	It("not complain if minChunkSize is using 1024 based integer", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{
+								InheritFromIAMRole: true,
+							},
+						},
+						Data: &DataBackupConfiguration{
+							MinChunkSize: "5Ki",
+						},
+					},
+				},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(err).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Default monitoring queries", func() {

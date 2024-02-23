@@ -63,6 +63,7 @@ spec:
           compression: gzip
         data:
           immediateCheckpoint: true
+          minChunkSize: 10M
         tags:
           retention: "30days"
         historyTags:

@@ -1979,6 +1979,25 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 		}
 	}
 
+	if r.Spec.Backup.BarmanObjectStore.Data == nil {
+		return allErrors
+	}
+
+	dataConfiguration := r.Spec.Backup.BarmanObjectStore.Data
+	if dataConfiguration.MinChunkSize != "" {
+		if _, err := resource.ParseQuantity(dataConfiguration.MinChunkSize); err != nil {
+			allErrors = append(allErrors, field.Invalid(
+				field.NewPath(
+					"spec",
+					"backupConfiguration",
+					"barmanObjectStore",
+					"data",
+					"minChunkSize"),
+				r.Spec.Backup.BarmanObjectStore.Data.MinChunkSize,
+				"Size value isn't valid, should be a valid quantity"))
+		}
+	}
+
 	return allErrors
 }
 

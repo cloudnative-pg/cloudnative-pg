@@ -831,6 +831,7 @@ metricNameKS
 microservice
 microservices
 microsoft
+minChunkSize
 minSyncReplicas
 minikube
 minio

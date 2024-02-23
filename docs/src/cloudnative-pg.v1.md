@@ -2195,6 +2195,17 @@ used, meaning PostgreSQL will complete the checkpoint as soon as
 possible. <code>false</code> by default.</p>
 </td>
 </tr>
+<tr><td><code>minChunkSize</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The minimum size of a single upload part when uploading to
+cloud storage, if not specified, default: 5M for aws-s3, 64K for
+azure-blob-storage, not applicable for google-cloud-storage.
+More information see min-chunk-size option in
+https://docs.pgbarman.org/release/3.10.0/barman-cloud-backup.1.html</p>
+</td>
+</tr>
 </tbody>
 </table>
 

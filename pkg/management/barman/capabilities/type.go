@@ -37,6 +37,7 @@ type Capabilities struct {
 	HasSnappy                  bool
 	HasErrorCodesForWALRestore bool
 	HasAzureManagedIdentity    bool
+	HasMinChunkSize            bool
 }
 
 // ShouldExecuteBackupWithName returns true if the new backup logic should be executed

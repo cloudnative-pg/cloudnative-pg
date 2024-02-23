@@ -46,3 +46,4 @@ spec:
         compression: gzip
       data:
         immediateCheckpoint: true
+        minChunkSize: 2M

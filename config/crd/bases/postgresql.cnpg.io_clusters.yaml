@@ -1059,6 +1059,13 @@ spec:
                             format: int32
                             minimum: 1
                             type: integer
+                          minChunkSize:
+                            description: 'The minimum size of a single upload part
+                              when uploading to cloud storage, if not specified, default:
+                              5MB for aws-s3, 64KB for azure-blob-storage, not applicable
+                              for google-cloud-storage. More information see min-chunk-size
+                              option in https://docs.pgbarman.org/release/3.10.0/barman-cloud-backup.1.html'
+                            type: string
                         type: object
                       destinationPath:
                         description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
@@ -2293,6 +2300,13 @@ spec:
                               format: int32
                               minimum: 1
                               type: integer
+                            minChunkSize:
+                              description: 'The minimum size of a single upload part
+                                when uploading to cloud storage, if not specified,
+                                default: 5MB for aws-s3, 64KB for azure-blob-storage,
+                                not applicable for google-cloud-storage. More information
+                                see min-chunk-size option in https://docs.pgbarman.org/release/3.10.0/barman-cloud-backup.1.html'
+                              type: string
                           type: object
                         destinationPath:
                           description: The path where to store the backup (i.e. s3://bucket/path/to/folder)

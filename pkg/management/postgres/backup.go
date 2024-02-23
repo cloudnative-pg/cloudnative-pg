@@ -134,6 +134,19 @@ func getDataConfiguration(
 			strconv.Itoa(int(*configuration.Data.Jobs)))
 	}
 
+	// barman-cloud-backup requires the min-chunk-size to be in format of number or number with unit (B, KB, MB, GB, TB)
+	if configuration.Data.MinChunkSize != "" {
+		if !capabilities.HasMinChunkSize {
+			return nil, fmt.Errorf("minChunkSize configuration is not supported in Barman %v",
+				capabilities.Version)
+		}
+
+		options = append(
+			options,
+			"--min-chunk-size",
+			fmt.Sprintf("%vB", configuration.Data.MinChunkSize))
+	}
+
 	return options, nil
 }
 

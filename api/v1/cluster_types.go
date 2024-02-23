@@ -2091,6 +2091,14 @@ type DataBackupConfiguration struct {
 	// possible. `false` by default.
 	// +optional
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
+
+	//  The minimum size of a single upload part when uploading to
+	//  cloud storage, if not specified, default: 5MB for aws-s3, 64KB for
+	//  azure-blob-storage, not applicable for google-cloud-storage.
+	//  More information see min-chunk-size option in
+	//  https://docs.pgbarman.org/release/3.10.0/barman-cloud-backup.1.html
+	//  +optional
+	MinChunkSize string `json:"minChunkSize,omitempty"`
 }
 
 // S3Credentials is the type for the credentials to be used to upload
