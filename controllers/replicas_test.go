@@ -21,8 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +34,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 			Name:      "car-1",
 			Namespace: "default",
 			Annotations: map[string]string{
-				utils.ClusterSerialAnnotationName: "1",
+				resources.ClusterSerialAnnotationName: "1",
 			},
 		},
 		Status: corev1.PodStatus{
@@ -52,7 +52,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 			Name:      "car-2",
 			Namespace: "default",
 			Annotations: map[string]string{
-				utils.ClusterSerialAnnotationName: "2",
+				resources.ClusterSerialAnnotationName: "2",
 			},
 		},
 		Status: corev1.PodStatus{
@@ -70,7 +70,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 			Name:      "foo",
 			Namespace: "default",
 			Annotations: map[string]string{
-				utils.ClusterSerialAnnotationName: "3",
+				resources.ClusterSerialAnnotationName: "3",
 			},
 		},
 		Status: corev1.PodStatus{
@@ -88,7 +88,7 @@ var _ = Describe("Sacrificial Pod detection", func() {
 			Name:      "bar",
 			Namespace: "default",
 			Annotations: map[string]string{
-				utils.ClusterSerialAnnotationName: "4",
+				resources.ClusterSerialAnnotationName: "4",
 			},
 		},
 		Status: corev1.PodStatus{

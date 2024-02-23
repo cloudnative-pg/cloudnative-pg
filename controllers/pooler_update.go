@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
@@ -65,17 +66,17 @@ func (r *PoolerReconciler) updateOwnedObjects(
 func (r *PoolerReconciler) updateDeployment(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
-	resources *poolerManagedResources,
+	pmr *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
 
-	generatedDeployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
+	generatedDeployment, err := pgbouncer.Deployment(pooler, pmr.Cluster)
 	if err != nil {
 		return err
 	}
 
 	switch {
-	case resources.Deployment == nil:
+	case pmr.Deployment == nil:
 		// Create a new deployment
 		if err := ctrl.SetControllerReference(pooler, generatedDeployment, r.Scheme); err != nil {
 			return err
@@ -86,30 +87,30 @@ func (r *PoolerReconciler) updateDeployment(
 		if err != nil && !apierrs.IsAlreadyExists(err) {
 			return err
 		}
-		resources.Deployment = generatedDeployment
+		pmr.Deployment = generatedDeployment
 		return nil
 
-	case resources.Deployment != nil:
-		currentVersion := resources.Deployment.Annotations[utils.PoolerSpecHashAnnotationName]
-		updatedVersion := generatedDeployment.Annotations[utils.PoolerSpecHashAnnotationName]
+	case pmr.Deployment != nil:
+		currentVersion := pmr.Deployment.Annotations[resources.PoolerSpecHashAnnotationName]
+		updatedVersion := generatedDeployment.Annotations[resources.PoolerSpecHashAnnotationName]
 		if currentVersion == updatedVersion {
 			// Everything fine, the two deployments are using the
 			// same specifications
 			return nil
 		}
 
-		deployment := resources.Deployment.DeepCopy()
+		deployment := pmr.Deployment.DeepCopy()
 		deployment.Spec = generatedDeployment.Spec
 
 		utils.MergeObjectsMetadata(deployment, generatedDeployment)
 
 		contextLog.Info("Updating deployment")
-		err = r.Patch(ctx, deployment, client.MergeFrom(resources.Deployment))
+		err = r.Patch(ctx, deployment, client.MergeFrom(pmr.Deployment))
 		if err != nil {
 			return err
 		}
 
-		resources.Deployment = deployment
+		pmr.Deployment = deployment
 	}
 
 	return nil

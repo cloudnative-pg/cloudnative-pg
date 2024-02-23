@@ -23,8 +23,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -74,7 +74,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 		snapshot := volumesnapshot.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.PvcRoleLabelName: "test",
+					resources.PvcRoleLabelName: "test",
 				},
 			},
 		}
@@ -106,10 +106,10 @@ var _ = Describe("Volume Snapshot validation", func() {
 						Name:      "pgdata",
 						Namespace: "default",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: "backup-one",
+							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 						},
 					},
 				},
@@ -118,10 +118,10 @@ var _ = Describe("Volume Snapshot validation", func() {
 						Name:      "pgwal",
 						Namespace: "default",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: "backup-two",
+							resources.BackupNameLabelName: "backup-two",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgWal),
 						},
 					},
 				},
@@ -160,10 +160,10 @@ var _ = Describe("Volume Snapshot validation", func() {
 						Name:      "pgdata",
 						Namespace: "default",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: "backup-one",
+							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 						},
 					},
 				},
@@ -172,10 +172,10 @@ var _ = Describe("Volume Snapshot validation", func() {
 						Name:      "pgwal",
 						Namespace: "default",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: "backup-one",
+							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgWal),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgWal),
 						},
 					},
 				},
@@ -207,10 +207,10 @@ var _ = Describe("Volume Snapshot validation", func() {
 						Name:      "pgdata",
 						Namespace: "default",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: "backup-one",
+							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 						},
 					},
 				},
@@ -239,10 +239,10 @@ var _ = Describe("Volume Snapshot validation", func() {
 						Name:      "pgdata",
 						Namespace: "default",
 						Labels: map[string]string{
-							utils.BackupNameLabelName: "backup-one",
+							resources.BackupNameLabelName: "backup-one",
 						},
 						Annotations: map[string]string{
-							utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+							resources.PvcRoleLabelName: string(resources.PVCRolePgData),
 						},
 					},
 				},

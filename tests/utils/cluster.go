@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
@@ -264,8 +265,8 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
 		client.MatchingLabels{
-			utils.ClusterLabelName: clusterName,
-			utils.PodRoleLabelName: "instance", // this ensures we are getting instance pods only
+			resources.ClusterLabelName: clusterName,
+			resources.PodRoleLabelName: "instance", // this ensures we are getting instance pods only
 		},
 	)
 	return podList, err
@@ -280,7 +281,7 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 	// Deprecated: Use utils.ClusterInstanceRoleLabelName instead of "role"
 	// TODO: for backward compatibility, we are fetching the primary using the old "role" label.
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "primary"},
+		client.MatchingLabels{resources.ClusterLabelName: clusterName, "role": "primary"},
 	)
 	if err != nil {
 		return &corev1.Pod{}, err
@@ -304,7 +305,7 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 func (env TestingEnvironment) GetClusterReplicas(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "replica"},
+		client.MatchingLabels{resources.ClusterLabelName: clusterName, "role": "replica"},
 	)
 	if err != nil {
 		return podList, err

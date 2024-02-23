@@ -26,9 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -194,12 +192,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 // shouldSkip skip this test if the current POSTGRES_IMG is already the latest major
 func shouldSkip(postgresImage string) bool {
 	// Get the current tag
-	currentImageReference := utils.NewReference(postgresImage)
-	currentImageVersion, err := postgres.GetPostgresVersionFromTag(currentImageReference.Tag)
+	currentImageReference := apiv1.NewReference(postgresImage)
+	currentImageVersion, err := apiv1.GetPostgresVersionFromTag(currentImageReference.Tag)
 	Expect(err).ToNot(HaveOccurred())
 	// Get the default tag
-	defaultImageReference := utils.NewReference(versions.DefaultImageName)
-	defaultImageVersion, err := postgres.GetPostgresVersionFromTag(defaultImageReference.Tag)
+	defaultImageReference := apiv1.NewReference(versions.DefaultImageName)
+	defaultImageVersion, err := apiv1.GetPostgresVersionFromTag(defaultImageReference.Tag)
 	Expect(err).ToNot(HaveOccurred())
 
 	return currentImageVersion >= defaultImageVersion

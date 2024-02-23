@@ -25,8 +25,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // errNoHibernatedPVCsFound indicates that no PVCs were found.
@@ -39,7 +39,7 @@ func getHibernatedPVCGroup(ctx context.Context, clusterName string) ([]corev1.Pe
 	if err := plugin.Client.List(
 		ctx,
 		&pvcList,
-		client.MatchingLabels{utils.ClusterLabelName: clusterName},
+		client.MatchingLabels{resources.ClusterLabelName: clusterName},
 		client.InNamespace(plugin.Namespace),
 	); err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func getHibernatedPVCGroup(ctx context.Context, clusterName string) ([]corev1.Pe
 func getClusterFromPVCAnnotation(pvc corev1.PersistentVolumeClaim) (apiv1.Cluster, error) {
 	var clusterFromPVC apiv1.Cluster
 	// get the cluster manifest
-	clusterJSON := pvc.Annotations[utils.HibernateClusterManifestAnnotationName]
+	clusterJSON := pvc.Annotations[resources.HibernateClusterManifestAnnotationName]
 	if err := json.Unmarshal([]byte(clusterJSON), &clusterFromPVC); err != nil {
 		return apiv1.Cluster{}, err
 	}

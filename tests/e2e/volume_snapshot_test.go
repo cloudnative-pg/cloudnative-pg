@@ -29,6 +29,7 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -50,8 +51,8 @@ var _ = Describe("Verify Volume Snapshot",
 			var snapshotList volumesnapshot.VolumeSnapshotList
 			err := env.Client.List(env.Ctx, &snapshotList, k8client.InNamespace(namespace),
 				k8client.MatchingLabels{
-					utils.ClusterLabelName:    clusterName,
-					utils.BackupNameLabelName: backupName,
+					resources.ClusterLabelName:    clusterName,
+					resources.BackupNameLabelName: backupName,
 				})
 			if err != nil {
 				return snapshotList, err
@@ -128,8 +129,8 @@ var _ = Describe("Verify Volume Snapshot",
 							volumeSnapshot, err := env.GetVolumeSnapshot(namespace, snapshot.Name)
 							g.Expect(err).ToNot(HaveOccurred())
 							g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
-							g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
-							g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+							g.Expect(volumeSnapshot.Labels[resources.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
+							g.Expect(volumeSnapshot.Labels[resources.ClusterLabelName]).To(BeEquivalentTo(clusterName))
 						}
 					}).Should(Succeed())
 				})
@@ -137,7 +138,7 @@ var _ = Describe("Verify Volume Snapshot",
 		})
 
 		Context("Can restore from a Volume Snapshot", Ordered, func() {
-			// test env constants
+			// test env resources
 			const (
 				namespacePrefix       = "volume-snapshot-recovery"
 				level                 = tests.High
@@ -146,17 +147,17 @@ var _ = Describe("Verify Volume Snapshot",
 				snapshotWalEnv        = "SNAPSHOT_PITR_PGWAL"
 				recoveryTargetTimeEnv = "SNAPSHOT_PITR"
 			)
-			// minio constants
+			// minio resources
 			const (
 				minioCaSecName  = "minio-server-ca-secret"
 				minioTLSSecName = "minio-server-tls-secret"
 			)
-			// file constants
+			// file resources
 			const (
 				clusterToSnapshot          = filesDir + "/cluster-pvc-snapshot.yaml.template"
 				clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-snapshot-restore.yaml.template"
 			)
-			// database constants
+			// database resources
 			const (
 				tableName = "test"
 			)
@@ -328,7 +329,7 @@ var _ = Describe("Verify Volume Snapshot",
 		})
 
 		Context("Declarative Volume Snapshot", Ordered, func() {
-			// test env constants
+			// test env resources
 			const (
 				namespacePrefix = "declarative-snapshot-backup"
 				level           = tests.High
@@ -336,7 +337,7 @@ var _ = Describe("Verify Volume Snapshot",
 				snapshotDataEnv = "SNAPSHOT_NAME_PGDATA"
 				snapshotWalEnv  = "SNAPSHOT_NAME_PGWAL"
 			)
-			// file constants
+			// file resources
 			const (
 				clusterToBackupFilePath  = filesDir + "/declarative-backup-cluster.yaml.template"
 				clusterToRestoreFilePath = filesDir + "/declarative-backup-cluster-restore.yaml.template"
@@ -344,7 +345,7 @@ var _ = Describe("Verify Volume Snapshot",
 				backupPrimaryFilePath    = filesDir + "/declarative-backup-on-primary.yaml.template"
 			)
 
-			// database constants
+			// database resources
 			const (
 				tableName = "test"
 			)
@@ -370,13 +371,13 @@ var _ = Describe("Verify Volume Snapshot",
 							*clusterToBackup.Spec.Backup.VolumeSnapshot)
 						Expect(utils.IsMapSubset(item.Annotations, snapshotConfig.Annotations)).To(BeTrue())
 						Expect(utils.IsMapSubset(item.Labels, snapshotConfig.Labels)).To(BeTrue())
-						Expect(item.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
-						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).ToNot(BeEmpty())
-						Expect(item.Annotations[utils.ClusterManifestAnnotationName]).To(ContainSubstring(clusterToBackupName))
-						Expect(item.Annotations[utils.PgControldataAnnotationName]).ToNot(BeEmpty())
-						Expect(item.Annotations[utils.PgControldataAnnotationName]).To(ContainSubstring("pg_control version number:"))
+						Expect(item.Labels[resources.BackupNameLabelName]).To(BeEquivalentTo(backup.Name))
+						Expect(item.Annotations[resources.ClusterManifestAnnotationName]).ToNot(BeEmpty())
+						Expect(item.Annotations[resources.ClusterManifestAnnotationName]).To(ContainSubstring(clusterToBackupName))
+						Expect(item.Annotations[resources.PgControldataAnnotationName]).ToNot(BeEmpty())
+						Expect(item.Annotations[resources.PgControldataAnnotationName]).To(ContainSubstring("pg_control version number:"))
 						// Ensure the ClusterManifestAnnotationName is a valid Cluster Object
-						err := json.Unmarshal([]byte(item.Annotations[utils.ClusterManifestAnnotationName]), clusterObj)
+						err := json.Unmarshal([]byte(item.Annotations[resources.ClusterManifestAnnotationName]), clusterObj)
 						Expect(err).ToNot(HaveOccurred())
 					}
 				})
@@ -588,7 +589,7 @@ var _ = Describe("Verify Volume Snapshot",
 		})
 
 		Context("Declarative Hot Backup", Ordered, func() {
-			// test env constants
+			// test env resources
 			const (
 				namespacePrefix = "volume-snapshot-recovery"
 				level           = tests.High
@@ -596,12 +597,12 @@ var _ = Describe("Verify Volume Snapshot",
 				snapshotDataEnv = "SNAPSHOT_PITR_PGDATA"
 				snapshotWalEnv  = "SNAPSHOT_PITR_PGWAL"
 			)
-			// minio constants
+			// minio resources
 			const (
 				minioCaSecName  = "minio-server-ca-secret"
 				minioTLSSecName = "minio-server-tls-secret"
 			)
-			// file constants
+			// file resources
 			const (
 				clusterToSnapshot = filesDir + "/cluster-pvc-hot-snapshot.yaml.template"
 			)

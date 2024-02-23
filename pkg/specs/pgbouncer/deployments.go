@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
@@ -49,9 +50,9 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 	}
 
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
-		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
-		WithLabel(utils.ClusterLabelName, cluster.Name).
-		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
+		WithLabel(resources.PgbouncerNameLabel, pooler.Name).
+		WithLabel(resources.ClusterLabelName, cluster.Name).
+		WithLabel(resources.PodRoleLabelName, string(utils.PodRolePooler)).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
@@ -123,19 +124,19 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
 			Labels: map[string]string{
-				utils.ClusterLabelName:   cluster.Name,
-				utils.PgbouncerNameLabel: pooler.Name,
-				utils.PodRoleLabelName:   string(utils.PodRolePooler),
+				resources.ClusterLabelName:   cluster.Name,
+				resources.PgbouncerNameLabel: pooler.Name,
+				resources.PodRoleLabelName:   string(utils.PodRolePooler),
 			},
 			Annotations: map[string]string{
-				utils.PoolerSpecHashAnnotationName: poolerHash,
+				resources.PoolerSpecHashAnnotationName: poolerHash,
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: pooler.Spec.Instances,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.PgbouncerNameLabel: pooler.Name,
+					resources.PgbouncerNameLabel: pooler.Name,
 				},
 			},
 			Template: corev1.PodTemplateSpec{

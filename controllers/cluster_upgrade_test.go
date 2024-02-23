@@ -24,10 +24,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -100,7 +100,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		clusterRestart := cluster
 		clusterRestart.Annotations = make(map[string]string)
-		clusterRestart.Annotations[utils.ClusterRestartAnnotationName] = "now"
+		clusterRestart.Annotations[resources.ClusterRestartAnnotationName] = "now"
 
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -195,7 +195,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		It("should trigger a rollout when the scheduler changes", func(ctx SpecContext) {
 			pod := specs.PodWithExistingStorage(cluster, 1)
 			cluster.Spec.SchedulerName = "newScheduler"
-			delete(pod.Annotations, utils.PodSpecAnnotationName)
+			delete(pod.Annotations, resources.PodSpecAnnotationName)
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod,
@@ -281,7 +281,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	When("the PodSpec annotation is not available", func() {
 		It("detects when a new custom environment variable is set", func(ctx SpecContext) {
 			pod := specs.PodWithExistingStorage(cluster, 1)
-			delete(pod.Annotations, utils.PodSpecAnnotationName)
+			delete(pod.Annotations, resources.PodSpecAnnotationName)
 
 			cluster := cluster.DeepCopy()
 			cluster.Spec.Env = []corev1.EnvVar{
@@ -309,7 +309,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				},
 			}
 			pod := specs.PodWithExistingStorage(cluster, 1)
-			delete(pod.Annotations, utils.PodSpecAnnotationName)
+			delete(pod.Annotations, resources.PodSpecAnnotationName)
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod,
@@ -333,7 +333,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				},
 			}
 			pod := specs.PodWithExistingStorage(cluster, 1)
-			delete(pod.Annotations, utils.PodSpecAnnotationName)
+			delete(pod.Annotations, resources.PodSpecAnnotationName)
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod,
@@ -580,7 +580,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			"the same TopologySpreadConstraints", func(ctx SpecContext) {
 			pod2 := pod.DeepCopy()
 			pod2.Spec.TopologySpreadConstraints[0].MaxSkew = 2
-			delete(pod2.Annotations, utils.PodSpecAnnotationName)
+			delete(pod2.Annotations, resources.PodSpecAnnotationName)
 			status := postgres.PostgresqlStatus{
 				Pod:            pod2,
 				IsPodReady:     true,
@@ -596,7 +596,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			pod2.Spec.TopologySpreadConstraints[0].LabelSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "different-app"},
 			}
-			delete(pod2.Annotations, utils.PodSpecAnnotationName)
+			delete(pod2.Annotations, resources.PodSpecAnnotationName)
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod2,
@@ -611,7 +611,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 		It("should require rollout when TopologySpreadConstraints is nil in one of the objects", func(ctx SpecContext) {
 			pod2 := pod.DeepCopy()
 			pod2.Spec.TopologySpreadConstraints = nil
-			delete(pod2.Annotations, utils.PodSpecAnnotationName)
+			delete(pod2.Annotations, resources.PodSpecAnnotationName)
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod2,
@@ -627,7 +627,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 			cluster.Spec.TopologySpreadConstraints = nil
 			pod2 := pod.DeepCopy()
 			pod2.Spec.TopologySpreadConstraints = nil
-			delete(pod2.Annotations, utils.PodSpecAnnotationName)
+			delete(pod2.Annotations, resources.PodSpecAnnotationName)
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod2,
@@ -665,14 +665,14 @@ var _ = Describe("hasValidPodSpec", func() {
 			It("should return true", func() {
 				podSpec := &corev1.PodSpec{}
 				podSpecBytes, _ := json.Marshal(podSpec)
-				status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName] = string(podSpecBytes)
+				status.Pod.ObjectMeta.Annotations[resources.PodSpecAnnotationName] = string(podSpecBytes)
 				Expect(hasValidPodSpec(status)).To(BeTrue())
 			})
 		})
 
 		Context("and the PodSpecAnnotation is invalid", func() {
 			It("should return false", func() {
-				status.Pod.ObjectMeta.Annotations[utils.PodSpecAnnotationName] = "invalid JSON"
+				status.Pod.ObjectMeta.Annotations[resources.PodSpecAnnotationName] = "invalid JSON"
 				Expect(hasValidPodSpec(status)).To(BeFalse())
 			})
 		})

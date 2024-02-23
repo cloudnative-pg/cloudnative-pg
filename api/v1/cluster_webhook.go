@@ -930,9 +930,9 @@ func (r *Cluster) validateImageName() field.ErrorList {
 		return result
 	}
 
-	tag := utils.GetImageTag(r.Spec.ImageName)
+	tag := GetImageTag(r.Spec.ImageName)
 	switch tag {
-	case "latest":
+	case tagLatest:
 		result = append(
 			result,
 			field.Invalid(
@@ -947,7 +947,7 @@ func (r *Cluster) validateImageName() field.ErrorList {
 				r.Spec.ImageName,
 				"Can't use just the image sha as we can't detect upgrades"))
 	default:
-		_, err := postgres.GetPostgresVersionFromTag(tag)
+		_, err := GetPostgresVersionFromTag(tag)
 		if err != nil {
 			result = append(
 				result,
@@ -1276,7 +1276,7 @@ func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 		oldVersion = configuration.Current.PostgresImageName
 	}
 
-	status, err := postgres.CanUpgrade(oldVersion, newVersion)
+	status, err := CanUpgrade(oldVersion, newVersion)
 	if err != nil {
 		result = append(
 			result,
@@ -1349,8 +1349,9 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 			"BackupID is missing"))
 	}
 
+	const latestTimeline = "latest"
 	switch recoveryTarget.TargetTLI {
-	case "", "latest":
+	case "", latestTimeline:
 		// Allowed non-numeric values
 	default:
 		// Everything else must be a valid positive integer

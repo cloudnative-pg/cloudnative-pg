@@ -23,9 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -46,7 +46,7 @@ var _ = Describe("Test the command", func() {
 			Namespace: namespace,
 			Name:      clusterName,
 			Labels: map[string]string{
-				utils.ClusterLabelName: clusterName,
+				resources.ClusterLabelName: clusterName,
 			},
 		},
 		Spec: apiv1.ClusterSpec{},

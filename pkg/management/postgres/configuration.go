@@ -434,7 +434,7 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 	}
 
 	// Compute the actual number of sync replicas
-	syncReplicas, electable := cluster.GetSyncReplicasData()
+	syncReplicas, electable := GetSyncReplicasData(cluster)
 	info.SyncReplicas = syncReplicas
 	info.SyncReplicasElectable = electable
 

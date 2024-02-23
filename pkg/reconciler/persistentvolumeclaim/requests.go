@@ -23,9 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1resources "github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // reconcileResourceRequests align the resource requests
@@ -59,7 +59,7 @@ func reconcilePVCQuantity(
 	if err != nil {
 		contextLogger.Error(err,
 			"encountered an error while trying to get pvc role from label",
-			"role", pvc.Labels[utils.PvcRoleLabelName],
+			"role", pvc.Labels[apiv1resources.PvcRoleLabelName],
 		)
 		return err
 	}
@@ -68,7 +68,7 @@ func reconcilePVCQuantity(
 	if err != nil {
 		contextLogger.Error(err,
 			"encountered an error while trying to obtain the storage configuration",
-			"role", pvc.Labels[utils.PvcRoleLabelName],
+			"role", pvc.Labels[apiv1resources.PvcRoleLabelName],
 			"pvcName", pvc.Name,
 		)
 		return err

@@ -39,7 +39,7 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Namespace: c.cluster.Namespace,
 		Name:      c.cluster.Name,
 	}
-	c.cluster.SetInheritedDataAndOwnership(&meta)
+	SetInheritedDataAndOwnership(c.cluster, &meta)
 
 	endpoint := monitoringv1.PodMetricsEndpoint{
 		Port: "metrics",

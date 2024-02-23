@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -147,6 +147,6 @@ var _ = Describe("PVC Creation", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Name).To(Equal("thecluster-1-tbs-fragglerock"))
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))
-		Expect(pvc.Labels[utils.TablespaceNameLabelName]).To(Equal(tbsName))
+		Expect(pvc.Labels[resources.TablespaceNameLabelName]).To(Equal(tbsName))
 	})
 })

@@ -23,8 +23,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // CreateSecret create a secret with the PostgreSQL and the owner passwords
@@ -43,7 +43,7 @@ func CreateSecret(
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				utils.WatchedLabelName: "true",
+				resources.WatchedLabelName: "true",
 			},
 		},
 		Type: corev1.SecretTypeBasicAuth,

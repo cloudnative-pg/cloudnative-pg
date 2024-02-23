@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1resources "github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // CreateConfiguration specifies how a PVC should be created
@@ -50,8 +50,8 @@ func Build(
 		BeginMetadata().
 		WithNamespacedName(calculator.GetName(instanceName), cluster.Namespace).
 		WithAnnotations(map[string]string{
-			utils.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
-			utils.PVCStatusAnnotationName:     configuration.Status,
+			apiv1resources.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
+			apiv1resources.PVCStatusAnnotationName:     configuration.Status,
 		}).
 		WithLabels(calculator.GetLabels(instanceName)).
 		WithClusterInheritance(cluster).

@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -65,8 +65,8 @@ var _ = Describe("PodMonitor test", func() {
 	It("should create a valid monitoringv1.PodMonitor object", func() {
 		mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
 		monitor := mgr.BuildPodMonitor()
-		Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(clusterName))
-		Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(clusterName))
+		Expect(monitor.Labels[resources.ClusterLabelName]).To(Equal(clusterName))
+		Expect(monitor.Spec.Selector.MatchLabels[resources.ClusterLabelName]).To(Equal(clusterName))
 		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(expectedEndpoint))
 	})
 

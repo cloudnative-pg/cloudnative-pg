@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package cache contains the constants and functions for reading/writing to the process local cache
+// Package cache contains the resources and functions for reading/writing to the process local cache
 // some specific supported objects
 package cache
 

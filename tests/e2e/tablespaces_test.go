@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -433,8 +434,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						volumeSnapshot, err := env.GetVolumeSnapshot(namespace, snapshot.Name)
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
-						g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
-						g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+						g.Expect(volumeSnapshot.Labels[resources.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
+						g.Expect(volumeSnapshot.Labels[resources.ClusterLabelName]).To(BeEquivalentTo(clusterName))
 					}
 				}).Should(Succeed())
 				Expect(len(backupObject.Status.BackupSnapshotStatus.Elements)).To(BeIdenticalTo(4))
@@ -502,8 +503,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						volumeSnapshot, err := env.GetVolumeSnapshot(namespace, snapshot.Name)
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
-						g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
-						g.Expect(volumeSnapshot.Labels[utils.ClusterLabelName]).To(BeEquivalentTo(clusterName))
+						g.Expect(volumeSnapshot.Labels[resources.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
+						g.Expect(volumeSnapshot.Labels[resources.ClusterLabelName]).To(BeEquivalentTo(clusterName))
 
 					}
 				}).Should(Succeed())
@@ -967,12 +968,12 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 			g.Expect(err).ShouldNot(HaveOccurred())
 			var tablespacePvcNames []string
 			for _, pvc := range pvcList.Items {
-				roleLabel := pvc.Labels[utils.PvcRoleLabelName]
-				if roleLabel != string(utils.PVCRolePgTablespace) {
+				roleLabel := pvc.Labels[resources.PvcRoleLabelName]
+				if roleLabel != string(resources.PVCRolePgTablespace) {
 					continue
 				}
 				tablespacePvcNames = append(tablespacePvcNames, pvc.Name)
-				tbsName := pvc.Labels[utils.TablespaceNameLabelName]
+				tbsName := pvc.Labels[resources.TablespaceNameLabelName]
 				g.Expect(tbsName).ToNot(BeEmpty())
 				labelTbsInCluster := cluster.GetTablespaceConfiguration(tbsName)
 				g.Expect(labelTbsInCluster).ToNot(BeNil())
@@ -1179,8 +1180,8 @@ func eventuallyHasExpectedNumberOfPVCs(pvcCount int, namespace string) {
 		g.Expect(err).ShouldNot(HaveOccurred())
 		tbsPvc := 0
 		for _, pvc := range pvcList.Items {
-			roleLabel := pvc.Labels[utils.PvcRoleLabelName]
-			if roleLabel != string(utils.PVCRolePgTablespace) {
+			roleLabel := pvc.Labels[resources.PvcRoleLabelName]
+			if roleLabel != string(resources.PVCRolePgTablespace) {
 				continue
 			}
 			tbsPvc++
@@ -1240,8 +1241,8 @@ func getSnapshots(
 	var snapshotList volumesnapshot.VolumeSnapshotList
 	err := env.Client.List(env.Ctx, &snapshotList, client.InNamespace(namespace),
 		client.MatchingLabels{
-			utils.ClusterLabelName:    clusterName,
-			utils.BackupNameLabelName: backupName,
+			resources.ClusterLabelName:    clusterName,
+			resources.BackupNameLabelName: backupName,
 		})
 	if err != nil {
 		return snapshotList, err

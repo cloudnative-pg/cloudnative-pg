@@ -19,23 +19,22 @@ package utils
 import (
 	"fmt"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // BumpPostgresImageMajorVersion returns a postgresImage incrementing the major version of the argument (if available)
 func BumpPostgresImageMajorVersion(postgresImage string) (string, error) {
-	imageReference := utils.NewReference(postgresImage)
+	imageReference := apiv1.NewReference(postgresImage)
 
-	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+	postgresImageVersion, err := apiv1.GetPostgresVersionFromTag(imageReference.Tag)
 	if err != nil {
 		return "", err
 	}
 
 	targetPostgresImageVersionInt := postgresImageVersion + 1_00_00
 
-	defaultImageVersion, err := postgres.GetPostgresVersionFromTag(utils.GetImageTag(versions.DefaultImageName))
+	defaultImageVersion, err := apiv1.GetPostgresVersionFromTag(apiv1.GetImageTag(versions.DefaultImageName))
 	if err != nil {
 		return "", err
 	}

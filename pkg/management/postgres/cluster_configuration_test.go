@@ -14,19 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package postgres
 
 import (
+	"fmt"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
+func createFakeCluster(name string) *apiv1.Cluster {
+	primaryPod := fmt.Sprintf("%s-1", name)
+	cluster := &apiv1.Cluster{}
+	cluster.Default()
+	cluster.Spec.Instances = 3
+	cluster.Spec.MaxSyncReplicas = 2
+	cluster.Spec.MinSyncReplicas = 1
+	cluster.Status = apiv1.ClusterStatus{
+		CurrentPrimary: primaryPod,
+		InstancesStatus: map[utils.PodStatus][]string{
+			utils.PodHealthy: {primaryPod, fmt.Sprintf("%s-2", name), fmt.Sprintf("%s-3", name)},
+			utils.PodFailed:  {},
+		},
+	}
+	return cluster
+}
+
 var _ = Describe("ensuring the correctness of synchronous replica data calculation", func() {
 	It("should return all the non primary pods as electable", func() {
 		cluster := createFakeCluster("example")
-		number, names := cluster.GetSyncReplicasData()
+		number, names := GetSyncReplicasData(cluster)
 		Expect(number).To(Equal(2))
 		Expect(names).To(Equal([]string{"example-2", "example-3"}))
 	})
@@ -39,13 +59,13 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		)
 
 		cluster := createFakeCluster("example")
-		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint = SyncReplicaElectionConstraints{
+		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint = apiv1.SyncReplicaElectionConstraints{
 			Enabled:                true,
 			NodeLabelsAntiAffinity: []string{"az"},
 		}
-		cluster.Status.Topology = Topology{
+		cluster.Status.Topology = apiv1.Topology{
 			SuccessfullyExtracted: true,
-			Instances: map[PodName]PodTopologyLabels{
+			Instances: map[apiv1.PodName]apiv1.PodTopologyLabels{
 				primaryPod: map[string]string{
 					"az": "one",
 				},
@@ -58,7 +78,7 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 			},
 		}
 
-		number, names := cluster.GetSyncReplicasData()
+		number, names := GetSyncReplicasData(cluster)
 
 		Expect(number).To(Equal(1))
 		Expect(names).To(Equal([]string{differentAZPod}))
@@ -66,14 +86,14 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 
 	It("should lower the synchronous replica number to enforce self-healing", func() {
 		cluster := createFakeCluster("example")
-		cluster.Status = ClusterStatus{
+		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "example-1",
 			InstancesStatus: map[utils.PodStatus][]string{
 				utils.PodHealthy: {"example-1"},
 				utils.PodFailed:  {"example-2", "example-3"},
 			},
 		}
-		number, names := cluster.GetSyncReplicasData()
+		number, names := GetSyncReplicasData(cluster)
 
 		Expect(number).To(BeZero())
 		Expect(names).To(BeEmpty())

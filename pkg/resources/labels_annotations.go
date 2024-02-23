@@ -19,7 +19,7 @@ package resources
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 )
 
 // mergeMap transfers the content of a giver map to a receiver
@@ -54,5 +54,5 @@ func inheritAnnotations(
 }
 
 func setHash(meta *metav1.ObjectMeta, hashValue string) {
-	meta.Annotations[utils.CNPGHashAnnotationName] = hashValue
+	meta.Annotations[resources.CNPGHashAnnotationName] = hashValue
 }

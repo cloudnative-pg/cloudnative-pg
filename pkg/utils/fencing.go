@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
@@ -52,7 +53,7 @@ const (
 
 // GetFencedInstances gets the set of fenced servers from the annotations
 func GetFencedInstances(annotations map[string]string) (*stringset.Data, error) {
-	fencedInstances, ok := annotations[FencedInstanceAnnotation]
+	fencedInstances, ok := annotations[resources.FencedInstanceAnnotation]
 	if !ok {
 		return stringset.New(), nil
 	}
@@ -69,7 +70,7 @@ func GetFencedInstances(annotations map[string]string) (*stringset.Data, error) 
 // SetFencedInstances sets the list of fenced servers inside the annotations
 func SetFencedInstances(object *metav1.ObjectMeta, data *stringset.Data) error {
 	if data.Len() == 0 {
-		delete(object.Annotations, FencedInstanceAnnotation)
+		delete(object.Annotations, resources.FencedInstanceAnnotation)
 		return nil
 	}
 
@@ -83,7 +84,7 @@ func SetFencedInstances(object *metav1.ObjectMeta, data *stringset.Data) error {
 	if object.Annotations == nil {
 		object.Annotations = make(map[string]string)
 	}
-	object.Annotations[FencedInstanceAnnotation] = string(annotationValue)
+	object.Annotations[resources.FencedInstanceAnnotation] = string(annotationValue)
 
 	return nil
 }

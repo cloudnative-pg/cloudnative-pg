@@ -25,8 +25,8 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // StorageSource the storage source to be used when creating a set
@@ -149,12 +149,12 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 			Kind:     apiv1.VolumeSnapshotKind,
 			Name:     element.Name,
 		}
-		switch utils.PVCRole(element.Type) {
-		case utils.PVCRolePgData:
+		switch resources.PVCRole(element.Type) {
+		case resources.PVCRolePgData:
 			result.DataSource = reference
-		case utils.PVCRolePgWal:
+		case resources.PVCRolePgWal:
 			result.WALSource = &reference
-		case utils.PVCRolePgTablespace:
+		case resources.PVCRolePgTablespace:
 			if result.TablespaceSource == nil {
 				result.TablespaceSource = map[string]corev1.TypedLocalObjectReference{}
 			}

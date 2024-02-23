@@ -49,8 +49,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
@@ -134,8 +134,8 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	if postgresImageFromUser, exist := os.LookupEnv("POSTGRES_IMG"); exist {
 		postgresImage = postgresImageFromUser
 	}
-	imageReference := utils.NewReference(postgresImage)
-	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+	imageReference := apiv1.NewReference(postgresImage)
+	postgresImageVersion, err := apiv1.GetPostgresVersionFromTag(imageReference.Tag)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +392,7 @@ func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName
 			// dump pooler pods info
 			podList := &corev1.PodList{}
 			_ = env.Client.List(env.Ctx, podList, client.InNamespace(namespace),
-				client.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
+				client.MatchingLabels{resources.PgbouncerNameLabel: poolerName})
 			for _, pod := range podList.Items {
 				out, _ = json.MarshalIndent(pod, "", "    ")
 				_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)

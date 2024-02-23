@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -813,7 +813,7 @@ var _ = Describe("Fencing annotation", func() {
 		cluster := Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.FencedInstanceAnnotation: "[\"one\"]",
+					resources.FencedInstanceAnnotation: "[\"one\"]",
 				},
 			},
 		}
@@ -831,7 +831,7 @@ var _ = Describe("Fencing annotation", func() {
 		cluster := Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.FencedInstanceAnnotation: "[\"*\"]",
+					resources.FencedInstanceAnnotation: "[\"*\"]",
 				},
 			},
 		}

@@ -25,7 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -109,7 +109,7 @@ var _ = Describe("Storage source", func() {
 						Elements: []apiv1.BackupSnapshotElementStatus{
 							{
 								Name: "completed-backup",
-								Type: string(utils.PVCRolePgData),
+								Type: string(resources.PVCRolePgData),
 							},
 						},
 					},
@@ -224,7 +224,7 @@ var _ = Describe("candidate backups", func() {
 				Elements: []apiv1.BackupSnapshotElementStatus{
 					{
 						Name: "completed-backup",
-						Type: string(utils.PVCRolePgData),
+						Type: string(resources.PVCRolePgData),
 					},
 				},
 			},
@@ -245,7 +245,7 @@ var _ = Describe("candidate backups", func() {
 				Elements: []apiv1.BackupSnapshotElementStatus{
 					{
 						Name: "bad-name",
-						Type: string(utils.PVCRolePgData),
+						Type: string(resources.PVCRolePgData),
 					},
 				},
 			},

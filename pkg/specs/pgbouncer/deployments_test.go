@@ -23,6 +23,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -80,24 +81,24 @@ var _ = Describe("Deployment", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 
 		// Check the computed hash
-		Expect(deployment.ObjectMeta.Annotations[utils.PoolerSpecHashAnnotationName]).Should(Equal(expectedHash))
+		Expect(deployment.ObjectMeta.Annotations[resources.PoolerSpecHashAnnotationName]).Should(Equal(expectedHash))
 
 		// Check the metadata
 		Expect(deployment.ObjectMeta.Name).To(Equal(pooler.Name))
 		Expect(deployment.ObjectMeta.Namespace).To(Equal(pooler.Namespace))
-		Expect(deployment.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
-		Expect(deployment.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
-		Expect(deployment.Labels[utils.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
+		Expect(deployment.Labels[resources.ClusterLabelName]).To(Equal(cluster.Name))
+		Expect(deployment.Labels[resources.PgbouncerNameLabel]).To(Equal(pooler.Name))
+		Expect(deployment.Labels[resources.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
 
 		// Check the DeploymentSpec
 		Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
-		Expect(deployment.Spec.Selector.MatchLabels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
+		Expect(deployment.Spec.Selector.MatchLabels[resources.PgbouncerNameLabel]).To(Equal(pooler.Name))
 
 		// Check the PodTemplateSpec
 		podTemplate := deployment.Spec.Template
 		Expect(podTemplate.ObjectMeta.Annotations).To(Equal(pooler.Spec.Template.ObjectMeta.Annotations))
-		Expect(podTemplate.ObjectMeta.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
-		Expect(podTemplate.ObjectMeta.Labels[utils.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
+		Expect(podTemplate.ObjectMeta.Labels[resources.PgbouncerNameLabel]).To(Equal(pooler.Name))
+		Expect(podTemplate.ObjectMeta.Labels[resources.PodRoleLabelName]).To(BeEquivalentTo(utils.PodRolePooler))
 
 		// Check the containers
 		Expect(podTemplate.Spec.Containers).ToNot(BeEmpty())

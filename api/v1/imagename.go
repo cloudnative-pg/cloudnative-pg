@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package v1
 
 import (
 	"fmt"
@@ -27,6 +27,8 @@ var (
 	tagRegex    = regexp.MustCompile(`:(?P<tag>[^/]+)$`)
 	hostRegex   = regexp.MustCompile(`^[^./:]+((\.[^./:]+)+(:[0-9]+)?|:[0-9]+)/`)
 )
+
+const tagLatest = "latest"
 
 // Reference .
 type Reference struct {
@@ -68,7 +70,7 @@ func NewReference(name string) *Reference {
 		reference.Tag = res[1] // tag capture group index
 		name = strings.TrimSuffix(name, res[0])
 	} else if reference.Digest == "" {
-		reference.Tag = "latest"
+		reference.Tag = tagLatest
 	}
 
 	// everything else is the name

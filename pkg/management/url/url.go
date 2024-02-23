@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package url holds the constants for webserver routing
+// Package url holds the resources for webserver routing
 package url
 
 import (

@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,7 +47,7 @@ var _ = Describe("Cluster logging tests", func() {
 			Namespace: clusterNamespace,
 			Name:      clusterName + "-1",
 			Labels: map[string]string{
-				utils.ClusterLabelName: clusterName,
+				resources.ClusterLabelName: clusterName,
 			},
 		},
 	}

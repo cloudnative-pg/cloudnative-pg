@@ -37,7 +37,7 @@ affected.
 */
 
 var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOperator), Ordered, func() {
-	// Define some constants to be used in the test
+	// Define some resources to be used in the test
 	const (
 		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		operatorNamespace = "cnpg-system"

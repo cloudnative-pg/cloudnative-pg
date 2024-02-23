@@ -29,7 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 )
 
 // DefaultFollowWaiting is the default time the cluster streaming should
@@ -169,7 +169,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 		)
 		if isFirstScan || csr.Options.Follow {
 			podList, err = client.CoreV1().Pods(csr.getClusterNamespace()).List(ctx, metav1.ListOptions{
-				LabelSelector: utils.ClusterLabelName + "=" + csr.getClusterName(),
+				LabelSelector: resources.ClusterLabelName + "=" + csr.getClusterName(),
 			})
 			if err != nil {
 				return err

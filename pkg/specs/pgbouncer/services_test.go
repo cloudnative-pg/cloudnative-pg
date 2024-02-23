@@ -22,8 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -55,8 +55,8 @@ var _ = Describe("Pooler Service", func() {
 			service := Service(pooler, cluster)
 			Expect(service.Name).To(Equal(pooler.Name))
 			Expect(service.Namespace).To(Equal(pooler.Namespace))
-			Expect(service.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
-			Expect(service.Labels[utils.PgbouncerNameLabel]).To(Equal(pooler.Name))
+			Expect(service.Labels[resources.ClusterLabelName]).To(Equal(cluster.Name))
+			Expect(service.Labels[resources.PgbouncerNameLabel]).To(Equal(pooler.Name))
 			Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
 			Expect(service.Spec.Ports).To(ConsistOf(corev1.ServicePort{
 				Name:       "pgbouncer",
@@ -65,7 +65,7 @@ var _ = Describe("Pooler Service", func() {
 				Port:       pgBouncerConfig.PgBouncerPort,
 			}))
 			Expect(service.Spec.Selector).To(Equal(map[string]string{
-				utils.PgbouncerNameLabel: pooler.Name,
+				resources.PgbouncerNameLabel: pooler.Name,
 			}))
 		})
 	})

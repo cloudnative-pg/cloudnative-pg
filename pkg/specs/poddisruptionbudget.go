@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 )
 
 // BuildReplicasPodDisruptionBudget creates a pod disruption budget telling
@@ -44,15 +44,15 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.ClusterLabelName:     cluster.Name,
-					utils.ClusterRoleLabelName: ClusterRoleLabelReplica,
+					resources.ClusterLabelName:     cluster.Name,
+					resources.ClusterRoleLabelName: ClusterRoleLabelReplica,
 				},
 			},
 			MinAvailable: &allReplicasButOne,
 		},
 	}
 
-	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+	SetInheritedDataAndOwnership(cluster, &pdb.ObjectMeta)
 
 	return pdb
 }
@@ -73,15 +73,15 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.ClusterLabelName:     cluster.Name,
-					utils.ClusterRoleLabelName: ClusterRoleLabelPrimary,
+					resources.ClusterLabelName:     cluster.Name,
+					resources.ClusterRoleLabelName: ClusterRoleLabelPrimary,
 				},
 			},
 			MinAvailable: &one,
 		},
 	}
 
-	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+	SetInheritedDataAndOwnership(cluster, &pdb.ObjectMeta)
 
 	return pdb
 }

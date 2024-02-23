@@ -14,16 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package resources
 
-import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-)
-
-func TestApi(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "v1 API tests")
-}
+// MetadataNamespace is the annotation and label namespace used by the operator
+const MetadataNamespace = "cnpg.io"

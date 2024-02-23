@@ -26,6 +26,7 @@ import (
 	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -234,9 +235,9 @@ func podUsesPVC(pod corev1.Pod, pvc corev1.PersistentVolumeClaim) bool {
 
 func hasUnknownStatus(ctx context.Context, pvc corev1.PersistentVolumeClaim) bool {
 	// Expected statuses are: Ready, Initializing or empty (that means initializing)
-	if pvc.Annotations[utils.PVCStatusAnnotationName] == StatusReady ||
-		pvc.Annotations[utils.PVCStatusAnnotationName] == StatusInitializing ||
-		pvc.Annotations[utils.PVCStatusAnnotationName] == "" {
+	if pvc.Annotations[resources.PVCStatusAnnotationName] == StatusReady ||
+		pvc.Annotations[resources.PVCStatusAnnotationName] == StatusInitializing ||
+		pvc.Annotations[resources.PVCStatusAnnotationName] == "" {
 		return false
 	}
 
@@ -244,7 +245,7 @@ func hasUnknownStatus(ctx context.Context, pvc corev1.PersistentVolumeClaim) boo
 	contextLogger.Warning("Unknown PVC status",
 		"namespace", pvc.Namespace,
 		"name", pvc.Name,
-		"status", pvc.Annotations[utils.PVCStatusAnnotationName])
+		"status", pvc.Annotations[resources.PVCStatusAnnotationName])
 
 	return true
 }

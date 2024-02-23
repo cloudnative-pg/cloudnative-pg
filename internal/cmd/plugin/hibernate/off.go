@@ -27,9 +27,9 @@ import (
 	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // offCommand represent the `hibernate off` command
@@ -117,14 +117,14 @@ func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.Persistent
 		// compatibility
 		if err := ensureAnnotationsExists(
 			pvc,
-			utils.HibernateClusterManifestAnnotationName,
-			utils.HibernatePgControlDataAnnotationName,
-			utils.ClusterSerialAnnotationName,
+			resources.HibernateClusterManifestAnnotationName,
+			resources.HibernatePgControlDataAnnotationName,
+			resources.ClusterSerialAnnotationName,
 		); err != nil {
 			return err
 		}
 
-		serial := pvc.Annotations[utils.ClusterSerialAnnotationName]
+		serial := pvc.Annotations[resources.ClusterSerialAnnotationName]
 		if !slices.Contains(nodeSerial, serial) {
 			nodeSerial = append(nodeSerial, serial)
 		}
@@ -152,7 +152,7 @@ func (off *offCommand) createClusterWithoutRuntimeDataStep(clusterFromPVC apiv1.
 	delete(cluster.Annotations, corev1.LastAppliedConfigAnnotation)
 
 	// remove the cluster fencing
-	delete(cluster.Annotations, utils.FencedInstanceAnnotation)
+	delete(cluster.Annotations, resources.FencedInstanceAnnotation)
 
 	// create cluster
 	return plugin.Client.Create(off.ctx, cluster)

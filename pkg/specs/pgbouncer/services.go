@@ -22,8 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Service create the specification for the service of
@@ -34,8 +34,8 @@ func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) *corev1.Service {
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
 			Labels: map[string]string{
-				utils.PgbouncerNameLabel: pooler.Name,
-				utils.ClusterLabelName:   cluster.Name,
+				resources.PgbouncerNameLabel: pooler.Name,
+				resources.ClusterLabelName:   cluster.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -49,7 +49,7 @@ func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) *corev1.Service {
 				},
 			},
 			Selector: map[string]string{
-				utils.PgbouncerNameLabel: pooler.Name,
+				resources.PgbouncerNameLabel: pooler.Name,
 			},
 		},
 	}

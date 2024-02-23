@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -49,8 +50,8 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 			PublishNotReadyAddresses: true,
 			Ports:                    buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName: cluster.Name,
-				utils.PodRoleLabelName: string(utils.PodRoleInstance),
+				resources.ClusterLabelName: cluster.Name,
+				resources.PodRoleLabelName: string(utils.PodRoleInstance),
 			},
 		},
 	}
@@ -67,8 +68,8 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 			Type:  corev1.ServiceTypeClusterIP,
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName: cluster.Name,
-				utils.PodRoleLabelName: string(utils.PodRoleInstance),
+				resources.ClusterLabelName: cluster.Name,
+				resources.PodRoleLabelName: string(utils.PodRoleInstance),
 			},
 		},
 	}
@@ -85,9 +86,9 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 			Type:  corev1.ServiceTypeClusterIP,
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName: cluster.Name,
+				resources.ClusterLabelName: cluster.Name,
 				// TODO: eventually migrate to the new label
-				utils.ClusterRoleLabelName: ClusterRoleLabelReplica,
+				resources.ClusterRoleLabelName: ClusterRoleLabelReplica,
 			},
 		},
 	}
@@ -104,8 +105,8 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 			Type:  corev1.ServiceTypeClusterIP,
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName:     cluster.Name,
-				utils.ClusterRoleLabelName: ClusterRoleLabelPrimary,
+				resources.ClusterLabelName:     cluster.Name,
+				resources.ClusterRoleLabelName: ClusterRoleLabelPrimary,
 			},
 		},
 	}

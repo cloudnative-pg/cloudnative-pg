@@ -467,7 +467,7 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 	// When the termination has been requested, this context will be cancelled.
 	<-ctx.Done()
 
-	cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
+	logTimestampsWithMessage(ctx, cluster, "Old primary shutdown complete")
 
 	return true, nil
 }
@@ -727,7 +727,7 @@ func (r *InstanceReconciler) reconcileMetrics(
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
 	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
 
-	syncReplicas, _ := cluster.GetSyncReplicasData()
+	syncReplicas, _ := postgresManagement.GetSyncReplicasData(cluster)
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
 
 	if cluster.IsReplica() {
@@ -1086,7 +1086,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
-		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
+		logTimestampsWithMessage(ctx, cluster, "Setting myself as primary")
 		if err := r.handlePromotion(ctx, cluster); err != nil {
 			return false, err
 		}
@@ -1106,7 +1106,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			return restarted, err
 		}
 
-		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
+		logTimestampsWithMessage(ctx, cluster, "Finished setting myself as primary")
 		return restarted, nil
 	}
 
@@ -1302,4 +1302,70 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Clus
 	}
 
 	return false
+}
+
+// logTimestampsWithMessage prints useful information about timestamps in stdout
+func logTimestampsWithMessage(ctx context.Context, cluster *apiv1.Cluster, logMessage string) {
+	contextLogger := log.FromContext(ctx)
+
+	currentTimestamp := pkgUtils.GetCurrentTimestamp()
+	keysAndValues := []interface{}{
+		"phase", cluster.Status.Phase,
+		"currentTimestamp", currentTimestamp,
+		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
+		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
+	}
+
+	var errs []string
+
+	// Elapsed time since the last request of promotion (TargetPrimaryTimestamp)
+	if diff, err := pkgUtils.DifferenceBetweenTimestamps(
+		currentTimestamp,
+		cluster.Status.TargetPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msPassedSinceTargetPrimaryTimestamp",
+			diff.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	// Elapsed time since the last promotion (CurrentPrimaryTimestamp)
+	if currentPrimaryDifference, err := pkgUtils.DifferenceBetweenTimestamps(
+		currentTimestamp,
+		cluster.Status.CurrentPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msPassedSinceCurrentPrimaryTimestamp",
+			currentPrimaryDifference.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	// Difference between the last promotion and the last request of promotion
+	// When positive, it is the amount of time required in the last promotion
+	// of a standby to a primary. If negative, it means we have a failover/switchover
+	// in progress, and the value represents the last measured uptime of the primary.
+	if currentPrimaryTargetDifference, err := pkgUtils.DifferenceBetweenTimestamps(
+		cluster.Status.CurrentPrimaryTimestamp,
+		cluster.Status.TargetPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msDifferenceBetweenCurrentAndTargetPrimary",
+			currentPrimaryTargetDifference.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	if len(errs) > 0 {
+		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
+	}
+
+	contextLogger.Info(logMessage, keysAndValues...)
 }

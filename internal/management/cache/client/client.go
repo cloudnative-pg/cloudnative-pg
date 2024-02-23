@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package client contains the constants and functions for reading supported objects from cache
+// Package client contains the resources and functions for reading supported objects from cache
 // or building them in case of cache miss.
 package client
 

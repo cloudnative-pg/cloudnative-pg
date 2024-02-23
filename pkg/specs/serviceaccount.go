@@ -24,8 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // UpdateServiceAccount sets the needed values in the ServiceAccount that will be used in every Pod
@@ -57,7 +57,7 @@ func UpdateServiceAccount(imagePullSecretsNames []string, serviceAccount *corev1
 	if serviceAccount.Annotations == nil {
 		serviceAccount.Annotations = map[string]string{}
 	}
-	serviceAccount.Annotations[utils.OperatorManagedSecretsAnnotationName] = annotationValue
+	serviceAccount.Annotations[resources.OperatorManagedSecretsAnnotationName] = annotationValue
 
 	return nil
 }
@@ -89,7 +89,7 @@ func IsServiceAccountAligned(
 		return false
 	}
 
-	value := sa.Annotations[utils.OperatorManagedSecretsAnnotationName]
+	value := sa.Annotations[resources.OperatorManagedSecretsAnnotationName]
 	if value == "" {
 		return false
 	}

@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package postgres
+package v1
 
 import (
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const firstMajorWithoutMinor = 10
@@ -116,8 +114,8 @@ func IsUpgradePossible(fromVersion, toVersion int) bool {
 
 // CanUpgrade check if we can upgrade from une image version to another
 func CanUpgrade(fromImage, toImage string) (bool, error) {
-	fromTag := utils.GetImageTag(fromImage)
-	toTag := utils.GetImageTag(toImage)
+	fromTag := GetImageTag(fromImage)
+	toTag := GetImageTag(toImage)
 
 	if fromTag == "latest" || toTag == "latest" {
 		// We don't really know which major version "latest" is,
