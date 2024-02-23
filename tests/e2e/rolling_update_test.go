@@ -352,8 +352,10 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				},
 				PrimaryUpdateStrategy: "unsupervised",
 				PrimaryUpdateMethod:   "switchover",
-				Bootstrap: &apiv1.BootstrapConfiguration{InitDB: &apiv1.BootstrapInitDB{Database: "app",
-					Owner: "app"}},
+				Bootstrap: &apiv1.BootstrapConfiguration{InitDB: &apiv1.BootstrapInitDB{
+					Database: "app",
+					Owner:    "app",
+				}},
 				StorageConfiguration: apiv1.StorageConfiguration{
 					Size:         "1Gi",
 					StorageClass: &storageClass,
@@ -554,7 +556,6 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		})
 
 		Context("ImageCatalog", func() {
-
 			Context("Three Instances", func() {
 				const (
 					namespacePrefix = "imagecatalog-cluster-rolling-e2e-three-instances"

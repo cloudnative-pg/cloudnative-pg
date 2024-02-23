@@ -1144,7 +1144,7 @@ var _ = Describe("validate image name change", func() {
 					},
 				},
 			}
-			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(0))
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
 		})
 		It("complains on major upgrades", func() {
 			clusterOld := Cluster{
@@ -1188,7 +1188,7 @@ var _ = Describe("validate image name change", func() {
 					},
 				},
 			}
-			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(0))
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
 		})
 	})
 
@@ -1207,7 +1207,7 @@ var _ = Describe("validate image name change", func() {
 					ImageName: "postgres:16.1",
 				},
 			}
-			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(0))
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
 		})
 		It("complains on major upgrades", func() {
 			clusterOld := Cluster{
@@ -1251,7 +1251,7 @@ var _ = Describe("validate image name change", func() {
 			clusterNew := Cluster{
 				Spec: ClusterSpec{},
 			}
-			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(0))
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
 		})
 	})
 })
