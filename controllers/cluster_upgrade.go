@@ -691,7 +691,12 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 		instanceManagerHash := postgresqlStatus.ExecutableHash
 		instanceManagerIsUpgrading := postgresqlStatus.IsInstanceManagerUpgrading
 
-		// Gather the hash of the operator's manager using the current pod architecture
+		// Gather the hash of the operator's manager using the current pod architecture.
+		// If one of the pods is requesting an architecture that's not present in the
+		// operator, that means we've upgraded to an image which doesn't support all
+		// the architectures currently being used by this cluster.
+		// In this case we force the reconciliation loop to stop, requiring manual
+		// intervention.
 		targetManager, err := utils.GetAvailableArchitecture(postgresqlStatus.InstanceArch)
 		if err != nil {
 			contextLogger.Error(err, "encountered an error while upgrading the instance manager")
