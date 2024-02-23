@@ -703,8 +703,8 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 			if regErr := r.RegisterPhase(
 				ctx,
 				cluster,
-				apiv1.PhaseUnrecoverable,
-				"requested an invalid architecture, please schedule the instance on an available architecture",
+				apiv1.PhaseArchitectureBinaryMissing,
+				fmt.Sprintf("encountered an error while upgrading the instance manager: %s", err.Error()),
 			); regErr != nil {
 				return regErr
 			}

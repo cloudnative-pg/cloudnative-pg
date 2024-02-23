@@ -504,6 +504,9 @@ const (
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
 
+	// PhaseArchitectureBinaryMissing is the error phase describing a missing architecture
+	PhaseArchitectureBinaryMissing = "Cluster cannot execute instance upgrade due to missing architecture binary"
+
 	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
 	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
 
