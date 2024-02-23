@@ -117,7 +117,7 @@ func (r *ClusterReconciler) ensureClientCASecret(ctx context.Context, cluster *a
 		return nil, err
 	}
 
-	// Validate also ca.key if needed
+	// Validate also tls.key if needed
 	if cluster.Spec.Certificates.ReplicationTLSSecret == "" {
 		_, err = certs.ParseCASecret(&secret)
 		if err != nil {
@@ -154,7 +154,7 @@ func (r *ClusterReconciler) ensureServerCASecret(ctx context.Context, cluster *a
 		return nil, err
 	}
 
-	// validate also ca.key if needed
+	// validate also tls.key if needed
 	if cluster.Spec.Certificates.ServerTLSSecret == "" {
 		_, err = certs.ParseCASecret(&secret)
 		if err != nil {

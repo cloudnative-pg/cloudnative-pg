@@ -40,7 +40,7 @@ containing the following keys:
 
 - `ca.crt` – CA certificate used to validate the server certificate, used as
   `sslrootcert` in clients' connection strings.
-- `ca.key` – The key used to sign the server SSL certificate automatically.
+- `tls.key` – The key used to sign the server SSL certificate automatically.
 
 #### Server TLS secret
 

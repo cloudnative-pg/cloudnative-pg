@@ -55,7 +55,7 @@ func CreateSecretCA(
 	caSecret := caPair.GenerateCASecret(namespace, caSecName)
 	// delete the key from the CA, as it is not needed in this case
 	if !includeCAPrivateKey {
-		delete(caSecret.Data, certs.CAPrivateKeyKey)
+		delete(caSecret.Data, certs.TLSPrivateKeyKey)
 	}
 	_, err = CreateObject(env, caSecret)
 	if err != nil {
