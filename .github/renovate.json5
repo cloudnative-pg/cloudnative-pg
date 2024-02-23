@@ -92,6 +92,18 @@
       "versioningTemplate": "loose",
       "depNameTemplate": "getwoke/woke",
     }, {
+      // Update the oeprator-sdk in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "OPERATOR_SDK_VERSION \\?= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "operator-framework/operator-sdk",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)"
+    },{
       // We want a PR to bump Default Container Images versions.
       "fileMatch": [
         "^pkg\\/versions\\/versions\\.go$",
