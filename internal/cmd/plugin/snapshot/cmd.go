@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/utils"
 )
 
 // NewCmd implements the `snapshot` subcommand
@@ -29,6 +31,9 @@ func NewCmd() *cobra.Command {
 		Use:   "snapshot <cluster-name>",
 		Short: "command removed",
 		Long:  "Replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utils.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(_ *cobra.Command, _ []string) error {
 			fmt.Println("This command was replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`")
 			fmt.Println("IMPORTANT: if you are using VolumeSnapshots on 1.20, you should upgrade to the latest minor release")

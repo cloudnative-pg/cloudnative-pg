@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/utils"
 )
 
 func clusterCmd() *cobra.Command {
@@ -31,12 +32,14 @@ func clusterCmd() *cobra.Command {
 	)
 
 	const filePlaceholder = "report_cluster_<name>_<timestamp>.zip"
-
 	cmd := &cobra.Command{
 		Use:   "cluster <clusterName>",
 		Short: "Report cluster resources, pods, events, logs (opt-in)",
 		Long:  "Collects combined information on the cluster in a Zip file",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utils.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			now := time.Now().UTC()

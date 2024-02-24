@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/utils"
 )
 
 // NewCmd creates the "psql" command
@@ -34,7 +35,10 @@ func NewCmd() *cobra.Command {
 		Use:   "psql [cluster] [-- psqlArgs...]",
 		Short: "Start a psql session targeting a CloudNativePG cluster",
 		Args:  validatePsqlArgs,
-		Long:  "This command will start an interactive psql session inside a PostgreSQL Pod created by CloudNativePG.",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utils.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+		Long: "This command will start an interactive psql session inside a PostgreSQL Pod created by CloudNativePG.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			psqlArgs := args[1:]
