@@ -141,7 +141,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: create ticket
-        uses: dacbd/create-issue-action@v1
+        uses: dacbd/create-issue-action@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: Backport failure for pull request ${{ env.PR }}
