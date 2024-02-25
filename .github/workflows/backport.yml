@@ -9,7 +9,7 @@ on:
       - main
 
 env:
-  GOLANG_VERSION: "1.21.x"
+  GOLANG_VERSION: "1.22.x"
 
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default

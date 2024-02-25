@@ -16,7 +16,7 @@ on:
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.21.x"
+  GOLANG_VERSION: "1.22.x"
   GOLANGCI_LINT_VERSION: "v1.56"
   KUBEBUILDER_VERSION: "2.3.1"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
