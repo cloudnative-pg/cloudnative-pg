@@ -24,10 +24,11 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-K8S_DEFAULT_VERSION=v1.28.0
+KIND_NODE_DEFAULT_VERSION=v1.27.0
+K3D_NODE_DEFAULT_VERSION=v1.27.1
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.11.0
-K8S_VERSION=${K8S_VERSION:-$K8S_DEFAULT_VERSION}
-KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
+K8S_VERSION=${K8S_VERSION-}
+KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
 ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
@@ -217,7 +218,7 @@ create_cluster_k3d() {
   local latest_k3s_tag
   latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
 
-  local volumes=()
+  local options=()
   if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
     config_file="${TEMP_DIR}/k3d-registries.yaml"
     cat >"${config_file}" <<-EOF
@@ -240,7 +241,7 @@ EOF
 EOF
     fi
 
-    volumes=(--volume "${config_file}:/etc/rancher/k3s/registries.yaml")
+    options+=(--registry-config "${config_file}")
   fi
 
   local agents=()
@@ -248,7 +249,7 @@ EOF
     agents=(-a "${NODES}")
   fi
 
-  k3d cluster create "${volumes[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
+  K3D_FIX_MOUNTS=1 k3d cluster create "${options[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
     --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
 
@@ -384,7 +385,7 @@ deploy_csi_host_path() {
 
   ## create storage class
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
-
+  kubectl annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapclass
 
   echo "${bright} CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready... ${reset}"
   ITER=0
@@ -700,6 +701,18 @@ main() {
     echo >&2
     usage
   fi
+
+  if [ -z "${K8S_VERSION}" ]; then
+    case "${ENGINE}" in
+    kind)
+      K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
+      ;;
+    k3d)
+      K8S_VERSION=${K3D_NODE_DEFAULT_VERSION}
+      ;;
+    esac
+  fi
+  KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 
   # Only here the K8S_VERSION veriable contains its final value
   # so we can set the default cluster name
