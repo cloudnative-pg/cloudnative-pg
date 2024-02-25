@@ -891,6 +891,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				testUtils.ExecuteBackup(namespace, sourceTakeFirstBackupFileMinio, false,
 					testTimeouts[testUtils.BackupIsReady], env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
+				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+
 				latestTar := minioPath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)

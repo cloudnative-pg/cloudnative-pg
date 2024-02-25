@@ -306,6 +306,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					apiv1.ConditionBackup,
 					&backupCondition.LastTransitionTime,
 				)
+				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 			})
 
@@ -478,7 +479,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					apiv1.BackupMethodVolumeSnapshot,
 				)
 				Expect(err).ToNot(HaveOccurred())
-
+				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 				Eventually(func(g Gomega) {
 					backupList, err := env.GetBackupList(namespace)
 					g.Expect(err).ToNot(HaveOccurred())
