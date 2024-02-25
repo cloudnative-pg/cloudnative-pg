@@ -119,6 +119,7 @@ var _ = SynchronizedAfterSuite(func() {
 // of output are not legal JSON
 func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, capLines int) {
 	scanner := bufio.NewScanner(buf)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	filename := fmt.Sprintf("out/%s_%s.log", logsType, specName)
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
