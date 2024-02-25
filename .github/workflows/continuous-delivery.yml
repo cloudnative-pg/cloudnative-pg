@@ -688,7 +688,7 @@ jobs:
       -
         # 'Retry' preparing the E2E test ENV
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -821,7 +821,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Create AKS shared resources
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         id: setup
         with:
           timeout_minutes: 10
@@ -898,7 +898,7 @@ jobs:
           check-latest: true
       -
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -907,7 +907,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -933,7 +933,7 @@ jobs:
           version: v${{ env.K8S_VERSION }}
       -
         name: Create AKS cluster
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -978,7 +978,7 @@ jobs:
         # use rook to get the small PV we use in the tests.
         # It can still take a while to deploy rook.
         name: Set up Rook
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 27
           max_attempts: 1
@@ -1247,7 +1247,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -1256,7 +1256,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -1271,7 +1271,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       -
         name: Install eksctl
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -1323,7 +1323,7 @@ jobs:
           kubectl get storageclass
       -
         name: Setup Velero
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         env:
           VELERO_VERSION: v1.9.2
           VELERO_AWS_PLUGIN_VERSION: v1.5.1
@@ -1374,7 +1374,7 @@ jobs:
               --wait
       -
         name: Setup log archiving via fluentd and insights
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -1630,7 +1630,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -1639,7 +1639,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 120
           max_attempts: 3
