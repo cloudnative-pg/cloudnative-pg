@@ -76,8 +76,8 @@ func reconcileMetadataComingFromInstance(
 	runningInstances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
+	//  keep nodeSerial in sync with pods
 	for _, pod := range runningInstances {
-		podRole, podHasRole := utils.GetInstanceRole(pod.ObjectMeta.Labels)
 		podSerial, podSerialErr := specs.GetNodeSerial(pod.ObjectMeta)
 		if podSerialErr != nil {
 			return podSerialErr
@@ -86,22 +86,12 @@ func reconcileMetadataComingFromInstance(
 		instanceReconciler := metadataReconciler{
 			name: "instance-inheritance",
 			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] != podRole {
-					return false
-				}
-				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName] != podRole {
-					return false
-				}
-
 				if serial, err := specs.GetNodeSerial(pvc.ObjectMeta); err != nil || serial != podSerial {
 					return false
 				}
-
 				return true
 			},
 			update: func(pvc *corev1.PersistentVolumeClaim) {
-				utils.SetInstanceRole(pvc.ObjectMeta, podRole)
-
 				if pvc.Annotations == nil {
 					pvc.Annotations = map[string]string{}
 				}
@@ -117,10 +107,37 @@ func reconcileMetadataComingFromInstance(
 		}
 	}
 
+	currentPrimary := cluster.Status.CurrentPrimary
+	if currentPrimary == "" {
+		return nil
+	}
+	for _, instanceName := range cluster.Status.InstanceNames {
+		instanceRole := specs.ClusterRoleLabelReplica
+		if instanceName == currentPrimary {
+			instanceRole = specs.ClusterRoleLabelPrimary
+		}
+
+		instanceReconciler := metadataReconciler{
+			name: "instance-role",
+			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
+				pvcInstanceRole, ok := utils.GetInstanceRole(pvc.GetLabels())
+				return ok && pvcInstanceRole == instanceRole
+			},
+			update: func(pvc *corev1.PersistentVolumeClaim) {
+				utils.SetInstanceRole(pvc.ObjectMeta, instanceRole)
+			},
+		}
+
+		// todo: this should not rely on expected cluster instance pvc but should fetch every possible pvc name
+		instancePVCs := filterByInstanceExpectedPVCs(cluster, instanceName, pvcs)
+		if err := instanceReconciler.reconcile(ctx, c, instancePVCs); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func reconcileMetadata(
+func ReconcileMetadata(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,

@@ -251,6 +251,16 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
+	if err := persistentvolumeclaim.ReconcileMetadata(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+		resources.pvcs.Items,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if instancesStatus.AllReadyInstancesStatusUnreachable() {
 		contextLogger.Warning(
 			"Failed to extract instance status from ready instances. Attempting to requeue...",
