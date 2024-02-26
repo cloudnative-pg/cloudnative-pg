@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
-	jsonpatch "github.com/evanphx/json-patch/v5"
 	"google.golang.org/grpc"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -101,10 +100,7 @@ func (f *fakeLifecycleClient) LifecycleHook(
 
 	switch in.OperationType.Type {
 	case lifecycle.OperatorOperationType_TYPE_CREATE:
-		rawInstance, err := json.Marshal(instance)
-		if err != nil {
-			return defRes, fmt.Errorf("(create) while serializing the instance: %w", err)
-		}
+		originalInstance := instance.DeepCopy()
 		if instance.Labels == nil {
 			instance.Labels = map[string]string{}
 		}
@@ -112,26 +108,14 @@ func (f *fakeLifecycleClient) LifecycleHook(
 			instance.Labels[key] = value
 		}
 
-		modifiedInstance, err := json.Marshal(instance)
-		if err != nil {
-			return defRes, fmt.Errorf("(create) while serializing the modifiedinstance: %w", err)
-		}
-
-		res, err := jsonpatch.CreateMergePatch(rawInstance, modifiedInstance)
+		res, err := createJSONPatchForLabels(originalInstance, &instance)
 		return &lifecycle.OperatorLifecycleResponse{JsonPatch: res}, err
 	case lifecycle.OperatorOperationType_TYPE_DELETE:
-		rawInstance, err := json.Marshal(instance)
-		if err != nil {
-			return defRes, fmt.Errorf("(delete) while serializing the instance: %w", err)
-		}
+		originalInstance := instance.DeepCopy()
 		for key := range f.labelInjector {
 			delete(instance.Labels, key)
 		}
-		modifiedInstance, err := json.Marshal(instance)
-		if err != nil {
-			return defRes, fmt.Errorf("(delete) while serializing the modifiedinstance: %w", err)
-		}
-		res, err := jsonpatch.CreateMergePatch(rawInstance, modifiedInstance)
+		res, err := createJSONPatchForLabels(originalInstance, &instance)
 		return &lifecycle.OperatorLifecycleResponse{JsonPatch: res}, err
 	default:
 		return defRes, nil
@@ -233,3 +217,25 @@ var _ = Describe("LifecycleHook", func() {
 		Expect(podModified.Labels).To(Equal(map[string]string{"other": "stuff"}))
 	})
 })
+
+func createJSONPatchForLabels(originalInstance, instance *corev1.Pod) ([]byte, error) {
+	type patch []struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}
+
+	op := "replace"
+	if len(originalInstance.Labels) == 0 {
+		op = "add"
+	}
+	p := patch{
+		{
+			Op:    op,
+			Path:  "/metadata/labels",
+			Value: instance.Labels,
+		},
+	}
+
+	return json.Marshal(p)
+}

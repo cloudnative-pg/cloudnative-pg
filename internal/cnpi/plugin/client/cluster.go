@@ -68,7 +68,13 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 			continue
 		}
 
-		mutatedObject, err := jsonpatch.MergePatch(serializedObject, result.JsonPatch)
+		patch, err := jsonpatch.DecodePatch(result.JsonPatch)
+		if err != nil {
+			contextLogger.Error(err, "Error while decoding JSON patch from plugin", "patch", result.JsonPatch)
+			return err
+		}
+
+		mutatedObject, err := patch.Apply(serializedObject)
 		if err != nil {
 			contextLogger.Error(err, "Error while applying JSON patch from plugin", "patch", result.JsonPatch)
 			return err
