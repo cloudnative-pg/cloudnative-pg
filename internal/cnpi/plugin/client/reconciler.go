@@ -30,6 +30,29 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
+// newContinueResult returns a result instructing the reconciliation loop
+// to continue its operation
+func newContinueResult() ReconcilerHookResult { return ReconcilerHookResult{} }
+
+// newTerminateResult returns a result instructing the reconciliation loop to stop
+// reconciliation
+func newTerminateResult() ReconcilerHookResult { return ReconcilerHookResult{StopReconciliation: true} }
+
+// newReconcilerRequeueResult creates a new result instructing
+// a reconciler to schedule a loop in the passed time frame
+func newReconcilerRequeueResult(after int64) ReconcilerHookResult {
+	return ReconcilerHookResult{
+		Err:                nil,
+		StopReconciliation: true,
+		Result:             ctrl.Result{Requeue: true, RequeueAfter: time.Second * time.Duration(after)},
+	}
+}
+
+// newReconcilerErrorResult creates a new result from an error
+func newReconcilerErrorResult(err error) ReconcilerHookResult {
+	return ReconcilerHookResult{Err: err, StopReconciliation: true}
+}
+
 func (data *data) PreReconcile(ctx context.Context, cluster client.Object, object client.Object) ReconcilerHookResult {
 	return reconcilerHook(
 		ctx,
@@ -79,7 +102,7 @@ func reconcilerHook(
 
 	serializedCluster, err := json.Marshal(cluster)
 	if err != nil {
-		return NewReconcilerErrorResult(
+		return newReconcilerErrorResult(
 			fmt.Errorf("while serializing %s %s/%s to JSON: %w",
 				cluster.GetObjectKind().GroupVersionKind().Kind,
 				cluster.GetNamespace(), cluster.GetName(),
@@ -90,7 +113,7 @@ func reconcilerHook(
 
 	serializedObject, err := json.Marshal(object)
 	if err != nil {
-		return NewReconcilerErrorResult(
+		return newReconcilerErrorResult(
 			fmt.Errorf(
 				"while serializing %s %s/%s to JSON: %w",
 				cluster.GetObjectKind().GroupVersionKind().Kind,
@@ -115,7 +138,7 @@ func reconcilerHook(
 		contextLogger.Info(
 			"Skipping reconciler hooks for unknown group",
 			"objectGvk", object.GetObjectKind())
-		return continueResult
+		return newContinueResult()
 	}
 
 	for idx := range plugins {
@@ -127,51 +150,20 @@ func reconcilerHook(
 
 		result, err := executeRequest(ctx, plugin.reconcilerHooksClient, request)
 		if err != nil {
-			return NewReconcilerErrorResult(err)
+			return newReconcilerErrorResult(err)
 		}
 
 		switch result.Behavior {
 		case reconciler.ReconcilerHooksResult_BEHAVIOR_TERMINATE:
-			return terminateResult
+			return newTerminateResult()
 
 		case reconciler.ReconcilerHooksResult_BEHAVIOR_REQUEUE:
-			return NewReconcilerRequeueResult(result.GetRequeueAfter())
+			return newReconcilerRequeueResult(result.GetRequeueAfter())
 
 		case reconciler.ReconcilerHooksResult_BEHAVIOR_CONTINUE:
-			return continueResult
+			return newContinueResult()
 		}
 	}
 
-	return continueResult
-}
-
-// NewReconcilerErrorResult creates a new result from an error
-func NewReconcilerErrorResult(err error) ReconcilerHookResult {
-	return ReconcilerHookResult{
-		Err:                err,
-		StopReconciliation: true,
-	}
-}
-
-// NewReconcilerRequeueResult creates a new result instructing
-// a reconciler to schedule a loop in the passed time frame
-func NewReconcilerRequeueResult(after int64) ReconcilerHookResult {
-	return ReconcilerHookResult{
-		Err:                nil,
-		StopReconciliation: true,
-		Result: ctrl.Result{
-			Requeue:      true,
-			RequeueAfter: time.Second * time.Duration(after),
-		},
-	}
-}
-
-// continueResult is a result instructing the reconciliation loop
-// to continue its operation
-var continueResult = ReconcilerHookResult{}
-
-// terminateResult is a result instructing the reconciliation loop to stop
-// reconciliation
-var terminateResult = ReconcilerHookResult{
-	StopReconciliation: true,
+	return newContinueResult()
 }
