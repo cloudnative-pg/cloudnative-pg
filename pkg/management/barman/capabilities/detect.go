@@ -31,14 +31,8 @@ var capabilities *Capabilities
 
 // Detect barman-cloud executables presence and store the Capabilities
 // of the barman-cloud version it finds
-func Detect() (*Capabilities, error) {
-	version, err := getBarmanCloudVersion(BarmanCloudWalArchive)
-	if err != nil {
-		return nil, err
-	}
-
+func Detect(version *semver.Version) (*Capabilities, error) {
 	newCapabilities := new(Capabilities)
-
 	if version == nil {
 		log.Info("Missing Barman Cloud installation in the operand image")
 		return newCapabilities, nil
@@ -119,7 +113,11 @@ func getBarmanCloudVersion(command string) (*semver.Version, error) {
 func CurrentCapabilities() (*Capabilities, error) {
 	if capabilities == nil {
 		var err error
-		capabilities, err = Detect()
+		version, err := getBarmanCloudVersion(BarmanCloudWalArchive)
+		if err != nil {
+			return nil, err
+		}
+		capabilities, err = Detect(version)
 		if err != nil {
 			log.Error(err, "Failed to detect Barman capabilities")
 			return nil, err
