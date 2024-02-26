@@ -143,6 +143,7 @@ func reconcileMetadataComingFromInstance(
 	return nil
 }
 
+// ReconcileMetadata a ensures that the pvc metadata is kept up to date
 func ReconcileMetadata(
 	ctx context.Context,
 	c client.Client,
