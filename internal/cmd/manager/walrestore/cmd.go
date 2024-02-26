@@ -243,7 +243,7 @@ func restoreWALViaPlugins(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pluginClient, err := cluster.LoadPluginClient(ctx)
+	pluginClient, err := cluster.LoadSelectedPluginsClient(ctx, cluster.GetWALPluginNames())
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins while archiving a WAL")
 		return err
