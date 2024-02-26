@@ -8,7 +8,7 @@ on:
       - v*
 
 env:
-  GOLANG_VERSION: "1.21.x"
+  GOLANG_VERSION: "1.22.x"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}"
 
 permissions:
