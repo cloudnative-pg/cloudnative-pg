@@ -91,6 +91,13 @@ func (c *multiNamespaceCache) GetInformerForKind(
 	return c.multiCache.GetInformerForKind(ctx, gvk, opts...)
 }
 
+func (c *multiNamespaceCache) RemoveInformer(
+	ctx context.Context,
+	obj client.Object,
+) error {
+	return c.multiCache.RemoveInformer(ctx, obj)
+}
+
 func (c *multiNamespaceCache) Start(ctx context.Context) error {
 	// start global cache
 	go func() {
