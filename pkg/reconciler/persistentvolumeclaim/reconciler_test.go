@@ -38,7 +38,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Reconcile Resources", func() {
+var _ = Describe("Reconcile Metadata", func() {
 	It("Reconcile existing resources shouldn't fail and "+
 		"it should make sure to add the new instanceRole label to existing PVC", func() {
 		clusterName := "Cluster-pvc-resources"
@@ -67,6 +67,10 @@ var _ = Describe("Reconcile Resources", func() {
 				WalStorage: &apiv1.StorageConfiguration{
 					Size: "1Gi",
 				},
+			},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: clusterName + "-1",
+				InstanceNames:  []string{clusterName + "-1", clusterName + "-2", clusterName + "-3"},
 			},
 		}
 
@@ -127,7 +131,7 @@ var _ = Describe("Reconcile Resources", func() {
 
 		configuration.Current.InheritedAnnotations = []string{"annotation1"}
 		configuration.Current.InheritedLabels = []string{"label1"}
-		_, err := Reconcile(
+		err := ReconcileMetadata(
 			context.Background(),
 			cli,
 			cluster,
@@ -332,8 +336,12 @@ var _ = Describe("PVC reconciliation", func() {
 
 	It("will reconcile each PVC's instance-relative labels by invoking the instance metadata reconciler", func() {
 		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-name", Namespace: "test-namespace"},
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: "test-namespace"},
 			Spec:       apiv1.ClusterSpec{WalStorage: &apiv1.StorageConfiguration{Size: "1Gi"}},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: clusterName + "-1",
+				InstanceNames:  []string{clusterName + "-1", clusterName + "-2", clusterName + "-3"},
+			},
 		}
 
 		pods := []corev1.Pod{

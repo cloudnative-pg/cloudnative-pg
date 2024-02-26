@@ -120,8 +120,14 @@ func reconcileMetadataComingFromInstance(
 		instanceReconciler := metadataReconciler{
 			name: "instance-role",
 			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-				pvcInstanceRole, ok := utils.GetInstanceRole(pvc.GetLabels())
-				return ok && pvcInstanceRole == instanceRole
+				if pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] != instanceRole {
+					return false
+				}
+				if pvc.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName] != instanceRole {
+					return false
+				}
+
+				return true
 			},
 			update: func(pvc *corev1.PersistentVolumeClaim) {
 				utils.SetInstanceRole(pvc.ObjectMeta, instanceRole)
