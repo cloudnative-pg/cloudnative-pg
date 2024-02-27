@@ -19,7 +19,6 @@ package persistentvolumeclaim
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -73,40 +72,8 @@ func reconcileMetadataComingFromInstance(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	runningInstances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	//  keep nodeSerial in sync with pods
-	for _, pod := range runningInstances {
-		podSerial, podSerialErr := specs.GetNodeSerial(pod.ObjectMeta)
-		if podSerialErr != nil {
-			return podSerialErr
-		}
-
-		instanceReconciler := metadataReconciler{
-			name: "instance-inheritance",
-			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-				if serial, err := specs.GetNodeSerial(pvc.ObjectMeta); err != nil || serial != podSerial {
-					return false
-				}
-				return true
-			},
-			update: func(pvc *corev1.PersistentVolumeClaim) {
-				if pvc.Annotations == nil {
-					pvc.Annotations = map[string]string{}
-				}
-
-				pvc.Annotations[utils.ClusterSerialAnnotationName] = strconv.Itoa(podSerial)
-			},
-		}
-
-		// todo: this should not rely on expected cluster instance pvc but should fetch every possible pvc name
-		instancePVCs := filterByInstanceExpectedPVCs(cluster, pod.Name, pvcs)
-		if err := instanceReconciler.reconcile(ctx, c, instancePVCs); err != nil {
-			return err
-		}
-	}
-
 	currentPrimary := cluster.Status.CurrentPrimary
 	if currentPrimary == "" {
 		return nil
@@ -148,10 +115,9 @@ func ReconcileMetadata(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	runningInstances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	if err := reconcileMetadataComingFromInstance(ctx, c, cluster, runningInstances, pvcs); err != nil {
+	if err := reconcileMetadataComingFromInstance(ctx, c, cluster, pvcs); err != nil {
 		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 

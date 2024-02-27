@@ -135,7 +135,6 @@ var _ = Describe("Reconcile Metadata", func() {
 			context.Background(),
 			cli,
 			cluster,
-			pods.Items,
 			pvcs.Items,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -344,12 +343,6 @@ var _ = Describe("PVC reconciliation", func() {
 			},
 		}
 
-		pods := []corev1.Pod{
-			makePod(clusterName, "1", specs.ClusterRoleLabelPrimary),
-			makePod(clusterName, "2", specs.ClusterRoleLabelReplica),
-			makePod(clusterName, "3", specs.ClusterRoleLabelReplica),
-		}
-
 		pvc := makePVC(clusterName, "1", NewPgDataCalculator(), false)
 		pvc2 := makePVC(clusterName, "2", NewPgDataCalculator(), false)
 		pvc3Wal := makePVC(clusterName, "3-wal", NewPgWalCalculator(), false)
@@ -369,7 +362,6 @@ var _ = Describe("PVC reconciliation", func() {
 			context.Background(),
 			cl,
 			cluster,
-			pods,
 			pvcs)
 		Expect(err).NotTo(HaveOccurred())
 
