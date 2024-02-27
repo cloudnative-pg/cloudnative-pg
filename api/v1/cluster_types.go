@@ -2091,6 +2091,9 @@ type DataBackupConfiguration struct {
 	// possible. `false` by default.
 	// +optional
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
+
+	// ExtraOptions extra options append to barman-cloud-backup command
+	ExtraOptions []string `json:"extraOptions,omitempty"`
 }
 
 // S3Credentials is the type for the credentials to be used to upload
@@ -2242,6 +2245,14 @@ type ExternalCluster struct {
 	// The configuration for the barman-cloud tool suite
 	// +optional
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
+}
+
+// GetBackupExtraOptions get the barman cloud options for the given type
+func (cfg *BarmanObjectStoreConfiguration) GetBackupExtraOptions() []string {
+	if cfg == nil || cfg.Data == nil {
+		return nil
+	}
+	return cfg.Data.ExtraOptions
 }
 
 // GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified

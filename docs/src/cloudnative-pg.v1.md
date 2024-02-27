@@ -2195,6 +2195,13 @@ used, meaning PostgreSQL will complete the checkpoint as soon as
 possible. <code>false</code> by default.</p>
 </td>
 </tr>
+<tr><td><code>extraOptions</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>ExtraOptions extra options append to barman-cloud-backup command</p>
+</td>
+</tr>
 </tbody>
 </table>
 

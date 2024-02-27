@@ -147,3 +147,31 @@ spec:
       historyTags:
         backupRetentionPolicy: "keep"
 ```
+
+## Extra options append to the backup command
+
+You can append more options to the `barman-cloud-backup` command by using 
+the `extraOptions` property in the `.spec.backup.barmanObjectStore.data` definition. 
+This property is a list of strings that will be appended to the `barman-cloud-backup` command. 
+For example, you can use the `--read-timeout=60` to customize the connection reading timeout. 
+For more options supported by `barman-cloud-backup` can reference the official barman 
+documentation [here](https://www.pgbarman.org/documentation/).
+
+If the option provided in `extraOptions` property is duplicated with the declared options in 
+the `barmanObjectStore` section, the extra option will be ignored.
+
+The following is an example of how to use this property:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      [...]
+      data:
+        extraOptions:
+        - "--min-chunk-size=5MB"
+        - "--read-timeout=60"
+```

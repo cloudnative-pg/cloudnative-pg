@@ -22,7 +22,9 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -134,7 +136,26 @@ func getDataConfiguration(
 			strconv.Itoa(int(*configuration.Data.Jobs)))
 	}
 
+	if configuration.GetBackupExtraOptions() != nil {
+		options = appendBarmanCloudBackupOptions(options, configuration)
+	}
+
 	return options, nil
+}
+
+// AppendBarmanCloudBackupOptions appends the extras options for the barman-cloud-backup command
+func appendBarmanCloudBackupOptions(
+	options []string,
+	configuration *apiv1.BarmanObjectStoreConfiguration,
+) []string {
+	for _, userOption := range configuration.GetBackupExtraOptions() {
+		key := strings.Split(userOption, "=")[0]
+		if key == "" || slices.Contains(options, key) {
+			continue
+		}
+		options = append(options, userOption)
+	}
+	return options
 }
 
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
@@ -309,7 +330,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	// record the backup beginning
-	b.Log.Info("Backup started", "options", options)
+	b.Log.Info("Starting barman-cloud-backup", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
@@ -484,6 +505,7 @@ func (b *BackupCommand) setupBackupStatus() {
 	if backupStatus.ServerName == "" {
 		backupStatus.ServerName = b.Cluster.Name
 	}
+
 	backupStatus.Phase = apiv1.BackupPhaseRunning
 }
 

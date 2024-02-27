@@ -19,11 +19,13 @@ package postgres
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -255,5 +257,72 @@ var _ = Describe("update barman backup metadata", func() {
 			To(Equal(oneHourAgo))
 		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
 			To(Equal(now))
+	})
+})
+
+var _ = Describe("generate backup options", func() {
+	const namespace = "test"
+	capabilities := barmanCapabilities.Capabilities{
+		Version:                    nil,
+		HasAzure:                   true,
+		HasS3:                      true,
+		HasGoogle:                  true,
+		HasRetentionPolicy:         true,
+		HasTags:                    true,
+		HasCheckWalArchive:         true,
+		HasSnappy:                  true,
+		HasErrorCodesForWALRestore: true,
+		HasAzureManagedIdentity:    true,
+	}
+	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+		Spec: apiv1.ClusterSpec{
+			Backup: &apiv1.BackupConfiguration{
+				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					Data: &apiv1.DataBackupConfiguration{
+						Compression:         "gzip",
+						Encryption:          "aes256",
+						ImmediateCheckpoint: true,
+						Jobs:                ptr.To(int32(2)),
+					},
+				},
+			},
+		},
+	}
+
+	It("should generate correct options", func() {
+		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
+		cluster.Spec.Backup.BarmanObjectStore.Data.ExtraOptions = extraOptions
+		options := []string{}
+		options, err := getDataConfiguration(options, cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(strings.Join(options, " ")).
+			To(
+				Equal(
+					"--gzip --encryption aes256 --immediate-checkpoint --jobs 2 " +
+						"--min-chunk-size=5MB --read-timeout=60 -vv",
+				))
+	})
+
+	It("should not overwrite declared options if conflict", func() {
+		extraOptions := []string{
+			"--min-chunk-size=5MB",
+			"--read-timeout=60",
+			"-vv",
+			"--immediate-checkpoint=false",
+			"--encryption=aes256",
+		}
+		cluster.Spec.Backup.BarmanObjectStore.Data.ExtraOptions = extraOptions
+		options := []string{}
+		options, err := getDataConfiguration(options, cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(strings.Join(options, " ")).
+			To(
+				Equal(
+					"--gzip --encryption aes256 --immediate-checkpoint --jobs 2 " +
+						"--min-chunk-size=5MB --read-timeout=60 -vv",
+				))
 	})
 })

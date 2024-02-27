@@ -133,6 +133,7 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
+ExtraOptions
 Fei
 Filesystem
 Fluentd
@@ -155,7 +156,6 @@ GolangCI
 GoogleCredentials
 Grafana
 HH
-Hai
 HashiCorp
 HistoryTags
 Huß
@@ -668,6 +668,7 @@ externalCluster
 externalClusterSecretVersion
 externalClusters
 externalclusters
+extraOptions
 facto
 failover
 failoverDelay

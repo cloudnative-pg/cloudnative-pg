@@ -1115,6 +1115,12 @@ spec:
                             - AES256
                             - aws:kms
                             type: string
+                          extraOptions:
+                            description: ExtraOptions extra options append to barman-cloud-backup
+                              command
+                            items:
+                              type: string
+                            type: array
                           immediateCheckpoint:
                             description: |-
                               Control whether the I/O workload for the backup initial checkpoint will
@@ -2383,6 +2389,12 @@ spec:
                               - AES256
                               - aws:kms
                               type: string
+                            extraOptions:
+                              description: ExtraOptions extra options append to barman-cloud-backup
+                                command
+                              items:
+                                type: string
+                              type: array
                             immediateCheckpoint:
                               description: |-
                                 Control whether the I/O workload for the backup initial checkpoint will
