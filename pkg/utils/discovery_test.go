@@ -247,6 +247,7 @@ var _ = Describe("AvailableArchitecture", func() {
 
 		AfterEach(func() {
 			Expect(os.RemoveAll(tempDir)).To(Succeed())
+			availableArchitectures = nil
 		})
 
 		It("shouldn't find available architectures", func() {
@@ -256,6 +257,7 @@ var _ = Describe("AvailableArchitecture", func() {
 
 			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
 			Expect(err).ToNot(HaveOccurred())
+			Expect(availableArchitectures).To(BeNil())
 
 			architectures := GetAvailableArchitectures()
 			Expect(architectures).To(BeEmpty())
@@ -270,6 +272,7 @@ var _ = Describe("AvailableArchitecture", func() {
 
 			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
 			Expect(err).ToNot(HaveOccurred())
+			Expect(availableArchitectures).To(HaveLen(2))
 
 			Eventually(func(g Gomega) {
 				architectures := GetAvailableArchitectures()
@@ -279,6 +282,32 @@ var _ = Describe("AvailableArchitecture", func() {
 					g.Expect(a.GetHash()).ToNot(BeEmpty())
 				}
 			}).Should(Succeed())
+		})
+	})
+
+	Describe("GetAvailableArchitecture", Ordered, func() {
+		BeforeAll(func() {
+			tempDir, err := os.MkdirTemp("", "test")
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(func() {
+				Expect(os.RemoveAll(tempDir)).To(Succeed())
+				availableArchitectures = nil
+			})
+			Expect(os.WriteFile(filepath.Join(tempDir, "manager_amd64"), []byte("amd64"), 0o600)).To(Succeed())
+			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(availableArchitectures).To(HaveLen(1))
+		})
+
+		It("should retrieve an existing available architecture", func() {
+			availableArch, err := GetAvailableArchitecture("amd64")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(availableArch.GoArch).To(BeEquivalentTo("amd64"))
+		})
+		It("should fail when retrieving an architecture that doesn't exist", func() {
+			availableArch, err := GetAvailableArchitecture("arm64")
+			Expect(err).To(HaveOccurred())
+			Expect(availableArch).To(BeNil())
 		})
 	})
 })
