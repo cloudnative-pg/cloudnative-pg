@@ -138,6 +138,7 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 		cd "$${CONFIG_TMP_DIR}" ;\
 	) ;\
 	rm -fr bundle bundle.Dockerfile ;\
+	sed -i -e "s/ClusterRole/Role/" "$${CONFIG_TMP_DIR}/config/rbac/role.yaml" "$${CONFIG_TMP_DIR}/config/rbac/role_binding.yaml"  ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
 	sed -e "s@\$${CREATED_AT}@$$(LANG=C date -Iseconds -u)@g" | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
