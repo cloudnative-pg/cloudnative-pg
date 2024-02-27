@@ -42,6 +42,7 @@ that work with CloudNativePG, and publishes them on
 
 To guarantee that the operator is able to take the right choices, it
 is necessary for it to be able to detect the PostgreSQL major version.
+
 This can happen in two ways:
 * using the `major` field of the `imageCatalogRef`, if defined
 * auto-detecting the major version from the image tag of the `imageName`, otherwise

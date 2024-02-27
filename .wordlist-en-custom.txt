@@ -73,8 +73,8 @@ CloudNativePG
 CloudNativePG's
 ClusterCondition
 ClusterConditionType
-ClusterImageCatalog
 ClusterIP
+ClusterImageCatalog
 ClusterIsNotReady
 ClusterList
 ClusterRole
@@ -526,8 +526,8 @@ bypassrls
 bzip
 cGFzc
 caSecretVersion
-catalogName
 cannotReconcile
+catalogName
 cb
 cd
 ce
@@ -551,8 +551,8 @@ cloudNativePGOperatorHash
 cloudnative
 cloudnativepg
 clusterBackup
-clusterimagecatalogs
 clusterName
+clusterimagecatalogs
 clusterlist
 clusterrole
 clusterspec
@@ -732,11 +732,11 @@ httpGet
 https
 hugepages
 ident
-imageName
 imageCatalogRef
-imagecatalogs
+imageName
 imagePullPolicy
 imagePullSecrets
+imagecatalogs
 img
 immediateCheckpoint
 impactful

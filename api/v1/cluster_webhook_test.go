@@ -1113,16 +1113,22 @@ var _ = Describe("validate image name change", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       15,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 15,
 					},
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       16,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
 					},
 				},
 			}
@@ -1139,8 +1145,11 @@ var _ = Describe("validate image name change", func() {
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       16,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
 					},
 				},
 			}
@@ -1155,8 +1164,11 @@ var _ = Describe("validate image name change", func() {
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       16,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
 					},
 				},
 			}
@@ -1169,8 +1181,11 @@ var _ = Describe("validate image name change", func() {
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       14,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 14,
 					},
 				},
 			}
@@ -1183,8 +1198,11 @@ var _ = Describe("validate image name change", func() {
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       16,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
 					},
 				},
 			}
@@ -1197,8 +1215,11 @@ var _ = Describe("validate image name change", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       16,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
 					},
 				},
 			}
@@ -1213,8 +1234,11 @@ var _ = Describe("validate image name change", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       15,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 15,
 					},
 				},
 			}
@@ -1229,8 +1253,11 @@ var _ = Describe("validate image name change", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       14,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 14,
 					},
 				},
 			}
@@ -1243,8 +1270,11 @@ var _ = Describe("validate image name change", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
-						CatalogName: "test",
-						Major:       16,
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
 					},
 				},
 			}

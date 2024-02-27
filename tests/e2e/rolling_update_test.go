@@ -336,8 +336,11 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			Spec: apiv1.ClusterSpec{
 				Instances: instances,
 				ImageCatalogRef: &apiv1.ImageCatalogRef{
-					CatalogName: name,
-					Major:       major,
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name: name,
+						Kind: "ImageCatalog",
+					},
+					Major: major,
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{

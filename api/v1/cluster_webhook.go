@@ -674,7 +674,9 @@ func (r *Cluster) validatePgBaseBackupApplicationDatabase() field.ErrorList {
 
 // validateApplicationDatabase validate the configuration for application database
 func (r *Cluster) validateApplicationDatabase(
-	database string, owner string, command string,
+	database string,
+	owner string,
+	command string,
 ) field.ErrorList {
 	var result field.ErrorList
 	// If you specify the database name, then you need also to specify the

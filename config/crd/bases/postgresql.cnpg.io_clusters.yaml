@@ -2692,16 +2692,14 @@ spec:
                 description: Defines the major PostgreSQL version we want to use within
                   an ImageCatalog
                 properties:
-                  catalogName:
-                    description: The name of the ImageCatalog
+                  apiGroup:
+                    description: |-
+                      APIGroup is the group for the resource being referenced.
+                      If APIGroup is not specified, the specified Kind must be in the core API group.
+                      For any other third-party types, APIGroup is required.
                     type: string
                   kind:
-                    default: ImageCatalog
-                    description: ImageCatalog or ClusterImageCatalog. Defaults to
-                      ImageCatalog.
-                    enum:
-                    - ImageCatalog
-                    - ClusterImageCatalog
+                    description: Kind is the type of resource being referenced
                     type: string
                   major:
                     description: The major version of PostgreSQL we want to use from
@@ -2710,10 +2708,20 @@ spec:
                     x-kubernetes-validations:
                     - message: Major is immutable
                       rule: self == oldSelf
+                  name:
+                    description: Name is the name of resource being referenced
+                    type: string
                 required:
-                - catalogName
+                - kind
                 - major
+                - name
                 type: object
+                x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: Only image catalogs are supported
+                  rule: self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'
+                - message: Only image catalogs are supported
+                  rule: self.apiGroup == 'postgresql.cnpg.io'
               imageName:
                 description: |-
                   Name of the container image, supporting both tags (`<image>:<tag>`)

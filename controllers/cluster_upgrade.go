@@ -197,8 +197,9 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 	contextLogger := log.FromContext(ctx)
 	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok &&
 		(primaryPod.Annotations == nil || primaryPod.Annotations[utils.ClusterRestartAnnotationName] != clusterRestart) {
-		contextLogger.Info("Setting restart annotation on primary pod as needed", "label",
-			utils.ClusterRestartAnnotationName)
+		contextLogger.Info(
+			"Setting restart annotation on primary pod as needed",
+			"label", utils.ClusterRestartAnnotationName)
 		original := primaryPod.DeepCopy()
 		if primaryPod.Annotations == nil {
 			primaryPod.Annotations = make(map[string]string)
@@ -480,8 +481,9 @@ func checkHasMissingPVCs(
 ) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
 		return rollout{
-			required: true, primaryForceRecreate: true,
-			reason: "attaching a new PVC to the instance Pod",
+			required:             true,
+			primaryForceRecreate: true,
+			reason:               "attaching a new PVC to the instance Pod",
 		}, nil
 	}
 	return rollout{}, nil

@@ -2580,19 +2580,11 @@ default to false.</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>kind</code><br/>
-<i>string</i>
+<tr><td><code>TypedLocalObjectReference</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
 </td>
-<td>
-   <p>ImageCatalog or ClusterImageCatalog. Defaults to ImageCatalog.</p>
-</td>
-</tr>
-<tr><td><code>catalogName</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The name of the ImageCatalog</p>
-</td>
+<td>(Members of <code>TypedLocalObjectReference</code> are embedded into this type.)
+   <span class="text-muted">No description provided.</span></td>
 </tr>
 <tr><td><code>major</code> <B>[Required]</B><br/>
 <i>int</i>

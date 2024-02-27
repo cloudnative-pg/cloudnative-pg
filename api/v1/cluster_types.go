@@ -227,13 +227,9 @@ func (o OnlineConfiguration) GetImmediateCheckpoint() bool {
 
 // ImageCatalogRef defines the reference to a major version in an ImageCatalog
 type ImageCatalogRef struct {
-	// +kubebuilder:validation:Enum:=ImageCatalog;ClusterImageCatalog
-	// +kubebuilder:default:=ImageCatalog
-	// +optional
-	// ImageCatalog or ClusterImageCatalog. Defaults to ImageCatalog.
-	Kind string `json:"kind,omitempty"`
-	// The name of the ImageCatalog
-	CatalogName string `json:"catalogName"`
+	// +kubebuilder:validation:XValidation:rule="self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'",message="Only image catalogs are supported"
+	// +kubebuilder:validation:XValidation:rule="self.apiGroup == 'postgresql.cnpg.io'",message="Only image catalogs are supported"
+	corev1.TypedLocalObjectReference `json:",inline"`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Major is immutable"
 	// The major version of PostgreSQL we want to use from the ImageCatalog
 	Major int `json:"major"`
@@ -521,6 +517,10 @@ const (
 
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
+
+	// PhaseImageCatalogError is triggered when the cluster cannot select the image to
+	// apply because of an invalid or incomplete catalog
+	PhaseImageCatalogError = "Cluster has incomplete or invalid image catalog"
 
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
@@ -2573,12 +2573,10 @@ func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
 	if cluster.Spec.ImageCatalogRef != nil {
 		return postgres.GetPostgresVersionFromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
 	}
-	if cluster.Spec.ImageName != "" {
-		image := cluster.GetImageName()
-		tag := utils.GetImageTag(image)
-		return postgres.GetPostgresVersionFromTag(tag)
-	}
-	return postgres.GetPostgresVersionFromTag(utils.GetImageTag(configuration.Current.PostgresImageName))
+
+	image := cluster.GetImageName()
+	tag := utils.GetImageTag(image)
+	return postgres.GetPostgresVersionFromTag(tag)
 }
 
 // GetPostgresqlMajorVersion gets the PostgreSQL image major version used in the Cluster

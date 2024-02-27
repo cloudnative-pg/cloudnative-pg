@@ -29,7 +29,6 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -187,8 +186,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
-	// Discover the image to be used and set in in the status
-	if err := r.reconcileImage(ctx, cluster); err != nil {
+	// Discover the image to be used and set it into the status
+	if result, err := r.reconcileImage(ctx, cluster); result != nil || err != nil {
+		if result != nil {
+			return *result, err
+		}
+
 		return ctrl.Result{}, fmt.Errorf("cannot set image name: %w", err)
 	}
 
@@ -554,7 +557,8 @@ func (r *ClusterReconciler) reconcileResources(
 
 // deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
 func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
-	ctx context.Context, cluster *apiv1.Cluster,
+	ctx context.Context,
+	cluster *apiv1.Cluster,
 	resources *managedResources,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -615,7 +619,8 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
 
 // reconcilePods decides when to create, scale up/down or wait for pods
 func (r *ClusterReconciler) reconcilePods(
-	ctx context.Context, cluster *apiv1.Cluster,
+	ctx context.Context,
+	cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -899,10 +904,10 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		&apiv1.Cluster{},
 		imageCatalogKey, func(rawObj client.Object) []string {
 			cluster := rawObj.(*apiv1.Cluster)
-			if cluster.Spec.ImageCatalogRef == nil || cluster.Spec.ImageCatalogRef.CatalogName == "" {
+			if cluster.Spec.ImageCatalogRef == nil || cluster.Spec.ImageCatalogRef.Name == "" {
 				return nil
 			}
-			return []string{cluster.Spec.ImageCatalogRef.CatalogName}
+			return []string{cluster.Spec.ImageCatalogRef.Name}
 		}); err != nil {
 		return err
 	}
@@ -1076,99 +1081,6 @@ func filterClustersUsingConfigMap(
 	return requests
 }
 
-func (r *ClusterReconciler) mapImageCatalogsToClusters() handler.MapFunc {
-	return func(ctx context.Context, obj client.Object) []reconcile.Request {
-		catalog, ok := obj.(*apiv1.ImageCatalog)
-		if !ok {
-			return nil
-		}
-		clusters, err := r.getClustersForImageCatalogsToClustersMapper(ctx, catalog)
-		if err != nil {
-			log.FromContext(ctx).Error(err, "while getting cluster list", "namespace", catalog.Namespace)
-			return nil
-		}
-
-		var requests []reconcile.Request
-		for _, cluster := range clusters.Items {
-			requests = append(requests,
-				reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      cluster.Name,
-						Namespace: cluster.Namespace,
-					},
-				},
-			)
-		}
-		return requests
-	}
-}
-
-func (r *ClusterReconciler) getClustersForImageCatalogsToClustersMapper(
-	ctx context.Context,
-	object metav1.Object,
-) (clusters apiv1.ClusterList, err error) {
-	_, isCatalog := object.(*apiv1.ImageCatalog)
-
-	if !isCatalog {
-		return clusters, fmt.Errorf("unsupported object: %+v", object)
-	}
-
-	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(".spec.imageCatalog.name", object.GetName()),
-		Namespace:     object.GetNamespace(),
-	}
-
-	err = r.List(ctx, &clusters, listOps)
-
-	return clusters, err
-}
-
-func (r *ClusterReconciler) mapClusterImageCatalogsToClusters() handler.MapFunc {
-	return func(ctx context.Context, obj client.Object) []reconcile.Request {
-		catalog, ok := obj.(*apiv1.ClusterImageCatalog)
-		if !ok {
-			return nil
-		}
-		clusters, err := r.getClustersForClusterImageCatalogsToClustersMapper(ctx, catalog)
-		if err != nil {
-			log.FromContext(ctx).Error(err, "while getting cluster list")
-			return nil
-		}
-
-		var requests []reconcile.Request
-		for _, cluster := range clusters.Items {
-			requests = append(requests,
-				reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      cluster.Name,
-						Namespace: cluster.Namespace,
-					},
-				},
-			)
-		}
-		return requests
-	}
-}
-
-func (r *ClusterReconciler) getClustersForClusterImageCatalogsToClustersMapper(
-	ctx context.Context,
-	object metav1.Object,
-) (clusters apiv1.ClusterList, err error) {
-	_, isCatalog := object.(*apiv1.ClusterImageCatalog)
-
-	if !isCatalog {
-		return clusters, fmt.Errorf("unsupported object: %+v", object)
-	}
-
-	listOps := &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(".spec.imageCatalog.name", object.GetName()),
-	}
-
-	err = r.List(ctx, &clusters, listOps)
-
-	return clusters, err
-}
-
 // mapNodeToClusters returns a function mapping cluster events watched to cluster reconcile requests
 func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 	return func(ctx context.Context, obj client.Object) []reconcile.Request {
@@ -1316,56 +1228,4 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 			"err", err,
 			"configmap", configuration.Current.MonitoringQueriesConfigmap)
 	}
-}
-
-func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.Cluster) error {
-	oldCluster := cluster.DeepCopy()
-	// If ImageName is defined and different from the current image in the status, we update the status
-	if cluster.Spec.ImageName != "" && cluster.Status.Image != cluster.Spec.ImageName {
-		cluster.Status.Image = cluster.Spec.ImageName
-		err := r.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
-		if err != nil {
-			return fmt.Errorf("cannot patch cluster %v: %w", cluster.Name, err)
-		}
-		return nil
-	}
-
-	// If ImageName is not defined, we try to discover the image from the image catalog
-	if cluster.Spec.ImageCatalogRef != nil {
-		catalogKind := cluster.Spec.ImageCatalogRef.Kind
-		var catalog apiv1.GenericImageCatalog
-		switch catalogKind {
-		case "ClusterImageCatalog":
-			catalog = &apiv1.ClusterImageCatalog{}
-		case "ImageCatalog":
-			catalog = &apiv1.ImageCatalog{}
-		default:
-			return fmt.Errorf("unknown image catalog kind %v", catalogKind)
-		}
-		catalogName := cluster.Spec.ImageCatalogRef.CatalogName
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
-		if err != nil {
-			r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v %v",
-				catalogKind, catalogName)
-			return fmt.Errorf("cannot get %v %v: %w", catalogKind, catalogName, err)
-		}
-
-		// Catalog found, we try to find the image for the major version
-		for _, image := range catalog.GetSpec().Images {
-			if image.Major == cluster.Spec.ImageCatalogRef.Major && cluster.Spec.ImageName != image.Image {
-				cluster.Status.Image = image.Image
-				err = r.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
-				if err != nil {
-					return err
-				}
-				return nil
-			}
-		}
-
-		r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot find major %v in %v %v",
-			cluster.Spec.ImageCatalogRef.Major, catalogKind, catalogName)
-		return fmt.Errorf("cannot find major %v in %v %v", cluster.Spec.ImageCatalogRef.Major, catalogKind, catalogName)
-	}
-
-	return nil
 }

@@ -9,7 +9,7 @@ cluster-scoped.
 Both of them have the same structure, composed of a list of images, each of them with a `major` field that indicates the
 major version of the image.
 
-!!! Warning The operator will trust the user-defined major version and will not perform any detection of the postgres
+!!! Warning The operator will trust the user-defined major version and will not perform any detection of the PostgreSQL
 version. It is up to the user to ensure that the image is compatible with the major version declared in the catalog.
 
 The `major` field value must be unique among the images within a catalog. Different catalogs can expose different images
@@ -51,6 +51,7 @@ metadata:
 spec:
   instances: 3
   imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
     kind: ImageCatalog
     catalogName: postgresql
     major: 16
