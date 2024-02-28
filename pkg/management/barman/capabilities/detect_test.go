@@ -61,7 +61,7 @@ var _ = Describe("detect capabilities", func() {
 		}))
 	})
 
-	It("test barman versions below 2.19.0 should has no google credentials ", func() {
+	It("ensures that the barman versions below 2.19.0 have no google credentials support", func() {
 		version, err := semver.ParseTolerant("2.18.0")
 		Expect(err).ToNot(HaveOccurred())
 		capabilities := detect(&version)
