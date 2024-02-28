@@ -25,5 +25,5 @@ import (
 
 func TestCatalog(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Spool test suite")
+	RunSpecs(t, "Barman capabilities test suite")
 }

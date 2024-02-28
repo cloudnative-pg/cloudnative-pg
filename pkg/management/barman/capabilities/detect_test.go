@@ -43,7 +43,7 @@ var _ = Describe("detect capabilities", func() {
 		}))
 	})
 
-	It("ensures that barman versions below 3.4 should has no name backup", func() {
+	It("ensures that barman versions below 3.4 have no named backup capabilities", func() {
 		version, err := semver.ParseTolerant("3.0.0")
 		Expect(err).ToNot(HaveOccurred())
 		capabilities := detect(&version)
