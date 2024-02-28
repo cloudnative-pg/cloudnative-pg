@@ -891,6 +891,9 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				testUtils.ExecuteBackup(namespace, sourceTakeFirstBackupFileMinio, false,
 					testTimeouts[testUtils.BackupIsReady], env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
+
+				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
+				// This should be better handled inside ExecuteBackup
 				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
 				latestTar := minioPath(clusterName, "data.tar")

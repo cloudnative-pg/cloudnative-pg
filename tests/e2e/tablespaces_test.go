@@ -306,7 +306,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					apiv1.ConditionBackup,
 					&backupCondition.LastTransitionTime,
 				)
+
+				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
+				// This should be better handled inside ExecuteBackup
 				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 			})
 
@@ -479,7 +483,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					apiv1.BackupMethodVolumeSnapshot,
 				)
 				Expect(err).ToNot(HaveOccurred())
+
+				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
+				// This should probably be moved elsewhere
 				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+
 				Eventually(func(g Gomega) {
 					backupList, err := env.GetBackupList(namespace)
 					g.Expect(err).ToNot(HaveOccurred())
