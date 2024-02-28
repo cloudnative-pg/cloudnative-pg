@@ -27,7 +27,7 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 	It("All version support in 3.4 and above", func() {
 		version, err := semver.ParseTolerant("3.4.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := Detect(&version)
+		capabilities, _ := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:                    &version,
 			hasName:                    true,
@@ -46,7 +46,7 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 	It("test barman version below 3.4 should has no name backup", func() {
 		version, err := semver.ParseTolerant("3.0.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := Detect(&version)
+		capabilities, _ := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:                    &version,
 			HasAzure:                   true,
@@ -64,7 +64,7 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 	It("test barman version below 2.19.0 should has no google credentials ", func() {
 		version, err := semver.ParseTolerant("2.18.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := Detect(&version)
+		capabilities, _ := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:                    &version,
 			HasAzure:                   true,
@@ -88,7 +88,7 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 	It("test barman version below 2.18 should not support various options", func() {
 		version, err := semver.ParseTolerant("2.17.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := Detect(&version)
+		capabilities, _ := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:            &version,
 			HasAzure:           true,
@@ -100,7 +100,7 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 	It("test barman version below 2.14.0 should has no HasRetentionPolicy ", func() {
 		version, err := semver.ParseTolerant("2.13.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := Detect(&version)
+		capabilities, _ := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:  &version,
 			HasAzure: true,
@@ -111,7 +111,7 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 	It("test barman version below 2.13.0 should has no aws and azure credentials ", func() {
 		version, err := semver.ParseTolerant("2.12.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := Detect(&version)
+		capabilities, _ := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version: &version,
 		}))

@@ -29,9 +29,9 @@ import (
 // capabilities stores the current Barman capabilities
 var capabilities *Capabilities
 
-// Detect barman-cloud executables presence and store the Capabilities
+// detect barman-cloud executables presence and store the Capabilities
 // of the barman-cloud version it finds
-func Detect(version *semver.Version) (*Capabilities, error) {
+func detect(version *semver.Version) (*Capabilities, error) {
 	newCapabilities := new(Capabilities)
 	if version == nil {
 		log.Info("Missing Barman Cloud installation in the operand image")
@@ -117,7 +117,7 @@ func CurrentCapabilities() (*Capabilities, error) {
 		if err != nil {
 			return nil, err
 		}
-		capabilities, err = Detect(version)
+		capabilities, err = detect(version)
 		if err != nil {
 			log.Error(err, "Failed to detect Barman capabilities")
 			return nil, err
