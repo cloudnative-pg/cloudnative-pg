@@ -23,11 +23,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Correct detecting the barman capabilities", func() {
-	It("All version support in 3.4 and above", func() {
+var _ = Describe("detect capabilities", func() {
+	It("ensures that all capabilities are true for the 3.4 version", func() {
 		version, err := semver.ParseTolerant("3.4.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := detect(&version)
+		capabilities := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:                    &version,
 			hasName:                    true,
@@ -43,10 +43,10 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 		}))
 	})
 
-	It("test barman version below 3.4 should has no name backup", func() {
+	It("ensures that barman versions below 3.4 should has no name backup", func() {
 		version, err := semver.ParseTolerant("3.0.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := detect(&version)
+		capabilities := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:                    &version,
 			HasAzure:                   true,
@@ -61,10 +61,10 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 		}))
 	})
 
-	It("test barman version below 2.19.0 should has no google credentials ", func() {
+	It("test barman versions below 2.19.0 should has no google credentials ", func() {
 		version, err := semver.ParseTolerant("2.18.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := detect(&version)
+		capabilities := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:                    &version,
 			HasAzure:                   true,
@@ -78,29 +78,22 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 		}))
 	})
 
-	// 2.17.0 should NOT support following
-	// google credentials
-	// tag
-	// HasCheckWalArchive
-	// HasSnappy
-	// HasErrorCodesForWALRestore
-	// HasAzureManagedIdentity
-	It("test barman version below 2.18 should not support various options", func() {
+	It("ensures that barmans versions below 2.18.0 only return the expected capabilities", func() {
 		version, err := semver.ParseTolerant("2.17.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := detect(&version)
+		capabilities := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:            &version,
 			HasAzure:           true,
 			HasS3:              true,
 			HasRetentionPolicy: true,
-		}))
+		}), "unexpected capabilities set to true")
 	})
 
-	It("test barman version below 2.14.0 should has no HasRetentionPolicy ", func() {
+	It("ensures that barman version below 2.14.0 have no HasRetentionPolicy ", func() {
 		version, err := semver.ParseTolerant("2.13.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := detect(&version)
+		capabilities := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version:  &version,
 			HasAzure: true,
@@ -108,10 +101,10 @@ var _ = Describe("Correct detecting the barman capabilities", func() {
 		}))
 	})
 
-	It("test barman version below 2.13.0 should has no aws and azure credentials ", func() {
+	It("ensures that barman version below 2.13.0 should have no aws and azure credentials", func() {
 		version, err := semver.ParseTolerant("2.12.0")
 		Expect(err).ToNot(HaveOccurred())
-		capabilities, _ := detect(&version)
+		capabilities := detect(&version)
 		Expect(capabilities).To(Equal(&Capabilities{
 			Version: &version,
 		}))

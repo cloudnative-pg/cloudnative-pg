@@ -31,11 +31,11 @@ var capabilities *Capabilities
 
 // detect barman-cloud executables presence and store the Capabilities
 // of the barman-cloud version it finds
-func detect(version *semver.Version) (*Capabilities, error) {
+func detect(version *semver.Version) *Capabilities {
 	newCapabilities := new(Capabilities)
 	if version == nil {
 		log.Info("Missing Barman Cloud installation in the operand image")
-		return newCapabilities, nil
+		return newCapabilities
 	}
 
 	newCapabilities.Version = version
@@ -74,7 +74,7 @@ func detect(version *semver.Version) (*Capabilities, error) {
 
 	log.Debug("Detected Barman installation", "newCapabilities", newCapabilities)
 
-	return newCapabilities, nil
+	return newCapabilities
 }
 
 // barmanCloudVersionRegex is a regular expression to parse the output of
@@ -117,11 +117,7 @@ func CurrentCapabilities() (*Capabilities, error) {
 		if err != nil {
 			return nil, err
 		}
-		capabilities, err = detect(version)
-		if err != nil {
-			log.Error(err, "Failed to detect Barman capabilities")
-			return nil, err
-		}
+		capabilities = detect(version)
 	}
 
 	return capabilities, nil
