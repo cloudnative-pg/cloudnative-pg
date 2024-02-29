@@ -3,6 +3,7 @@ API's
 APIs
 ARMv
 AcolumnName
+AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
@@ -133,7 +134,6 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
-ExtraOptions
 Fei
 Filesystem
 Fluentd
@@ -430,6 +430,7 @@ abd
 accessKeyId
 accessModes
 adc
+additionalCommandArgs
 additionalPodAffinity
 additionalPodAntiAffinity
 addons
@@ -668,7 +669,6 @@ externalCluster
 externalClusterSecretVersion
 externalClusters
 externalclusters
-extraOptions
 facto
 failover
 failoverDelay

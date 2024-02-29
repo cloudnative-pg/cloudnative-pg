@@ -136,7 +136,7 @@ func getDataConfiguration(
 			strconv.Itoa(int(*configuration.Data.Jobs)))
 	}
 
-	if configuration.GetBackupExtraOptions() != nil {
+	if configuration.GetAdditionalCommandArgs() != nil {
 		options = appendBarmanCloudBackupOptions(options, configuration)
 	}
 
@@ -148,7 +148,7 @@ func appendBarmanCloudBackupOptions(
 	options []string,
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 ) []string {
-	for _, userOption := range configuration.GetBackupExtraOptions() {
+	for _, userOption := range configuration.GetAdditionalCommandArgs() {
 		key := strings.Split(userOption, "=")[0]
 		if key == "" || slices.Contains(options, key) {
 			continue
@@ -505,7 +505,6 @@ func (b *BackupCommand) setupBackupStatus() {
 	if backupStatus.ServerName == "" {
 		backupStatus.ServerName = b.Cluster.Name
 	}
-
 	backupStatus.Phase = apiv1.BackupPhaseRunning
 }
 

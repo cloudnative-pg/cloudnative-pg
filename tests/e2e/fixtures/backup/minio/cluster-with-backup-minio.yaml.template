@@ -63,7 +63,7 @@ spec:
           compression: gzip
         data:
           immediateCheckpoint: true
-          extraOptions:
+          additionalCommandArgs:
             - "--min-chunk-size=5MB"
             - "--read-timeout=60"
         tags:

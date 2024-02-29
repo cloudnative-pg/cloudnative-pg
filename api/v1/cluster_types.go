@@ -2092,8 +2092,25 @@ type DataBackupConfiguration struct {
 	// +optional
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
 
-	// ExtraOptions extra options append to barman-cloud-backup command
-	ExtraOptions []string `json:"extraOptions,omitempty"`
+	// AdditionalCommandArgs represents additional arguments that can be appended
+	// to the 'barman-cloud-backup' command during execution. These arguments
+	// provide flexibility to customize the backup process further according to
+	// specific requirements or configurations.
+	//
+	// These arguments are passed directly to the 'barman-cloud-backup' command
+	// as supplementary options, allowing users to extend the functionality or
+	// tailor the backup process as needed.
+	//
+	// Example:
+	// In a scenario where specialized backup options are required, such as setting
+	// a specific timeout or defining custom behavior, users can utilize this field
+	// to specify additional command arguments.
+	//
+	// Note:
+	// It's essential to ensure that the provided arguments are valid and supported
+	// by the 'barman-cloud-backup' command to avoid potential errors or unintended
+	// behavior during execution.
+	AdditionalCommandArgs []string `json:"additionalCommandArgs,omitempty"`
 }
 
 // S3Credentials is the type for the credentials to be used to upload
@@ -2247,12 +2264,12 @@ type ExternalCluster struct {
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 }
 
-// GetBackupExtraOptions get the barman cloud options for the given type
-func (cfg *BarmanObjectStoreConfiguration) GetBackupExtraOptions() []string {
+// GetAdditionalCommandArgs get the barman cloud options for the given type
+func (cfg *BarmanObjectStoreConfiguration) GetAdditionalCommandArgs() []string {
 	if cfg == nil || cfg.Data == nil {
 		return nil
 	}
-	return cfg.Data.ExtraOptions
+	return cfg.Data.AdditionalCommandArgs
 }
 
 // GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified

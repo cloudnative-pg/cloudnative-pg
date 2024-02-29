@@ -960,8 +960,8 @@ func (in *DataBackupConfiguration) DeepCopyInto(out *DataBackupConfiguration) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.ExtraOptions != nil {
-		in, out := &in.ExtraOptions, &out.ExtraOptions
+	if in.AdditionalCommandArgs != nil {
+		in, out := &in.AdditionalCommandArgs, &out.AdditionalCommandArgs
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

@@ -2195,11 +2195,25 @@ used, meaning PostgreSQL will complete the checkpoint as soon as
 possible. <code>false</code> by default.</p>
 </td>
 </tr>
-<tr><td><code>extraOptions</code> <B>[Required]</B><br/>
+<tr><td><code>additionalCommandArgs</code> <B>[Required]</B><br/>
 <i>[]string</i>
 </td>
 <td>
-   <p>ExtraOptions extra options append to barman-cloud-backup command</p>
+   <p>AdditionalCommandArgs represents additional arguments that can be appended
+to the 'barman-cloud-backup' command during execution. These arguments
+provide flexibility to customize the backup process further according to
+specific requirements or configurations.</p>
+<p>These arguments are passed directly to the 'barman-cloud-backup' command
+as supplementary options, allowing users to extend the functionality or
+tailor the backup process as needed.</p>
+<p>Example:
+In a scenario where specialized backup options are required, such as setting
+a specific timeout or defining custom behavior, users can utilize this field
+to specify additional command arguments.</p>
+<p>Note:
+It's essential to ensure that the provided arguments are valid and supported
+by the 'barman-cloud-backup' command to avoid potential errors or unintended
+behavior during execution.</p>
 </td>
 </tr>
 </tbody>

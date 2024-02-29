@@ -292,7 +292,7 @@ var _ = Describe("generate backup options", func() {
 
 	It("should generate correct options", func() {
 		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
-		cluster.Spec.Backup.BarmanObjectStore.Data.ExtraOptions = extraOptions
+		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
 		options := []string{}
 		options, err := getDataConfiguration(options, cluster.Spec.Backup.BarmanObjectStore, &capabilities)
 		Expect(err).ToNot(HaveOccurred())
@@ -313,7 +313,7 @@ var _ = Describe("generate backup options", func() {
 			"--immediate-checkpoint=false",
 			"--encryption=aes256",
 		}
-		cluster.Spec.Backup.BarmanObjectStore.Data.ExtraOptions = extraOptions
+		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
 		options := []string{}
 		options, err := getDataConfiguration(options, cluster.Spec.Backup.BarmanObjectStore, &capabilities)
 		Expect(err).ToNot(HaveOccurred())
