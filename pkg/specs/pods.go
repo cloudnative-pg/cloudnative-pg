@@ -326,6 +326,13 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 						clusterName,
 					},
 				},
+				{
+					Key:      utils.PodRoleLabelName,
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						string(utils.PodRoleInstance),
+					},
+				},
 			},
 		},
 		TopologyKey: topologyKey,
