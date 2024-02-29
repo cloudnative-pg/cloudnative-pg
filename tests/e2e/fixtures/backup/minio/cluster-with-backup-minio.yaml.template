@@ -70,5 +70,4 @@ spec:
           retention: "30days"
         historyTags:
           retention: "30days"
-
     retentionPolicy: "30d"

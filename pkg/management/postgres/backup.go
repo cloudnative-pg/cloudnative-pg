@@ -18,13 +18,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"reflect"
-	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -136,26 +135,7 @@ func getDataConfiguration(
 			strconv.Itoa(int(*configuration.Data.Jobs)))
 	}
 
-	if configuration.GetAdditionalCommandArgs() != nil {
-		options = appendBarmanCloudBackupOptions(options, configuration)
-	}
-
-	return options, nil
-}
-
-// AppendBarmanCloudBackupOptions appends the extras options for the barman-cloud-backup command
-func appendBarmanCloudBackupOptions(
-	options []string,
-	configuration *apiv1.BarmanObjectStoreConfiguration,
-) []string {
-	for _, userOption := range configuration.GetAdditionalCommandArgs() {
-		key := strings.Split(userOption, "=")[0]
-		if key == "" || slices.Contains(options, key) {
-			continue
-		}
-		options = append(options, userOption)
-	}
-	return options
+	return configuration.AppendAdditionalCommandArgs(options), nil
 }
 
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
@@ -352,6 +332,14 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	cmd.Env = b.Env
 	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
 	if err := execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup); err != nil {
+		const badArgumentsErrorCode = "3"
+		if err.Error() == badArgumentsErrorCode {
+			descriptiveError := errors.New("bad arguments encountered while executing barman-cloud-backup, " +
+				"ensure that additionalCommandArgs field is correctly populated")
+			b.Log.Error(descriptiveError, "error while executing barman-cloud-backup",
+				"arguments", options)
+			return descriptiveError
+		}
 		return err
 	}
 

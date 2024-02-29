@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -2264,12 +2265,21 @@ type ExternalCluster struct {
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 }
 
-// GetAdditionalCommandArgs get the barman cloud options for the given type
-func (cfg *BarmanObjectStoreConfiguration) GetAdditionalCommandArgs() []string {
+// AppendAdditionalCommandArgs get the barman cloud options for the given type
+func (cfg *BarmanObjectStoreConfiguration) AppendAdditionalCommandArgs(options []string) []string {
 	if cfg == nil || cfg.Data == nil {
-		return nil
+		return options
 	}
-	return cfg.Data.AdditionalCommandArgs
+
+	for _, userOption := range cfg.Data.AdditionalCommandArgs {
+		key := strings.Split(userOption, "=")[0]
+		if key == "" || slices.Contains(options, key) {
+			continue
+		}
+		options = append(options, userOption)
+	}
+
+	return options
 }
 
 // GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified
