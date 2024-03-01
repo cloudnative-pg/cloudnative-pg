@@ -36,7 +36,7 @@ func NewCmd() *cobra.Command {
 		Short: "Start a psql session targeting a CloudNativePG cluster",
 		Args:  validatePsqlArgs,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utils.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utils.CompleteClusters(cmd.Context(), plugin.Client, args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		Long: "This command will start an interactive psql session inside a PostgreSQL Pod created by CloudNativePG.",
 		RunE: func(cmd *cobra.Command, args []string) error {

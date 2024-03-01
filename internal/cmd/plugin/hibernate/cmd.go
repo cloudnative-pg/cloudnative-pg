@@ -31,7 +31,7 @@ var (
 		Short: "Hibernates the cluster named [cluster]",
 		Args:  cobra.ExactArgs(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utils.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utils.CompleteClusters(cmd.Context(), plugin.Client, args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
@@ -54,7 +54,7 @@ var (
 		Short: "Bring the cluster named [cluster] back from hibernation",
 		Args:  cobra.ExactArgs(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utils.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utils.CompleteClusters(cmd.Context(), plugin.Client, args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
@@ -68,7 +68,7 @@ var (
 		Short: "Prints the hibernation status for the [cluster]",
 		Args:  cobra.ExactArgs(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utils.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utils.CompleteClusters(cmd.Context(), plugin.Client, args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]

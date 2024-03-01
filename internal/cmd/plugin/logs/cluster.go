@@ -32,7 +32,7 @@ func clusterCmd() *cobra.Command {
 		Long:  "Collects the logs for all pods in a cluster into a single stream or outputFile",
 		Args:  cobra.ExactArgs(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utils.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utils.CompleteClusters(cmd.Context(), plugin.Client, args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cl.clusterName = args[0]

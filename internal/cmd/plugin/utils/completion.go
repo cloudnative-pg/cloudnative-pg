@@ -28,12 +28,11 @@ import (
 )
 
 // CompleteClusters will complete the cluster name when necessary getting the list from the current namespace
-func CompleteClusters(ctx context.Context, args []string, toComplete string) []string {
+func CompleteClusters(ctx context.Context, cli client.Client, args []string, toComplete string) []string {
 	var clusters apiv1.ClusterList
 
 	// Get the cluster lists object if error we just return empty array string
-	err := plugin.Client.List(ctx, &clusters, client.InNamespace(plugin.Namespace))
-	if err != nil {
+	if err := cli.List(ctx, &clusters, client.InNamespace(plugin.Namespace)); err != nil {
 		return []string{}
 	}
 
