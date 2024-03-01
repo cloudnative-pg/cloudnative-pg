@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
@@ -137,4 +138,27 @@ func GetPGControlData(
 	}
 
 	return stdout, nil
+}
+
+func completeClusters(ctx context.Context, cli client.Client, namespace string, toComplete string) []string {
+	var clusters apiv1.ClusterList
+
+	// Get the cluster lists object if error we just return empty array string
+	if err := cli.List(ctx, &clusters, client.InNamespace(namespace)); err != nil {
+		return []string{}
+	}
+
+	clustersNames := make([]string, 0, len(clusters.Items))
+	for _, cluster := range clusters.Items {
+		if len(toComplete) == 0 || strings.HasPrefix(cluster.Name, toComplete) {
+			clustersNames = append(clustersNames, cluster.Name)
+		}
+	}
+
+	return clustersNames
+}
+
+// CompleteClusters will complete the cluster name when necessary getting the list from the current namespace
+func CompleteClusters(ctx context.Context, toComplete string) []string {
+	return completeClusters(ctx, Client, Namespace, toComplete)
 }
