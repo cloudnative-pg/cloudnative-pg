@@ -233,6 +233,19 @@ const (
 	PVCRolePgTablespace PVCRole = "PG_TABLESPACE"
 )
 
+// HibernationStatus describes the status of the hibernation
+type HibernationStatus string
+
+const (
+	// HibernationOff is the value of hibernation annotation when the hibernation
+	// has been deactivated for the cluster
+	HibernationOff HibernationStatus = "off"
+
+	// HibernationOn is the value of hibernation annotation when the hibernation
+	// has been requested for the cluster
+	HibernationOn HibernationStatus = "on"
+)
+
 // LabelClusterName labels the object with the cluster name
 func LabelClusterName(object *metav1.ObjectMeta, name string) {
 	if object.Labels == nil {

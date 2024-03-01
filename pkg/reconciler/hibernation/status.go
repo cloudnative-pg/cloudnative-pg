@@ -29,13 +29,11 @@ import (
 )
 
 const (
-	// HibernationOff is the value of hibernation annotation when the hibernation
-	// has been deactivated for the cluster
-	HibernationOff = "off"
+	// HibernationOff is the shadow of utils.HibernationOff, for compatibility
+	HibernationOff = string(utils.HibernationOff)
 
-	// HibernationOn is the value of hibernation annotation when the hibernation
-	// has been requested for the cluster
-	HibernationOn = "on"
+	// HibernationOn is the shadow of utils.HibernationOn, for compatibility
+	HibernationOn = string(utils.HibernationOn)
 )
 
 const (
