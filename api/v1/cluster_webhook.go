@@ -1276,18 +1276,23 @@ func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	} else {
 		newImagePath = field.NewPath("spec", "imageName")
 	}
+
+	r.Status.Image = ""
 	newMajor, err = r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
+
+	old.Status.Image = ""
 	oldMajor, err = old.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
+
 	status := postgres.IsUpgradePossible(oldMajor, newMajor)
 
 	if !status {
