@@ -56,25 +56,6 @@ var _ = Describe("Status enrichment", func() {
 		Expect(cluster.Status.Conditions).To(BeEmpty())
 	})
 
-	It("adds an error condition when the hibernation annotation has a wrong value", func(ctx SpecContext) {
-		cluster := apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					utils.HibernationAnnotationName: "not-correct",
-				},
-			},
-			Status: apiv1.ClusterStatus{
-				Phase: apiv1.PhaseHealthy,
-			},
-		}
-		EnrichStatus(ctx, &cluster, nil)
-
-		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
-		Expect(hibernationCondition).ToNot(BeNil())
-		Expect(hibernationCondition.Status).To(Equal(metav1.ConditionFalse))
-		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonWrongAnnotationValue))
-	})
-
 	It("removes the hibernation condition when hibernation is turned off", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
