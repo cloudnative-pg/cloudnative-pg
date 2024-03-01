@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -58,6 +59,8 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		return nil, nil
 	}
 
+	contextLogger = contextLogger.WithValues("catalogRef", cluster.Spec.ImageCatalogRef)
+
 	// Ensure the catalog has a correct type
 	catalogKind := cluster.Spec.ImageCatalogRef.Kind
 	var catalog apiv1.GenericImageCatalog
@@ -67,14 +70,14 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	case apiv1.ImageCatalogKind:
 		catalog = &apiv1.ImageCatalog{}
 	default:
-		contextLogger.Info("Unknown catalog kind", "catalogRef", cluster.Spec.ImageCatalogRef)
+		contextLogger.Info("Unknown catalog kind")
 		return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError,
 			"Invalid image catalog type")
 	}
 
 	apiGroup := cluster.Spec.ImageCatalogRef.APIGroup
 	if apiGroup == nil || *apiGroup != apiv1.GroupVersion.Group {
-		contextLogger.Info("Unknown catalog group", "catalogRef", cluster.Spec.ImageCatalogRef)
+		contextLogger.Info("Unknown catalog group")
 		return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError,
 			"Invalid image catalog group")
 	}
@@ -83,9 +86,13 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	catalogName := cluster.Spec.ImageCatalogRef.Name
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: catalogName}, catalog)
 	if err != nil {
-		r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v/%v",
-			catalogKind, catalogName)
-		return &ctrl.Result{}, nil
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(cluster, "Warning", "DiscoverImage", "Cannot get %v/%v",
+				catalogKind, catalogName)
+			return &ctrl.Result{}, nil
+		}
+
+		return nil, err
 	}
 
 	// Catalog found, we try to find the image for the major version
@@ -100,8 +107,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 			catalogKind,
 			catalogName)
 		contextLogger.Info("cannot find requested major version",
-			"requestedMajorVersion", requestedMajorVersion,
-			"catalogSpec", catalog.GetSpec())
+			"requestedMajorVersion", requestedMajorVersion)
 		return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError,
 			"Selected major version is not available in the catalog")
 	}
@@ -109,9 +115,13 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	// If the image is different, we set it into the cluster status
 	if cluster.Spec.ImageName != catalogImage {
 		cluster.Status.Image = catalogImage
-		err = r.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
-		if err != nil {
-			contextLogger.Error(err, "While patching cluster status to set the image name from the catalog")
+		patch := client.MergeFrom(oldCluster)
+		if err := r.Status().Patch(ctx, cluster, patch); err != nil {
+			patchBytes, _ := patch.Data(cluster)
+			contextLogger.Error(
+				err,
+				"While patching cluster status to set the image name from the catalog",
+				"patch", string(patchBytes))
 			return nil, err
 		}
 	}
