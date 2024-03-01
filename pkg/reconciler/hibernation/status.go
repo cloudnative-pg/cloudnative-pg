@@ -79,18 +79,7 @@ func EnrichStatus(
 	cluster *apiv1.Cluster,
 	podList []corev1.Pod,
 ) {
-	hibernationRequested, err := getHibernationAnnotationValue(cluster)
-	if err != nil {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:    HibernationConditionType,
-			Status:  metav1.ConditionFalse,
-			Reason:  HibernationConditionReasonWrongAnnotationValue,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	if !hibernationRequested {
+	if !isEnabledHibernation(cluster) {
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, HibernationConditionType)
 		return
 	}
@@ -98,7 +87,9 @@ func EnrichStatus(
 	// We proceed to hibernate the cluster only when it is ready.
 	// Hibernating a non-ready cluster may be dangerous since the PVCs
 	// won't be completely created.
-	if cluster.Status.Phase != apiv1.PhaseHealthy {
+	// For the hibernation is in progress(the condition is present), continue to hibernate the cluster
+	condition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
+	if condition == nil && cluster.Status.Phase != apiv1.PhaseHealthy {
 		return
 	}
 
@@ -132,20 +123,6 @@ func EnrichStatus(
 	})
 }
 
-func getHibernationAnnotationValue(cluster *apiv1.Cluster) (bool, error) {
-	value, ok := cluster.Annotations[utils.HibernationAnnotationName]
-	if !ok {
-		return false, nil
-	}
-
-	switch value {
-	case HibernationOn:
-		return true, nil
-
-	case HibernationOff:
-		return false, nil
-
-	default:
-		return false, &ErrInvalidHibernationValue{value: value}
-	}
+func isEnabledHibernation(cluster *apiv1.Cluster) bool {
+	return cluster.Annotations[utils.HibernationAnnotationName] == HibernationOn
 }
