@@ -75,13 +75,12 @@ func reconcileInstanceRoleLabel(
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	currentPrimary := cluster.Status.CurrentPrimary
-	if currentPrimary == "" {
+	if cluster.Status.CurrentPrimary == "" {
 		return nil
 	}
 	for _, instanceName := range cluster.Status.InstanceNames {
 		instanceRole := specs.ClusterRoleLabelReplica
-		if instanceName == currentPrimary {
+		if instanceName == cluster.Status.CurrentPrimary {
 			instanceRole = specs.ClusterRoleLabelPrimary
 		}
 
