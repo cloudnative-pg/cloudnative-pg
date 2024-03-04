@@ -255,6 +255,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		ctx,
 		r.Client,
 		cluster,
+		resources.instances.Items,
 		resources.pvcs.Items,
 	); err != nil {
 		return ctrl.Result{}, err
