@@ -18,8 +18,11 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 // ParseJSONLogs returns the pod's logs of a given pod name,
@@ -109,4 +112,43 @@ func CheckRecordForQuery(entry map[string]interface{}, errorTestQuery, user, dat
 	timeFormat := "2006-01-02 15:04:05.999 UTC"
 	_, err := time.Parse(timeFormat, recordMap["log_time"].(string))
 	return err == nil
+}
+
+// CheckOptionForBarmanCommand check if the expected options is used in the barman command execution log
+func CheckOptionForBarmanCommand(
+	logEntries []map[string]interface{},
+	message, backupName, podName string,
+	optionsExpected []string,
+) (bool, error) {
+	var optionsInLog interface{}
+	for _, logEntry := range logEntries {
+		if logEntry["msg"] == message &&
+			logEntry["backupName"] == backupName &&
+			logEntry["logging_pod"] == podName {
+			optionsInLog = logEntry["options"]
+			break // We only need to check the first occurrence of the message
+		}
+	}
+	if optionsInLog == nil {
+		return false, fmt.Errorf("no log entry found for message %v, backupName %v and logging_pod %v",
+			message,
+			backupName,
+			podName,
+		)
+	}
+
+	optionsSlice, isSlice := optionsInLog.([]interface{})
+	if !isSlice {
+		return false, fmt.Errorf("optionsInLog is not a slice %v", optionsInLog)
+	}
+
+	for _, option := range optionsExpected {
+		if !slices.ContainsFunc(optionsSlice, func(opt interface{}) bool { return opt == option }) {
+			return false, fmt.Errorf("option %v is not found in logEntry %v",
+				option,
+				optionsInLog,
+			)
+		}
+	}
+	return true, nil
 }
