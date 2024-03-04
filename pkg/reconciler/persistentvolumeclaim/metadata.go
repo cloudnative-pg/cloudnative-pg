@@ -68,8 +68,8 @@ func (m metadataReconciler) reconcile(
 	return nil
 }
 
-// reconcilePVCRole ensures that the PVCs have the correct metadata that is inherited by the instance
-func reconcilePVCRole(
+// reconcileInstanceRoleLabel ensures that the PVCs have the correct instance role label attached to them
+func reconcileInstanceRoleLabel(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
@@ -118,7 +118,7 @@ func ReconcileMetadata(
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
-	if err := reconcilePVCRole(ctx, c, cluster, pvcs); err != nil {
+	if err := reconcileInstanceRoleLabel(ctx, c, cluster, pvcs); err != nil {
 		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 
