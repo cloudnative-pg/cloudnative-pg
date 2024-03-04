@@ -182,7 +182,7 @@ func validateInstanceManagerHash(
 
 // reloadInstanceManager gracefully stops the log collection process and then
 // replace this process with a new one executing the new binary.
-// This function never return in case of success.
+// This function never returns in case of success.
 func reloadInstanceManager() error {
 	log.Info("Replacing current instance")
 	err := syscall.Exec(os.Args[0], os.Args, os.Environ()) // #nosec
