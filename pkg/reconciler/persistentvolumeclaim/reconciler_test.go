@@ -135,7 +135,6 @@ var _ = Describe("Reconcile Metadata", func() {
 			context.Background(),
 			cli,
 			cluster,
-			pods.Items,
 			pvcs.Items,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -366,6 +365,13 @@ var _ = Describe("PVC reconciliation", func() {
 			Build()
 
 		err := ReconcileMetadata(
+			context.Background(),
+			cl,
+			cluster,
+			pvcs)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = ReconcileSerialAnnotation(
 			context.Background(),
 			cl,
 			cluster,

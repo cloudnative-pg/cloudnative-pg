@@ -116,15 +116,10 @@ func ReconcileMetadata(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	runningInstances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	if err := reconcilePVCRole(ctx, c, cluster, pvcs); err != nil {
 		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
-	}
-
-	if err := serialReconciler(ctx, c, cluster, runningInstances, pvcs); err != nil {
-		return fmt.Errorf("cannot update node serial annotation on pvcs: %w", err)
 	}
 
 	if err := newAnnotationReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
@@ -138,7 +133,8 @@ func ReconcileMetadata(
 	return nil
 }
 
-func serialReconciler(
+// ReconcileSerialAnnotation ensures that all the PVCs have the correct serial annotation
+func ReconcileSerialAnnotation(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
