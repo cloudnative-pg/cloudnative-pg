@@ -125,7 +125,13 @@ func (data *data) LifecycleHook(
 			continue
 		}
 
-		responseObj, err := jsonpatch.MergePatch(serializedObject, result.JsonPatch)
+		patch, err := jsonpatch.DecodePatch(result.JsonPatch)
+		if err != nil {
+			contextLogger.Error(err, "Error while decoding JSON patch from plugin", "patch", result.JsonPatch)
+			return nil, err
+		}
+
+		responseObj, err := patch.Apply(serializedObject)
 		if err != nil {
 			contextLogger.Error(err, "Error while applying JSON patch from plugin", "patch", result.JsonPatch)
 			return nil, err
