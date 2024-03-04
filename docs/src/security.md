@@ -215,6 +215,11 @@ CloudNativePG.
 
 ### Pod Security Policies
 
+!!! Important
+    PodSecurityPolicy was deprecated in Kubernetes v1.21 and fully removed in
+    Kubernetes v1.25, since the operator is still being tested in old versions we keep
+    this section, but versions older than 1.25 aren't supported by the community.
+
 A [Pod Security Policy](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
 is the Kubernetes way to define security rules and specifications that a pod needs to meet
 to run in a cluster.

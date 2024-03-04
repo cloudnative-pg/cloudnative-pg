@@ -279,6 +279,7 @@ PodAntiAffinityType
 PodDisruptionBudget
 PodMeta
 PodMonitor
+PodSecurityPolicy
 PodSpec
 PodStatus
 PodTemplateSpec
