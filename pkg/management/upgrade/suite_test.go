@@ -14,15 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package upgrade
 
 import (
-	"errors"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-// ErrNextLoop is not a real error. It forces the current reconciliation loop to stop
-// and return the associated Result object
-var ErrNextLoop = errors.New("stop this loop and return the associated Result object")
-
-// ErrTerminateLoop is not a real error. It forces the current reconciliation loop to stop
-var ErrTerminateLoop = errors.New("stop this loop and do not requeue")
+func TestCatalog(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "in-place upgrade test suite")
+}

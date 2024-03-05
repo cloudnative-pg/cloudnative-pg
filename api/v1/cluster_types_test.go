@@ -1081,3 +1081,28 @@ var _ = Describe("Tablespaces", func() {
 		})
 	})
 })
+
+var _ = Describe("AvailableArchitectures", func() {
+	cluster := Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "clustername",
+		},
+		Status: ClusterStatus{
+			AvailableArchitectures: []AvailableArchitecture{
+				{
+					GoArch: "amd64",
+					Hash:   "precalculatedHash",
+				},
+			},
+		},
+	}
+	It("returns an availableArchitecture given it's name", func() {
+		availableArch := cluster.Status.GetAvailableArchitecture("amd64")
+		Expect(availableArch.GoArch).To(BeEquivalentTo("amd64"))
+		Expect(availableArch.Hash).To(BeEquivalentTo("precalculatedHash"))
+	})
+	It("returns nil if an availableArchitecture is not found", func() {
+		availableArch := cluster.Status.GetAvailableArchitecture("arm64")
+		Expect(availableArch).To(BeNil())
+	})
+})
