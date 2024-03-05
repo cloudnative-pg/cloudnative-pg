@@ -46,14 +46,12 @@ func NewCmd() *cobra.Command {
 }
 
 func run() error {
-	binaries, err := filepath.Glob("bin/manager_*")
-	if err != nil {
+	if err := utils.DetectAvailableArchitectures(); err != nil {
 		return err
 	}
-	architectures := make([]string, 0, len(binaries))
-	for _, b := range binaries {
-		goArch := strings.Split(filepath.Base(b), "manager_")[1]
-		architectures = append(architectures, goArch)
+	architectures := make([]string, 0, len(utils.GetAvailableArchitectures()))
+	for _, arch := range utils.GetAvailableArchitectures() {
+		architectures = append(architectures, arch.GoArch)
 	}
 	val, err := json.MarshalIndent(architectures, "", "    ")
 	if err != nil {
