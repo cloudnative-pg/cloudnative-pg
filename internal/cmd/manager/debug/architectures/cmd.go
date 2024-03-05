@@ -20,12 +20,11 @@ package architectures
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // NewCmd creates the new cobra command
