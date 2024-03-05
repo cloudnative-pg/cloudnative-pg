@@ -35,13 +35,13 @@ func ReconcileMetadata(
 	ctx context.Context,
 	cli client.Client,
 	cluster *apiv1.Cluster,
-	instances corev1.PodList,
+	instances []corev1.Pod,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	for idx := range instances.Items {
-		origInstance := instances.Items[idx].DeepCopy()
-		instance := &instances.Items[idx]
+	for idx := range instances {
+		origInstance := instances[idx].DeepCopy()
+		instance := &instances[idx]
 
 		// Update the labels for the -rw service to work correctly
 		modified := updateRoleLabels(ctx, cluster, instance)

@@ -256,7 +256,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
-	if err := instanceReconciler.ReconcileMetadata(ctx, r.Client, cluster, resources.instances); err != nil {
+	if err := instanceReconciler.ReconcileMetadata(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
