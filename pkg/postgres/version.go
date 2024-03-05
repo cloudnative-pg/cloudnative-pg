@@ -25,7 +25,7 @@ import (
 
 const firstMajorWithoutMinor = 10
 
-var semanticVersionRegex = regexp.MustCompile(`^(\d\.?)+`)
+var semanticVersionRegex = regexp.MustCompile(`^(?:pg)?(\d\.?)+`)
 
 // GetPostgresVersionFromTag parse a PostgreSQL version string returning
 // a major version ID. Example:

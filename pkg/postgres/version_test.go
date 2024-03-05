@@ -41,6 +41,15 @@ var _ = Describe("PostgreSQL version handling", func() {
 			Expect(GetPostgresVersionFromTag("15beta1")).To(Equal(150000))
 		})
 
+		It("should parse timescale/timescaledb versions", func() {
+			Expect(GetPostgresVersionFromTag("pg16.2")).To(Equal(160002))
+			Expect(GetPostgresVersionFromTag("pg16.2-all")).To(Equal(160002))
+			Expect(GetPostgresVersionFromTag("pg16.2-all-oss")).To(Equal(160002))
+			Expect(GetPostgresVersionFromTag("pg16.2-ts2.14.2")).To(Equal(160002))
+			Expect(GetPostgresVersionFromTag("pg16.2-ts2.14.2-all")).To(Equal(160002))
+			Expect(GetPostgresVersionFromTag("pg16.2-ts2.14.2-all-oss")).To(Equal(160002))
+		})
+
 		It("should gracefully handle errors", func() {
 			_, err := GetPostgresVersionFromTag("")
 			Expect(err).To(HaveOccurred())
