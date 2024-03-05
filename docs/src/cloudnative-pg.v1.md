@@ -8,6 +8,8 @@
 
 - [Backup](#postgresql-cnpg-io-v1-Backup)
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
+- [ClusterImageCatalog](#postgresql-cnpg-io-v1-ClusterImageCatalog)
+- [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
 - [Pooler](#postgresql-cnpg-io-v1-Pooler)
 - [ScheduledBackup](#postgresql-cnpg-io-v1-ScheduledBackup)
 
@@ -81,6 +83,64 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <td>
    <p>Most recently observed status of the cluster. This data may not be up
 to date. Populated by the system. Read-only.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ClusterImageCatalog     {#postgresql-cnpg-io-v1-ClusterImageCatalog}
+
+
+
+<p>ClusterImageCatalog is the Schema for the clusterimagecatalogs API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>ClusterImageCatalog</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ImageCatalogSpec"><i>ImageCatalogSpec</i></a>
+</td>
+<td>
+   <p>Specification of the desired behavior of the ClusterImageCatalog.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ImageCatalog     {#postgresql-cnpg-io-v1-ImageCatalog}
+
+
+
+<p>ImageCatalog is the Schema for the imagecatalogs API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>ImageCatalog</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ImageCatalogSpec"><i>ImageCatalogSpec</i></a>
+</td>
+<td>
+   <p>Specification of the desired behavior of the ImageCatalog.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
 </td>
 </tr>
@@ -1263,6 +1323,37 @@ created from scratch</p>
 </tbody>
 </table>
 
+## CatalogImage     {#postgresql-cnpg-io-v1-CatalogImage}
+
+
+**Appears in:**
+
+- [ImageCatalogSpec](#postgresql-cnpg-io-v1-ImageCatalogSpec)
+
+
+<p>CatalogImage defines the image and major version</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>image</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The image reference</p>
+</td>
+</tr>
+<tr><td><code>major</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>The PostgreSQL major version of the image. Must be unique within the catalog.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## CertificatesConfiguration     {#postgresql-cnpg-io-v1-CertificatesConfiguration}
 
 
@@ -1409,6 +1500,13 @@ this can be omitted.<!-- raw HTML omitted --></li>
    <p>Name of the container image, supporting both tags (<code>&lt;image&gt;:&lt;tag&gt;</code>)
 and digests for deterministic and repeatable deployments
 (<code>&lt;image&gt;:&lt;tag&gt;@sha256:&lt;digestValue&gt;</code>)</p>
+</td>
+</tr>
+<tr><td><code>imageCatalogRef</code><br/>
+<a href="#postgresql-cnpg-io-v1-ImageCatalogRef"><i>ImageCatalogRef</i></a>
+</td>
+<td>
+   <p>Defines the major PostgreSQL version we want to use within an ImageCatalog</p>
 </td>
 </tr>
 <tr><td><code>imagePullPolicy</code><br/>
@@ -2063,6 +2161,13 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster</p>
 </td>
 </tr>
+<tr><td><code>image</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Image contains the image name used by the pods</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2456,6 +2561,62 @@ This needs to be specified even if we run inside a GKE environment.</p>
 <td>
    <p>If set to true, will presume that it's running inside a GKE environment,
 default to false.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ImageCatalogRef     {#postgresql-cnpg-io-v1-ImageCatalogRef}
+
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>ImageCatalogRef defines the reference to a major version in an ImageCatalog</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>TypedLocalObjectReference</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
+</td>
+<td>(Members of <code>TypedLocalObjectReference</code> are embedded into this type.)
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>major</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>The major version of PostgreSQL we want to use from the ImageCatalog</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ImageCatalogSpec     {#postgresql-cnpg-io-v1-ImageCatalogSpec}
+
+
+**Appears in:**
+
+- [ClusterImageCatalog](#postgresql-cnpg-io-v1-ClusterImageCatalog)
+
+- [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
+
+
+<p>ImageCatalogSpec defines the desired ImageCatalog</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>images</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-CatalogImage"><i>[]CatalogImage</i></a>
+</td>
+<td>
+   <p>List of CatalogImages available in the catalog</p>
 </td>
 </tr>
 </tbody>

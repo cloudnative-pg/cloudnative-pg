@@ -77,7 +77,7 @@ func NewControllerRuntimeClient() (client.WithWatch, error) {
 	// add here any resource that need to be registered.
 	objectsToRegister := []runtime.Object{
 		// custom resources
-		&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{},
+		&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &apiv1.ImageCatalog{}, &apiv1.ClusterImageCatalog{},
 		// k8s resources needed for the typedClient to work properly
 		&v1.ConfigMap{}, &v1.Secret{},
 	}

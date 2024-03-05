@@ -21,8 +21,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const firstMajorWithoutMinor = 10
@@ -78,27 +76,6 @@ func GetPostgresVersionFromTag(version string) (int, error) {
 	return parsedVersion, nil
 }
 
-// GetPostgresMajorVersionFromTag retrieves the major version from a version tag
-func GetPostgresMajorVersionFromTag(version string) (int, error) {
-	if !semanticVersionRegex.MatchString(version) {
-		return 0,
-			fmt.Errorf("version not starting with a semantic version regex (%v): %s", semanticVersionRegex, version)
-	}
-
-	if versionOnly := semanticVersionRegex.FindString(version); versionOnly != "" {
-		version = versionOnly
-	}
-
-	splitVersion := strings.Split(version, ".")
-
-	majorVersion, err := strconv.Atoi(splitVersion[0])
-	if err != nil {
-		return 0, fmt.Errorf("wrong format in PostgreSQL major version from %v: %w", splitVersion[0], err)
-	}
-
-	return majorVersion, err
-}
-
 // GetPostgresMajorVersion gets only the Major version from a PostgreSQL version string.
 // Example:
 //
@@ -112,28 +89,4 @@ func GetPostgresMajorVersion(parsedVersion int) int {
 // toVersion
 func IsUpgradePossible(fromVersion, toVersion int) bool {
 	return GetPostgresMajorVersion(fromVersion) == GetPostgresMajorVersion(toVersion)
-}
-
-// CanUpgrade check if we can upgrade from une image version to another
-func CanUpgrade(fromImage, toImage string) (bool, error) {
-	fromTag := utils.GetImageTag(fromImage)
-	toTag := utils.GetImageTag(toImage)
-
-	if fromTag == "latest" || toTag == "latest" {
-		// We don't really know which major version "latest" is,
-		// so we can't safely upgrade
-		return false, nil
-	}
-
-	fromVersion, err := GetPostgresVersionFromTag(fromTag)
-	if err != nil {
-		return false, err
-	}
-
-	toVersion, err := GetPostgresVersionFromTag(toTag)
-	if err != nil {
-		return false, err
-	}
-
-	return IsUpgradePossible(fromVersion, toVersion), nil
 }

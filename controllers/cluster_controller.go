@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -58,6 +59,7 @@ const (
 	jobOwnerKey                   = ".metadata.controller"
 	poolerClusterKey              = ".spec.cluster.name"
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
+	imageCatalogKey               = ".spec.imageCatalog.name"
 )
 
 var apiGVString = apiv1.GroupVersion.String()
@@ -113,6 +115,8 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update;list;watch;get
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list;patch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=imagecatalogs,verbs=get;watch;list
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusterimagecatalogs,verbs=get;watch;list
 
 // Reconcile is the operator reconcile loop
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -180,6 +184,15 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	err = r.setDefaults(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Discover the image to be used and set it into the status
+	if result, err := r.reconcileImage(ctx, cluster); result != nil || err != nil {
+		if result != nil {
+			return *result, err
+		}
+
+		return ctrl.Result{}, fmt.Errorf("cannot set image name: %w", err)
 	}
 
 	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
@@ -543,7 +556,9 @@ func (r *ClusterReconciler) reconcileResources(
 }
 
 // deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
-func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Context, cluster *apiv1.Cluster,
+func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
 	resources *managedResources,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -603,7 +618,9 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Cont
 }
 
 // reconcilePods decides when to create, scale up/down or wait for pods
-func (r *ClusterReconciler) reconcilePods(ctx context.Context, cluster *apiv1.Cluster,
+func (r *ClusterReconciler) reconcilePods(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -782,6 +799,16 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
 			builder.WithPredicates(nodesPredicate),
 		).
+		Watches(
+			&apiv1.ImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&apiv1.ClusterImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
 }
 
@@ -866,6 +893,21 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 			}
 
 			return []string{pooler.Spec.Cluster.Name}
+		}); err != nil {
+		return err
+	}
+
+	// Create a new indexed field on ImageCatalogs. This field will be used to easily
+	// find all the ImageCatalogs pointing to a cluster.
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Cluster{},
+		imageCatalogKey, func(rawObj client.Object) []string {
+			cluster := rawObj.(*apiv1.Cluster)
+			if cluster.Spec.ImageCatalogRef == nil || cluster.Spec.ImageCatalogRef.Name == "" {
+				return nil
+			}
+			return []string{cluster.Spec.ImageCatalogRef.Name}
 		}); err != nil {
 		return err
 	}

@@ -61,6 +61,10 @@ primary/standby architecture directly by setting the `imageName`
 attribute in the CR. The operator also supports `imagePullSecrets`
 to access private container registries, and it supports digests and
 tags for finer control of container image immutability.
+If you prefer not to specify an image name, you can leverage
+[image catalogs](image_catalog.md) by simply referencing the PostgreSQL
+major version. Moreover, image catalogs enable you to effortlessly create
+custom catalogs, directing to images based on your specific requirements.
 
 ### Labels and annotations
 
