@@ -30,43 +30,15 @@ they're inherited by all resources created by it (including pods).
 
 These predefined labels are managed by CloudNativePG.
 
+`cnpg.io/backupDate`
+: The date of the backup in ISO 8601 format (`YYYYMMDD`)
+
 `cnpg.io/backupName`
-:   Backup identifier, available only on `Backup` and `VolumeSnapshot`
-    resources
+: Backup identifier, available only on `Backup` and `VolumeSnapshot`
+  resources
 
-`cnpg.io/cluster`
-:   Name of the cluster
-
-`cnpg.io/immediateBackup`
-:   Applied to a `Backup` resource if the backup is the first one created from
-    a `ScheduledBackup` object having `immediate` set to `true`
-
-`cnpg.io/instanceName`
-:   Name of the PostgreSQL instance (replaces the old and
-    deprecated `postgresql` label)
-
-`cnpg.io/jobRole`
-:   Role of the job (that is, `import`, `initdb`, `join`, ...)
-
-`cnpg.io/podRole`
-:   Role of the pod: `instance`, or `pooler`
-
-`cnpg.io/poolerName`
-:   Name of the PgBouncer pooler
-
-`cnpg.io/pvcRole`
-:   Purpose of the PVC, such as `PG_DATA` or `PG_WAL`
-
-`cnpg.io/reload`
-:   Available on `ConfigMap` and `Secret` resources. When set to `true`,
-    a change in the resource is automatically reloaded by the operator.
-
-`cnpg.io/scheduled-backup`
-:   When available, name of the `ScheduledBackup` resource that created a given
-    `Backup` object
-
-`role`
-:   Whether the instance running in a pod is a `primary` or a `replica`
+`cnpg.io/backupMonth`
+: The year/month when a backup was taken
 
 `cnpg.io/backupTimeline`
 : The timeline of the instance when a backup was taken
@@ -74,14 +46,44 @@ These predefined labels are managed by CloudNativePG.
 `cnpg.io/backupYear`
 : The year a backup was taken
 
-`cnpg.io/backupMonth`
-: The year/month when a backup was taken
+`cnpg.io/cluster`
+: Name of the cluster
 
-`cnpg.io/backupDate`
-: The date of the backup in ISO 8601 format (`YYYYMMDD`) 
+`cnpg.io/immediateBackup`
+: Applied to a `Backup` resource if the backup is the first one created from
+  a `ScheduledBackup` object having `immediate` set to `true`
+
+`cnpg.io/instanceName`
+: Name of the PostgreSQL instance (replaces the old and
+  deprecated `postgresql` label)
+
+`cnpg.io/jobRole`
+: Role of the job (that is, `import`, `initdb`, `join`, ...)
 
 `cnpg.io/onlineBackup`
 : Whether the backup is online (hot) or taken when Postgres is down (cold)
+
+`cnpg.io/podRole`
+: Role of the pod: `instance`, or `pooler`
+
+`cnpg.io/poolerName`
+: Name of the PgBouncer pooler
+
+`cnpg.io/pvcRole`
+: Purpose of the PVC, such as `PG_DATA` or `PG_WAL`
+
+`cnpg.io/reload`
+: Available on `ConfigMap` and `Secret` resources. When set to `true`,
+  a change in the resource is automatically reloaded by the operator.
+
+`role`
+:  Deprecated, Whether the instance running in a pod is a `primary` or a `replica`.
+   Use `cnpg.io/podRole` instead.
+
+`cnpg.io/scheduled-backup`
+:  When available, name of the `ScheduledBackup` resource that created a given
+   `Backup` object
+
 
 ## Predefined annotations
 
@@ -91,6 +93,18 @@ These predefined annotations are managed by CloudNativePG.
 :   Name of the AppArmor profile to apply to the named container.
     See [AppArmor](security.md#restricting-pod-access-using-apparmor)
     for details.
+
+`cnpg.io/backupEndTime`
+: The time a backup ended.
+
+`cnpg.io/backupEndWAL`
+: The WAL at the conclusion of a backup.
+
+`cnpg.io/backupStartTime`
+: The time a backup started.
+
+`cnpg.io/backupStartWAL`
+: The WAL at the start of a backup.
 
 `cnpg.io/coredumpFilter`
 :   Filter to control the coredump of Postgres processes, expressed with a
@@ -153,31 +167,19 @@ These predefined annotations are managed by CloudNativePG.
 `cnpg.io/reloadedAt`
 :   Contains the latest cluster `reload` time. `reload` is triggered by the user through a plugin.
 
+`kubectl.kubernetes.io/restartedAt`
+:  When available, the time of last requested restart of a Postgres cluster.
+
 `cnpg.io/skipEmptyWalArchiveCheck`
 :   When set to `true` on a `Cluster` resource, the operator disables the check
     that ensures that the WAL archive is empty before writing data. Use at your own
     risk.
-
-`cnpg.io/backupStartWAL`
-: The WAL at the start of a backup.
-
-`cnpg.io/backupEndWAL`
-: The WAL at the conclusion of a backup.
-
-`cnpg.io/backupStartTime`
-: The time a backup started.
-
-`cnpg.io/backupEndTime`
-: The time a backup ended.
 
 `cnpg.io/snapshotStartTime`
 : The time a snapshot started.
 
 `cnpg.io/snapshotEndTime`
 : The time a snapshot was marked as ready to use.
-
-`kubectl.kubernetes.io/restartedAt`
-:  When available, the time of last requested restart of a Postgres cluster.
 
 ## Prerequisites
 
