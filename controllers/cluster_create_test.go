@@ -1059,7 +1059,13 @@ var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
 	})
 
 	It("should delete the existing PDBs", func(ctx SpecContext) {
-		err := reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		err := fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
