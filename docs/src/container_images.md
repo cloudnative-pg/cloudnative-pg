@@ -40,28 +40,32 @@ that work with CloudNativePG, and publishes them on
 
 ## Image tag requirements
 
-To guarantee that the operator is able to take the right choices, it
-is necessary for it to be able to detect the PostgreSQL major version.
+Certainly! Here's an improved version:
 
-This can happen in two ways:
-* using the `major` field of the `imageCatalogRef`, if defined
-* auto-detecting the major version from the image tag of the `imageName`, otherwise
+## Image Tag Requirements
 
-To use the auto-detection, the image tag must follow a specific format.
-The image tag must start with a valid PostgreSQL major version number (e.g.
-14.5 or 15) optionally followed by a dot and the patch level.
+To ensure the operator makes informed decisions, it must accurately detect the
+PostgreSQL major version. This detection can occur in two ways:
 
-This can be followed by any character combination that is valid and
+1. Utilizing the `major` field of the `imageCatalogRef`, if defined.
+2. Auto-detecting the major version from the image tag of the `imageName` if
+   not explicitly specified.
+
+For auto-detection to work, the image tag must adhere to a specific format. It
+should commence with a valid PostgreSQL major version number (e.g., 15.6 or
+16), optionally followed by a dot and the patch level.
+
+Following this, the tag can include any character combination valid and
 accepted in a Docker tag, preceded by a dot, an underscore, or a minus sign.
 
 Examples of accepted image tags:
 
-- `11.1`
-- `12.3.2.1-1`
-- `12.4`
-- `13`
-- `14.5-10`
-- `15.0`
+- `12.1`
+- `13.3.2.1-1`
+- `13.4`
+- `14`
+- `15.5-10`
+- `16.0`
 
 !!! Warning
     `latest` is not considered a valid tag for the image.

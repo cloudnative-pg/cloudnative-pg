@@ -75,7 +75,8 @@ cluster role which defines the set of rules/resources/verbs granted to the opera
     The above permissions are exclusively reserved for the operator's service
     account to interact with the Kubernetes API server.  They are not directly
     accessible by the users of the operator that interact only with `Cluster`,
-    `Pooler`, `Backup`, and `ScheduledBackup` resources.
+    `Pooler`, `Backup`, `ScheduledBackup`, `ImageCatalog` and
+    `ClusterImageCatalog` resources.
 
 Below we provide some examples and, most importantly, the reasons why
 CloudNativePG requires full or partial management of standard Kubernetes
