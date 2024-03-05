@@ -87,6 +87,13 @@ reusePVC disabled: see section below.
     Don't be afraid: it refers to another volume internally used
     by the operator - not the PostgreSQL data directory.
 
+!!! Important
+    `PodDisruptionBudget` management is can be disabled by setting the
+    `.spec.enablePDB` field to `false`. In that case, the operator won't
+    create `PodDisruptionBudgets` and will delete them if they were
+    previously created.
+
+
 ## Single instance clusters with `reusePVC` set to `false`
 
 !!! Important
