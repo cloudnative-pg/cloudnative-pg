@@ -125,6 +125,7 @@ EKS
 EOF
 EOL
 EmbeddedObjectMetadata
+EnablePDB
 EncryptionType
 EndpointCA
 EnsureOption
@@ -248,6 +249,7 @@ OpenShift
 Openshift
 OperatorGroup
 OperatorHub
+PDB
 PGAudit
 PGDATA
 PGDG
@@ -277,6 +279,7 @@ PodAffinity
 PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
+PodDisruptionBudgets
 PodMeta
 PodMonitor
 PodSecurityPolicy
@@ -657,6 +660,7 @@ ecdsa
 edb
 eks
 enableAlterSystem
+enablePDB
 enablePodAntiAffinity
 enablePodMonitor
 enableSuperuserAccess

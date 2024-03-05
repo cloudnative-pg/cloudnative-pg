@@ -108,7 +108,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 }
 
 func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
-	if !cluster.Spec.CreatePDB {
+	if !cluster.GetEnablePDB() {
 		return r.deletePodDisruptionBudgetIfExists(ctx, cluster)
 	}
 
@@ -421,20 +421,12 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 }
 
 func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(ctx context.Context, cluster *apiv1.Cluster) error {
-	err := r.deletePrimaryPodDisruptionBudget(ctx, cluster)
-	if err != nil {
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("unable to retrieve primary PodDisruptionBudget: %w", err)
-		}
-		return nil
+	if err := r.deletePrimaryPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
+		return fmt.Errorf("unable to retrieve primary PodDisruptionBudget: %w", err)
 	}
 
-	err = r.deleteReplicasPodDisruptionBudget(ctx, cluster)
-	if err != nil {
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("unable to retrieve replica PodDisruptionBudget: %w", err)
-		}
-		return nil
+	if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
+		return fmt.Errorf("unable to retrieve replica PodDisruptionBudget: %w", err)
 	}
 
 	return nil

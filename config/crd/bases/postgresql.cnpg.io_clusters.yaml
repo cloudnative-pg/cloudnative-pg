@@ -1874,13 +1874,16 @@ spec:
                       created using the provided CA.
                     type: string
                 type: object
-              createPDB:
-                default: true
-                description: Do we create PDB or not?
-                type: boolean
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              enablePDB:
+                default: true
+                description: |-
+                  EnablePDB indicates whether the PodDisruptionBudgets (PDB) will be created for the cluster.
+                  When set to true, the PDB will be created. If turned off (set to false), no PDB will be created,
+                  and any existing PDB associated with the cluster will be destroyed.
+                type: boolean
               enableSuperuserAccess:
                 default: false
                 description: |-

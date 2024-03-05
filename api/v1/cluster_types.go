@@ -490,10 +490,12 @@ type ClusterSpec struct {
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
 
-	// Do we create PDB or not?
+	// EnablePDB indicates whether the PodDisruptionBudgets (PDB) will be created for the cluster.
+	// When set to true, the PDB will be created. If turned off (set to false), no PDB will be created,
+	// and any existing PDB associated with the cluster will be destroyed.
 	// +kubebuilder:default:=true
 	// +optional
-	CreatePDB bool `json:"createPDB,omitempty"`
+	EnablePDB *bool `json:"enablePDB,omitempty"`
 }
 
 const (
@@ -2902,6 +2904,15 @@ func (cluster *Cluster) GetPrimaryUpdateMethod() PrimaryUpdateMethod {
 	}
 
 	return strategy
+}
+
+// GetEnablePDB get the cluster EnablePDB value, defaults to true
+func (cluster *Cluster) GetEnablePDB() bool {
+	if cluster.Spec.EnablePDB == nil {
+		return true
+	}
+
+	return *cluster.Spec.EnablePDB
 }
 
 // IsNodeMaintenanceWindowInProgress check if the upgrade mode is active or not
