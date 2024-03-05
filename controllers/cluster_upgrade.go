@@ -32,7 +32,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -655,7 +654,7 @@ func (r *ClusterReconciler) upgradePod(
 	return nil
 }
 
-// upgradeInstanceManager upgrades the instance managers of the Pod running in this cluster
+// upgradeInstanceManager upgrades the instance managers of each Pod running in this cluster
 func (r *ClusterReconciler) upgradeInstanceManager(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -669,7 +668,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	// 1. an instance manager which doesn't support automatic update
 	// 2. an instance manager which isn't working
 	//
-	// In both ways, we are skipping this automatic update and we rely
+	// In both ways, we are skipping this automatic update and relying
 	// on the rollout strategy
 	for i := len(podList.Items) - 1; i >= 0; i-- {
 		postgresqlStatus := podList.Items[i]
@@ -684,16 +683,34 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 		}
 	}
 
-	operatorHash, err := executablehash.Get()
-	if err != nil {
-		return err
-	}
-
 	// We start upgrading the instance managers we have
 	for i := len(podList.Items) - 1; i >= 0; i-- {
 		postgresqlStatus := podList.Items[i]
 		instanceManagerHash := postgresqlStatus.ExecutableHash
 		instanceManagerIsUpgrading := postgresqlStatus.IsInstanceManagerUpgrading
+
+		// Gather the hash of the operator's manager using the current pod architecture.
+		// If one of the pods is requesting an architecture that's not present in the
+		// operator, that means we've upgraded to an image which doesn't support all
+		// the architectures currently being used by this cluster.
+		// In this case we force the reconciliation loop to stop, requiring manual
+		// intervention.
+		targetManager, err := utils.GetAvailableArchitecture(postgresqlStatus.InstanceArch)
+		if err != nil {
+			contextLogger.Error(err, "encountered an error while upgrading the instance manager")
+			if regErr := r.RegisterPhase(
+				ctx,
+				cluster,
+				apiv1.PhaseArchitectureBinaryMissing,
+				fmt.Sprintf("encountered an error while upgrading the instance manager: %s", err.Error()),
+			); regErr != nil {
+				return regErr
+			}
+
+			return utils.ErrTerminateLoop
+		}
+		operatorHash := targetManager.GetHash()
+
 		if instanceManagerHash != "" && instanceManagerHash != operatorHash && !instanceManagerIsUpgrading {
 			// We need to upgrade this Pod
 			contextLogger.Info("Upgrading instance manager",
@@ -707,7 +724,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				}
 			}
 
-			err = upgradeInstanceManagerOnPod(ctx, *postgresqlStatus.Pod)
+			err = upgradeInstanceManagerOnPod(ctx, postgresqlStatus.Pod, targetManager)
 			if err != nil {
 				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
 					postgresqlStatus.Pod.Name,
@@ -733,8 +750,12 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 }
 
 // upgradeInstanceManagerOnPod upgrades an instance manager of a Pod via an HTTP PUT request.
-func upgradeInstanceManagerOnPod(ctx context.Context, pod corev1.Pod) error {
-	binaryFileStream, err := executablehash.Stream()
+func upgradeInstanceManagerOnPod(
+	ctx context.Context,
+	pod *corev1.Pod,
+	targetManager *utils.AvailableArchitecture,
+) error {
+	binaryFileStream, err := targetManager.FileStream()
 	if err != nil {
 		return err
 	}

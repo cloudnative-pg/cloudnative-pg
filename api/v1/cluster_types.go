@@ -492,6 +492,9 @@ const (
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
 
+	// PhaseArchitectureBinaryMissing is the error phase describing a missing architecture
+	PhaseArchitectureBinaryMissing = "Cluster cannot execute instance online upgrade due to missing architecture binary"
+
 	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
 	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
 
@@ -639,6 +642,16 @@ type AvailableArchitecture struct {
 
 	// Hash is the hash of the executable
 	Hash string `json:"hash"`
+}
+
+// GetAvailableArchitecture returns an AvailableArchitecture given it's name. It returns nil if it's not found.
+func (status *ClusterStatus) GetAvailableArchitecture(archName string) *AvailableArchitecture {
+	for _, architecture := range status.AvailableArchitectures {
+		if architecture.GoArch == archName {
+			return &architecture
+		}
+	}
+	return nil
 }
 
 // ClusterStatus defines the observed state of Cluster

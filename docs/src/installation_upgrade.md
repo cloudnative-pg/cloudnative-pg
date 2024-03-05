@@ -204,10 +204,6 @@ The in-place upgrade process will not change the init container image inside the
 Pods. Therefore, the Pod definition will not reflect the current version of the
 operator.
 
-!!! Important
-    This feature requires that all pods (operators and operands) run on the
-    same platform/architecture (for example, all `linux/amd64`).
-
 ### Compatibility among versions
 
 CloudNativePG follows semantic versioning. Every release of the

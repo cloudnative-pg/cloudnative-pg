@@ -18,6 +18,7 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -83,6 +84,11 @@ func (arch *AvailableArchitecture) calculateHash() {
 	}
 
 	arch.hash = hash
+}
+
+// FileStream opens a stream reading from the manager's binary
+func (arch *AvailableArchitecture) FileStream() (io.ReadCloser, error) {
+	return executablehash.StreamByName(arch.binaryPath)
 }
 
 // availableArchitectures stores the result of DetectAvailableArchitectures function
@@ -226,6 +232,16 @@ func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
 
 // GetAvailableArchitectures returns the available instance's architectures
 func GetAvailableArchitectures() []*AvailableArchitecture { return availableArchitectures }
+
+// GetAvailableArchitecture returns an available architecture given its goArch
+func GetAvailableArchitecture(goArch string) (*AvailableArchitecture, error) {
+	for _, a := range availableArchitectures {
+		if a.GoArch == goArch {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid architecture: %s", goArch)
+}
 
 // detectAvailableArchitectures detects the architectures available in a given path
 func detectAvailableArchitectures(filepathGlob string) error {
