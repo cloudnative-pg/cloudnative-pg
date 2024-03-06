@@ -630,3 +630,36 @@ spec:
       - displayName: Last backup
         description: When the last backup was scheduled
         path: lastScheduleTime
+
+    - kind: ImageCatalog
+      name: imagecatalogs.postgresql.cnpg.io
+      displayName: Image Catalog
+      description: Some description
+      version: v1
+      resources:
+      - kind: ConfigMap
+        name: ''
+        version: v1
+      specDescriptors:
+      - path: images
+        displayName: Images
+        description: images
+      - path: images.image
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+    - kind: ClusterImageCatalog
+      name: clusterimagecatalogs.postgresql.cnpg.io
+      displayName: Cluster Image Catalog
+      description: some descirption
+      version: v1
+      resources:
+      - kind: ConfigMap
+        name: ''
+        version: v1
+      specDescriptors:
+      - path: images
+        displayName: images
+        description: images
+      - path: images.image
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
