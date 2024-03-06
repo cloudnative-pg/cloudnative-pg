@@ -76,9 +76,9 @@ These predefined labels are managed by CloudNativePG.
 : Available on `ConfigMap` and `Secret` resources. When set to `true`,
   a change in the resource is automatically reloaded by the operator.
 
-`role`
-:  Deprecated, Whether the instance running in a pod is a `primary` or a `replica`.
-   Use `cnpg.io/podRole` instead.
+`role` - **deprecated**
+:  Whether the instance running in a pod is a `primary` or a `replica`.
+   This label is deprecated, you should use `cnpg.io/podRole` instead.
 
 `cnpg.io/scheduled-backup`
 :  When available, name of the `ScheduledBackup` resource that created a given
