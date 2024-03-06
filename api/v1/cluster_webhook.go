@@ -287,7 +287,7 @@ func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	clusterLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 	allErrs := r.Validate()
 	if len(allErrs) == 0 {
-		return nil, nil
+		return r.getAdmissionWarnings(), nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -357,7 +357,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 	)
 
 	if len(allErrs) == 0 {
-		return nil, nil
+		return r.getAdmissionWarnings(), nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -2317,6 +2317,22 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 				"nil or false",
 				"High Availability replication slots must be enabled"),
 		)
+	}
+
+	return result
+}
+
+func (r *Cluster) getAdmissionWarnings() admission.Warnings {
+	return r.getMaintenanceWindowsAdmissionWarnings()
+}
+
+func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.NodeMaintenanceWindow != nil {
+		result = append(
+			result,
+			"Consider using `.spec.enablePGD` instead of the legacy maintenance window feature")
 	}
 
 	return result
