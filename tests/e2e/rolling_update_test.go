@@ -337,8 +337,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				Instances: instances,
 				ImageCatalogRef: &apiv1.ImageCatalogRef{
 					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
-						Name: name,
-						Kind: "ImageCatalog",
+						APIGroup: &apiv1.GroupVersion.Group,
+						Name:     name,
+						Kind:     "ImageCatalog",
 					},
 					Major: major,
 				},
