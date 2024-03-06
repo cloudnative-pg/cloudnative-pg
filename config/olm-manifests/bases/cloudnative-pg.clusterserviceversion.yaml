@@ -634,7 +634,7 @@ spec:
     - kind: ImageCatalog
       name: imagecatalogs.postgresql.cnpg.io
       displayName: Image Catalog
-      description: Some description
+      description: A catalog of PostgreSQL operand images
       version: v1
       resources:
       - kind: ConfigMap
@@ -650,7 +650,7 @@ spec:
     - kind: ClusterImageCatalog
       name: clusterimagecatalogs.postgresql.cnpg.io
       displayName: Cluster Image Catalog
-      description: some descirption
+      description: A cluster-wide catalog of PostgreSQL operand images
       version: v1
       resources:
       - kind: ConfigMap
