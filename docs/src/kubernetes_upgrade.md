@@ -1,54 +1,105 @@
-# Kubernetes Upgrade
+# Kubernetes Upgrade and Maintenance
 
-Kubernetes clusters must be kept updated. This becomes even more
-important if you are self-managing your Kubernetes clusters, especially
-on **bare metal**.
-
-Planning and executing regular updates is a way for your organization
-to clean up the technical debt and reduce the business risks, despite
-the introduction in your Kubernetes infrastructure of controlled
-downtimes that temporarily take out a node from the cluster for
-maintenance reasons (recommended reading:
+Maintaining an up-to-date Kubernetes cluster is crucial for ensuring optimal
+performance and security, particularly for self-managed clusters, especially
+those running on bare metal infrastructure. Regular updates help address
+technical debt and mitigate business risks, despite the controlled downtimes
+associated with temporarily removing a node from the cluster for maintenance
+purposes. For further insights on embracing risk in operations, refer to the
 ["Embracing Risk"](https://landing.google.com/sre/sre-book/chapters/embracing-risk/)
-from the Site Reliability Engineering book).
+chapter from the Site Reliability Engineering book.
 
-For example, you might need to apply security updates on the Linux
-servers where Kubernetes is installed, or to replace a malfunctioning
-hardware component such as RAM, CPU, or RAID controller, or even upgrade
-the cluster to the latest version of Kubernetes.
+## Importance of Regular Updates
 
-Usually, maintenance operations in a cluster are performed one node
-at a time by:
+Updating Kubernetes involves planning and executing maintenance tasks, such as
+applying security updates to underlying Linux servers, replacing malfunctioning
+hardware components, or upgrading the cluster to the latest Kubernetes version.
+These activities are essential for maintaining a robust and secure
+infrastructure.
 
-1. evicting the workloads from the node to be updated (`drain`)
-2. performing the actual operation (for example, system update)
-3. re-joining the node to the cluster (`uncordon`)
+## Maintenance Operations in a Cluster
 
-The above process requires workloads to be either stopped for the
-entire duration of the upgrade or migrated to another node.
+Typically, maintenance operations are carried out on one node at a time, following a [structured process](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/):
 
-While the latest case is the expected one in terms of service
-reliability and self-healing capabilities of Kubernetes, there can
-be situations where it is advised to operate with a temporarily
-degraded cluster and wait for the upgraded node to be up again.
+1. eviction of workloads (`drain`): workloads are gracefully moved away from
+   the node to be updated, ensuring a smooth transition.
+2. performing the operation: the actual maintenance operation, such as a
+   system update or hardware replacement, is executed.
+3. rejoining the node to the cluster (`uncordon`): the updated node is
+   reintegrated into the cluster, ready to resume its responsibilities.
 
-In particular, if your PostgreSQL cluster relies on **node-local storage**
-\- that is *storage which is local to the Kubernetes worker node where
-the PostgreSQL database is running*.
-Node-local storage (or simply *local storage*) is used to enhance performance.
+This process requires either stopping workloads for the entire upgrade duration
+or migrating them to other nodes in the cluster.
+
+## Temporary PostgreSQL Cluster Degradation
+
+While the standard approach ensures service reliability and leverages
+Kubernetes' self-healing capabilities, there are scenarios where operating with
+a temporarily degraded cluster may be advisable. This is particularly relevant
+for PostgreSQL clusters relying on **node-local storage**, where the storage is
+local to the Kubernetes worker node running the PostgreSQL database. Node-local
+storage, or simply *local storage*, is employed to enhance performance.
 
 !!! Note
-    If your database files are on shared storage over the network,
-    you may not need to define a maintenance window. If the volumes currently
-    used by the pods can be reused by pods running on different nodes after
-    the drain, the default self-healing behavior of the operator will work
-    fine (you can then skip the rest of this section).
+    If your database files reside on shared storage accessible over the
+    network, the default self-healing behavior of the operator can efficiently
+    handle scenarios where volumes are reused by pods on different nodes after a
+    drain operation. In such cases, you can skip the remaining sections of this
+    document.
 
-When using local storage for PostgreSQL, you are advised to temporarily
-put the cluster in **maintenance mode** through the `nodeMaintenanceWindow`
-option to avoid standard self-healing procedures to kick in,
-while, for example, enlarging the partition on the physical node or
-updating the node itself.
+## Pod Disruption Budgets
+
+By default, CloudNativePG ensures that the primary node in a PostgreSQL cluster
+prohibits its own draining, safeguarding uninterrupted operations.
+Additionally, in the presence of replicas, it guarantees that only one replica
+at a time is gracefully shut down during a drain operation.
+
+Each PostgreSQL `Cluster` is equipped with two associated `PodDisruptionBudget`
+resources - you can easily confirm it with the `kubectl get pdb` command.
+
+Our recommendation is to leave pod disruption budgets enabled for every
+production Postgres cluster. This can be effortlessly managed by toggling the
+`.spec.enablePDB` option, as detailed in the
+[API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ClusterSpec).
+
+## PostgreSQL Clusters for Development Purposes
+
+For PostgreSQL clusters designed for development purposes, often consisting of
+a single instance, it is essential to disable pod disruption budgets. Failure
+to do so will prevent the node hosting that cluster from being drained.
+
+The following example illustrates how to disable pod disruption budgets for a
+1-instance development cluster:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: dev
+spec:
+  instances: 1
+  enablePDB: false
+
+  storage:
+    size: 1Gi
+```
+
+This configuration ensures smoother maintenance procedures without restrictions
+on draining the node during development activities.
+
+## Node Maintenance Window
+
+!!! Important
+    While CloudNativePG will continue supporting the node maintenance window,
+    it is currently recommended to transition to direct control of pod disruption
+    budgets, as explained earlier. This information is retained mainly for backward
+    compatibility.
+
+Prior to release 1.23, CloudNativePG had just one declarative mechanism to manage
+Kubernetes upgrades when dealing with local storage: you had to temporarily put
+the cluster in **maintenance mode** through the `nodeMaintenanceWindow` option
+to avoid standard self-healing procedures to kick in, while, for example,
+enlarging the partition on the physical node or updating the node itself.
 
 !!! Warning
     Limit the duration of the maintenance window to the shortest
@@ -94,7 +145,7 @@ reusePVC disabled: see section below.
     previously created.
 
 
-## Single instance clusters with `reusePVC` set to `false`
+### Single instance clusters with `reusePVC` set to `false`
 
 !!! Important
     We recommend to always create clusters with more
