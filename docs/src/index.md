@@ -91,9 +91,10 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Parallel WAL archiving and restore to allow the database to keep up with WAL
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
-  retention management at the object store layer Replica clusters for
-* PostgreSQL deployments across multiple Kubernetes
+  retention management at the object store layer
+* Replica clusters for PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
+* Delayed Replica clusters
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)
