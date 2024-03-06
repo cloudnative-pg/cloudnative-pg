@@ -17,11 +17,14 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -619,6 +622,11 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			AfterEach(func() {
 				err := env.Client.Delete(env.Ctx, catalog)
 				Expect(err).ToNot(HaveOccurred())
+
+				// Wait until we really deleted it
+				Eventually(func(ctx context.Context) error {
+					return env.Client.Get(ctx, ctrl.ObjectKey{Name: catalog.Name}, catalog)
+				}).Should(MatchError(apierrs.IsNotFound))
 			})
 			Context("Three Instances", func() {
 				const (
