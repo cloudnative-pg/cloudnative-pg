@@ -1850,9 +1850,14 @@ Defaults to: <code>RuntimeDefault</code></p>
 <i>bool</i>
 </td>
 <td>
-   <p>EnablePDB indicates whether the PodDisruptionBudgets (PDB) will be created for the cluster.
-When set to true, the PDB will be created. If turned off (set to false), no PDB will be created,
-and any existing PDB associated with the cluster will be destroyed.</p>
+   <p>Manage the <code>PodDisruptionBudget</code> resources within the cluster. When
+configured as <code>true</code> (default setting), the pod disruption budgets
+will safeguard the primary node from being terminated. Conversely,
+setting it to <code>false</code> will result in the absence of any
+<code>PodDisruptionBudget</code> resource, permitting the shutdown of all nodes
+hosting the PostgreSQL cluster. This latter configuration is
+advisable for any PostgreSQL cluster employed for
+development/staging purposes.</p>
 </td>
 </tr>
 </tbody>
