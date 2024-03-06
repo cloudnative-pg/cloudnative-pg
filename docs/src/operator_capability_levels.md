@@ -415,24 +415,30 @@ instances in the cluster. It uses the following formula for the quorum (`q`):
 
 ### Replica clusters
 
-Define a cross-Kubernetes cluster topology of PostgreSQL clusters by taking
-advantage of PostgreSQL native streaming and cascading replication.
-Using the `replica` option, you can set up an independent cluster to
-continuously replicate data from another PostgreSQL source of the same major
-version. Such a source can be anywhere, as long as a direct streaming
-connection by way of TLS is allowed from the two endpoints.
+Establish a robust cross-Kubernetes cluster topology for PostgreSQL clusters,
+harnessing the power of native streaming and cascading replication. With the
+`replica` option, you can configure an autonomous cluster to consistently
+replicate data from another PostgreSQL source of the same major version. This
+source can be located anywhere, provided you have access to a WAL archive for
+fetching WAL files or a direct streaming connection via TLS between the two
+endpoints.
 
-Moreover, the source can be even outside Kubernetes, running in a physical or
-virtual environment.
+Notably, the source PostgreSQL instance can exist outside the Kubernetes
+environment, whether in a physical or virtual setting.
 
-Replica clusters can be created from a volume snapshot, a recovery object store
-(backup in Barman Cloud format), or by way of streaming using `pg_basebackup`.
-Both WAL file shipping and WAL streaming are allowed.
-Replica clusters dramatically improve the business continuity posture of your
-PostgreSQL databases in Kubernetes, spanning over multiple data centers and
-opening up for hybrid and multi-cloud setups. (Currently, while waiting for Kubernetes 
-federation native capabilities, manual switchover
-across data centers is required.)
+Replica clusters can be instantiated through various methods, including volume
+snapshots, a recovery object store (utilizing the Barman Cloud backup format),
+or streaming using `pg_basebackup`. Both WAL file shipping and WAL streaming
+are supported. The deployment of replica clusters significantly elevates the
+business continuity posture of PostgreSQL databases within Kubernetes,
+extending across multiple data centers and facilitating hybrid and multi-cloud
+setups. (While anticipating Kubernetes federation native capabilities, manual
+switchover across data centers remains necessary.)
+
+Additionally, the flexibility extends to creating delayed replica clusters
+intentionally lagging behind the primary cluster. This intentional lag aims to
+minimize the Recovery Time Objective (RTO) in the event of unintended errors,
+such as incorrect `DELETE` or `UPDATE` SQL operations.
 
 ### Liveness and readiness probes
 
