@@ -2332,7 +2332,7 @@ func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
 	if r.Spec.NodeMaintenanceWindow != nil {
 		result = append(
 			result,
-			"Consider using `.spec.enablePGD` instead of the legacy maintenance window feature")
+			"Consider using `.spec.enablePGD` instead of the node maintenance window feature")
 	}
 
 	return result
