@@ -87,7 +87,7 @@ var barmanCloudVersionRegex = regexp.MustCompile("barman-cloud.* (?P<Version>.*)
 func getBarmanCloudVersion(command string) (*semver.Version, error) {
 	_, err := exec.LookPath(command)
 	if err != nil {
-		log.Info("barman command not found", "command", command)
+		log.Info("barman-cloud command not found", "command", command)
 		return nil, nil
 	}
 
@@ -103,7 +103,7 @@ func getBarmanCloudVersion(command string) (*semver.Version, error) {
 	matches := barmanCloudVersionRegex.FindStringSubmatch(string(out))
 	version, err := semver.ParseTolerant(matches[1])
 	if err != nil {
-		log.Error(err, "was unable to parse the version from the given match",
+		log.Error(err, "was unable to parse the version from the given regexp match",
 			"command", command,
 			"match", matches[1])
 		return nil, fmt.Errorf("while parsing %s version: %w", command, err)
