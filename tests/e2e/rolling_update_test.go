@@ -628,7 +628,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// Wait until we really deleted it
 				Eventually(func() error {
 					return env.Client.Get(env.Ctx, ctrl.ObjectKey{Name: catalog.Name}, catalog)
-				}, 10).Should(MatchError(apierrs.IsNotFound))
+				}, 30).Should(MatchError(apierrs.IsNotFound, metav1.StatusReasonNotFound))
 			})
 			Context("Three Instances", func() {
 				const (
