@@ -1199,7 +1199,9 @@ var _ = Describe("configuration change validation", func() {
 			},
 		}
 
-		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+		errs := cluster.validateConfiguration()
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Detail).To(ContainSubstring("unknown wal_level value set"))
 	})
 })
 
