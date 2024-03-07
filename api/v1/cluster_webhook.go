@@ -1079,6 +1079,24 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	const walLevelParameter = "wal_level"
+	walLevel := sanitizedParameters[walLevelParameter]
+	if r.Spec.Instances > 1 && walLevel != "logical" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", walLevelParameter),
+				walLevel,
+				"wal_level should be set at `logical` level if the cluster has more than one instance"))
+	} else if r.Spec.Backup.IsBarmanBackupConfigured() && (walLevel != "logical" && walLevel != "replica") {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", walLevelParameter),
+				walLevel,
+				"wal_level should be set at least at `replica` level when backup is configured"))
+	}
+
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
 		if _, err := parsePostgresQuantityValue(value); err != nil {
 			result = append(

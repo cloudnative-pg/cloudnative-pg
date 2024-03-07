@@ -428,6 +428,7 @@ var (
 			{130000, MajorVersionRangeUnlimited}: {
 				"wal_keep_size":      "512MB",
 				"shared_memory_type": "mmap",
+				"wal_level":          "logical",
 			},
 			{120000, MajorVersionRangeUnlimited}: {
 				"ssl_max_protocol_version": "TLSv1.3",
@@ -442,7 +443,6 @@ var (
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
 			"port":                fmt.Sprint(ServerPort),
-			"wal_level":           "logical",
 			"wal_log_hints":       "on",
 			"full_page_writes":    "on",
 			"ssl":                 "on",
