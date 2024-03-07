@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package v1
 
-import (
-	"errors"
-)
+// FindImageForMajor finds the correct image for the selected major version
+func (spec *ImageCatalogSpec) FindImageForMajor(major int) (string, bool) {
+	for _, entry := range spec.Images {
+		if entry.Major == major {
+			return entry.Image, true
+		}
+	}
 
-// ErrNextLoop is not a real error. It forces the current reconciliation loop to stop
-// and return the associated Result object
-var ErrNextLoop = errors.New("stop this loop and return the associated Result object")
-
-// ErrTerminateLoop is not a real error. It forces the current reconciliation loop to stop
-var ErrTerminateLoop = errors.New("stop this loop and do not requeue")
+	return "", false
+}

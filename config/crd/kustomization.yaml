@@ -8,6 +8,8 @@ resources:
 - bases/postgresql.cnpg.io_backups.yaml
 - bases/postgresql.cnpg.io_scheduledbackups.yaml
 - bases/postgresql.cnpg.io_poolers.yaml
+- bases/postgresql.cnpg.io_imagecatalogs.yaml
+- bases/postgresql.cnpg.io_clusterimagecatalogs.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 patches:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.

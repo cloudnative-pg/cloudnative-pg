@@ -20,10 +20,12 @@ import (
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -64,6 +66,32 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		return podNames, podUIDs, pvcUIDs, nil
 	}
 
+	AssertPodsRunOnImage := func(
+		namespace string, clusterName string, imageName string, expectedInstances int, timeout int,
+	) {
+		Eventually(func() (int32, error) {
+			podList, err := env.GetClusterPodList(namespace, clusterName)
+			updatedPods := int32(0)
+			for _, pod := range podList.Items {
+				// We need to check if a pod is ready, otherwise we
+				// may end up asking the status of a container that
+				// doesn't exist yet
+				if utils.IsPodActive(pod) && utils.IsPodReady(pod) {
+					for _, data := range pod.Spec.Containers {
+						if data.Name != specs.PostgresContainerName {
+							continue
+						}
+
+						if data.Image == imageName {
+							updatedPods++
+						}
+					}
+				}
+			}
+			return updatedPods, err
+		}, timeout).Should(BeEquivalentTo(expectedInstances))
+	}
+
 	// Verify that after an update all the pods are ready and running
 	// an updated image
 	AssertUpdateImage := func(namespace string, clusterName string) {
@@ -90,27 +118,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		}, RetryTimeout, PollingTime).Should(BeNil())
 
 		// All the postgres containers should have the updated image
-		Eventually(func() (int32, error) {
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			updatedPods := int32(0)
-			for _, pod := range podList.Items {
-				// We need to check if a pod is ready, otherwise we
-				// may end up asking the status of a container that
-				// doesn't exist yet
-				if utils.IsPodActive(pod) && utils.IsPodReady(pod) {
-					for _, data := range pod.Spec.Containers {
-						if data.Name != specs.PostgresContainerName {
-							continue
-						}
-
-						if data.Image == updatedImageName {
-							updatedPods++
-						}
-					}
-				}
-			}
-			return updatedPods, err
-		}, timeout).Should(BeEquivalentTo(cluster.Spec.Instances))
+		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, timeout)
 
 		// Setting up a cluster with three pods is slow, usually 200-600s
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
@@ -298,73 +306,367 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		})
 	}
 
-	Context("Three Instances", func() {
-		const (
-			namespacePrefix = "cluster-rolling-e2e-three-instances"
-			sampleFile      = fixturesDir + "/rolling_updates/cluster-three-instances.yaml.template"
-		)
-		It("can do a rolling update", func() {
-			// We set up a cluster with a previous release of the same PG major
-			// The yaml has been previously generated from a template and
-			// the image name has to be tagged as foo:MAJ.MIN. We'll update
-			// it to foo:MAJ, representing the latest minor.
-			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+	newImageCatalog := func(namespace string, name string, major int, image string) *apiv1.ImageCatalog {
+		imgCat := &apiv1.ImageCatalog{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			Spec: apiv1.ImageCatalogSpec{
+				Images: []apiv1.CatalogImage{
+					{
+						Image: image,
+						Major: major,
+					},
+				},
+			},
+		}
+
+		return imgCat
+	}
+
+	newImageCatalogCluster := func(
+		namespace string, name string, major int, instances int, storageClass string,
+	) *apiv1.Cluster {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			Spec: apiv1.ClusterSpec{
+				Instances: instances,
+				ImageCatalogRef: &apiv1.ImageCatalogRef{
+					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+						Name: name,
+						Kind: "ImageCatalog",
+					},
+					Major: major,
+				},
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"log_checkpoints":             "on",
+						"log_lock_waits":              "on",
+						"log_min_duration_statement":  "1000",
+						"log_statement":               "ddl",
+						"log_temp_files":              "1024",
+						"log_autovacuum_min_duration": "1s",
+						"log_replication_commands":    "on",
+					},
+				},
+				PrimaryUpdateStrategy: "unsupervised",
+				PrimaryUpdateMethod:   "switchover",
+				Bootstrap: &apiv1.BootstrapConfiguration{InitDB: &apiv1.BootstrapInitDB{
+					Database: "app",
+					Owner:    "app",
+				}},
+				StorageConfiguration: apiv1.StorageConfiguration{
+					Size:         "1Gi",
+					StorageClass: &storageClass,
+				},
+				WalStorage: &apiv1.StorageConfiguration{
+					Size:         "1Gi",
+					StorageClass: &storageClass,
+				},
+			},
+		}
+
+		return cluster
+	}
+
+	newClusterImageCatalog := func(name string, major int, image string) *apiv1.ClusterImageCatalog {
+		imgCat := &apiv1.ClusterImageCatalog{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: apiv1.ImageCatalogSpec{
+				Images: []apiv1.CatalogImage{
+					{
+						Image: image,
+						Major: major,
+					},
+				},
+			},
+		}
+
+		return imgCat
+	}
+
+	AssertRollingUpdateWithImageCatalog := func(
+		cluster *apiv1.Cluster, catalog apiv1.GenericImageCatalog, updatedImageName string,
+		expectNewPrimaryIdx bool,
+	) {
+		var originalPodNames []string
+		var originalPodUID []types.UID
+		var originalPVCUID []types.UID
+
+		namespace := cluster.Namespace
+		clusterName := cluster.Name
+		err := env.Client.Create(env.Ctx, catalog)
+		Expect(err).ToNot(HaveOccurred())
+		err = env.Client.Create(env.Ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+
+		// Gather the number of instances in this Cluster
+		cluster, err = env.GetCluster(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		clusterInstances := cluster.Spec.Instances
+
+		// Gather the original primary Pod
+		originalPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		By("Gathering info on the current state", func() {
+			originalPodNames, originalPodUID, originalPVCUID, err = gatherClusterInfo(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
+		})
+		By("updating the catalog", func() {
+			// Update to the latest minor
+			catalog.GetSpec().Images[0].Image = updatedImageName
+			err := env.Client.Update(env.Ctx, catalog)
+			Expect(err).ToNot(HaveOccurred())
+		})
+		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, 900)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+
+		// Since we're using a pvc, after the update the pods should
+		// have been created with the same name using the same pvc.
+		// Here we check that the names we've saved at the beginning
+		// of the It are the same names of the current pods.
+		By("checking that the names of the pods have not changed", func() {
+			AssertChangedNames(namespace, clusterName, originalPodNames, clusterInstances)
+		})
+		// Even if they have the same names, they should have different
+		// UIDs, as the pods are new. Here we check that the UID
+		// we've saved at the beginning of the It don't match the
+		// current ones.
+		By("checking that the pods are new ones", func() {
+			AssertNewPodsUID(namespace, clusterName, originalPodUID, 0)
+		})
+		// The PVC get reused, so they should have the same UID
+		By("checking that the PVCs are the same", func() {
+			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
+			AssertPvcHasLabels(namespace, clusterName)
+		})
+		// The operator should upgrade the primary last and the primary role
+		// should go to a new TargetPrimary.
+		// In case of single-instance cluster, we expect the primary to just
+		// be deleted and recreated.
+		By("having the current primary on the new TargetPrimary", func() {
+			AssertPrimary(namespace, clusterName, originalPrimaryPod, expectNewPrimaryIdx)
+		})
+		// Check that the new pods are included in the endpoint
+		By("having each pod included in the -r service", func() {
+			AssertReadyEndpoint(namespace, clusterName, clusterInstances)
+		})
+	}
+
+	Context("Image name", func() {
+		Context("Three Instances", func() {
+			const (
+				namespacePrefix = "cluster-rolling-e2e-three-instances"
+				sampleFile      = fixturesDir + "/rolling_updates/cluster-three-instances.yaml.template"
+			)
+			It("can do a rolling update", func() {
+				// We set up a cluster with a previous release of the same PG major
+				// The yaml has been previously generated from a template and
+				// the image name has to be tagged as foo:MAJ.MIN. We'll update
+				// it to foo:MAJ, representing the latest minor.
+				// Create a cluster in a namespace we'll delete after the test
+				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					return env.DeleteNamespace(namespace)
+				})
+				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+				Expect(err).ToNot(HaveOccurred())
+				AssertRollingUpdate(namespace, clusterName, sampleFile, true)
 			})
-			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
-			Expect(err).ToNot(HaveOccurred())
-			AssertRollingUpdate(namespace, clusterName, sampleFile, true)
+		})
+
+		Context("Single Instance", func() {
+			const (
+				namespacePrefix = "cluster-rolling-e2e-single-instance"
+				sampleFile      = fixturesDir + "/rolling_updates/cluster-single-instance.yaml.template"
+			)
+			It("can do a rolling updates on a single instance", func() {
+				// We set up a cluster with a previous release of the same PG major
+				// The yaml has been previously generated from a template and
+				// the image name has to be tagged as foo:MAJ.MIN. We'll update
+				// it to foo:MAJ, representing the latest minor.
+				// Create a cluster in a namespace we'll delete after the test
+				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					return env.DeleteNamespace(namespace)
+				})
+				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+				Expect(err).ToNot(HaveOccurred())
+				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
+			})
+		})
+
+		Context("primaryUpdateMethod set to restart", func() {
+			const (
+				namespacePrefix = "cluster-rolling-with-primary-update-method"
+				sampleFile      = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
+			)
+			It("can do rolling update", func() {
+				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					return env.DeleteNamespace(namespace)
+				})
+				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+				Expect(err).ToNot(HaveOccurred())
+				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
+			})
 		})
 	})
 
-	Context("Single Instance", func() {
+	Context("Image Catalogs", func() {
 		const (
-			namespacePrefix = "cluster-rolling-e2e-single-instance"
-			sampleFile      = fixturesDir + "/rolling_updates/cluster-single-instance.yaml.template"
+			clusterName = "image-catalog"
 		)
-		It("can do a rolling updates on a single instance", func() {
-			// We set up a cluster with a previous release of the same PG major
-			// The yaml has been previously generated from a template and
-			// the image name has to be tagged as foo:MAJ.MIN. We'll update
-			// it to foo:MAJ, representing the latest minor.
-			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
-			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
-			Expect(err).ToNot(HaveOccurred())
-			AssertRollingUpdate(namespace, clusterName, sampleFile, false)
-		})
-	})
+		var storageClass string
+		var preRollingImg string
+		var updatedImageName string
+		var major int
+		BeforeEach(func() {
+			storageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+			preRollingImg = os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
+			updatedImageName = os.Getenv("POSTGRES_IMG")
+			if updatedImageName == "" {
+				updatedImageName = configuration.Current.PostgresImageName
+			}
 
-	Context("primaryUpdateMethod set to restart", func() {
-		const (
-			namespacePrefix = "cluster-rolling-with-primary-update-method"
-			sampleFile      = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
-		)
-		It("can do rolling update", func() {
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
+			// We automate the extraction of the major version from the image, because we don't want to keep maintaining
+			// the major version in the test
+			version, err := postgres.GetPostgresVersionFromTag(utils.GetImageTag(preRollingImg))
+			if err != nil {
+				Expect(err).ToNot(HaveOccurred())
+			}
+			major = postgres.GetPostgresMajorVersion(version) / 10000
+		})
+
+		Context("ImageCatalog", func() {
+			Context("Three Instances", func() {
+				const (
+					namespacePrefix = "imagecatalog-cluster-rolling-e2e-three-instances"
+				)
+				It("can do a rolling update", func() {
+					// We set up a cluster with a previous release of the same PG major
+					// The yaml has been previously generated from a template and
+					// the image name has to be tagged as foo:MAJ.MIN. We'll update
+					// it to foo:MAJ, representing the latest minor.
+					// Create a cluster in a namespace we'll delete after the test
+					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					Expect(err).ToNot(HaveOccurred())
+					DeferCleanup(func() error {
+						if CurrentSpecReport().Failed() {
+							env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+						}
+						return env.DeleteNamespace(namespace)
+					})
+
+					// Create a new image catalog and a new cluster
+					catalog := newImageCatalog(namespace, clusterName, major, preRollingImg)
+					cluster := newImageCatalogCluster(namespace, clusterName, major, 3, storageClass)
+
+					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, true)
+				})
 			})
-			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
-			Expect(err).ToNot(HaveOccurred())
-			AssertRollingUpdate(namespace, clusterName, sampleFile, false)
+			Context("Single Instance", func() {
+				const (
+					namespacePrefix = "imagecatalog-cluster-rolling-e2e-single-instance"
+				)
+				It("can do a rolling updates on a single instance", func() {
+					// We set up a cluster with a previous release of the same PG major
+					// The yaml has been previously generated from a template and
+					// the image name has to be tagged as foo:MAJ.MIN. We'll update
+					// it to foo:MAJ, representing the latest minor.
+					// Create a cluster in a namespace we'll delete after the test
+					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					Expect(err).ToNot(HaveOccurred())
+					DeferCleanup(func() error {
+						if CurrentSpecReport().Failed() {
+							env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+						}
+						return env.DeleteNamespace(namespace)
+					})
+
+					catalog := newImageCatalog(namespace, clusterName, major, preRollingImg)
+					cluster := newImageCatalogCluster(namespace, clusterName, major, 1, storageClass)
+					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, false)
+				})
+			})
+		})
+		Context("ClusterImageCatalog", func() {
+			var catalog *apiv1.ClusterImageCatalog
+			BeforeEach(func() {
+				catalog = newClusterImageCatalog(clusterName, major, preRollingImg)
+			})
+			AfterEach(func() {
+				err := env.Client.Delete(env.Ctx, catalog)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			Context("Three Instances", func() {
+				const (
+					namespacePrefix = "clusterimagecatalog-cluster-rolling-e2e-three-instances"
+				)
+				It("can do a rolling update", func() {
+					// We set up a cluster with a previous release of the same PG major
+					// The yaml has been previously generated from a template and
+					// the image name has to be tagged as foo:MAJ.MIN. We'll update
+					// it to foo:MAJ, representing the latest minor.
+					// Create a cluster in a namespace we'll delete after the test
+					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					Expect(err).ToNot(HaveOccurred())
+					DeferCleanup(func() error {
+						if CurrentSpecReport().Failed() {
+							env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+						}
+						return env.DeleteNamespace(namespace)
+					})
+
+					cluster := newImageCatalogCluster(namespace, clusterName, major, 3, storageClass)
+					cluster.Spec.ImageCatalogRef.Kind = "ClusterImageCatalog"
+					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, true)
+				})
+			})
+			Context("Single Instance", func() {
+				const (
+					namespacePrefix = "clusterimagecatalog-cluster-rolling-e2e-single-instance"
+				)
+				It("can do a rolling updates on a single instance", func() {
+					// We set up a cluster with a previous release of the same PG major
+					// The yaml has been previously generated from a template and
+					// the image name has to be tagged as foo:MAJ.MIN. We'll update
+					// it to foo:MAJ, representing the latest minor.
+					// Create a cluster in a namespace we'll delete after the test
+					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					Expect(err).ToNot(HaveOccurred())
+					DeferCleanup(func() error {
+						if CurrentSpecReport().Failed() {
+							env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+						}
+						return env.DeleteNamespace(namespace)
+					})
+
+					cluster := newImageCatalogCluster(namespace, clusterName, major, 1, storageClass)
+					cluster.Spec.ImageCatalogRef.Kind = "ClusterImageCatalog"
+					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, false)
+				})
+			})
 		})
 	})
 })

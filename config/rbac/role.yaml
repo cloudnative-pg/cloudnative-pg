@@ -232,6 +232,14 @@ rules:
 - apiGroups:
   - postgresql.cnpg.io
   resources:
+  - clusterimagecatalogs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
   - clusters
   verbs:
   - create
@@ -255,6 +263,14 @@ rules:
   - get
   - patch
   - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - imagecatalogs
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - postgresql.cnpg.io

@@ -89,7 +89,7 @@ func (r *Cluster) SetDefaults() {
 
 func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	// Defaulting the image name if not specified
-	if r.Spec.ImageName == "" {
+	if r.Spec.ImageName == "" && r.Spec.ImageCatalogRef == nil {
 		r.Spec.ImageName = configuration.Current.PostgresImageName
 	}
 
@@ -673,7 +673,10 @@ func (r *Cluster) validatePgBaseBackupApplicationDatabase() field.ErrorList {
 }
 
 // validateApplicationDatabase validate the configuration for application database
-func (r *Cluster) validateApplicationDatabase(database string, owner string, command string,
+func (r *Cluster) validateApplicationDatabase(
+	database string,
+	owner string,
+	command string,
 ) field.ErrorList {
 	var result field.ErrorList
 	// If you specify the database name, then you need also to specify the
@@ -926,10 +929,11 @@ func (r *Cluster) validateImageName() field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.ImageName == "" {
-		// We'll use the default one
+		// We'll use the default one or the one in the catalog
 		return result
 	}
 
+	// We have to check if the image has a valid tag
 	tag := utils.GetImageTag(r.Spec.ImageName)
 	switch tag {
 	case "latest":
@@ -1264,34 +1268,41 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 // to a new one.
 func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
-
-	newVersion := r.Spec.ImageName
-	if newVersion == "" {
-		// We'll use the default one
-		newVersion = configuration.Current.PostgresImageName
+	var newMajor, oldMajor int
+	var err error
+	var newImagePath *field.Path
+	if r.Spec.ImageCatalogRef != nil {
+		newImagePath = field.NewPath("spec", "imageCatalogRef")
+	} else {
+		newImagePath = field.NewPath("spec", "imageName")
 	}
 
-	oldVersion := old.Spec.ImageName
-	if oldVersion == "" {
-		oldVersion = configuration.Current.PostgresImageName
-	}
-
-	status, err := postgres.CanUpgrade(oldVersion, newVersion)
+	r.Status.Image = ""
+	newMajor, err = r.GetPostgresqlVersion()
 	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return result
+	}
+
+	old.Status.Image = ""
+	oldMajor, err = old.GetPostgresqlVersion()
+	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return result
+	}
+
+	status := postgres.IsUpgradePossible(oldMajor, newMajor)
+
+	if !status {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
-				fmt.Sprintf("wrong version: %v", err.Error())))
-	} else if !status {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
-				fmt.Sprintf("can't upgrade between %v and %v",
-					oldVersion, newVersion)))
+				newImagePath,
+				newMajor,
+				fmt.Sprintf("can't upgrade between majors %v and %v",
+					oldMajor, newMajor)))
 	}
 
 	return result

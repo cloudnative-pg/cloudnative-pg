@@ -717,12 +717,23 @@ var _ = Describe("PostgreSQL version detection", func() {
 		},
 	}
 
-	It("correctly extract PostgreSQL versions", func() {
+	It("correctly extract PostgreSQL versions from ImageName", func() {
 		cluster := Cluster{}
 		for _, test := range tests {
 			cluster.Spec.ImageName = test.imageName
 			Expect(cluster.GetPostgresqlVersion()).To(Equal(test.postgresVersion))
 		}
+	})
+	It("correctly extract PostgreSQL versions from ImageCatalogRef", func() {
+		cluster := Cluster{}
+		cluster.Spec.ImageCatalogRef = &ImageCatalogRef{
+			TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+				Name: "test",
+				Kind: "ImageCatalog",
+			},
+			Major: 16,
+		}
+		Expect(cluster.GetPostgresqlVersion()).To(Equal(160000))
 	})
 })
 
@@ -1187,5 +1198,30 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 				Expect(isExcludedByUser).To(BeFalse())
 			})
 		})
+	})
+})
+
+var _ = Describe("AvailableArchitectures", func() {
+	cluster := Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "clustername",
+		},
+		Status: ClusterStatus{
+			AvailableArchitectures: []AvailableArchitecture{
+				{
+					GoArch: "amd64",
+					Hash:   "precalculatedHash",
+				},
+			},
+		},
+	}
+	It("returns an availableArchitecture given it's name", func() {
+		availableArch := cluster.Status.GetAvailableArchitecture("amd64")
+		Expect(availableArch.GoArch).To(BeEquivalentTo("amd64"))
+		Expect(availableArch.Hash).To(BeEquivalentTo("precalculatedHash"))
+	})
+	It("returns nil if an availableArchitecture is not found", func() {
+		availableArch := cluster.Status.GetAvailableArchitecture("arm64")
+		Expect(availableArch).To(BeNil())
 	})
 })

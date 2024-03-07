@@ -39,7 +39,7 @@ Please refer to the ["Supported releases"](supported_releases.md) page for detai
 
 ## Container images
 
-The [CloudNativePG community](https://github.com/cloudnative-pg)  maintains
+The [CloudNativePG community](https://github.com/cloudnative-pg) maintains
 container images for both the operator and the operand, that is PostgreSQL.
 
 The CloudNativePG operator container images are [distroless](https://github.com/GoogleContainerTools/distroless)
@@ -51,11 +51,6 @@ on multiple architectures, directly from the
 [`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
 Additionally, the Community provides images for the [PostGIS extension](postgis.md).
-
-!!! Warning
-    CloudNativePG requires that all nodes in a Kubernetes cluster have the
-    same CPU architecture, thus a hybrid CPU architecture Kubernetes cluster is not
-    supported.
 
 ## Main features
 
@@ -96,9 +91,10 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Parallel WAL archiving and restore to allow the database to keep up with WAL
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
-  retention management at the object store layer Replica clusters for
-* PostgreSQL deployments across multiple Kubernetes
+  retention management at the object store layer
+* Replica clusters for PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
+* Delayed Replica clusters
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)
