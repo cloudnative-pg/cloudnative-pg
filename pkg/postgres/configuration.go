@@ -421,6 +421,9 @@ var (
 			{MajorVersionRangeUnlimited, 120000}: {
 				"wal_keep_segments": "32",
 			},
+			{MajorVersionRangeUnlimited, MajorVersionRangeUnlimited}: {
+				"wal_level": "logical",
+			},
 			{120000, 130000}: {
 				"wal_keep_segments":  "32",
 				"shared_memory_type": "mmap",
@@ -428,7 +431,6 @@ var (
 			{130000, MajorVersionRangeUnlimited}: {
 				"wal_keep_size":      "512MB",
 				"shared_memory_type": "mmap",
-				"wal_level":          "logical",
 			},
 			{120000, MajorVersionRangeUnlimited}: {
 				"ssl_max_protocol_version": "TLSv1.3",
