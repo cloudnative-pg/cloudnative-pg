@@ -956,7 +956,7 @@ func (instance *Instance) Rewind(ctx context.Context, postgresMajorVersion int) 
 
 	// As PostgreSQL 13 introduces support of restore from the WAL archive in pg_rewind,
 	// let’s automatically use it, if possible
-	if postgresMajorVersion >= 13 {
+	if postgresMajorVersion >= 130000 {
 		options = append(options, "--restore-target-wal")
 	}
 
