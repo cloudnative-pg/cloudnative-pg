@@ -84,7 +84,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	// Setup a global MinIO service on his own namespace
+	// Set up a global MinIO service on his own namespace
 	err = env.CreateNamespace(minioEnv.Namespace)
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(func() {

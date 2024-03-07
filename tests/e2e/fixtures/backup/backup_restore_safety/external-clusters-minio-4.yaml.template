@@ -57,7 +57,7 @@ spec:
     - name: pg-backup-minio
       barmanObjectStore:
         destinationPath: s3://cluster-backups/
-        endpointURL: http://minio-service.minio:9000
+        endpointURL: https://minio-service.minio:9000
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds

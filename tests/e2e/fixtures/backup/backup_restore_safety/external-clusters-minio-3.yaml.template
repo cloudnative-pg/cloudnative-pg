@@ -35,7 +35,7 @@ spec:
     target: primary
     barmanObjectStore:
       destinationPath: s3://cluster-backups/
-      endpointURL: http://minio-service.minio:9000
+      endpointURL: https://minio-service.minio:9000
       s3Credentials:
         accessKeyId:
           name: backup-storage-creds
@@ -57,7 +57,7 @@ spec:
     - name: external-cluster-minio-1
       barmanObjectStore:
         destinationPath: s3://cluster-backups/pg-backup-minio/
-        endpointURL: http://minio-service.minio:9000
+        endpointURL: https://minio-service.minio:9000
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds

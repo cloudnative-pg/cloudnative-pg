@@ -39,7 +39,7 @@ spec:
     target: primary
     barmanObjectStore:
       destinationPath: s3://cluster2-full-backup/
-      endpointURL: http://minio-service.minio:9000
+      endpointURL: https://minio-service.minio:9000
       s3Credentials:
         accessKeyId:
           name: aws-creds

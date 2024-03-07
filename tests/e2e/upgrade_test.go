@@ -389,7 +389,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("creating the cloud storage credentials", func() {
 			AssertStorageCredentialsAreCreated(upgradeNamespace, "aws-creds", "minio", "minio123")
 		})
-
+		By("create the certificates for MinIO", func() {
+			err := minioEnv.CreateCaSecret(env, upgradeNamespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
 		// Create the cluster. Since it will take a while, we'll do more stuff
 		// in parallel and check for it to be up later.
 		By(fmt.Sprintf("creating a Cluster in the '%v' upgradeNamespace",
