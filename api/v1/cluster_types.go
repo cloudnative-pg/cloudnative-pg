@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -2015,6 +2016,22 @@ type DataBackupConfiguration struct {
 	// possible. `false` by default.
 	// +optional
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
+
+	// AdditionalCommandArgs represents additional arguments that can be appended
+	// to the 'barman-cloud-backup' command-line invocation. These arguments
+	// provide flexibility to customize the backup process further according to
+	// specific requirements or configurations.
+	//
+	// Example:
+	// In a scenario where specialized backup options are required, such as setting
+	// a specific timeout or defining custom behavior, users can use this field
+	// to specify additional command arguments.
+	//
+	// Note:
+	// It's essential to ensure that the provided arguments are valid and supported
+	// by the 'barman-cloud-backup' command, to avoid potential errors or unintended
+	// behavior during execution.
+	AdditionalCommandArgs []string `json:"additionalCommandArgs,omitempty"`
 }
 
 // S3Credentials is the type for the credentials to be used to upload
@@ -2166,6 +2183,23 @@ type ExternalCluster struct {
 	// The configuration for the barman-cloud tool suite
 	// +optional
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
+}
+
+// AppendAdditionalCommandArgs adds custom arguments as barman cloud command-line options
+func (cfg *BarmanObjectStoreConfiguration) AppendAdditionalCommandArgs(options []string) []string {
+	if cfg == nil || cfg.Data == nil {
+		return options
+	}
+
+	for _, userOption := range cfg.Data.AdditionalCommandArgs {
+		key := strings.Split(userOption, "=")[0]
+		if key == "" || slices.Contains(options, key) {
+			continue
+		}
+		options = append(options, userOption)
+	}
+
+	return options
 }
 
 // GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified

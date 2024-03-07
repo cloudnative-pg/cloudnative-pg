@@ -56,6 +56,9 @@ spec:
           compression: gzip
         data:
           immediateCheckpoint: true
+          additionalCommandArgs:
+            - "--min-chunk-size=5MB"
+            - "--read-timeout=60"
         tags:
           retention: "30days"
         historyTags:

@@ -3,6 +3,7 @@ API's
 APIs
 ARMv
 AcolumnName
+AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
@@ -155,7 +156,6 @@ GolangCI
 GoogleCredentials
 Grafana
 HH
-Hai
 HashiCorp
 HistoryTags
 Huß
@@ -429,6 +429,7 @@ abd
 accessKeyId
 accessModes
 adc
+additionalCommandArgs
 additionalPodAffinity
 additionalPodAntiAffinity
 addons

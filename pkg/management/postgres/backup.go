@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -134,7 +135,7 @@ func getDataConfiguration(
 			strconv.Itoa(int(*configuration.Data.Jobs)))
 	}
 
-	return options, nil
+	return configuration.AppendAdditionalCommandArgs(options), nil
 }
 
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
@@ -309,7 +310,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	// record the backup beginning
-	b.Log.Info("Backup started", "options", options)
+	b.Log.Info("Starting barman-cloud-backup", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
@@ -331,6 +332,14 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	cmd.Env = b.Env
 	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
 	if err := execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup); err != nil {
+		const badArgumentsErrorCode = "3"
+		if err.Error() == badArgumentsErrorCode {
+			descriptiveError := errors.New("invalid arguments for barman-cloud-backup. " +
+				"Ensure that the additionalCommandArgs field is correctly populated")
+			b.Log.Error(descriptiveError, "error while executing barman-cloud-backup",
+				"arguments", options)
+			return descriptiveError
+		}
 		return err
 	}
 
