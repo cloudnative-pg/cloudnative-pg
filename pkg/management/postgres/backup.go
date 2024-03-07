@@ -334,8 +334,8 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	if err := execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup); err != nil {
 		const badArgumentsErrorCode = "3"
 		if err.Error() == badArgumentsErrorCode {
-			descriptiveError := errors.New("bad arguments encountered while executing barman-cloud-backup, " +
-				"ensure that additionalCommandArgs field is correctly populated")
+			descriptiveError := errors.New("invalid arguments for barman-cloud-backup. " +
+				"Ensure that the additionalCommandArgs field is correctly populated")
 			b.Log.Error(descriptiveError, "error while executing barman-cloud-backup",
 				"arguments", options)
 			return descriptiveError

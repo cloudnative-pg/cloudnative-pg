@@ -114,8 +114,8 @@ func CheckRecordForQuery(entry map[string]interface{}, errorTestQuery, user, dat
 	return err == nil
 }
 
-// CheckOptionForBarmanCommand check if the expected options is used in the barman command execution log
-func CheckOptionForBarmanCommand(
+// CheckOptionsForBarmanCommand checks if the expected options are used from the barman command execution log
+func CheckOptionsForBarmanCommand(
 	logEntries []map[string]interface{},
 	message, backupName, podName string,
 	optionsExpected []string,

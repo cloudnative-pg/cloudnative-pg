@@ -28,6 +28,6 @@ spec:
         compression: gzip
       data:
         additionalCommandArgs:
-          - "--min-truck-size=5MB"
+          - "--min-chunk-size=5MB"
           - "--read-timeout=60"
           - "-vv"

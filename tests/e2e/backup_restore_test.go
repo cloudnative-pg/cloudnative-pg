@@ -204,7 +204,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				}, 30).Should(BeEmpty())
 			})
 
-			By("verify the backup is use expected barman-cloud-backup options", func() {
+			By("verifying the backup is using the expected barman-cloud-backup options", func() {
 				Expect(backup).ToNot(BeNil())
 				Expect(backup.Status.InstanceID).ToNot(BeNil())
 				logEntries, err := testUtils.ParseJSONLogs(namespace, backup.Status.InstanceID.PodName, env)
@@ -214,7 +214,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					"--min-chunk-size=5MB",
 					"--read-timeout=59",
 				}
-				result, err := testUtils.CheckOptionForBarmanCommand(
+				result, err := testUtils.CheckOptionsForBarmanCommand(
 					logEntries,
 					barmanCloudBackupLogEntry,
 					backup.Name,
@@ -1337,7 +1337,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			// Creates the cluster
 			AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
 
-			By("backup and verify the backup is use expected barman-cloud-backup options", func() {
+			By("backup and verify the backup is using the expected barman-cloud-backup options", func() {
 				// Taking backup of source cluster
 				backup := testUtils.ExecuteBackup(
 					namespace,
@@ -1355,7 +1355,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 					"--min-chunk-size=5MB",
 					"--read-timeout=60",
 				}
-				result, err := testUtils.CheckOptionForBarmanCommand(
+				result, err := testUtils.CheckOptionsForBarmanCommand(
 					logEntries,
 					barmanCloudBackupLogEntry,
 					backup.Name,
