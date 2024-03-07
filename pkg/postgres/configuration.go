@@ -25,15 +25,20 @@ import (
 	"text/template"
 )
 
+// WalLevelValue a value that is assigned to the 'wal_level' configuration field
 type WalLevelValue string
 
+// WalLevelParameter the configuration key containing the wal_level value
+const WalLevelParameter = "wal_level"
+
+// An acceptable wal_level value
 const (
-	WalLevelParameter                  = "wal_level"
 	WalLevelValueLogical WalLevelValue = "logical"
 	WalLevelValueReplica WalLevelValue = "replica"
 	WalLevelValueMinimal WalLevelValue = "minimal"
 )
 
+// IsKnownValue returns a bool indicating if the contained value is a well-know value
 func (w WalLevelValue) IsKnownValue() bool {
 	switch w {
 	case WalLevelValueLogical, WalLevelValueReplica, WalLevelValueMinimal:
@@ -43,6 +48,8 @@ func (w WalLevelValue) IsKnownValue() bool {
 	}
 }
 
+// IsStricterThanMinimal returns a boolean indicating if the contained value is stricter than the minimal
+// wal_level
 func (w WalLevelValue) IsStricterThanMinimal() bool {
 	switch w {
 	case WalLevelValueLogical, WalLevelValueReplica:

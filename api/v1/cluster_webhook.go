@@ -1081,7 +1081,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 
 	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.WalLevelParameter])
 	hasWalLevelRequirement := r.Spec.Instances > 1 || r.Spec.Backup.IsBarmanBackupConfigured() || r.IsReplica()
-	if hasWalLevelRequirement && walLevel.IsStricterThanMinimal() {
+	if hasWalLevelRequirement && !walLevel.IsStricterThanMinimal() {
 		result = append(
 			result,
 			field.Invalid(
