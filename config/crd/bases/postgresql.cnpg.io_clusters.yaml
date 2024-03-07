@@ -1095,6 +1095,27 @@ spec:
                           be unencrypted in the object store, according to the bucket default
                           policy.
                         properties:
+                          additionalCommandArgs:
+                            description: |-
+                              AdditionalCommandArgs represents additional arguments that can be appended
+                              to the 'barman-cloud-backup' command-line invocation. These arguments
+                              provide flexibility to customize the backup process further according to
+                              specific requirements or configurations.
+
+
+                              Example:
+                              In a scenario where specialized backup options are required, such as setting
+                              a specific timeout or defining custom behavior, users can use this field
+                              to specify additional command arguments.
+
+
+                              Note:
+                              It's essential to ensure that the provided arguments are valid and supported
+                              by the 'barman-cloud-backup' command, to avoid potential errors or unintended
+                              behavior during execution.
+                            items:
+                              type: string
+                            type: array
                           compression:
                             description: |-
                               Compress a backup file (a tar file per tablespace) while streaming it
@@ -2363,6 +2384,27 @@ spec:
                             be unencrypted in the object store, according to the bucket default
                             policy.
                           properties:
+                            additionalCommandArgs:
+                              description: |-
+                                AdditionalCommandArgs represents additional arguments that can be appended
+                                to the 'barman-cloud-backup' command-line invocation. These arguments
+                                provide flexibility to customize the backup process further according to
+                                specific requirements or configurations.
+
+
+                                Example:
+                                In a scenario where specialized backup options are required, such as setting
+                                a specific timeout or defining custom behavior, users can use this field
+                                to specify additional command arguments.
+
+
+                                Note:
+                                It's essential to ensure that the provided arguments are valid and supported
+                                by the 'barman-cloud-backup' command, to avoid potential errors or unintended
+                                behavior during execution.
+                              items:
+                                type: string
+                              type: array
                             compression:
                               description: |-
                                 Compress a backup file (a tar file per tablespace) while streaming it
