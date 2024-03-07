@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"context"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
@@ -538,9 +537,6 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	})
 
 	Context("Image Catalogs", func() {
-		const (
-			clusterName = "image-catalog"
-		)
 		var storageClass string
 		var preRollingImg string
 		var updatedImageName string
@@ -563,6 +559,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		})
 
 		Context("ImageCatalog", func() {
+			const (
+				clusterName = "image-catalog"
+			)
 			Context("Three Instances", func() {
 				const (
 					namespacePrefix = "imagecatalog-cluster-rolling-e2e-three-instances"
@@ -614,7 +613,10 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				})
 			})
 		})
-		Context("ClusterImageCatalog", func() {
+		Context("ClusterImageCatalog", Serial, func() {
+			const (
+				clusterName = "cluster-image-catalog"
+			)
 			var catalog *apiv1.ClusterImageCatalog
 			BeforeEach(func() {
 				catalog = newClusterImageCatalog(clusterName, major, preRollingImg)
@@ -624,9 +626,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				Expect(err).ToNot(HaveOccurred())
 
 				// Wait until we really deleted it
-				Eventually(func(ctx context.Context) error {
-					return env.Client.Get(ctx, ctrl.ObjectKey{Name: catalog.Name}, catalog)
-				}).Should(MatchError(apierrs.IsNotFound))
+				Eventually(func() error {
+					return env.Client.Get(env.Ctx, ctrl.ObjectKey{Name: catalog.Name}, catalog)
+				}, 10).Should(MatchError(apierrs.IsNotFound))
 			})
 			Context("Three Instances", func() {
 				const (
