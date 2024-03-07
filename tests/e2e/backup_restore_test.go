@@ -41,6 +41,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		azuriteBlobSampleFile = fixturesDir + "/backup/azurite/cluster-backup.yaml.template"
 
 		tableName = "to_restore"
+
+		barmanCloudBackupLogEntry = "Starting barman-cloud-backup"
 	)
 
 	var namespace, clusterName, curlPodName string
@@ -165,7 +167,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				testTableName            = "test_table"
 				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml.template"
 			)
-
+			var backup *apiv1.Backup
 			restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			backupName, err := env.GetResourceNameFromYAML(backupFile)
@@ -183,7 +185,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			// There should be a backup resource and
 			By(fmt.Sprintf("backing up a cluster and verifying it exists on minio, backup path is %v", latestTar), func() {
-				testUtils.ExecuteBackup(namespace, backupFile, false, testTimeouts[testUtils.BackupIsReady], env)
+				backup = testUtils.ExecuteBackup(namespace, backupFile, false, testTimeouts[testUtils.BackupIsReady], env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
@@ -200,6 +202,27 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 					cluster, err := env.GetCluster(namespace, clusterName)
 					return cluster.Status.LastFailedBackup, err
 				}, 30).Should(BeEmpty())
+			})
+
+			By("verifying the backup is using the expected barman-cloud-backup options", func() {
+				Expect(backup).ToNot(BeNil())
+				Expect(backup.Status.InstanceID).ToNot(BeNil())
+				logEntries, err := testUtils.ParseJSONLogs(namespace, backup.Status.InstanceID.PodName, env)
+				Expect(err).ToNot(HaveOccurred())
+				expectedBaseBackupOptions := []string{
+					"--immediate-checkpoint",
+					"--min-chunk-size=5MB",
+					"--read-timeout=59",
+				}
+				result, err := testUtils.CheckOptionsForBarmanCommand(
+					logEntries,
+					barmanCloudBackupLogEntry,
+					backup.Name,
+					backup.Status.InstanceID.PodName,
+					expectedBaseBackupOptions,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(BeTrue())
 			})
 
 			By("executing a second backup and verifying the number of backups on minio", func() {
@@ -1232,7 +1255,9 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 	const (
 		level = tests.High
 
-		clusterSampleFile = fixturesDir + "/backup/backup_restore_safety/cluster-with-backup-minio.yaml.template"
+		clusterSampleFile         = fixturesDir + "/backup/backup_restore_safety/cluster-with-backup-minio.yaml.template"
+		barmanCloudBackupLogEntry = "Starting barman-cloud-backup"
+		aa
 	)
 
 	var namespace, clusterName, namespace2 string
@@ -1307,8 +1332,34 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			// Creates the cluster
 			AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
 
-			// Taking backup of source cluster
-			testUtils.ExecuteBackup(namespace, sourceBackup, false, testTimeouts[testUtils.BackupIsReady], env)
+			By("backup and verify the backup is using the expected barman-cloud-backup options", func() {
+				// Taking backup of source cluster
+				backup := testUtils.ExecuteBackup(
+					namespace,
+					sourceBackup,
+					false,
+					testTimeouts[testUtils.BackupIsReady],
+					env,
+				)
+				Expect(backup).ToNot(BeNil())
+				Expect(backup.Status.InstanceID).ToNot(BeNil())
+				logEntries, err := testUtils.ParseJSONLogs(namespace, backup.Status.InstanceID.PodName, env)
+				Expect(err).ToNot(HaveOccurred())
+				expectedBaseBackupOptions := []string{
+					"--immediate-checkpoint",
+					"--min-chunk-size=5MB",
+					"--read-timeout=60",
+				}
+				result, err := testUtils.CheckOptionsForBarmanCommand(
+					logEntries,
+					barmanCloudBackupLogEntry,
+					backup.Name,
+					backup.Status.InstanceID.PodName,
+					expectedBaseBackupOptions,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(BeTrue())
+			})
 		})
 
 		It("restore a cluster with different backup destination and creates another cluster with same path as "+

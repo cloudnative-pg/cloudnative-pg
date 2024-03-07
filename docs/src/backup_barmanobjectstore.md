@@ -29,7 +29,7 @@ A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
 [replica clusters](replica_cluster.md)
 for more information about designated primary instances), or alternatively
-on a [standby](#backup-from-a-standby).
+on a [standby](backup.md#backup-from-a-standby).
 
 ## Common object stores
 
@@ -126,9 +126,9 @@ for backup objects, namely base backups, WAL files and history files.
 
 You can use two properties in the `.spec.backup.barmanObjectStore` definition:
 
-- `tags`: key-value pair tags to be added to backup objects and archived WAL
+* `tags`: key-value pair tags to be added to backup objects and archived WAL
   file in the backup object store
-- `historyTags`: key-value pair tags to be added to archived history files in
+* `historyTags`: key-value pair tags to be added to archived history files in
   the backup object store
 
 The excerpt of a YAML manifest below provides an example of usage of this
@@ -146,4 +146,36 @@ spec:
         backupRetentionPolicy: "expire"
       historyTags:
         backupRetentionPolicy: "keep"
+```
+
+## Extra options for the backup command
+
+You can append additional options to the `barman-cloud-backup` command by using
+the `additionalCommandArgs` property in the
+`.spec.backup.barmanObjectStore.data` section.
+This property is a list of strings that will be appended to the
+`barman-cloud-backup` command.
+For example, you can use the `--read-timeout=60` to customize the connection
+reading timeout.
+For additional options supported by `barman-cloud-backup` you can refer to the
+official barman  documentation [here](https://www.pgbarman.org/documentation/).
+
+If an option provided in `additionalCommandArgs` is already present in the
+declared options in  the `barmanObjectStore` section, the extra option will be
+ignored.
+
+The following is an example of how to use this property:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      [...]
+      data:
+        additionalCommandArgs:
+        - "--min-chunk-size=5MB"
+        - "--read-timeout=60"
 ```
