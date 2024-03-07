@@ -25,6 +25,33 @@ import (
 	"text/template"
 )
 
+type WalLevelValue string
+
+const (
+	WalLevelParameter                  = "wal_level"
+	WalLevelValueLogical WalLevelValue = "logical"
+	WalLevelValueReplica WalLevelValue = "replica"
+	WalLevelValueMinimal WalLevelValue = "minimal"
+)
+
+func (w WalLevelValue) IsKnownValue() bool {
+	switch w {
+	case WalLevelValueLogical, WalLevelValueReplica, WalLevelValueMinimal:
+		return true
+	default:
+		return false
+	}
+}
+
+func (w WalLevelValue) IsStricterThanMinimal() bool {
+	switch w {
+	case WalLevelValueLogical, WalLevelValueReplica:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
 	// hbaTemplateString is the template used to generate the pg_hba.conf
 	// configuration file

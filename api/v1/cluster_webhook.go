@@ -1079,33 +1079,26 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
-	const (
-		walLevelParameter    = "wal_level"
-		walLevelValueLogical = "logical"
-		walLevelValueReplica = "replica"
-		walLevelValueMinimal = "minimal"
-	)
-
-	walLevel := sanitizedParameters[walLevelParameter]
-	if (r.Spec.Instances > 1 || r.Spec.Backup.IsBarmanBackupConfigured() || r.IsReplica()) &&
-		(walLevel != walLevelValueLogical && walLevel != walLevelValueReplica) {
+	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.WalLevelParameter])
+	hasWalLevelRequirement := r.Spec.Instances > 1 || r.Spec.Backup.IsBarmanBackupConfigured() || r.IsReplica()
+	if hasWalLevelRequirement && walLevel.IsStricterThanMinimal() {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "postgresql", "parameters", walLevelParameter),
+				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
 				walLevel,
 				"wal_level should be set at 'logical' or `replica` when backup is configured, "+
 					"'.instances' field is greater than one, or is a replica cluster"))
-	} else if walLevel != walLevelValueLogical && walLevel != walLevelValueReplica && walLevel != walLevelValueMinimal {
+	} else if !walLevel.IsKnownValue() {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "postgresql", "parameters", walLevelParameter),
+				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
 				walLevel,
 				fmt.Sprintf("unknown wal_level value set. Allowed values: %s, %s, %s",
-					walLevelValueLogical,
-					walLevelValueReplica,
-					walLevelValueMinimal,
+					postgres.WalLevelValueLogical,
+					postgres.WalLevelValueReplica,
+					postgres.WalLevelValueMinimal,
 				)))
 	}
 
