@@ -1079,10 +1079,16 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
-	const walLevelParameter = "wal_level"
+	const (
+		walLevelParameter    = "wal_level"
+		walLevelValueLogical = "logical"
+		walLevelValueReplica = "replica"
+		walLevelValueMinimal = "minimal"
+	)
+
 	walLevel := sanitizedParameters[walLevelParameter]
 	if (r.Spec.Instances > 1 || r.Spec.Backup.IsBarmanBackupConfigured()) &&
-		(walLevel != "logical" && walLevel != "replica") {
+		(walLevel != walLevelValueLogical && walLevel != walLevelValueReplica) {
 		result = append(
 			result,
 			field.Invalid(
@@ -1090,6 +1096,17 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 				walLevel,
 				"wal_level should be set at 'logical' or `replica` when backup is configured or "+
 					"'.instances' field is greater than one"))
+	} else if walLevel != walLevelValueLogical && walLevel != walLevelValueReplica && walLevel != walLevelValueMinimal {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", walLevelParameter),
+				walLevel,
+				fmt.Sprintf("unknown wal_level value set. Allowed values: %s, %s, %s",
+					walLevelValueLogical,
+					walLevelValueReplica,
+					walLevelValueMinimal,
+				)))
 	}
 
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {

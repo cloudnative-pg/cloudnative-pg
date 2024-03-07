@@ -1066,6 +1066,141 @@ var _ = Describe("configuration change validation", func() {
 
 		Expect(cluster.validateConfiguration()).To(HaveLen(1))
 	})
+
+	It("should allow the setting of the wal_level", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "minimal",
+					},
+				},
+			},
+		}
+
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should reject minimal wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "minimal",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow replica wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "replica",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should allow logical wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "logical",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should reject minimal wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "minimal",
+					},
+				},
+			},
+		}
+
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow replica wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "replica",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should allow logical wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "logical",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should reject an unknown wal_level value", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "test",
+					},
+				},
+			},
+		}
+
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
 })
 
 var _ = Describe("validate image name change", func() {

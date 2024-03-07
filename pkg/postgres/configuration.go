@@ -357,7 +357,6 @@ var (
 		"unix_socket_directories":   blockedConfigurationParameter,
 		"unix_socket_group":         blockedConfigurationParameter,
 		"unix_socket_permissions":   blockedConfigurationParameter,
-		"wal_level":                 fixedConfigurationParameter,
 		"wal_log_hints":             fixedConfigurationParameter,
 
 		// The following parameters need a reload to be applied
