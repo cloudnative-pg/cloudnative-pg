@@ -34,6 +34,7 @@ import (
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"

@@ -19,7 +19,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
