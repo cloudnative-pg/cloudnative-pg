@@ -1203,6 +1203,24 @@ var _ = Describe("configuration change validation", func() {
 		Expect(errs).To(HaveLen(1))
 		Expect(errs[0].Detail).To(ContainSubstring("unknown wal_level value set"))
 	})
+
+	It("should reject minimal if it is a replica cluster", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "minimal",
+					},
+				},
+			},
+		}
+		Expect(cluster.IsReplica()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
 })
 
 var _ = Describe("validate image name change", func() {

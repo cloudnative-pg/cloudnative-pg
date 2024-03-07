@@ -1087,7 +1087,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	)
 
 	walLevel := sanitizedParameters[walLevelParameter]
-	if (r.Spec.Instances > 1 || r.Spec.Backup.IsBarmanBackupConfigured()) &&
+	if (r.Spec.Instances > 1 || r.Spec.Backup.IsBarmanBackupConfigured() || r.IsReplica()) &&
 		(walLevel != walLevelValueLogical && walLevel != walLevelValueReplica) {
 		result = append(
 			result,
