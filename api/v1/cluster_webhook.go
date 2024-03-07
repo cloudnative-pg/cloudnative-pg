@@ -1094,8 +1094,8 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", walLevelParameter),
 				walLevel,
-				"wal_level should be set at 'logical' or `replica` when backup is configured or "+
-					"'.instances' field is greater than one"))
+				"wal_level should be set at 'logical' or `replica` when backup is configured, "+
+					"'.instances' field is greater than one, or is a replica cluster"))
 	} else if walLevel != walLevelValueLogical && walLevel != walLevelValueReplica && walLevel != walLevelValueMinimal {
 		result = append(
 			result,
