@@ -38,10 +38,6 @@ func Reconcile(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if err := reconcileMetadata(ctx, c, cluster, instances, pvcs); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	if res, err := reconcileMultipleInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
 		return res, err
 	}

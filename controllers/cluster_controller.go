@@ -234,7 +234,31 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
 
-	if err := instanceReconciler.ReconcileMetadata(ctx, r.Client, cluster, resources.instances); err != nil {
+	if err := persistentvolumeclaim.ReconcileMetadata(
+		ctx,
+		r.Client,
+		cluster,
+		resources.pvcs.Items,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := instanceReconciler.ReconcileMetadata(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := persistentvolumeclaim.ReconcileSerialAnnotation(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+		resources.pvcs.Items,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 

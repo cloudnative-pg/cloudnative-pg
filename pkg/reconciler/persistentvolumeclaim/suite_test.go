@@ -34,9 +34,15 @@ func TestSpecs(t *testing.T) {
 	RunSpecs(t, "PersistentVolumeClaim reconciler")
 }
 
-func makePVC(clusterName string, suffix string, role utils.PVCRole, isResizing bool) corev1.PersistentVolumeClaim {
+func makePVC(
+	clusterName string,
+	suffix string,
+	serial string,
+	role utils.PVCRole,
+	isResizing bool,
+) corev1.PersistentVolumeClaim {
 	annotations := map[string]string{
-		utils.ClusterSerialAnnotationName: suffix,
+		utils.ClusterSerialAnnotationName: serial,
 		utils.PVCStatusAnnotationName:     StatusReady,
 	}
 

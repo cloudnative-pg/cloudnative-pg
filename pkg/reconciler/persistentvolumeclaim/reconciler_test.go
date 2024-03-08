@@ -37,16 +37,16 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Reconcile Resources", func() {
+var _ = Describe("Reconcile Metadata", func() {
 	It("Reconcile existing resources shouldn't fail and "+
 		"it should make sure to add the new instanceRole label to existing PVC", func() {
 		clusterName := "Cluster-pvc-resources"
 		pvcs := corev1.PersistentVolumeClaimList{
 			Items: []corev1.PersistentVolumeClaim{
-				makePVC(clusterName, "1", utils.PVCRolePgData, false),
-				makePVC(clusterName, "2", utils.PVCRolePgWal, false),      // role is out of sync with name
-				makePVC(clusterName, "3-wal", utils.PVCRolePgData, false), // role is out of sync with name
-				makePVC(clusterName, "3", utils.PVCRolePgData, false),
+				makePVC(clusterName, "1", "1", utils.PVCRolePgData, false),
+				makePVC(clusterName, "2", "2", utils.PVCRolePgWal, false),      // role is out of sync with name
+				makePVC(clusterName, "3-wal", "3", utils.PVCRolePgData, false), // role is out of sync with name
+				makePVC(clusterName, "3", "3", utils.PVCRolePgData, false),
 			},
 		}
 		cluster := &apiv1.Cluster{
@@ -66,6 +66,10 @@ var _ = Describe("Reconcile Resources", func() {
 				WalStorage: &apiv1.StorageConfiguration{
 					Size: "1Gi",
 				},
+			},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: clusterName + "-1",
+				InstanceNames:  []string{clusterName + "-1", clusterName + "-2", clusterName + "-3"},
 			},
 		}
 
@@ -126,11 +130,10 @@ var _ = Describe("Reconcile Resources", func() {
 
 		configuration.Current.InheritedAnnotations = []string{"annotation1"}
 		configuration.Current.InheritedLabels = []string{"label1"}
-		_, err := Reconcile(
+		err := ReconcileMetadata(
 			context.Background(),
 			cli,
 			cluster,
-			pods.Items,
 			pvcs.Items,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -195,10 +198,10 @@ var _ = Describe("PVC reconciliation", func() {
 	It("Will reconcile each PVC's with the correct labels", func() {
 		pvcs := corev1.PersistentVolumeClaimList{
 			Items: []corev1.PersistentVolumeClaim{
-				makePVC(clusterName, "1", utils.PVCRolePgData, false),
-				makePVC(clusterName, "2", utils.PVCRolePgWal, false),      // role is out of sync with name
-				makePVC(clusterName, "3-wal", utils.PVCRolePgData, false), // role is out of sync with name
-				makePVC(clusterName, "3", utils.PVCRolePgData, false),
+				makePVC(clusterName, "1", "1", utils.PVCRolePgData, false),
+				makePVC(clusterName, "2", "2", utils.PVCRolePgWal, false),      // role is out of sync with name
+				makePVC(clusterName, "3-wal", "3", utils.PVCRolePgData, false), // role is out of sync with name
+				makePVC(clusterName, "3", "3", utils.PVCRolePgData, false),
 			},
 		}
 		cluster := &apiv1.Cluster{
@@ -251,7 +254,7 @@ var _ = Describe("PVC reconciliation", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvcs.Items[2].Annotations).To(BeEquivalentTo(map[string]string{
 			utils.PVCStatusAnnotationName:     "ready",
-			utils.ClusterSerialAnnotationName: "3-wal",
+			utils.ClusterSerialAnnotationName: "3",
 			"annotation1":                     "value",
 			"annotation2":                     "value",
 		}))
@@ -279,10 +282,10 @@ var _ = Describe("PVC reconciliation", func() {
 			},
 		}
 
-		pvc := makePVC(clusterName, "1", utils.PVCRolePgData, false)
-		pvc2 := makePVC(clusterName, "2", utils.PVCRolePgWal, false)         // role is out of sync with name
-		pvc3Wal := makePVC(clusterName, "3-wal", utils.PVCRolePgData, false) // role is out of sync with name
-		pvc3Data := makePVC(clusterName, "3", "", false)
+		pvc := makePVC(clusterName, "1", "1", utils.PVCRolePgData, false)
+		pvc2 := makePVC(clusterName, "2", "2", utils.PVCRolePgWal, false)         // role is out of sync with name
+		pvc3Wal := makePVC(clusterName, "3-wal", "3", utils.PVCRolePgData, false) // role is out of sync with name
+		pvc3Data := makePVC(clusterName, "3", "3", "", false)
 		pvcs := []corev1.PersistentVolumeClaim{
 			pvc,
 			pvc2,
@@ -330,8 +333,12 @@ var _ = Describe("PVC reconciliation", func() {
 
 	It("will reconcile each PVC's instance-relative labels by invoking the instance metadata reconciler", func() {
 		cluster := &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-name", Namespace: "test-namespace"},
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: "test-namespace"},
 			Spec:       apiv1.ClusterSpec{WalStorage: &apiv1.StorageConfiguration{Size: "1Gi"}},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: clusterName + "-1",
+				InstanceNames:  []string{clusterName + "-1", clusterName + "-2", clusterName + "-3"},
+			},
 		}
 
 		pods := []corev1.Pod{
@@ -340,10 +347,10 @@ var _ = Describe("PVC reconciliation", func() {
 			makePod(clusterName, "3", specs.ClusterRoleLabelReplica),
 		}
 
-		pvc := makePVC(clusterName, "1", utils.PVCRolePgData, false)
-		pvc2 := makePVC(clusterName, "2", utils.PVCRolePgData, false)
-		pvc3Wal := makePVC(clusterName, "3-wal", utils.PVCRolePgWal, false)
-		pvc3Data := makePVC(clusterName, "3", utils.PVCRolePgData, false)
+		pvc := makePVC(clusterName, "1", "0", utils.PVCRolePgData, false)
+		pvc2 := makePVC(clusterName, "2", "0", utils.PVCRolePgData, false)
+		pvc3Wal := makePVC(clusterName, "3-wal", "0", utils.PVCRolePgWal, false)
+		pvc3Data := makePVC(clusterName, "3", "0", utils.PVCRolePgData, false)
 		pvcs := []corev1.PersistentVolumeClaim{
 			pvc,
 			pvc2,
@@ -355,7 +362,14 @@ var _ = Describe("PVC reconciliation", func() {
 			WithObjects(&pvc, &pvc2, &pvc3Wal, &pvc3Data).
 			Build()
 
-		err := reconcileMetadataComingFromInstance(
+		err := ReconcileMetadata(
+			context.Background(),
+			cl,
+			cluster,
+			pvcs)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = ReconcileSerialAnnotation(
 			context.Background(),
 			cl,
 			cluster,
@@ -365,30 +379,50 @@ var _ = Describe("PVC reconciliation", func() {
 
 		patchedPvc := fetchPVC(cl, pvc)
 		Expect(patchedPvc.Labels).To(Equal(map[string]string{
+			utils.InstanceNameLabelName:        clusterName + "-1",
 			utils.PvcRoleLabelName:             "PG_DATA",
 			utils.ClusterRoleLabelName:         "primary",
 			utils.ClusterInstanceRoleLabelName: "primary",
 		}))
+		Expect(patchedPvc.Annotations).To(Equal(map[string]string{
+			utils.ClusterSerialAnnotationName: "1",
+			utils.PVCStatusAnnotationName:     "ready",
+		}))
 
 		patchedPvc2 := fetchPVC(cl, pvc2)
 		Expect(patchedPvc2.Labels).To(Equal(map[string]string{
+			utils.InstanceNameLabelName:        clusterName + "-2",
 			utils.PvcRoleLabelName:             "PG_DATA",
 			utils.ClusterRoleLabelName:         "replica",
 			utils.ClusterInstanceRoleLabelName: "replica",
+		}))
+		Expect(patchedPvc2.Annotations).To(Equal(map[string]string{
+			utils.ClusterSerialAnnotationName: "2",
+			utils.PVCStatusAnnotationName:     "ready",
 		}))
 
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
 		Expect(patchedPvc3Wal.Labels).To(Equal(map[string]string{
+			utils.InstanceNameLabelName:        clusterName + "-3",
 			utils.PvcRoleLabelName:             "PG_WAL",
 			utils.ClusterRoleLabelName:         "replica",
 			utils.ClusterInstanceRoleLabelName: "replica",
 		}))
+		Expect(patchedPvc3Wal.Annotations).To(Equal(map[string]string{
+			utils.ClusterSerialAnnotationName: "3",
+			utils.PVCStatusAnnotationName:     "ready",
+		}))
 
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
 		Expect(patchedPvc3Data.Labels).To(Equal(map[string]string{
+			utils.InstanceNameLabelName:        clusterName + "-3",
 			utils.PvcRoleLabelName:             "PG_DATA",
 			utils.ClusterRoleLabelName:         "replica",
 			utils.ClusterInstanceRoleLabelName: "replica",
+		}))
+		Expect(patchedPvc3Data.Annotations).To(Equal(map[string]string{
+			utils.ClusterSerialAnnotationName: "3",
+			utils.PVCStatusAnnotationName:     "ready",
 		}))
 	})
 })
@@ -432,7 +466,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 				Name: clusterName,
 			},
 		}
-		pvc = makePVC(clusterName, "1", "", false)
+		pvc = makePVC(clusterName, "1", "1", utils.PVCRolePgData, false)
 
 		cli = fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).

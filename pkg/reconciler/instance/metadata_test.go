@@ -460,11 +460,9 @@ var _ = Describe("object metadata test", func() {
 var _ = Describe("metadata reconciliation test", func() {
 	Context("ReconcileMetadata", func() {
 		It("Should update all pods metadata successfully", func() {
-			instanceList := corev1.PodList{
-				Items: []corev1.Pod{
-					{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
-					{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
-				},
+			instances := []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
 			}
 
 			cluster := &apiv1.Cluster{
@@ -481,16 +479,16 @@ var _ = Describe("metadata reconciliation test", func() {
 
 			cli := fake.NewClientBuilder().
 				WithScheme(scheme.BuildWithAllKnownScheme()).
-				WithObjects(&instanceList.Items[0], &instanceList.Items[1]).
+				WithObjects(&instances[0], &instances[1]).
 				Build()
 
-			err := ReconcileMetadata(context.Background(), cli, cluster, instanceList)
+			err := ReconcileMetadata(context.Background(), cli, cluster, instances)
 			Expect(err).ToNot(HaveOccurred())
 
 			var updatedInstanceList corev1.PodList
 			err = cli.List(context.Background(), &updatedInstanceList)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(updatedInstanceList.Items).To(HaveLen(len(instanceList.Items)))
+			Expect(updatedInstanceList.Items).To(HaveLen(len(instances)))
 
 			for _, pod := range updatedInstanceList.Items {
 				Expect(pod.Labels[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
