@@ -3,3 +3,5 @@ resources:
 - postgresql_v1_pooler.yaml
 - postgresql_v1_backup.yaml
 - postgresql_v1_scheduledbackup.yaml
+- postgresql_v1_imagecatalog.yaml
+- postgresql_v1_clusterimagecatalog.yaml

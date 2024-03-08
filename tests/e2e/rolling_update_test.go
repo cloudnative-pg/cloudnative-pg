@@ -20,8 +20,10 @@ import (
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -337,8 +339,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				Instances: instances,
 				ImageCatalogRef: &apiv1.ImageCatalogRef{
 					TypedLocalObjectReference: corev1.TypedLocalObjectReference{
-						Name: name,
-						Kind: "ImageCatalog",
+						APIGroup: &apiv1.GroupVersion.Group,
+						Name:     name,
+						Kind:     "ImageCatalog",
 					},
 					Major: major,
 				},
@@ -534,9 +537,6 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	})
 
 	Context("Image Catalogs", func() {
-		const (
-			clusterName = "image-catalog"
-		)
 		var storageClass string
 		var preRollingImg string
 		var updatedImageName string
@@ -559,6 +559,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		})
 
 		Context("ImageCatalog", func() {
+			const (
+				clusterName = "image-catalog"
+			)
 			Context("Three Instances", func() {
 				const (
 					namespacePrefix = "imagecatalog-cluster-rolling-e2e-three-instances"
@@ -610,7 +613,10 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				})
 			})
 		})
-		Context("ClusterImageCatalog", func() {
+		Context("ClusterImageCatalog", Serial, func() {
+			const (
+				clusterName = "cluster-image-catalog"
+			)
 			var catalog *apiv1.ClusterImageCatalog
 			BeforeEach(func() {
 				catalog = newClusterImageCatalog(clusterName, major, preRollingImg)
@@ -618,6 +624,11 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			AfterEach(func() {
 				err := env.Client.Delete(env.Ctx, catalog)
 				Expect(err).ToNot(HaveOccurred())
+
+				// Wait until we really deleted it
+				Eventually(func() error {
+					return env.Client.Get(env.Ctx, ctrl.ObjectKey{Name: catalog.Name}, catalog)
+				}, 30).Should(MatchError(apierrs.IsNotFound, metav1.StatusReasonNotFound))
 			})
 			Context("Three Instances", func() {
 				const (
