@@ -36,6 +36,9 @@ spec:
     barmanObjectStore:
       destinationPath: s3://cluster-backups/test/
       endpointURL: https://minio-service.minio:9000
+      endpointCA:
+        key: ca.crt
+        name: minio-server-ca-secret
       s3Credentials:
         accessKeyId:
           name: backup-storage-creds
@@ -58,6 +61,9 @@ spec:
       barmanObjectStore:
         destinationPath: s3://cluster-backups/
         endpointURL: https://minio-service.minio:9000
+        endpointCA:
+          key: ca.crt
+          name: minio-server-ca-secret
         s3Credentials:
           accessKeyId:
             name: backup-storage-creds
