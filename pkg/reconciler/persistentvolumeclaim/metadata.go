@@ -68,8 +68,72 @@ func (m metadataReconciler) reconcile(
 	return nil
 }
 
-// reconcileMetadataComingFromInstance ensures that the PVCs have the correct metadata that is inherited by the instance
-func reconcileMetadataComingFromInstance(
+// reconcileInstanceRoleLabel ensures that the PVCs have the correct instance role label attached to them
+func reconcileInstanceRoleLabel(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	pvcs []corev1.PersistentVolumeClaim,
+) error {
+	if cluster.Status.CurrentPrimary == "" {
+		return nil
+	}
+	for _, instanceName := range cluster.Status.InstanceNames {
+		instanceRole := specs.ClusterRoleLabelReplica
+		if instanceName == cluster.Status.CurrentPrimary {
+			instanceRole = specs.ClusterRoleLabelPrimary
+		}
+
+		instanceReconciler := metadataReconciler{
+			name: "instance-role",
+			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
+				if pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] != instanceRole {
+					return false
+				}
+				if pvc.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName] != instanceRole {
+					return false
+				}
+
+				return true
+			},
+			update: func(pvc *corev1.PersistentVolumeClaim) {
+				utils.SetInstanceRole(pvc.ObjectMeta, instanceRole)
+			},
+		}
+
+		// todo: this should not rely on expected cluster instance pvc but should fetch every possible pvc name
+		instancePVCs := filterByInstanceExpectedPVCs(cluster, instanceName, pvcs)
+		if err := instanceReconciler.reconcile(ctx, c, instancePVCs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ReconcileMetadata a ensures that the pvc metadata is kept up to date
+func ReconcileMetadata(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	pvcs []corev1.PersistentVolumeClaim,
+) error {
+	if err := reconcileInstanceRoleLabel(ctx, c, cluster, pvcs); err != nil {
+		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
+	}
+
+	if err := newAnnotationReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
+		return fmt.Errorf("cannot update annotations on pvcs: %w", err)
+	}
+
+	if err := newLabelReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
+		return fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
+	}
+
+	return nil
+}
+
+// ReconcileSerialAnnotation ensures that all the PVCs have the correct serial annotation
+func ReconcileSerialAnnotation(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
@@ -77,22 +141,14 @@ func reconcileMetadataComingFromInstance(
 	pvcs []corev1.PersistentVolumeClaim,
 ) error {
 	for _, pod := range runningInstances {
-		podRole, podHasRole := utils.GetInstanceRole(pod.ObjectMeta.Labels)
 		podSerial, podSerialErr := specs.GetNodeSerial(pod.ObjectMeta)
 		if podSerialErr != nil {
 			return podSerialErr
 		}
 
 		instanceReconciler := metadataReconciler{
-			name: "instance-inheritance",
+			name: "serial",
 			isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
-				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterRoleLabelName] != podRole {
-					return false
-				}
-				if podHasRole && pvc.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName] != podRole {
-					return false
-				}
-
 				if serial, err := specs.GetNodeSerial(pvc.ObjectMeta); err != nil || serial != podSerial {
 					return false
 				}
@@ -100,8 +156,6 @@ func reconcileMetadataComingFromInstance(
 				return true
 			},
 			update: func(pvc *corev1.PersistentVolumeClaim) {
-				utils.SetInstanceRole(pvc.ObjectMeta, podRole)
-
 				if pvc.Annotations == nil {
 					pvc.Annotations = map[string]string{}
 				}
@@ -116,29 +170,6 @@ func reconcileMetadataComingFromInstance(
 			return err
 		}
 	}
-
-	return nil
-}
-
-func reconcileMetadata(
-	ctx context.Context,
-	c client.Client,
-	cluster *apiv1.Cluster,
-	runningInstances []corev1.Pod,
-	pvcs []corev1.PersistentVolumeClaim,
-) error {
-	if err := reconcileMetadataComingFromInstance(ctx, c, cluster, runningInstances, pvcs); err != nil {
-		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
-	}
-
-	if err := newAnnotationReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
-		return fmt.Errorf("cannot update annotations on pvcs: %w", err)
-	}
-
-	if err := newLabelReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
-		return fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
-	}
-
 	return nil
 }
 
