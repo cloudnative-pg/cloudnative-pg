@@ -159,7 +159,6 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout 4m
 
       - name: Check go mod tidy has no pending changes
         run: |
