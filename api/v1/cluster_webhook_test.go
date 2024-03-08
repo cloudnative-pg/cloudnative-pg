@@ -1187,7 +1187,7 @@ var _ = Describe("configuration change validation", func() {
 
 		errs := cluster.validateConfiguration()
 		Expect(errs).To(HaveLen(1))
-		Expect(errs[0].Detail).To(ContainSubstring("unknown wal_level value set"))
+		Expect(errs[0].Detail).To(ContainSubstring("unrecognized `wal_level` value - allowed values"))
 	})
 
 	It("should reject minimal if it is a replica cluster", func() {
