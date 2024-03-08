@@ -1087,7 +1087,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
 				walLevel,
-				fmt.Sprintf("unknown wal_level value set. Allowed values: %s, %s, %s",
+				fmt.Sprintf("unrecognized `wal_level` value  -allowed values: `%s`, `%s`, `%s`",
 					postgres.WalLevelValueLogical,
 					postgres.WalLevelValueReplica,
 					postgres.WalLevelValueMinimal,
@@ -1098,8 +1098,8 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
 				walLevel,
-				"wal_level should be set at 'logical' or `replica` when archive_mode is on, "+
-					"'.instances' field is greater than one, or is a replica cluster"))
+				"`wal_level` should be set at `logical` or `replica` when `archive_mode` is `on`, "+
+					"'.instances' field is greater than 1, or this is a replica cluster"))
 	}
 
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
