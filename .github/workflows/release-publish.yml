@@ -344,3 +344,57 @@ jobs:
             --
             <sup>1</sup> If you feel your Operator does not fit any of the pre-defined categories, file an issue against this repo and explain your need
             <sup>2</sup> For more information see [here](https://sdk.operatorframework.io/docs/overview/#operator-capability-level)
+            
+
+  publish_bundle:
+    name: Publish OLM Bundle
+    needs: olm-bundle
+    if: |
+      (always() && !cancelled()) &&
+      needs.buildx.result == 'success' &&
+      needs.buildx.outputs.upload_artifacts == 'true' &&
+      github.repository_owner == 'cloudnative-pg'
+    runs-on: ubuntu-22.04
+    steps:
+      -
+        name: Checkout artifact
+        uses: actions/checkout@v4
+        with:
+          repository: cloudnative-pg/artifacts
+          token: ${{ secrets.REPO_GHA_PAT }}
+          ref: main
+          fetch-depth: 0
+      -
+        name: Configure git user
+        run: |
+          git config user.email "${{ needs.buildx.outputs.author_email }}"
+          git config user.name "${{ needs.buildx.outputs.author_name }}"
+      -
+        name: Download the bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle
+      -
+        name: Copy the bundle
+        run: |
+          mkdir -p "bundles/${{ env.VERSION }}"
+          cp -R bundle/* "bundles/${{ env.VERSION }}"
+          rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
+      -
+        name: Prepare commit message
+        env:
+          COMMIT_MESSAGE: |
+            operator cloudnative-pg (${{ env.VERSION }}
+        run: |
+          # Skip creating the commit if there are no changes
+          [ -n "$(git status -s)" ] || exit 0
+
+          git add bundle/${{ env.VERSION }}
+          git commit -m "${COMMIT_MESSAGE}"
+      -
+        naem: Push commit
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
+          repository: cloudnative-pg/artifacts
+          branch: "main"
