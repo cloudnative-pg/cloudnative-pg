@@ -1080,16 +1080,8 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	}
 
 	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.WalLevelParameter])
-	hasWalLevelRequirement := r.Spec.Instances > 1 || r.Spec.Backup.IsBarmanBackupConfigured() || r.IsReplica()
-	if hasWalLevelRequirement && !walLevel.IsStricterThanMinimal() {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
-				walLevel,
-				"wal_level should be set at 'logical' or `replica` when backup is configured, "+
-					"'.instances' field is greater than one, or is a replica cluster"))
-	} else if !walLevel.IsKnownValue() {
+	hasWalLevelRequirement := r.Spec.Instances > 1 || sanitizedParameters["archive_mode"] != "off" || r.IsReplica()
+	if !walLevel.IsKnownValue() {
 		result = append(
 			result,
 			field.Invalid(
@@ -1100,6 +1092,14 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 					postgres.WalLevelValueReplica,
 					postgres.WalLevelValueMinimal,
 				)))
+	} else if hasWalLevelRequirement && !walLevel.IsStricterThanMinimal() {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
+				walLevel,
+				"wal_level should be set at 'logical' or `replica` when archive_mode is on, "+
+					"'.instances' field is greater than one, or is a replica cluster"))
 	}
 
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {

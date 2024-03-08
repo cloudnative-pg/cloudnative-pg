@@ -1067,20 +1067,6 @@ var _ = Describe("configuration change validation", func() {
 		Expect(cluster.validateConfiguration()).To(HaveLen(1))
 	})
 
-	It("should allow the setting of the wal_level", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				PostgresConfiguration: PostgresConfiguration{
-					Parameters: map[string]string{
-						"wal_level": "minimal",
-					},
-				},
-			},
-		}
-
-		Expect(cluster.validateConfiguration()).To(BeEmpty())
-	})
-
 	It("should reject minimal wal_level when backup is configured", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
