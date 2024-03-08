@@ -1041,6 +1041,29 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.WalLevelParameter])
+	hasWalLevelRequirement := r.Spec.Instances > 1 || sanitizedParameters["archive_mode"] != "off" || r.IsReplica()
+	if !walLevel.IsKnownValue() {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
+				walLevel,
+				fmt.Sprintf("unrecognized `wal_level` value  -allowed values: `%s`, `%s`, `%s`",
+					postgres.WalLevelValueLogical,
+					postgres.WalLevelValueReplica,
+					postgres.WalLevelValueMinimal,
+				)))
+	} else if hasWalLevelRequirement && !walLevel.IsStricterThanMinimal() {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
+				walLevel,
+				"`wal_level` should be set at `logical` or `replica` when `archive_mode` is `on`, "+
+					"'.instances' field is greater than 1, or this is a replica cluster"))
+	}
+
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
 		if _, err := parsePostgresQuantityValue(value); err != nil {
 			result = append(

@@ -78,6 +78,7 @@ max_worker_processes = '32'
 shared_memory_type = 'mmap' # for PostgreSQL >= 12 only
 wal_keep_size = '512MB' # for PostgreSQL >= 13 only
 wal_keep_segments = '32' # for PostgreSQL <= 12 only
+wal_level = 'logical'
 wal_sender_timeout = '5s'
 wal_receiver_timeout = '5s'
 ```
@@ -637,6 +638,5 @@ Users are not allowed to set the following configuration parameters in the
 - `unix_socket_directories`
 - `unix_socket_group`
 - `unix_socket_permissions`
-- `wal_level`
 - `wal_log_hints`
 
