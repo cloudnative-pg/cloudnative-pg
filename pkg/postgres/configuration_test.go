@@ -110,6 +110,8 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig("wal_keep_size")).To(Equal("512MB"))
+			Expect(config.GetConfig("wal_level")).To(Equal("logical"))
+			Expect(config.GetConfig("shared_memory_type")).To(Equal("mmap"))
 		})
 	})
 

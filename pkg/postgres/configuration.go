@@ -25,6 +25,40 @@ import (
 	"text/template"
 )
 
+// WalLevelValue a value that is assigned to the 'wal_level' configuration field
+type WalLevelValue string
+
+// WalLevelParameter the configuration key containing the wal_level value
+const WalLevelParameter = "wal_level"
+
+// An acceptable wal_level value
+const (
+	WalLevelValueLogical WalLevelValue = "logical"
+	WalLevelValueReplica WalLevelValue = "replica"
+	WalLevelValueMinimal WalLevelValue = "minimal"
+)
+
+// IsKnownValue returns a bool indicating if the contained value is a well-know value
+func (w WalLevelValue) IsKnownValue() bool {
+	switch w {
+	case WalLevelValueLogical, WalLevelValueReplica, WalLevelValueMinimal:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsStricterThanMinimal returns a boolean indicating if the contained value is stricter than the minimal
+// wal_level
+func (w WalLevelValue) IsStricterThanMinimal() bool {
+	switch w {
+	case WalLevelValueLogical, WalLevelValueReplica:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
 	// hbaTemplateString is the template used to generate the pg_hba.conf
 	// configuration file
@@ -357,7 +391,6 @@ var (
 		"unix_socket_directories":   blockedConfigurationParameter,
 		"unix_socket_group":         blockedConfigurationParameter,
 		"unix_socket_permissions":   blockedConfigurationParameter,
-		"wal_level":                 fixedConfigurationParameter,
 		"wal_log_hints":             fixedConfigurationParameter,
 
 		// The following parameters need a reload to be applied
@@ -421,6 +454,9 @@ var (
 			{MajorVersionRangeUnlimited, 120000}: {
 				"wal_keep_segments": "32",
 			},
+			{MajorVersionRangeUnlimited, MajorVersionRangeUnlimited}: {
+				"wal_level": "logical",
+			},
 			{120000, 130000}: {
 				"wal_keep_segments":  "32",
 				"shared_memory_type": "mmap",
@@ -442,7 +478,6 @@ var (
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
 			"port":                fmt.Sprint(ServerPort),
-			"wal_level":           "logical",
 			"wal_log_hints":       "on",
 			"full_page_writes":    "on",
 			"ssl":                 "on",
