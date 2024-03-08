@@ -1078,7 +1078,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
 				walLevel,
-				fmt.Sprintf("unrecognized `wal_level` value  -allowed values: `%s`, `%s`, `%s`",
+				fmt.Sprintf("unrecognized `wal_level` value - allowed values: `%s`, `%s`, `%s`",
 					postgres.WalLevelValueLogical,
 					postgres.WalLevelValueReplica,
 					postgres.WalLevelValueMinimal,
