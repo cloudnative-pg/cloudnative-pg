@@ -383,6 +383,7 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 		r.validateReplicaModeChange,
 		r.validateUnixPermissionIdentifierChange,
 		r.validateReplicationSlotsChange,
+		r.validateWALLevelChange,
 	}
 	for _, validate := range validations {
 		allErrs = append(allErrs, validate(old)...)
@@ -2129,6 +2130,22 @@ func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
 				newReplicationSlots.HighAvailability.SlotPrefix,
 				"Cannot change replication slot prefix while highAvailability is enabled"),
 		)
+	}
+
+	return errs
+}
+
+func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
+	var errs field.ErrorList
+
+	newWALLevel := r.Spec.PostgresConfiguration.Parameters["wal_level"]
+	oldWALLevel := old.Spec.PostgresConfiguration.Parameters["wal_level"]
+
+	if newWALLevel == "minimal" && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
+		errs = append(errs, field.Invalid(
+			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
+			"minimal",
+			fmt.Sprintf("Cannot change wal_level to minimal in clusters already existing (from %s)", oldWALLevel)))
 	}
 
 	return errs
