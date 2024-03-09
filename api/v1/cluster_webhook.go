@@ -1079,6 +1079,23 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	if r.Spec.PostgresConfiguration.Parameters["archive_mode"] == "always" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", "archive_mode"),
+				"always",
+				"archive_mode=always is directly managed by the operator"))
+	}
+	if !slices.Contains([]string{"on", "off", "always"}, sanitizedParameters["archive_mode"]) {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", "archive_mode"),
+				sanitizedParameters["archive_mode"],
+				"invalid archive_mode value"))
+	}
+
 	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.WalLevelParameter])
 	hasWalLevelRequirement := r.Spec.Instances > 1 || sanitizedParameters["archive_mode"] != "off" || r.IsReplica()
 	if !walLevel.IsKnownValue() {

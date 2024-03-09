@@ -359,7 +359,6 @@ var (
 	FixedConfigurationParameters = map[string]string{
 		// The following parameters need a restart to be applied
 		"allow_system_table_mods":   blockedConfigurationParameter,
-		"archive_mode":              fixedConfigurationParameter,
 		"bonjour":                   blockedConfigurationParameter,
 		"bonjour_name":              blockedConfigurationParameter,
 		"cluster_name":              fixedConfigurationParameter,
@@ -431,7 +430,9 @@ var (
 	// default and the mandatory behavior of CNP
 	CnpgConfigurationSettings = ConfigurationSettings{
 		GlobalDefaultSettings: SettingsCollection{
+			"archive_mode":               "on",
 			"archive_timeout":            "5min",
+			"wal_level":                  "logical",
 			"max_parallel_workers":       "32",
 			"max_worker_processes":       "32",
 			"max_replication_slots":      "32",
@@ -453,9 +454,6 @@ var (
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
 			{MajorVersionRangeUnlimited, 120000}: {
 				"wal_keep_segments": "32",
-			},
-			{MajorVersionRangeUnlimited, MajorVersionRangeUnlimited}: {
-				"wal_level": "logical",
 			},
 			{120000, 130000}: {
 				"wal_keep_segments":  "32",
@@ -617,8 +615,6 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	// Apply the correct archive_mode
 	if info.IsReplicaCluster {
 		configuration.OverwriteConfig("archive_mode", "always")
-	} else {
-		configuration.OverwriteConfig("archive_mode", "on")
 	}
 
 	// Apply the list of replicas
