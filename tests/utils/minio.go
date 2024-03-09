@@ -560,6 +560,11 @@ func composeListFilesMinio(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --path %v'", serviceName, path)
 }
 
+// composeListFilesMinio builds the Minio command to list the filenames matching a given path
+func composeCleanFilesMinio(serviceName string) string {
+	return fmt.Sprintf("sh -c 'mc rm --force --recursive minio/%v'", serviceName)
+}
+
 // composeFindMinioCmd builds the Minio find command
 func composeFindMinioCmd(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --path %v | wc -l'", serviceName, path)
@@ -620,4 +625,18 @@ func MinioTestConnectivityUsingBarmanCloudWalArchive(
 		return false, err
 	}
 	return true, nil
+}
+
+// CleanFilesOnMinio clean files on minio for a given path
+func CleanFilesOnMinio(minioEnv *MinioEnv, path string) (string, error) {
+	var stdout string
+	stdout, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		minioEnv.Namespace,
+		minioEnv.Client.Name,
+		composeCleanFilesMinio(path)))
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(stdout, "\n"), nil
 }

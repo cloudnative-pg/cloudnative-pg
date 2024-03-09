@@ -324,7 +324,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
 		// the operator's namespace so that affects subsequent test
-		return env.DeleteNamespaceAndWait(operatorNamespace, 60)
+		if err := env.DeleteNamespaceAndWait(operatorNamespace, 60); err != nil {
+			return err
+		}
+
+		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, "cluster-backups"); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	assertCreateNamespace := func(namespacePrefix string) string {
