@@ -35,9 +35,9 @@ var _ = Describe("psql launcher", func() {
 	}
 
 	It("selects the correct Pod when looking for a primary", func() {
-		cmd := psqlCommand{
-			psqlCommandOptions: psqlCommandOptions{
-				replica: false,
+		cmd := Command{
+			CommandOptions: CommandOptions{
+				Replica: false,
 			},
 			podList: podList,
 		}
@@ -45,9 +45,9 @@ var _ = Describe("psql launcher", func() {
 	})
 
 	It("selects the correct Pod when looking for a replica", func() {
-		cmd := psqlCommand{
-			psqlCommandOptions: psqlCommandOptions{
-				replica: true,
+		cmd := Command{
+			CommandOptions: CommandOptions{
+				Replica: true,
 			},
 			podList: podList,
 		}
@@ -61,9 +61,9 @@ var _ = Describe("psql launcher", func() {
 			fakePod("cluster-example-3", "oboe"),
 		}
 
-		cmd := psqlCommand{
-			psqlCommandOptions: psqlCommandOptions{
-				replica: false,
+		cmd := Command{
+			CommandOptions: CommandOptions{
+				Replica: false,
 			},
 			podList: fakePodList,
 		}
@@ -74,12 +74,12 @@ var _ = Describe("psql launcher", func() {
 	})
 
 	It("correctly composes a kubectl exec command line", func() {
-		cmd := psqlCommand{
-			psqlCommandOptions: psqlCommandOptions{
-				replica:     true,
-				allocateTTY: true,
-				passStdin:   true,
-				namespace:   "default",
+		cmd := Command{
+			CommandOptions: CommandOptions{
+				Replica:     true,
+				AllocateTTY: true,
+				PassStdin:   true,
+				Namespace:   "default",
 			},
 			podList: podList,
 		}
@@ -99,11 +99,11 @@ var _ = Describe("psql launcher", func() {
 	})
 
 	It("correctly composes a kubectl exec command line with psql args", func() {
-		cmd := psqlCommand{
-			psqlCommandOptions: psqlCommandOptions{
-				replica:   true,
-				namespace: "default",
-				args: []string{
+		cmd := Command{
+			CommandOptions: CommandOptions{
+				Replica:   true,
+				Namespace: "default",
+				Args: []string{
 					"-c",
 					"select 1",
 				},

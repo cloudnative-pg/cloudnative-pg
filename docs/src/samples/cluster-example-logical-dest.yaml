@@ -1,0 +1,53 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-dest
+spec:
+  instances: 1
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        schemaOnly: true
+        databases:
+          - app
+        source:
+          externalCluster: cluster-example
+
+  externalClusters:
+  - name: cluster-example
+    connectionParameters:
+      host: cluster-example-rw.default.svc
+      # We're using the superuser to allow the publication to be
+      # created directly when connected to the target server.
+      # See cluster-example-logical-source.yaml for more information
+      # about this.
+      user: postgres
+      dbname: app
+    password:
+      name: cluster-example-superuser
+      key: password
+
+# To create the publication while connected to the target side, use:
+#
+#     ./bin/kubectl-cnpg publication create cluster-example-dest \
+#         --external-cluster=cluster-example \
+#         --dbname=app --publication=app --all-tables
+#
+#     Executing: CREATE PUBLICATION "app" FOR ALL TABLES
+#     CREATE PUBLICATION
+#
+# To create the subscription, use:
+#
+#     ./bin/kubectl-cnpg subscription create cluster-example-dest \
+#         --external-cluster=cluster-example \
+#         --publication=app --subscription=app
+#
+# Sequences can be refreshed with:
+#
+#    ./bin/kubectl-cnpg subscription sync-sequences cluster-example-dest \
+#         --external-cluster=cluster-example
