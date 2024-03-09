@@ -1079,7 +1079,8 @@ var _ = Describe("configuration change validation", func() {
 				},
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level": "minimal",
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
 					},
 				},
 			},
@@ -1136,7 +1137,8 @@ var _ = Describe("configuration change validation", func() {
 				Instances: 2,
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level": "minimal",
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
 					},
 				},
 			},
@@ -1199,12 +1201,44 @@ var _ = Describe("configuration change validation", func() {
 				},
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"wal_level": "minimal",
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
 					},
 				},
 			},
 		}
 		Expect(cluster.IsReplica()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow minimal wal_level with one instance and without archive mode", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"archive_mode":    "off",
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should disallow minimal wal_level with one instance, without max_wal_senders being specified", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"archive_mode": "off",
+						"wal_level":    "minimal",
+					},
+				},
+			},
+		}
 		Expect(cluster.validateConfiguration()).To(HaveLen(1))
 	})
 })
