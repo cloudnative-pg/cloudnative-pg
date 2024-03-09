@@ -1241,6 +1241,66 @@ var _ = Describe("configuration change validation", func() {
 		}
 		Expect(cluster.validateConfiguration()).To(HaveLen(1))
 	})
+
+	It("should disallow changing wal_level to minimal for existing clusters", func() {
+		oldCluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"archive_mode":    "off",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		oldCluster.setDefaults(true)
+
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"archive_mode":    "off",
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateWALLevelChange(&oldCluster)).To(HaveLen(1))
+	})
+
+	It("should allow retaining wal_level to minimal for existing clusters", func() {
+		oldCluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"archive_mode":    "off",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		oldCluster.setDefaults(true)
+
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"archive_mode":    "off",
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+						"shared_buffers":  "512MB",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateWALLevelChange(&oldCluster)).To(BeEmpty())
+	})
 })
 
 var _ = Describe("validate image name change", func() {
