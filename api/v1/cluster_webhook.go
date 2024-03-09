@@ -1165,6 +1165,15 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 					"'.instances' field is greater than 1, or this is a replica cluster"))
 	}
 
+	if value, ok := sanitizedParameters["max_wal_senders"]; walLevel == "minimal" && (!ok || value != "0") {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", "max_wal_senders"),
+				walLevel,
+				"`max_wal_senders` should be set at `0` when `wal_level` is `minimal`"))
+	}
+
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
 		if _, err := parsePostgresQuantityValue(value); err != nil {
 			result = append(
