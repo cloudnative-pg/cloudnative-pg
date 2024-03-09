@@ -2145,7 +2145,7 @@ func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
 		errs = append(errs, field.Invalid(
 			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
 			"minimal",
-			fmt.Sprintf("Cannot change wal_level to minimal in clusters already existing (from %s)", oldWALLevel)))
+			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)", oldWALLevel)))
 	}
 
 	return errs
