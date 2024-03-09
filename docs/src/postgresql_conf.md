@@ -578,7 +578,6 @@ Users are not allowed to set the following configuration parameters in the
 - `allow_system_table_mods`
 - `archive_cleanup_command`
 - `archive_command`
-- `archive_mode`
 - `bonjour`
 - `bonjour_name`
 - `cluster_name`

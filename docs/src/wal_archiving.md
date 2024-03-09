@@ -1,5 +1,13 @@
 # WAL archiving
 
+!!! Warning
+    If you have no plans to utilize Write-Ahead Logging (WAL) archiving within
+    your PostgreSQL cluster, it is recommended to disable it explicitly. To do
+    this, set the `.spec.postgresql.parameters.archive_mode` to `"off"`. It is
+    crucial to understand that modifying this setting may have significant
+    consequences. We strongly advise against altering the default value unless you
+    are thoroughly familiar with the potential implications of such actions.
+
 WAL archiving is the process that feeds a [WAL archive](backup.md#wal-archive)
 in CloudNativePG.
 
