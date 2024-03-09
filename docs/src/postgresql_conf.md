@@ -64,6 +64,7 @@ operator by applying the following sections in this order:
 The **global default parameters** are:
 
 ```text
+archive_mode = 'on'
 dynamic_shared_memory_type = 'posix'
 logging_collector = 'on'
 log_destination = 'csvlog'
@@ -109,7 +110,6 @@ The following parameters are **fixed** and exclusively controlled by the operato
 
 ```text
 archive_command = '/controller/manager wal-archive %p'
-archive_mode = 'on'
 full_page_writes = 'on'
 hot_standby = 'true'
 listen_addresses = '*'
@@ -120,7 +120,6 @@ ssl_ca_file = '/controller/certificates/client-ca.crt'
 ssl_cert_file = '/controller/certificates/server.crt'
 ssl_key_file = '/controller/certificates/server.key'
 unix_socket_directories = '/controller/run'
-wal_level = 'logical'
 wal_log_hints = 'on'
 ```
 
