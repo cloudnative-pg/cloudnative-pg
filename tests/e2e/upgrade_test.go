@@ -328,8 +328,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return err
 		}
 
-		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, "cluster-backups"); err != nil {
-			return err
+		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, "cluster-full-backup"); err != nil {
+			GinkgoWriter.Printf("Error cleaning up minio: %v\n", err)
+		}
+
+		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, "cluster2-full-backup"); err != nil {
+			GinkgoWriter.Printf("Error cleaning up minio: %v\n", err)
 		}
 
 		return nil
