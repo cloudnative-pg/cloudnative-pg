@@ -28,9 +28,9 @@ var (
 	hibernateOnCmd = &cobra.Command{
 		Use:   "on [cluster]",
 		Short: "Hibernates the cluster named [cluster]",
-		Args:  cobra.ExactArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return plugin.CompleteClusters(cmd.Context(), toComplete), cobra.ShellCompDirectiveNoFileComp
+		Args:  plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
@@ -51,9 +51,9 @@ var (
 	hibernateOffCmd = &cobra.Command{
 		Use:   "off [cluster]",
 		Short: "Bring the cluster named [cluster] back from hibernation",
-		Args:  cobra.ExactArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return plugin.CompleteClusters(cmd.Context(), toComplete), cobra.ShellCompDirectiveNoFileComp
+		Args:  plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
@@ -65,9 +65,9 @@ var (
 	hibernateStatusCmd = &cobra.Command{
 		Use:   "status [cluster]",
 		Short: "Prints the hibernation status for the [cluster]",
-		Args:  cobra.ExactArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return plugin.CompleteClusters(cmd.Context(), toComplete), cobra.ShellCompDirectiveNoFileComp
+		Args:  plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]

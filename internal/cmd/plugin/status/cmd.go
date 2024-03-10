@@ -17,6 +17,9 @@ limitations under the License.
 package status
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -27,9 +30,12 @@ func NewCmd() *cobra.Command {
 	statusCmd := &cobra.Command{
 		Use:   "status [cluster]",
 		Short: "Get the status of a PostgreSQL cluster",
-		Args:  cobra.ExactArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return plugin.CompleteClusters(cmd.Context(), toComplete), cobra.ShellCompDirectiveNoFileComp
+		Args:  plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if strings.HasPrefix(toComplete, "-") {
+				fmt.Printf("%+v\n", toComplete)
+			}
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -140,8 +141,20 @@ func GetPGControlData(
 	return stdout, nil
 }
 
-func completeClusters(ctx context.Context, cli client.Client, namespace string, toComplete string) []string {
+func completeClusters(
+	ctx context.Context,
+	cli client.Client,
+	namespace string,
+	args []string,
+	toComplete string,
+) []string {
 	var clusters apiv1.ClusterList
+
+	// Since all our functions require only one cluster, if we already have one in the list
+	// we just return an empty set of strings
+	if len(args) == 1 {
+		return []string{}
+	}
 
 	// Get the cluster lists object if error we just return empty array string
 	if err := cli.List(ctx, &clusters, client.InNamespace(namespace)); err != nil {
@@ -159,6 +172,17 @@ func completeClusters(ctx context.Context, cli client.Client, namespace string, 
 }
 
 // CompleteClusters will complete the cluster name when necessary getting the list from the current namespace
-func CompleteClusters(ctx context.Context, toComplete string) []string {
-	return completeClusters(ctx, Client, Namespace, toComplete)
+func CompleteClusters(ctx context.Context, args []string, toComplete string) []string {
+	return completeClusters(ctx, Client, Namespace, args, toComplete)
+}
+
+// RequiresArguments will show the help message in case no argument has been provides
+func RequiresArguments(nArgs int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) < nArgs {
+			_ = cmd.Help()
+			os.Exit(0)
+		}
+		return nil
+	}
 }

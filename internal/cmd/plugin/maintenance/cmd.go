@@ -40,9 +40,9 @@ func NewCmd() *cobra.Command {
 		Short: "Sets maintenance mode",
 		Long: "This command will set maintenance mode on a single cluster or on all clusters " +
 			"in the current namespace if not specified differently through flags",
-		Args: cobra.MaximumNArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return plugin.CompleteClusters(cmd.Context(), toComplete), cobra.ShellCompDirectiveNoFileComp
+		Args: plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var clusterName string
@@ -61,9 +61,9 @@ func NewCmd() *cobra.Command {
 		Short: "Removes maintenance mode",
 		Long: "This command will unset maintenance mode on a single cluster or on all clusters " +
 			"in the current namespace if not specified differently through flags",
-		Args: cobra.MaximumNArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return plugin.CompleteClusters(cmd.Context(), toComplete), cobra.ShellCompDirectiveNoFileComp
+		Args: plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var clusterName string

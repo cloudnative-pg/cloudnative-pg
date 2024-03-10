@@ -36,7 +36,7 @@ var _ = Describe("create client", func() {
 	})
 })
 
-var _ = Describe("CompleteClusters", func() {
+var _ = Describe("CompleteClusters testing", func() {
 	const namespace = "default"
 	var client k8client.Client
 
@@ -60,20 +60,27 @@ var _ = Describe("CompleteClusters", func() {
 
 	It("should return matching cluster names", func(ctx SpecContext) {
 		toComplete := "clu"
-		result := completeClusters(ctx, client, namespace, toComplete)
+		result := completeClusters(ctx, client, namespace, []string{}, toComplete)
 		Expect(result).To(HaveLen(2))
 		Expect(result).To(ConsistOf("cluster1", "cluster2"))
 	})
 
 	It("should return empty array when no clusters found", func(ctx SpecContext) {
 		toComplete := "nonexistent"
-		result := completeClusters(ctx, client, namespace, toComplete)
+		result := completeClusters(ctx, client, namespace, []string{}, toComplete)
 		Expect(result).To(BeEmpty())
 	})
 
 	It("should skip clusters with prefix not matching toComplete", func(ctx SpecContext) {
 		toComplete := "nonexistent"
-		result := completeClusters(ctx, client, namespace, toComplete)
+		result := completeClusters(ctx, client, namespace, []string{}, toComplete)
+		Expect(result).To(BeEmpty())
+	})
+
+	It("should return nothing when a cluster name is already on the arguments list", func(ctx SpecContext) {
+		args := []string{"cluster-example"}
+		toComplete := "cluster-"
+		result := completeClusters(ctx, client, namespace, args, toComplete)
 		Expect(result).To(BeEmpty())
 	})
 })
