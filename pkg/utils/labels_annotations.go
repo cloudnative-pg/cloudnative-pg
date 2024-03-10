@@ -131,8 +131,8 @@ const (
 	// PgControldataAnnotationName is the name of the annotation containing the pg_controldata output of the cluster
 	PgControldataAnnotationName = MetadataNamespace + "/pgControldata"
 
-	// skipWalArchiving is the name of the annotation which turns off WAL archiving
-	skipWalArchiving = MetadataNamespace + "/skipWalArchiving"
+	// SkipWalArchiving is the name of the annotation which turns off WAL archiving
+	SkipWalArchiving = MetadataNamespace + "/skipWalArchiving"
 
 	// skipEmptyWalArchiveCheck is the name of the annotation which turns off the checks that ensure that the WAL
 	// archive is empty before writing data
@@ -382,7 +382,7 @@ func IsEmptyWalArchiveCheckEnabled(object *metav1.ObjectMeta) bool {
 // IsWalArchivingDisabled returns a boolean indicating if PostgreSQL not archive
 // WAL files
 func IsWalArchivingDisabled(object *metav1.ObjectMeta) bool {
-	return object.Annotations[skipWalArchiving] == string(annotationStatusEnabled)
+	return object.Annotations[SkipWalArchiving] == string(annotationStatusEnabled)
 }
 
 func mergeMap(receiver, giver map[string]string) map[string]string {

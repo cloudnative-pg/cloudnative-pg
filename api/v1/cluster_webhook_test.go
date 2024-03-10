@@ -27,6 +27,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -1213,11 +1214,15 @@ var _ = Describe("configuration change validation", func() {
 
 	It("should allow minimal wal_level with one instance and without archive mode", func() {
 		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
 			Spec: ClusterSpec{
 				Instances: 1,
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"archive_mode":    "off",
 						"wal_level":       "minimal",
 						"max_wal_senders": "0",
 					},
@@ -1229,12 +1234,16 @@ var _ = Describe("configuration change validation", func() {
 
 	It("should disallow minimal wal_level with one instance, without max_wal_senders being specified", func() {
 		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
 			Spec: ClusterSpec{
 				Instances: 1,
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"archive_mode": "off",
-						"wal_level":    "minimal",
+						"wal_level": "minimal",
 					},
 				},
 			},
@@ -1244,11 +1253,15 @@ var _ = Describe("configuration change validation", func() {
 
 	It("should disallow changing wal_level to minimal for existing clusters", func() {
 		oldCluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
 			Spec: ClusterSpec{
 				Instances: 1,
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"archive_mode":    "off",
 						"max_wal_senders": "0",
 					},
 				},
@@ -1257,11 +1270,15 @@ var _ = Describe("configuration change validation", func() {
 		oldCluster.setDefaults(true)
 
 		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
 			Spec: ClusterSpec{
 				Instances: 1,
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"archive_mode":    "off",
 						"wal_level":       "minimal",
 						"max_wal_senders": "0",
 					},
@@ -1273,12 +1290,16 @@ var _ = Describe("configuration change validation", func() {
 
 	It("should allow retaining wal_level to minimal for existing clusters", func() {
 		oldCluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
 			Spec: ClusterSpec{
 				Instances: 1,
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
 						"wal_level":       "minimal",
-						"archive_mode":    "off",
 						"max_wal_senders": "0",
 					},
 				},
@@ -1287,11 +1308,15 @@ var _ = Describe("configuration change validation", func() {
 		oldCluster.setDefaults(true)
 
 		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
 			Spec: ClusterSpec{
 				Instances: 1,
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"archive_mode":    "off",
 						"wal_level":       "minimal",
 						"max_wal_senders": "0",
 						"shared_buffers":  "512MB",
