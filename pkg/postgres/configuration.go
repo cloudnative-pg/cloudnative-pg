@@ -298,7 +298,7 @@ type ConfigurationInfo struct {
 	// TemporaryTablespaces is the list of temporary tablespaces
 	TemporaryTablespaces []string
 
-	// IsWalArchivingDisabled is true whether PostgreSQL should disable WAL archiving
+	// IsWalArchivingDisabled is true when user requested to disable WAL archiving
 	IsWalArchivingDisabled bool
 }
 
