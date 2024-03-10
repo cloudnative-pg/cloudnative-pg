@@ -297,6 +297,9 @@ type ConfigurationInfo struct {
 
 	// TemporaryTablespaces is the list of temporary tablespaces
 	TemporaryTablespaces []string
+
+	// IsWalArchivingDisabled is true whether PostgreSQL should disable WAL archiving
+	IsWalArchivingDisabled bool
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -615,9 +618,14 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	// Apply the correct archive_mode
-	if info.IsReplicaCluster {
+	switch {
+	case info.IsWalArchivingDisabled:
+		configuration.OverwriteConfig("archive_mode", "off")
+
+	case info.IsReplicaCluster:
 		configuration.OverwriteConfig("archive_mode", "always")
-	} else {
+
+	default:
 		configuration.OverwriteConfig("archive_mode", "on")
 	}
 

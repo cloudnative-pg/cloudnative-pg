@@ -129,6 +129,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
 			IsReplicaCluster:              r.IsReplica(),
 			PreserveFixedSettingsFromUser: preserveUserSettings,
+			IsWalArchivingDisabled:        utils.IsWalArchivingDisabled(&r.ObjectMeta),
 		}
 		sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 		r.Spec.PostgresConfiguration.Parameters = sanitizedParameters
@@ -1120,10 +1121,11 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 				"Unsupported PostgreSQL version. Versions 11 or newer are supported"))
 	}
 	info := postgres.ConfigurationInfo{
-		Settings:         postgres.CnpgConfigurationSettings,
-		MajorVersion:     pgVersion,
-		UserSettings:     r.Spec.PostgresConfiguration.Parameters,
-		IsReplicaCluster: r.IsReplica(),
+		Settings:               postgres.CnpgConfigurationSettings,
+		MajorVersion:           pgVersion,
+		UserSettings:           r.Spec.PostgresConfiguration.Parameters,
+		IsReplicaCluster:       r.IsReplica(),
+		IsWalArchivingDisabled: utils.IsWalArchivingDisabled(&r.ObjectMeta),
 	}
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
