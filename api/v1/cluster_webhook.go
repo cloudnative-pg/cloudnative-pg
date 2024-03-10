@@ -1080,13 +1080,13 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
-	if r.Spec.PostgresConfiguration.Parameters["archive_mode"] == "always" {
+	if r.Spec.PostgresConfiguration.Parameters["archive_mode"] == "always" && !r.IsReplica() {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", "archive_mode"),
 				"always",
-				"archive_mode=always is directly managed by the operator"))
+				"archive_mode=always is reserved for replica clusters"))
 	}
 	if !slices.Contains([]string{"on", "off", "always"}, sanitizedParameters["archive_mode"]) {
 		result = append(
