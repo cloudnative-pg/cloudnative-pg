@@ -592,6 +592,11 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 	ignoreFixedSettingsFromUser := info.IncludingMandatory || !info.PreserveFixedSettingsFromUser
 
+	// Remove archive_mode set to always if we're not in a replica cluster
+	if !info.IsReplicaCluster && info.UserSettings["archive_mode"] == "always" {
+		delete(info.UserSettings, "archive_mode")
+	}
+
 	// Set all the default settings
 	setDefaultConfigurations(info, configuration)
 
