@@ -313,6 +313,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		GinkgoWriter.Println("cleaning up")
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			// Dump the minio namespace when failed
+			env.DumpNamespaceObjects(minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
 			// Dump the operator namespace, as operator is changing too
 			env.DumpOperator(operatorNamespace,
 				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
