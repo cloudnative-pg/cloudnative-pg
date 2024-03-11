@@ -49,10 +49,14 @@ storage, or simply *local storage*, is employed to enhance performance.
 
 ## Pod Disruption Budgets
 
-By default, CloudNativePG ensures that the primary node in a PostgreSQL cluster
-prohibits its own draining, safeguarding uninterrupted operations.
-Additionally, in the presence of replicas, it guarantees that only one replica
-at a time is gracefully shut down during a drain operation.
+By default, CloudNativePG safeguards Postgres cluster operations. If a node is
+to be drained and contains a cluster's primary instance, a switchover happens
+ahead of the drain. Once the instance in the node is downgraded to replica, the
+draining can resume.
+For single-instance clusters, a switchover is not possible, so CloudNativePG
+will prevent draining the node where the instance is housed.
+Additionally, in multi-instance clusters, CloudNativePG guarantees that only
+one replica at a time is gracefully shut down during a drain operation.
 
 Each PostgreSQL `Cluster` is equipped with two associated `PodDisruptionBudget`
 resources - you can easily confirm it with the `kubectl get pdb` command.
@@ -62,9 +66,9 @@ production Postgres cluster. This can be effortlessly managed by toggling the
 `.spec.enablePDB` option, as detailed in the
 [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ClusterSpec).
 
-## PostgreSQL Clusters for Development Purposes
+## PostgreSQL Clusters used for Development or Testing
 
-For PostgreSQL clusters designed for development purposes, often consisting of
+For PostgreSQL clusters used for development purposes, often consisting of
 a single instance, it is essential to disable pod disruption budgets. Failure
 to do so will prevent the node hosting that cluster from being drained.
 
@@ -92,8 +96,8 @@ on draining the node during development activities.
 !!! Important
     While CloudNativePG will continue supporting the node maintenance window,
     it is currently recommended to transition to direct control of pod disruption
-    budgets, as explained earlier. This information is retained mainly for backward
-    compatibility.
+    budgets, as explained in the previous section. This section is retained
+    mainly for backward compatibility.
 
 Prior to release 1.23, CloudNativePG had just one declarative mechanism to manage
 Kubernetes upgrades when dealing with local storage: you had to temporarily put
@@ -143,7 +147,6 @@ reusePVC disabled: see section below.
     `.spec.enablePDB` field to `false`. In that case, the operator won't
     create `PodDisruptionBudgets` and will delete them if they were
     previously created.
-
 
 ### Single instance clusters with `reusePVC` set to `false`
 

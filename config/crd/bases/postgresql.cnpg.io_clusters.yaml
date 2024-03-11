@@ -1880,9 +1880,14 @@ spec:
               enablePDB:
                 default: true
                 description: |-
-                  EnablePDB indicates whether the PodDisruptionBudgets (PDB) will be created for the cluster.
-                  When set to true, the PDB will be created. If turned off (set to false), no PDB will be created,
-                  and any existing PDB associated with the cluster will be destroyed.
+                  Manage the `PodDisruptionBudget` resources within the cluster. When
+                  configured as `true` (default setting), the pod disruption budgets
+                  will safeguard the primary node from being terminated. Conversely,
+                  setting it to `false` will result in the absence of any
+                  `PodDisruptionBudget` resource, permitting the shutdown of all nodes
+                  hosting the PostgreSQL cluster. This latter configuration is
+                  advisable for any PostgreSQL cluster employed for
+                  development/staging purposes.
                 type: boolean
               enableSuperuserAccess:
                 default: false
