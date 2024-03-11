@@ -37,7 +37,7 @@ func ExecuteBackup(
 	onlyTargetStandbys bool,
 	timeoutSeconds int,
 	env *TestingEnvironment,
-) {
+) *apiv1.Backup {
 	backupName, err := env.GetResourceNameFromYAML(backupFile)
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() error {
@@ -93,6 +93,8 @@ func ExecuteBackup(
 	Expect(backupStatus.BeginWal).NotTo(BeEmpty())
 	Expect(backupStatus.EndLSN).NotTo(BeEmpty())
 	Expect(backupStatus.EndWal).NotTo(BeEmpty())
+
+	return backup
 }
 
 // CreateClusterFromBackupUsingPITR creates a cluster from backup, using the PITR
