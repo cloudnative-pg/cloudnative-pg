@@ -28,8 +28,14 @@ import (
 // WalLevelValue a value that is assigned to the 'wal_level' configuration field
 type WalLevelValue string
 
-// WalLevelParameter the configuration key containing the wal_level value
-const WalLevelParameter = "wal_level"
+// ParameterWalLevel the configuration key containing the wal_level value
+const ParameterWalLevel = "wal_level"
+
+// ParameterMaxWalSenders the configuration key containing the max_wal_senders value
+const ParameterMaxWalSenders = "max_wal_senders"
+
+// ParameterArchiveMode the configuration key containing the archive_mode value
+const ParameterArchiveMode = "archive_mode"
 
 // An acceptable wal_level value
 const (
@@ -294,6 +300,9 @@ type ConfigurationInfo struct {
 
 	// Is this a replica cluster?
 	IsReplicaCluster bool
+
+	// IsWalArchivingDisabled is true when user requested to disable WAL archiving
+	IsWalArchivingDisabled bool
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -611,9 +620,14 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	// Apply the correct archive_mode
-	if info.IsReplicaCluster {
+	switch {
+	case info.IsWalArchivingDisabled:
+		configuration.OverwriteConfig("archive_mode", "off")
+
+	case info.IsReplicaCluster:
 		configuration.OverwriteConfig("archive_mode", "always")
-	} else {
+
+	default:
 		configuration.OverwriteConfig("archive_mode", "on")
 	}
 

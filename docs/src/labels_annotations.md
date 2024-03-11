@@ -167,19 +167,24 @@ These predefined annotations are managed by CloudNativePG.
 `cnpg.io/reloadedAt`
 :   Contains the latest cluster `reload` time. `reload` is triggered by the user through a plugin.
 
-`kubectl.kubernetes.io/restartedAt`
-:  When available, the time of last requested restart of a Postgres cluster.
-
 `cnpg.io/skipEmptyWalArchiveCheck`
 :   When set to `true` on a `Cluster` resource, the operator disables the check
     that ensures that the WAL archive is empty before writing data. Use at your own
     risk.
 
+`cnpg.io/skipEmptyWalArchiveCheck`
+:   When set to `true` on a `Cluster` resource, the operator disables WAL archiving.
+    This will set `archive_mode` to `off` and require a restart of all PostgreSQL
+    instances. Use at your own risk.
+
 `cnpg.io/snapshotStartTime`
-: The time a snapshot started.
+:   The time a snapshot started.
 
 `cnpg.io/snapshotEndTime`
-: The time a snapshot was marked as ready to use.
+:   The time a snapshot was marked as ready to use.
+
+`kubectl.kubernetes.io/restartedAt`
+:   When available, the time of last requested restart of a Postgres cluster.
 
 ## Prerequisites
 
