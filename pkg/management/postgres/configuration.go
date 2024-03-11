@@ -32,6 +32,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // InstallPgDataFileContent installs a file in PgData, returning true/false if
@@ -425,6 +426,7 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
 		IsReplicaCluster:                 cluster.IsReplica(),
+		IsWalArchivingDisabled:           utils.IsWalArchivingDisabled(&cluster.ObjectMeta),
 	}
 
 	if preserveUserSettings {

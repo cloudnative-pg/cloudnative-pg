@@ -128,6 +128,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
 			IsReplicaCluster:              r.IsReplica(),
 			PreserveFixedSettingsFromUser: preserveUserSettings,
+			IsWalArchivingDisabled:        utils.IsWalArchivingDisabled(&r.ObjectMeta),
 		}
 		sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 		r.Spec.PostgresConfiguration.Parameters = sanitizedParameters
@@ -378,6 +379,7 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 		r.validateReplicaModeChange,
 		r.validateUnixPermissionIdentifierChange,
 		r.validateReplicationSlotsChange,
+		r.validateWALLevelChange,
 	}
 	for _, validate := range validations {
 		allErrs = append(allErrs, validate(old)...)
@@ -1050,10 +1052,11 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 				"Unsupported PostgreSQL version. Versions 11 or newer are supported"))
 	}
 	info := postgres.ConfigurationInfo{
-		Settings:         postgres.CnpgConfigurationSettings,
-		MajorVersion:     pgVersion,
-		UserSettings:     r.Spec.PostgresConfiguration.Parameters,
-		IsReplicaCluster: r.IsReplica(),
+		Settings:               postgres.CnpgConfigurationSettings,
+		MajorVersion:           pgVersion,
+		UserSettings:           r.Spec.PostgresConfiguration.Parameters,
+		IsReplicaCluster:       r.IsReplica(),
+		IsWalArchivingDisabled: utils.IsWalArchivingDisabled(&r.ObjectMeta),
 	}
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
@@ -1070,13 +1073,14 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
-	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.WalLevelParameter])
-	hasWalLevelRequirement := r.Spec.Instances > 1 || sanitizedParameters["archive_mode"] != "off" || r.IsReplica()
+	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.ParameterWalLevel])
+	hasWalLevelRequirement := r.Spec.Instances > 1 || sanitizedParameters[postgres.ParameterArchiveMode] != "off" ||
+		r.IsReplica()
 	if !walLevel.IsKnownValue() {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLevel),
 				walLevel,
 				fmt.Sprintf("unrecognized `wal_level` value - allowed values: `%s`, `%s`, `%s`",
 					postgres.WalLevelValueLogical,
@@ -1087,10 +1091,21 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "postgresql", "parameters", postgres.WalLevelParameter),
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLevel),
 				walLevel,
 				"`wal_level` should be set at `logical` or `replica` when `archive_mode` is `on`, "+
 					"'.instances' field is greater than 1, or this is a replica cluster"))
+	}
+
+	if walLevel == "minimal" {
+		if value, ok := sanitizedParameters[postgres.ParameterMaxWalSenders]; !ok || value != "0" {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", "max_wal_senders"),
+					walLevel,
+					"`max_wal_senders` should be set at `0` when `wal_level` is `minimal`"))
+		}
 	}
 
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
@@ -2064,6 +2079,22 @@ func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
 				newReplicationSlots.HighAvailability.SlotPrefix,
 				"Cannot change replication slot prefix while highAvailability is enabled"),
 		)
+	}
+
+	return errs
+}
+
+func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
+	var errs field.ErrorList
+
+	newWALLevel := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
+	oldWALLevel := old.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
+
+	if newWALLevel == "minimal" && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
+		errs = append(errs, field.Invalid(
+			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
+			"minimal",
+			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)", oldWALLevel)))
 	}
 
 	return errs
