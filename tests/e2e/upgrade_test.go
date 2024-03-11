@@ -436,7 +436,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		// Create a WAL on the primary and check if it arrives on
 		// minio within a short time.
-		By("archiving WALs on minio", func() {
+		var latestWAL string
+		By("create a WAL on primary", func() {
 			primary := clusterName1 + "-1"
 			out, _, err := env.ExecCommandInInstancePod(
 				testsUtils.PodLocator{
@@ -446,9 +447,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				"psql", "-U", "postgres", "appdb", "-v", "SHOW_ALL_RESULTS=off", "-tAc",
 				"CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())")
 			Expect(err).ToNot(HaveOccurred())
-			latestWAL := strings.TrimSpace(out)
+			latestWAL = strings.TrimSpace(out)
+		})
 
-			Eventually(func() (int, error, error) {
+		By(fmt.Sprintf("checking latest wal on minio, latestWal: %v", latestWAL), func() {
+			Eventually(func(g Gomega) (int, error, error) {
 				// In the fixture WALs are compressed with gzip
 				findCmd := fmt.Sprintf(
 					"mc find minio --name %v.gz | wc -l",
@@ -460,6 +463,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 						ContainerName: "mc",
 					}, nil,
 					"sh", "-c", findCmd)
+				g.Expect(err).ToNot(HaveOccurred())
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
 			}, 60).Should(BeEquivalentTo(1))
