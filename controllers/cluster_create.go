@@ -972,12 +972,10 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		backup           *apiv1.Backup
 		recoverySnapshot *persistentvolumeclaim.StorageSource
 	)
-	// if the cluster is bootstrapping from recovery, it may do so from
+	// If the cluster is bootstrapping from recovery, it may do so from:
 	//  1 - a backup object, which may be done with volume snapshots or object storage
 	//  2 - volume snapshots
 	// We need to check that whichever alternative is used, the backup/snapshot is completed.
-	// If not completed, we requeue.
-	// If completed, we know that either backup or recoverySnapshot (perhaps both) are non-nil
 	if cluster.Spec.Bootstrap != nil &&
 		cluster.Spec.Bootstrap.Recovery != nil {
 		var err error
@@ -1016,7 +1014,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	isBootstrappingFromRecovery := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil
 	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
-
 	switch {
 	case isBootstrappingFromRecovery && recoverySnapshot != nil:
 		var snapshot volumesnapshot.VolumeSnapshot
