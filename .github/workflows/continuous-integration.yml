@@ -623,6 +623,7 @@ jobs:
         if: |
           !github.event.repository.fork && 
           !github.event.pull_request.head.repo.fork
+        continue-on-error: true
         with:
           sarif_file: snyk.sarif
 
