@@ -87,7 +87,7 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 		// Fetch the operator's available architectures
 		operatorPod, err := env.GetOperatorPod()
 		Expect(err).ToNot(HaveOccurred())
-		imageArchitectures, err := utils.GetOperatorArchitectures(operatorPod)
+		imageArchitectures, err := utils.GetOperatorArchitectures(&operatorPod)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Fetch the Cluster status

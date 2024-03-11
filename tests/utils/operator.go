@@ -303,7 +303,7 @@ func GetOperatorVersion(namespace, podName string) (string, error) {
 }
 
 // GetOperatorArchitectures returns all the supported operator architectures
-func GetOperatorArchitectures(operatorPod corev1.Pod) ([]string, error) {
+func GetOperatorArchitectures(operatorPod *corev1.Pod) ([]string, error) {
 	out, _, err := RunUnchecked(fmt.Sprintf(
 		"kubectl -n %v exec %v -c manager -- /manager debug show-architectures",
 		operatorPod.Namespace,
