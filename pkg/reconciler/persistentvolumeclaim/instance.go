@@ -81,6 +81,7 @@ func reconcileSingleInstanceMissingPVCs(
 	var shouldReconcile bool
 	instanceName := specs.GetInstanceName(cluster.Name, serial)
 	for _, expectedPVC := range getExpectedPVCsFromCluster(cluster, instanceName) {
+		// Continue if the expectedPVC is in present in the current PVC list
 		if slices.ContainsFunc(pvcs, func(pvc corev1.PersistentVolumeClaim) bool { return expectedPVC.name == pvc.Name }) {
 			continue
 		}

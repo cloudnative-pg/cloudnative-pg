@@ -178,15 +178,9 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 // from a Cluster definition, taking into consideration the backup that the
 // cluster has been bootstrapped from
 func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSource {
-	if cluster.Spec.Bootstrap == nil {
-		return nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery == nil {
-		return nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.Recovery == nil ||
+		cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
 		return nil
 	}
 
