@@ -67,6 +67,10 @@ type ScheduledBackupSpec struct {
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
 
+	// Configuration parameters passed to the plugin managing this backup
+	// +optional
+	PluginConfiguration *BackupPluginConfiguration `json:"pluginConfiguration,omitempty"`
+
 	// Whether the default type of backup with volume snapshots is
 	// online/hot (`true`, default) or offline/cold (`false`)
 	// Overrides the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'
@@ -180,6 +184,7 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 			Method:              scheduledBackup.Spec.Method,
 			Online:              scheduledBackup.Spec.Online,
 			OnlineConfiguration: scheduledBackup.Spec.OnlineConfiguration,
+			PluginConfiguration: scheduledBackup.Spec.PluginConfiguration,
 		},
 	}
 	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, configuration.Current)

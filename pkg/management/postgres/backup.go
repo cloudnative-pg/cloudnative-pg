@@ -69,8 +69,9 @@ type BackupCommand struct {
 	Capabilities *barmanCapabilities.Capabilities
 }
 
-// NewBackupCommand initializes a BackupCommand object
-func NewBackupCommand(
+// NewBarmanBackupCommand initializes a BackupCommand object, taking a physical
+// backup using Barman Cloud
+func NewBarmanBackupCommand(
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 	client client.Client,
@@ -250,16 +251,7 @@ func (b *BackupCommand) retryWithRefreshedCluster(
 	ctx context.Context,
 	cb func() error,
 ) error {
-	return retry.OnError(retry.DefaultBackoff, resources.RetryAlways, func() error {
-		if err := b.Client.Get(ctx, types.NamespacedName{
-			Namespace: b.Cluster.Namespace,
-			Name:      b.Cluster.Name,
-		}, b.Cluster); err != nil {
-			return err
-		}
-
-		return cb()
-	})
+	return resources.RetryWithRefreshedResource(ctx, b.Client, b.Cluster, cb)
 }
 
 // run executes the barman-cloud-backup command and updates the status

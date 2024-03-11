@@ -21,12 +21,14 @@ AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
 BDR
+BackupCapabilities
 BackupConfiguration
 BackupFrom
 BackupLabelFile
 BackupList
 BackupMethod
 BackupPhase
+BackupPluginConfiguration
 BackupSnapshotElementStatus
 BackupSnapshotStatus
 BackupSource
@@ -247,6 +249,7 @@ OnlineUpgrading
 OpenSSL
 OpenShift
 Openshift
+OperatorCapabilities
 OperatorGroup
 OperatorHub
 PDB
@@ -274,6 +277,8 @@ PgBouncerSecrets
 PgBouncerSecretsVersions
 PgBouncerSpec
 Philippe
+PluginConfigurationList
+PluginStatus
 PoLA
 PodAffinity
 PodAntiAffinity
@@ -427,6 +432,7 @@ VolumeSnapshots
 WAL
 WAL's
 WALBackupConfiguration
+WALCapabilities
 WALs
 Wadle
 WalBackupConfiguration
@@ -491,6 +497,7 @@ backends
 backport
 backported
 backporting
+backupCapabilities
 backupID
 backupId
 backupLabelFile
@@ -897,6 +904,7 @@ openldap
 openshift
 operability
 operativity
+operatorCapabilities
 operatorframework
 operatorgorup
 operatorgroup
@@ -935,6 +943,8 @@ pid
 pitr
 plpgsql
 pluggable
+pluginConfiguration
+pluginStatus
 png
 podAffinityTerm
 podAntiAffinity
@@ -994,6 +1004,7 @@ readService
 readinessProbe
 readthedocs
 readyInstances
+reconciler
 reconciliationLoop
 recoverability
 recoveredCluster
@@ -1201,6 +1212,7 @@ volumeSnapshots
 volumesnapshot
 waitForArchive
 wal
+walCapabilities
 walClassName
 walSegmentSize
 walStorage

@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -80,7 +81,7 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 	return &ClusterReconciler{
 		StatusClient:    instance.NewStatusClient(),
 		DiscoveryClient: discoveryClient,
-		Client:          mgr.GetClient(),
+		Client:          operatorclient.NewExtendedClient(mgr.GetClient()),
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
 	}
@@ -144,7 +145,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		return ctrl.Result{}, err
 	}
-
+	ctx = cluster.SetInContext(ctx)
 	// Run the inner reconcile loop. Translate any ErrNextLoop to an errorless return
 	result, err := r.reconcile(ctx, cluster)
 	if errors.Is(err, ErrNextLoop) {
@@ -157,7 +158,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
-// nolint:gocognit
+// nolint:gocognit,gocyclo
 func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -195,6 +196,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot set image name: %w", err)
 	}
 
+	// Ensure we load all the plugins that are required to reconcile this cluster
+	if err := r.updatePluginsStatus(ctx, cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile required plugins: %w", err)
+	}
+
 	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
 	if err := r.reconcileRestoredCluster(ctx, cluster); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot reconcile restored Cluster: %w", err)
@@ -222,6 +228,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
+	}
+
+	// Calls pre-reconcile hooks
+	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
+		return hookResult.Result, hookResult.Err
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
@@ -363,7 +374,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Updates all the objects managed by the controller
-	return r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	res, err := r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	if err != nil || !res.IsZero() {
+		return res, err
+	}
+
+	// Calls post-reconcile hooks
+	hookResult := postReconcilePluginHooks(ctx, cluster, cluster)
+	return hookResult.Result, hookResult.Err
 }
 
 func (r *ClusterReconciler) handleSwitchover(

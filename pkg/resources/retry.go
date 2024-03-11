@@ -16,5 +16,28 @@ limitations under the License.
 
 package resources
 
+import (
+	"context"
+
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
 // RetryAlways is a function that always returns true on any error encountered
 func RetryAlways(_ error) bool { return true }
+
+// RetryWithRefreshedResource updates the resource before invoking the cb
+func RetryWithRefreshedResource(
+	ctx context.Context,
+	cli client.Client,
+	resource client.Object,
+	cb func() error,
+) error {
+	return retry.OnError(retry.DefaultBackoff, RetryAlways, func() error {
+		if err := cli.Get(ctx, client.ObjectKeyFromObject(resource), resource); err != nil {
+			return err
+		}
+
+		return cb()
+	})
+}
