@@ -28,8 +28,14 @@ import (
 // WalLevelValue a value that is assigned to the 'wal_level' configuration field
 type WalLevelValue string
 
-// WalLevelParameter the configuration key containing the wal_level value
-const WalLevelParameter = "wal_level"
+// ParameterWalLevel the configuration key containing the wal_level value
+const ParameterWalLevel = "wal_level"
+
+// ParameterMaxWalSenders the configuration key containing the max_wal_senders value
+const ParameterMaxWalSenders = "max_wal_senders"
+
+// ParameterArchiveMode the configuration key containing the archive_mode value
+const ParameterArchiveMode = "archive_mode"
 
 // An acceptable wal_level value
 const (
