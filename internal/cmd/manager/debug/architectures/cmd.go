@@ -35,6 +35,7 @@ func NewCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := run(); err != nil {
 				log.Error(err, "Error while extracting the list of supported architectures")
+				return err
 			}
 
 			return nil

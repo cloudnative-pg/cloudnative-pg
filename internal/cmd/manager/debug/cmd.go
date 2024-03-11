@@ -27,7 +27,7 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use:           "debug [cmd]",
-		Short:         "Useful debug subfeatures",
+		Short:         "Command aimed to gather useful debug data",
 		SilenceErrors: true,
 	}
 
