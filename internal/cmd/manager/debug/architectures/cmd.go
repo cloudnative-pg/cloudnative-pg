@@ -48,8 +48,9 @@ func run() error {
 	if err := utils.DetectAvailableArchitectures(); err != nil {
 		return err
 	}
-	architectures := make([]string, 0, len(utils.GetAvailableArchitectures()))
-	for _, arch := range utils.GetAvailableArchitectures() {
+	availableArchitectures := utils.GetAvailableArchitectures()
+	architectures := make([]string, 0, len(availableArchitectures))
+	for _, arch := range availableArchitectures {
 		architectures = append(architectures, arch.GoArch)
 	}
 	val, err := json.MarshalIndent(architectures, "", "    ")
