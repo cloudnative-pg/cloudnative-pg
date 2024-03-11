@@ -140,7 +140,7 @@ func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
 
 // CreateAndSignPair given a CA keypair, generate and sign a leaf keypair
 func (pair KeyPair) CreateAndSignPair(host string, usage CertType, altDNSNames []string) (*KeyPair, error) {
-	certificateDuration := time.Duration(configuration.Current.CertificateDuration) * time.Hour * 24
+	certificateDuration := getCertificateDuration()
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 	return pair.createAndSignPairWithValidity(host, notBefore, notAfter, usage, altDNSNames)
@@ -265,7 +265,7 @@ func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCert
 		return err
 	}
 
-	certificateDuration := time.Duration(configuration.Current.CertificateDuration) * time.Hour * 24
+	certificateDuration := getCertificateDuration()
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 
@@ -313,7 +313,7 @@ func (pair *KeyPair) IsExpiring() (bool, *time.Time, error) {
 	if time.Now().Before(cert.NotBefore) {
 		return true, &cert.NotAfter, nil
 	}
-	expiringCheckThreshold := time.Duration(configuration.Current.ExpiringCheckThreshold) * time.Hour * 24
+	expiringCheckThreshold := getCheckThreshold()
 	if time.Now().Add(expiringCheckThreshold).After(cert.NotAfter) {
 		return true, &cert.NotAfter, nil
 	}
@@ -334,7 +334,7 @@ func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit strin
 		return nil, err
 	}
 
-	certificateDuration := time.Duration(configuration.Current.CertificateDuration) * time.Hour * 24
+	certificateDuration := getCertificateDuration()
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 
@@ -343,7 +343,7 @@ func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit strin
 
 // CreateRootCA generates a CA returning its keys
 func CreateRootCA(commonName string, organizationalUnit string) (*KeyPair, error) {
-	certificateDuration := time.Duration(configuration.Current.CertificateDuration) * time.Hour * 24
+	certificateDuration := getCertificateDuration()
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 	return createCAWithValidity(notBefore, notAfter, nil, nil, commonName, organizationalUnit)
@@ -467,4 +467,20 @@ func encodeCertificate(derBytes []byte) []byte {
 
 func encodePrivateKey(derBytes []byte) []byte {
 	return pem.EncodeToMemory(&pem.Block{Type: ecPrivateKeyPEMBlockType, Bytes: derBytes})
+}
+
+func getCertificateDuration() time.Duration {
+	duration := configuration.Current.CertificateDuration
+	if duration <= 0 {
+		return configuration.CertificateDuration * 24 * time.Hour
+	}
+	return time.Duration(duration) * 24 * time.Hour
+}
+
+func getCheckThreshold() time.Duration {
+	threshold := configuration.Current.ExpiringCheckThreshold
+	if threshold <= 0 {
+		return configuration.ExpiringCheckThreshold * 24 * time.Hour
+	}
+	return time.Duration(threshold) * 24 * time.Hour
 }

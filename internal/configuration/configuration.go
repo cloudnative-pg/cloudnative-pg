@@ -29,8 +29,16 @@ import (
 
 var configurationLog = log.WithName("configuration")
 
-// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
-const DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
+const (
+	// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
+	DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
+
+	// CertificateDuration is the default value for the lifetime of the generated certificates
+	CertificateDuration = 90
+
+	// ExpiringCheckThreshold is the default threshold to consider a certificate as expiring
+	ExpiringCheckThreshold = 7
+)
 
 // DefaultPluginSocketDir is the default directory where the plugin sockets are located.
 const DefaultPluginSocketDir = "/plugins"
@@ -114,8 +122,8 @@ func newDefaultConfig() *Data {
 		PostgresImageName:      versions.DefaultImageName,
 		PluginSocketDir:        DefaultPluginSocketDir,
 		CreateAnyService:       false,
-		CertificateDuration:    90,
-		ExpiringCheckThreshold: 7,
+		CertificateDuration:    CertificateDuration,
+		ExpiringCheckThreshold: ExpiringCheckThreshold,
 	}
 }
 
