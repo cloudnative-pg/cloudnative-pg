@@ -17,11 +17,9 @@ limitations under the License.
 package e2e
 
 import (
-	"os"
-	"strings"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,24 +32,9 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 		level           = tests.Low
 	)
 
-	// we assume the image to be built for just amd64 as default. We try to calculate other envs inside the beforeEach
-	// block
-	imageArchitectures := []string{"amd64"}
-
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
-		}
-
-		// TODO: instead of fetching the current architectures using the
-		// PLATFORMS env variable, we should have a manager command which
-		// returns all the architectures available in the current image.
-
-		// Fetch the current image architectures via the PLATFORMS env variable.
-		if architecturesFromUser, exist := os.LookupEnv("PLATFORMS"); exist {
-			s := strings.ReplaceAll(architecturesFromUser, "linux/", "")
-			arches := strings.Split(s, ",")
-			imageArchitectures = arches
 		}
 	})
 
@@ -100,6 +83,12 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+
+		// Fetch the operator's available architectures
+		operatorPod, err := env.GetOperatorPod()
+		Expect(err).ToNot(HaveOccurred())
+		imageArchitectures, err := utils.GetOperatorArchitectures(&operatorPod)
+		Expect(err).ToNot(HaveOccurred())
 
 		// Fetch the Cluster status
 		cluster, err := env.GetCluster(namespace, clusterName)
