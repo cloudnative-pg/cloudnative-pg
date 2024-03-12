@@ -20,6 +20,8 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd creates the new "reset" command
@@ -28,7 +30,10 @@ func NewCmd() *cobra.Command {
 		Use:   "reload [clusterName]",
 		Short: `Reload the cluster`,
 		Long:  `Triggers a reconciliation loop for all the cluster's instances, rolling out new configurations if present.`,
-		Args:  cobra.ExactArgs(1),
+		Args:  plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]

@@ -17,7 +17,8 @@ limitations under the License.
 package status
 
 import (
-	"context"
+	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -29,9 +30,15 @@ func NewCmd() *cobra.Command {
 	statusCmd := &cobra.Command{
 		Use:   "status [cluster]",
 		Short: "Get the status of a PostgreSQL cluster",
-		Args:  cobra.ExactArgs(1),
+		Args:  plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if strings.HasPrefix(toComplete, "-") {
+				fmt.Printf("%+v\n", toComplete)
+			}
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
+			ctx := cmd.Context()
 			clusterName := args[0]
 
 			verbose, _ := cmd.Flags().GetBool("verbose")
