@@ -95,6 +95,10 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		InRoles:         []string{"pg_monitoring"},
 		DisablePassword: true,
 	}
+	wantedRoleWithDefaultConnectionLimit := apiv1.RoleConfiguration{
+		Name:            "foo",
+		ConnectionLimit: -1,
+	}
 	unWantedRole := apiv1.RoleConfiguration{
 		Name: "foo",
 	}
@@ -117,6 +121,10 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		"CREATE ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION "+
 			"NOSUPERUSER CONNECTION LIMIT 2 IN ROLE pg_monitoring PASSWORD NULL VALID UNTIL '2100-01-01 00:00:00Z'",
 		wantedRole.Name)
+	wantedRoleWithDefaultConnectionLimitExpectedCrtStmt := fmt.Sprintf(
+		"CREATE ROLE \"%s\" NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT NOLOGIN NOREPLICATION "+
+			"NOSUPERUSER CONNECTION LIMIT -1",
+		wantedRoleWithDefaultConnectionLimit.Name)
 
 	wantedRoleCommentStmt := fmt.Sprintf(
 		"COMMENT ON ROLE \"%s\" IS %s",
@@ -307,6 +315,18 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			WillReturnResult(sqlmock.NewResult(2, 3))
 		err = prm.Create(ctx,
 			roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPassDeletion}.toDatabaseRole())
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+	It("Create will send a correct CREATE with password deletion to the DB", func(ctx context.Context) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		prm := NewPostgresRoleManager(db)
+
+		mock.ExpectExec(wantedRoleWithDefaultConnectionLimitExpectedCrtStmt).
+			WillReturnResult(sqlmock.NewResult(2, 3))
+
+		err = prm.Create(ctx,
+			roleConfigurationAdapter{RoleConfiguration: wantedRoleWithDefaultConnectionLimit}.toDatabaseRole())
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 	// Testing Delete
