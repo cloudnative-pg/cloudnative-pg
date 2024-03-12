@@ -50,4 +50,4 @@ spec:
 # Sequences can be refreshed with:
 #
 #    ./bin/kubectl-cnpg subscription sync-sequences cluster-example-dest \
-#         --external-cluster=cluster-example
+#         --subscription=app
