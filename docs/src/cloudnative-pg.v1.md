@@ -1758,6 +1758,20 @@ Defaults to: <code>RuntimeDefault</code></p>
    <p>The tablespaces configuration</p>
 </td>
 </tr>
+<tr><td><code>enablePDB</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Manage the <code>PodDisruptionBudget</code> resources within the cluster. When
+configured as <code>true</code> (default setting), the pod disruption budgets
+will safeguard the primary node from being terminated. Conversely,
+setting it to <code>false</code> will result in the absence of any
+<code>PodDisruptionBudget</code> resource, permitting the shutdown of all nodes
+hosting the PostgreSQL cluster. This latter configuration is
+advisable for any PostgreSQL cluster employed for
+development/staging purposes.</p>
+</td>
+</tr>
 </tbody>
 </table>
 

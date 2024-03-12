@@ -479,6 +479,18 @@ type ClusterSpec struct {
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
+
+	// Manage the `PodDisruptionBudget` resources within the cluster. When
+	// configured as `true` (default setting), the pod disruption budgets
+	// will safeguard the primary node from being terminated. Conversely,
+	// setting it to `false` will result in the absence of any
+	// `PodDisruptionBudget` resource, permitting the shutdown of all nodes
+	// hosting the PostgreSQL cluster. This latter configuration is
+	// advisable for any PostgreSQL cluster employed for
+	// development/staging purposes.
+	// +kubebuilder:default:=true
+	// +optional
+	EnablePDB *bool `json:"enablePDB,omitempty"`
 }
 
 const (
@@ -2772,6 +2784,15 @@ func (cluster *Cluster) GetPrimaryUpdateMethod() PrimaryUpdateMethod {
 	}
 
 	return strategy
+}
+
+// GetEnablePDB get the cluster EnablePDB value, defaults to true
+func (cluster *Cluster) GetEnablePDB() bool {
+	if cluster.Spec.EnablePDB == nil {
+		return true
+	}
+
+	return *cluster.Spec.EnablePDB
 }
 
 // IsNodeMaintenanceWindowInProgress check if the upgrade mode is active or not
