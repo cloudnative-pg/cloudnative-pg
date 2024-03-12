@@ -109,7 +109,7 @@ func NewCmd() *cobra.Command {
 		&publicationName,
 		"publication",
 		"",
-		"The name of the pubication to be created",
+		"The name of the publication to be created",
 	)
 
 	publicationCreateCmd.Flags().BoolVar(
