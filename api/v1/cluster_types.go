@@ -502,7 +502,7 @@ type ClusterSpec struct {
 	// +optional
 	EnablePDB *bool `json:"enablePDB,omitempty"`
 
-  // The plugins configuration, containing
+	// The plugins configuration, containing
 	// any plugin to be loaded with the corresponding configuration
 	Plugins PluginConfigurationList `json:"plugins,omitempty"`
 }

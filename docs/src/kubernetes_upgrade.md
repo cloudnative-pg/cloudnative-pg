@@ -35,7 +35,7 @@ or migrating them to other nodes in the cluster.
 
 While the standard approach ensures service reliability and leverages
 Kubernetes' self-healing capabilities, there are scenarios where operating with
-a temporarily degraded cluster may be advisable. This is particularly relevant
+a temporarily degraded cluster may be acceptable. This is particularly relevant
 for PostgreSQL clusters relying on **node-local storage**, where the storage is
 local to the Kubernetes worker node running the PostgreSQL database. Node-local
 storage, or simply *local storage*, is employed to enhance performance.

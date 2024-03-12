@@ -496,9 +496,12 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 
 				By("having the draining of the primary node rejected", func() {
-					pod, err := env.GetClusterPrimary(namespace, clusterName)
-					Expect(err).ToNot(HaveOccurred())
-					primaryNode := pod.Spec.NodeName
+					var primaryNode string
+					Eventually(func(g Gomega) {
+						pod, err := env.GetClusterPrimary(namespace, clusterName)
+						g.Expect(err).ToNot(HaveOccurred())
+						primaryNode = pod.Spec.NodeName
+					}, 60).Should(Succeed())
 
 					// Draining the primary pod's node
 					Eventually(func(g Gomega) {
