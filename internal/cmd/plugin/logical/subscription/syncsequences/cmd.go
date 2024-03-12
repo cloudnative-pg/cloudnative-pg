@@ -115,7 +115,7 @@ func NewCmd() *cobra.Command {
 		&dbName,
 		"dbname",
 		"",
-		"The name of the application where to refresh the sequences. Defaults to the application database if available",
+		"The name of the database where the subscription is present and sequences need to be updated. Defaults to the application database, if available",
 	)
 	syncSequencesCmd.Flags().BoolVar(
 		&dryRun,
