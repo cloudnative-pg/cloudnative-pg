@@ -440,11 +440,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// minio within a short time.
 		var latestWAL string
 		By("create a WAL on primary", func() {
-			primary := clusterName1 + "-1"
+			primary, err := env.GetClusterPrimary(upgradeNamespace, clusterName1)
+			Expect(err).ToNot(HaveOccurred())
 			out, _, err := env.ExecCommandInInstancePod(
 				testsUtils.PodLocator{
 					Namespace: upgradeNamespace,
-					PodName:   primary,
+					PodName:   primary.Name,
 				}, nil,
 				"psql", "-U", "postgres", "appdb", "-v", "SHOW_ALL_RESULTS=off", "-tAc",
 				"CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())")
