@@ -137,7 +137,7 @@ func NewCmd() *cobra.Command {
 		"parameters",
 		"",
 		"The subscription parameters. IMPORTANT: this command won't perform any validation. "+
-			"Users are responsible to pass them correctly",
+			"Users are responsible for passing them correctly",
 	)
 	subscriptionCreateCmd.Flags().BoolVar(
 		&dryRun,
