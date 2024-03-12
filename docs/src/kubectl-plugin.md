@@ -68,7 +68,7 @@ Dependencies resolved.
  Package            Architecture         Version                   Repository                  Size
 ====================================================================================================
 Installing:
- cnpg               x86_64               1.22.1-1                  @commandline                14 M
+ cnpg               x86_64               1.22.1-1                  @commandline                17 M
 
 Transaction Summary
 ====================================================================================================
