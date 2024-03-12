@@ -34,7 +34,7 @@ For example, let's install the 1.18.1 release of the plugin, for an Intel based
 64 bit server. First, we download the right `.deb` file.
 
 ``` sh
-$ wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.18.1/kubectl-cnpg_1.18.1_linux_x86_64.deb
+wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.18.1/kubectl-cnpg_1.18.1_linux_x86_64.deb
 ```
 
 Then, install from the local file using `dpkg`:
@@ -115,6 +115,29 @@ operating system and architectures:
   * amd64
   * arm 5/6/7
   * arm64
+
+### Configuring auto-completion
+
+To configure auto-completion for the plugin, an helper shell script need to be
+installed into your current PATH. Assuming the latter contains `/usr/local/bin`,
+this can be done with the following commands:
+
+```shell
+cat > kubectl_complete-cnpg <<EOF
+#!/usr/bin/env sh
+
+# Call the __complete command passing it all arguments
+kubectl cnpg __complete "\$@"
+EOF
+
+chmod +x kubectl_complete-cnpg
+
+# Important: the following command may require superuser permission
+sudo mv kubectl_complete-cnpg /usr/local/bin
+```
+
+!!! Important
+    The name of the script needs to be exactly the one provided since is used by the kubectl auto-complete process
 
 ## Use
 
@@ -1046,4 +1069,3 @@ The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
 popular terminal-based UI to interact with Kubernetes clusters.
 
 See [`k9s/plugins.yml`](samples/k9s/plugins.yml) for details.
-

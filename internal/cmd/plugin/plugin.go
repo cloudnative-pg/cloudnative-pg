@@ -21,9 +21,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -137,4 +139,54 @@ func GetPGControlData(
 	}
 
 	return stdout, nil
+}
+
+// completeClusters is mainly used inside the unit tests
+func completeClusters(
+	ctx context.Context,
+	cli client.Client,
+	namespace string,
+	args []string,
+	toComplete string,
+) []string {
+	var clusters apiv1.ClusterList
+
+	// Since all our commands work on one cluster, if we already have one in the list
+	// we just return an empty set of strings
+	if len(args) == 1 {
+		return []string{}
+	}
+
+	// Get the cluster lists object if error we just return empty array string
+	if err := cli.List(ctx, &clusters, client.InNamespace(namespace)); err != nil {
+		// We can't list the clusters, so we cannot provide any completion.
+		// Unfortunately there's no way for us to provide an error message
+		// notifying the user of what is happening.
+		return []string{}
+	}
+
+	clustersNames := make([]string, 0, len(clusters.Items))
+	for _, cluster := range clusters.Items {
+		if len(toComplete) == 0 || strings.HasPrefix(cluster.Name, toComplete) {
+			clustersNames = append(clustersNames, cluster.Name)
+		}
+	}
+
+	return clustersNames
+}
+
+// CompleteClusters will complete the cluster name when necessary getting the list from the current namespace
+func CompleteClusters(ctx context.Context, args []string, toComplete string) []string {
+	return completeClusters(ctx, Client, Namespace, args, toComplete)
+}
+
+// RequiresArguments will show the help message in case no argument has been provided
+func RequiresArguments(nArgs int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) < nArgs {
+			_ = cmd.Help()
+			os.Exit(0)
+		}
+		return nil
+	}
 }
