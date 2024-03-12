@@ -118,7 +118,7 @@ func NewCmd() *cobra.Command {
 		&publicationName,
 		"publication",
 		"",
-		"The name of the publication to subscribe",
+		"The name of the publication to subscribe to",
 	)
 	subscriptionCreateCmd.Flags().StringVar(
 		&subscriptionName,
