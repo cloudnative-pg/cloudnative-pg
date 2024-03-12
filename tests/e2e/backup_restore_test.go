@@ -790,30 +790,32 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.LabelBackupRestore), func() {
 	const (
-		fixturesBackupDir               = fixturesDir + "/backup/recovery_external_clusters/"
-		azuriteBlobSampleFile           = fixturesDir + "/backup/azurite/cluster-backup.yaml.template"
-		externalClusterFileMinio        = fixturesBackupDir + "external-clusters-minio-03.yaml.template"
-		externalClusterFileMinioReplica = fixturesBackupDir + "external-clusters-minio-replica-04.yaml.template"
-		sourceTakeFirstBackupFileMinio  = fixturesBackupDir + "backup-minio-02.yaml"
-		sourceTakeSecondBackupFileMinio = fixturesBackupDir + "backup-minio-03.yaml"
-		sourceTakeThirdBackupFileMinio  = fixturesBackupDir + "backup-minio-04.yaml"
-		clusterSourceFileMinio          = fixturesBackupDir + "source-cluster-minio-01.yaml.template"
-		sourceBackupFileAzure           = fixturesBackupDir + "backup-azure-blob-02.yaml"
-		clusterSourceFileAzure          = fixturesBackupDir + "source-cluster-azure-blob-01.yaml.template"
-		externalClusterFileAzure        = fixturesBackupDir + "external-clusters-azure-blob-03.yaml.template"
-		sourceBackupFileAzurePITR       = fixturesBackupDir + "backup-azure-blob-pitr.yaml"
-		externalClusterFileAzurite      = fixturesBackupDir + "external-clusters-azurite-03.yaml.template"
-		backupFileAzurite               = fixturesBackupDir + "backup-azurite-02.yaml"
-		tableName                       = "to_restore"
-		clusterSourceFileAzureSAS       = fixturesBackupDir + "cluster-with-backup-azure-blob-sas.yaml.template"
-		clusterRestoreFileAzureSAS      = fixturesBackupDir + "cluster-from-restore-sas.yaml.template"
-		sourceBackupFileAzureSAS        = fixturesBackupDir + "backup-azure-blob-sas.yaml"
-		sourceBackupFileAzurePITRSAS    = fixturesBackupDir + "backup-azure-blob-pitr-sas.yaml"
-		level                           = tests.High
-		minioCaSecName                  = "minio-server-ca-secret"
-		minioTLSSecName                 = "minio-server-tls-secret"
-		azuriteCaSecName                = "azurite-ca-secret"
-		azuriteTLSSecName               = "azurite-tls-secret"
+		fixturesBackupDir                   = fixturesDir + "/backup/recovery_external_clusters/"
+		azuriteBlobSampleFile               = fixturesDir + "/backup/azurite/cluster-backup.yaml.template"
+		externalClusterFileMinio            = fixturesBackupDir + "external-clusters-minio-03.yaml.template"
+		externalClusterFileMinioMaxParallel = fixturesBackupDir + "external-clusters-minio-03-max-parallel.yaml.template"
+		externalClusterFileMinioReplica     = fixturesBackupDir + "external-clusters-minio-replica-04.yaml.template"
+		sourceTakeFirstBackupFileMinio      = fixturesBackupDir + "backup-minio-02.yaml"
+		sourceTakeSecondBackupFileMinio     = fixturesBackupDir + "backup-minio-03.yaml"
+		sourceTakeThirdBackupFileMinio      = fixturesBackupDir + "backup-minio-04.yaml"
+		clusterSourceFileMinio              = fixturesBackupDir + "source-cluster-minio-01.yaml.template"
+		sourceBackupFileAzure               = fixturesBackupDir + "backup-azure-blob-02.yaml"
+		clusterSourceFileAzure              = fixturesBackupDir + "source-cluster-azure-blob-01.yaml.template"
+		externalClusterFileAzure            = fixturesBackupDir + "external-clusters-azure-blob-03.yaml.template"
+		externalClusterFileAzureMaxParallel = fixturesBackupDir + "external-clusters-azure-blob-03-max-parallel.yaml.template"
+		sourceBackupFileAzurePITR           = fixturesBackupDir + "backup-azure-blob-pitr.yaml"
+		externalClusterFileAzurite          = fixturesBackupDir + "external-clusters-azurite-03.yaml.template"
+		backupFileAzurite                   = fixturesBackupDir + "backup-azurite-02.yaml"
+		tableName                           = "to_restore"
+		clusterSourceFileAzureSAS           = fixturesBackupDir + "cluster-with-backup-azure-blob-sas.yaml.template"
+		clusterRestoreFileAzureSAS          = fixturesBackupDir + "cluster-from-restore-sas.yaml.template"
+		sourceBackupFileAzureSAS            = fixturesBackupDir + "backup-azure-blob-sas.yaml"
+		sourceBackupFileAzurePITRSAS        = fixturesBackupDir + "backup-azure-blob-pitr-sas.yaml"
+		level                               = tests.High
+		minioCaSecName                      = "minio-server-ca-secret"
+		minioTLSSecName                     = "minio-server-tls-secret"
+		azuriteCaSecName                    = "azurite-ca-secret"
+		azuriteTLSSecName                   = "azurite-tls-secret"
 	)
 
 	var namespace, clusterName string
@@ -939,6 +941,49 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			By("deleting the restored cluster", func() {
 				err = DeleteResourcesFromFile(namespace, externalClusterFileMinio)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
+		It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section with wal.maxParallel", func() {
+			externalClusterName, err := env.GetResourceNameFromYAML(externalClusterFileMinioMaxParallel)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+
+			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+
+			// There should be a backup resource and
+			By("backing up a cluster and verifying it exists on minio", func() {
+				testUtils.ExecuteBackup(namespace, sourceTakeFirstBackupFileMinio, false,
+					testTimeouts[testUtils.BackupIsReady], env)
+				AssertBackupConditionInClusterStatus(namespace, clusterName)
+
+				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
+				// This should be better handled inside ExecuteBackup
+				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+
+				latestTar := minioPath(clusterName, "data.tar")
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+				}, 60).Should(BeEquivalentTo(1),
+					fmt.Sprintf("verify the number of backup %v is equals to 1", latestTar))
+				Eventually(func() (string, error) {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
+			})
+
+			// Restoring cluster using a recovery barman object store, which is defined
+			// in the externalClusters section
+			AssertClusterRestore(namespace, externalClusterFileMinioMaxParallel, tableName, psqlClientPod)
+
+			// verify test data on restored external cluster
+			AssertDataExpectedCount(namespace, externalClusterName, tableName, 2, psqlClientPod)
+
+			By("deleting the restored cluster", func() {
+				err = DeleteResourcesFromFile(namespace, externalClusterFileMinioMaxParallel)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
