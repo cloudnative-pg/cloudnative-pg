@@ -36,7 +36,7 @@ const (
 	PoolerTypeRO = PoolerType("ro")
 
 	// DefaultPgBouncerPoolerAuthQuery is the default auth_query for PgBouncer
-	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM user_search($1)"
+	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM public.user_search($1)"
 )
 
 // PgBouncerPoolMode is the mode of PgBouncer
@@ -135,13 +135,13 @@ type PgBouncerSpec struct {
 
 	// The credentials of the user that need to be used for the authentication
 	// query. In case it is specified, also an AuthQuery
-	// (e.g. "SELECT usename, passwd FROM pg_shadow WHERE usename=$1")
+	// (e.g. "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1")
 	// has to be specified and no automatic CNPG Cluster integration will be triggered.
 	// +optional
 	AuthQuerySecret *LocalObjectReference `json:"authQuerySecret,omitempty"`
 
 	// The query that will be used to download the hash of the password
-	// of a certain user. Default: "SELECT usename, passwd FROM user_search($1)".
+	// of a certain user. Default: "SELECT usename, passwd FROM public.user_search($1)".
 	// In case it is specified, also an AuthQuerySecret has to be specified and
 	// no automatic CNPG Cluster integration will be triggered.
 	// +optional

@@ -160,15 +160,15 @@ Finally, as a *superuser* connect in each application database, and then create
 the authentication function inside each of the application databases:
 
 ```sql
-CREATE OR REPLACE FUNCTION user_search(uname TEXT)
+CREATE OR REPLACE FUNCTION public.user_search(uname TEXT)
   RETURNS TABLE (usename name, passwd text)
   LANGUAGE sql SECURITY DEFINER AS
-  'SELECT usename, passwd FROM pg_shadow WHERE usename=$1;';
+  'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;';
 
-REVOKE ALL ON FUNCTION user_search(text)
+REVOKE ALL ON FUNCTION public.user_search(text)
   FROM public;
 
-GRANT EXECUTE ON FUNCTION user_search(text)
+GRANT EXECUTE ON FUNCTION public.user_search(text)
   TO cnpg_pooler_pgbouncer;
 ```
 
