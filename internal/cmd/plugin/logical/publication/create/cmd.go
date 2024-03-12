@@ -122,7 +122,8 @@ func NewCmd() *cobra.Command {
 		&dbName,
 		"dbname",
 		"",
-		"The database in which the command should create the publication",
+		"The database in which the command should create the publication" +
+		" (default: `app`)",
 	)
 	publicationCreateCmd.Flags().StringSliceVar(
 		&schemaNames,
