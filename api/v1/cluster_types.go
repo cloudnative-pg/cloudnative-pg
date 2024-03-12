@@ -172,6 +172,11 @@ type VolumeSnapshotConfiguration struct {
 	// +kubebuilder:default:={waitForArchive:true,immediateCheckpoint:false}
 	// +optional
 	OnlineConfiguration OnlineConfiguration `json:"onlineConfiguration,omitempty"`
+
+	// GroupSnapshot makes the operator use a VolumeGroupSnapshot resource
+	// instead of individual snapshots
+	// +kubebuilder:default:=false
+	GroupSnapshot bool `json:"groupSnapshot,omitempty"`
 }
 
 // GetOnline tells whether this volume snapshot configuration allows
