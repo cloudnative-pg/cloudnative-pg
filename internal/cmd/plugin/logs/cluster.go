@@ -29,7 +29,7 @@ func clusterCmd() *cobra.Command {
 		Use:   "cluster <clusterName>",
 		Short: "Logs for cluster's pods",
 		Long:  "Collects the logs for all pods in a cluster into a single stream or outputFile",
-		Args:  cobra.ExactArgs(1),
+		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},

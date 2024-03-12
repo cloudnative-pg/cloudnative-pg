@@ -141,6 +141,7 @@ func GetPGControlData(
 	return stdout, nil
 }
 
+// completeClusters is mainly used inside the unit tests
 func completeClusters(
 	ctx context.Context,
 	cli client.Client,
@@ -150,7 +151,7 @@ func completeClusters(
 ) []string {
 	var clusters apiv1.ClusterList
 
-	// Since all our functions require only one cluster, if we already have one in the list
+	// Since all our commands work on one cluster, if we already have one in the list
 	// we just return an empty set of strings
 	if len(args) == 1 {
 		return []string{}
@@ -158,6 +159,9 @@ func completeClusters(
 
 	// Get the cluster lists object if error we just return empty array string
 	if err := cli.List(ctx, &clusters, client.InNamespace(namespace)); err != nil {
+		// We can't list the clusters, so we cannot provide any completion.
+		// Unfortunately there's no way for us to provide an error message
+		// notifying the user of what is happening.
 		return []string{}
 	}
 
@@ -176,7 +180,7 @@ func CompleteClusters(ctx context.Context, args []string, toComplete string) []s
 	return completeClusters(ctx, Client, Namespace, args, toComplete)
 }
 
-// RequiresArguments will show the help message in case no argument has been provides
+// RequiresArguments will show the help message in case no argument has been provided
 func RequiresArguments(nArgs int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) < nArgs {

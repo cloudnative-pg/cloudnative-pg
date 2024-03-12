@@ -116,29 +116,28 @@ operating system and architectures:
   * arm 5/6/7
   * arm64
 
-### Plugin auto-complete
+### Configuring auto-completion
 
-The `kubectl` command can auto-complete the subs-commands of a plugin, but to make this possible the user
-needs to create a shell script in the $PATH that can be executed, to enable this for the cnpg plugin, you
-should add the following script to your $PATH with the following name `kubectl_complete-cnpg`
-
-!!! Important
-    The name of the script needs to be exactly the one provided since is used by the kubectl auto-complete process
+To configure auto-completion for the plugin, an helper shell script need to be
+installed into your current PATH. Assuming the latter contains `/usr/local/bin`,
+this can be done with the following commands:
 
 ```shell
+cat > kubectl_complete-cnpg <<EOF
 #!/usr/bin/env sh
 
 # Call the __complete command passing it all arguments
-kubectl cnpg __complete "$@"
+kubectl cnpg __complete "\$@"
+EOF
 
-```
-
-Make the script executable
-```shell
 chmod +x kubectl_complete-cnpg
+
+# Important: the following command may require superuser permission
+sudo mv kubectl_complete-cnpg /usr/local/bin
 ```
 
-And after place it in your $PATH you'll be able to start using the auto-complete pressing the tab key twice
+!!! Important
+    The name of the script needs to be exactly the one provided since is used by the kubectl auto-complete process
 
 ## Use
 

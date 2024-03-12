@@ -31,7 +31,7 @@ func NewCmd() *cobra.Command {
 
 	fioCmd := &cobra.Command{
 		Use:     "fio [name]",
-		Short:   "Creates a fio deployment,pvc and configmap.",
+		Short:   "Creates a fio deployment, pvc and configmap",
 		Args:    cobra.MinimumNArgs(1),
 		Long:    `Creates a fio deployment that will execute a fio job on the specified pvc.`,
 		Example: jobExample,
