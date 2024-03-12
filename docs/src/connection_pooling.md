@@ -156,8 +156,8 @@ Then, for each application database, grant the permission for
 GRANT CONNECT ON DATABASE { database name here } TO cnpg_pooler_pgbouncer;
 ```
 
-Finally, connect in each application database, and then create the authentication
-function inside each of the application databases:
+Finally, as a *superuser* connect in each application database, and then create
+the authentication function inside each of the application databases:
 
 ```sql
 CREATE OR REPLACE FUNCTION user_search(uname TEXT)
@@ -171,6 +171,11 @@ REVOKE ALL ON FUNCTION user_search(text)
 GRANT EXECUTE ON FUNCTION user_search(text)
   TO cnpg_pooler_pgbouncer;
 ```
+
+!!! Important
+    Given that `user_search` is a `SECURITY DEFINER` function, you need to
+    create it through a role with `SUPERUSER` privileges, such as the `postgres`
+    user.
 
 ## Pod templates
 
