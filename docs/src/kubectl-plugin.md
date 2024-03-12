@@ -1063,6 +1063,60 @@ kubectl cnpg pgadmin4 --dry-run cluster-example | kubectl delete -f -
 !!! Warning
     Never deploy pgAdmin in production using the plugin.
 
+### Logical replication publication
+
+You can use the `cnpg publication` command to create and drop PostgreSQL
+[logical replication publications](https://www.postgresql.org/docs/current/logical-replication-publication.html).
+
+#### Creating a new publication
+
+You can create a new publication with:
+
+```sh
+kubectl cnpg publication create <NAME> [flags]
+```
+
+If you provide the `--external-cluster` option, you are asking to create a
+remote `PUBLICATION` in the provided external cluster defined in the Postgres
+`Cluster` called `<NAME>`. If no external cluster is provided, the publication
+will be created in the `<NAME>` Postgres `Cluster`.
+
+You have the following options:
+
+- create the publication `FOR ALL TABLES` (so with `--all-tables`), or
+- create the publication for one or more of the following:
+    - a specific table (with an expression)
+    - all tables in one or more database schema (available from PostgreSQL 15)
+
+The `--dry-run` option allows you to preview the SQL commands that the plugin
+will run on the destination database.
+
+When connecting to an external cluster, make sure that the specified user has
+enough permissions to run the `CREATE PUBLICATION` command.
+
+For more information, type:
+
+```sh
+kubectl cnpg publication create help
+```
+
+#### Dropping a publication
+
+TODO
+
+#### Creating a new subscription
+
+TODO
+
+#### Dropping a subscription
+
+TODO
+
+#### Synchronizing sequences
+
+TODO
+
+
 ## Integration with K9s
 
 The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
