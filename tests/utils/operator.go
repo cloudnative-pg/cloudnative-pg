@@ -301,3 +301,24 @@ func GetOperatorVersion(namespace, podName string) (string, error) {
 	ver := versionRegexp.FindStringSubmatch(strings.TrimSpace(out))[1]
 	return ver, nil
 }
+
+// GetOperatorArchitectures returns all the supported operator architectures
+func GetOperatorArchitectures(operatorPod *corev1.Pod) ([]string, error) {
+	out, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl -n %v exec %v -c manager -- /manager debug show-architectures",
+		operatorPod.Namespace,
+		operatorPod.Name,
+	))
+	if err != nil {
+		return nil, err
+	}
+
+	// `debug show-architectures` will print a JSON object
+	var res []string
+	err = json.Unmarshal([]byte(out), &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, err
+}
