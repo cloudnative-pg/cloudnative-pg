@@ -990,3 +990,109 @@ var _ = Describe("createOrPatchOwnedPodDisruptionBudget", func() {
 		})
 	})
 })
+
+var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
+	const namespace = "default"
+
+	var (
+		fakeClient k8client.Client
+		reconciler *ClusterReconciler
+		cluster    *apiv1.Cluster
+		pdbPrimary *policyv1.PodDisruptionBudget
+		pdb        *policyv1.PodDisruptionBudget
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: namespace,
+			},
+		}
+		pdbPrimary = &policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"test": "value",
+				},
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "example"},
+				},
+				MinAvailable: &intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 1,
+				},
+			},
+		}
+		pdb = &policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cluster.Name,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"test": "value",
+				},
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "example"},
+				},
+				MinAvailable: &intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 1,
+				},
+			},
+		}
+
+		fakeClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster, pdbPrimary, pdb).
+			Build()
+
+		reconciler = &ClusterReconciler{
+			Client:   fakeClient,
+			Recorder: record.NewFakeRecorder(10000),
+			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
+		}
+	})
+
+	It("should delete the existing PDBs", func(ctx SpecContext) {
+		err := fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+
+		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdb), &policyv1.PodDisruptionBudget{})
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("should be able to delete the PDB when the primary PDB is missing", func(ctx SpecContext) {
+		fakeClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster, pdb).
+			Build()
+		reconciler = &ClusterReconciler{
+			Client:   fakeClient,
+			Recorder: record.NewFakeRecorder(10000),
+			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
+		}
+
+		err := fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+
+		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdb), &policyv1.PodDisruptionBudget{})
+		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	})
+})

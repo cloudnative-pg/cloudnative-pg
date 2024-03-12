@@ -330,7 +330,7 @@ func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	allErrs = append(allErrs, pluginValidationResult...)
 
 	if len(allErrs) == 0 {
-		return nil, nil
+		return r.getAdmissionWarnings(), nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -419,7 +419,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 	allErrs = append(allErrs, pluginValidationResult...)
 
 	if len(allErrs) == 0 {
-		return nil, nil
+		return r.getAdmissionWarnings(), nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -2409,6 +2409,22 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 				"nil or false",
 				"High Availability replication slots must be enabled"),
 		)
+	}
+
+	return result
+}
+
+func (r *Cluster) getAdmissionWarnings() admission.Warnings {
+	return r.getMaintenanceWindowsAdmissionWarnings()
+}
+
+func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.NodeMaintenanceWindow != nil {
+		result = append(
+			result,
+			"Consider using `.spec.enablePDB` instead of the node maintenance window feature")
 	}
 
 	return result

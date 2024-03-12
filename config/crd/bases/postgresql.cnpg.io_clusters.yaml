@@ -1877,6 +1877,18 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              enablePDB:
+                default: true
+                description: |-
+                  Manage the `PodDisruptionBudget` resources within the cluster. When
+                  configured as `true` (default setting), the pod disruption budgets
+                  will safeguard the primary node from being terminated. Conversely,
+                  setting it to `false` will result in the absence of any
+                  `PodDisruptionBudget` resource, permitting the shutdown of all nodes
+                  hosting the PostgreSQL cluster. This latter configuration is
+                  advisable for any PostgreSQL cluster employed for
+                  development/staging purposes.
+                type: boolean
               enableSuperuserAccess:
                 default: false
                 description: |-

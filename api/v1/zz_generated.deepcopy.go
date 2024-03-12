@@ -898,6 +898,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.EnablePDB != nil {
+		in, out := &in.EnablePDB, &out.EnablePDB
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = make(PluginConfigurationList, len(*in))

@@ -108,6 +108,10 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 }
 
 func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+	if !cluster.GetEnablePDB() {
+		return r.deletePodDisruptionBudgetIfExists(ctx, cluster)
+	}
+
 	// The PDB should not be enforced if we are inside a maintenance
 	// window, and we chose to avoid allocating more storage space.
 	if cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
@@ -411,6 +415,18 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 
 	if err := r.Patch(ctx, patchedPdb, client.MergeFrom(&oldPdb)); err != nil {
 		return fmt.Errorf("while patching PodDisruptionBudget: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(ctx context.Context, cluster *apiv1.Cluster) error {
+	if err := r.deletePrimaryPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
+		return fmt.Errorf("unable to retrieve primary PodDisruptionBudget: %w", err)
+	}
+
+	if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
+		return fmt.Errorf("unable to retrieve replica PodDisruptionBudget: %w", err)
 	}
 
 	return nil
