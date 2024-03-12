@@ -8,10 +8,11 @@ metadata:
     operators.operatorframework.io/project_layout: ""
     description: CloudNativePG is an open source operator designed to manage highly available PostgreSQL databases with a primary/standby architecture on any supported Kubernetes cluster.
     certified: "true"
-    createdAt: ${CREATED_AT}
+    createdAt:
     containerImage: $(OPERATOR_IMAGE_NAME)
     repository: https://github.com/cloudnative-pg/cloudnative-pg
     support: Community
+    olm.skipRange: '>= 1.18.0 < ${VERSION}'
   labels:
     operatorframework.io/arch.amd64: supported
   name: cloudnative-pg.v0.0.0
