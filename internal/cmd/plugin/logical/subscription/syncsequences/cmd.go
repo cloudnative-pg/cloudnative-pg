@@ -34,6 +34,7 @@ func NewCmd() *cobra.Command {
 	var externalClusterName string
 	var dbName string
 	var dryRun bool
+	var offset int
 
 	syncSequencesCmd := &cobra.Command{
 		Use:   "sync-sequences cluster_name",
@@ -74,6 +75,10 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("external cluster not existent in the cluster definition")
 			}
 
+			if offset < 0 {
+				return fmt.Errorf("offset should be a positive number")
+			}
+
 			// Force the dbname parameter in the external cluster params.
 			// This is needed since the user may not have specified it, or specified a different db
 			// than the one where we should create the subscription
@@ -90,7 +95,7 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("while getting sequences status from the destination database: %w", err)
 			}
 
-			script := CreateSyncScript(sourceStatus, destinationStatus)
+			script := CreateSyncScript(sourceStatus, destinationStatus, offset)
 			fmt.Println(script)
 			if dryRun {
 				return nil
@@ -117,6 +122,12 @@ func NewCmd() *cobra.Command {
 		"dry-run",
 		false,
 		"If specified, the subscription is not created",
+	)
+	syncSequencesCmd.Flags().IntVar(
+		&offset,
+		"offset",
+		0,
+		"The number to add to every sequence number before being updated",
 	)
 
 	return syncSequencesCmd

@@ -24,7 +24,7 @@ import (
 
 // CreateSyncScript creates a SQL script to synchronize the sequences
 // in the destination database with the status of the source database
-func CreateSyncScript(source, destination SequenceMap) string {
+func CreateSyncScript(source, destination SequenceMap, offset int) string {
 	script := ""
 
 	for name := range destination {
@@ -38,6 +38,9 @@ func CreateSyncScript(source, destination SequenceMap) string {
 		sqlTargetValue := "NULL"
 		if targetValue != nil {
 			sqlTargetValue = fmt.Sprintf("%d", *targetValue)
+			if offset != 0 {
+				sqlTargetValue = fmt.Sprintf("%s + %d", sqlTargetValue, offset)
+			}
 		}
 
 		script += fmt.Sprintf(
