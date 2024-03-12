@@ -55,8 +55,11 @@ func main() {
 	configFlags := genericclioptions.NewConfigFlags(true)
 
 	rootCmd := &cobra.Command{
-		Use:          "kubectl-cnpg",
-		Short:        "A plugin to manage your CloudNativePG clusters",
+		Use:   "kubectl-cnpg",
+		Short: "A plugin to manage your CloudNativePG clusters",
+		Annotations: map[string]string{
+			cobra.CommandDisplayNameAnnotation: "kubectl cnpg",
+		},
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			logFlags.ConfigureLogging()
