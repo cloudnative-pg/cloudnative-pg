@@ -26,12 +26,11 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 )
 
 // NewCmd initializes the subscription create command
 func NewCmd() *cobra.Command {
-	var externalClusterName string
+	var subscriptionName string
 	var dbName string
 	var dryRun bool
 	var offset int
@@ -42,11 +41,11 @@ func NewCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-			externalClusterName := strings.TrimSpace(externalClusterName)
+			subscriptionName := strings.TrimSpace(subscriptionName)
 			dbName := strings.TrimSpace(dbName)
 
-			if len(externalClusterName) == 0 {
-				return fmt.Errorf("the external cluster name is required")
+			if len(subscriptionName) == 0 {
+				return fmt.Errorf("the subscription name is required")
 			}
 
 			var cluster apiv1.Cluster
@@ -70,20 +69,15 @@ func NewCmd() *cobra.Command {
 					"the name of the database was not specified and there is no available application database")
 			}
 
-			externalCluster, ok := cluster.ExternalCluster(externalClusterName)
-			if !ok {
-				return fmt.Errorf("external cluster not existent in the cluster definition")
+			connectionString, err := logical.GetSubscriptionConnInfo(cmd.Context(), clusterName, dbName, subscriptionName)
+			if err != nil {
+				return fmt.Errorf(
+					"while getting connection string from subscription: %w", err)
 			}
-
-			if offset < 0 {
-				return fmt.Errorf("offset should be a positive number")
+			if len(connectionString) == 0 {
+				return fmt.Errorf(
+					"subscription %s was not found", subscriptionName)
 			}
-
-			// Force the dbname parameter in the external cluster params.
-			// This is needed since the user may not have specified it, or specified a different db
-			// than the one where we should create the subscription
-			externalCluster.ConnectionParameters["dbname"] = dbName
-			connectionString := external.GetServerConnectionString(&externalCluster)
 
 			sourceStatus, err := GetSequenceStatus(cmd.Context(), clusterName, connectionString)
 			if err != nil {
@@ -106,16 +100,17 @@ func NewCmd() *cobra.Command {
 	}
 
 	syncSequencesCmd.Flags().StringVar(
-		&externalClusterName,
-		"external-cluster",
+		&subscriptionName,
+		"subscription",
 		"",
-		"The external cluster name",
+		"The name of the subscription on which to refresh sequences",
 	)
 	syncSequencesCmd.Flags().StringVar(
 		&dbName,
 		"dbname",
 		"",
-		"The name of the database where the subscription is present and sequences need to be updated. Defaults to the application database, if available",
+		"The name of the database where the subscription is present and sequences need to be updated. "+
+			"Defaults to the application database, if available",
 	)
 	syncSequencesCmd.Flags().BoolVar(
 		&dryRun,

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lib/pq"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -43,4 +44,24 @@ func GetApplicationDatabaseName(ctx context.Context, clusterName string) (string
 	}
 
 	return cluster.GetApplicationDatabaseName(), nil
+}
+
+// GetSubscriptionConnInfo gets the connection string a subscription is connected to
+func GetSubscriptionConnInfo(
+	ctx context.Context,
+	clusterName string,
+	connectionString string,
+	subscriptionName string,
+) (string, error) {
+	sqlCommand := fmt.Sprintf(
+		"SELECT subconninfo FROM pg_catalog.pg_subscription WHERE subname=%s",
+		pq.QuoteLiteral(subscriptionName),
+	)
+	output, err := RunSQLWithOutput(
+		ctx,
+		clusterName,
+		connectionString,
+		sqlCommand,
+	)
+	return string(output), err
 }
