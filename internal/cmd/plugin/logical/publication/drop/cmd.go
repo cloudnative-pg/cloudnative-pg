@@ -74,7 +74,7 @@ func NewCmd() *cobra.Command {
 		&publicationName,
 		"publication",
 		"",
-		"The name of the pubication to be dropped",
+		"The name of the publication to be dropped",
 	)
 	publicationDropCmd.Flags().StringVar(
 		&dbName,
