@@ -802,7 +802,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		sourceBackupFileAzure               = fixturesBackupDir + "backup-azure-blob-02.yaml"
 		clusterSourceFileAzure              = fixturesBackupDir + "source-cluster-azure-blob-01.yaml.template"
 		externalClusterFileAzure            = fixturesBackupDir + "external-clusters-azure-blob-03.yaml.template"
-		externalClusterFileAzureMaxParallel = fixturesBackupDir + "external-clusters-azure-blob-03-max-parallel.yaml.template"
 		sourceBackupFileAzurePITR           = fixturesBackupDir + "backup-azure-blob-pitr.yaml"
 		externalClusterFileAzurite          = fixturesBackupDir + "external-clusters-azurite-03.yaml.template"
 		backupFileAzurite                   = fixturesBackupDir + "backup-azurite-02.yaml"
