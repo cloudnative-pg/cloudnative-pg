@@ -1104,6 +1104,12 @@ kubectl cnpg publication create help
 
 TODO
 
+### Logical replication subscription
+
+You can use the `cnpg subscription` command to create and drop PostgreSQL
+[logical replication subscriptions](https://www.postgresql.org/docs/current/logical-replication-subscription.html).
+Additionally, you can also synchronize sequences.
+
 #### Creating a new subscription
 
 TODO
