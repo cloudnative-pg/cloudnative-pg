@@ -21,12 +21,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 )
 
 // NewCmd initializes the subscription create command
@@ -59,38 +55,23 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("the name of the subscription is required")
 			}
 
-			var cluster apiv1.Cluster
-			err := plugin.Client.Get(
-				cmd.Context(),
-				client.ObjectKey{
-					Namespace: plugin.Namespace,
-					Name:      clusterName,
-				},
-				&cluster,
-			)
-			if err != nil {
-				return fmt.Errorf("cluster %s not found in namespace %s", clusterName, plugin.Namespace)
-			}
-
 			if len(dbName) == 0 {
-				dbName = cluster.GetApplicationDatabaseName()
+				var err error
+				dbName, err = logical.GetApplicationDatabaseName(cmd.Context(), clusterName)
+				if err != nil {
+					return err
+				}
 			}
 			if len(dbName) == 0 {
 				return fmt.Errorf(
 					"the name of the database was not specified and there is no available application database")
 			}
 
-			externalCluster, ok := cluster.ExternalCluster(externalClusterName)
-			if !ok {
-				return fmt.Errorf("external cluster not existent in the cluster definition")
+			connectionString, err := logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName)
+			if err != nil {
+				return err
 			}
 
-			// Force the dbname parameter in the external cluster params.
-			// This is needed since the user may not have specified it, or specified a different db
-			// than the one where we should create the subscription
-			externalCluster.ConnectionParameters["dbname"] = dbName
-
-			connectionString := external.GetServerConnectionString(&externalCluster)
 			createCmd := SubscriptionCmdBuilder{
 				SubscriptionName: subscriptionName,
 				PublicationName:  publicationName,

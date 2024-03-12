@@ -24,17 +24,11 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 )
 
-// GetConnectionString gets the connection string to be used to connect to
-// the specified external cluster, while connected to a pod of the specified
-// cluster.
-func GetConnectionString(
-	ctx context.Context,
-	clusterName string,
-	externalClusterName string,
-) (string, error) {
+// GetApplicationDatabaseName gets the application database name for
+// a cluster with a given name
+func GetApplicationDatabaseName(ctx context.Context, clusterName string) (string, error) {
 	var cluster apiv1.Cluster
 	err := plugin.Client.Get(
 		ctx,
@@ -48,10 +42,5 @@ func GetConnectionString(
 		return "", fmt.Errorf("cluster %s not found in namespace %s", clusterName, plugin.Namespace)
 	}
 
-	externalCluster, ok := cluster.ExternalCluster(externalClusterName)
-	if !ok {
-		return "", fmt.Errorf("external cluster not existent in the cluster definition")
-	}
-
-	return external.GetServerConnectionString(&externalCluster), nil
+	return cluster.GetApplicationDatabaseName(), nil
 }

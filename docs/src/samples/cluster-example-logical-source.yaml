@@ -46,7 +46,7 @@ spec:
 
 # To create the publication while connected to the source side, use:
 #
-#     ./bin/kubectl-cnpg publication create cluster-example  --dbname=app --publication=app --all-tables
+#     ./bin/kubectl-cnpg publication create cluster-example --publication=app --all-tables
 #
 #     Executing: CREATE PUBLICATION "app" FOR ALL TABLES
 #     CREATE PUBLICATION

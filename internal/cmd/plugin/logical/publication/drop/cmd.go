@@ -45,7 +45,15 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("publication is a required option")
 			}
 			if len(dbName) == 0 {
-				return fmt.Errorf("dbname is a required option")
+				var err error
+				dbName, err = logical.GetApplicationDatabaseName(cmd.Context(), clusterName)
+				if err != nil {
+					return err
+				}
+			}
+			if len(dbName) == 0 {
+				return fmt.Errorf(
+					"the name of the database was not specified and there is no available application database")
 			}
 
 			sqlCommand := fmt.Sprintf(
@@ -60,7 +68,7 @@ func NewCmd() *cobra.Command {
 			target := dbName
 			if len(externalClusterName) > 0 {
 				var err error
-				target, err = logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName, dbName)
+				target, err = logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName)
 				if err != nil {
 					return err
 				}
