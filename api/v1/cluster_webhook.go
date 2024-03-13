@@ -330,6 +330,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
 		r.validateResources,
+		r.validateHibernationAnnotation,
 	}
 
 	for _, validate := range validations {
@@ -2312,4 +2313,25 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 	}
 
 	return result
+}
+
+// validate whether the hibernation configuration is valid
+func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
+	value, ok := r.Annotations[utils.HibernationAnnotationName]
+	isKnownValue := value == string(utils.HibernationAnnotationValueOn) ||
+		value == string(utils.HibernationAnnotationValueOff)
+	if !ok || isKnownValue {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("metadata", "annotations", utils.HibernationAnnotationName),
+			value,
+			fmt.Sprintf("Annotation value for hibernation should be %q or %q",
+				utils.HibernationAnnotationValueOn,
+				utils.HibernationAnnotationValueOff,
+			),
+		),
+	}
 }

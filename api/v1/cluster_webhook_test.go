@@ -4004,3 +4004,38 @@ var _ = Describe("Tablespaces validation", func() {
 		Expect(cluster.validateTablespaceBackupSnapshot()).To(HaveLen(1))
 	})
 })
+
+var _ = Describe("Validate hibernation", func() {
+	It("should succeed if hibernation is set to 'on'", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: string(utils.HibernationAnnotationValueOn),
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
+	})
+
+	It("should succeed if hibernation is set to 'off'", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: string(utils.HibernationAnnotationValueOff),
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
+	})
+
+	It("should fail if hibernation is set to an invalid value", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: "",
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(HaveLen(1))
+	})
+})
