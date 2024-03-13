@@ -1220,7 +1220,7 @@ database, retrieves all relevant sequences, and subsequently updates local
 sequences with matching identities (based on database schema and sequence
 name).
 
-You can the command as shown below:
+You can use the command as shown below:
 
 ```sh
 kubectl cnpg subscription sync-sequences \
