@@ -4236,7 +4236,7 @@ var _ = Describe("Validate hibernation", func() {
 		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
 	})
 
-	It("should failed if hibernation is set to a invalid value", func() {
+	It("should fail if hibernation is set to an invalid value", func() {
 		cluster := &Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
