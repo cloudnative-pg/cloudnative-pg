@@ -5,7 +5,7 @@ metadata:
 spec:
   instances: 1
 
-  imageName: ghcr.io/cloudnative-pg/postgresql:13.14
+  imageName: ghcr.io/cloudnative-pg/postgresql:13
 
   storage:
     size: 1Gi
@@ -13,15 +13,15 @@ spec:
   bootstrap:
     initdb:
       postInitApplicationSQL:
-        - create table numbers (i serial primary key, m integer)
-        - insert into numbers (m) (select generate_series(1,10000))
-        - alter table numbers owner to app;
-        - create table numbers_two (i serial primary key, m integer)
-        - insert into numbers_two (m) (select generate_series(1,10000))
-        - alter table numbers_two owner to app;
-        - create table numbers_three (i serial primary key, m integer)
-        - insert into numbers_three (m) (select generate_series(1,10000))
-        - alter table numbers_three owner to app;
+        - CREATE TABLE numbers (i SERIAL PRIMARY KEY, m INTEGER)
+        - INSERT INTO numbers (m) (SELECT generate_series(1,10000))
+        - ALTER TABLE numbers OWNER TO app;
+        - CREATE TABLE numbers_two (i SERIAL PRIMARY KEY, m INTEGER)
+        - INSERT INTO numbers_two (m) (SELECT generate_series(1,10000))
+        - ALTER TABLE numbers_two OWNER TO app;
+        - CREATE TABLE numbers_three (i SERIAL PRIMARY KEY, m INTEGER)
+        - INSERT INTO numbers_three (m) (SELECT generate_series(1,10000))
+        - ALTER TABLE numbers_three OWNER TO app;
 
   # This is needed to enable users to create the publication while
   # they are connected from the destination. Like in:

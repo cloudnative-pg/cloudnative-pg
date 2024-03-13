@@ -1207,8 +1207,71 @@ kubectl cnpg subscription drop help
 
 #### Synchronizing sequences
 
-TODO
+One of the limitations of PostgreSQL logical replication built on top of
+publication and subscriptions is that sequences are not synchronized.
 
+However, often logical replication is used to migrate a live database on
+another one, even on an higher version of PostgreSQL. Before cutting over
+applications to the new database, sequences are updated.
+The `cnpg subscription sync-sequences` command connects to the database of
+source, pulls down all the sequences, and then updates the ones with the same
+identity (database schema and sequence name) locally.
+
+The command to execute is similar to the following:
+
+```sh
+kubectl-cnpg subscription sync-sequences \
+  --subscription <SUBSCRIPTION_NAME> \
+  <LOCAL_CLUSTER>
+```
+
+For additional information and detailed instructions, type the following
+command:
+
+```sh
+kubectl cnpg subscription sync-sequences help
+```
+
+!!! Warning
+    Prioritize testing subscriptions in a non-production environment to ensure
+    their effectiveness and identify any potential issues before implementing them
+    in a production setting.
+
+
+#### Synchronizing Sequences in PostgreSQL Logical Replication
+
+One notable constraint of PostgreSQL logical replication, implemented through
+publications and subscriptions, is the lack of sequence synchronization. This
+becomes particularly relevant when utilizing logical replication for live
+database migration, especially to a higher version of PostgreSQL. A crucial
+step in this process involves updating sequences before transitioning
+applications to the new database (*cutover*).
+
+To address this limitation, the `cnpg subscription sync-sequences` command
+offers a solution. This command establishes a connection with the source
+database, retrieves all relevant sequences, and subsequently updates local
+sequences with matching identities (based on database schema and sequence
+name).
+
+You can the command as shown below:
+
+```sh
+kubectl cnpg subscription sync-sequences \
+  --subscription <SUBSCRIPTION_NAME> \
+  <LOCAL_CLUSTER>
+```
+
+For comprehensive details and specific instructions, utilize the following
+command:
+
+```sh
+kubectl cnpg subscription sync-sequences help
+```
+
+!!! Warning
+    Prioritize testing subscriptions in a non-production environment to
+    guarantee their effectiveness and detect any potential issues before deploying
+    them in a production setting.
 
 ## Integration with K9s
 
