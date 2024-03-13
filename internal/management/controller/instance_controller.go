@@ -58,8 +58,9 @@ import (
 )
 
 const (
-	userSearchFunctionName = "user_search"
-	userSearchFunction     = "SELECT usename, passwd FROM pg_shadow WHERE usename=$1;"
+	userSearchFunctionSchema = "public"
+	userSearchFunctionName   = "user_search"
+	userSearchFunction       = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;"
 )
 
 // RetryUntilWalReceiverDown is the default retry configuration that is used
@@ -658,20 +659,23 @@ func (r *InstanceReconciler) reconcilePoolers(
 		return err
 	}
 	if !existsFunction {
-		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s(uname TEXT) "+
+		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s.%s(uname TEXT) "+
 			"RETURNS TABLE (usename name, passwd text) "+
 			"as '%s' "+
 			"LANGUAGE sql SECURITY DEFINER",
+			userSearchFunctionSchema,
 			userSearchFunctionName,
 			userSearchFunction))
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("REVOKE ALL ON FUNCTION %s(text) FROM public;", userSearchFunctionName))
+		_, err = tx.Exec(fmt.Sprintf("REVOKE ALL ON FUNCTION %s.%s(text) FROM public;",
+			userSearchFunctionSchema, userSearchFunctionName))
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("GRANT EXECUTE ON FUNCTION %s(text) TO %s",
+		_, err = tx.Exec(fmt.Sprintf("GRANT EXECUTE ON FUNCTION %s.%s(text) TO %s",
+			userSearchFunctionSchema,
 			userSearchFunctionName,
 			apiv1.PGBouncerPoolerUserName))
 		if err != nil {

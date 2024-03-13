@@ -3202,7 +3202,7 @@ by pgbouncer</p>
 <td>
    <p>The credentials of the user that need to be used for the authentication
 query. In case it is specified, also an AuthQuery
-(e.g. &quot;SELECT usename, passwd FROM pg_shadow WHERE usename=$1&quot;)
+(e.g. &quot;SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1&quot;)
 has to be specified and no automatic CNPG Cluster integration will be triggered.</p>
 </td>
 </tr>
@@ -3211,7 +3211,7 @@ has to be specified and no automatic CNPG Cluster integration will be triggered.
 </td>
 <td>
    <p>The query that will be used to download the hash of the password
-of a certain user. Default: &quot;SELECT usename, passwd FROM user_search($1)&quot;.
+of a certain user. Default: &quot;SELECT usename, passwd FROM public.user_search($1)&quot;.
 In case it is specified, also an AuthQuerySecret has to be specified and
 no automatic CNPG Cluster integration will be triggered.</p>
 </td>

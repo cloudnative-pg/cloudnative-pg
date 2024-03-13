@@ -137,7 +137,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 			pooler3.Spec.PgBouncer.AuthQuerySecret = &v1.LocalObjectReference{
 				Name: "test-one",
 			}
-			pooler3.Spec.PgBouncer.AuthQuery = "SELECT usename, passwd FROM pg_shadow WHERE usename=$1"
+			pooler3.Spec.PgBouncer.AuthQuery = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1"
 			err := k8sClient.Update(ctx, &pooler3)
 			Expect(err).ToNot(HaveOccurred())
 

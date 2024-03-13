@@ -323,7 +323,7 @@ spec:
                   authQuery:
                     description: |-
                       The query that will be used to download the hash of the password
-                      of a certain user. Default: "SELECT usename, passwd FROM user_search($1)".
+                      of a certain user. Default: "SELECT usename, passwd FROM public.user_search($1)".
                       In case it is specified, also an AuthQuerySecret has to be specified and
                       no automatic CNPG Cluster integration will be triggered.
                     type: string
@@ -331,7 +331,7 @@ spec:
                     description: |-
                       The credentials of the user that need to be used for the authentication
                       query. In case it is specified, also an AuthQuery
-                      (e.g. "SELECT usename, passwd FROM pg_shadow WHERE usename=$1")
+                      (e.g. "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1")
                       has to be specified and no automatic CNPG Cluster integration will be triggered.
                     properties:
                       name:
