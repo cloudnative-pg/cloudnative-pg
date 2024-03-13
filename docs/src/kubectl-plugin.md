@@ -1161,7 +1161,32 @@ or data import from remote servers.
 
 #### Creating a new subscription
 
-TODO
+To create a logical replication subscription, use the `cnpg subscription create`
+command. The basic structure of this command is as follows:
+
+```sh
+kubectl cnpg subscription create \
+  --subscription <SUBSCRIPTION_NAME> \
+  --publication <PUBLICATION_NAME> \
+  --external-cluster <EXTERNAL_CLUSTER> \
+  <LOCAL_CLUSTER> [options]
+```
+
+This command configures a subscription directed towards the specified
+publication in the designated external cluster, as defined in the
+`<LOCAL_CLUSTER>`.
+
+For additional information and detailed instructions, type the following
+command:
+
+```sh
+kubectl cnpg subscription create help
+```
+
+!!! Warning
+    Prioritize testing subscriptions in a non-production environment to ensure
+    their effectiveness and identify any potential issues before implementing them
+    in a production setting.
 
 #### Dropping a subscription
 
