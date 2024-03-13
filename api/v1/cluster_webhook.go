@@ -328,9 +328,10 @@ func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 		return nil, err
 	}
 	allErrs = append(allErrs, pluginValidationResult...)
+	allWarnings := r.getAdmissionWarnings()
 
 	if len(allErrs) == 0 {
-		return r.getAdmissionWarnings(), nil
+		return allWarnings, nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -377,6 +378,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
 		r.validateResources,
+		r.validateHibernationAnnotation,
 	}
 
 	for _, validate := range validations {
@@ -2426,6 +2428,26 @@ func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
 			result,
 			"Consider using `.spec.enablePDB` instead of the node maintenance window feature")
 	}
-
 	return result
+}
+
+// validate whether the hibernation configuration is valid
+func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
+	value, ok := r.Annotations[utils.HibernationAnnotationName]
+	isKnownValue := value == string(utils.HibernationAnnotationValueOn) ||
+		value == string(utils.HibernationAnnotationValueOff)
+	if !ok || isKnownValue {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("metadata", "annotations", utils.HibernationAnnotationName),
+			value,
+			fmt.Sprintf("Annotation value for hibernation should be %q or %q",
+				utils.HibernationAnnotationValueOn,
+				utils.HibernationAnnotationValueOff,
+			),
+		),
+	}
 }
