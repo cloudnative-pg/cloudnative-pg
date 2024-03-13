@@ -1063,38 +1063,58 @@ kubectl cnpg pgadmin4 --dry-run cluster-example | kubectl delete -f -
 !!! Warning
     Never deploy pgAdmin in production using the plugin.
 
-### Logical replication publication
+### Logical Replication Publications
 
-You can use the `cnpg publication` command to create and drop PostgreSQL
-[logical replication publications](https://www.postgresql.org/docs/current/logical-replication-publication.html).
+The `cnpg publication` command group is designed to streamline the creation and
+removal of [PostgreSQL logical replication publications](https://www.postgresql.org/docs/current/logical-replication-publication.html).
+Be aware that these commands are primarily intended for assisting in the
+creation of logical replication publications, particularly on remote PostgreSQL
+databases.
+
+!!! Warning
+    It is crucial to have a solid understanding of both the capabilities and
+    limitations of PostgreSQL's native logical replication system before using
+    these commands.
 
 #### Creating a new publication
 
-You can create a new publication with:
+To create a logical replication publication, use the `cnpg publication create`
+command. The basic structure of this command is as follows:
 
 ```sh
-kubectl cnpg publication create <NAME> [flags]
+kubectl cnpg publication create \
+  --publication <PUBLICATION_NAME> \
+  [--external-cluster <EXTERNAL_CLUSTER>]
+  <LOCAL_CLUSTER> [options]
 ```
 
-If you provide the `--external-cluster` option, you are asking to create a
-remote `PUBLICATION` in the provided external cluster defined in the Postgres
-`Cluster` called `<NAME>`. If no external cluster is provided, the publication
-will be created in the `<NAME>` Postgres `Cluster`.
+There are two primary use cases:
 
-You have the following options:
+- With `--external-cluster`: Use this option to create a remote publication
+  in the specified external source `<EXTERNAL_CLUSTER>`, defined within the
+  `<LOCAL_CLUSTER>` PostgreSQL `Cluster`.
 
-- create the publication `FOR ALL TABLES` (so with `--all-tables`), or
-- create the publication for one or more of the following:
-    - a specific table (with an expression)
-    - all tables in one or more database schema (available from PostgreSQL 15)
+- Without `--external-cluster`: Use this option to create a publication in the
+  `<LOCAL_CLUSTER>` PostgreSQL `Cluster` (by default, the `app` database).
 
-The `--dry-run` option allows you to preview the SQL commands that the plugin
-will run on the destination database.
+You have several options, similar to the [`CREATE PUBLICATION`](https://www.postgresql.org/docs/current/sql-createpublication.html)
+command, to define the group of tables to replicate. Notable options include:
 
-When connecting to an external cluster, make sure that the specified user has
-enough permissions to run the `CREATE PUBLICATION` command.
+- If you specify the `--all-tables` option, you create a publication `FOR ALL TABLES`.
+- Alternatively, you can specify multiple occurrences of:
+  - `--table`: Add a specific table (with an expression) to the publication.
+  - `--schema`: Include all tables in the specified database schema (available
+    from PostgreSQL 15).
 
-For more information, type:
+The `--dry-run` option enables you to preview the SQL commands that the plugin
+will execute on the destination database.
+
+!!! Warning
+    When connecting to an external cluster, ensure that the specified user has
+    sufficient permissions to execute the `CREATE PUBLICATION` command.
+
+For additional information and detailed instructions, type the following
+command:
 
 ```sh
 kubectl cnpg publication create help
@@ -1102,13 +1122,42 @@ kubectl cnpg publication create help
 
 #### Dropping a publication
 
-TODO
+The `cnpg publication drop` command seamlessly complements the `create` command
+by offering similar key options, including the publication name, cluster name,
+and an optional external cluster. You can drop a `PUBLICATION` with the
+following command structure:
 
-### Logical replication subscription
+```sh
+kubectl cnpg publication drop \
+  --publication <PUBLICATION_NAME> \
+  [--external-cluster <EXTERNAL_CLUSTER>]
+  <LOCAL_CLUSTER> [options]
+```
 
-You can use the `cnpg subscription` command to create and drop PostgreSQL
-[logical replication subscriptions](https://www.postgresql.org/docs/current/logical-replication-subscription.html).
-Additionally, you can also synchronize sequences.
+To access further details and precise instructions, use the following command:
+
+```sh
+kubectl cnpg publication drop help
+```
+
+### Logical Replication Subscriptions
+
+The `cnpg subscription` command group is a dedicated set of commands designed
+to simplify the creation and removal of [PostgreSQL logical replication
+subscriptions](https://www.postgresql.org/docs/current/logical-replication-subscription.html).
+These commands are specifically crafted to aid in the establishment of logical
+replication subscriptions, especially when dealing with remote PostgreSQL
+databases.
+
+!!! Warning
+    Before utilizing these commands, it is essential to have a comprehensive
+    understanding of both the capabilities and limitations of PostgreSQL's native
+    logical replication system.
+
+In addition to subscription management, we provide a helpful command for
+synchronizing all sequences from the source. While its applicability may vary,
+this command can be particularly useful in scenarios involving major upgrades
+or data import from remote servers.
 
 #### Creating a new subscription
 
@@ -1116,7 +1165,20 @@ TODO
 
 #### Dropping a subscription
 
-TODO
+The `cnpg subscription drop` command seamlessly complements the `create` command.
+You can drop a `SUBSCRIPTION` with the following command structure:
+
+```sh
+kubectl cnpg subcription drop \
+  --subscription <SUBSCRIPTION_NAME> \
+  <LOCAL_CLUSTER> [options]
+```
+
+To access further details and precise instructions, use the following command:
+
+```sh
+kubectl cnpg subscription drop help
+```
 
 #### Synchronizing sequences
 
