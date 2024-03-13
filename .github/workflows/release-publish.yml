@@ -56,6 +56,8 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.build-meta.outputs.version }}
+      author_name: ${{ steps.build-meta.outputs.author_name }}
+      author_email: ${{ steps.build-meta.outputs.author_email }}
       digest: ${{ steps.build.outputs.digest }}
       platforms: ${{ env.PLATFORMS }}
     steps:
@@ -86,6 +88,11 @@ jobs:
           if [[ "$latest_release_branch" != "$current_release_branch" ]]; then
             skip_krew="true"
           fi
+
+          # get git user and email
+          author_name=$(git show -s --format='%an' "${commit_sha}")
+          author_email=$(git show -s --format='%ae' "${commit_sha}")
+
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
@@ -94,6 +101,8 @@ jobs:
           echo "version=${commit_version}" >> $GITHUB_OUTPUT
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "SKIP_KREW=${skip_krew}" >> $GITHUB_ENV
+          echo "author_name=${author_name}" >> $GITHUB_OUTPUT
+          echo "author_email=${author_email}" >> $GITHUB_OUTPUT
       -
         name: Import GPG key
         id: import_gpg
@@ -344,3 +353,57 @@ jobs:
             --
             <sup>1</sup> If you feel your Operator does not fit any of the pre-defined categories, file an issue against this repo and explain your need
             <sup>2</sup> For more information see [here](https://sdk.operatorframework.io/docs/overview/#operator-capability-level)
+            
+
+  publish_bundle:
+    name: Publish OLM Bundle
+    needs: olm-bundle
+    if: |
+      (always() && !cancelled()) &&
+      needs.release-binaries.result == 'success'
+    env:
+      VERSION: ${{ needs.release-binaries.outputs.version }}
+    runs-on: ubuntu-22.04
+    steps:
+      -
+        name: Checkout artifact
+        uses: actions/checkout@v4
+        with:
+          repository: cloudnative-pg/artifacts
+          token: ${{ secrets.REPO_GHA_PAT }}
+          ref: main
+          fetch-depth: 0
+      -
+        name: Configure git user
+        run: |
+          git config user.email "${{ needs.release-binaries.outputs.author_email }}"
+          git config user.name "${{ needs.release-binaries.outputs.author_name }}"
+      -
+        name: Download the bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle
+      -
+        name: Copy the bundle
+        run: |
+          mkdir -p "bundles/${{ env.VERSION }}"
+          cp -R bundle/* "bundles/${{ env.VERSION }}"
+          rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
+      -
+        name: Prepare commit message
+        env:
+          COMMIT_MESSAGE: |
+            operator cloudnative-pg (${{ env.VERSION }})
+        run: |
+          # Skip creating the commit if there are no changes
+          [ -n "$(git status -s)" ] || exit 0
+
+          git add bundle/${{ env.VERSION }}
+          git commit -m "${COMMIT_MESSAGE}"
+      -
+        name: Push commit
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
+          repository: cloudnative-pg/artifacts
+          branch: "main"
