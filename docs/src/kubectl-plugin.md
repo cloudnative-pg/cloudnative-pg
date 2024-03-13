@@ -792,7 +792,7 @@ kubectl cnpg report cluster cluster-example -f --tail 3
 With the `-o` option omitted, and with `--output` specified:
 
 ``` sh
-kubectl-cnpg logs cluster cluster-example --output my-cluster.log
+kubectl cnpg logs cluster cluster-example --output my-cluster.log
 
 Successfully written logs to "my-cluster.log"
 ```
