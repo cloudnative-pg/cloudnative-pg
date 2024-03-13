@@ -81,6 +81,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Backups on object stores (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
 * Full recovery and Point-In-Time recovery from an existing backup on volume snapshots or object stores
 * Offline import of existing PostgreSQL databases, including major upgrades of PostgreSQL
+* Online import of existing PostgreSQL databases, including major upgrades of PostgreSQL, through PostgreSQL native logical replication (imperative, via the `cnpg` plugin)
 * Fencing of an entire PostgreSQL cluster, or a subset of the instances in a declarative way
 * Hibernation of a PostgreSQL cluster in a declarative way
 * Support for Synchronous Replicas
