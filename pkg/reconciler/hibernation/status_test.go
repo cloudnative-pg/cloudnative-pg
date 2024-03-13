@@ -31,7 +31,7 @@ import (
 var _ = Describe("Hibernation annotation management", func() {
 	It("classifies clusters with no annotation as not hibernated", func() {
 		cluster := apiv1.Cluster{}
-		Expect(isEnabledHibernation(&cluster)).To(BeFalse())
+		Expect(isHibernationEnabled(&cluster)).To(BeFalse())
 	})
 
 	It("correctly handles on/off values", func() {
@@ -42,10 +42,10 @@ var _ = Describe("Hibernation annotation management", func() {
 				},
 			},
 		}
-		Expect(isEnabledHibernation(&cluster)).To(BeTrue())
+		Expect(isHibernationEnabled(&cluster)).To(BeTrue())
 
 		cluster.ObjectMeta.Annotations[utils.HibernationAnnotationName] = HibernationOff
-		Expect(isEnabledHibernation(&cluster)).To(BeFalse())
+		Expect(isHibernationEnabled(&cluster)).To(BeFalse())
 	})
 })
 

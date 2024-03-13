@@ -233,17 +233,17 @@ const (
 	PVCRolePgTablespace PVCRole = "PG_TABLESPACE"
 )
 
-// HibernationStatus describes the status of the hibernation
-type HibernationStatus string
+// HibernationAnnotationValue describes the status of the hibernation
+type HibernationAnnotationValue string
 
 const (
-	// HibernationOff is the value of hibernation annotation when the hibernation
+	// HibernationAnnotationValueOff is the value of hibernation annotation when the hibernation
 	// has been deactivated for the cluster
-	HibernationOff HibernationStatus = "off"
+	HibernationAnnotationValueOff HibernationAnnotationValue = "off"
 
-	// HibernationOn is the value of hibernation annotation when the hibernation
+	// HibernationAnnotationValueOn is the value of hibernation annotation when the hibernation
 	// has been requested for the cluster
-	HibernationOn HibernationStatus = "on"
+	HibernationAnnotationValueOn HibernationAnnotationValue = "on"
 )
 
 // LabelClusterName labels the object with the cluster name

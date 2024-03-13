@@ -378,7 +378,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
 		r.validateResources,
-		r.validateHibernation,
+		r.validateHibernationAnnotation,
 	}
 
 	for _, validate := range validations {
@@ -2432,18 +2432,22 @@ func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
 }
 
 // validate whether the hibernation configuration is valid
-func (r *Cluster) validateHibernation() field.ErrorList {
+func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
 	value, ok := r.Annotations[utils.HibernationAnnotationName]
-	if !ok || value == string(utils.HibernationOn) || value == string(utils.HibernationOff) {
+	isKnownValue := value == string(utils.HibernationAnnotationValueOn) ||
+		value == string(utils.HibernationAnnotationValueOff)
+	if !ok || isKnownValue {
 		return nil
 	}
 
-	var result field.ErrorList
-	result = append(result, field.Invalid(
-		field.NewPath("metadata", "annotations", utils.HibernationAnnotationName),
-		value,
-		fmt.Sprintf("Annotation value for hibernation should be %q or %q", utils.HibernationOn, utils.HibernationOff)),
-	)
-
-	return result
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("metadata", "annotations", utils.HibernationAnnotationName),
+			value,
+			fmt.Sprintf("Annotation value for hibernation should be %q or %q",
+				utils.HibernationAnnotationValueOn,
+				utils.HibernationAnnotationValueOff,
+			),
+		),
+	}
 }

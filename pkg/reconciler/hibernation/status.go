@@ -29,11 +29,11 @@ import (
 )
 
 const (
-	// HibernationOff is the shadow of utils.HibernationOff, for compatibility
-	HibernationOff = string(utils.HibernationOff)
+	// HibernationOff is the shadow of utils.HibernationAnnotationValueOff, for compatibility
+	HibernationOff = string(utils.HibernationAnnotationValueOff)
 
-	// HibernationOn is the shadow of utils.HibernationOn, for compatibility
-	HibernationOn = string(utils.HibernationOn)
+	// HibernationOn is the shadow of utils.HibernationAnnotationValueOn, for compatibility
+	HibernationOn = string(utils.HibernationAnnotationValueOn)
 )
 
 const (
@@ -77,7 +77,7 @@ func EnrichStatus(
 	cluster *apiv1.Cluster,
 	podList []corev1.Pod,
 ) {
-	if !isEnabledHibernation(cluster) {
+	if !isHibernationEnabled(cluster) {
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, HibernationConditionType)
 		return
 	}
@@ -85,9 +85,8 @@ func EnrichStatus(
 	// We proceed to hibernate the cluster only when it is ready.
 	// Hibernating a non-ready cluster may be dangerous since the PVCs
 	// won't be completely created.
-	// Once the hibernation is in progressing, even the cluster is not healthy, we should not
-	// stop the hibernation process here
-	if cluster.Status.Phase != apiv1.PhaseHealthy && !isHibernationInProcessing(cluster) {
+	// We should stop the enrich status only when the cluster is unhealthy and the process hasn't already started
+	if cluster.Status.Phase != apiv1.PhaseHealthy && !isHibernationOngoing(cluster) {
 		return
 	}
 
@@ -121,11 +120,11 @@ func EnrichStatus(
 	})
 }
 
-func isEnabledHibernation(cluster *apiv1.Cluster) bool {
+func isHibernationEnabled(cluster *apiv1.Cluster) bool {
 	return cluster.Annotations[utils.HibernationAnnotationName] == HibernationOn
 }
 
-// isHibernationInProcessing check if the cluster is doing the hibernation process
-func isHibernationInProcessing(cluster *apiv1.Cluster) bool {
+// isHibernationOngoing check if the cluster is doing the hibernation process
+func isHibernationOngoing(cluster *apiv1.Cluster) bool {
 	return meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType) != nil
 }

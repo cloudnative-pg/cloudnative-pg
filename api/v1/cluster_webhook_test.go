@@ -4218,22 +4218,22 @@ var _ = Describe("Validate hibernation", func() {
 		cluster := &Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.HibernationAnnotationName: string(utils.HibernationOn),
+					utils.HibernationAnnotationName: string(utils.HibernationAnnotationValueOn),
 				},
 			},
 		}
-		Expect(cluster.validateHibernation()).To(BeEmpty())
+		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
 	})
 
 	It("should succeed if hibernation is set to 'off'", func() {
 		cluster := &Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					utils.HibernationAnnotationName: string(utils.HibernationOff),
+					utils.HibernationAnnotationName: string(utils.HibernationAnnotationValueOff),
 				},
 			},
 		}
-		Expect(cluster.validateHibernation()).To(BeEmpty())
+		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
 	})
 
 	It("should failed if hibernation is set to a invalid value", func() {
@@ -4244,6 +4244,6 @@ var _ = Describe("Validate hibernation", func() {
 				},
 			},
 		}
-		Expect(cluster.validateHibernation()).To(HaveLen(1))
+		Expect(cluster.validateHibernationAnnotation()).To(HaveLen(1))
 	})
 })
