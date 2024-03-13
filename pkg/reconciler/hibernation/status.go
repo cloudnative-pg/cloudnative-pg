@@ -85,9 +85,9 @@ func EnrichStatus(
 	// We proceed to hibernate the cluster only when it is ready.
 	// Hibernating a non-ready cluster may be dangerous since the PVCs
 	// won't be completely created.
-	// For the hibernation is in progress(the condition is present), continue to hibernate the cluster
-	condition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
-	if condition == nil && cluster.Status.Phase != apiv1.PhaseHealthy {
+	// Once the hibernation is in progressing, even the cluster is not healthy, we should not
+	// stop the hibernation process here
+	if cluster.Status.Phase != apiv1.PhaseHealthy && !isHibernationInProcessing(cluster) {
 		return
 	}
 
@@ -123,4 +123,9 @@ func EnrichStatus(
 
 func isEnabledHibernation(cluster *apiv1.Cluster) bool {
 	return cluster.Annotations[utils.HibernationAnnotationName] == HibernationOn
+}
+
+// isHibernationInProcessing check if the cluster is doing the hibernation process
+func isHibernationInProcessing(cluster *apiv1.Cluster) bool {
+	return meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType) != nil
 }

@@ -2442,7 +2442,7 @@ func (r *Cluster) validateHibernation() field.ErrorList {
 	result = append(result, field.Invalid(
 		field.NewPath("metadata", "annotations", utils.HibernationAnnotationName),
 		value,
-		fmt.Sprintf("Invalid value. It should be %q or %q", utils.HibernationOn, utils.HibernationOff)),
+		fmt.Sprintf("Annotation value for hibernation should be %q or %q", utils.HibernationOn, utils.HibernationOff)),
 	)
 
 	return result
