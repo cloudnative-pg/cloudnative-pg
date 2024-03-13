@@ -122,5 +122,6 @@ and the following suite of E2E tests are performed on that cluster:
 
 * **Tablespaces**
      * Declarative creation of tablespaces
+     * Declarative creation of temporary tablespaces
      * Backup / recovery from object storage
      * Backup / recovery from volume snapshots
