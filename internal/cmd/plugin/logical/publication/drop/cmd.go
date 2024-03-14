@@ -103,7 +103,7 @@ func NewCmd() *cobra.Command {
 		&dryRun,
 		"dry-run",
 		false,
-		"If specified, the publication is not deleted",
+		"If specified, the publication deletion commands are shown but not executed",
 	)
 
 	return publicationDropCmd
