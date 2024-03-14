@@ -124,7 +124,7 @@ func NewCmd() *cobra.Command {
 		&dryRun,
 		"dry-run",
 		false,
-		"If specified, the subscription is not created",
+		"If specified, the subscription commands are shown but not executed",
 	)
 
 	return subscriptionCreateCmd
