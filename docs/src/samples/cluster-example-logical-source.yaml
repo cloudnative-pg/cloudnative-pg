@@ -23,19 +23,6 @@ spec:
         - INSERT INTO numbers_three (m) (SELECT generate_series(1,10000))
         - ALTER TABLE numbers_three OWNER TO app;
 
-  # This is needed to enable users to create the publication while
-  # they are connected from the destination. Like in:
-  #
-  #     ./bin/kubectl-cnpg publication create cluster-example-dest --external-cluster=cluster-example \
-  #        --dbname=app \
-  #        --publication=app \ 
-  #        --all-tables
-  #
-  # Without superuser access, this would fail with:
-  #
-  #     Executing: CREATE PUBLICATION "app" FOR ALL TABLES
-  #     ERROR:  must be superuser to create FOR ALL TABLES publication
-  #    command terminated with exit code 1
   enableSuperuserAccess: true
 
   managed:
@@ -43,10 +30,3 @@ spec:
       - name: app
         login: true
         replication: true
-
-# To create the publication while connected to the source side, use:
-#
-#     ./bin/kubectl-cnpg publication create cluster-example --publication=app --all-tables
-#
-#     Executing: CREATE PUBLICATION "app" FOR ALL TABLES
-#     CREATE PUBLICATION
