@@ -77,7 +77,7 @@ func NewCmd() *cobra.Command {
 		&dryRun,
 		"dry-run",
 		false,
-		"If specified, the subscription is not deleted",
+		"If specified, the subscription deletion commands are shown but not executed",
 	)
 
 	return subscriptionDropCmd
