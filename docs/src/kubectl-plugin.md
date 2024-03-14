@@ -1140,7 +1140,7 @@ which will create a publication named `app` for all the tables in the
 
 TIP: there are two sample files,
 [logical-source](samples/cluster-example-logical-source.yaml) and
-[logical-destination](samples/cluster-example-logical-dest.yaml)
+[logical-destination](samples/cluster-example-logical-destination.yaml)
 provided for illustration and inspiration.
 
 !!! Warning
@@ -1236,7 +1236,7 @@ will create a subscription for `app` on the destination cluster.
 
 TIP: there are two sample files,
 [logical-source](samples/cluster-example-logical-source.yaml) and
-[logical-destinatino](samples/cluster-example-logical-dest.yaml)
+[logical-destination](samples/cluster-example-logical-destination.yaml)
 provided for illustration and inspiration.
 
 !!! Warning
