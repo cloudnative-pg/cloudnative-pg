@@ -38,7 +38,7 @@ type FakeData struct {
 
 	// This is the lifetime of the generated certificates
 	CertificateDuration int `json:"certificateDuration" env:"CERTIFICATE_DURATION"`
-	
+
 	//  Threshold to consider a certificate as expiring
 	ExpiringCheckThreshold int `json:"expiringCheckThreshold" env:"EXPIRING_CHECK_THRESHOLD"`
 
