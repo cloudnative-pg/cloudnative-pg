@@ -118,7 +118,7 @@ operating system and architectures:
 
 ### Configuring auto-completion
 
-To configure auto-completion for the plugin, an helper shell script need to be
+To configure auto-completion for the plugin, a helper shell script needs to be
 installed into your current PATH. Assuming the latter contains `/usr/local/bin`,
 this can be done with the following commands:
 
@@ -1151,7 +1151,7 @@ For additional information and detailed instructions, type the following
 command:
 
 ```sh
-kubectl cnpg publication create help
+kubectl cnpg publication create --help
 ```
 
 #### Dropping a publication
@@ -1171,7 +1171,7 @@ kubectl cnpg publication drop \
 To access further details and precise instructions, use the following command:
 
 ```sh
-kubectl cnpg publication drop help
+kubectl cnpg publication drop --help
 ```
 
 ### Logical Replication Subscriptions
