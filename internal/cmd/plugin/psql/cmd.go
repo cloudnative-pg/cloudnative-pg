@@ -41,21 +41,21 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			psqlArgs := args[1:]
-			psqlOptions := psqlCommandOptions{
-				replica:     replica,
-				namespace:   plugin.Namespace,
-				allocateTTY: allocateTTY,
-				passStdin:   passStdin,
-				args:        psqlArgs,
-				name:        clusterName,
+			psqlOptions := CommandOptions{
+				Replica:     replica,
+				Namespace:   plugin.Namespace,
+				AllocateTTY: allocateTTY,
+				PassStdin:   passStdin,
+				Args:        psqlArgs,
+				Name:        clusterName,
 			}
 
-			psqlCommand, err := newPsqlCommand(cmd.Context(), psqlOptions)
+			psqlCommand, err := NewCommand(cmd.Context(), psqlOptions)
 			if err != nil {
 				return err
 			}
 
-			return psqlCommand.exec()
+			return psqlCommand.Exec()
 		},
 	}
 

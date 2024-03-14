@@ -36,9 +36,9 @@ const (
 	kubectlCommand = "kubectl"
 )
 
-// psqlCommand is the launcher of `psql` with `kubectl exec`
-type psqlCommand struct {
-	psqlCommandOptions
+// Command is the launcher of `psql` with `kubectl exec`
+type Command struct {
+	CommandOptions
 
 	// The list of possible pods where to launch psql
 	podList []corev1.Pod
@@ -47,37 +47,37 @@ type psqlCommand struct {
 	kubectlPath string
 }
 
-// psqlCommandOptions are the options required to start psql
-type psqlCommandOptions struct {
-	// Require a connection to a replica
-	replica bool
+// CommandOptions are the options required to start psql
+type CommandOptions struct {
+	// Require a connection to a Replica
+	Replica bool
 
-	// The cluster name
-	name string
+	// The cluster Name
+	Name string
 
-	// The namespace where we're working in
-	namespace string
+	// The Namespace where we're working in
+	Namespace string
 
 	// Whether we should we allocate a TTY for psql
-	allocateTTY bool
+	AllocateTTY bool
 
 	// Whether we should we pass stdin to psql
-	passStdin bool
+	PassStdin bool
 
 	// Arguments to pass to psql
-	args []string
+	Args []string
 }
 
-// newPsqlCommand creates a new psql command
-func newPsqlCommand(
+// NewCommand creates a new psql command
+func NewCommand(
 	ctx context.Context,
-	options psqlCommandOptions,
-) (*psqlCommand, error) {
+	options CommandOptions,
+) (*Command, error) {
 	var pods corev1.PodList
 	if err := plugin.Client.List(
 		ctx,
 		&pods,
-		client.MatchingLabels{utils.ClusterLabelName: options.name},
+		client.MatchingLabels{utils.ClusterLabelName: options.Name},
 		client.InNamespace(plugin.Namespace),
 	); err != nil {
 		return nil, err
@@ -88,26 +88,26 @@ func newPsqlCommand(
 		return nil, fmt.Errorf("while getting kubectl path: %w", err)
 	}
 
-	return &psqlCommand{
-		psqlCommandOptions: options,
-		podList:            pods.Items,
-		kubectlPath:        kubectlPath,
+	return &Command{
+		CommandOptions: options,
+		podList:        pods.Items,
+		kubectlPath:    kubectlPath,
 	}, nil
 }
 
 // getKubectlInvocation gets the kubectl command to be executed
-func (psql *psqlCommand) getKubectlInvocation() ([]string, error) {
-	result := make([]string, 0, 11+len(psql.args))
+func (psql *Command) getKubectlInvocation() ([]string, error) {
+	result := make([]string, 0, 11+len(psql.Args))
 	result = append(result, "kubectl", "exec")
 
-	if psql.allocateTTY {
+	if psql.AllocateTTY {
 		result = append(result, "-t")
 	}
-	if psql.passStdin {
+	if psql.PassStdin {
 		result = append(result, "-i")
 	}
-	if len(psql.namespace) > 0 {
-		result = append(result, "-n", psql.namespace)
+	if len(psql.Namespace) > 0 {
+		result = append(result, "-n", psql.Namespace)
 	}
 	result = append(result, "-c", specs.PostgresContainerName)
 
@@ -118,14 +118,14 @@ func (psql *psqlCommand) getKubectlInvocation() ([]string, error) {
 
 	result = append(result, podName)
 	result = append(result, "--", "psql")
-	result = append(result, psql.args...)
+	result = append(result, psql.Args...)
 	return result, nil
 }
 
 // getPodName get the first Pod name with the required role
-func (psql *psqlCommand) getPodName() (string, error) {
+func (psql *Command) getPodName() (string, error) {
 	targetPodRole := specs.ClusterRoleLabelPrimary
-	if psql.replica {
+	if psql.Replica {
 		targetPodRole = specs.ClusterRoleLabelReplica
 	}
 
@@ -139,9 +139,9 @@ func (psql *psqlCommand) getPodName() (string, error) {
 	return "", &ErrMissingPod{role: targetPodRole}
 }
 
-// exec replaces the current process with a `kubectl exec` invocation.
+// Exec replaces the current process with a `kubectl Exec` invocation.
 // This function won't return
-func (psql *psqlCommand) exec() error {
+func (psql *Command) Exec() error {
 	kubectlExec, err := psql.getKubectlInvocation()
 	if err != nil {
 		return err
@@ -153,6 +153,32 @@ func (psql *psqlCommand) exec() error {
 	}
 
 	return nil
+}
+
+// Run starts a psql process inside the target pod
+func (psql *Command) Run() error {
+	kubectlExec, err := psql.getKubectlInvocation()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) // nolint:gosec
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// Output starts a psql process inside the target pod
+// and returns its stdout
+func (psql *Command) Output() ([]byte, error) {
+	kubectlExec, err := psql.getKubectlInvocation()
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := exec.Command(psql.kubectlPath, kubectlExec[1:]...) // nolint:gosec
+	cmd.Stderr = os.Stderr
+	return cmd.Output()
 }
 
 // ErrMissingPod is raised when we can't find a Pod having the desired role
