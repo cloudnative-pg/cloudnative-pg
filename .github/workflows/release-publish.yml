@@ -56,6 +56,8 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.build-meta.outputs.version }}
+      author_name: ${{ steps.build-meta.outputs.author_name }}
+      author_email: ${{ steps.build-meta.outputs.author_email }}
       digest: ${{ steps.build.outputs.digest }}
       platforms: ${{ env.PLATFORMS }}
     steps:
@@ -86,6 +88,11 @@ jobs:
           if [[ "$latest_release_branch" != "$current_release_branch" ]]; then
             skip_krew="true"
           fi
+
+          # get git user and email
+          author_name=$(git show -s --format='%an' "${commit_sha}")
+          author_email=$(git show -s --format='%ae' "${commit_sha}")
+
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
@@ -94,6 +101,8 @@ jobs:
           echo "version=${commit_version}" >> $GITHUB_OUTPUT
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "SKIP_KREW=${skip_krew}" >> $GITHUB_ENV
+          echo "author_name=${author_name}" >> $GITHUB_OUTPUT
+          echo "author_email=${author_email}" >> $GITHUB_OUTPUT
       -
         name: Import GPG key
         id: import_gpg
@@ -351,9 +360,9 @@ jobs:
     needs: olm-bundle
     if: |
       (always() && !cancelled()) &&
-      needs.buildx.result == 'success' &&
-      needs.buildx.outputs.upload_artifacts == 'true' &&
-      github.repository_owner == 'cloudnative-pg'
+      needs.release-binaries.result == 'success'
+    env:
+      VERSION: ${{ needs.release-binaries.outputs.version }}
     runs-on: ubuntu-22.04
     steps:
       -
@@ -367,8 +376,8 @@ jobs:
       -
         name: Configure git user
         run: |
-          git config user.email "${{ needs.buildx.outputs.author_email }}"
-          git config user.name "${{ needs.buildx.outputs.author_name }}"
+          git config user.email "${{ needs.release-binaries.outputs.author_email }}"
+          git config user.name "${{ needs.release-binaries.outputs.author_name }}"
       -
         name: Download the bundle
         uses: actions/download-artifact@v4
@@ -384,7 +393,7 @@ jobs:
         name: Prepare commit message
         env:
           COMMIT_MESSAGE: |
-            operator cloudnative-pg (${{ env.VERSION }}
+            operator cloudnative-pg (${{ env.VERSION }})
         run: |
           # Skip creating the commit if there are no changes
           [ -n "$(git status -s)" ] || exit 0
@@ -392,7 +401,7 @@ jobs:
           git add bundle/${{ env.VERSION }}
           git commit -m "${COMMIT_MESSAGE}"
       -
-        naem: Push commit
+        name: Push commit
         uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
