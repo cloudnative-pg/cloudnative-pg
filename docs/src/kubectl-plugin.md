@@ -1099,6 +1099,10 @@ There are two primary use cases:
 - Without `--external-cluster`: Use this option to create a publication in the
   `<LOCAL_CLUSTER>` PostgreSQL `Cluster` (by default, the `app` database).
 
+!!! Warning
+    When connecting to an external cluster, ensure that the specified user has
+    sufficient permissions to execute the `CREATE PUBLICATION` command.
+
 You have several options, similar to the [`CREATE PUBLICATION`](https://www.postgresql.org/docs/current/sql-createpublication.html)
 command, to define the group of tables to replicate. Notable options include:
 
@@ -1110,6 +1114,13 @@ command, to define the group of tables to replicate. Notable options include:
 
 The `--dry-run` option enables you to preview the SQL commands that the plugin
 will execute.
+
+For additional information and detailed instructions, type the following
+command:
+
+```sh
+kubectl cnpg publication create --help
+```
 
 ##### Example
 
@@ -1138,21 +1149,10 @@ kubectl cnpg publication create source-cluster \
 which will create a publication named `app` for all the tables in the
 `source-cluster`, running the SQL commands on the source cluster.
 
-TIP: there are two sample files,
-[logical-source](samples/cluster-example-logical-source.yaml) and
-[logical-destination](samples/cluster-example-logical-destination.yaml)
-provided for illustration and inspiration.
-
-!!! Warning
-    When connecting to an external cluster, ensure that the specified user has
-    sufficient permissions to execute the `CREATE PUBLICATION` command.
-
-For additional information and detailed instructions, type the following
-command:
-
-```sh
-kubectl cnpg publication create --help
-```
+!!! Info
+    There are two sample files that have been provided for illustration and inspiration:
+    [logical-source](samples/cluster-example-logical-source.yaml) and
+    [logical-destination](samples/cluster-example-logical-destination.yaml).
 
 #### Dropping a publication
 
@@ -1177,8 +1177,8 @@ kubectl cnpg publication drop --help
 ### Logical Replication Subscriptions
 
 The `cnpg subscription` command group is a dedicated set of commands designed
-to simplify the creation and removal of [PostgreSQL logical replication
-subscriptions](https://www.postgresql.org/docs/current/logical-replication-subscription.html).
+to simplify the creation and removal of
+[PostgreSQL logical replication subscriptions](https://www.postgresql.org/docs/current/logical-replication-subscription.html).
 These commands are specifically crafted to aid in the establishment of logical
 replication subscriptions, especially when dealing with remote PostgreSQL
 databases.
@@ -1234,15 +1234,15 @@ kubectl cnpg subscription create destination-cluster \
 
 will create a subscription for `app` on the destination cluster.
 
-TIP: there are two sample files,
-[logical-source](samples/cluster-example-logical-source.yaml) and
-[logical-destination](samples/cluster-example-logical-destination.yaml)
-provided for illustration and inspiration.
-
 !!! Warning
     Prioritize testing subscriptions in a non-production environment to ensure
     their effectiveness and identify any potential issues before implementing them
     in a production setting.
+
+!!! Info
+    There are two sample files that have been provided for illustration and inspiration:
+    [logical-source](samples/cluster-example-logical-source.yaml) and
+    [logical-destination](samples/cluster-example-logical-destination.yaml).
 
 #### Dropping a subscription
 
