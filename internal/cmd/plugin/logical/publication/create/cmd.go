@@ -157,7 +157,7 @@ func NewCmd() *cobra.Command {
 		&dryRun,
 		"dry-run",
 		false,
-		"If specified, the publication is not created",
+		"If specified, the publication commands are shown but not executed",
 	)
 
 	publicationCreateCmd.Flags().StringVar(
