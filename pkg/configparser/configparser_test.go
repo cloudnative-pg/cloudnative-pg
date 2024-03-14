@@ -36,6 +36,9 @@ type FakeData struct {
 	// the owning Cluster
 	InheritedLabels []string `json:"inheritedLabels" env:"INHERITED_LABELS"`
 
+	// This is the lifetime of the generated certificates
+	CertificateDuration int `json:"certificateDuration" env:"CERTIFICATE_DURATION"`
+	
 	//  Threshold to consider a certificate as expiring
 	ExpiringCheckThreshold int `json:"expiringCheckThreshold" env:"EXPIRING_CHECK_THRESHOLD"`
 
@@ -87,6 +90,24 @@ var _ = Describe("Data test suite", func() {
 		Expect(config.InheritedAnnotations).To(Equal([]string{"one", "two"}))
 		Expect(config.InheritedLabels).To(Equal([]string{"alpha", "beta"}))
 		Expect(config.ExpiringCheckThreshold).To(Equal(2))
+	})
+
+	It("reset to default value if format is not correct", func() {
+		config := &FakeData{
+			CertificateDuration:    90,
+			ExpiringCheckThreshold: 7,
+		}
+		fakeEnv := NewFakeEnvironment(map[string]string{
+			"EXPIRING_CHECK_THRESHOLD": "3600min",
+			"CERTIFICATE_DURATION":     "unknown",
+		})
+		defaultData := &FakeData{
+			CertificateDuration:    90,
+			ExpiringCheckThreshold: 7,
+		}
+		ReadConfigMap(config, defaultData, nil, fakeEnv)
+		Expect(config.ExpiringCheckThreshold).To(Equal(7))
+		Expect(config.CertificateDuration).To(Equal(90))
 	})
 
 	It("handles correctly default values of slices", func() {
