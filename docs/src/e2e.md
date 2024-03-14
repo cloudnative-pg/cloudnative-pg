@@ -5,7 +5,7 @@ commit via a suite of **End-to-end (E2E) tests** (or integration tests)
 which ensure that the operator correctly deploys and manages PostgreSQL
 clusters.
 
-Kubernetes versions 1.23 through 1.28, and PostgreSQL versions 12 through 16,
+Kubernetes versions 1.23 through 1.29, and PostgreSQL versions 12 through 16,
 are tested for each commit, helping detect bugs at an early stage of the
 development process.
 
@@ -41,7 +41,7 @@ and the following suite of E2E tests are performed on that cluster:
      * Restore from backup using Barman Cloud on S3
      * Restore from backup using Barman Cloud on Azure blob storage
      * Point-in-time recovery (PITR) on Azure, S3 storage
-     * Wal-Restore
+     * Wal-Restore (sequential / parallel)
 
 * **Operator:**
      * Operator Deployment
@@ -75,6 +75,7 @@ and the following suite of E2E tests are performed on that cluster:
 * **Postgres Configuration:**
      * Manage PostgreSQL configuration changes
      * Rolling updates when changing PostgreSQL images
+     * Rolling updates when changing ImageCatalog/ClusterImageCatalog images
      * Rolling updates on hot standby sensitive parameter changes
      * Database initialization via InitDB
 
@@ -83,6 +84,7 @@ and the following suite of E2E tests are performed on that cluster:
      * Pod affinity using `NodeSelector`
      * Rolling updates on PodSpec drift detection
      * In-place upgrades
+     * Multi-Arch availability
 
 * **Cluster Metadata:**
      * ConfigMap for Cluster Labels and Annotations
@@ -98,6 +100,7 @@ and the following suite of E2E tests are performed on that cluster:
 
 * **Storage:**
      * Storage expansion
+     * Dedicated PG_WAL persistent volume
 
 * **Security:**
      * AppArmor annotation propagation. Executed only on Azure environment
@@ -108,7 +111,6 @@ and the following suite of E2E tests are performed on that cluster:
 
 * **Hibernation**
      * Declarative hibernation / rehydration
-
 
 * **Volume snapshots**
      * Backup/restore for cold and online snapshots
