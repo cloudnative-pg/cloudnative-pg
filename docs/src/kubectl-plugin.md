@@ -1232,7 +1232,7 @@ For comprehensive details and specific instructions, utilize the following
 command:
 
 ```sh
-kubectl cnpg subscription sync-sequences help
+kubectl cnpg subscription sync-sequences --help
 ```
 
 !!! Warning
