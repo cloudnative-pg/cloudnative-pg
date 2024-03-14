@@ -34,6 +34,7 @@ func NewCmd() *cobra.Command {
 	var tableExprs []string
 	var publicationName string
 	var externalClusterName string
+	var publicationParameters string
 	var dryRun bool
 
 	publicationCreateCmd := &cobra.Command{
@@ -61,7 +62,8 @@ func NewCmd() *cobra.Command {
 			}
 
 			sqlCommandBuilder := PublicationCmdBuilder{
-				PublicationName: publicationName,
+				PublicationName:       publicationName,
+				PublicationParameters: publicationParameters,
 			}
 
 			if allTables {
@@ -76,11 +78,12 @@ func NewCmd() *cobra.Command {
 						},
 					)
 				}
-				for _, tableExpression := range tableExprs {
+
+				if len(tableExprs) > 0 {
 					targets.PublicationObjects = append(
 						targets.PublicationObjects,
 						&PublicationObjectTableExpression{
-							TableExpression: tableExpression,
+							TableExpressions: tableExprs,
 						},
 					)
 				}
@@ -155,6 +158,14 @@ func NewCmd() *cobra.Command {
 		"dry-run",
 		false,
 		"If specified, the publication is not created",
+	)
+
+	publicationCreateCmd.Flags().StringVar(
+		&publicationParameters,
+		"parameters",
+		"",
+		"The publication parameters. IMPORTANT: this command won't perform any validation. "+
+			"Users are responsible for passing them correctly",
 	)
 
 	return publicationCreateCmd

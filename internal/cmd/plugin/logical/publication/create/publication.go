@@ -18,6 +18,7 @@ package create
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -29,28 +30,37 @@ type PublicationCmdBuilder struct {
 
 	// The target to be publication
 	PublicationTarget PublicationTarget
+
+	// The optional publication parameters
+	PublicationParameters string
 }
 
 // ToSQL create the SQL Statement to create the publication
 func (cmd PublicationCmdBuilder) ToSQL() string {
-	return fmt.Sprintf(
+	result := fmt.Sprintf(
 		"CREATE PUBLICATION %s %s",
 		pgx.Identifier{cmd.PublicationName}.Sanitize(),
-		cmd.PublicationTarget.ToSQL(),
+		cmd.PublicationTarget.ToPublicationTargetSQL(),
 	)
+
+	if len(cmd.PublicationParameters) > 0 {
+		result = fmt.Sprintf("%s WITH (%s)", result, cmd.PublicationParameters)
+	}
+
+	return result
 }
 
 // PublicationTarget represent the publication target
 type PublicationTarget interface {
 	// Create the SQL statement to publication the tables
-	ToSQL() string
+	ToPublicationTargetSQL() string
 }
 
 // PublicationTargetALLTables will publicate all tables
 type PublicationTargetALLTables struct{}
 
-// ToSQL implements the PublicationTarget interface
-func (PublicationTargetALLTables) ToSQL() string {
+// ToPublicationTargetSQL implements the PublicationTarget interface
+func (PublicationTargetALLTables) ToPublicationTargetSQL() string {
 	return "FOR ALL TABLES"
 }
 
@@ -59,14 +69,18 @@ type PublicationTargetPublicationObjects struct {
 	PublicationObjects []PublicationObject
 }
 
-// ToSQL implements the PublicationObject interface
-func (objs *PublicationTargetPublicationObjects) ToSQL() string {
-	var result string
+// ToPublicationTargetSQL implements the PublicationObject interface
+func (objs *PublicationTargetPublicationObjects) ToPublicationTargetSQL() string {
+	result := ""
 	for _, object := range objs.PublicationObjects {
 		if len(result) > 0 {
 			result += ", "
 		}
-		result += fmt.Sprintf("FOR %s", object.ToSQL())
+		result += object.ToPublicationObjectSQL()
+	}
+
+	if len(result) > 0 {
+		result = fmt.Sprintf("FOR %s", result)
 	}
 	return result
 }
@@ -74,7 +88,7 @@ func (objs *PublicationTargetPublicationObjects) ToSQL() string {
 // PublicationObject represent an object to publicate
 type PublicationObject interface {
 	// Create the SQL statement to publicate this object
-	ToSQL() string
+	ToPublicationObjectSQL() string
 }
 
 // PublicationObjectSchema will publicate all the tables in a certain schema
@@ -83,18 +97,18 @@ type PublicationObjectSchema struct {
 	SchemaName string
 }
 
-// ToSQL implements the PublicationObject interface
-func (obj PublicationObjectSchema) ToSQL() string {
+// ToPublicationObjectSQL implements the PublicationObject interface
+func (obj PublicationObjectSchema) ToPublicationObjectSQL() string {
 	return fmt.Sprintf("TABLES IN SCHEMA %s", pgx.Identifier{obj.SchemaName}.Sanitize())
 }
 
 // PublicationObjectTableExpression will publicate the passed table expression
 type PublicationObjectTableExpression struct {
 	// The table expression to publicate
-	TableExpression string
+	TableExpressions []string
 }
 
-// ToSQL implements the PublicationObject interface
-func (obj PublicationObjectTableExpression) ToSQL() string {
-	return obj.TableExpression
+// ToPublicationObjectSQL implements the PublicationObject interface
+func (obj PublicationObjectTableExpression) ToPublicationObjectSQL() string {
+	return fmt.Sprintf("TABLE %s", strings.Join(obj.TableExpressions, ", "))
 }
