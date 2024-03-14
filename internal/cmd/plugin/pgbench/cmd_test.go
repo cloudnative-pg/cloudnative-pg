@@ -41,6 +41,14 @@ var _ = Describe("NewCmd", func() {
 		Expect(dbNameFlag).ToNot(BeNil())
 		Expect(dbNameFlag.DefValue).To(Equal("app"))
 
+		dbUserFlag := cmd.Flag("db-user")
+		Expect(dbUserFlag).ToNot(BeNil())
+		Expect(dbUserFlag.DefValue).To(Equal("app"))
+
+		dbPasswordFlag := cmd.Flag("db-password")
+		Expect(dbPasswordFlag).ToNot(BeNil())
+		Expect(dbPasswordFlag.DefValue).To(Equal(""))
+
 		dryRunFlag := cmd.Flag("dry-run")
 		Expect(dryRunFlag).ToNot(BeNil())
 		Expect(dryRunFlag.DefValue).To(Equal("false"))
@@ -60,6 +68,8 @@ var _ = Describe("NewCmd", func() {
 		cmd.RunE = func(cmd *cobra.Command, args []string) error {
 			testRun.jobName, _ = cmd.Flags().GetString("job-name")
 			testRun.dbName, _ = cmd.Flags().GetString("db-name")
+			testRun.dbUser, _ = cmd.Flags().GetString("db-user")
+			testRun.dbPassword, _ = cmd.Flags().GetString("db-password")
 			testRun.dryRun, _ = cmd.Flags().GetBool("dry-run")
 			testRun.nodeSelector, _ = cmd.Flags().GetStringSlice("node-selector")
 
@@ -73,6 +83,8 @@ var _ = Describe("NewCmd", func() {
 			"mycluster",
 			"--job-name=myjob",
 			"--db-name=mydb",
+			"--db-user=myuser",
+			"--db-password=mypassword",
 			"--dry-run=true",
 			"--node-selector=label=value",
 			"arg1",
@@ -89,6 +101,8 @@ var _ = Describe("NewCmd", func() {
 		Expect(testRun.jobName).To(Equal("myjob"))
 		Expect(testRun.clusterName).To(Equal("mycluster"))
 		Expect(testRun.dbName).To(Equal("mydb"))
+		Expect(testRun.dbUser).To(Equal("myuser"))
+		Expect(testRun.dbPassword).To(Equal("mypassword"))
 		Expect(testRun.dryRun).To(BeTrue())
 		Expect(testRun.nodeSelector).To(Equal([]string{"label=value"}))
 		Expect(testRun.pgBenchCommandArgs).To(Equal([]string{"arg1", "arg2"}))

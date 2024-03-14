@@ -37,6 +37,8 @@ type pgBenchRun struct {
 	jobName            string
 	clusterName        string
 	dbName             string
+	dbUser             string
+	dbPassword         string
 	nodeSelector       []string
 	pgBenchCommandArgs []string
 	dryRun             bool
@@ -179,17 +181,18 @@ func (cmd *pgBenchRun) buildEnvVariables() []corev1.EnvVar {
 			Value: "5432",
 		},
 		{
-			Name: "PGUSER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: appSecreteName,
-					},
-					Key: "username",
-				},
-			},
+			Name:  "PGUSER",
+			Value: cmd.dbUser,
 		},
-		{
+	}
+
+	if cmd.dbPassword != "" {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  "PGPASSWORD",
+			Value: cmd.dbPassword,
+		})
+	} else {
+		envVar = append(envVar, corev1.EnvVar{
 			Name: "PGPASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
@@ -199,7 +202,7 @@ func (cmd *pgBenchRun) buildEnvVariables() []corev1.EnvVar {
 					Key: "password",
 				},
 			},
-		},
+		})
 	}
 
 	return envVar
