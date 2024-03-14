@@ -1180,7 +1180,7 @@ For additional information and detailed instructions, type the following
 command:
 
 ```sh
-kubectl cnpg subscription create help
+kubectl cnpg subscription create --help
 ```
 
 !!! Warning
