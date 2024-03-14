@@ -169,7 +169,7 @@ spec:
     it would be advisable to:
 
     1. start with a single instance replica cluster. The primary instance will
-      be recovered using the snapshot and available WALs form the source cluster
+      be recovered using the snapshot and available WALs from the source cluster
     2. take a snapshot of the primary in the replica cluster
     3. increase the number of instances in the replica cluster as desired
 
