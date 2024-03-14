@@ -43,6 +43,19 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			subscriptionName := strings.TrimSpace(subscriptionName)
 			clusterName := args[0]
+			dbName := strings.TrimSpace(dbName)
+
+			if len(dbName) == 0 {
+				var err error
+				dbName, err = logical.GetApplicationDatabaseName(cmd.Context(), clusterName)
+				if err != nil {
+					return err
+				}
+			}
+			if len(dbName) == 0 {
+				return fmt.Errorf(
+					"the name of the database was not specified and there is no available application database")
+			}
 
 			sqlCommand := fmt.Sprintf(
 				"DROP SUBSCRIPTION %s",
@@ -71,7 +84,6 @@ func NewCmd() *cobra.Command {
 		"",
 		"The database in which the command should drop the subscription (required)",
 	)
-	_ = subscriptionDropCmd.MarkFlagRequired("dbname")
 
 	subscriptionDropCmd.Flags().BoolVar(
 		&dryRun,
