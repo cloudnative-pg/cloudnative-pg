@@ -45,16 +45,6 @@ func NewCmd() *cobra.Command {
 			subscriptionName := strings.TrimSpace(subscriptionName)
 			dbName := strings.TrimSpace(dbName)
 
-			if len(externalClusterName) == 0 {
-				return fmt.Errorf("the external cluster name is required")
-			}
-			if len(publicationName) == 0 {
-				return fmt.Errorf("the name of the publication is required")
-			}
-			if len(subscriptionName) == 0 {
-				return fmt.Errorf("the name of the subscription is required")
-			}
-
 			if len(dbName) == 0 {
 				var err error
 				dbName, err = logical.GetApplicationDatabaseName(cmd.Context(), clusterName)
@@ -93,20 +83,26 @@ func NewCmd() *cobra.Command {
 		&externalClusterName,
 		"external-cluster",
 		"",
-		"The external cluster name",
+		"The external cluster name (required)",
 	)
+	subscriptionCreateCmd.MarkFlagRequired("external-cluster")
+
 	subscriptionCreateCmd.Flags().StringVar(
 		&publicationName,
 		"publication",
 		"",
-		"The name of the publication to subscribe to",
+		"The name of the publication to subscribe to (required)",
 	)
+	subscriptionCreateCmd.MarkFlagRequired("publication")
+
 	subscriptionCreateCmd.Flags().StringVar(
 		&subscriptionName,
 		"subscription",
 		"",
-		"The name of the subscription to create",
+		"The name of the subscription to create (required)",
 	)
+	subscriptionCreateCmd.MarkFlagRequired("subscription")
+
 	subscriptionCreateCmd.Flags().StringVar(
 		&dbName,
 		"dbname",

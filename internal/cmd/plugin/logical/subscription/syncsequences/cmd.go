@@ -44,10 +44,6 @@ func NewCmd() *cobra.Command {
 			subscriptionName := strings.TrimSpace(subscriptionName)
 			dbName := strings.TrimSpace(dbName)
 
-			if len(subscriptionName) == 0 {
-				return fmt.Errorf("the subscription name is required")
-			}
-
 			var cluster apiv1.Cluster
 			err := plugin.Client.Get(
 				cmd.Context(),
@@ -103,8 +99,10 @@ func NewCmd() *cobra.Command {
 		&subscriptionName,
 		"subscription",
 		"",
-		"The name of the subscription on which to refresh sequences",
+		"The name of the subscription on which to refresh sequences (required)",
 	)
+	syncSequencesCmd.MarkFlagRequired("subscription")
+
 	syncSequencesCmd.Flags().StringVar(
 		&dbName,
 		"dbname",

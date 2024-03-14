@@ -41,9 +41,6 @@ func NewCmd() *cobra.Command {
 			publicationName := strings.TrimSpace(publicationName)
 			clusterName := args[0]
 
-			if len(publicationName) == 0 {
-				return fmt.Errorf("publication is a required option")
-			}
 			if len(dbName) == 0 {
 				var err error
 				dbName, err = logical.GetApplicationDatabaseName(cmd.Context(), clusterName)
@@ -82,8 +79,10 @@ func NewCmd() *cobra.Command {
 		&publicationName,
 		"publication",
 		"",
-		"The name of the publication to be dropped",
+		"The name of the publication to be dropped (required)",
 	)
+	publicationDropCmd.MarkFlagRequired("publication")
+
 	publicationDropCmd.Flags().StringVar(
 		&dbName,
 		"dbname",

@@ -56,17 +56,6 @@ func NewCmd() *cobra.Command {
 					"the name of the database was not specified and there is no available application database")
 			}
 
-			if len(publicationName) == 0 {
-				return fmt.Errorf("publication is a required option")
-			}
-
-			if allTables && (len(schemaNames) > 0 || len(tableExprs) > 0) {
-				return fmt.Errorf("cannot publicate all tables and selected schema/tables at the same time")
-			}
-			if !allTables && len(schemaNames) == 0 && len(tableExprs) == 0 {
-				return fmt.Errorf("no publication target selected")
-			}
-
 			sqlCommandBuilder := PublicationCmdBuilder{
 				PublicationName: publicationName,
 			}
@@ -114,24 +103,26 @@ func NewCmd() *cobra.Command {
 	}
 
 	publicationCreateCmd.Flags().StringVar(
+		&dbName,
+		"dbname",
+		"",
+		"The database in which the command should create the publication "+
+			"(defaults to the name of the application database)",
+	)
+
+	publicationCreateCmd.Flags().StringVar(
 		&publicationName,
 		"publication",
 		"",
-		"The name of the publication to be created",
+		"The name of the publication to be created (required)",
 	)
+	publicationCreateCmd.MarkFlagRequired("publication")
 
 	publicationCreateCmd.Flags().BoolVar(
 		&allTables,
 		"all-tables",
 		false,
 		"Create the publication for all the tables in the database or in the schema",
-	)
-	publicationCreateCmd.Flags().StringVar(
-		&dbName,
-		"dbname",
-		"",
-		"The database in which the command should create the publication "+
-			"(defaults to the name of the application database)",
 	)
 	publicationCreateCmd.Flags().StringSliceVar(
 		&schemaNames,
@@ -145,6 +136,10 @@ func NewCmd() *cobra.Command {
 		nil,
 		"Create the publication for the selected table expression",
 	)
+	publicationCreateCmd.MarkFlagsOneRequired("all-tables", "schema", "table")
+	publicationCreateCmd.MarkFlagsMutuallyExclusive("all-tables", "schema")
+	publicationCreateCmd.MarkFlagsMutuallyExclusive("all-tables", "table")
+
 	publicationCreateCmd.Flags().StringVar(
 		&externalClusterName,
 		"external-cluster",

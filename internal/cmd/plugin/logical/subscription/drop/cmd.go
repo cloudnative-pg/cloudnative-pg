@@ -40,13 +40,6 @@ func NewCmd() *cobra.Command {
 			subscriptionName := strings.TrimSpace(subscriptionName)
 			clusterName := args[0]
 
-			if len(subscriptionName) == 0 {
-				return fmt.Errorf("subscription is a required option")
-			}
-			if len(dbName) == 0 {
-				return fmt.Errorf("dbname is a required option")
-			}
-
 			sqlCommand := fmt.Sprintf(
 				"DROP SUBSCRIPTION %s",
 				pgx.Identifier{subscriptionName}.Sanitize(),
@@ -64,14 +57,18 @@ func NewCmd() *cobra.Command {
 		&subscriptionName,
 		"subscription",
 		"",
-		"The name of the subscription to be dropped",
+		"The name of the subscription to be dropped (required)",
 	)
+	subscriptionDropCmd.MarkFlagRequired("subscription")
+
 	subscriptionDropCmd.Flags().StringVar(
 		&dbName,
 		"dbname",
 		"",
-		"The database in which the command should drop the subscription",
+		"The database in which the command should drop the subscription (required)",
 	)
+	subscriptionDropCmd.MarkFlagRequired("dbname")
+
 	subscriptionDropCmd.Flags().BoolVar(
 		&dryRun,
 		"dry-run",
