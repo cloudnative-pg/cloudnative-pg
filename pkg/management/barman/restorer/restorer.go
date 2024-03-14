@@ -220,6 +220,18 @@ func (restorer *WALRestorer) RestoreList(
 
 // Restore restores a WAL file from the object store
 func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOptions []string) error {
+	const (
+		exitCodeBucketOrWalNotFound = 1
+		exitCodeConnectivityError   = 2
+		exitCodeInvalidWalName      = 3
+		exitCodeGeneric             = 4
+	)
+
+	currentCapabilities, capabilitiesError := barmanCapabilities.CurrentCapabilities()
+	if capabilitiesError != nil {
+		return capabilitiesError
+	}
+
 	optionsLength := len(baseOptions)
 	if optionsLength >= math.MaxInt-2 {
 		return fmt.Errorf("can't restore wal file %v, options too long", walName)
@@ -232,27 +244,34 @@ func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOption
 		barmanCapabilities.BarmanCloudWalRestore,
 		options...) // #nosec G204
 	barmanCloudWalRestoreCmd.Env = restorer.env
+
 	err := execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCapabilities.BarmanCloudWalRestore)
 	if err == nil {
 		return nil
 	}
 
-	var currentCapabilities *barmanCapabilities.Capabilities
-	var barmanError error
-	currentCapabilities, barmanError = barmanCapabilities.CurrentCapabilities()
-	if barmanError != nil {
-		return barmanError
+	var exitError *exec.ExitError
+	if !currentCapabilities.HasErrorCodesForWALRestore || !errors.As(err, &exitError) {
+		return fmt.Errorf("unexpected failure retrieving %q with %s: %w",
+			walName, barmanCapabilities.BarmanCloudWalRestore, err)
 	}
 
-	if currentCapabilities.HasErrorCodesForWALRestore {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			if exitError.ExitCode() == 1 {
-				return fmt.Errorf("file not found %s: %w", walName, ErrWALNotFound)
-			}
-		}
+	// nolint: lll
+	// source: https://github.com/EnterpriseDB/barman/blob/26ed480cd0268dfd3f8546cc97660d4bd827772a/tests/test_barman_cloud_wal_restore.py
+	switch exitError.ExitCode() {
+	case exitCodeBucketOrWalNotFound:
+		// TODO: this should be improved, can be both file not found or a bucket that doesn't exist
+		return fmt.Errorf("file not found %s: %w", walName, ErrWALNotFound)
+	case exitCodeConnectivityError:
+		return fmt.Errorf("connectivity failure while executing %s, retrying",
+			barmanCapabilities.BarmanCloudWalRestore)
+	case exitCodeInvalidWalName:
+		return fmt.Errorf("invalid name for a WAL file: %s", walName)
+	case exitCodeGeneric:
+		return fmt.Errorf("generic error code encountered while executing %s",
+			barmanCapabilities.BarmanCloudWalRestore)
+	default:
+		return fmt.Errorf("unrecognized error exit code encountered while executing %s",
+			barmanCapabilities.BarmanCloudWalRestore)
 	}
-
-	return fmt.Errorf("unexpected failure retrieving %q with %s: %w",
-		walName, barmanCapabilities.BarmanCloudWalRestore, err)
 }
