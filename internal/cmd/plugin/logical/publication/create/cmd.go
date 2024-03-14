@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical"
 )
 
@@ -36,8 +37,11 @@ func NewCmd() *cobra.Command {
 	var dryRun bool
 
 	publicationCreateCmd := &cobra.Command{
-		Use:   "create cluster_name",
-		Args:  cobra.ExactArgs(1),
+		Use:  "create cluster_name",
+		Args: plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		Short: "create a logical replication publication",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dbName := strings.TrimSpace(dbName)
@@ -116,7 +120,7 @@ func NewCmd() *cobra.Command {
 		"",
 		"The name of the publication to be created (required)",
 	)
-	publicationCreateCmd.MarkFlagRequired("publication")
+	_ = publicationCreateCmd.MarkFlagRequired("publication")
 
 	publicationCreateCmd.Flags().BoolVar(
 		&allTables,

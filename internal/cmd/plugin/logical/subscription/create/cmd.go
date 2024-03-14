@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical"
 )
 
@@ -37,7 +38,10 @@ func NewCmd() *cobra.Command {
 	subscriptionCreateCmd := &cobra.Command{
 		Use:   "create cluster_name",
 		Short: "create a logical replication subscription",
-		Args:  cobra.ExactArgs(1),
+		Args:  plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			externalClusterName := strings.TrimSpace(externalClusterName)
@@ -85,7 +89,7 @@ func NewCmd() *cobra.Command {
 		"",
 		"The external cluster name (required)",
 	)
-	subscriptionCreateCmd.MarkFlagRequired("external-cluster")
+	_ = subscriptionCreateCmd.MarkFlagRequired("external-cluster")
 
 	subscriptionCreateCmd.Flags().StringVar(
 		&publicationName,
@@ -93,7 +97,7 @@ func NewCmd() *cobra.Command {
 		"",
 		"The name of the publication to subscribe to (required)",
 	)
-	subscriptionCreateCmd.MarkFlagRequired("publication")
+	_ = subscriptionCreateCmd.MarkFlagRequired("publication")
 
 	subscriptionCreateCmd.Flags().StringVar(
 		&subscriptionName,
@@ -101,7 +105,7 @@ func NewCmd() *cobra.Command {
 		"",
 		"The name of the subscription to create (required)",
 	)
-	subscriptionCreateCmd.MarkFlagRequired("subscription")
+	_ = subscriptionCreateCmd.MarkFlagRequired("subscription")
 
 	subscriptionCreateCmd.Flags().StringVar(
 		&dbName,

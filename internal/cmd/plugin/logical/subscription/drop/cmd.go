@@ -23,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical"
 )
 
@@ -33,8 +34,11 @@ func NewCmd() *cobra.Command {
 	var dryRun bool
 
 	subscriptionDropCmd := &cobra.Command{
-		Use:   "drop cluster_name",
-		Args:  cobra.ExactArgs(1),
+		Use:  "drop cluster_name",
+		Args: plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		Short: "drop a logical replication subscription",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			subscriptionName := strings.TrimSpace(subscriptionName)
@@ -59,7 +63,7 @@ func NewCmd() *cobra.Command {
 		"",
 		"The name of the subscription to be dropped (required)",
 	)
-	subscriptionDropCmd.MarkFlagRequired("subscription")
+	_ = subscriptionDropCmd.MarkFlagRequired("subscription")
 
 	subscriptionDropCmd.Flags().StringVar(
 		&dbName,
@@ -67,7 +71,7 @@ func NewCmd() *cobra.Command {
 		"",
 		"The database in which the command should drop the subscription (required)",
 	)
-	subscriptionDropCmd.MarkFlagRequired("dbname")
+	_ = subscriptionDropCmd.MarkFlagRequired("dbname")
 
 	subscriptionDropCmd.Flags().BoolVar(
 		&dryRun,

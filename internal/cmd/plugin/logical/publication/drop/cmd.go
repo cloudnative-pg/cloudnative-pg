@@ -23,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical"
 )
 
@@ -34,8 +35,11 @@ func NewCmd() *cobra.Command {
 	var dryRun bool
 
 	publicationDropCmd := &cobra.Command{
-		Use:   "drop cluster_name",
-		Args:  cobra.ExactArgs(1),
+		Use:  "drop cluster_name",
+		Args: plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		Short: "drop a logical replication publication",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			publicationName := strings.TrimSpace(publicationName)
@@ -81,7 +85,7 @@ func NewCmd() *cobra.Command {
 		"",
 		"The name of the publication to be dropped (required)",
 	)
-	publicationDropCmd.MarkFlagRequired("publication")
+	_ = publicationDropCmd.MarkFlagRequired("publication")
 
 	publicationDropCmd.Flags().StringVar(
 		&dbName,

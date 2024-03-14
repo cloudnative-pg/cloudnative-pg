@@ -38,7 +38,10 @@ func NewCmd() *cobra.Command {
 	syncSequencesCmd := &cobra.Command{
 		Use:   "sync-sequences cluster_name",
 		Short: "synchronize the sequences from the source database",
-		Args:  cobra.ExactArgs(1),
+		Args:  plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			subscriptionName := strings.TrimSpace(subscriptionName)
@@ -101,7 +104,7 @@ func NewCmd() *cobra.Command {
 		"",
 		"The name of the subscription on which to refresh sequences (required)",
 	)
-	syncSequencesCmd.MarkFlagRequired("subscription")
+	_ = syncSequencesCmd.MarkFlagRequired("subscription")
 
 	syncSequencesCmd.Flags().StringVar(
 		&dbName,
