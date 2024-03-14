@@ -392,7 +392,7 @@ jobs:
           git add bundle/${{ env.VERSION }}
           git commit -m "${COMMIT_MESSAGE}"
       -
-        naem: Push commit
+        name: Push commit
         uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
