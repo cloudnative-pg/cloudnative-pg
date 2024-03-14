@@ -260,8 +260,7 @@ func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOption
 	// source: https://github.com/EnterpriseDB/barman/blob/26ed480cd0268dfd3f8546cc97660d4bd827772a/tests/test_barman_cloud_wal_restore.py
 	switch exitError.ExitCode() {
 	case exitCodeBucketOrWalNotFound:
-		// TODO: this should be improved, can be both file not found or a bucket that doesn't exist
-		return fmt.Errorf("file not found %s: %w", walName, ErrWALNotFound)
+		return fmt.Errorf("object storage or file not found %s: %w", walName, ErrWALNotFound)
 	case exitCodeConnectivityError:
 		return fmt.Errorf("connectivity failure while executing %s, retrying",
 			barmanCapabilities.BarmanCloudWalRestore)
