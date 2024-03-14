@@ -151,7 +151,7 @@ func NewCmd() *cobra.Command {
 		&externalClusterName,
 		"external-cluster",
 		"",
-		"The cluster where to create the publication. Defaults to the local cluster",
+		"The cluster in which to create the publication. Defaults to the local cluster",
 	)
 	publicationCreateCmd.Flags().BoolVar(
 		&dryRun,
