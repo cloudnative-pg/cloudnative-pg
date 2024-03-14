@@ -1202,7 +1202,7 @@ kubectl cnpg subcription drop \
 To access further details and precise instructions, use the following command:
 
 ```sh
-kubectl cnpg subscription drop help
+kubectl cnpg subscription drop --help
 ```
 
 #### Synchronizing sequences
