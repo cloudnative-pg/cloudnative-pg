@@ -29,8 +29,16 @@ import (
 
 var configurationLog = log.WithName("configuration")
 
-// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
-const DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
+const (
+	// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
+	DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
+
+	// CertificateDuration is the default value for the lifetime of the generated certificates
+	CertificateDuration = 90
+
+	// ExpiringCheckThreshold is the default threshold to consider a certificate as expiring
+	ExpiringCheckThreshold = 7
+)
 
 // DefaultPluginSocketDir is the default directory where the plugin sockets are located.
 const DefaultPluginSocketDir = "/plugins"
@@ -92,6 +100,12 @@ type Data struct {
 	// EnablePodDebugging enable debugging mode in new generated pods
 	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
 
+	// This is the lifetime of the generated certificates
+	CertificateDuration int `json:"certificateDuration" env:"CERTIFICATE_DURATION"`
+
+	// Threshold to consider a certificate as expiring
+	ExpiringCheckThreshold int `json:"expiringCheckThreshold" env:"EXPIRING_CHECK_THRESHOLD"`
+
 	// CreateAnyService is true when the user wants the operator to create
 	// the <cluster-name>-any service. Defaults to false.
 	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
@@ -108,6 +122,8 @@ func newDefaultConfig() *Data {
 		PostgresImageName:      versions.DefaultImageName,
 		PluginSocketDir:        DefaultPluginSocketDir,
 		CreateAnyService:       false,
+		CertificateDuration:    CertificateDuration,
+		ExpiringCheckThreshold: ExpiringCheckThreshold,
 	}
 }
 

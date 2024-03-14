@@ -22,6 +22,8 @@ import (
 	"encoding/pem"
 	"time"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -276,5 +278,49 @@ var _ = Describe("Keypair generation", func() {
 			err = tlsCert.IsValid(caBundleIncomplete, nil)
 			Expect(err).Should(HaveOccurred())
 		})
+	})
+})
+
+var _ = Describe("Certicate duration and expiration threshold", func() {
+	defaultCertificateDuration := configuration.CertificateDuration * 24 * time.Hour
+	defaultExpiringThreshold := configuration.ExpiringCheckThreshold * 24 * time.Hour
+	tenDays := 10 * 24 * time.Hour
+
+	It("returns the default duration", func() {
+		duration := getCertificateDuration()
+		Expect(duration).To(BeEquivalentTo(defaultCertificateDuration))
+	})
+
+	It("returns the default duration if the configuration is a negative value", func() {
+		configuration.Current = configuration.NewConfiguration()
+		configuration.Current.CertificateDuration = -1
+		duration := getCertificateDuration()
+		Expect(duration).To(BeEquivalentTo(defaultCertificateDuration))
+	})
+
+	It("returns a valid duration of 10 days", func() {
+		configuration.Current = configuration.NewConfiguration()
+		configuration.Current.CertificateDuration = 10
+		duration := getCertificateDuration()
+		Expect(duration).To(BeEquivalentTo(tenDays))
+	})
+
+	It("returns the default check threshold", func() {
+		threshold := getCheckThreshold()
+		Expect(threshold).To(BeEquivalentTo(defaultExpiringThreshold))
+	})
+
+	It("returns the default check threshold if the configuration is a negative value", func() {
+		configuration.Current = configuration.NewConfiguration()
+		configuration.Current.ExpiringCheckThreshold = -1
+		threshold := getCheckThreshold()
+		Expect(threshold).To(BeEquivalentTo(defaultExpiringThreshold))
+	})
+
+	It("returns a valid threshold of 10 days", func() {
+		configuration.Current = configuration.NewConfiguration()
+		configuration.Current.ExpiringCheckThreshold = 10
+		threshold := getCheckThreshold()
+		Expect(threshold).To(BeEquivalentTo(tenDays))
 	})
 })

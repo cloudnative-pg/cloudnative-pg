@@ -82,6 +82,9 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 		case reflect.Bool:
 			value = strconv.FormatBool(valueField.Bool())
 
+		case reflect.Int:
+			value = fmt.Sprintf("%v", valueField.Int())
+
 		case reflect.Slice:
 			if valueField.Type().Elem().Kind() != reflect.String {
 				configparserLog.Info(
@@ -113,6 +116,15 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 				continue
 			}
 			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetBool(boolValue)
+		case reflect.Int:
+			intValue, err := strconv.ParseInt(value, 10, 0)
+			if err != nil {
+				configparserLog.Info(
+					"Skipping invalid integer value parsing configuration",
+					"field", field.Name, "value", value)
+				continue
+			}
+			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetInt(intValue)
 		case reflect.String:
 			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetString(value)
 		case reflect.Slice:
