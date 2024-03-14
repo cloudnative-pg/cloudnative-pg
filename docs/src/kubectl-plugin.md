@@ -1075,6 +1075,7 @@ databases.
     It is crucial to have a solid understanding of both the capabilities and
     limitations of PostgreSQL's native logical replication system before using
     these commands.
+    In particular, be mindful of the [logical replication restrictions](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
 
 #### Creating a new publication
 
@@ -1090,9 +1091,10 @@ kubectl cnpg publication create \
 
 There are two primary use cases:
 
-- With `--external-cluster`: Use this option to create a remote publication
-  in the specified external source `<EXTERNAL_CLUSTER>`, defined within the
-  `<LOCAL_CLUSTER>` PostgreSQL `Cluster`.
+- With `--external-cluster`: Use this option to create a publication on an
+  external cluster (i.e. defined in the `externalClusters` stanza). The commands
+  will be issued from the `<LOCAL_CLUSTER>`, but the publication will be for the
+  data in `<EXTERNAL_CLUSTER>`.
 
 - Without `--external-cluster`: Use this option to create a publication in the
   `<LOCAL_CLUSTER>` PostgreSQL `Cluster` (by default, the `app` database).
@@ -1107,7 +1109,39 @@ command, to define the group of tables to replicate. Notable options include:
     from PostgreSQL 15).
 
 The `--dry-run` option enables you to preview the SQL commands that the plugin
-will execute on the destination database.
+will execute.
+
+##### Example
+
+Given a `source-cluster` and a `destination-cluster`, we would like to create a
+publication for the data on `source-cluster`.
+The `destination-cluster` has an entry in the `externalClusters` stanza pointing
+to `source-cluster`.
+
+We can run:
+
+``` sh
+kubectl cnpg publication create destination-cluster  \
+  --external-cluster=source-cluster --all-tables
+```
+
+which will create a publication for all tables on `source-cluster`, running
+the SQL commands on the `destination-cluster`.
+
+Or instead, we can run:
+
+``` sh
+kubectl cnpg publication create source-cluster \
+  --publication=app --all-tables
+```
+
+which will create a publication named `app` for all the tables in the
+`source-cluster`, running the SQL commands on the source cluster.
+
+TIP: there are two sample files,
+[logical-source](samples/cluster-example-logical-source.yaml) and
+[logical-destination](samples/cluster-example-logical-dest.yaml)
+provided for illustration and inspiration.
 
 !!! Warning
     When connecting to an external cluster, ensure that the specified user has
@@ -1150,14 +1184,15 @@ replication subscriptions, especially when dealing with remote PostgreSQL
 databases.
 
 !!! Warning
-    Before utilizing these commands, it is essential to have a comprehensive
-    understanding of both the capabilities and limitations of PostgreSQL's native
-    logical replication system.
+    Before using these commands, it is essential to have a comprehensive
+    understanding of both the capabilities and limitations of PostgreSQL's
+    native logical replication system.
+    In particular, be mindful of the [logical replication restrictions](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
 
 In addition to subscription management, we provide a helpful command for
-synchronizing all sequences from the source. While its applicability may vary,
-this command can be particularly useful in scenarios involving major upgrades
-or data import from remote servers.
+synchronizing all sequences from the source cluster. While its applicability
+may vary, this command can be particularly useful in scenarios involving major
+upgrades or data import from remote servers.
 
 #### Creating a new subscription
 
@@ -1174,7 +1209,7 @@ kubectl cnpg subscription create \
 
 This command configures a subscription directed towards the specified
 publication in the designated external cluster, as defined in the
-`<LOCAL_CLUSTER>`.
+`externalClusters` stanza of the `<LOCAL_CLUSTER>`.
 
 For additional information and detailed instructions, type the following
 command:
@@ -1182,6 +1217,27 @@ command:
 ```sh
 kubectl cnpg subscription create --help
 ```
+
+##### Example
+
+As in the section on publications, we have a `source-cluster` and a
+`destination-cluster`, and we have already created a publication called
+`app`.
+
+The following command:
+
+``` sh
+kubectl cnpg subscription create destination-cluster \
+  --external-cluster=source-cluster \
+  --publication=app --subscription=app
+```
+
+will create a subscription for `app` on the destination cluster.
+
+TIP: there are two sample files,
+[logical-source](samples/cluster-example-logical-source.yaml) and
+[logical-destinatino](samples/cluster-example-logical-dest.yaml)
+provided for illustration and inspiration.
 
 !!! Warning
     Prioritize testing subscriptions in a non-production environment to ensure
@@ -1233,6 +1289,20 @@ command:
 
 ```sh
 kubectl cnpg subscription sync-sequences --help
+```
+
+##### Example
+
+As in the previous sections for publication and subscription, we have
+a `source-cluster` and a `destination-cluster`. The publication and the
+subscription, both called `app`, are already present.
+
+The following command will synchronize the sequences involved in the
+`app` subscription, from the source cluster into the destination cluster.
+
+``` sh
+kubectl cnpg subscription sync-sequences destination-cluster \
+  --subscription=app
 ```
 
 !!! Warning
