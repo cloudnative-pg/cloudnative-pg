@@ -44,7 +44,7 @@ func newOfflineExecutor(cli client.Client, recorder record.EventRecorder) *offli
 	return &offlineExecutor{cli: cli, recorder: recorder}
 }
 
-func (o offlineExecutor) finalize(
+func (o *offlineExecutor) finalize(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
@@ -53,7 +53,7 @@ func (o offlineExecutor) finalize(
 	return nil, EnsurePodIsUnfenced(ctx, o.cli, o.recorder, cluster, backup, targetPod)
 }
 
-func (o offlineExecutor) prepare(
+func (o *offlineExecutor) prepare(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
