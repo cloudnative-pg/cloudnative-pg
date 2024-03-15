@@ -88,7 +88,7 @@ func SnapshotBackupNameForTablespace(backupName, tablespaceName string) string {
 	return backupName + apiv1.TablespaceVolumeInfix + convertPostgresIDToK8sName(tablespaceName)
 }
 
-func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
+func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
 		{
 			Name: "pgdata",
@@ -293,7 +293,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
 	// later it will be  retrieved to do deepEquals
 	if cluster.ContainsTablespaces() {
-		tbsNames := getSortedTablespaceList(cluster)
+		tbsNames := getSortedTablespaceList(&cluster)
 		for i := range tbsNames {
 			volumeMounts = append(volumeMounts,
 				corev1.VolumeMount{
@@ -306,7 +306,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	return volumeMounts
 }
 
-func getSortedTablespaceList(cluster apiv1.Cluster) []string {
+func getSortedTablespaceList(cluster *apiv1.Cluster) []string {
 	// Try to get a fix order of name
 	tbsNames := make([]string, len(cluster.Spec.Tablespaces))
 	i := 0
@@ -318,7 +318,7 @@ func getSortedTablespaceList(cluster apiv1.Cluster) []string {
 	return tbsNames
 }
 
-func createEphemeralVolume(cluster apiv1.Cluster) corev1.Volume {
+func createEphemeralVolume(cluster *apiv1.Cluster) corev1.Volume {
 	scratchVolumeSource := corev1.VolumeSource{}
 	if cluster.Spec.EphemeralVolumeSource != nil {
 		scratchVolumeSource.Ephemeral = cluster.Spec.EphemeralVolumeSource
@@ -333,7 +333,7 @@ func createEphemeralVolume(cluster apiv1.Cluster) corev1.Volume {
 	}
 }
 
-func createProjectedVolume(cluster apiv1.Cluster) corev1.Volume {
+func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	return corev1.Volume{
 		Name: "projected",
 		VolumeSource: corev1.VolumeSource{
