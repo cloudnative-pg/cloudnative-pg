@@ -31,7 +31,7 @@ const PgWalVolumePath = "/var/lib/postgresql/wal"
 // PgWalVolumePgWalPath its the path of pg_wal directory inside the WAL volume when present
 const PgWalVolumePgWalPath = "/var/lib/postgresql/wal/pg_wal"
 
-func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
+func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
 		{
 			Name: "pgdata",
@@ -217,7 +217,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	return volumeMounts
 }
 
-func createEphemeralVolume(cluster apiv1.Cluster) corev1.Volume {
+func createEphemeralVolume(cluster *apiv1.Cluster) corev1.Volume {
 	scratchVolumeSource := corev1.VolumeSource{}
 	if cluster.Spec.EphemeralVolumeSource != nil {
 		scratchVolumeSource.Ephemeral = cluster.Spec.EphemeralVolumeSource
@@ -232,7 +232,7 @@ func createEphemeralVolume(cluster apiv1.Cluster) corev1.Volume {
 	}
 }
 
-func createProjectedVolume(cluster apiv1.Cluster) corev1.Volume {
+func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	return corev1.Volume{
 		Name: "projected",
 		VolumeSource: corev1.VolumeSource{

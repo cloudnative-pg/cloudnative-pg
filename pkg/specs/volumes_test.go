@@ -301,7 +301,7 @@ var _ = Describe("createEphemeralVolume", func() {
 	})
 
 	It("should create an emptyDir volume by default", func() {
-		ephemeralVolume := createEphemeralVolume(cluster)
+		ephemeralVolume := createEphemeralVolume(&cluster)
 		Expect(ephemeralVolume.Name).To(Equal("scratch-data"))
 		Expect(ephemeralVolume.VolumeSource.EmptyDir).NotTo(BeNil())
 	})
@@ -316,7 +316,7 @@ var _ = Describe("createEphemeralVolume", func() {
 			},
 		}
 
-		ephemeralVolume := createEphemeralVolume(cluster)
+		ephemeralVolume := createEphemeralVolume(&cluster)
 
 		Expect(ephemeralVolume.Name).To(Equal("scratch-data"))
 		Expect(ephemeralVolume.EmptyDir).To(BeNil())
@@ -330,7 +330,7 @@ var _ = Describe("createEphemeralVolume", func() {
 			TemporaryData: &quantity,
 		}
 
-		ephemeralVolume := createEphemeralVolume(cluster)
+		ephemeralVolume := createEphemeralVolume(&cluster)
 
 		Expect(ephemeralVolume.Name).To(Equal("scratch-data"))
 		Expect(*ephemeralVolume.VolumeSource.EmptyDir.SizeLimit).To(Equal(quantity))
