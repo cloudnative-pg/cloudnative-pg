@@ -6,5 +6,5 @@
     "GKE": {"min": "1.23", "max": ""},
     "OPENSHIFT": {"min":  "4.11", "max": ""}
   },
-  "unit_test": {"min":  "1.23", "max":  "1.28"}
+  "unit_test": {"min":  "1.23", "max":  "1.29"}
 }
