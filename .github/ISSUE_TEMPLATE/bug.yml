@@ -48,8 +48,8 @@ body:
       label: Version
       description: What is the version of CloudNativePG you are running?
       options:
-        - 1.22.1
-        - 1.21.3
+        - 1.22.2
+        - 1.21.4
         - trunk (main)
         - older in 1.21.x
         - older in 1.22.x
@@ -61,6 +61,7 @@ body:
     attributes:
       label: What version of Kubernetes are you using?
       options:
+        - 1.29
         - 1.28
         - 1.27
         - 1.26
