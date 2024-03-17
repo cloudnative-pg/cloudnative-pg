@@ -407,21 +407,12 @@ deploy_csi_host_path() {
 
 
 deploy_pyroscope() {
-  helm repo add pyroscope-io https://pyroscope-io.github.io/helm-chart
+  helm repo add pyroscope-io https://grafana.github.io/helm-charts
 
   values_file="${TEMP_DIR}/pyroscope_values.yaml"
   cat >"${values_file}" <<-EOF
 pyroscopeConfigs:
   log-level: "debug"
-  scrape-configs:
-    - job-name: cnpg
-      enabled-profiles: [cpu, mem]
-      static-configs:
-        - application: cloudnative-pg
-          targets:
-            - cnpg-pprof:6060
-          labels:
-            cnpg: cnpg
 EOF
   helm -n cnpg-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
@@ -443,6 +434,22 @@ spec:
     app.kubernetes.io/name: cloudnative-pg
 EOF
   kubectl -n cnpg-system apply -f "${service_file}"
+
+  annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
+  cat >"${annotations}" <<- EOF
+spec:
+   template:
+      metadata:
+         annotations:
+            profiles.grafana.com/memory.scrape: "true"
+            profiles.grafana.com/memory.port: "6060"
+            profiles.grafana.com/cpu.scrape: "true"
+            profiles.grafana.com/cpu.port: "6060"
+            profiles.grafana.com/goroutine.scrape: "true"
+            profiles.grafana.com/goroutine.port: "6060"
+EOF
+
+  kubectl -n cnpg-system patch deployment cnpg-controller-manager --patch-file "${annotations}"
 }
 
 load_image_registry() {
@@ -502,8 +509,6 @@ Options:
                           Env: NODES
 
     -r|--registry         Enable local registry. Env: ENABLE_REGISTRY
-
-    -p|--pyroscope        Enable Pyroscope in the operator namespace
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
@@ -580,7 +585,7 @@ load() {
     # to a future one, we build and push an image with a different VERSION
     # to force a different hash for the manager binary.
     # (Otherwise the ONLINE upgrade won't trigger)
-    
+
     echo "${bright}Building a 'prime' operator from current worktree${reset}"
 
     PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
