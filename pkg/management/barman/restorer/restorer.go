@@ -258,7 +258,8 @@ func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOption
 
 	// nolint: lll
 	// source: https://github.com/EnterpriseDB/barman/blob/26ed480cd0268dfd3f8546cc97660d4bd827772a/tests/test_barman_cloud_wal_restore.py
-	switch exitError.ExitCode() {
+	exitCode := exitError.ExitCode()
+	switch exitCode {
 	case exitCodeBucketOrWalNotFound:
 		return fmt.Errorf("object storage or file not found %s: %w", walName, ErrWALNotFound)
 	case exitCodeConnectivityError:
@@ -270,7 +271,8 @@ func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOption
 		return fmt.Errorf("generic error code encountered while executing %s",
 			barmanCapabilities.BarmanCloudWalRestore)
 	default:
-		return fmt.Errorf("unrecognized error exit code encountered while executing %s",
+		return fmt.Errorf("encountered an unrecognized exit code error: '%d' while executing %s",
+			exitCode,
 			barmanCapabilities.BarmanCloudWalRestore)
 	}
 }
