@@ -18,11 +18,14 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -39,13 +42,20 @@ func reconcileResourceRequests(
 		return nil
 	}
 
+	contextLogger := log.FromContext(ctx)
+
 	for idx := range pvcs {
 		if err := reconcilePVCQuantity(ctx, c, cluster, &pvcs[idx]); err != nil {
+			if patchErr := conditions.Patch(ctx, c, cluster, setConditions(err)); patchErr != nil {
+				contextLogger.Error(patchErr,
+					"encountered an error while patching the pvc resize conditions",
+				)
+			}
 			return err
 		}
 	}
 
-	return nil
+	return conditions.Patch(ctx, c, cluster, setConditions(nil))
 }
 
 func reconcilePVCQuantity(
@@ -84,10 +94,11 @@ func reconcilePVCQuantity(
 	case 0:
 		return nil
 	case 1:
-		contextLogger.Warning("cannot decrease storage requirement",
+		err := fmt.Errorf("cannot decrease storage requirement")
+		contextLogger.Error(err,
 			"from", currentSize, "to", parsedSize,
 			"pvcName", pvc.Name)
-		return nil
+		return err
 	}
 
 	oldPVC := pvc.DeepCopy()
@@ -106,4 +117,21 @@ func reconcilePVCQuantity(
 	}
 
 	return nil
+}
+
+func setConditions(err error) *metav1.Condition {
+	var condition metav1.Condition
+	if err == nil {
+		condition.Type = string(apiv1.ConditionPVCResize)
+		condition.Status = metav1.ConditionTrue
+		condition.Reason = string(apiv1.ConditionReasonPVCResizeSuccess)
+		condition.Message = ""
+	} else {
+		condition.Type = string(apiv1.ConditionPVCResize)
+		condition.Status = metav1.ConditionFalse
+		condition.Reason = string(apiv1.ConditionReasonPVCResizeFailing)
+		condition.Message = err.Error()
+	}
+
+	return &condition
 }

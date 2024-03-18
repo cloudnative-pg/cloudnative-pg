@@ -441,7 +441,6 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 	validations := []validationFunc{
 		r.validateImageChange,
 		r.validateConfigurationChange,
-		r.validateStorageChange,
 		r.validateWalStorageChange,
 		r.validateTablespacesChange,
 		r.validateReplicaModeChange,
@@ -1653,15 +1652,6 @@ func validateStorageConfigurationSize(
 	return result
 }
 
-// Validate a change in the storage
-func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
-	return validateStorageConfigurationChange(
-		field.NewPath("spec", "storage"),
-		old.Spec.StorageConfiguration,
-		r.Spec.StorageConfiguration,
-	)
-}
-
 func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 	if old.Spec.WalStorage == nil {
 		return nil
@@ -1676,11 +1666,7 @@ func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 		}
 	}
 
-	return validateStorageConfigurationChange(
-		field.NewPath("spec", "walStorage"),
-		*old.Spec.WalStorage,
-		*r.Spec.WalStorage,
-	)
+	return nil
 }
 
 // validateTablespacesChange checks that no tablespaces have been deleted, and that
