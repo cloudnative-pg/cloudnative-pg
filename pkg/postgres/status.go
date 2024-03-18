@@ -374,9 +374,9 @@ func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bo
 	return false
 }
 
-// AllReadyInstancesStatusUnreachable returns true if all the
+// AllReadyAndActiveInstancesAreUnreachable returns true if all the
 // ready instances are unreachable from the operator via HTTP request.
-func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
+func (list PostgresqlStatusList) AllReadyAndActiveInstancesAreUnreachable() bool {
 	hasActiveAndReady := false
 	for _, item := range list.Items {
 		podIsActiveAndReady := utils.IsPodActive(*item.Pod) && utils.IsPodReady(*item.Pod)

@@ -104,6 +104,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 		return "", nil
 	}
 
+	// TODO: here we assume that the list is populated by at least an instance that is reporting the status
 	// If the first pod of the list has no reported status, it means that we weren't able to fetch any status.
 	// This is a programmatic error as the reconciliation cycle should not have reached this function.
 	if !mostAdvancedInstance.HasHTTPStatus() {
