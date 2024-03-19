@@ -134,17 +134,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(replicaNamespace, "backup-storage-creds", "minio", "minio123")
 			})
-			By("setting up minio", func() {
-				minio, err := testUtils.MinioDefaultSetup(replicaNamespace)
-				Expect(err).ToNot(HaveOccurred())
-				err = testUtils.InstallMinio(env, minio, uint(testTimeouts[testUtils.MinioInstallation]))
-				Expect(err).ToNot(HaveOccurred())
-			})
-			// Create the minio client pod and wait for it to be ready.
-			// We'll use it to check if everything is archived correctly
-			By("setting up minio client pod", func() {
-				minioClient := testUtils.MinioDefaultClient(replicaNamespace)
-				err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
+
+			By("create the certificates for MinIO", func() {
+				err := minioEnv.CreateCaSecret(env, replicaNamespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -203,18 +195,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 			})
 
-			By("setting up minio", func() {
-				minio, err := testUtils.MinioDefaultSetup(namespace)
-				Expect(err).ToNot(HaveOccurred())
-				err = testUtils.InstallMinio(env, minio, uint(testTimeouts[testUtils.MinioInstallation]))
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			// Create the minio client pod and wait for it to be ready.
-			// We'll use it to check if everything is archived correctly
-			By("setting up minio client pod", func() {
-				minioClient := testUtils.MinioDefaultClient(namespace)
-				err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
+			By("create the certificates for MinIO", func() {
+				err := minioEnv.CreateCaSecret(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 

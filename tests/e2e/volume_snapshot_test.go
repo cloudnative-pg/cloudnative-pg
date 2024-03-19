@@ -29,7 +29,6 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -146,11 +145,6 @@ var _ = Describe("Verify Volume Snapshot",
 				snapshotWalEnv        = "SNAPSHOT_PITR_PGWAL"
 				recoveryTargetTimeEnv = "SNAPSHOT_PITR"
 			)
-			// minio constants
-			const (
-				minioCaSecName  = "minio-server-ca-secret"
-				minioTLSSecName = "minio-server-tls-secret"
-			)
 			// file constants
 			const (
 				clusterToSnapshot          = filesDir + "/cluster-pvc-snapshot.yaml.template"
@@ -185,39 +179,12 @@ var _ = Describe("Verify Volume Snapshot",
 					return env.DeleteNamespace(namespace)
 				})
 
-				By("creating ca and tls certificate secrets", func() {
-					// create CA certificates
-					_, caPair, err := testUtils.CreateSecretCA(namespace, clusterToSnapshotName, minioCaSecName, true, env)
-					Expect(err).ToNot(HaveOccurred())
-
-					// sign and create secret using CA certificate and key
-					serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
-						[]string{"minio-service.internal.mydomain.net, minio-service.default.svc, minio-service.default,"},
-					)
-					Expect(err).ToNot(HaveOccurred())
-					serverSecret := serverPair.GenerateCertificateSecret(namespace, minioTLSSecName)
-					err = env.Client.Create(env.Ctx, serverSecret)
+				By("create the certificates for MinIO", func() {
+					err := minioEnv.CreateCaSecret(env, namespace)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				By("creating the credentials for minio", func() {
-					AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
-				})
-
-				By("setting up minio", func() {
-					setup, err := testUtils.MinioSSLSetup(namespace)
-					Expect(err).ToNot(HaveOccurred())
-					err = testUtils.InstallMinio(env, setup, uint(testTimeouts[testUtils.MinioInstallation]))
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				// Create the minio client pod and wait for it to be ready.
-				// We'll use it to check if everything is archived correctly
-				By("setting up minio client pod", func() {
-					minioClient := testUtils.MinioSSLClient(namespace)
-					err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
-					Expect(err).ToNot(HaveOccurred())
-				})
+				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 			})
 
 			It("correctly executes PITR with a cold snapshot", func() {
@@ -241,7 +208,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
 						connectionStatus, err := testUtils.MinioTestConnectivityUsingBarmanCloudWalArchive(
-							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123")
+							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
 						if err != nil {
 							return false, err
 						}
@@ -596,11 +563,6 @@ var _ = Describe("Verify Volume Snapshot",
 				snapshotDataEnv = "SNAPSHOT_PITR_PGDATA"
 				snapshotWalEnv  = "SNAPSHOT_PITR_PGWAL"
 			)
-			// minio constants
-			const (
-				minioCaSecName  = "minio-server-ca-secret"
-				minioTLSSecName = "minio-server-tls-secret"
-			)
 			// file constants
 			const (
 				clusterToSnapshot = filesDir + "/cluster-pvc-hot-snapshot.yaml.template"
@@ -630,39 +592,12 @@ var _ = Describe("Verify Volume Snapshot",
 					return env.DeleteNamespace(namespace)
 				})
 
-				By("creating ca and tls certificate secrets", func() {
-					// create CA certificates
-					_, caPair, err := testUtils.CreateSecretCA(namespace, clusterToSnapshotName, minioCaSecName, true, env)
-					Expect(err).ToNot(HaveOccurred())
-
-					// sign and create secret using CA certificate and key
-					serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
-						[]string{"minio-service.internal.mydomain.net, minio-service.default.svc, minio-service.default,"},
-					)
-					Expect(err).ToNot(HaveOccurred())
-					serverSecret := serverPair.GenerateCertificateSecret(namespace, minioTLSSecName)
-					err = env.Client.Create(env.Ctx, serverSecret)
+				By("create the certificates for MinIO", func() {
+					err := minioEnv.CreateCaSecret(env, namespace)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				By("creating the credentials for minio", func() {
-					AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
-				})
-
-				By("setting up minio", func() {
-					setup, err := testUtils.MinioSSLSetup(namespace)
-					Expect(err).ToNot(HaveOccurred())
-					err = testUtils.InstallMinio(env, setup, uint(testTimeouts[testUtils.MinioInstallation]))
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				// Create the minio client pod and wait for it to be ready.
-				// We'll use it to check if everything is archived correctly
-				By("setting up minio client pod", func() {
-					minioClient := testUtils.MinioSSLClient(namespace)
-					err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
-					Expect(err).ToNot(HaveOccurred())
-				})
+				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 
 				By("creating the cluster to snapshot", func() {
 					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
@@ -673,7 +608,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
 						connectionStatus, err := testUtils.MinioTestConnectivityUsingBarmanCloudWalArchive(
-							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123")
+							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
 						if err != nil {
 							return false, err
 						}

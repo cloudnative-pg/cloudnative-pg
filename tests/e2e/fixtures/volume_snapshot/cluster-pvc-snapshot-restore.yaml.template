@@ -32,8 +32,8 @@ spec:
   externalClusters:
     - name: cluster-pvc-snapshot
       barmanObjectStore:
-        destinationPath: s3://cluster-backups/
-        endpointURL: https://minio-service:9000
+        destinationPath: s3://cluster-pvc-snapshot/
+        endpointURL: https://minio-service.minio:9000
         endpointCA:
           key: ca.crt
           name: minio-server-ca-secret

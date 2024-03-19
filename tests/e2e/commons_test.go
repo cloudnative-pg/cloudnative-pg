@@ -18,12 +18,6 @@ package e2e
 
 import "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
-const (
-	minioClientName = "mc"
-	checkPointCmd   = "psql -U postgres postgres -tAc 'CHECKPOINT;'"
-	getLatestWalCmd = "psql -U postgres postgres -tAc 'SELECT pg_walfile_name(pg_switch_wal());'"
-)
-
 // IsAKS checks if the running cluster is on AKS
 func IsAKS() bool {
 	return *testCloudVendorEnv == utils.AKS

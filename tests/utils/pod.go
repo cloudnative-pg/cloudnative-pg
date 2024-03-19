@@ -192,6 +192,9 @@ func (env TestingEnvironment) ExecCommandInContainer(
 	if err != nil {
 		return "", "", wrapErr(err)
 	}
+	if !pkgutils.IsPodReady(*pod) {
+		return "", "", fmt.Errorf("pod not ready. Namespace: %v, Name: %v", pod.Namespace, pod.Name)
+	}
 	return env.ExecCommand(env.Ctx, *pod, container.ContainerName, timeout, command...)
 }
 
