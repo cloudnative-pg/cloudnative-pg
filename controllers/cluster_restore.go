@@ -18,8 +18,10 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -48,8 +50,11 @@ func (r *ClusterReconciler) reconcileRestoredCluster(ctx context.Context, cluste
 		contextLogger.Info("no orphan PVCs found, skipping the restored cluster reconciliation")
 		return nil
 	}
-
 	contextLogger.Info("found orphan pvcs, trying to restore the cluster", "pvcs", pvcs)
+
+	if err := ensureOrphanPodsAreDeleted(ctx, r.Client, cluster); err != nil {
+		return fmt.Errorf("encountered an error while deleting an orphan pod: %w", err)
+	}
 
 	highestSerial, primarySerial, err := getNodeSerialsFromPVCs(pvcs)
 	if err != nil {
@@ -146,6 +151,38 @@ func getOrphanPVCs(
 	}
 
 	return orphanPVCs, nil
+}
+
+func ensureOrphanPodsAreDeleted(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
+	var podList corev1.PodList
+	if err := c.List(
+		ctx,
+		&podList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{utils.ClusterLabelName: cluster.Name},
+	); err != nil {
+		return err
+	}
+
+	if len(podList.Items) == 0 {
+		return nil
+	}
+
+	contextLogger := log.FromContext(ctx).WithValues("orphan_pod_cleaner")
+	contextLogger.Info("found one or more orphan pods, proceeding with the deletion...")
+
+	for idx := range podList.Items {
+		pod := podList.Items[idx]
+		if len(pod.OwnerReferences) != 0 {
+			continue
+		}
+		contextLogger.Debug("deleting orphan pod", "name", pod.Name)
+		if err := c.Delete(ctx, &pod); err != nil && !apierrs.IsNotFound(err) && !apierrs.IsGone(err) {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // getNodeSerialsFromPVCs tries to obtain the highestSerial and the primary serial from a group of PVCs
