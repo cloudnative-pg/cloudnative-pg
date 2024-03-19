@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-pvc-snapshot
+  name: cluster-pvc-hot-snapshot
 spec:
   instances: 2
   primaryUpdateStrategy: unsupervised
@@ -23,8 +23,8 @@ spec:
         immediateCheckpoint: true
         waitForArchive: true
     barmanObjectStore:
-        destinationPath: s3://cluster-backups/
-        endpointURL: https://minio-service:9000
+        destinationPath: s3://cluster-pvc-hot-snapshot/
+        endpointURL: https://minio-service.minio:9000
         endpointCA:
           key: ca.crt
           name: minio-server-ca-secret

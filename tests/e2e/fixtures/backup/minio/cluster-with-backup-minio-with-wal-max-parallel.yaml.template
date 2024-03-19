@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-backup-minio-wal-max-parallel
+  name: backup-wal-max-parallel
 spec:
   instances: 2
 
@@ -38,8 +38,11 @@ spec:
   backup:
     target: primary
     barmanObjectStore:
-      destinationPath: s3://cluster-backups/
-      endpointURL: http://minio-service:9000
+      destinationPath: s3://backup-wal-max-parallel/
+      endpointURL: https://minio-service.minio:9000/
+      endpointCA:
+        key: ca.crt
+        name: minio-server-ca-secret
       s3Credentials:
         accessKeyId:
           name: backup-storage-creds

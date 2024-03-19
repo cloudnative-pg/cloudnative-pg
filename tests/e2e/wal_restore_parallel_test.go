@@ -78,18 +78,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 		})
 
-		By("setting up minio", func() {
-			setup, err := testUtils.MinioDefaultSetup(namespace)
-			Expect(err).ToNot(HaveOccurred())
-			err = testUtils.InstallMinio(env, setup, uint(testTimeouts[testUtils.MinioInstallation]))
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		// Create the minio client pod and wait for it to be ready.
-		// We'll use it to check if everything is archived correctly
-		By("setting up minio client pod", func() {
-			minioClient := testUtils.MinioDefaultClient(namespace)
-			err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
+		By("create the certificates for MinIO", func() {
+			err := minioEnv.CreateCaSecret(env, namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -103,6 +93,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 
 		// Get the standby
 		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
 		for _, po := range podList.Items {
 			if po.Name != primary {
 				// Only one standby in this specific testing
@@ -122,7 +113,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			latestWALPath := minioPath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
-				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
+				return testUtils.CountFilesOnMinio(minioEnv, latestWALPath)
 			}, RetryTimeout).Should(BeEquivalentTo(1),
 				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
 		})
@@ -133,15 +124,15 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			walFile3 = "0000000100000000000000F3"
 			walFile4 = "0000000100000000000000F4"
 			walFile5 = "0000000100000000000000F5"
-			Expect(testUtils.ForgeArchiveWalOnMinio(namespace, clusterName, minioClientName, latestWAL, walFile1)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile1)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(namespace, clusterName, minioClientName, latestWAL, walFile2)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile2)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(namespace, clusterName, minioClientName, latestWAL, walFile3)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile3)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(namespace, clusterName, minioClientName, latestWAL, walFile4)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile4)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(namespace, clusterName, minioClientName, latestWAL, walFile5)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile5)).
 				ShouldNot(HaveOccurred())
 		})
 
@@ -265,7 +256,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Generate a new wal file; the archive also contains WAL #6.
 		By("forging a new wal file, the #6 wal", func() {
 			walFile6 = "0000000100000000000000F6"
-			Expect(testUtils.ForgeArchiveWalOnMinio(namespace, clusterName, minioClientName, latestWAL, walFile6)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile6)).
 				ShouldNot(HaveOccurred())
 		})
 
