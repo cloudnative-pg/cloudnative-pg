@@ -20,15 +20,16 @@ package fence
 import (
 	"context"
 	"fmt"
-
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // fencingOn marks an instance in a cluster as fenced
 func fencingOn(ctx context.Context, clusterName string, serverName string) error {
-	err := resources.ApplyFenceFunc(ctx, plugin.Client, clusterName, plugin.Namespace, serverName, utils.AddFencedInstance)
+	err := utils.NewFencingBuilder(plugin.Client, clusterName, plugin.Namespace).
+		Add().
+		Instance(serverName).
+		Execute(ctx)
 	if err != nil {
 		return err
 	}
@@ -38,8 +39,10 @@ func fencingOn(ctx context.Context, clusterName string, serverName string) error
 
 // fencingOff marks an instance in a cluster as not fenced
 func fencingOff(ctx context.Context, clusterName string, serverName string) error {
-	err := resources.ApplyFenceFunc(ctx, plugin.Client, clusterName, plugin.Namespace,
-		serverName, utils.RemoveFencedInstance)
+	err := utils.NewFencingBuilder(plugin.Client, clusterName, plugin.Namespace).
+		Remove().
+		Instance(serverName).
+		Execute(ctx)
 	if err != nil {
 		return err
 	}

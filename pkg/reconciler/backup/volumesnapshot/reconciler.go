@@ -37,7 +37,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -346,14 +345,7 @@ func EnsurePodIsUnfenced(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	err := resources.ApplyFenceFunc(
-		ctx,
-		cli,
-		cluster.Name,
-		cluster.Namespace,
-		targetPod.Name,
-		utils.RemoveFencedInstance,
-	)
+	err := utils.NewFencingBuilder(cli, cluster.Name, cluster.Namespace).Remove().Instance(targetPod.Name).Execute(ctx)
 	if errors.Is(err, utils.ErrorServerAlreadyUnfenced) {
 		return nil
 	}
