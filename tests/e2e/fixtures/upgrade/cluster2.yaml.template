@@ -39,7 +39,10 @@ spec:
     target: primary
     barmanObjectStore:
       destinationPath: s3://cluster2-full-backup/
-      endpointURL: http://minio-service:9000
+      endpointURL: https://minio-service.minio:9000
+      endpointCA:
+        key: ca.crt
+        name: minio-server-ca-secret
       s3Credentials:
         accessKeyId:
           name: aws-creds

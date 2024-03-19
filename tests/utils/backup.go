@@ -297,7 +297,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 					Name: sourceClusterName,
 					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: "s3://cluster-backups/",
-						EndpointURL:     "https://minio-service:9000",
+						EndpointURL:     "https://minio-service.minio:9000",
 						EndpointCA: &apiv1.SecretKeySelector{
 							LocalObjectReference: apiv1.LocalObjectReference{
 								Name: "minio-server-ca-secret",

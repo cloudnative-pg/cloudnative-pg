@@ -714,7 +714,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
-			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
+			return testsUtils.CountFilesOnMinio(minioEnv, latestWALPath)
 		}, testTimeouts[testsUtils.WalsInMinio]).Should(BeEquivalentTo(1))
 	})
 }
@@ -1788,7 +1788,7 @@ func prepareClusterForPITROnMinio(
 		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
 		latestTar := minioPath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+			return testsUtils.CountFilesOnMinio(minioEnv, latestTar)
 		}, 60).Should(BeNumerically(">=", expectedVal),
 			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
 				expectedVal))

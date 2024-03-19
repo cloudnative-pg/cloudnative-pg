@@ -29,10 +29,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -41,6 +43,19 @@ const (
 	minioImage       = "minio/minio:RELEASE.2022-06-20T23-13-45Z"
 	minioClientImage = "minio/mc:RELEASE.2022-06-11T21-10-36Z"
 )
+
+// MinioEnv contains all the information related or required by MinIO deployment and
+// used by the functions on every test
+type MinioEnv struct {
+	Client       *corev1.Pod
+	CaPair       *certs.KeyPair
+	CaSecretObj  corev1.Secret
+	ServiceName  string
+	Namespace    string
+	CaSecretName string
+	TLSSecret    string
+	Timeout      uint
+}
 
 // MinioSetup contains the resources needed for a working minio server deployment:
 // a PersistentVolumeClaim, a Deployment and a Service
@@ -361,11 +376,11 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 					Env: []corev1.EnvVar{
 						{
 							Name:  "MC_HOST_minio",
-							Value: "http://minio:minio123@minio-service:9000",
+							Value: "http://minio:minio123@minio-service.minio:9000",
 						},
 						{
 							Name:  "MC_URL",
-							Value: "https://minio-service:9000",
+							Value: "https://minio-service.minio:9000",
 						},
 						{
 							Name:  "HOME",
@@ -435,19 +450,88 @@ func MinioSSLClient(namespace string) corev1.Pod {
 			MountPath: tlsVolumeMountPath,
 		},
 	)
-	minioClient.Spec.Containers[0].Env[0].Value = "https://minio:minio123@minio-service:9000"
+	minioClient.Spec.Containers[0].Env[0].Value = "https://minio:minio123@minio-service.minio:9000"
 
 	return minioClient
 }
 
+// MinioDeploy will create a full MinIO deployment defined inthe minioEnv variable
+func MinioDeploy(minioEnv *MinioEnv, env *TestingEnvironment) (*corev1.Pod, error) {
+	var err error
+	minioEnv.CaPair, err = certs.CreateRootCA(minioEnv.Namespace, "minio")
+	if err != nil {
+		return nil, err
+	}
+
+	minioEnv.CaSecretObj = *minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
+	if _, err = CreateObject(env, &minioEnv.CaSecretObj); err != nil {
+		return nil, err
+	}
+
+	// sign and create secret using CA certificate and key
+	serverPair, err := minioEnv.CaPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
+		[]string{"minio.useless.domain.not.verified", "minio-service.minio"},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	serverSecret := serverPair.GenerateCertificateSecret(minioEnv.Namespace, minioEnv.TLSSecret)
+	if err = env.Client.Create(env.Ctx, serverSecret); err != nil {
+		return nil, err
+	}
+
+	setup, err := MinioSSLSetup(minioEnv.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	if err = InstallMinio(env, setup, minioEnv.Timeout); err != nil {
+		return nil, err
+	}
+
+	minioClient := MinioSSLClient(minioEnv.Namespace)
+
+	return &minioClient, PodCreateAndWaitForReady(env, &minioClient, 240)
+}
+
+func (m *MinioEnv) getCaSecret(env *TestingEnvironment, namespace string) (*corev1.Secret, error) {
+	var certSecret corev1.Secret
+	if err := env.Client.Get(env.Ctx,
+		types.NamespacedName{
+			Namespace: m.Namespace,
+			Name:      m.CaSecretName,
+		}, &certSecret); err != nil {
+		return nil, err
+	}
+
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.CaSecretName,
+			Namespace: namespace,
+		},
+		Data: certSecret.Data,
+		Type: certSecret.Type,
+	}, nil
+}
+
+// CreateCaSecret creates the certificates required to authenticate against the the MinIO service
+func (m *MinioEnv) CreateCaSecret(env *TestingEnvironment, namespace string) error {
+	caSecret, err := m.getCaSecret(env, namespace)
+	if err != nil {
+		return err
+	}
+	_, err = CreateObject(env, caSecret)
+	return err
+}
+
 // CountFilesOnMinio uses the minioClient in the given `namespace` to count  the
 // amount of files matching the given `path`
-func CountFilesOnMinio(namespace string, minioClientName string, path string) (value int, err error) {
+func CountFilesOnMinio(minioEnv *MinioEnv, path string) (value int, err error) {
 	var stdout string
 	stdout, _, err = RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
-		namespace,
-		minioClientName,
+		minioEnv.Namespace,
+		minioEnv.Client.Name,
 		composeFindMinioCmd(path, "minio")))
 	if err != nil {
 		return -1, err
@@ -456,19 +540,44 @@ func CountFilesOnMinio(namespace string, minioClientName string, path string) (v
 	return value, err
 }
 
+// ListFilesOnMinio uses the minioClient in the given `namespace` to list the
+// paths matching the given `path`
+func ListFilesOnMinio(minioEnv *MinioEnv, path string) (string, error) {
+	var stdout string
+	stdout, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		minioEnv.Namespace,
+		minioEnv.Client.Name,
+		composeListFilesMinio(path, "minio")))
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(stdout, "\n"), nil
+}
+
+// composeListFilesMinio builds the Minio command to list the filenames matching a given path
+func composeListFilesMinio(path string, serviceName string) string {
+	return fmt.Sprintf("sh -c 'mc find %v --path %v'", serviceName, path)
+}
+
+// composeListFilesMinio builds the Minio command to list the filenames matching a given path
+func composeCleanFilesMinio(serviceName string) string {
+	return fmt.Sprintf("sh -c 'mc rm --force --recursive minio/%v'", serviceName)
+}
+
 // composeFindMinioCmd builds the Minio find command
 func composeFindMinioCmd(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --path %v | wc -l'", serviceName, path)
 }
 
 // GetFileTagsOnMinio will use the minioClient to retrieve the tags in a specified path
-func GetFileTagsOnMinio(namespace, minioClientName, path string) (TagSet, error) {
+func GetFileTagsOnMinio(minioEnv *MinioEnv, path string) (TagSet, error) {
 	var output TagSet
 	// Make sure we have a registered backup to access
 	out, _, err := RunUncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c 'mc find minio --name %v | head -n1'",
-		namespace,
-		minioClientName,
+		minioEnv.Namespace,
+		minioEnv.Client.Name,
 		path))
 	if err != nil {
 		return output, err
@@ -478,8 +587,8 @@ func GetFileTagsOnMinio(namespace, minioClientName, path string) (TagSet, error)
 
 	stdout, _, err := RunUncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c 'mc --json tag list %v'",
-		namespace,
-		minioClientName,
+		minioEnv.Namespace,
+		minioEnv.Client.Name,
 		walFile))
 	if err != nil {
 		return output, err
@@ -493,9 +602,14 @@ func GetFileTagsOnMinio(namespace, minioClientName, path string) (TagSet, error)
 }
 
 // MinioTestConnectivityUsingBarmanCloudWalArchive returns true if test connection is successful else false
-func MinioTestConnectivityUsingBarmanCloudWalArchive(namespace, clusterName, podName, id, key string) (bool, error) {
-	minioSvc := MinioDefaultSVC(namespace)
-	minioSvcName := minioSvc.GetName()
+func MinioTestConnectivityUsingBarmanCloudWalArchive(
+	namespace,
+	clusterName,
+	podName,
+	id,
+	key string,
+	minioSvcName string,
+) (bool, error) {
 	// test connectivity should work with valid sample "000000010000000000000000" wal file
 	// using barman-cloud-wal-archive script
 	cmd := fmt.Sprintf("export AWS_CA_BUNDLE=%s;export AWS_ACCESS_KEY_ID=%s;export AWS_SECRET_ACCESS_KEY=%s;"+
@@ -511,4 +625,18 @@ func MinioTestConnectivityUsingBarmanCloudWalArchive(namespace, clusterName, pod
 		return false, err
 	}
 	return true, nil
+}
+
+// CleanFilesOnMinio clean files on minio for a given path
+func CleanFilesOnMinio(minioEnv *MinioEnv, path string) (string, error) {
+	var stdout string
+	stdout, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		minioEnv.Namespace,
+		minioEnv.Client.Name,
+		composeCleanFilesMinio(path)))
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(stdout, "\n"), nil
 }
