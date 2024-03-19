@@ -17,8 +17,13 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	v12 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,4 +139,71 @@ func RemoveFencedInstance(serverName string, object *metav1.ObjectMeta) error {
 
 	fencedInstances.Delete(serverName)
 	return SetFencedInstances(object, fencedInstances)
+}
+
+type FencingBuilder struct {
+	fenceFunc    func(string, *metav1.ObjectMeta) error
+	instanceName string
+	cli          client.Client
+	namespace    string
+	clusterName  string
+}
+
+func NewFencingBuilder(cli client.Client, clusterName, namespace string) *FencingBuilder {
+	return &FencingBuilder{
+		cli:         cli,
+		clusterName: clusterName,
+		namespace:   namespace,
+	}
+}
+
+func (fb *FencingBuilder) Add() *FencingBuilder {
+	fb.fenceFunc = AddFencedInstance
+	return fb
+}
+
+func (fb *FencingBuilder) Remove() *FencingBuilder {
+	fb.fenceFunc = RemoveFencedInstance
+	return fb
+}
+
+func (fb *FencingBuilder) AllInstances() *FencingBuilder {
+	fb.instanceName = FenceAllServers
+	return fb
+}
+
+func (fb *FencingBuilder) Instance(instanceName string) *FencingBuilder {
+	fb.instanceName = instanceName
+	return fb
+}
+
+func (fb *FencingBuilder) Execute(ctx context.Context) error {
+	var cluster v1.Cluster
+
+	// Get the Cluster object
+	err := fb.cli.Get(ctx, client.ObjectKey{Namespace: fb.namespace, Name: fb.clusterName}, &cluster)
+	if err != nil {
+		return err
+	}
+
+	if fb.instanceName != FenceAllServers {
+		// Check if the Pod exist
+		var pod v12.Pod
+		err = fb.cli.Get(ctx, client.ObjectKey{Namespace: fb.namespace, Name: fb.instanceName}, &pod)
+		if err != nil {
+			return fmt.Errorf("node %s not found in namespace %s", fb.instanceName, fb.namespace)
+		}
+	}
+
+	fencedCluster := cluster.DeepCopy()
+	if err = fb.fenceFunc(fb.instanceName, &fencedCluster.ObjectMeta); err != nil {
+		return err
+	}
+
+	err = fb.cli.Patch(ctx, fencedCluster, client.MergeFrom(&cluster))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
