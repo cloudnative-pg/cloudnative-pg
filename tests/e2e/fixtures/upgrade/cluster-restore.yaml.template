@@ -5,13 +5,16 @@ metadata:
 spec:
   instances: 3
   imageName: "${POSTGRES_IMG}"
-
-  storage:
-    size: 1Gi
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  description: "Example of cluster"
+  startDelay: 300
+  stopDelay: 300
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
 
   postgresql:
     parameters:
+      shared_buffers: '32MB'
+      max_connections: '15'
       log_checkpoints: 'on'
       log_lock_waits: 'on'
       log_min_duration_statement: '1000'
@@ -20,6 +23,8 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
       wal_receiver_timeout: '2s'
+    pg_hba:
+      - host all all 10.244.0.0/16 md5
 
   bootstrap:
     recovery:
@@ -30,3 +35,18 @@ spec:
 
   superuserSecret:
     name: cluster-superuser
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "0.1"
+    limits:
+      memory: "1Gi"
+      cpu: "0.5"
+
+  affinity:
+    enablePodAntiAffinity: true
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
