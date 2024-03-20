@@ -38,6 +38,7 @@ spec:
   backup:
     target: primary
     barmanObjectStore:
+      serverName: ${SERVER_NAME}
       destinationPath: s3://cluster2-full-backup/
       endpointURL: https://minio-service.minio:9000
       endpointCA:

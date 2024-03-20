@@ -2552,6 +2552,11 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
 		})
 
+		serverName := os.Getenv("SERVER_NAME")
+		if serverName != "" {
+			envVars["SERVER_NAME"] = serverName
+		}
+
 		yaml, err = testsUtils.Envsubst(envVars, data)
 		if err != nil {
 			return nil, wrapErr(err)

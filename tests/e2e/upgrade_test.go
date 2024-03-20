@@ -26,7 +26,6 @@ import (
 
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -330,28 +329,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
 		// the operator's namespace so that affects subsequent test
-		err = env.DeleteNamespace(operatorNamespace)
-		if err != nil {
+		if err := env.DeleteNamespaceAndWait(operatorNamespace, 60); err != nil {
 			return fmt.Errorf("could not cleanup. Failed to delete operator namespace: %v", err)
 		}
-
-		// Wait for both namespace to be deleted as we use minio
-		Eventually(func(g Gomega) {
-			operatorNS := types.NamespacedName{
-				Namespace: operatorNamespace,
-				Name:      operatorNamespace,
-			}
-
-			clusterNS := types.NamespacedName{
-				Namespace: namespace,
-				Name:      namespace,
-			}
-			namespaceResource := &corev1.Namespace{}
-			err := env.Client.Get(env.Ctx, operatorNS, namespaceResource)
-			g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
-			err = env.Client.Get(env.Ctx, clusterNS, namespaceResource)
-			g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
-		}, 120).Should(Succeed())
 
 		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath1); err != nil {
 			return fmt.Errorf("Error cleaning up minio: %v", err)
@@ -420,6 +400,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	}
 
 	assertClustersWorkAfterOperatorUpgrade := func(upgradeNamespace, operatorManifest string) {
+		// generate random serverNames for the clusters each time
+		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
+		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
 		// Create the secrets used by the clusters and minio
 		By("creating the postgres secrets", func() {
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
@@ -435,6 +418,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// in parallel and check for it to be up later.
 		By(fmt.Sprintf("creating a Cluster in the '%v' upgradeNamespace",
 			upgradeNamespace), func() {
+			// set the serverName to a random name
+			err := os.Setenv("SERVER_NAME", serverName1)
+			Expect(err).ToNot(HaveOccurred())
 			CreateResourceFromFile(upgradeNamespace, sampleFile)
 		})
 
@@ -602,6 +588,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		AssertConfUpgrade(clusterName1, upgradeNamespace)
 
 		By("installing a second Cluster on the upgraded operator", func() {
+			// set the serverName to a random name
+			err := os.Setenv("SERVER_NAME", serverName2)
+			Expect(err).ToNot(HaveOccurred())
 			CreateResourceFromFile(upgradeNamespace, sampleFile2)
 			AssertClusterIsReady(upgradeNamespace, clusterName2, testTimeouts[testsUtils.ClusterIsReady], env)
 		})
