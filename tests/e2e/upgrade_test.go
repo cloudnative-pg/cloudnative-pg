@@ -330,15 +330,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
 		// the operator's namespace so that affects subsequent test
 		if err := env.DeleteNamespaceAndWait(operatorNamespace, 60); err != nil {
-			return fmt.Errorf("could not cleanup. Failed to delete operator namespace: %v", err)
+			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
 		}
 
 		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath1); err != nil {
-			return fmt.Errorf("Error cleaning up minio: %v", err)
+			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
 		}
 
 		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath2); err != nil {
-			return fmt.Errorf("Error cleaning up minio: %v", err)
+			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
 		}
 
 		GinkgoWriter.Println("cleaning up done")

@@ -2552,8 +2552,7 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
 		})
 
-		serverName := os.Getenv("SERVER_NAME")
-		if serverName != "" {
+		if serverName := os.Getenv("SERVER_NAME"); serverName != "" {
 			envVars["SERVER_NAME"] = serverName
 		}
 
