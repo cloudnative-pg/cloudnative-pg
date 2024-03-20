@@ -81,7 +81,7 @@ var _ = Describe("ensureClusterIsNotFenced", func() {
 
 	Context("when fenced instances exist", func() {
 		BeforeEach(func() {
-			err := utils.AddFencedInstance(utils.FenceAllServers, &cluster.ObjectMeta)
+			err := utils.AddFencedInstance(utils.FenceAllInstances, &cluster.ObjectMeta)
 			Expect(err).ToNot(HaveOccurred())
 			mockCli = fake.NewClientBuilder().
 				WithScheme(k8scheme.BuildWithAllKnownScheme()).

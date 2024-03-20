@@ -48,7 +48,7 @@ func FencingOn(
 			return err
 		}
 	case UsingAnnotation:
-		err := utils.NewFencingBuilder(env.Client, clusterName, namespace).Add().Instance(serverName).Execute(env.Ctx)
+		err := utils.NewFencingBuilder(env.Client, clusterName, namespace).AddFencing().ToInstance(serverName).Execute(env.Ctx)
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func FencingOff(
 			return err
 		}
 	case UsingAnnotation:
-		err := utils.NewFencingBuilder(env.Client, clusterName, namespace).Remove().Instance(serverName).
+		err := utils.NewFencingBuilder(env.Client, clusterName, namespace).RemoveFencing().ToInstance(serverName).
 			Execute(env.Ctx)
 		if err != nil {
 			return err

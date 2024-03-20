@@ -123,11 +123,8 @@ func (o *offlineExecutor) ensurePodIsFenced(
 			"targetBackup", backup.Name, "targetPod", targetPodName,
 		)
 	}
-	err = utils.NewFencingBuilder(o.cli, cluster.Name, cluster.Namespace).Add().Instance(targetPodName).Execute(ctx)
-	if errors.Is(err, utils.ErrorServerAlreadyFenced) {
-		return nil
-	}
-	if err != nil {
+	if err = utils.NewFencingBuilder(o.cli, cluster.Name, cluster.Namespace).AddFencing().ToInstance(targetPodName).
+		Execute(ctx); err != nil {
 		return err
 	}
 

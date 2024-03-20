@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -345,11 +344,9 @@ func EnsurePodIsUnfenced(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	err := utils.NewFencingBuilder(cli, cluster.Name, cluster.Namespace).Remove().Instance(targetPod.Name).Execute(ctx)
-	if errors.Is(err, utils.ErrorServerAlreadyUnfenced) {
-		return nil
-	}
-	if err != nil {
+	if err := utils.NewFencingBuilder(cli, cluster.Name, cluster.Namespace).
+		RemoveFencing().
+		ToInstance(targetPod.Name).Execute(ctx); err != nil {
 		return err
 	}
 

@@ -39,7 +39,7 @@ var _ = Describe("Fencing annotation handling", func() {
 					FencedInstanceAnnotation: jsonMarshal("cluster-example-1"),
 				},
 			}
-			err := RemoveFencedInstance("cluster-example-1", &clusterMeta)
+			err := removeFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(clusterMeta.Annotations).NotTo(HaveKey(FencedInstanceAnnotation))
 		})
@@ -49,7 +49,7 @@ var _ = Describe("Fencing annotation handling", func() {
 					FencedInstanceAnnotation: jsonMarshal("cluster-example-1", "cluster-example-2"),
 				},
 			}
-			err := RemoveFencedInstance("cluster-example-1", &clusterMeta)
+			err := removeFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(clusterMeta.Annotations).To(HaveKeyWithValue(FencedInstanceAnnotation, jsonMarshal("cluster-example-2")))
 		})
@@ -91,7 +91,7 @@ var _ = Describe("Fencing annotation handling", func() {
 					FencedInstanceAnnotation: jsonMarshal("cluster-example-2"),
 				},
 			}
-			err := RemoveFencedInstance("cluster-example-1", &clusterMeta)
+			err := removeFencedInstance("cluster-example-1", &clusterMeta)
 			Expect(err).To(HaveOccurred())
 			Expect(clusterMeta.Annotations).
 				To(HaveKeyWithValue(FencedInstanceAnnotation, jsonMarshal("cluster-example-2")))
