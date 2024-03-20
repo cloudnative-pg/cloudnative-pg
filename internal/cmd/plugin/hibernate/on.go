@@ -177,7 +177,7 @@ func (on *onCommand) fenceClusterStep() error {
 	contextLogger := log.FromContext(on.ctx)
 
 	contextLogger.Debug("applying the fencing annotation to the cluster manifest")
-	if err := utils.NewFencingBuilder(plugin.Client, on.cluster.Name, plugin.Namespace).Add().AllInstances().
+	if err := utils.NewFencingBuilder(plugin.Client, on.cluster.Name, plugin.Namespace).AddFencing().ToAllInstances().
 		Execute(on.ctx); err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 	contextLogger := log.FromContext(on.ctx)
 
 	fmt.Println("rolling back hibernation: removing the fencing annotation")
-	if err := utils.NewFencingBuilder(plugin.Client, on.cluster.Name, plugin.Namespace).Remove().AllInstances().
+	if err := utils.NewFencingBuilder(plugin.Client, on.cluster.Name, plugin.Namespace).RemoveFencing().ToAllInstances().
 		Execute(on.ctx); err != nil {
 		contextLogger.Error(err, "Rolling back from hibernation failed")
 	}

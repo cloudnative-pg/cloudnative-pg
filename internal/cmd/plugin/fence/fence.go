@@ -27,8 +27,8 @@ import (
 // fencingOn marks an instance in a cluster as fenced
 func fencingOn(ctx context.Context, clusterName string, serverName string) error {
 	err := utils.NewFencingBuilder(plugin.Client, clusterName, plugin.Namespace).
-		Add().
-		Instance(serverName).
+		AddFencing().
+		ToInstance(serverName).
 		Execute(ctx)
 	if err != nil {
 		return err
@@ -40,8 +40,8 @@ func fencingOn(ctx context.Context, clusterName string, serverName string) error
 // fencingOff marks an instance in a cluster as not fenced
 func fencingOff(ctx context.Context, clusterName string, serverName string) error {
 	err := utils.NewFencingBuilder(plugin.Client, clusterName, plugin.Namespace).
-		Remove().
-		Instance(serverName).
+		RemoveFencing().
+		ToInstance(serverName).
 		Execute(ctx)
 	if err != nil {
 		return err

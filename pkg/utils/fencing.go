@@ -22,7 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	v12 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sort"
 
@@ -36,23 +36,15 @@ var (
 	// have an invalid syntax
 	ErrorFencedInstancesSyntax = errors.New("fencedInstances annotation has invalid syntax")
 
-	// ErrorServerAlreadyFenced is emitted when trying to fence an instance
-	// which is already fenced
-	ErrorServerAlreadyFenced = errors.New("this instance has already been fenced")
-
-	// ErrorServerAlreadyUnfenced is emitted when trying to unfencing an instance
-	// which was not fenced
-	ErrorServerAlreadyUnfenced = errors.New("this instance was not fenced")
-
 	// ErrorSingleInstanceUnfencing is emitted when unfencing a single instance
 	// while all the cluster is fenced
 	ErrorSingleInstanceUnfencing = errors.New("unfencing an instance while the whole cluster is fenced is not supported")
 )
 
 const (
-	// FenceAllServers is the wildcard that, if put inside the fenced instances list, will fence every
+	// FenceAllInstances is the wildcard that, if put inside the fenced instances list, will fence every
 	// CNPG instance
-	FenceAllServers = "*"
+	FenceAllInstances = "*"
 )
 
 // GetFencedInstances gets the set of fenced servers from the annotations
@@ -63,16 +55,15 @@ func GetFencedInstances(annotations map[string]string) (*stringset.Data, error) 
 	}
 
 	var fencedInstancesList []string
-	err := json.Unmarshal([]byte(fencedInstances), &fencedInstancesList)
-	if err != nil {
+	if err := json.Unmarshal([]byte(fencedInstances), &fencedInstancesList); err != nil {
 		return nil, ErrorFencedInstancesSyntax
 	}
 
 	return stringset.From(fencedInstancesList), nil
 }
 
-// SetFencedInstances sets the list of fenced servers inside the annotations
-func SetFencedInstances(object *metav1.ObjectMeta, data *stringset.Data) error {
+// setFencedInstances sets the list of fenced servers inside the annotations
+func setFencedInstances(object *metav1.ObjectMeta, data *stringset.Data) error {
 	if data.Len() == 0 {
 		delete(object.Annotations, FencedInstanceAnnotation)
 		return nil
@@ -95,54 +86,54 @@ func SetFencedInstances(object *metav1.ObjectMeta, data *stringset.Data) error {
 
 // AddFencedInstance adds the given server name to the FencedInstanceAnnotation annotation
 // returns an error if the instance was already fenced
-func AddFencedInstance(serverName string, object *metav1.ObjectMeta) error {
+func AddFencedInstance(serverName string, object *metav1.ObjectMeta) (bool, error) {
 	fencedInstances, err := GetFencedInstances(object.Annotations)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	if fencedInstances.Has(FenceAllServers) {
-		return nil
-	}
-	if fencedInstances.Has(serverName) {
-		return ErrorServerAlreadyFenced
+	if fencedInstances.Has(FenceAllInstances) || fencedInstances.Has(serverName) {
+		return false, nil
 	}
 
-	if serverName == FenceAllServers {
-		fencedInstances = stringset.From([]string{FenceAllServers})
-	} else {
+	switch serverName {
+	case FenceAllInstances:
+		fencedInstances = stringset.From([]string{FenceAllInstances})
+	default:
 		fencedInstances.Put(serverName)
 	}
 
-	return SetFencedInstances(object, fencedInstances)
+	return true, setFencedInstances(object, fencedInstances)
 }
 
-// RemoveFencedInstance removes the given server name from the FencedInstanceAnnotation annotation
+// removeFencedInstance removes the given server name from the FencedInstanceAnnotation annotation
 // returns an error if the instance was already unfenced
-func RemoveFencedInstance(serverName string, object *metav1.ObjectMeta) error {
-	if serverName == FenceAllServers {
-		return SetFencedInstances(object, stringset.New())
-	}
-
+func removeFencedInstance(serverName string, object *metav1.ObjectMeta) (bool, error) {
 	fencedInstances, err := GetFencedInstances(object.Annotations)
 	if err != nil {
-		return err
+		return false, err
+	}
+	if fencedInstances.Len() == 0 {
+		return false, nil
+	}
+	if serverName == FenceAllInstances {
+		return true, setFencedInstances(object, stringset.New())
 	}
 
-	if fencedInstances.Has(FenceAllServers) {
-		return ErrorSingleInstanceUnfencing
+	if fencedInstances.Has(FenceAllInstances) {
+		return false, ErrorSingleInstanceUnfencing
 	}
 
 	if !fencedInstances.Has(serverName) {
-		return ErrorServerAlreadyUnfenced
+		return false, nil
 	}
 
 	fencedInstances.Delete(serverName)
-	return SetFencedInstances(object, fencedInstances)
+	return true, setFencedInstances(object, fencedInstances)
 }
 
 type FencingBuilder struct {
-	fenceFunc    func(string, *metav1.ObjectMeta) error
+	fenceFunc    func(string, *metav1.ObjectMeta) (appliedChange bool, err error)
 	instanceName string
 	cli          client.Client
 	namespace    string
@@ -157,22 +148,22 @@ func NewFencingBuilder(cli client.Client, clusterName, namespace string) *Fencin
 	}
 }
 
-func (fb *FencingBuilder) Add() *FencingBuilder {
+func (fb *FencingBuilder) AddFencing() *FencingBuilder {
 	fb.fenceFunc = AddFencedInstance
 	return fb
 }
 
-func (fb *FencingBuilder) Remove() *FencingBuilder {
-	fb.fenceFunc = RemoveFencedInstance
+func (fb *FencingBuilder) RemoveFencing() *FencingBuilder {
+	fb.fenceFunc = removeFencedInstance
 	return fb
 }
 
-func (fb *FencingBuilder) AllInstances() *FencingBuilder {
-	fb.instanceName = FenceAllServers
+func (fb *FencingBuilder) ToAllInstances() *FencingBuilder {
+	fb.instanceName = FenceAllInstances
 	return fb
 }
 
-func (fb *FencingBuilder) Instance(instanceName string) *FencingBuilder {
+func (fb *FencingBuilder) ToInstance(instanceName string) *FencingBuilder {
 	fb.instanceName = instanceName
 	return fb
 }
@@ -186,9 +177,8 @@ func (fb *FencingBuilder) Execute(ctx context.Context) error {
 		return err
 	}
 
-	if fb.instanceName != FenceAllServers {
-		// Check if the Pod exist
-		var pod v12.Pod
+	if fb.instanceName != FenceAllInstances {
+		var pod corev1.Pod
 		err = fb.cli.Get(ctx, client.ObjectKey{Namespace: fb.namespace, Name: fb.instanceName}, &pod)
 		if err != nil {
 			return fmt.Errorf("node %s not found in namespace %s", fb.instanceName, fb.namespace)
@@ -196,14 +186,13 @@ func (fb *FencingBuilder) Execute(ctx context.Context) error {
 	}
 
 	fencedCluster := cluster.DeepCopy()
-	if err = fb.fenceFunc(fb.instanceName, &fencedCluster.ObjectMeta); err != nil {
-		return err
-	}
-
-	err = fb.cli.Patch(ctx, fencedCluster, client.MergeFrom(&cluster))
+	appliedChange, err := fb.fenceFunc(fb.instanceName, &fencedCluster.ObjectMeta)
 	if err != nil {
 		return err
 	}
+	if !appliedChange {
+		return nil
+	}
 
-	return nil
+	return fb.cli.Patch(ctx, fencedCluster, client.MergeFrom(&cluster))
 }
