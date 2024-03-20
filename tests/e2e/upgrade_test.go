@@ -26,6 +26,7 @@ import (
 
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -84,10 +85,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// This is a cluster of the previous version, created before the operator upgrade
 		clusterName1 = "cluster1"
 		sampleFile   = fixturesDir + "/upgrade/cluster1.yaml.template"
+		minioPath1   = "minio/cluster-full-backup"
 
 		// This is a cluster of the previous version, created after the operator upgrade
 		clusterName2 = "cluster2"
 		sampleFile2  = fixturesDir + "/upgrade/cluster2.yaml.template"
+		minioPath2   = "minio/cluster2-full-backup"
 
 		backupName          = "cluster-backup"
 		backupFile          = fixturesDir + "/upgrade/backup1.yaml"
@@ -324,20 +327,41 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		if err != nil {
 			return fmt.Errorf("could not cleanup. Failed to delete namespace: %v", err)
 		}
+
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
 		// the operator's namespace so that affects subsequent test
-		if err := env.DeleteNamespaceAndWait(operatorNamespace, 60); err != nil {
-			return err
+		err = env.DeleteNamespace(operatorNamespace)
+		if err != nil {
+			return fmt.Errorf("could not cleanup. Failed to delete operator namespace: %v", err)
 		}
 
-		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, "cluster-full-backup"); err != nil {
-			GinkgoWriter.Printf("Error cleaning up minio: %v\n", err)
+		// Wait for both namespace to be deleted as we use minio
+		Eventually(func(g Gomega) {
+			operatorNS := types.NamespacedName{
+				Namespace: operatorNamespace,
+				Name:      operatorNamespace,
+			}
+
+			clusterNS := types.NamespacedName{
+				Namespace: namespace,
+				Name:      namespace,
+			}
+			namespaceResource := &corev1.Namespace{}
+			err := env.Client.Get(env.Ctx, operatorNS, namespaceResource)
+			g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			err = env.Client.Get(env.Ctx, clusterNS, namespaceResource)
+			g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		}, 120).Should(Succeed())
+
+		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath1); err != nil {
+			return fmt.Errorf("Error cleaning up minio: %v", err)
 		}
 
-		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, "cluster2-full-backup"); err != nil {
-			GinkgoWriter.Printf("Error cleaning up minio: %v\n", err)
+		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath2); err != nil {
+			return fmt.Errorf("Error cleaning up minio: %v", err)
 		}
 
+		GinkgoWriter.Println("cleaning up done")
 		return nil
 	}
 
