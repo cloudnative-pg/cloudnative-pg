@@ -105,6 +105,8 @@ var _ = Describe("Verify Volume Snapshot",
 					)
 					Expect(err).ToNot(HaveOccurred())
 
+					// trigger a checkpoint as the backup may run on standby
+					CheckPointAndSwitchWalOnPrimary(namespace, clusterName)
 					Eventually(func(g Gomega) {
 						backupList, err := env.GetBackupList(namespace)
 						g.Expect(err).ToNot(HaveOccurred())
@@ -228,7 +230,8 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.BackupMethodVolumeSnapshot,
 						env)
 					Expect(err).ToNot(HaveOccurred())
-
+					// trigger a checkpoint
+					CheckPointAndSwitchWalOnPrimary(namespace, clusterToSnapshotName)
 					Eventually(func(g Gomega) {
 						err = env.Client.Get(env.Ctx, types.NamespacedName{
 							Namespace: namespace,
@@ -510,6 +513,7 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).NotTo(HaveOccurred())
 				})
 
+				CheckPointAndSwitchWalOnPrimary(namespace, clusterToBackupName)
 				var backup apiv1.Backup
 				By("waiting the backup to complete", func() {
 					Eventually(func(g Gomega) {
