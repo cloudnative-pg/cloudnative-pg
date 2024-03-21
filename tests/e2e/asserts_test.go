@@ -723,6 +723,18 @@ func minioPath(serverName, fileName string) string {
 	return filepath.Join("*", serverName, "*", "*", fileName)
 }
 
+// CheckPointAndSwitchWalOnPrimary trigger a checkpoint and switch wal on primary pod and returns the latest WAL file
+func CheckPointAndSwitchWalOnPrimary(namespace, clusterName string) string {
+	var latestWAL string
+	By("trigger checkpoint and switch wal on primary", func() {
+		pod, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		primary := pod.GetName()
+		latestWAL = switchWalAndGetLatestArchive(namespace, primary)
+	})
+	return latestWAL
+}
+
 // AssertArchiveWalOnMinio archives WALs and verifies that they are in the storage
 func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 	var latestWALPath string
