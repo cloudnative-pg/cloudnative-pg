@@ -561,8 +561,8 @@ func composeListFilesMinio(path string, serviceName string) string {
 }
 
 // composeListFilesMinio builds the Minio command to list the filenames matching a given path
-func composeCleanFilesMinio(serviceName string) string {
-	return fmt.Sprintf("sh -c 'mc rm --force --recursive minio/%v'", serviceName)
+func composeCleanFilesMinio(path string) string {
+	return fmt.Sprintf("sh -c 'mc rm --force --recursive %v'", path)
 }
 
 // composeFindMinioCmd builds the Minio find command

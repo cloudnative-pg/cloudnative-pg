@@ -38,6 +38,7 @@ spec:
   backup:
     target: primary
     barmanObjectStore:
+      serverName: ${SERVER_NAME}
       destinationPath: s3://cluster-full-backup/
       endpointURL: https://minio-service.minio:9000
       endpointCA:
@@ -55,7 +56,7 @@ spec:
       data:
         compression: gzip
         immediateCheckpoint: true
-        jobs: 2
+        jobs: 4
 
   resources:
     requests:
