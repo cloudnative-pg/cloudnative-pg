@@ -371,6 +371,19 @@ func RemoveFile(fileName string) error {
 	return err
 }
 
+// RemoveDirectory remove the directory and all its content
+func RemoveDirectory(dir string) error {
+	if exists, _ := FileExists(dir); exists {
+		if err := RemoveDirectoryContent(dir); err != nil {
+			return err
+		}
+		if err := RemoveFile(dir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetDirectoryContent return a slice of string with the name of the files
 // in the dir directory
 func GetDirectoryContent(dir string) (files []string, err error) {

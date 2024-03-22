@@ -272,6 +272,7 @@ var _ = Describe("generate backup options", func() {
 		HasCheckWalArchive:         true,
 		HasSnappy:                  true,
 		HasErrorCodesForWALRestore: true,
+		HasErrorCodesForRestore:    true,
 		HasAzureManagedIdentity:    true,
 	}
 	cluster := &apiv1.Cluster{

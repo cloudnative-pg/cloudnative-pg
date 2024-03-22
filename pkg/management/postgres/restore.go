@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -374,8 +375,20 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 }
 
 // restoreDataDir restores PGDATA from an existing backup
-func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
+func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) (err error) {
 	var options []string
+	// The error code of barman-cloud-restore is retrieved from doc
+	// https://docs.pgbarman.org/release/3.10.0/barman-cloud-restore.1.html
+	const (
+		// connectivity to csp was ok but operation still failed error code
+		operationErrorCode = 1
+		// network related error code
+		networkErrorCode = 2
+		// cli related error code
+		cliErrorCode = 3
+		// general barman cloud errors
+		generalErrorCode = 4
+	)
 
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
@@ -384,7 +397,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
 
-	options, err := barman.AppendCloudProviderOptionsFromBackup(options, backup)
+	options, err = barman.AppendCloudProviderOptionsFromBackup(options, backup)
 	if err != nil {
 		return err
 	}
@@ -397,12 +410,40 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	cmd := exec.Command(barmanCapabilities.BarmanCloudRestore, options...) // #nosec G204
 	cmd.Env = env
 	err = execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudRestore)
-	if err != nil {
-		log.Error(err, "Can't restore backup")
-		return err
+	if err == nil {
+		log.Info("Restore completed")
+		return nil
 	}
-	log.Info("Restore completed")
-	return nil
+
+	var currentCapabilities *barmanCapabilities.Capabilities
+	var barmanError error
+	currentCapabilities, barmanError = barmanCapabilities.CurrentCapabilities()
+	if barmanError != nil {
+		return barmanError
+	}
+	var exitError *exec.ExitError
+	if !currentCapabilities.HasErrorCodesForRestore || !errors.As(err, &exitError) {
+		return fmt.Errorf("unexpected failure invoking %s: %w",
+			barmanCapabilities.BarmanCloudRestore, err)
+	}
+	exitCode := exitError.ExitCode()
+	switch exitCode {
+	case networkErrorCode, generalErrorCode:
+		if err := fileutils.RemoveDirectory(info.PgData); err != nil {
+			log.Error(err, "error occurred cleaning up directory", "directory", info.PgData)
+		}
+		return fmt.Errorf("unexpected error with exit code: %d occurred invoking %s, will retry later: %w",
+			exitCode, barmanCapabilities.BarmanCloudRestore, err)
+	case operationErrorCode:
+		return fmt.Errorf("operation error occurred invoking %s, "+
+			"please ensure the remote backup is available: %w",
+			barmanCapabilities.BarmanCloudRestore, err)
+	case cliErrorCode:
+		return fmt.Errorf("input error occurred invoking %s: %w", barmanCapabilities.BarmanCloudRestore, err)
+	default:
+		return fmt.Errorf("encountered an unrecognized exit code error invoking %s: %w",
+			barmanCapabilities.BarmanCloudRestore, err)
+	}
 }
 
 // loadCluster loads the cluster definition from the API server
