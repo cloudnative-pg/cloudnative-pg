@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -374,8 +375,19 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 }
 
 // restoreDataDir restores PGDATA from an existing backup
-func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
+func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) (err error) {
 	var options []string
+	const networkErrorCode = "2"
+
+	defer func() {
+		if err.Error() == networkErrorCode {
+			descriptiveError := errors.New("network error while restoring the backup, will clean PGDATA directory and retry")
+			log.Error(descriptiveError, "error while executing barman-cloud-backup")
+			if fileutils.RemoveDirectoryContent(info.PgData) != nil || fileutils.RemoveFile(info.PgData) != nil {
+				log.Error(err, "error while cleaning up the PGDATA directory after network error")
+			}
+		}
+	}()
 
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
@@ -384,7 +396,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
 
-	options, err := barman.AppendCloudProviderOptionsFromBackup(options, backup)
+	options, err = barman.AppendCloudProviderOptionsFromBackup(options, backup)
 	if err != nil {
 		return err
 	}
@@ -398,7 +410,6 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	cmd.Env = env
 	err = execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudRestore)
 	if err != nil {
-		log.Error(err, "Can't restore backup")
 		return err
 	}
 	log.Info("Restore completed")
