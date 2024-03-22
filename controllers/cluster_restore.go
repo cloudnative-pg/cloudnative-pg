@@ -104,7 +104,9 @@ func ensureClusterIsNotFenced(
 	cli client.Client,
 	cluster *apiv1.Cluster,
 ) error {
-	return utils.NewFencingBuilder(cli, cluster.Name, cluster.Namespace).RemoveFencing().ToAllInstances().Execute(ctx)
+	return utils.NewFencingMetadataExecutor(cli, cluster.Name, cluster.Namespace).
+		ForObject(&apiv1.Cluster{}).
+		RemoveFencing().ForAllInstances().Execute(ctx)
 }
 
 // restoreClusterStatus bootstraps the status needed to make the restored cluster work
