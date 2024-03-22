@@ -344,9 +344,11 @@ func EnsurePodIsUnfenced(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if err := utils.NewFencingBuilder(cli, cluster.Name, cluster.Namespace).
+	if err := utils.NewFencingMetadataExecutor(cli, cluster.Name, cluster.Namespace).
+		ForObject(&apiv1.Cluster{}).
 		RemoveFencing().
-		ToInstance(targetPod.Name).Execute(ctx); err != nil {
+		ForInstance(targetPod.Name).
+		Execute(ctx); err != nil {
 		return err
 	}
 
