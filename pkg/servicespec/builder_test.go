@@ -17,9 +17,10 @@ limitations under the License.
 package servicespec
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,7 +46,8 @@ var _ = Describe("Service template builder", func() {
 	})
 
 	It("sets service type", func() {
-		Expect(New().WithServiceType(corev1.ServiceTypeLoadBalancer, true).Build().Spec.Type).To(Equal(corev1.ServiceTypeLoadBalancer))
+		Expect(New().WithServiceType(corev1.ServiceTypeLoadBalancer, true).Build().Spec.Type).
+			To(Equal(corev1.ServiceTypeLoadBalancer))
 	})
 
 	It("updates pgbouncer port", func() {
@@ -82,6 +84,7 @@ var _ = Describe("Service template builder", func() {
 					utils.PgbouncerNameLabel: "myservice",
 				},
 			},
-		}).WithSelector("otherservice", true).Build().Spec.Selector).To(Equal(map[string]string{utils.PgbouncerNameLabel: "otherservice"}))
+		}).WithSelector("otherservice", true).Build().Spec.Selector).
+			To(Equal(map[string]string{utils.PgbouncerNameLabel: "otherservice"}))
 	})
 })

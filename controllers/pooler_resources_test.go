@@ -37,7 +37,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		Expect(result.Namespace).To(Equal(expected.Namespace))
 	}
 
-	It("should correctly fetch the deployment when it exists", func() {
+	It("should correctly fetch the deployment when it exists", func() { // nolint:dupl
 		ctx := context.Background()
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
@@ -106,7 +106,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 	})
 
-	It("should correctly fetch the service when it exists", func() {
+	It("should correctly fetch the service when it exists", func() { // nolint:dupl
 		ctx := context.Background()
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)

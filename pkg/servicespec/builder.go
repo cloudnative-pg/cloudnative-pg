@@ -69,7 +69,7 @@ func (builder *Builder) WithLabel(name, value string) *Builder {
 
 // WithServiceType adds a service type to the current status
 func (builder *Builder) WithServiceType(serviceType corev1.ServiceType, overwrite bool) *Builder {
-	if overwrite {
+	if overwrite || builder.status.Spec.Type == "" {
 		builder.status.Spec.Type = serviceType
 	}
 	return builder

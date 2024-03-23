@@ -3137,6 +3137,8 @@ with an explanation of the cause</p>
 
 - [ServiceAccountTemplate](#postgresql-cnpg-io-v1-ServiceAccountTemplate)
 
+- [ServiceTemplateSpec](#postgresql-cnpg-io-v1-ServiceTemplateSpec)
+
 
 <p>Metadata is a structure similar to the metav1.ObjectMeta, but still
 parseable by controller-gen to create a suitable CRD for the user.
@@ -4736,15 +4738,15 @@ a template for Service generation.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>metadata</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+<a href="#postgresql-cnpg-io-v1-Metadata"><i>Metadata</i></a>
 </td>
 <td>
    <p>Standard object's metadata.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata</p>
-Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</td>
 </tr>
 <tr><td><code>spec</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#servicespec-v1-core"><i>core/v1.ServiceSpec</i></a>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#servicespec-v1-core"><i>core/v1.ServiceSpec</i></a>
 </td>
 <td>
    <p>Specification of the desired behavior of the service.

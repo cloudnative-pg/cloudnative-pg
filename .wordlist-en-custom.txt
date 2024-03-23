@@ -378,6 +378,8 @@ ServiceAccount
 ServiceAccount's
 ServiceAccountTemplate
 ServiceMonitor
+ServiceSpec
+ServiceTemplateSpec
 Silvela
 Slonik
 SnapshotOwnerReference
@@ -1076,6 +1078,7 @@ serverSecretVersion
 serverTLS
 serverTLSSecret
 serviceAccountTemplate
+serviceTemplate
 serviceaccount
 sessionToken
 sha
