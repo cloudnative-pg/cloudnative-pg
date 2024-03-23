@@ -76,7 +76,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			"run",
 		}, false).
 		WithContainerPort("pgbouncer", &corev1.ContainerPort{
-			Name:          "pgbouncer",
+			Name:          pgBouncerConfig.PgBouncerPortName,
 			ContainerPort: pgBouncerConfig.PgBouncerPort,
 		}).
 		WithContainerPort("pgbouncer", &corev1.ContainerPort{

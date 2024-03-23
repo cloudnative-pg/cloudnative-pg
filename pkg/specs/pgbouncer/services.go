@@ -39,18 +39,16 @@ func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*corev1.Service, err
 	serviceTemplate := servicespec.NewFrom(pooler.Spec.ServiceTemplate).
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
+		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
+		WithAnnotation(utils.PoolerSpecHashAnnotationName, poolerHash).
 		WithServiceType(corev1.ServiceTypeClusterIP, false).
 		WithServicePort(&corev1.ServicePort{
-			Name:       "pgbouncer",
+			Name:       pgBouncerConfig.PgBouncerPortName,
 			Port:       pgBouncerConfig.PgBouncerPort,
-			TargetPort: intstr.FromString("pgbouncer"),
+			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
 			Protocol:   corev1.ProtocolTCP,
 		}).
 		WithSelector(pooler.Name, true).
-		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
-		WithLabel(utils.ClusterLabelName, cluster.Name).
-		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
-		WithAnnotation(utils.PoolerSpecHashAnnotationName, poolerHash).
 		Build()
 
 	return &corev1.Service{
