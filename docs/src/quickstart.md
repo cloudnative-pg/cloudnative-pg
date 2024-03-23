@@ -303,8 +303,8 @@ And access Grafana locally at [`http://localhost:3000/`](http://localhost:3000/)
 providing the credentials `admin` as username, `prom-operator` as password (defined in `kube-stack-config.yaml`).
 
 CloudNativePG provides a default dashboard for Grafana as part of the official
-[Helm chart](https://github.com/cloudnative-pg/charts). You can download the
-[grafana-dashboard.json](https://github.com/cloudnative-pg/charts/blob/main/charts/cloudnative-pg/monitoring/grafana-dashboard.json)
+[Helm chart](https://github.com/cloudnative-pg/charts). You can also download the
+[grafana-dashboard.json](https://github.com/cloudnative-pg/grafana-dashboards/blob/main/charts/cluster/grafana-dashboard.json)
 file and manually importing it via the GUI.
 
 !!! Warning
