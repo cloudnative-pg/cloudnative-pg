@@ -91,7 +91,11 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 // ensureClusterRestoreCanStart is a function where the plugins can inject their custom logic to tell the
 // restore process to wait before starting the process
 // nolint: revive
-func ensureClusterRestoreCanStart(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (*ctrl.Result, error) {
+func ensureClusterRestoreCanStart(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+) (*ctrl.Result, error) {
 	return nil, nil
 }
 
@@ -169,6 +173,8 @@ func getOrphanPVCs(
 }
 
 func ensureOrphanPodsAreDeleted(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx).WithValues("orphan_pod_cleaner")
+
 	var podList corev1.PodList
 	if err := c.List(
 		ctx,
@@ -179,20 +185,29 @@ func ensureOrphanPodsAreDeleted(ctx context.Context, c client.Client, cluster *a
 		return err
 	}
 
-	if len(podList.Items) == 0 {
+	orphanPodList := make([]corev1.Pod, 0, podList.Size())
+	orphanPodNames := make([]string, 0, podList.Size())
+	for idx := range podList.Items {
+		pod := podList.Items[idx]
+		if len(pod.OwnerReferences) == 0 {
+			orphanPodList = append(orphanPodList, pod)
+			orphanPodNames = append(orphanPodNames, pod.Name)
+		}
+	}
+
+	if len(orphanPodList) == 0 {
 		return nil
 	}
 
-	contextLogger := log.FromContext(ctx).WithValues("orphan_pod_cleaner")
-	contextLogger.Info("found one or more orphan pods, proceeding with the deletion...")
+	contextLogger.Info(
+		"Found one or more orphan pods, deleting them",
+		"orphanPodNames", orphanPodNames,
+	)
 
-	for idx := range podList.Items {
-		pod := podList.Items[idx]
-		if len(pod.OwnerReferences) != 0 {
-			continue
-		}
-		contextLogger.Debug("deleting orphan pod", "name", pod.Name)
-		if err := c.Delete(ctx, &pod); err != nil && !apierrs.IsNotFound(err) && !apierrs.IsGone(err) {
+	for idx := range orphanPodList {
+		pod := orphanPodList[idx]
+		contextLogger.Debug("Deleting orphan pod", "podName", pod.Name)
+		if err := c.Delete(ctx, &pod); err != nil && !apierrs.IsNotFound(err) {
 			return err
 		}
 	}
