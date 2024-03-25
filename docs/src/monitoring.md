@@ -749,8 +749,7 @@ section for context:
 In addition, we provide the "raw" sources for the Prometheus alert rules in the
 `alerts.yaml` file.
 
-The [Grafana dashboard](https://github.com/cloudnative-pg/charts/blob/main/charts/cloudnative-pg/monitoring/grafana-dashboard.json)
-is now part of the official Helm Chart project.
+The [Grafana dashboard](https://github.com/cloudnative-pg/grafana-dashboards/blob/main/charts/cluster/grafana-dashboard.json) has a dedicated repository now.
 
 Note that, for the configuration of `kube-prometheus-stack`, other fields and
 settings are available over what we provide in `kube-stack-config.yaml`.
