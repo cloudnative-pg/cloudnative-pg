@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"os/exec"
+	"runtime"
 	"sync"
 	"time"
 
@@ -155,10 +156,13 @@ func (restorer *WALRestorer) RestoreList(
 	fetchList []string,
 	destinationPath string,
 	options []string,
+	maxParallel int,
 ) (resultList []Result) {
 	resultList = make([]Result, len(fetchList))
 	contextLog := log.FromContext(ctx)
 	var waitGroup sync.WaitGroup
+
+	prevMaxProcs := runtime.GOMAXPROCS(maxParallel)
 
 	for idx := range fetchList {
 		waitGroup.Add(1)
@@ -210,11 +214,12 @@ func (restorer *WALRestorer) RestoreList(
 						"error", result.Err)
 				}
 			}
-			waitGroup.Done()
+			defer waitGroup.Done()
 		}(idx)
 	}
 
 	waitGroup.Wait()
+	runtime.GOMAXPROCS(prevMaxProcs)
 	return resultList
 }
 
