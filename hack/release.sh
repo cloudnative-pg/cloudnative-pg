@@ -82,6 +82,7 @@ KUSTOMIZE="${REPO_ROOT}/bin/kustomize"
 
 mkdir -p releases/
 release_manifest="releases/cnpg-${release_version}.yaml"
+floating_release_manifest="releases/cnpg-latest.yaml"
 
 # Perform automated substitutions of the version string in the source code
 sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
@@ -100,6 +101,7 @@ cp -r config/* "${CONFIG_TMP_DIR}"
 )
 
 "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"
+cp "${release_manifest}" "${floating_release_manifest}"
 rm -fr "${CONFIG_TMP_DIR}"
 
 # Create a new branch for the release that originates the PR
@@ -107,11 +109,12 @@ git checkout -b "release/v${release_version}"
 git add \
     pkg/versions/versions.go \
     docs/src/installation_upgrade.md \
+    "${floating_release_manifest}" \
     "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
 git push origin -u "release/v${release_version}"
 
 cat <<EOF
-Generated release manifest ${release_manifest}
+Generated release manifest ${release_manifest} and ${floating_release_manifest}
 Created and pushed branch release/v${release_version}
 EOF
