@@ -183,7 +183,10 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
-	if err := r.reconcileRestoredCluster(ctx, cluster); err != nil {
+	if res, err := r.reconcileRestoredCluster(ctx, cluster); res != nil || err != nil {
+		if res != nil {
+			return *res, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("cannot reconcile restored Cluster: %w", err)
 	}
 
