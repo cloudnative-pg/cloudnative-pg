@@ -347,7 +347,7 @@ func EnsurePodIsUnfenced(
 	if err := utils.NewFencingMetadataExecutor(cli).
 		RemoveFencing().
 		ForInstance(targetPod.Name).
-		Execute(ctx, client.ObjectKeyFromObject(cluster), &apiv1.Cluster{}); err != nil {
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
 		return err
 	}
 
