@@ -24,6 +24,9 @@ jobs:
       is_latest: ${{ env.IS_LATEST }}
     steps:
       -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
         name: Check release branch
         run: |
           tag="${GITHUB_REF#refs/tags/v}"
