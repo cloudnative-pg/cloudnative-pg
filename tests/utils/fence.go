@@ -19,6 +19,8 @@ package utils
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -49,11 +51,10 @@ func FencingOn(
 			return err
 		}
 	case UsingAnnotation:
-		err := utils.NewFencingMetadataExecutor(env.Client, clusterName, namespace).
-			ForObject(&apiv1.Cluster{}).
+		err := utils.NewFencingMetadataExecutor(env.Client).
 			AddFencing().
 			ForInstance(serverName).
-			Execute(env.Ctx)
+			Execute(env.Ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &apiv1.Cluster{})
 		if err != nil {
 			return err
 		}
@@ -79,11 +80,10 @@ func FencingOff(
 			return err
 		}
 	case UsingAnnotation:
-		err := utils.NewFencingMetadataExecutor(env.Client, clusterName, namespace).
-			ForObject(&apiv1.Cluster{}).
+		err := utils.NewFencingMetadataExecutor(env.Client).
 			RemoveFencing().
 			ForInstance(serverName).
-			Execute(env.Ctx)
+			Execute(env.Ctx, types.NamespacedName{Name: clusterName, Namespace: namespace}, &apiv1.Cluster{})
 		if err != nil {
 			return err
 		}

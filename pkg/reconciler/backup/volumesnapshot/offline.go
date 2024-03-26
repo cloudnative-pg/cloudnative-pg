@@ -123,11 +123,10 @@ func (o *offlineExecutor) ensurePodIsFenced(
 			"targetBackup", backup.Name, "targetPod", targetPodName,
 		)
 	}
-	if err = utils.NewFencingMetadataExecutor(o.cli, cluster.Name, cluster.Namespace).
-		ForObject(&apiv1.Cluster{}).
+	if err = utils.NewFencingMetadataExecutor(o.cli).
 		AddFencing().
 		ForInstance(targetPodName).
-		Execute(ctx); err != nil {
+		Execute(ctx, client.ObjectKeyFromObject(cluster), &apiv1.Cluster{}); err != nil {
 		return err
 	}
 
