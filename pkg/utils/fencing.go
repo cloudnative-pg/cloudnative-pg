@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
@@ -89,21 +90,21 @@ func setFencedInstances(object metav1.Object, data *stringset.Data) error {
 
 // AddFencedInstance adds the given server name to the FencedInstanceAnnotation annotation
 // returns an error if the instance was already fenced
-func AddFencedInstance(serverName string, object metav1.Object) (bool, error) {
+func AddFencedInstance(instanceName string, object metav1.Object) (bool, error) {
 	fencedInstances, err := GetFencedInstances(object.GetAnnotations())
 	if err != nil {
 		return false, err
 	}
 
-	if fencedInstances.Has(FenceAllInstances) || fencedInstances.Has(serverName) {
+	if fencedInstances.Has(FenceAllInstances) || fencedInstances.Has(instanceName) {
 		return false, nil
 	}
 
-	switch serverName {
+	switch instanceName {
 	case FenceAllInstances:
 		fencedInstances = stringset.From([]string{FenceAllInstances})
 	default:
-		fencedInstances.Put(serverName)
+		fencedInstances.Put(instanceName)
 	}
 
 	return true, setFencedInstances(object, fencedInstances)
@@ -111,7 +112,7 @@ func AddFencedInstance(serverName string, object metav1.Object) (bool, error) {
 
 // removeFencedInstance removes the given server name from the FencedInstanceAnnotation annotation
 // returns an error if the instance was already unfenced
-func removeFencedInstance(serverName string, object metav1.Object) (bool, error) {
+func removeFencedInstance(instanceName string, object metav1.Object) (bool, error) {
 	fencedInstances, err := GetFencedInstances(object.GetAnnotations())
 	if err != nil {
 		return false, err
@@ -119,7 +120,7 @@ func removeFencedInstance(serverName string, object metav1.Object) (bool, error)
 	if fencedInstances.Len() == 0 {
 		return false, nil
 	}
-	if serverName == FenceAllInstances {
+	if instanceName == FenceAllInstances {
 		return true, setFencedInstances(object, stringset.New())
 	}
 
@@ -127,11 +128,11 @@ func removeFencedInstance(serverName string, object metav1.Object) (bool, error)
 		return false, ErrorSingleInstanceUnfencing
 	}
 
-	if !fencedInstances.Has(serverName) {
+	if !fencedInstances.Has(instanceName) {
 		return false, nil
 	}
 
-	fencedInstances.Delete(serverName)
+	fencedInstances.Delete(instanceName)
 	return true, setFencedInstances(object, fencedInstances)
 }
 
@@ -141,24 +142,13 @@ type FencingMetadataExecutor struct {
 	fenceFunc    func(string, metav1.Object) (appliedChange bool, err error)
 	instanceName string
 	cli          client.Client
-	namespace    string
-	clusterName  string
-	remoteObject client.Object
 }
 
 // NewFencingMetadataExecutor creates a fluent client for FencingMetadataExecutor
-func NewFencingMetadataExecutor(cli client.Client, clusterName, namespace string) *FencingMetadataExecutor {
+func NewFencingMetadataExecutor(cli client.Client) *FencingMetadataExecutor {
 	return &FencingMetadataExecutor{
-		cli:         cli,
-		clusterName: clusterName,
-		namespace:   namespace,
+		cli: cli,
 	}
-}
-
-// ForObject specifies which kubernetes object needs to be modified
-func (fb *FencingMetadataExecutor) ForObject(obj client.Object) *FencingMetadataExecutor {
-	fb.remoteObject = obj
-	return fb
 }
 
 // AddFencing instructs the client to execute the logic of adding a instance
@@ -186,28 +176,23 @@ func (fb *FencingMetadataExecutor) ForInstance(instanceName string) *FencingMeta
 }
 
 // Execute executes the instructions given with the fluent builder, returns any error encountered
-func (fb *FencingMetadataExecutor) Execute(ctx context.Context) error {
-	if fb.remoteObject == nil {
-		return errors.New("initialize the fencing object with ForObject")
-	}
+func (fb *FencingMetadataExecutor) Execute(ctx context.Context, key types.NamespacedName, obj client.Object) error {
 	if fb.instanceName == "" {
 		return errors.New("chose an operation to execute")
 	}
 
-	err := fb.cli.Get(ctx, client.ObjectKey{Namespace: fb.namespace, Name: fb.clusterName}, fb.remoteObject)
-	if err != nil {
+	if err := fb.cli.Get(ctx, key, obj); err != nil {
 		return err
 	}
 
 	if fb.instanceName != FenceAllInstances {
 		var pod corev1.Pod
-		err = fb.cli.Get(ctx, client.ObjectKey{Namespace: fb.namespace, Name: fb.instanceName}, &pod)
-		if err != nil {
-			return fmt.Errorf("node %s not found in namespace %s", fb.instanceName, fb.namespace)
+		if err := fb.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: fb.instanceName}, &pod); err != nil {
+			return fmt.Errorf("node %s not found in namespace %s", fb.instanceName, key.Namespace)
 		}
 	}
 
-	fencedObject := fb.remoteObject.DeepCopyObject().(client.Object)
+	fencedObject := obj.DeepCopyObject().(client.Object)
 	appliedChange, err := fb.fenceFunc(fb.instanceName, fencedObject)
 	if err != nil {
 		return err
@@ -216,5 +201,5 @@ func (fb *FencingMetadataExecutor) Execute(ctx context.Context) error {
 		return nil
 	}
 
-	return fb.cli.Patch(ctx, fencedObject, client.MergeFrom(fb.remoteObject))
+	return fb.cli.Patch(ctx, fencedObject, client.MergeFrom(obj))
 }
