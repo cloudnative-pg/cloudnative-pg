@@ -357,10 +357,14 @@ jobs:
 
   publish_bundle:
     name: Publish OLM Bundle
-    needs: olm-bundle
+    needs:
+      - olm-bundle
+      - release-binaries
     if: |
       (always() && !cancelled()) &&
-      needs.release-binaries.result == 'success'
+      needs.release-binaries.result == 'success' &&
+      needs.olm-bundle.result == 'success' &&
+      github.repository_owner == 'cloudnative-pg'
     env:
       VERSION: ${{ needs.release-binaries.outputs.version }}
     runs-on: ubuntu-22.04
@@ -398,8 +402,8 @@ jobs:
           # Skip creating the commit if there are no changes
           [ -n "$(git status -s)" ] || exit 0
 
-          git add bundle/${{ env.VERSION }}
-          git commit -m "${COMMIT_MESSAGE}"
+          git add bundles/${{ env.VERSION }}
+          git commit -sm "${COMMIT_MESSAGE}"
       -
         name: Push commit
         uses: ad-m/github-push-action@v0.8.0
