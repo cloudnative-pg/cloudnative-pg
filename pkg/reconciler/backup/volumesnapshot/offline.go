@@ -31,7 +31,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -124,19 +123,10 @@ func (o *offlineExecutor) ensurePodIsFenced(
 			"targetBackup", backup.Name, "targetPod", targetPodName,
 		)
 	}
-
-	err = resources.ApplyFenceFunc(
-		ctx,
-		o.cli,
-		cluster.Name,
-		cluster.Namespace,
-		targetPodName,
-		utils.AddFencedInstance,
-	)
-	if errors.Is(err, utils.ErrorServerAlreadyFenced) {
-		return nil
-	}
-	if err != nil {
+	if err = utils.NewFencingMetadataExecutor(o.cli).
+		AddFencing().
+		ForInstance(targetPodName).
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
 		return err
 	}
 
