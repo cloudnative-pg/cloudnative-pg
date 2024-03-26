@@ -831,7 +831,7 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 		// See: https://www.postgresql.org/docs/current/progress-reporting.html#BASEBACKUP-PROGRESS-REPORTING
 		progress := ""
 		if bb.BackupTotal != 0 {
-			progress = fmt.Sprintf("%.2f%%", float64(bb.BackupStreamed)/float64(bb.BackupTotal))
+			progress = fmt.Sprintf("%.2f%%", float64(bb.BackupStreamed)/float64(bb.BackupTotal)*100)
 		}
 
 		columns := []interface{}{
