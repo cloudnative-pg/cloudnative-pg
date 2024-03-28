@@ -103,7 +103,6 @@ linters:
 
 run:
   timeout: 5m
-  skip-files: "zz_generated.*"
 
 issues:
   exclude-rules:
@@ -127,3 +126,4 @@ issues:
       text: "ST1016:"
       path: api/
   exclude-use-default: false
+  exclude-files: "zz_generated.*"
