@@ -35,8 +35,8 @@ import (
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -230,17 +230,17 @@ func RunController(
 		return err
 	}
 
-	if err = controllers.NewClusterReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
+	if err = controller.NewClusterReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
 	}
 
-	if err = controllers.NewBackupReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
+	if err = controller.NewBackupReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}
 
-	if err = (&controllers.ScheduledBackupReconciler{
+	if err = (&controller.ScheduledBackupReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"),
@@ -249,7 +249,7 @@ func RunController(
 		return err
 	}
 
-	if err = (&controllers.PoolerReconciler{
+	if err = (&controller.PoolerReconciler{
 		Client:          mgr.GetClient(),
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),

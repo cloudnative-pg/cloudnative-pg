@@ -1,0 +1,1 @@
+../internal/cmd/manager/controller/controller.go
