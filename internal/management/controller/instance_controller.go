@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/reconciler"
@@ -341,7 +341,7 @@ func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv
 }
 
 func handleErrNextLoop(err error) (reconcile.Result, error) {
-	if errors.Is(err, controllers.ErrNextLoop) {
+	if errors.Is(err, controller.ErrNextLoop) {
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 	return reconcile.Result{}, err
