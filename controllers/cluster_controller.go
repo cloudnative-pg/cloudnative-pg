@@ -289,7 +289,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
-	if instancesStatus.AllReadyInstancesStatusUnreachable() {
+	if instancesStatus.AllReadyAndActiveInstancesAreUnreachable() {
 		contextLogger.Warning(
 			"Failed to extract instance status from ready instances. Attempting to requeue...",
 		)
@@ -304,6 +304,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 	}
 
+	// TODO: instances that are not ready and active could be evaluated here
 	// The instance list is sorted and will present the primary as the first
 	// element, followed by the replicas, the most updated coming first.
 	// Pods that are not responding will be at the end of the list. We use
@@ -335,6 +336,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 				"isPodReady", isPodReady)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
+
+		// TODO: we never evaluate the case that the leading instance has no valid status
 	}
 
 	// If the user has requested to hibernate the cluster, we do that before
