@@ -46,6 +46,7 @@ GORELEASER_VERSION ?= v1.25.1
 SPELLCHECK_VERSION ?= 0.36.0
 WOKE_VERSION ?= 0.19.0
 OPERATOR_SDK_VERSION ?= 1.34.1
+PREFLIGHT_VERSION ?= 1.9.1
 OPENSHIFT_VERSIONS ?= v4.11-v4.15
 ARCH ?= amd64
 
@@ -339,10 +340,8 @@ ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version 2>/dev/null | aw
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
-	GO_ARCH=$(shell go env GOARCH) ;\
-	SDK_OS="linux" ;\
-	if [ $$(uname) = "Darwin" ]; then SDK_OS="darwin"; fi ;\
-	curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${SDK_OS}_$${GO_ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
 	chmod +x "$(LOCALBIN)/operator-sdk" ;\
 	}
 OPERATOR_SDK=$(LOCALBIN)/operator-sdk
@@ -355,6 +354,7 @@ opm: ## Download opm locally if necessary.
 ifeq (,$(shell PATH="$(LOCALBIN):$${PATH}" which opm 2>/dev/null))
 	@{ \
 	set -e ;\
+	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
 	OPM_VERSION=$$(curl -s -LH "Accept:application/json" -w "%(http_code)" https://github.com/operator-framework/operator-registry/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/') ;\
 	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/$${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(LOCALBIN)/opm";\
@@ -363,4 +363,23 @@ ifeq (,$(shell PATH="$(LOCALBIN):$${PATH}" which opm 2>/dev/null))
 OPM=$(LOCALBIN)/opm
 else
 OPM=$(shell which opm)
+endif
+
+.PHONY: preflight
+preflight: ## Download preflight locally if necessary.
+ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" preflight --version 2>/dev/null | awk '{print $$3}'), $(PREFLIGHT_VERSION))
+	@{ \
+	set -e ;\
+	mkdir -p $(LOCALBIN) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	if [ "$${OS}" != "linux" ] ; then \
+		echo "Unsupported OS: $${OS}" ;\
+	else \
+		curl -s -L "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(LOCALBIN)/preflight" ;\
+		chmod +x $(LOCALBIN)/preflight ;\
+	fi \
+	}
+PREFLIGHT=$(LOCALBIN)/preflight
+else
+PREFLIGHT=$(shell which PREFLIGHT)
 endif

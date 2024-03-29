@@ -734,6 +734,45 @@ jobs:
             cloudnative-pg-catalog.yaml
           retention-days: 7
 
+  preflight:
+    name: Run openshift-preflight test
+    runs-on: ubuntu-22.04
+    needs:
+      - buildx
+      - olm-bundle
+    if: |
+      (always() && !cancelled()) &&
+      needs.olm-bundle.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
+
+      - name: Setup operator-sdk
+        run: |
+          make operator-sdk
+
+      - name: Setup preflight
+        run: |
+          make preflight
+
+      - name: Run preflight container test
+        env:
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
+        run: |
+          bin/preflight check container ${CONTROLLER_IMG}
+
+      - name: Run preflight operator test
+        env:
+          BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+        run: |
+          bin/preflight check operator ${BUNDLE_IMG}
+
   olm-scorecard:
     name: Run OLM scorecard test
     runs-on: ubuntu-22.04
