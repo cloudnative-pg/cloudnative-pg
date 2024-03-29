@@ -26,6 +26,9 @@ jobs:
       -
         name: Checkout
         uses: actions/checkout@v4
+        with:
+          # To identify the commit we need the history and all the tags.
+          fetch-depth: 0
       -
         name: Check release branch
         run: |
