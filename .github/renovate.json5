@@ -123,7 +123,8 @@
     }, {
       // We want a PR to bump kind version
       "fileMatch": [
-        "^.github/workflows/continuous-delivery.yml"
+        "^.github/workflows/continuous-delivery.yml",
+        "^.github/workflows/continuous-integration.yml",
       ],
       "matchStrings": [
         "KIND_VERSION: \"(?<currentValue>.*?)\"",

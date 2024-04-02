@@ -19,6 +19,7 @@ env:
   GOLANG_VERSION: "1.22.x"
   GOLANGCI_LINT_VERSION: "v1.57"
   KUBEBUILDER_VERSION: "2.3.1"
+  KIND_VERSION: "v0.22.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   API_DOC_NAME: "cloudnative-pg.v1.md"
   SLACK_USERNAME: "cnpg-bot"
@@ -392,6 +393,7 @@ jobs:
       controller_img: ${{ env.CONTROLLER_IMG }}
       controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
       bundle_img: ${{ env.BUNDLE_IMG }}
+      catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
     steps:
       - name: Checkout
@@ -675,6 +677,7 @@ jobs:
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -721,6 +724,7 @@ jobs:
           IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+          CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
           make olm-catalog
 
@@ -753,13 +757,9 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
 
-      - name: Setup operator-sdk
+      - name: Setup tools
         run: |
-          make operator-sdk
-
-      - name: Setup preflight
-        run: |
-          make preflight
+          make operator-sdk preflight
 
       - name: Run preflight container test
         env:
@@ -767,9 +767,17 @@ jobs:
         run: |
           bin/preflight check container ${CONTROLLER_IMG}
 
+      - name: Setting up KinD cluster
+        uses: helm/kind-action@v1.9.0
+        with:
+          wait: "600s"
+          version: ${{ env.KIND_VERSION }}
+
       - name: Run preflight operator test
         env:
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+          KUBECONFIG: /home/runner/.kube/config
+          PFLT_INDEXIMAGE: ${{ needs.buildx.outputs.catalog_img }}
         run: |
           bin/preflight check operator ${BUNDLE_IMG}
 
@@ -787,11 +795,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: "Setting up KinD cluster"
+      - name: Setting up KinD cluster
         uses: helm/kind-action@v1.9.0
         with:
           wait: "600s"
-          version: "v0.20.0"
+          version: ${{ env.KIND_VERSION }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -814,7 +822,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
 
-      - name: "Running Scorecard tests"
+      - name: Running Scorecard tests
         env:
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
         run: |

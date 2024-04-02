@@ -24,6 +24,7 @@ IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --e
 ifneq (,${IMAGE_TAG})
 CONTROLLER_IMG = ${IMAGE_NAME}:${IMAGE_TAG}
 BUNDLE_IMG = ${IMAGE_NAME}:bundle-${IMAGE_TAG}
+CATALOG_IMG = ${IMAGE_NAME}:catalog-${IMAGE_TAG}
 endif
 endif
 
@@ -162,7 +163,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	    - Image: ${BUNDLE_IMG}" | envsubst > cloudnative-pg-operator-template.yaml
 	$(OPM) alpha render-template semver -o yaml < cloudnative-pg-operator-template.yaml > catalog/catalog.yaml ;\
 	$(OPM) validate catalog/ ;\
-	DOCKER_BUILDKIT=1 docker build --push -f catalog.Dockerfile -t ${IMAGE_NAME}:catalog-${VERSION} . ;\
+	DOCKER_BUILDKIT=1 docker build --push -f catalog.Dockerfile -t ${CATALOG_IMG} . ;\
 	echo -e "apiVersion: operators.coreos.com/v1alpha1\n\
 	kind: CatalogSource\n\
 	metadata:\n\
@@ -170,7 +171,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	   namespace: operators\n\
 	spec:\n\
 	   sourceType: grpc\n\
-	   image: ${IMAGE_NAME}:catalog-${VERSION}\n\
+	   image: ${CATALOG_IMG}\n\
 	   secrets:\n\
        - cnpg-pull-secret" | envsubst > cloudnative-pg-catalog.yaml ;\
 
