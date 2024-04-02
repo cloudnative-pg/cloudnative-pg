@@ -154,6 +154,11 @@ var _ = Describe("File copying functions", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(BeFalse())
 	})
+
+	It("fails when the directory to be removed doesn't exist", func() {
+		err := RemoveDirectory(path.Join(tempDir2, "not-existing"))
+		Expect(err).To(MatchError(os.IsNotExist, "is not exists"))
+	})
 })
 
 var _ = Describe("function GetDirectoryContent", func() {
