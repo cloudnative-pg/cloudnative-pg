@@ -24,7 +24,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -37,43 +37,52 @@ import (
 )
 
 var _ = Describe("scale down", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
 	When("there's no separate WAL storage", func() {
 		It("delete the PGDATA PVC", func() {
 			ctx := context.Background()
-			namespace := newFakeNamespace()
-			cluster := newFakeCNPGCluster(namespace)
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGCluster(env.client, namespace)
 
 			resources := &managedResources{
-				pvcs:      corev1.PersistentVolumeClaimList{Items: generateFakePVCWithDefaultClient(cluster)},
-				jobs:      batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(cluster)},
-				instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
+				pvcs: corev1.PersistentVolumeClaimList{
+					Items: generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady),
+				},
+				jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(env.client, cluster)},
+				instances: corev1.PodList{
+					Items: generateFakeClusterPodsWithDefaultClient(env.client, cluster, true),
+				},
 			}
 
 			instanceName := findDeletableInstance(cluster, resources.instances.Items)
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.Pod{},
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.PersistentVolumeClaim{},
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 
-			Expect(clusterReconciler.scaleDownCluster(
-				ctx,
-				cluster,
-				resources,
-			)).To(Succeed())
+			Expect(env.clusterReconciler.scaleDownCluster(ctx, cluster, resources)).To(Succeed())
 
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.Pod{},
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.PersistentVolumeClaim{},
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
@@ -83,34 +92,41 @@ var _ = Describe("scale down", func() {
 	When("WAL storage is separate", func() {
 		It("delete the PGDATA and WAL PVC", func() {
 			ctx := context.Background()
-			namespace := newFakeNamespace()
-			cluster := newFakeCNPGClusterWithPGWal(namespace)
+			namespace := newFakeNamespace(env.client)
+			cluster := newFakeCNPGClusterWithPGWal(env.client, namespace)
 
 			resources := &managedResources{
-				pvcs:      corev1.PersistentVolumeClaimList{Items: generateFakePVCWithDefaultClient(cluster)},
-				jobs:      batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(cluster)},
-				instances: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
+				pvcs: corev1.PersistentVolumeClaimList{
+					Items: generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady),
+				},
+				jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(env.client, cluster)},
+				instances: corev1.PodList{
+					Items: generateFakeClusterPodsWithDefaultClient(env.client, cluster, true),
+				},
 			}
 
 			instanceName := findDeletableInstance(cluster, resources.instances.Items)
 			pvcWalName := persistentvolumeclaim.NewPgWalCalculator().GetName(instanceName)
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.Pod{},
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.PersistentVolumeClaim{},
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.PersistentVolumeClaim{},
 				types.NamespacedName{Name: pvcWalName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 
-			Expect(clusterReconciler.scaleDownCluster(
+			Expect(env.clusterReconciler.scaleDownCluster(
 				ctx,
 				cluster,
 				resources,
@@ -118,16 +134,19 @@ var _ = Describe("scale down", func() {
 
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.Pod{},
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.PersistentVolumeClaim{},
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
 			Expect(isResourceExisting(
 				ctx,
+				env.client,
 				&corev1.PersistentVolumeClaim{},
 				types.NamespacedName{Name: pvcWalName, Namespace: cluster.Namespace},
 			)).To(BeFalse())
@@ -137,7 +156,7 @@ var _ = Describe("scale down", func() {
 
 var _ = Describe("cluster scale pod and job deletion logic", func() {
 	var (
-		fakeClientSet ctrl.WithWatch
+		fakeClientSet client.WithWatch
 		reconciler    *ClusterReconciler
 		ctx           context.Context
 		cancel        context.CancelFunc
@@ -219,7 +238,12 @@ var _ = Describe("cluster scale pod and job deletion logic", func() {
 })
 
 // isResourceExisting check is a certain resource exists in the Kubernetes space and has not been deleted
-func isResourceExisting(ctx context.Context, store ctrl.Object, key ctrl.ObjectKey) (bool, error) {
+func isResourceExisting(
+	ctx context.Context,
+	k8sClient client.Client,
+	store client.Object,
+	key client.ObjectKey,
+) (bool, error) {
 	err := k8sClient.Get(ctx, key, store)
 	if err != nil && apierrors.IsNotFound(err) {
 		return false, nil

@@ -33,24 +33,26 @@ import (
 
 var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly", func() {
 	const cmName = apiv1.DefaultMonitoringConfigMapName
+	var env *testingEnvironment
 
 	BeforeEach(func() {
+		env = buildTestEnvironment()
 		configuration.Current = configuration.NewConfiguration()
 		configuration.Current.MonitoringQueriesConfigmap = cmName
 	})
 
 	It("should make sure that a dangling monitoring queries config map is deleted", func() {
 		ctx := context.Background()
-		namespace := newFakeNamespace()
+		namespace := newFakeNamespace(env.client)
 		crReconciler := &ClusterReconciler{
 			Client: fakeClientWithIndexAdapter{
-				Client:          clusterReconciler.Client,
+				Client:          env.clusterReconciler.Client,
 				indexerAdapters: []indexAdapter{clusterDefaultQueriesFalsePathIndexAdapter},
 			},
-			Scheme:          clusterReconciler.Scheme,
-			Recorder:        clusterReconciler.Recorder,
-			DiscoveryClient: clusterReconciler.DiscoveryClient,
-			StatusClient:    clusterReconciler.StatusClient,
+			Scheme:          env.clusterReconciler.Scheme,
+			Recorder:        env.clusterReconciler.Recorder,
+			DiscoveryClient: env.clusterReconciler.DiscoveryClient,
+			StatusClient:    env.clusterReconciler.StatusClient,
 		}
 
 		By("creating the required monitoring configmap", func() {
@@ -67,7 +69,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 
 		By("making sure configmap exists", func() {
 			cm := &corev1.ConfigMap{}
-			expectResourceExistsWithDefaultClient(cmName, namespace, cm)
+			expectResourceExists(env.client, cmName, namespace, cm)
 		})
 
 		By("deleting the dangling monitoring configmap", func() {
@@ -76,7 +78,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 		})
 
 		By("making sure it doesn't exist anymore", func() {
-			expectResourceDoesntExistWithDefaultClient(cmName, namespace, &corev1.ConfigMap{})
+			expectResourceDoesntExist(env.client, cmName, namespace, &corev1.ConfigMap{})
 		})
 	})
 
@@ -84,15 +86,15 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 		ctx := context.Background()
 		crReconciler := &ClusterReconciler{
 			Client: fakeClientWithIndexAdapter{
-				Client:          clusterReconciler.Client,
+				Client:          env.clusterReconciler.Client,
 				indexerAdapters: []indexAdapter{clusterDefaultQueriesFalsePathIndexAdapter},
 			},
-			Scheme:          clusterReconciler.Scheme,
-			Recorder:        clusterReconciler.Recorder,
-			DiscoveryClient: clusterReconciler.DiscoveryClient,
-			StatusClient:    clusterReconciler.StatusClient,
+			Scheme:          env.clusterReconciler.Scheme,
+			Recorder:        env.clusterReconciler.Recorder,
+			DiscoveryClient: env.clusterReconciler.DiscoveryClient,
+			StatusClient:    env.clusterReconciler.StatusClient,
 		}
-		namespace := newFakeNamespace()
+		namespace := newFakeNamespace(env.client)
 		var cluster *apiv1.Cluster
 
 		By("creating the required monitoring configmap", func() {
@@ -108,7 +110,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 		})
 
 		By("creating the required resources", func() {
-			cluster = newFakeCNPGCluster(namespace)
+			cluster = newFakeCNPGCluster(env.client, namespace)
 		})
 
 		By("making sure that the configmap and the cluster exists", func() {
@@ -135,7 +137,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 		})
 
 		By("making sure it still exists", func() {
-			expectResourceExistsWithDefaultClient(cmName, namespace, &corev1.ConfigMap{})
+			expectResourceExists(env.client, cmName, namespace, &corev1.ConfigMap{})
 		})
 	})
 })
