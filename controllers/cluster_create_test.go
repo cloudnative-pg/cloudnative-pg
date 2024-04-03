@@ -52,11 +52,12 @@ var _ = Describe("cluster_create unit tests", func() {
 		env = buildTestEnvironment()
 	})
 
-	It("should make sure that reconcilePostgresSecrets works correctly", func(ctx SpecContext) {
+	It("should NOT create EnableSuperuserAccess if it is disabled", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pooler := newFakePooler(env.client, cluster)
 		poolerSecretName := pooler.Name
+		cluster.Spec.EnableSuperuserAccess = ptr.To(false)
 		cluster.Status.PoolerIntegrations = &apiv1.PoolerIntegrations{
 			PgBouncerIntegration: apiv1.PgBouncerIntegrationStatus{
 				Secrets: []string{poolerSecretName},
@@ -96,9 +97,9 @@ var _ = Describe("cluster_create unit tests", func() {
 				&appUser,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(appUser.Data["username"])).To(Equal("app"))
-			Expect(string(appUser.Data["password"])).To(HaveLen(64))
-			Expect(string(appUser.Data["dbname"])).To(Equal("app"))
+			Expect(appUser.StringData["username"]).To(Equal("app"))
+			Expect(appUser.StringData["password"]).To(HaveLen(64))
+			Expect(appUser.StringData["dbname"]).To(Equal("app"))
 		})
 
 		By("making sure that the pooler secrets has been created", func() {
@@ -130,9 +131,9 @@ var _ = Describe("cluster_create unit tests", func() {
 				&superUser,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(superUser.Data["username"])).To(Equal("postgres"))
-			Expect(string(superUser.Data["password"])).To(HaveLen(64))
-			Expect(string(superUser.Data["dbname"])).To(Equal("*"))
+			Expect(superUser.StringData["username"]).To(Equal("postgres"))
+			Expect(superUser.StringData["password"]).To(HaveLen(64))
+			Expect(superUser.StringData["dbname"]).To(Equal("*"))
 		})
 	})
 
