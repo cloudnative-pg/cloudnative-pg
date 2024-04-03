@@ -74,7 +74,7 @@ jobs:
           draft: false
           name: v${{ env.TAG }}
           files: releases/cnpg-${{ env.VERSION }}.yaml
-          make_latest: ${{ steps.check-branch.outputs.is_latest }}
+          make_latest: ${{ needs.check-branch.outputs.is_latest }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -151,7 +151,7 @@ jobs:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
       -
         name: Publish Krew
-        if: ${{ steps.check-branch.outputs.is_latest == 'true' }}
+        if: ${{ needs.check-branch.outputs.is_latest == 'true' }}
         uses: rajatjindal/krew-release-bot@v0.0.46
         with:
           krew_template_file: dist/krew/cnpg.yaml
