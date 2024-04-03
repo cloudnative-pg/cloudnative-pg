@@ -542,6 +542,7 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 		Expect(res).To(Or(BeNil(), Equal(reconcile.Result{})))
 	})
 
+	// nolint: dupl
 	It("should requeue if bootstrapping from an invalid volume snapshot", func(ctx SpecContext) {
 		snapshots := volumesnapshot.VolumeSnapshotList{
 			Items: []volumesnapshot.VolumeSnapshot{
@@ -578,6 +579,7 @@ var _ = Describe("check if bootstrap recovery can proceed from volume snapshot",
 		Expect(res).ToNot(Equal(reconcile.Result{}))
 	})
 
+	// nolint: dupl
 	It("should requeue if bootstrapping from a snapshot that isn't there", func(ctx SpecContext) {
 		snapshots := volumesnapshot.VolumeSnapshotList{
 			Items: []volumesnapshot.VolumeSnapshot{

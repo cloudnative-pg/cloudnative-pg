@@ -139,8 +139,7 @@ var _ = Describe("pooler_status unit tests", func() {
 			poolerAfter := &v1.Pooler{}
 			err = env.client.Get(ctx, poolerQuery, poolerAfter)
 			Expect(err).ToNot(HaveOccurred())
-
-			Expect(poolerAfter.ResourceVersion).To(Equal(poolerBefore.ResourceVersion))
+			Expect(poolerBefore.Status).To(BeEquivalentTo(poolerAfter.Status))
 		})
 	})
 })

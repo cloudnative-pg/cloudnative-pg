@@ -136,6 +136,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 	})
 
+	// nolint: dupl
 	It("should correctly fetch the role when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)
@@ -186,6 +187,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 	})
 
+	// nolint: dupl
 	It("should correctly fetch the SA when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace(env.client)

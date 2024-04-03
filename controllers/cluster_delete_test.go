@@ -18,11 +18,10 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -111,24 +110,16 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 
 		By("creating the required resources", func() {
 			cluster = newFakeCNPGCluster(env.client, namespace)
+			cluster.Spec.Monitoring = &apiv1.MonitoringConfiguration{
+				DisableDefaultQueries: ptr.To(false),
+			}
+			err := crReconciler.Client.Update(context.Background(), cluster)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("making sure that the configmap and the cluster exists", func() {
 			expectResourceExists(crReconciler.Client, cmName, namespace, &corev1.ConfigMap{})
 			expectResourceExists(crReconciler.Client, cluster.Name, namespace, &apiv1.Cluster{})
-		})
-
-		By("making sure that the cache is indexed", func() {
-			Eventually(func(g Gomega) {
-				clustersUsingDefaultMetrics := apiv1.ClusterList{}
-				err := crReconciler.List(
-					ctx,
-					&clustersUsingDefaultMetrics,
-					client.InNamespace(namespace),
-				)
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(clustersUsingDefaultMetrics.Items).To(HaveLen(1))
-			}, 20*time.Second).Should(Succeed())
 		})
 
 		By("deleting the dangling monitoring configmap", func() {

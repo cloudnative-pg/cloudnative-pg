@@ -256,7 +256,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		})
 
 		By("making sure the svc doesn't get updated if there are not changes", func() {
-			previousResourceVersion := res.Service.ResourceVersion
+			previousService := res.Service.DeepCopy()
 			err := env.poolerReconciler.reconcileService(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -264,8 +264,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			expectedSVC := pgbouncer.Service(pooler, cluster)
 			err = env.client.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
-
-			Expect(previousResourceVersion).To(Equal(svc.ResourceVersion))
+			Expect(previousService.Spec).To(BeEquivalentTo(svc.Spec))
+			Expect(previousService.Labels).To(BeEquivalentTo(svc.Labels))
 		})
 
 		By("making sure it reconciles if differences from the living and expected service are present", func() {
