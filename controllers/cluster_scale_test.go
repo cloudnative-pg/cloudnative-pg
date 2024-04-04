@@ -72,7 +72,11 @@ var _ = Describe("scale down", func() {
 				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 
-			Expect(env.clusterReconciler.scaleDownCluster(ctx, cluster, resources)).To(Succeed())
+			Expect(env.clusterReconciler.scaleDownCluster(
+				ctx,
+				cluster,
+				resources,
+			)).To(Succeed())
 
 			Expect(isResourceExisting(
 				ctx,
