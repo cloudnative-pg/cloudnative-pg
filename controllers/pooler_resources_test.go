@@ -49,23 +49,36 @@ var _ = Describe("pooler_resources unit tests", func() {
 		pooler := newFakePooler(env.client, cluster)
 		objectKey := client.ObjectKey{Namespace: pooler.Namespace, Name: pooler.Name}
 
-		By("making sure that returns nil if the deployment doesn't exist", func() {
-			result, err := getDeploymentOrNil(ctx, env.poolerReconciler.Client, objectKey)
+		By("making sure that returns nil if the deployment and/or service doesn't exist", func() {
+			deployment, err := getDeploymentOrNil(ctx, env.poolerReconciler.Client, objectKey)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result).To(BeNil())
+			Expect(deployment).To(BeNil())
+
+			service, err := getServiceOrNil(ctx, env.poolerReconciler.Client, objectKey)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(service).To(BeNil())
 		})
 
-		By("creating the deployment", func() {
-			dep, err := pgbouncer.Deployment(pooler, cluster)
+		By("creating the deployment and service", func() {
+			deployment, err := pgbouncer.Deployment(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			err = env.poolerReconciler.Create(ctx, deployment)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = env.poolerReconciler.Create(ctx, dep)
+			service, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			err = env.poolerReconciler.Create(ctx, service)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("making sure it returns the created deployment", func() {
-			result, err := getDeploymentOrNil(ctx, env.poolerReconciler.Client, objectKey)
-			assertResourceIsCorrect(pooler.ObjectMeta, result.ObjectMeta, err)
+		By("making sure it returns the created deployment and service", func() {
+			deployment, err := getDeploymentOrNil(ctx, env.poolerReconciler.Client, objectKey)
+			Expect(err).ToNot(HaveOccurred())
+			assertResourceIsCorrect(pooler.ObjectMeta, deployment.ObjectMeta, err)
+
+			service, err := getServiceOrNil(ctx, env.poolerReconciler.Client, objectKey)
+			Expect(err).ToNot(HaveOccurred())
+			assertResourceIsCorrect(pooler.ObjectMeta, service.ObjectMeta, err)
 		})
 	})
 
@@ -125,8 +138,9 @@ var _ = Describe("pooler_resources unit tests", func() {
 		})
 
 		By("creating the service", func() {
-			service := pgbouncer.Service(pooler, cluster)
-			err := env.poolerReconciler.Create(ctx, service)
+			service, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			err = env.poolerReconciler.Create(ctx, service)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -158,6 +172,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 
 		By("making sure it returns the created role", func() {
 			result, err := getRoleOrNil(ctx, env.poolerReconciler.Client, objectKey)
+			Expect(err).ToNot(HaveOccurred())
 			assertResourceIsCorrect(pooler.ObjectMeta, result.ObjectMeta, err)
 		})
 	})
@@ -183,6 +198,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 
 		By("making sure it returns the created roleBinding", func() {
 			result, err := getRoleBindingOrNil(ctx, env.poolerReconciler.Client, objectKey)
+			Expect(err).ToNot(HaveOccurred())
 			assertResourceIsCorrect(pooler.ObjectMeta, result.ObjectMeta, err)
 		})
 	})
@@ -209,6 +225,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 
 		By("making sure it returns the created SA", func() {
 			result, err := getServiceAccountOrNil(ctx, env.poolerReconciler.Client, objectKey)
+			Expect(err).ToNot(HaveOccurred())
 			assertResourceIsCorrect(pooler.ObjectMeta, result.ObjectMeta, err)
 		})
 	})
