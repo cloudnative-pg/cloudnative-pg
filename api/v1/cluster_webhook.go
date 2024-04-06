@@ -1201,7 +1201,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
 				r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints],
-				"`wal_log_hints` should be set to `on` when having replica instances"))
+				"`wal_log_hints` must be set to `on` when `instances` > 1"))
 	}
 
 	// verify the postgres setting min_wal_size < max_wal_size < volume size
