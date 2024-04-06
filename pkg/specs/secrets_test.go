@@ -34,10 +34,10 @@ var _ = Describe("Secret creation", func() {
 		Expect(secret.StringData["host"]).To(Equal("thishost"))
 		Expect(secret.StringData["port"]).To(Equal("5432"))
 		Expect(secret.StringData["uri"]).To(
-			Equal("postgresql://thisuser:thispassword@thishost:5432/thisdb"),
+			Equal("postgresql://thisuser:thispassword@thishost.namespace:5432/thisdb"),
 		)
 		Expect(secret.StringData["jdbc-uri"]).To(
-			Equal("jdbc:postgresql://thishost:5432/thisdb?password=thispassword&user=thisuser"),
+			Equal("jdbc:postgresql://thishost.namespace:5432/thisdb?password=thispassword&user=thisuser"),
 		)
 	})
 })
