@@ -76,6 +76,7 @@ max_parallel_workers = '32'
 max_replication_slots = '32'
 max_worker_processes = '32'
 shared_memory_type = 'mmap' # for PostgreSQL >= 12 only
+wal_log_hints = 'on'
 wal_keep_size = '512MB' # for PostgreSQL >= 13 only
 wal_keep_segments = '32' # for PostgreSQL <= 12 only
 wal_level = 'logical'
@@ -121,7 +122,6 @@ ssl_cert_file = '/controller/certificates/server.crt'
 ssl_key_file = '/controller/certificates/server.key'
 unix_socket_directories = '/controller/run'
 wal_level = 'logical'
-wal_log_hints = 'on'
 ```
 
 Since the fixed parameters are added at the end, they can't be overridden by the
