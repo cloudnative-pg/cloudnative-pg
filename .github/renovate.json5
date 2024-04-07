@@ -333,6 +333,13 @@
         "action"
       ],
       "pinDigests": false
+    },{
+// PR group for Kubernetes CSI
+      "groupName": "kubernetes CSI",
+      "matchPackagePrefixes": [
+        "kubernetes-cs"
+      ],
+      "pinDigests": false
     }
   ]
 }
