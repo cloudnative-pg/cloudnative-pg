@@ -41,7 +41,7 @@ var _ = Describe("PostgreSQL cluster type", func() {
 
 	It("correctly get if the superuser is enabled", func() {
 		postgresql.Spec.EnableSuperuserAccess = nil
-		Expect(postgresql.GetEnableSuperuserAccess()).To(BeTrue())
+		Expect(postgresql.GetEnableSuperuserAccess()).To(BeFalse())
 
 		falseValue := false
 		postgresql.Spec.EnableSuperuserAccess = &falseValue

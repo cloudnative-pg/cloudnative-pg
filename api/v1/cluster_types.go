@@ -3006,7 +3006,7 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 		return *cluster.Spec.EnableSuperuserAccess
 	}
 
-	return true
+	return false
 }
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout
