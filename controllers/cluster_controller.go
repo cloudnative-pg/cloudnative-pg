@@ -416,7 +416,7 @@ func (r *ClusterReconciler) handleSwitchover(
 
 	// Update the target primary name from the Pods status.
 	// This means issuing a failover or switchover when needed.
-	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
+	selectedPrimary, err := r.reconcileTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
 	if err != nil {
 		if errors.Is(err, ErrWaitingOnFailOverDelay) {
 			contextLogger.Info("Waiting for the failover delay to expire")
