@@ -64,7 +64,7 @@ These predefined labels are managed by CloudNativePG.
 : Whether the backup is online (hot) or taken when Postgres is down (cold)
 
 `cnpg.io/podRole`
-: Role of the pod: `instance`, or `pooler`
+: Distinguishes pods dedicated to pooler from those for instance
 
 `cnpg.io/poolerName`
 : Name of the PgBouncer pooler
@@ -78,11 +78,14 @@ These predefined labels are managed by CloudNativePG.
 
 `role` - **deprecated**
 :  Whether the instance running in a pod is a `primary` or a `replica`.
-   This label is deprecated, you should use `cnpg.io/podRole` instead.
+   This label is deprecated, you should use `cnpg.io/instanceRole` instead.
 
 `cnpg.io/scheduled-backup`
 :  When available, name of the `ScheduledBackup` resource that created a given
    `Backup` object
+
+`cnpg.io/instanceRole`
+: Whether the instance running in a pod is a `primary` or a `replica`.
 
 
 ## Predefined annotations
