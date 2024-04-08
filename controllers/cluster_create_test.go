@@ -57,7 +57,6 @@ var _ = Describe("cluster_create unit tests", func() {
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pooler := newFakePooler(env.client, cluster)
 		poolerSecretName := pooler.Name
-		cluster.Spec.EnableSuperuserAccess = ptr.To(false)
 		cluster.Status.PoolerIntegrations = &apiv1.PoolerIntegrations{
 			PgBouncerIntegration: apiv1.PgBouncerIntegrationStatus{
 				Secrets: []string{poolerSecretName},
