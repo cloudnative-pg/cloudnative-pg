@@ -64,7 +64,8 @@ These predefined labels are managed by CloudNativePG.
 : Whether the backup is online (hot) or taken when Postgres is down (cold)
 
 `cnpg.io/podRole`
-: Distinguishes pods dedicated to pooler from those for instance
+: Distinguishes pods dedicated to pooler deployment from those used for
+  database instances
 
 `cnpg.io/poolerName`
 : Name of the PgBouncer pooler
