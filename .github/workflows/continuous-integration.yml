@@ -825,7 +825,6 @@ jobs:
           mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
           cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
           rm -fr bundle.Dockerfile *.zip bundle/
-          echo "updateGraph: replaces-mode" > operators/cloudnative-pg/ci.yaml
 
       - name: Test bundle
         run: |
