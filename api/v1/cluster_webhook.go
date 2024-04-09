@@ -1880,14 +1880,6 @@ func (r *Cluster) validateReplicaModeChange(old *Cluster) field.ErrorList {
 		return result
 	}
 
-	// otherwise if it was not defined before or it was just not enabled, add an error
-	if old.Spec.ReplicaCluster == nil || !old.Spec.ReplicaCluster.Enabled {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "replicaCluster"),
-			r.Spec.ReplicaCluster,
-			"Can not enable replication on existing clusters"))
-	}
-
 	return result
 }
 
@@ -1925,12 +1917,9 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 			field.NewPath("spec", "bootstrap"),
 			r.Spec.ReplicaCluster,
 			"bootstrap configuration is required for replica mode"))
-	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "replicaCluster"),
-			r.Spec.ReplicaCluster,
-			"replica mode is compatible only with bootstrap using pg_basebackup or recovery"))
 	}
+	// TODO: avoid during the creation incompatible bootstrap modes but not during changes
+
 	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
 	if !found {
 		result = append(
