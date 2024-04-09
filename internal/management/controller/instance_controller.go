@@ -1159,9 +1159,9 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	}
 
 	// We need to ensure that this instance is replicating from the correct server
-	changed, _, err = r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
+	changed, needsRestart, err = r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
 	if err != nil {
-		return changed, needsRestart, err
+		return changed, false, err
 	}
 
 	// I'm the primary, need to inform the operator

@@ -39,20 +39,20 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	//       to override.conf for coordinating replication configuration
 	changed, err = instance.migratePostgresAutoConfFile(ctx)
 	if err != nil {
-		return changed, needsRestart, err
+		return changed, false, err
 	}
 
 	primary, err := instance.IsPrimary()
 	if err != nil {
-		return changed, needsRestart, err
+		return changed, false, err
 	}
 
 	needsRestart, err = instance.NeedsDesignatedPrimaryTransition(cluster)
 	if err != nil {
-		return changed, needsRestart, nil
+		return changed, false, nil
 	}
 	if primary && !needsRestart {
-		return changed, needsRestart, nil
+		return changed, false, nil
 	}
 
 	if cluster.IsReplica() && cluster.Status.TargetPrimary == instance.PodName {
