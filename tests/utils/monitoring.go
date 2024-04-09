@@ -22,11 +22,11 @@ import (
 )
 
 // GetPodMonitor gathers the current PodMonitor in a namespace
-func (env TestingEnvironment) GetPodMonitor(namespace string, clusterName string) (*monitoringv1.PodMonitor, error) {
+func (env TestingEnvironment) GetPodMonitor(namespace string, name string) (*monitoringv1.PodMonitor, error) {
 	podMonitor := &monitoringv1.PodMonitor{}
 	namespacedName := types.NamespacedName{
 		Namespace: namespace,
-		Name:      clusterName,
+		Name:      name,
 	}
 
 	err := GetObject(&env, namespacedName, podMonitor)
