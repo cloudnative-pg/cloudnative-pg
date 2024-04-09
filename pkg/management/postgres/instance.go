@@ -735,6 +735,8 @@ func (instance *Instance) IsPrimary() (bool, error) {
 	return true, nil
 }
 
+// NeedsDesignatedPrimaryTransition returns true if the instance is a primary that requires to be migrated to a
+// designatedPrimary
 func (instance *Instance) NeedsDesignatedPrimaryTransition(cluster *apiv1.Cluster) (bool, error) {
 	if !cluster.IsReplica() {
 		return false, nil

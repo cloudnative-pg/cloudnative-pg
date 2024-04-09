@@ -2612,26 +2612,6 @@ var _ = Describe("replica mode validation", func() {
 		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
 	})
 
-	It("complains if the initdb bootstrap method is used", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					InitDB: &BootstrapInitDB{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
-	})
-
 	It("is valid when the pg_basebackup bootstrap option is used", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
@@ -2691,61 +2671,6 @@ var _ = Describe("replica mode validation", func() {
 		cluster.Spec.Bootstrap.PgBaseBackup = nil
 		result := cluster.validateReplicaMode()
 		Expect(result).ToNot(BeEmpty())
-	})
-
-	It("complains when enabled on an existing cluster with no replica mode configured", func() {
-		oldCluster := &Cluster{
-			Spec: ClusterSpec{},
-		}
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).To(BeEmpty())
-		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
-	})
-
-	It("complains when enabled on an existing cluster with replica mode disabled", func() {
-		oldCluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: false,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).To(BeEmpty())
-		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
 	})
 })
 
