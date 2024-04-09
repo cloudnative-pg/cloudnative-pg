@@ -48,6 +48,9 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	}
 
 	needsRestart, err = instance.NeedsDesignatedPrimaryTransition(cluster)
+	if err != nil {
+		return changed, needsRestart, nil
+	}
 	if primary && !needsRestart {
 		return changed, needsRestart, nil
 	}

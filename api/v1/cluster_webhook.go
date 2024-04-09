@@ -1873,7 +1873,7 @@ func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path
 }
 
 // Check replica mode is enabled only at cluster creation time
-func (r *Cluster) validateReplicaModeChange(old *Cluster) field.ErrorList {
+func (r *Cluster) validateReplicaModeChange(_ *Cluster) field.ErrorList {
 	var result field.ErrorList
 	// if we are not specifying any replica cluster configuration or disabling it, nothing to do
 	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
