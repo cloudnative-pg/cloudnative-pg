@@ -37,6 +37,9 @@ const ParameterMaxWalSenders = "max_wal_senders"
 // ParameterArchiveMode the configuration key containing the archive_mode value
 const ParameterArchiveMode = "archive_mode"
 
+// ParameterWalLogHints the configuration key containing the wal_log_hints value
+const ParameterWalLogHints = "wal_log_hints"
+
 // An acceptable wal_level value
 const (
 	WalLevelValueLogical WalLevelValue = "logical"
@@ -396,7 +399,6 @@ var (
 		"unix_socket_directories":   blockedConfigurationParameter,
 		"unix_socket_group":         blockedConfigurationParameter,
 		"unix_socket_permissions":   blockedConfigurationParameter,
-		"wal_log_hints":             fixedConfigurationParameter,
 
 		// The following parameters need a reload to be applied
 		"archive_cleanup_command":                blockedConfigurationParameter,
@@ -450,6 +452,8 @@ var (
 			"dynamic_shared_memory_type": "posix",
 			"wal_sender_timeout":         "5s",
 			"wal_receiver_timeout":       "5s",
+			"wal_level":                  "logical",
+			"wal_log_hints":              "on",
 			// Workaround for PostgreSQL not behaving correctly when
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.
@@ -458,9 +462,6 @@ var (
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
 			{MajorVersionRangeUnlimited, 120000}: {
 				"wal_keep_segments": "32",
-			},
-			{MajorVersionRangeUnlimited, MajorVersionRangeUnlimited}: {
-				"wal_level": "logical",
 			},
 			{120000, 130000}: {
 				"wal_keep_segments":  "32",
@@ -483,7 +484,6 @@ var (
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
 			"port":                fmt.Sprint(ServerPort),
-			"wal_log_hints":       "on",
 			"full_page_writes":    "on",
 			"ssl":                 "on",
 			"ssl_cert_file":       ServerCertificateLocation,

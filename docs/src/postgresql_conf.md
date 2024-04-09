@@ -64,6 +64,7 @@ operator by applying the following sections in this order:
 The **global default parameters** are:
 
 ```text
+archive_mode = 'on'
 dynamic_shared_memory_type = 'posix'
 logging_collector = 'on'
 log_destination = 'csvlog'
@@ -79,6 +80,7 @@ shared_memory_type = 'mmap' # for PostgreSQL >= 12 only
 wal_keep_size = '512MB' # for PostgreSQL >= 13 only
 wal_keep_segments = '32' # for PostgreSQL <= 12 only
 wal_level = 'logical'
+wal_log_hints = 'on'
 wal_sender_timeout = '5s'
 wal_receiver_timeout = '5s'
 ```
@@ -109,7 +111,6 @@ The following parameters are **fixed** and exclusively controlled by the operato
 
 ```text
 archive_command = '/controller/manager wal-archive %p'
-archive_mode = 'on'
 full_page_writes = 'on'
 hot_standby = 'true'
 listen_addresses = '*'
@@ -120,8 +121,6 @@ ssl_ca_file = '/controller/certificates/client-ca.crt'
 ssl_cert_file = '/controller/certificates/server.crt'
 ssl_key_file = '/controller/certificates/server.key'
 unix_socket_directories = '/controller/run'
-wal_level = 'logical'
-wal_log_hints = 'on'
 ```
 
 Since the fixed parameters are added at the end, they can't be overridden by the
@@ -638,5 +637,4 @@ Users are not allowed to set the following configuration parameters in the
 - `unix_socket_directories`
 - `unix_socket_group`
 - `unix_socket_permissions`
-- `wal_log_hints`
 
