@@ -444,7 +444,6 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 		r.validateStorageChange,
 		r.validateWalStorageChange,
 		r.validateTablespacesChange,
-		r.validateReplicaModeChange,
 		r.validateUnixPermissionIdentifierChange,
 		r.validateReplicationSlotsChange,
 		r.validateWALLevelChange,
@@ -1872,17 +1871,6 @@ func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path
 	return result
 }
 
-// Check replica mode is enabled only at cluster creation time
-func (r *Cluster) validateReplicaModeChange(_ *Cluster) field.ErrorList {
-	var result field.ErrorList
-	// if we are not specifying any replica cluster configuration or disabling it, nothing to do
-	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
-		return result
-	}
-
-	return result
-}
-
 func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
 
@@ -1917,9 +1905,15 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 			field.NewPath("spec", "bootstrap"),
 			r.Spec.ReplicaCluster,
 			"bootstrap configuration is required for replica mode"))
+	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
+		// this is needed because we only want to validate this during cluster creation, currently if we would have
+		// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
+		r.Status.LatestGeneratedNode == 0 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "replicaCluster"),
+			r.Spec.ReplicaCluster,
+			"replica mode bootstrap is compatible only with using pg_basebackup or recovery"))
 	}
-	// TODO: avoid during the creation incompatible bootstrap modes but not during changes
-
 	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
 	if !found {
 		result = append(
