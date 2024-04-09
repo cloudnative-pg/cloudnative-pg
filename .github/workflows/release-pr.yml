@@ -19,7 +19,7 @@ jobs:
         run: |
           TAG=${GITHUB_REF##*/}
           DEST=$(echo ${TAG#v} | awk -F '[.]' '{print "release-"$1"."$2}')
-          echo "TAG=${TAG}" >> $GITHUB_ENV
+          echo "TAG=${TAG#v}" >> $GITHUB_ENV
           echo "DEST=${DEST}" >> $GITHUB_ENV
       -
         name: Pull Request
@@ -30,4 +30,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
           pr_label: release
-          pr_title: "feat: release ${{ env.TAG }}"
+          pr_title: "Version tag to ${{ env.TAG }}"
