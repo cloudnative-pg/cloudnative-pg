@@ -36,7 +36,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
+var _ = FDescribe("Replica Mode", Label(tests.LabelReplication), func() {
 	const (
 		replicaModeClusterDir = "/replica_mode_cluster/"
 		srcClusterName        = "cluster-replica-src"
@@ -103,6 +103,45 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				replicaClusterSampleBasicAuth,
 				checkQuery,
 				psqlClientPod)
+
+			AssertDetachReplicaModeCluster(
+				replicaNamespace,
+				srcClusterName,
+				replicaClusterName,
+				sourceDBName,
+				replicaDBName,
+				"test_replica")
+		})
+
+		FIt("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
+			const (
+				replicaClusterSampleBasicAuth = fixturesDir + replicaModeClusterDir + "cluster-replica-basicauth.yaml.template"
+				replicaNamespacePrefix        = "replica-mode-basic-auth"
+			)
+
+			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleBasicAuth)
+			Expect(err).ToNot(HaveOccurred())
+			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(replicaNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(replicaNamespace)
+			})
+			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+			AssertReplicaModeCluster(
+				replicaNamespace,
+				srcClusterName,
+				replicaClusterSampleBasicAuth,
+				checkQuery,
+				psqlClientPod)
+
+			cluster, err := env.GetCluster(replicaNamespace, srcClusterName)
+			Expect(err).ToNot(HaveOccurred())
+			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+				Enabled: true,
+			}
 
 			AssertDetachReplicaModeCluster(
 				replicaNamespace,
