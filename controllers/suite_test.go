@@ -19,8 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -32,17 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/discovery"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -50,17 +47,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-)
-
-var (
-	cfg               *rest.Config
-	k8sClient         client.Client
-	testEnv           *envtest.Environment
-	poolerReconciler  *PoolerReconciler
-	clusterReconciler *ClusterReconciler
-	backupReconciler  *BackupReconciler
-	scheme            *runtime.Scheme
-	discoveryClient   discovery.DiscoveryInterface
 )
 
 func init() {
@@ -72,68 +58,75 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controllers Suite")
 }
 
-var _ = BeforeSuite(func() {
-	By("bootstrapping test environment")
-	testEnv = buildTestEnv()
+type testingEnvironment struct {
+	backupReconciler  *BackupReconciler
+	scheme            *runtime.Scheme
+	clusterReconciler *ClusterReconciler
+	poolerReconciler  *PoolerReconciler
+	discoveryClient   *fakediscovery.FakeDiscovery
+	client            client.WithWatch
+}
+
+func buildTestEnvironment() *testingEnvironment {
 	var err error
-	cfg, err = testEnv.Start()
-	Expect(err).ToNot(HaveOccurred())
-	Expect(cfg).ToNot(BeNil())
-
-	scheme = runtime.NewScheme()
-
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(apiv1.AddToScheme(scheme))
-
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).ToNot(HaveOccurred())
 
-	discoveryClient, err = discovery.NewDiscoveryClientForConfig(cfg)
+	scheme := schemeBuilder.BuildWithAllKnownScheme()
+	k8sClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &corev1.Service{},
+			&corev1.ConfigMap{}, &corev1.Secret{}).
+		Build()
 	Expect(err).ToNot(HaveOccurred())
 
-	clusterReconciler = &ClusterReconciler{
+	discoveryClient := &fakediscovery.FakeDiscovery{
+		Fake: &k8stesting.Fake{
+			Resources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "monitoring.coreos.com/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "podmonitors",
+							Kind:       "PodMonitor",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+		},
+	}
+	Expect(err).ToNot(HaveOccurred())
+
+	clusterReconciler := &ClusterReconciler{
 		Client:          k8sClient,
 		Scheme:          scheme,
 		Recorder:        record.NewFakeRecorder(120),
 		DiscoveryClient: discoveryClient,
 	}
 
-	poolerReconciler = &PoolerReconciler{
+	poolerReconciler := &PoolerReconciler{
 		Client:          k8sClient,
 		Scheme:          scheme,
 		Recorder:        record.NewFakeRecorder(120),
 		DiscoveryClient: discoveryClient,
 	}
 
-	backupReconciler = &BackupReconciler{
+	backupReconciler := &BackupReconciler{
 		Client:   k8sClient,
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(120),
 	}
-})
 
-var _ = AfterSuite(func() {
-	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).ToNot(HaveOccurred())
-})
-
-func buildTestEnv() *envtest.Environment {
-	const (
-		envUseExistingCluster = "USE_EXISTING_CLUSTER"
-	)
-
-	testEnvironment := &envtest.Environment{}
-	if os.Getenv(envUseExistingCluster) != "true" {
-		By("bootstrapping test environment")
-		testEnvironment.CRDDirectoryPaths = []string{filepath.Join("..", "config", "crd", "bases")}
+	return &testingEnvironment{
+		scheme:            scheme,
+		client:            k8sClient,
+		clusterReconciler: clusterReconciler,
+		backupReconciler:  backupReconciler,
+		poolerReconciler:  poolerReconciler,
+		discoveryClient:   discoveryClient,
 	}
-
-	return testEnvironment
 }
 
-func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
+func newFakePooler(k8sClient client.Client, cluster *apiv1.Cluster) *apiv1.Pooler {
 	pooler := &apiv1.Pooler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pooler-" + rand.String(10),
@@ -163,7 +156,11 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	return pooler
 }
 
-func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluster)) *apiv1.Cluster {
+func newFakeCNPGCluster(
+	k8sClient client.Client,
+	namespace string,
+	mutators ...func(cluster *apiv1.Cluster),
+) *apiv1.Cluster {
 	const instances int = 3
 	name := "cluster-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
@@ -212,11 +209,10 @@ func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluste
 		mutator(cluster)
 	}
 
-	err = k8sClient.Status().Update(context.Background(), cluster)
-	Expect(err).ToNot(HaveOccurred())
 	err = k8sClient.Update(context.Background(), cluster)
 	Expect(err).ToNot(HaveOccurred())
-
+	err = k8sClient.Status().Update(context.Background(), cluster)
+	Expect(err).ToNot(HaveOccurred())
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
 	cluster.TypeMeta = metav1.TypeMeta{
 		Kind:       apiv1.ClusterKind,
@@ -226,7 +222,7 @@ func newFakeCNPGCluster(namespace string, mutators ...func(cluster *apiv1.Cluste
 	return cluster
 }
 
-func newFakeCNPGClusterWithPGWal(namespace string) *apiv1.Cluster {
+func newFakeCNPGClusterWithPGWal(k8sClient client.Client, namespace string) *apiv1.Cluster {
 	const instances int = 3
 	name := "cluster-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
@@ -277,7 +273,7 @@ func newFakeCNPGClusterWithPGWal(namespace string) *apiv1.Cluster {
 	return cluster
 }
 
-func newFakeNamespace() string {
+func newFakeNamespace(k8sClient client.Client) string {
 	name := rand.String(10)
 
 	namespace := &corev1.Namespace{
@@ -293,7 +289,7 @@ func newFakeNamespace() string {
 	return name
 }
 
-func getPoolerDeployment(ctx context.Context, pooler *apiv1.Pooler) *appsv1.Deployment {
+func getPoolerDeployment(ctx context.Context, k8sClient client.Client, pooler *apiv1.Pooler) *appsv1.Deployment {
 	deployment := &appsv1.Deployment{}
 	err := k8sClient.Get(
 		ctx,
@@ -338,7 +334,11 @@ func generateFakeClusterPods(
 	return pods
 }
 
-func generateFakeClusterPodsWithDefaultClient(cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
+func generateFakeClusterPodsWithDefaultClient(
+	k8sClient client.Client,
+	cluster *apiv1.Cluster,
+	markAsReady bool,
+) []corev1.Pod {
 	return generateFakeClusterPods(k8sClient, cluster, markAsReady)
 }
 
@@ -357,7 +357,7 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	return jobs
 }
 
-func generateFakeInitDBJobsWithDefaultClient(cluster *apiv1.Cluster) []batchv1.Job {
+func generateFakeInitDBJobsWithDefaultClient(k8sClient client.Client, cluster *apiv1.Cluster) []batchv1.Job {
 	return generateFakeInitDBJobs(k8sClient, cluster)
 }
 
@@ -417,10 +417,6 @@ func newFakePVC(
 	return pvcGroup
 }
 
-func generateFakePVCWithDefaultClient(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
-	return generateClusterPVC(k8sClient, cluster, persistentvolumeclaim.StatusReady)
-}
-
 // generateFakeCASecret follows the conventions established by cert.GenerateCASecret
 func generateFakeCASecret(c client.Client, name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
 	keyPair, err := certs.CreateRootCA(domain, namespace)
@@ -443,10 +439,6 @@ func generateFakeCASecret(c client.Client, name, namespace, domain string) (*cor
 	return secret, keyPair
 }
 
-func generateFakeCASecretWithDefaultClient(name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
-	return generateFakeCASecret(k8sClient, name, namespace, domain)
-}
-
 func expectResourceExists(c client.Client, name, namespace string, resource client.Object) {
 	err := c.Get(
 		context.Background(),
@@ -456,10 +448,6 @@ func expectResourceExists(c client.Client, name, namespace string, resource clie
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func expectResourceExistsWithDefaultClient(name, namespace string, resource client.Object) {
-	expectResourceExists(k8sClient, name, namespace, resource)
-}
-
 func expectResourceDoesntExist(c client.Client, name, namespace string, resource client.Object) {
 	err := c.Get(
 		context.Background(),
@@ -467,10 +455,6 @@ func expectResourceDoesntExist(c client.Client, name, namespace string, resource
 		resource,
 	)
 	Expect(apierrors.IsNotFound(err)).To(BeTrue())
-}
-
-func expectResourceDoesntExistWithDefaultClient(name, namespace string, resource client.Object) {
-	expectResourceDoesntExist(k8sClient, name, namespace, resource)
 }
 
 type (
