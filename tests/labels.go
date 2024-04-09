@@ -91,4 +91,7 @@ const (
 
 	// LabelUpgrade is the string for labelling upgrade tests
 	LabelUpgrade = "upgrade"
+
+	// LabelPrometheus is the string for Prometheus stack tests
+	LabelPrometheus = "prometheus"
 )
