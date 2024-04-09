@@ -128,7 +128,7 @@ func (r *InstanceReconciler) Reconcile(
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadNeeded := r.RefreshSecrets(ctx, cluster)
 
-	reloadConfigNeeded, err := r.refreshConfigurationFiles(ctx, cluster)
+	reloadConfigNeeded, restartNeeded, err := r.refreshConfigurationFiles(ctx, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -147,11 +147,12 @@ func (r *InstanceReconciler) Reconcile(
 	r.reconcileAutoConf(ctx, cluster)
 
 	// Reconcile cluster role without DB
-	reloadClusterRoleConfig, err := r.reconcileClusterRoleWithoutDB(ctx, cluster)
+	reloadClusterRoleConfig, requiresRestart, err := r.reconcileClusterRoleWithoutDB(ctx, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 	reloadNeeded = reloadNeeded || reloadClusterRoleConfig
+	restartNeeded = restartNeeded || requiresRestart
 
 	r.systemInitialization.Broadcast()
 
@@ -186,7 +187,7 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	restartedInplace, err := r.restartPrimaryInplaceIfRequested(ctx, cluster)
+	restartedInplace, err := r.restartPrimaryInplaceIfRequested(ctx, cluster, restartNeeded)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -266,12 +267,13 @@ func (r *InstanceReconciler) configureSlotReplicator(cluster *apiv1.Cluster) {
 func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
+	restartNeeded bool,
 ) (bool, error) {
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		return false, err
 	}
-	if isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
+	if restartNeeded || (isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart) {
 		if err := r.instance.RequestAndWaitRestartSmartFast(); err != nil {
 			return true, err
 		}
@@ -286,15 +288,15 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 func (r *InstanceReconciler) refreshConfigurationFiles(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-) (reloadNeeded bool, err error) {
+) (reloadNeeded bool, restartNeeded bool, err error) {
 	reloadNeeded, err = r.refreshPGHBA(ctx, cluster)
 	if err != nil {
-		return false, err
+		return false, restartNeeded, err
 	}
 
 	reloadIdent, err := r.instance.RefreshPGIdent(cluster)
 	if err != nil {
-		return false, err
+		return false, restartNeeded, err
 	}
 	reloadNeeded = reloadNeeded || reloadIdent
 
@@ -302,16 +304,16 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster, false)
 	if err != nil {
-		return false, err
+		return false, restartNeeded, err
 	}
 	reloadNeeded = reloadNeeded || reloadConfig
 
-	reloadReplicaConfig, err := r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
+	reloadReplicaConfig, restartNeeded, err := r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
 	if err != nil {
-		return false, err
+		return false, restartNeeded, err
 	}
 	reloadNeeded = reloadNeeded || reloadReplicaConfig
-	return reloadNeeded, nil
+	return reloadNeeded, restartNeeded, nil
 }
 
 func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile.Result {
@@ -691,10 +693,10 @@ func (r *InstanceReconciler) reconcilePoolers(
 func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-) (changed bool, err error) {
+) (changed bool, restartNeeded bool, err error) {
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	// Reconcile replica role
 	if cluster.Status.TargetPrimary != r.instance.PodName {
@@ -702,7 +704,7 @@ func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 			// We need to ensure that this instance is replicating from the correct server
 			return r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
 		}
-		return false, nil
+		return false, false, nil
 	}
 
 	// Reconcile designated primary role
@@ -710,7 +712,7 @@ func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 		return r.reconcileDesignatedPrimary(ctx, cluster)
 	}
 	// This is a primary server
-	return false, nil
+	return false, false, nil
 }
 
 // reconcileMetrics updates any required metrics
@@ -1077,7 +1079,10 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 }
 
 // Reconciler primary logic. DB needed.
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (restarted bool, err error) {
+func (r *InstanceReconciler) reconcilePrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (restarted bool, err error) {
 	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
 		return false, nil
 	}
@@ -1143,16 +1148,20 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-) (changed bool, err error) {
+) (changed bool, needsRestart bool, err error) {
+	needsRestart, err = r.instance.NeedsDesignatedPrimaryTransition(cluster)
+	if err != nil {
+		return false, needsRestart, err
+	}
 	// If I'm already the current designated primary everything is ok.
-	if cluster.Status.CurrentPrimary == r.instance.PodName {
-		return false, nil
+	if cluster.Status.CurrentPrimary == r.instance.PodName && !needsRestart {
+		return false, needsRestart, nil
 	}
 
 	// We need to ensure that this instance is replicating from the correct server
-	changed, err = r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
+	changed, _, err = r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
 	if err != nil {
-		return changed, err
+		return changed, needsRestart, err
 	}
 
 	// I'm the primary, need to inform the operator
@@ -1161,7 +1170,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	oldCluster := cluster.DeepCopy()
 	cluster.Status.CurrentPrimary = r.instance.PodName
 	cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
-	return changed, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+	return changed, needsRestart, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used
