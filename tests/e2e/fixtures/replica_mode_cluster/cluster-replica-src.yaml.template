@@ -5,6 +5,10 @@ metadata:
 spec:
   instances: 1
 
+  replica:
+    enabled: false
+    source: cluster-replica-tls
+
   postgresql:
     parameters:
       log_checkpoints: "on"
