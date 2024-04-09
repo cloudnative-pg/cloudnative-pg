@@ -31,6 +31,11 @@ import (
 )
 
 var _ = Describe("pooler_status unit tests", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
 	assertClusterInheritedStatus := func(pooler *v1.Pooler, cluster *v1.Cluster) {
 		Expect(pooler.Status.Secrets.ServerCA.Name).To(Equal(cluster.GetServerCASecretName()))
 		Expect(pooler.Status.Secrets.ServerTLS.Name).To(Equal(cluster.GetServerTLSSecretName()))
@@ -43,21 +48,21 @@ var _ = Describe("pooler_status unit tests", func() {
 
 	It("should correctly deduce the status inherited from the cluster resource", func() {
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		pooler := newFakePooler(cluster)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
 		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
 
-		err := poolerReconciler.updatePoolerStatus(ctx, pooler, res)
+		err := env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 		Expect(err).ToNot(HaveOccurred())
 		assertClusterInheritedStatus(pooler, cluster)
 	})
 
 	It("should correctly set the status for authUserSecret", func() {
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		pooler := newFakePooler(cluster)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
 		authUserSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            pooler.GetAuthQuerySecretName(),
@@ -67,31 +72,31 @@ var _ = Describe("pooler_status unit tests", func() {
 		}
 		res := &poolerManagedResources{AuthUserSecret: authUserSecret, Cluster: cluster}
 
-		err := poolerReconciler.updatePoolerStatus(ctx, pooler, res)
+		err := env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 		Expect(err).ToNot(HaveOccurred())
 		assertAuthUserStatus(pooler, authUserSecret)
 	})
 
 	It("should correctly set the deployment status", func() {
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		pooler := newFakePooler(cluster)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
 		dep, err := pgbouncer.Deployment(pooler, cluster)
 		dep.Status.Replicas = *dep.Spec.Replicas
 		Expect(err).ToNot(HaveOccurred())
 		res := &poolerManagedResources{Deployment: dep, Cluster: cluster}
 
-		err = poolerReconciler.updatePoolerStatus(ctx, pooler, res)
+		err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pooler.Status.Instances).To(Equal(dep.Status.Replicas))
 	})
 
 	It("should correctly interact with the api server", func() {
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		pooler := newFakePooler(cluster)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
 		poolerQuery := types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}
 		authUserSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -107,14 +112,14 @@ var _ = Describe("pooler_status unit tests", func() {
 
 		By("making sure it updates the remote stored status when there are changes", func() {
 			poolerBefore := &v1.Pooler{}
-			err := k8sClient.Get(ctx, poolerQuery, poolerBefore)
+			err := env.client.Get(ctx, poolerQuery, poolerBefore)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = poolerReconciler.updatePoolerStatus(ctx, pooler, res)
+			err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
 			poolerAfter := &v1.Pooler{}
-			err = k8sClient.Get(ctx, poolerQuery, poolerAfter)
+			err = env.client.Get(ctx, poolerQuery, poolerAfter)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(poolerAfter.ResourceVersion).ToNot(Equal(poolerBefore.ResourceVersion))
@@ -125,17 +130,16 @@ var _ = Describe("pooler_status unit tests", func() {
 
 		By("making sure it doesn't update the remote stored status when there aren't changes", func() {
 			poolerBefore := &v1.Pooler{}
-			err := k8sClient.Get(ctx, poolerQuery, poolerBefore)
+			err := env.client.Get(ctx, poolerQuery, poolerBefore)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = poolerReconciler.updatePoolerStatus(ctx, pooler, res)
+			err = env.poolerReconciler.updatePoolerStatus(ctx, pooler, res)
 			Expect(err).ToNot(HaveOccurred())
 
 			poolerAfter := &v1.Pooler{}
-			err = k8sClient.Get(ctx, poolerQuery, poolerAfter)
+			err = env.client.Get(ctx, poolerQuery, poolerAfter)
 			Expect(err).ToNot(HaveOccurred())
-
-			Expect(poolerAfter.ResourceVersion).To(Equal(poolerBefore.ResourceVersion))
+			Expect(poolerBefore.Status).To(BeEquivalentTo(poolerAfter.Status))
 		})
 	})
 })

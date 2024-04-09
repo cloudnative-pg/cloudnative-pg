@@ -34,21 +34,26 @@ import (
 )
 
 var _ = Describe("pooler_controller unit tests", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
 	It("should make sure that getPoolersUsingSecret works correctly", func() {
 		var poolers []v1.Pooler
 		var expectedContent []types.NamespacedName
 		var nonExpectedContent []types.NamespacedName
 		var expectedAuthSecretName string
 
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
 
 		By("creating expected poolers", func() {
-			pooler1 := *newFakePooler(cluster)
+			pooler1 := *newFakePooler(env.client, cluster)
 			expectedAuthSecretName = pooler1.GetAuthQuerySecretName()
 
-			pooler2 := *newFakePooler(cluster)
-			pooler3 := *newFakePooler(cluster)
+			pooler2 := *newFakePooler(env.client, cluster)
+			pooler3 := *newFakePooler(env.client, cluster)
 			for _, expectedPooler := range []v1.Pooler{pooler1, pooler2, pooler3} {
 				poolers = append(poolers, expectedPooler)
 				expectedContent = append(
@@ -59,8 +64,8 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 
 		By("creating pooler that should be skipped", func() {
-			cluster := newFakeCNPGCluster(namespace)
-			pooler := *newFakePooler(cluster)
+			cluster := newFakeCNPGCluster(env.client, namespace)
+			pooler := *newFakePooler(env.client, cluster)
 			nn := types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}
 			nonExpectedContent = append(nonExpectedContent, nn)
 			poolers = append(poolers, pooler)
@@ -82,11 +87,11 @@ var _ = Describe("pooler_controller unit tests", func() {
 	})
 
 	It("should make sure to create a request for any pooler owned secret", func() {
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
 
-		pooler1 := *newFakePooler(cluster)
-		pooler2 := *newFakePooler(cluster)
+		pooler1 := *newFakePooler(env.client, cluster)
+		pooler2 := *newFakePooler(env.client, cluster)
 		poolerList := v1.PoolerList{Items: []v1.Pooler{pooler1, pooler2}}
 
 		secret := &corev1.Secret{
@@ -113,12 +118,12 @@ var _ = Describe("pooler_controller unit tests", func() {
 		var expectedAuthSecretName string
 
 		ctx := context.Background()
-		namespace1 := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace1)
+		namespace1 := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace1)
 
 		By("creating expected poolers", func() {
-			pooler1 := *newFakePooler(cluster)
-			pooler2 := *newFakePooler(cluster)
+			pooler1 := *newFakePooler(env.client, cluster)
+			pooler2 := *newFakePooler(env.client, cluster)
 			expectedAuthSecretName = pooler1.GetAuthQuerySecretName()
 
 			for _, expectedPooler := range []v1.Pooler{pooler1, pooler2} {
@@ -133,12 +138,12 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 
 		By("creating pooler with a different secret that should be skipped", func() {
-			pooler3 := *newFakePooler(cluster)
+			pooler3 := *newFakePooler(env.client, cluster)
 			pooler3.Spec.PgBouncer.AuthQuerySecret = &v1.LocalObjectReference{
 				Name: "test-one",
 			}
 			pooler3.Spec.PgBouncer.AuthQuery = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1"
-			err := k8sClient.Update(ctx, &pooler3)
+			err := env.client.Update(ctx, &pooler3)
 			Expect(err).ToNot(HaveOccurred())
 
 			req := reconcile.Request{
@@ -152,9 +157,9 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 
 		By("creating a pooler in a different namespace that should be skipped", func() {
-			namespace2 := newFakeNamespace()
-			cluster2 := newFakeCNPGCluster(namespace2)
-			pooler := *newFakePooler(cluster2)
+			namespace2 := newFakeNamespace(env.client)
+			cluster2 := newFakeCNPGCluster(env.client, namespace2)
+			pooler := *newFakePooler(env.client, cluster2)
 			req := reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      pooler.Name,
@@ -165,7 +170,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 
 		By("making sure the function builds up the correct reconcile requests", func() {
-			handler := poolerReconciler.mapSecretToPooler()
+			handler := env.poolerReconciler.mapSecretToPooler()
 			reReqs := handler(
 				ctx,
 				&corev1.Secret{
@@ -186,9 +191,9 @@ var _ = Describe("pooler_controller unit tests", func() {
 	})
 
 	It("should make sure that isOwnedByPooler works correctly", func() {
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		pooler := *newFakePooler(cluster)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := *newFakePooler(env.client, cluster)
 
 		By("making sure it returns true when the resource is owned by a pooler", func() {
 			ownedResource := corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "example-service", Namespace: namespace}}
