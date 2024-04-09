@@ -1,6 +1,7 @@
 # This workflow executes the E2E Test Suite for a series of combinations that
 # represent different execution environments
 name: continuous-delivery
+
 on:
   issue_comment:
     type: [created]
