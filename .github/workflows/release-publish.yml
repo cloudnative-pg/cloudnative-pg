@@ -17,9 +17,35 @@ permissions:
 
 jobs:
 
+  check-branch:
+    name: Evaluate release tag
+    runs-on: ubuntu-22.04
+    outputs:
+      is_latest: ${{ env.IS_LATEST }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # To identify the commit we need the history and all the tags.
+          fetch-depth: 0
+      -
+        name: Check release branch
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          latest_release_branch=$(git branch -rl 'origin/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
+          current_release_branch=$(echo "${tag}" | sed -e 's/\([0-9]\+.[0-9]\+\).*/release-\1/')
+          is_latest="false"
+          if [[ "$latest_release_branch" == "$current_release_branch" ]]; then
+            is_latest="true"
+          fi
+          echo "IS_LATEST=${is_latest}" >> $GITHUB_ENV
+
   release:
     name: Create Github release
     runs-on: ubuntu-22.04
+    needs:
+      - check-branch
     steps:
       -
         name: Checkout
@@ -46,14 +72,17 @@ jobs:
         with:
           body_path: release_notes.md
           draft: false
-          name: Release ${{ env.TAG }}
+          name: v${{ env.TAG }}
           files: releases/cnpg-${{ env.VERSION }}.yaml
+          make_latest: ${{ needs.check-branch.outputs.is_latest }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-binaries:
     name: Build containers
     runs-on: ubuntu-22.04
+    needs:
+      - check-branch
     outputs:
       version: ${{ steps.build-meta.outputs.version }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
@@ -81,13 +110,6 @@ jobs:
           images="${images},ghcr.io/cloudnative-pg/cloudnative-pg-testing"
           commit_sha=${{ github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
-          tag="${GITHUB_REF#refs/tags/v}"
-          skip_krew="false"
-          latest_release_branch=$(git branch -rl 'origin/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
-          current_release_branch=$(echo "${tag}" | sed -e 's/\([0-9]\+.[0-9]\+\).*/release-\1/')
-          if [[ "$latest_release_branch" != "$current_release_branch" ]]; then
-            skip_krew="true"
-          fi
 
           # get git user and email
           author_name=$(git show -s --format='%an' "${commit_sha}")
@@ -100,7 +122,6 @@ jobs:
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "version=${commit_version}" >> $GITHUB_OUTPUT
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
-          echo "SKIP_KREW=${skip_krew}" >> $GITHUB_ENV
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
           echo "author_email=${author_email}" >> $GITHUB_OUTPUT
       -
@@ -130,7 +151,7 @@ jobs:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
       -
         name: Publish Krew
-        if: ${{ env.SKIP_KREW == 'false' }}
+        if: ${{ needs.check-branch.outputs.is_latest == 'true' }}
         uses: rajatjindal/krew-release-bot@v0.0.46
         with:
           krew_template_file: dist/krew/cnpg.yaml
@@ -149,6 +170,7 @@ jobs:
         with:
           images: ${{ env.IMAGES }}
           flavor: |
+            latest=false
             suffix=-ubi8
           tags: |
             type=semver,pattern={{version}}
@@ -159,6 +181,7 @@ jobs:
         with:
           images: ${{ env.IMAGES }}
           flavor: |
+            latest=false
             suffix=-ubi9
           tags: |
             type=semver,pattern={{version}}
@@ -353,7 +376,6 @@ jobs:
             --
             <sup>1</sup> If you feel your Operator does not fit any of the pre-defined categories, file an issue against this repo and explain your need
             <sup>2</sup> For more information see [here](https://sdk.operatorframework.io/docs/overview/#operator-capability-level)
-            
 
   publish_bundle:
     name: Publish OLM Bundle
