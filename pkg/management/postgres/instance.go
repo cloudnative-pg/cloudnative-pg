@@ -175,6 +175,10 @@ type Instance struct {
 	// SmartStopDelay is used to control PostgreSQL smart shutdown timeout
 	SmartStopDelay int32
 
+	// RequiresDesignatedPrimaryTransition indicates if this instance is a primary that needs to become
+	// a designatedPrimary
+	RequiresDesignatedPrimaryTransition bool
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -735,13 +739,22 @@ func (instance *Instance) IsPrimary() (bool, error) {
 	return true, nil
 }
 
-// NeedsDesignatedPrimaryTransition returns true if the instance is a primary that requires to be migrated to a
+// DetectNeedsDesignatedPrimaryTransition returns true if the instance is a primary that requires to be migrated to a
 // designatedPrimary
-func (instance *Instance) NeedsDesignatedPrimaryTransition(cluster *apiv1.Cluster) (bool, error) {
+func (instance *Instance) DetectNeedsDesignatedPrimaryTransition(cluster *apiv1.Cluster) error {
 	if !cluster.IsReplica() {
-		return false, nil
+		instance.RequiresDesignatedPrimaryTransition = false
+		return nil
 	}
-	return instance.IsPrimary()
+
+	isPrimary, err := instance.IsPrimary()
+	if err != nil {
+		return err
+	}
+
+	instance.RequiresDesignatedPrimaryTransition = isPrimary
+
+	return nil
 }
 
 // Demote demotes an existing PostgreSQL instance
