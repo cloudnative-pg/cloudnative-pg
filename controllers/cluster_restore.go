@@ -104,22 +104,10 @@ func ensureClusterIsNotFenced(
 	cli client.Client,
 	cluster *apiv1.Cluster,
 ) error {
-	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
-	if err != nil {
-		return err
-	}
-	if fencedInstances.Len() == 0 {
-		return nil
-	}
-
-	clusterOrig := cluster.DeepCopy()
-
-	// we remove the fenced instances this way to ensure that the patch method will work
-	if err := utils.RemoveFencedInstance(utils.FenceAllServers, &cluster.ObjectMeta); err != nil {
-		return err
-	}
-
-	return cli.Patch(ctx, cluster, client.MergeFrom(clusterOrig))
+	return utils.NewFencingMetadataExecutor(cli).
+		RemoveFencing().
+		ForAllInstances().
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)
 }
 
 // restoreClusterStatus bootstraps the status needed to make the restored cluster work

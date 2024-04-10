@@ -2793,7 +2793,7 @@ func (cluster *Cluster) IsInstanceFenced(instance string) bool {
 		return false
 	}
 
-	if fencedInstances.Has(utils.FenceAllServers) {
+	if fencedInstances.Has(utils.FenceAllInstances) {
 		return true
 	}
 	return fencedInstances.Has(instance)
