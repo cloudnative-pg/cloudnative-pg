@@ -157,7 +157,7 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 }
 
 func listFencedInstances(fencedInstances *stringset.Data) string {
-	if fencedInstances.Has(utils.FenceAllServers) {
+	if fencedInstances.Has(utils.FenceAllInstances) {
 		return "All Instances"
 	}
 	return strings.Join(fencedInstances.ToList(), ", ")

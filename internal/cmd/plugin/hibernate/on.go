@@ -177,14 +177,14 @@ func (on *onCommand) fenceClusterStep() error {
 	contextLogger := log.FromContext(on.ctx)
 
 	contextLogger.Debug("applying the fencing annotation to the cluster manifest")
-	if err := resources.ApplyFenceFunc(
-		on.ctx,
-		plugin.Client,
-		on.cluster.Name,
-		plugin.Namespace,
-		utils.FenceAllServers,
-		utils.AddFencedInstance,
-	); err != nil {
+	if err := utils.NewFencingMetadataExecutor(plugin.Client).
+		AddFencing().
+		ForAllInstances().
+		Execute(
+			on.ctx,
+			types.NamespacedName{Name: on.cluster.Name, Namespace: plugin.Namespace},
+			&apiv1.Cluster{},
+		); err != nil {
 		return err
 	}
 	contextLogger.Debug("fencing annotation set on the cluster manifest")
@@ -202,15 +202,11 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 	contextLogger := log.FromContext(on.ctx)
 
 	fmt.Println("rolling back hibernation: removing the fencing annotation")
-	err := resources.ApplyFenceFunc(
-		on.ctx,
-		plugin.Client,
-		on.cluster.Name,
-		plugin.Namespace,
-		utils.FenceAllServers,
-		utils.RemoveFencedInstance,
-	)
-	if err != nil {
+	if err := utils.NewFencingMetadataExecutor(plugin.Client).
+		RemoveFencing().
+		ForAllInstances().
+		Execute(on.ctx,
+			types.NamespacedName{Name: on.cluster.Name, Namespace: plugin.Namespace}, &apiv1.Cluster{}); err != nil {
 		contextLogger.Error(err, "Rolling back from hibernation failed")
 	}
 }

@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -36,7 +35,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -345,18 +343,10 @@ func EnsurePodIsUnfenced(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	err := resources.ApplyFenceFunc(
-		ctx,
-		cli,
-		cluster.Name,
-		cluster.Namespace,
-		targetPod.Name,
-		utils.RemoveFencedInstance,
-	)
-	if errors.Is(err, utils.ErrorServerAlreadyUnfenced) {
-		return nil
-	}
-	if err != nil {
+	if err := utils.NewFencingMetadataExecutor(cli).
+		RemoveFencing().
+		ForInstance(targetPod.Name).
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
 		return err
 	}
 
