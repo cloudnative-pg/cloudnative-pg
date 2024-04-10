@@ -21,14 +21,22 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // fencingOn marks an instance in a cluster as fenced
 func fencingOn(ctx context.Context, clusterName string, serverName string) error {
-	err := resources.ApplyFenceFunc(ctx, plugin.Client, clusterName, plugin.Namespace, serverName, utils.AddFencedInstance)
+	err := utils.NewFencingMetadataExecutor(plugin.Client).
+		AddFencing().
+		ForInstance(serverName).
+		Execute(ctx,
+			types.NamespacedName{Name: clusterName, Namespace: plugin.Namespace},
+			&apiv1.Cluster{},
+		)
 	if err != nil {
 		return err
 	}
@@ -38,8 +46,13 @@ func fencingOn(ctx context.Context, clusterName string, serverName string) error
 
 // fencingOff marks an instance in a cluster as not fenced
 func fencingOff(ctx context.Context, clusterName string, serverName string) error {
-	err := resources.ApplyFenceFunc(ctx, plugin.Client, clusterName, plugin.Namespace,
-		serverName, utils.RemoveFencedInstance)
+	err := utils.NewFencingMetadataExecutor(plugin.Client).
+		RemoveFencing().
+		ForInstance(serverName).
+		Execute(ctx,
+			types.NamespacedName{Name: clusterName, Namespace: plugin.Namespace},
+			&apiv1.Cluster{},
+		)
 	if err != nil {
 		return err
 	}

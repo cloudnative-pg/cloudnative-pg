@@ -115,8 +115,9 @@ var _ = Describe("offlineExecutor", func() {
 	})
 
 	It("finalize should remove the fencing annotation from the cluster", func(ctx SpecContext) {
-		err := utils.AddFencedInstance(pod.Name, &cluster.ObjectMeta)
+		modified, err := utils.AddFencedInstance(pod.Name, &cluster.ObjectMeta)
 		Expect(err).ToNot(HaveOccurred())
+		Expect(modified).To(BeTrue())
 
 		err = oe.cli.Update(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
