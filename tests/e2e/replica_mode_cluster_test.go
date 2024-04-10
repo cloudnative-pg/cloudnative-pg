@@ -23,6 +23,7 @@ import (
 	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,7 +37,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
+var _ = FDescribe("Replica Mode", Label(tests.LabelReplication), func() {
 	const (
 		replicaModeClusterDir = "/replica_mode_cluster/"
 		srcClusterName        = "cluster-replica-src"
@@ -113,47 +114,96 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				"test_replica")
 		})
 
-		XIt("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
+		FIt("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
 			const (
-				replicaClusterSampleBasicAuth = fixturesDir + replicaModeClusterDir + "cluster-replica-basicauth.yaml.template"
-				replicaNamespacePrefix        = "replica-mode-basic-auth"
+				clusterOneName = "cluster-one"
+				clusterTwoName = "cluster-two"
+				clusterOneFile = fixturesDir + replicaModeClusterDir +
+					"cluster-demotion-one.yaml.template"
+				clusterTwoFile = fixturesDir + replicaModeClusterDir +
+					"cluster-demotion-two.yaml.template"
 			)
 
-			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleBasicAuth)
-			Expect(err).ToNot(HaveOccurred())
-			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
+			namespace, err := env.CreateUniqueNamespace("replica-promotion-demotion")
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(replicaNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
-				return env.DeleteNamespace(replicaNamespace)
+				return env.DeleteNamespace(namespace)
 			})
-			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+			AssertCreateCluster(namespace, clusterOneName, clusterOneFile, env)
 			AssertReplicaModeCluster(
-				replicaNamespace,
-				srcClusterName,
-				replicaClusterSampleBasicAuth,
+				namespace,
+				clusterOneName,
+				clusterTwoFile,
 				checkQuery,
 				psqlClientPod)
 
-			cluster, err := env.GetCluster(replicaNamespace, srcClusterName)
+			// turn the src cluster into a replica
+			By("setting replica mode on the src cluster", func() {
+				cluster, err := env.GetCluster(namespace, clusterOneName)
+				Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.ReplicaCluster.Enabled = true
+				err = env.Client.Update(ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
+			})
+
+			By("disabling the replica mode on the src cluster", func() {
+				cluster, err := env.GetCluster(namespace, clusterTwoName)
+				Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.ReplicaCluster.Enabled = false
+				err = env.Client.Update(ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
+			})
+
+			var newPrimaryPod *corev1.Pod
+			Eventually(func() error {
+				newPrimaryPod, err = env.GetClusterPrimary(namespace, clusterTwoName)
+				return err
+			}, 30, 3).Should(BeNil())
+
+			var newPrimaryReplicaPod *corev1.Pod
+			Eventually(func() error {
+				newPrimaryReplicaPod, err = env.GetClusterPrimary(namespace, clusterOneName)
+				return err
+			}, 30, 3).Should(BeNil())
+
+			var appUser, appUserPass string
+			Eventually(func(g Gomega) {
+				var err error
+				appUser, appUserPass, err = testUtils.GetCredentials(clusterTwoName, namespace,
+					apiv1.ApplicationUserSecretSuffix, env)
+				g.Expect(err).ToNot(HaveOccurred())
+			}, 60).Should(Succeed())
+
+			host, err := testUtils.GetHostName(namespace, clusterTwoName, env)
 			Expect(err).ToNot(HaveOccurred())
-			cluster.Spec.ReplicaCluster.Enabled = true
 
-			err = env.Client.Update(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
+			By("creating a new data in the new source cluster", func() {
+				cmd := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", "new_test_table")
+				_, _, err = testUtils.RunQueryFromPod(
+					newPrimaryPod,
+					host,
+					"appSrc",
+					appUser,
+					appUserPass,
+					cmd,
+					env)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
-			// TODO: we need an intermediate phase when we are switching
-			// ENDTODO
-
-			AssertDetachReplicaModeCluster(
-				replicaNamespace,
-				srcClusterName,
-				replicaClusterName,
-				sourceDBName,
-				replicaDBName,
-				"test_replica")
+			By("checking that the data is present in the old src cluster", func() {
+				AssertDataExpectedCountWithDatabaseName(
+					namespace,
+					newPrimaryReplicaPod.Name,
+					"appSrc",
+					"new_test_table",
+					2,
+				)
+			})
 		})
 	})
 

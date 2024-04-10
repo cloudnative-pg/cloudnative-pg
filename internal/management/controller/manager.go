@@ -109,14 +109,3 @@ func (r *InstanceReconciler) GetSecret(ctx context.Context, name string) (*corev
 	}
 	return &secret, nil
 }
-
-func (r *InstanceReconciler) reconcilePhase(ctx context.Context, cluster *apiv1.Cluster) error {
-	if !r.instance.RequiresDesignatedPrimaryTransition {
-		return nil
-	}
-	origCluster := cluster.DeepCopy()
-	cluster.Status.Phase = apiv1.PhaseInplacePrimaryRestart
-	cluster.Status.PhaseReason = "Primary needs to transition to designated primary"
-
-	return r.client.Patch(ctx, cluster, ctrl.MergeFrom(origCluster))
-}
