@@ -36,7 +36,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("Replica Mode", Label(tests.LabelReplication), func() {
+var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 	const (
 		replicaModeClusterDir = "/replica_mode_cluster/"
 		srcClusterName        = "cluster-replica-src"
@@ -113,7 +113,7 @@ var _ = FDescribe("Replica Mode", Label(tests.LabelReplication), func() {
 				"test_replica")
 		})
 
-		FIt("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
+		XIt("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
 			const (
 				replicaClusterSampleBasicAuth = fixturesDir + replicaModeClusterDir + "cluster-replica-basicauth.yaml.template"
 				replicaNamespacePrefix        = "replica-mode-basic-auth"
@@ -139,9 +139,13 @@ var _ = FDescribe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			cluster, err := env.GetCluster(replicaNamespace, srcClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
-				Enabled: true,
-			}
+			cluster.Spec.ReplicaCluster.Enabled = true
+
+			err = env.Client.Update(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			// TODO: we need an intermediate phase when we are switching
+			// ENDTODO
 
 			AssertDetachReplicaModeCluster(
 				replicaNamespace,
