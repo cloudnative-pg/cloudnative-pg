@@ -1896,7 +1896,7 @@ func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.Err
 func (r *Cluster) validateReplicaMode() field.ErrorList {
 	var result field.ErrorList
 
-	if r.Spec.ReplicaCluster == nil {
+	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
 		return result
 	}
 
@@ -1912,7 +1912,7 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "replicaCluster"),
 			r.Spec.ReplicaCluster,
-			"replica mode bootstrap is compatible only with using pg_basebackup or recovery"))
+			"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
 	}
 	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
 	if !found {

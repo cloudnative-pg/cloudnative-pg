@@ -1,9 +1,13 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-replica-src
+  name: cluster-one
 spec:
   instances: 1
+
+  replica:
+    enabled: false
+    source: cluster-two
 
   postgresql:
     parameters:
@@ -27,3 +31,14 @@ spec:
   storage:
     size: 1Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  externalClusters:
+    - name: cluster-two
+      connectionParameters:
+        host: cluster-two-rw
+        user: userSrc
+        dbname: appSrc
+        port: "5432"
+      password:
+        name: cluster-two-app
+        key: password
