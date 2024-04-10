@@ -113,6 +113,9 @@ func (r *InstanceReconciler) Reconcile(
 	if err := r.reconcileInstance(cluster); err != nil {
 		return reconcile.Result{}, err
 	}
+	if err := r.reconcilePhase(ctx, cluster); err != nil {
+		return reconcile.Result{}, err
+	}
 
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
@@ -273,8 +276,7 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	if err != nil {
 		return false, err
 	}
-	inPlaceRestartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
-	if r.instance.RequiresDesignatedPrimaryTransition || inPlaceRestartRequested {
+	if isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
 		if err := r.instance.RequestAndWaitRestartSmartFast(); err != nil {
 			return true, err
 		}
