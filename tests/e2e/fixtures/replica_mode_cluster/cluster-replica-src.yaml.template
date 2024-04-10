@@ -7,7 +7,7 @@ spec:
 
   replica:
     enabled: false
-    source: cluster-replica-tls
+    source: cluster-replica-basicauth
 
   postgresql:
     parameters:
@@ -31,3 +31,14 @@ spec:
   storage:
     size: 1Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  externalClusters:
+    - name: cluster-replica-basicauth
+      connectionParameters:
+        host: cluster-replica-basicauth-rw
+        user: userSrc
+        dbname: appSrc
+        port: "5432"
+      password:
+        name: cluster-replica-basicauth-app
+        key: password
