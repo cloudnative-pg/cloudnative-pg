@@ -620,6 +620,12 @@ deploy() {
   echo "${bright}Done deploying manifests from current worktree on cluster ${CLUSTER_NAME}${reset}"
 }
 
+reload() {
+  # Build and reload controller
+  load
+  deploy
+}
+
 print_image() {
   local tag=devel
   if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
@@ -746,7 +752,7 @@ main() {
       prepare "${dest_dir}"
       ;;
 
-    create | load | load-helper-images | deploy | print-image | export-logs | destroy | pyroscope)
+    create | load | load-helper-images | reload | deploy | print-image | export-logs | destroy | pyroscope)
       ensure_registry
       "${command//-/_}"
       ;;
