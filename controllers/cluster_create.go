@@ -23,7 +23,6 @@ import (
 	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
@@ -33,7 +32,6 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
 	k8slices "k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,49 +51,49 @@ import (
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *apiv1.Cluster) error {
 	err := r.setupPostgresPKI(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("pki: %w", err)
 	}
 
 	err = r.reconcilePostgresSecrets(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("secrets: %w", err)
 	}
 
 	err = r.reconcilePostgresServices(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("services: %w", err)
 	}
 
 	err = r.reconcilePodDisruptionBudget(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("pdb: %w", err)
 	}
 
 	err = r.createOrPatchServiceAccount(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("serviceaccount: %w", err)
 	}
 
 	err = r.createOrPatchRole(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("role: %w", err)
 	}
 
 	err = r.createRoleBinding(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("rolebinding: %w", err)
 	}
 
 	if !cluster.Spec.Monitoring.AreDefaultQueriesDisabled() {
 		err = r.createOrPatchDefaultMetrics(ctx, cluster)
 		if err != nil {
-			return nil
+			return fmt.Errorf("default metrics: %w", err)
 		}
 	}
 
-	err = createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, specs.NewClusterPodMonitorManager(cluster))
+	err = r.createOrPatchPodMonitor(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("podmonitor: %w", err)
 	}
 
 	// TODO: only required to cleanup custom monitoring queries configmaps from older versions (v1.10 and v1.11)
@@ -839,84 +837,24 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 	return nil
 }
 
-type podMonitorManager interface {
-	// IsPodMonitorEnabled returns a boolean indicating if the PodMonitor should exists or not
-	IsPodMonitorEnabled() bool
-	// BuildPodMonitor builds a new PodMonitor object
-	BuildPodMonitor() *monitoringv1.PodMonitor
-}
-
 // createOrPatchPodMonitor
-func createOrPatchPodMonitor(
+func (r *ClusterReconciler) createOrPatchPodMonitor(
 	ctx context.Context,
-	cli client.Client,
-	discoveryClient discovery.DiscoveryInterface,
-	manager podMonitorManager,
+	cluster *apiv1.Cluster,
 ) error {
-	contextLogger := log.FromContext(ctx)
+	podManager := PodMonitorManagerController{
+		manager:   cluster,
+		ctx:       ctx,
+		discovery: r.DiscoveryClient,
+		client:    r.Client,
+	}
 
-	// Checking for the PodMonitor Custom Resource Definition in the Kubernetes cluster
-	havePodMonitorCRD, err := utils.PodMonitorExist(discoveryClient)
+	err := podManager.createOrPatchPodMonitor()
 	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create pod monitor")
 		return err
 	}
-
-	if !havePodMonitorCRD {
-		if manager.IsPodMonitorEnabled() {
-			// If the PodMonitor CRD does not exist, but the cluster has monitoring enabled,
-			// the controller cannot do anything until the CRD is installed
-			contextLogger.Warning("PodMonitor CRD not present. Cannot create the PodMonitor object")
-		}
-		return nil
-	}
-
-	expectedPodMonitor := manager.BuildPodMonitor()
-	// We get the current pod monitor
-	podMonitor := &monitoringv1.PodMonitor{}
-	if err := cli.Get(
-		ctx,
-		client.ObjectKeyFromObject(expectedPodMonitor),
-		podMonitor,
-	); err != nil {
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("while getting the podmonitor: %w", err)
-		}
-		podMonitor = nil
-	}
-
-	switch {
-	// Pod monitor disabled and no pod monitor - nothing to do
-	case !manager.IsPodMonitorEnabled() && podMonitor == nil:
-		return nil
-	// Pod monitor disabled and pod monitor present - delete it
-	case !manager.IsPodMonitorEnabled() && podMonitor != nil:
-		contextLogger.Info("Deleting PodMonitor")
-		if err := cli.Delete(ctx, podMonitor); err != nil {
-			if !apierrs.IsNotFound(err) {
-				return err
-			}
-		}
-		return nil
-	// Pod monitor enabled and no pod monitor - create it
-	case manager.IsPodMonitorEnabled() && podMonitor == nil:
-		contextLogger.Debug("Creating PodMonitor")
-		return cli.Create(ctx, expectedPodMonitor)
-	// Pod monitor enabled and pod monitor present - update it
-	default:
-		origPodMonitor := podMonitor.DeepCopy()
-		podMonitor.Spec = expectedPodMonitor.Spec
-		// We don't override the current labels/annotations given that there could be data that isn't managed by us
-		utils.MergeObjectsMetadata(podMonitor, expectedPodMonitor)
-
-		// If there's no changes we are done
-		if reflect.DeepEqual(origPodMonitor, podMonitor) {
-			return nil
-		}
-
-		// Patch the PodMonitor, so we always reconcile it with the cluster changes
-		contextLogger.Debug("Patching PodMonitor")
-		return cli.Patch(ctx, podMonitor, client.MergeFrom(origPodMonitor))
-	}
+	return nil
 }
 
 // createRole creates the role

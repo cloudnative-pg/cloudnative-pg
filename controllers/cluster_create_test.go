@@ -20,16 +20,12 @@ import (
 	"context"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
-	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/discovery"
-	fakediscovery "k8s.io/client-go/discovery/fake"
-	"k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -629,139 +625,6 @@ var _ = Describe("Set cluster metadata of service account", func() {
 		cluster.Spec.ServiceAccountTemplate.MergeMetadata(sa)
 		Expect(sa.Annotations).To(BeEquivalentTo(cluster.Spec.ServiceAccountTemplate.Metadata.Annotations))
 		Expect(sa.Labels).To(BeEquivalentTo(cluster.Spec.ServiceAccountTemplate.Metadata.Labels))
-	})
-})
-
-type mockPodMonitorManager struct {
-	isEnabled  bool
-	podMonitor *v1.PodMonitor
-}
-
-func (m *mockPodMonitorManager) IsPodMonitorEnabled() bool {
-	return m.isEnabled
-}
-
-func (m *mockPodMonitorManager) BuildPodMonitor() *v1.PodMonitor {
-	return m.podMonitor
-}
-
-var _ = Describe("CreateOrPatchPodMonitor", func() {
-	var (
-		ctx                 context.Context
-		fakeCli             k8client.Client
-		fakeDiscoveryClient discovery.DiscoveryInterface
-		manager             *mockPodMonitorManager
-	)
-
-	BeforeEach(func() {
-		ctx = context.Background()
-		manager = &mockPodMonitorManager{}
-		manager.isEnabled = true
-		manager.podMonitor = &v1.PodMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
-			},
-		}
-
-		fakeCli = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
-
-		fakeDiscoveryClient = &fakediscovery.FakeDiscovery{
-			Fake: &testing.Fake{
-				Resources: []*metav1.APIResourceList{
-					{
-						GroupVersion: "monitoring.coreos.com/v1",
-						APIResources: []metav1.APIResource{
-							{
-								Name:       "podmonitors",
-								Kind:       "PodMonitor",
-								Namespaced: true,
-							},
-						},
-					},
-				},
-			},
-		}
-	})
-
-	It("should create the PodMonitor  when it is enabled and doesn't already exists", func() {
-		err := createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
-		Expect(err).ToNot(HaveOccurred())
-
-		podMonitor := &v1.PodMonitor{}
-		err = fakeCli.Get(
-			ctx,
-			types.NamespacedName{
-				Name:      manager.podMonitor.Name,
-				Namespace: manager.podMonitor.Namespace,
-			},
-			podMonitor,
-		)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(podMonitor.Name).To(Equal(manager.podMonitor.Name))
-		Expect(podMonitor.Namespace).To(Equal(manager.podMonitor.Namespace))
-	})
-
-	It("should not return an error when PodMonitor is disabled", func() {
-		manager.isEnabled = false
-		err := createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("should remove the PodMonitor if it is disabled when the PodMonitor exists", func() {
-		// Create the PodMonitor with the fake client
-		err := fakeCli.Create(ctx, manager.podMonitor)
-		Expect(err).ToNot(HaveOccurred())
-
-		manager.isEnabled = false
-		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Ensure the PodMonitor doesn't exist anymore
-		podMonitor := &v1.PodMonitor{}
-		err = fakeCli.Get(
-			ctx,
-			types.NamespacedName{
-				Name:      manager.podMonitor.Name,
-				Namespace: manager.podMonitor.Namespace,
-			},
-			podMonitor,
-		)
-		Expect(err).To(HaveOccurred())
-		Expect(apierrs.IsNotFound(err)).To(BeTrue())
-	})
-
-	It("should patch the PodMonitor with updated labels and annotations", func() {
-		initialLabels := map[string]string{"label1": "value1"}
-		initialAnnotations := map[string]string{"annotation1": "value1"}
-
-		manager.podMonitor.Labels = initialLabels
-		manager.podMonitor.Annotations = initialAnnotations
-		err := fakeCli.Create(ctx, manager.podMonitor)
-		Expect(err).ToNot(HaveOccurred())
-
-		updatedLabels := map[string]string{"label1": "changedValue1", "label2": "value2"}
-		updatedAnnotations := map[string]string{"annotation1": "changedValue1", "annotation2": "value2"}
-
-		manager.podMonitor.Labels = updatedLabels
-		manager.podMonitor.Annotations = updatedAnnotations
-
-		err = createOrPatchPodMonitor(ctx, fakeCli, fakeDiscoveryClient, manager)
-		Expect(err).ToNot(HaveOccurred())
-
-		podMonitor := &v1.PodMonitor{}
-		err = fakeCli.Get(
-			ctx,
-			types.NamespacedName{
-				Name:      manager.podMonitor.Name,
-				Namespace: manager.podMonitor.Namespace,
-			},
-			podMonitor,
-		)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(podMonitor.Labels).To(Equal(updatedLabels))
-		Expect(podMonitor.Annotations).To(Equal(updatedAnnotations))
 	})
 })
 

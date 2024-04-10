@@ -19,13 +19,13 @@ package v1
 import (
 	"context"
 	"fmt"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2268,11 +2268,17 @@ type MonitoringConfiguration struct {
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
-	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+	// PodMonitorConfiguration is used to customized PodMonitor
+	// +optional
+	PodMonitorConfiguration *PodMonitoringConfiguration `json:"podMonitorConfiguration,omitempty"`
+
+	// The list of metric relabeling for the `PodMonitor`. Applied to samples before ingestion.
+	// Deprecated: This property is deprecated, please refer to `PodMonitorConfiguration`
 	// +optional
 	PodMonitorMetricRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
-	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+	// The list of relabeling for the `PodMonitor`. Applied to samples before scraping.
+	// Deprecated: This property is deprecated, please refer to `PodMonitorConfiguration`
 	// +optional
 	PodMonitorRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
@@ -3284,6 +3290,46 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	}
 
 	return false
+}
+
+func (cluster *Cluster) BuildPodMonitor() *monitoringv1.PodMonitor {
+	meta := metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+	cluster.SetInheritedDataAndOwnership(&meta)
+
+	endpoint := monitoringv1.PodMetricsEndpoint{
+		Port: "metrics",
+	}
+
+	if cluster.Spec.Monitoring.PodMonitorConfiguration != nil {
+		endpoint.MetricRelabelConfigs = cluster.Spec.Monitoring.PodMonitorConfiguration.PodMonitorMetricRelabelConfigs
+		endpoint.RelabelConfigs = cluster.Spec.Monitoring.PodMonitorConfiguration.PodMonitorRelabelConfigs
+
+		if cluster.Spec.Monitoring.PodMonitorConfiguration.PodMonitorInterval != nil {
+			endpoint.Interval = *cluster.Spec.Monitoring.PodMonitorConfiguration.PodMonitorInterval
+		}
+
+		if cluster.Spec.Monitoring.PodMonitorConfiguration.PodMonitorScrapeTimeout != nil {
+			endpoint.ScrapeTimeout = *cluster.Spec.Monitoring.PodMonitorConfiguration.PodMonitorScrapeTimeout
+		}
+	} else if cluster.Spec.Monitoring != nil {
+		endpoint.MetricRelabelConfigs = cluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs
+		endpoint.RelabelConfigs = cluster.Spec.Monitoring.PodMonitorRelabelConfigs
+	}
+
+	spec := monitoringv1.PodMonitorSpec{
+		Selector: metav1.LabelSelector{
+			MatchLabels: meta.Labels,
+		},
+		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{endpoint},
+	}
+
+	return &monitoringv1.PodMonitor{
+		ObjectMeta: meta,
+		Spec:       spec,
+	}
 }
 
 // GetEnableSuperuserAccess returns if the superuser access is enabled or not

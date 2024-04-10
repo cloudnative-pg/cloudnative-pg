@@ -3017,9 +3017,214 @@ spec:
                     default: false
                     description: Enable or disable the `PodMonitor`
                     type: boolean
+                  podMonitorConfiguration:
+                    description: PodMonitorConfiguration is used to customized PodMonitor
+                    properties:
+                      podMonitorInterval:
+                        description: The scrape interval for the `PodMonitor`, if
+                          nil global Prometheus value will be used
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
+                      podMonitorMetricRelabelings:
+                        description: The list of metric relabelings for the `PodMonitor`.
+                          Applied to samples before ingestion.
+                        items:
+                          description: |-
+                            RelabelConfig allows dynamic rewriting of the label set for targets, alerts,
+                            scraped samples and remote write samples.
+
+
+                            More info: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config
+                          properties:
+                            action:
+                              default: replace
+                              description: |-
+                                Action to perform based on the regex matching.
+
+
+                                `Uppercase` and `Lowercase` actions require Prometheus >= v2.36.0.
+                                `DropEqual` and `KeepEqual` actions require Prometheus >= v2.41.0.
+
+
+                                Default: "Replace"
+                              enum:
+                              - replace
+                              - Replace
+                              - keep
+                              - Keep
+                              - drop
+                              - Drop
+                              - hashmod
+                              - HashMod
+                              - labelmap
+                              - LabelMap
+                              - labeldrop
+                              - LabelDrop
+                              - labelkeep
+                              - LabelKeep
+                              - lowercase
+                              - Lowercase
+                              - uppercase
+                              - Uppercase
+                              - keepequal
+                              - KeepEqual
+                              - dropequal
+                              - DropEqual
+                              type: string
+                            modulus:
+                              description: |-
+                                Modulus to take of the hash of the source label values.
+
+
+                                Only applicable when the action is `HashMod`.
+                              format: int64
+                              type: integer
+                            regex:
+                              description: Regular expression against which the extracted
+                                value is matched.
+                              type: string
+                            replacement:
+                              description: |-
+                                Replacement value against which a Replace action is performed if the
+                                regular expression matches.
+
+
+                                Regex capture groups are available.
+                              type: string
+                            separator:
+                              description: Separator is the string between concatenated
+                                SourceLabels.
+                              type: string
+                            sourceLabels:
+                              description: |-
+                                The source labels select values from existing labels. Their content is
+                                concatenated using the configured Separator and matched against the
+                                configured regular expression.
+                              items:
+                                description: |-
+                                  LabelName is a valid Prometheus label name which may only contain ASCII
+                                  letters, numbers, as well as underscores.
+                                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                                type: string
+                              type: array
+                            targetLabel:
+                              description: |-
+                                Label to which the resulting string is written in a replacement.
+
+
+                                It is mandatory for `Replace`, `HashMod`, `Lowercase`, `Uppercase`,
+                                `KeepEqual` and `DropEqual` actions.
+
+
+                                Regex capture groups are available.
+                              type: string
+                          type: object
+                        type: array
+                      podMonitorRelabelings:
+                        description: The list of relabelings for the `PodMonitor`.
+                          Applied to samples before scraping.
+                        items:
+                          description: |-
+                            RelabelConfig allows dynamic rewriting of the label set for targets, alerts,
+                            scraped samples and remote write samples.
+
+
+                            More info: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config
+                          properties:
+                            action:
+                              default: replace
+                              description: |-
+                                Action to perform based on the regex matching.
+
+
+                                `Uppercase` and `Lowercase` actions require Prometheus >= v2.36.0.
+                                `DropEqual` and `KeepEqual` actions require Prometheus >= v2.41.0.
+
+
+                                Default: "Replace"
+                              enum:
+                              - replace
+                              - Replace
+                              - keep
+                              - Keep
+                              - drop
+                              - Drop
+                              - hashmod
+                              - HashMod
+                              - labelmap
+                              - LabelMap
+                              - labeldrop
+                              - LabelDrop
+                              - labelkeep
+                              - LabelKeep
+                              - lowercase
+                              - Lowercase
+                              - uppercase
+                              - Uppercase
+                              - keepequal
+                              - KeepEqual
+                              - dropequal
+                              - DropEqual
+                              type: string
+                            modulus:
+                              description: |-
+                                Modulus to take of the hash of the source label values.
+
+
+                                Only applicable when the action is `HashMod`.
+                              format: int64
+                              type: integer
+                            regex:
+                              description: Regular expression against which the extracted
+                                value is matched.
+                              type: string
+                            replacement:
+                              description: |-
+                                Replacement value against which a Replace action is performed if the
+                                regular expression matches.
+
+
+                                Regex capture groups are available.
+                              type: string
+                            separator:
+                              description: Separator is the string between concatenated
+                                SourceLabels.
+                              type: string
+                            sourceLabels:
+                              description: |-
+                                The source labels select values from existing labels. Their content is
+                                concatenated using the configured Separator and matched against the
+                                configured regular expression.
+                              items:
+                                description: |-
+                                  LabelName is a valid Prometheus label name which may only contain ASCII
+                                  letters, numbers, as well as underscores.
+                                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                                type: string
+                              type: array
+                            targetLabel:
+                              description: |-
+                                Label to which the resulting string is written in a replacement.
+
+
+                                It is mandatory for `Replace`, `HashMod`, `Lowercase`, `Uppercase`,
+                                `KeepEqual` and `DropEqual` actions.
+
+
+                                Regex capture groups are available.
+                              type: string
+                          type: object
+                        type: array
+                      podMonitorScrapeTimeout:
+                        description: The scrape timeout for the `PodMonitor`, if nil
+                          global Prometheus value will be used
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
+                    type: object
                   podMonitorMetricRelabelings:
-                    description: The list of metric relabelings for the `PodMonitor`.
-                      Applied to samples before ingestion.
+                    description: |-
+                      The list of metric relabeling for the `PodMonitor`. Applied to samples before ingestion.
+                      Deprecated: This property is deprecated, please refer to `PodMonitorConfiguration`
                     items:
                       description: |-
                         RelabelConfig allows dynamic rewriting of the label set for targets, alerts,
@@ -3113,8 +3318,9 @@ spec:
                       type: object
                     type: array
                   podMonitorRelabelings:
-                    description: The list of relabelings for the `PodMonitor`. Applied
-                      to samples before scraping.
+                    description: |-
+                      The list of relabeling for the `PodMonitor`. Applied to samples before scraping.
+                      Deprecated: This property is deprecated, please refer to `PodMonitorConfiguration`
                     items:
                       description: |-
                         RelabelConfig allows dynamic rewriting of the label set for targets, alerts,

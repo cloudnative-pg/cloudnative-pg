@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -94,11 +95,17 @@ type PoolerMonitoringConfiguration struct {
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
+	// PodMonitorConfiguration is used to customized PodMonitor.
+	// +optional
+	PodMonitorConfiguration *PodMonitoringConfiguration `json:"podMonitorConfiguration,omitempty"`
+
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
+	// Deprecated: This property is deprecated, please refer to `PodMonitorConfiguration`
 	// +optional
 	PodMonitorMetricRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
+	// Deprecated: This property is deprecated, please refer to `PodMonitorConfiguration`
 	// +optional
 	PodMonitorRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
@@ -288,4 +295,51 @@ func (in *Pooler) IsAutomatedIntegration() bool {
 		return false
 	}
 	return true
+}
+
+func (pooler *Pooler) IsPodMonitorEnabled() bool {
+	return pooler.Spec.Monitoring != nil && pooler.Spec.Monitoring.EnablePodMonitor
+}
+
+func (pooler *Pooler) BuildPodMonitor() *monitoringv1.PodMonitor {
+	meta := metav1.ObjectMeta{
+		Namespace: pooler.Namespace,
+		Name:      pooler.Name,
+		Labels: map[string]string{
+			utils.PgbouncerNameLabel: pooler.Name,
+		},
+	}
+
+	utils.SetAsOwnedBy(&meta, pooler.ObjectMeta, pooler.TypeMeta)
+
+	endpoint := monitoringv1.PodMetricsEndpoint{
+		Port: "metrics",
+	}
+
+	if pooler.Spec.Monitoring.PodMonitorConfiguration != nil {
+		endpoint.MetricRelabelConfigs = pooler.Spec.Monitoring.PodMonitorConfiguration.PodMonitorMetricRelabelConfigs
+		endpoint.RelabelConfigs = pooler.Spec.Monitoring.PodMonitorConfiguration.PodMonitorRelabelConfigs
+
+		if pooler.Spec.Monitoring.PodMonitorConfiguration.PodMonitorInterval != nil {
+			endpoint.Interval = *pooler.Spec.Monitoring.PodMonitorConfiguration.PodMonitorInterval
+		}
+
+		if pooler.Spec.Monitoring.PodMonitorConfiguration.PodMonitorScrapeTimeout != nil {
+			endpoint.ScrapeTimeout = *pooler.Spec.Monitoring.PodMonitorConfiguration.PodMonitorScrapeTimeout
+		}
+	} else if pooler.Spec.Monitoring != nil {
+		endpoint.MetricRelabelConfigs = pooler.Spec.Monitoring.PodMonitorMetricRelabelConfigs
+		endpoint.RelabelConfigs = pooler.Spec.Monitoring.PodMonitorRelabelConfigs
+	}
+
+	spec := monitoringv1.PodMonitorSpec{
+		Selector: metav1.LabelSelector{
+			MatchLabels: meta.Labels,
+		},
+		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{endpoint},
+	}
+	return &monitoringv1.PodMonitor{
+		ObjectMeta: meta,
+		Spec:       spec,
+	}
 }

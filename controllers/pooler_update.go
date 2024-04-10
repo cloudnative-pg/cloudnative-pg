@@ -56,7 +56,31 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
-	return createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, pgbouncer.NewPoolerPodMonitorManager(pooler))
+	if err := r.createOrPatchPodMonitor(ctx, pooler); err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *PoolerReconciler) createOrPatchPodMonitor(
+	ctx context.Context,
+	pooler *apiv1.Pooler,
+) error {
+	podManager := PodMonitorManagerController{
+		manager:   pooler,
+		ctx:       ctx,
+		discovery: r.DiscoveryClient,
+		client:    r.Client,
+	}
+
+	err := podManager.createOrPatchPodMonitor()
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to create pod monitor")
+		return err
+	}
+	return nil
 }
 
 // updateDeployment update the deployment or create it when needed
