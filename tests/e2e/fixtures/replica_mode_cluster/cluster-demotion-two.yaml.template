@@ -29,15 +29,21 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
     pg_hba:
-      - host replication userSrc all md5
+      - hostssl replication streaming-replica 0.0.0.0/0 cert
 
   externalClusters:
     - name: cluster-one
       connectionParameters:
         host: cluster-one-rw
-        user: userSrc
+        user: streaming_replica
+        sslmode: verify-full
         dbname: appSrc
-        port: "5432"
-      password:
-        name: cluster-one-app
-        key: password
+      sslKey:
+        name: cluster-one-replication
+        key: tls.key
+      sslCert:
+        name: cluster-one-replication
+        key: tls.crt
+      sslRootCert:
+        name: cluster-one-ca
+        key: ca.crt
