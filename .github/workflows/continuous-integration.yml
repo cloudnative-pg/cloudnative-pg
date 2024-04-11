@@ -764,22 +764,27 @@ jobs:
       - name: Run preflight container test
         env:
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
+          PFLT_ARTIFACTS: "preflight_results"
         run: |
           bin/preflight check container ${CONTROLLER_IMG}
 
-      - name: Setting up KinD cluster
-        uses: helm/kind-action@v1.9.0
+      - name: Archive the preflight results
+        uses: actions/upload-artifact@v4
         with:
-          wait: "600s"
-          version: ${{ env.KIND_VERSION }}
+          name: preflight_results
+          path: |
+            preflight_results
+          retention-days: 7
 
-      - name: Run preflight operator test
-        env:
-          BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
-          KUBECONFIG: /home/runner/.kube/config
-          PFLT_INDEXIMAGE: ${{ needs.buildx.outputs.catalog_img }}
+      - name: Check preflight container results
         run: |
-          bin/preflight check operator ${BUNDLE_IMG}
+          for dir in `ls preflight_results`; do
+              PASS=`jq -r .passed preflight_results/$dir/results.json`
+              if [[ "$PASS" == "false" ]]
+              then
+                exit 1
+              fi
+          done
 
   olm-scorecard:
     name: Run OLM scorecard test
