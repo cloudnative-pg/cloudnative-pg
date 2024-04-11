@@ -219,6 +219,13 @@ jobs:
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
       -
+        name: Generate SBOM for image
+        uses: anchore/sbom-action@v0.15.10
+        with:
+          image: ${{ steps.docker-meta.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}.spdx
+          upload-artifact: true
+      -
         name: Build and push UBI8
         uses: docker/build-push-action@v5
         with:
@@ -230,6 +237,13 @@ jobs:
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
       -
+        name: Generate SBOM for image UBI8
+        uses: anchore/sbom-action@v0.15.10
+        with:
+          image: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}-ubi8.spdx
+          upload-artifact: true
+      -
         name: Build and push UBI9
         uses: docker/build-push-action@v5
         with:
@@ -240,6 +254,13 @@ jobs:
           build-args: |
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
+      -
+        name: Generate SBOM for image UBI9
+        uses: anchore/sbom-action@v0.15.10
+        with:
+          image: ${{ steps.docker-meta-ubi9.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}-ubi8.spdx
+          upload-artifact: true
 
   olm-bundle:
     name: Create OLM bundle and catalog
