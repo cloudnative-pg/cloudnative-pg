@@ -1326,6 +1326,84 @@ var _ = Describe("configuration change validation", func() {
 		}
 		Expect(cluster.validateWALLevelChange(&oldCluster)).To(BeEmpty())
 	})
+
+	Describe("wal_log_hints", func() {
+		It("should allow wal_log_hints set to off for clusters having just one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 1,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "off",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+
+		It("should not allow wal_log_hints set to off for clusters having more than one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 3,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "off",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).ToNot(BeEmpty())
+		})
+
+		It("should allow wal_log_hints set to on for clusters having just one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 1,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "on",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+
+		It("should not allow wal_log_hints set to on for clusters having more than one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 3,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "on",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+	})
 })
 
 var _ = Describe("validate image name change", func() {

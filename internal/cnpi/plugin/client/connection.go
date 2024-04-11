@@ -57,7 +57,7 @@ func (p protocolUnix) dial(ctx context.Context, path string) (connectionHandler,
 
 	contextLogger.Debug("Connecting to plugin", "path", dialPath)
 
-	return grpc.Dial(
+	return grpc.NewClient(
 		dialPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(

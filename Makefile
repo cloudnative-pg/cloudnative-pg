@@ -30,6 +30,7 @@ endif
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
 VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/-dev\1/')
+REPLACE_VERSION := $(shell git describe --tags --abbrev=0 $(git describe --tags --match 'v*' --abbrev=0)^)
 LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=${VERSION} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
@@ -39,9 +40,9 @@ LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v5.3.0
+KUSTOMIZE_VERSION ?= v5.4.1
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
-GORELEASER_VERSION ?= v1.25.0
+GORELEASER_VERSION ?= v1.25.1
 SPELLCHECK_VERSION ?= 0.36.0
 WOKE_VERSION ?= 0.19.0
 OPERATOR_SDK_VERSION ?= 1.34.1
@@ -140,7 +141,7 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 	rm -fr bundle bundle.Dockerfile ;\
 	sed -i -e "s/ClusterRole/Role/" "$${CONFIG_TMP_DIR}/config/rbac/role.yaml" "$${CONFIG_TMP_DIR}/config/rbac/role_binding.yaml"  ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
-	sed -e "s@\$${VERSION}@${VERSION}@g" | \
+	sed -e "s@\$${VERSION}@${VERSION}@g; s@\$${REPLACE_VERSION}@${REPLACE_VERSION}@g" | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
 	echo -e "\n  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
 	echo -e "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\

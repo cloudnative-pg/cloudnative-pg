@@ -67,15 +67,20 @@ var _ = Describe("Filtering cluster", func() {
 })
 
 var _ = Describe("Updating target primary", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
 	It("selects the new target primary right away", func() {
 		ctx := context.TODO()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(clusterReconciler.Client, cluster)
-		instances := generateFakeClusterPods(clusterReconciler.Client, cluster, true)
-		pvc := generateClusterPVC(clusterReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
 
 		managedResources := &managedResources{
 			nodes:     nil,
@@ -114,7 +119,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("updating target primary pods for the cluster", func() {
-			selectedPrimary, err := clusterReconciler.updateTargetPrimaryFromPods(
+			selectedPrimary, err := env.clusterReconciler.updateTargetPrimaryFromPods(
 				ctx,
 				cluster,
 				statusList,
@@ -128,15 +133,15 @@ var _ = Describe("Updating target primary", func() {
 
 	It("it should wait the failover delay to select the new target primary", func() {
 		ctx := context.TODO()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace, func(cluster *apiv1.Cluster) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 			cluster.Spec.FailoverDelay = 2
 		})
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(clusterReconciler.Client, cluster)
-		instances := generateFakeClusterPods(clusterReconciler.Client, cluster, true)
-		pvc := generateClusterPVC(clusterReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
 
 		managedResources := &managedResources{
 			nodes:     nil,
@@ -178,7 +183,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("returning the ErrWaitingOnFailOverDelay when first detecting the failure", func() {
-			selectedPrimary, err := clusterReconciler.updateTargetPrimaryFromPodsPrimaryCluster(
+			selectedPrimary, err := env.clusterReconciler.updateTargetPrimaryFromPodsPrimaryCluster(
 				ctx,
 				cluster,
 				statusList,
@@ -192,7 +197,7 @@ var _ = Describe("Updating target primary", func() {
 
 		By("eventually updating the primary pod once the delay is elapsed", func() {
 			Eventually(func(g Gomega) {
-				selectedPrimary, err := clusterReconciler.updateTargetPrimaryFromPodsPrimaryCluster(
+				selectedPrimary, err := env.clusterReconciler.updateTargetPrimaryFromPodsPrimaryCluster(
 					ctx,
 					cluster,
 					statusList,
@@ -206,18 +211,18 @@ var _ = Describe("Updating target primary", func() {
 
 	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func() {
 		ctx := context.TODO()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace, func(cluster *apiv1.Cluster) {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 			cluster.Spec.Instances = 2
 			cluster.Status.LatestGeneratedNode = 2
 			cluster.Status.ReadyInstances = 2
 		})
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(clusterReconciler.Client, cluster)
-		instances := generateFakeClusterPods(clusterReconciler.Client, cluster, true)
-		pvcs := generateClusterPVC(clusterReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
-		thirdInstancePVCGroup := newFakePVC(clusterReconciler.Client, cluster, 3, persistentvolumeclaim.StatusReady)
+		jobs := generateFakeInitDBJobs(env.client, cluster)
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+		thirdInstancePVCGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
 		pvcs = append(pvcs, thirdInstancePVCGroup...)
 
 		cluster.Status.DanglingPVC = append(cluster.Status.DanglingPVC, thirdInstancePVCGroup[0].Name)
@@ -252,7 +257,7 @@ var _ = Describe("Updating target primary", func() {
 		}
 
 		By("triggering ensureInstancesAreCreated", func() {
-			res, err := clusterReconciler.ensureInstancesAreCreated(ctx, cluster, managedResources, statusList)
+			res, err := env.clusterReconciler.ensureInstancesAreCreated(ctx, cluster, managedResources, statusList)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(Equal(reconcile.Result{RequeueAfter: time.Second}))
 		})
@@ -260,7 +265,7 @@ var _ = Describe("Updating target primary", func() {
 		By("checking that the third instance exists even if the cluster has two instances", func() {
 			var expectedPod corev1.Pod
 			instanceName := specs.GetInstanceName(cluster.Name, 3)
-			err := clusterReconciler.Client.Get(ctx, types.NamespacedName{
+			err := env.clusterReconciler.Client.Get(ctx, types.NamespacedName{
 				Name:      instanceName,
 				Namespace: cluster.Namespace,
 			}, &expectedPod)

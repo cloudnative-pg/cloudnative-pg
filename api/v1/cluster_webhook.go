@@ -1195,6 +1195,15 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	if r.Spec.Instances > 1 && r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints] == "off" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
+				r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints],
+				"`wal_log_hints` must be set to `on` when `instances` > 1"))
+	}
+
 	// verify the postgres setting min_wal_size < max_wal_size < volume size
 	result = append(result, validateWalSizeConfiguration(
 		r.Spec.PostgresConfiguration, r.Spec.WalStorage.GetSizeOrNil())...)

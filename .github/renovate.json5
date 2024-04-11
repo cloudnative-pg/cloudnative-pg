@@ -47,6 +47,81 @@
       "versioningTemplate": "loose",
       "depNameTemplate": "github.com/goreleaser/goreleaser",
     }, {
+      // We want a PR to bump the external-snapshotter version
+      "fileMatch": [
+        "^.github/workflows/continuous-delivery.yml",
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "EXTERNAL_SNAPSHOTTER_VERSION: \"(?<currentValue>.*?)\"",
+        "EXTERNAL_SNAPSHOTTER_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/external-snapshotter",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the external-provisioner version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "EXTERNAL_PROVISIONER_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/external-provisioner",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the external-resizer version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "EXTERNAL_RESIZER_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/external-resizer",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the external-attacher version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "EXTERNAL_ATTACHER_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/external-attacher",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the csi-driver-host-path version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/csi-driver-host-path",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the rook version
+      "fileMatch": [
+        "^.github/workflows/continuous-delivery.yml",
+      ],
+      "matchStrings": [
+        "ROOK_VERSION: \"(?<currentValue>.*?)\"",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "rook/rook",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump kind version
       "fileMatch": [
         "^.github/workflows/continuous-delivery.yml"
       ],
@@ -257,6 +332,14 @@
       "matchDepTypes": [
         "action"
       ],
+      "pinDigests": false
+    },{
+// PR group for Kubernetes CSI
+      "groupName": "kubernetes CSI",
+      "matchPackagePrefixes": [
+        "kubernetes-csi"
+      ],
+      "separateMajorMinor": "false",
       "pinDigests": false
     }
   ]
