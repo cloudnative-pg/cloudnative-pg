@@ -37,7 +37,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("Replica Mode", Label(tests.LabelReplication), func() {
+var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 	const (
 		replicaModeClusterDir = "/replica_mode_cluster/"
 		srcClusterName        = "cluster-replica-src"
@@ -114,7 +114,7 @@ var _ = FDescribe("Replica Mode", Label(tests.LabelReplication), func() {
 				"test_replica")
 		})
 
-		FIt("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
+		It("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
 			const (
 				clusterOneName = "cluster-one"
 				clusterTwoName = "cluster-two"
@@ -171,28 +171,14 @@ var _ = FDescribe("Replica Mode", Label(tests.LabelReplication), func() {
 				return err
 			}, 30, 3).Should(BeNil())
 
-			var appUser, appUserPass string
-			Eventually(func(g Gomega) {
-				var err error
-				appUser, appUserPass, err = testUtils.GetCredentials(clusterTwoName, namespace,
-					apiv1.ApplicationUserSecretSuffix, env)
-				g.Expect(err).ToNot(HaveOccurred())
-			}, 60).Should(Succeed())
-
-			host, err := testUtils.GetHostName(namespace, clusterTwoName, env)
-			Expect(err).ToNot(HaveOccurred())
-
 			By("creating a new data in the new source cluster", func() {
-				cmd := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", "new_test_table")
-				_, _, err = testUtils.RunQueryFromPod(
-					newPrimaryPod,
-					host,
-					"appSrc",
-					appUser,
-					appUserPass,
-					cmd,
-					env)
-				Expect(err).ToNot(HaveOccurred())
+				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", "new_test_table")
+				commandTimeout := time.Second * 10
+				Eventually(func(g Gomega) {
+					_, _, err := env.ExecCommand(env.Ctx, *newPrimaryPod, specs.PostgresContainerName,
+						&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
+					g.Expect(err).ToNot(HaveOccurred())
+				}, 300).Should(Succeed())
 			})
 
 			By("checking that the data is present in the old src cluster", func() {

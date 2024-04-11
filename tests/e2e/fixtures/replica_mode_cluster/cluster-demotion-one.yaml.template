@@ -19,7 +19,8 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
     pg_hba:
-      - host replication userSrc all md5
+      - hostssl replication streaming-replica 0.0.0.0/0 cert
+
 
   bootstrap:
     initdb:
@@ -36,9 +37,15 @@ spec:
     - name: cluster-two
       connectionParameters:
         host: cluster-two-rw
-        user: userSrc
+        user: streaming_replica
+        sslmode: verify-full
         dbname: appSrc
-        port: "5432"
-      password:
-        name: cluster-two-app
-        key: password
+      sslKey:
+        name: cluster-two-replication
+        key: tls.key
+      sslCert:
+        name: cluster-two-replication
+        key: tls.crt
+      sslRootCert:
+        name: cluster-two-ca
+        key: ca.crt
