@@ -119,7 +119,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("updating target primary pods for the cluster", func() {
-			selectedPrimary, err := env.clusterReconciler.updateTargetPrimaryFromPods(
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryFromPods(
 				ctx,
 				cluster,
 				statusList,
@@ -183,7 +183,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("returning the ErrWaitingOnFailOverDelay when first detecting the failure", func() {
-			selectedPrimary, err := env.clusterReconciler.updateTargetPrimaryFromPodsPrimaryCluster(
+			selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
 				ctx,
 				cluster,
 				statusList,
@@ -197,7 +197,7 @@ var _ = Describe("Updating target primary", func() {
 
 		By("eventually updating the primary pod once the delay is elapsed", func() {
 			Eventually(func(g Gomega) {
-				selectedPrimary, err := env.clusterReconciler.updateTargetPrimaryFromPodsPrimaryCluster(
+				selectedPrimary, err := env.clusterReconciler.reconcileTargetPrimaryForNonReplicaCluster(
 					ctx,
 					cluster,
 					statusList,
