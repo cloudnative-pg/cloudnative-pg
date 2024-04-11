@@ -842,14 +842,14 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) error {
-	podManager := PodMonitorManagerController{
-		manager:   cluster,
-		ctx:       ctx,
-		discovery: r.DiscoveryClient,
-		client:    r.Client,
+	podManager := specs.PodMonitorManagerController{
+		Manager:   cluster,
+		Ctx:       ctx,
+		Discovery: r.DiscoveryClient,
+		Client:    r.Client,
 	}
 
-	err := podManager.createOrPatchPodMonitor()
+	err := podManager.CreateOrPatchPodMonitor()
 	if err != nil {
 		log.FromContext(ctx).Error(err, "unable to create pod monitor")
 		return err

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package specs
 
 import (
 	"context"
@@ -85,15 +85,15 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		}
 
 		podManager = PodMonitorManagerController{
-			manager:   mockManager,
-			ctx:       mockCtx,
-			discovery: fakeDiscoveryClient,
-			client:    fakeCli,
+			Manager:   mockManager,
+			Ctx:       mockCtx,
+			Discovery: fakeDiscoveryClient,
+			Client:    fakeCli,
 		}
 	})
 
 	It("should create the PodMonitor  when it is enabled and doesn't already exists", func() {
-		err := podManager.createOrPatchPodMonitor()
+		err := podManager.CreateOrPatchPodMonitor()
 		Expect(err).ToNot(HaveOccurred())
 
 		podMonitor := &v1.PodMonitor{}
@@ -112,7 +112,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 
 	It("should not return an error when PodMonitor is disabled", func() {
 		mockManager.isEnabled = false
-		err := podManager.createOrPatchPodMonitor()
+		err := podManager.CreateOrPatchPodMonitor()
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -122,7 +122,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		mockManager.isEnabled = false
-		err = podManager.createOrPatchPodMonitor()
+		err = podManager.CreateOrPatchPodMonitor()
 		Expect(err).ToNot(HaveOccurred())
 
 		// Ensure the PodMonitor doesn't exist anymore
@@ -154,7 +154,7 @@ var _ = Describe("CreateOrPatchPodMonitor", func() {
 		mockManager.podMonitor.Labels = updatedLabels
 		mockManager.podMonitor.Annotations = updatedAnnotations
 
-		err = podManager.createOrPatchPodMonitor()
+		err = podManager.CreateOrPatchPodMonitor()
 		Expect(err).ToNot(HaveOccurred())
 
 		podMonitor := &v1.PodMonitor{}

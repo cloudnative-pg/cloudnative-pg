@@ -32,6 +32,9 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelPrometheus), fun
 		level                        = tests.Medium
 		clusterDefaultName           = "cluster-default-monitoring"
 		clusterDefaultMonitoringFile = fixturesDir + "/monitoring/cluster-default-monitoring.yaml"
+		clusterName                  = "cluster-monitoring"
+		poolerName                   = "cluster-pooler-monitoring"
+		clusterMonitoringFile        = fixturesDir + "/monitoring/cluster-monitoring.yaml"
 	)
 	var err error
 	var namespace string
@@ -69,13 +72,56 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelPrometheus), fun
 		By("verifying PodMonitor existence", func() {
 			var podMonitor *monitoringv1.PodMonitor
 
-			podMonitor, err := env.GetPodMonitor(namespace, clusterDefaultName)
+			podMonitor, err := env.GetPodMonitor(map[string]string{
+				utils.ClusterLabelName: clusterDefaultName,
+			})
 			Expect(err).ToNot(HaveOccurred())
 
 			endpoints := podMonitor.Spec.PodMetricsEndpoints
 			Expect(endpoints).Should(HaveLen(1), "endpoints should be of size 1")
 			Expect(endpoints[0].Interval).Should(BeEmpty(), "should not be set as spec")
 			Expect(endpoints[0].ScrapeTimeout).Should(BeEmpty(), "should not be set as spec")
+		})
+	})
+
+	It("sets up a cluster enabling PodMonitor feature and custom specs", func() {
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+			return env.DeleteNamespace(namespace)
+		})
+
+		AssertCreateCluster(namespace, clusterName, clusterMonitoringFile, env)
+
+		By("verifying PodMonitor properties", func() {
+			var podMonitor *monitoringv1.PodMonitor
+
+			podMonitor, err := env.GetPodMonitor(map[string]string{
+				utils.ClusterLabelName: clusterName,
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			endpoints := podMonitor.Spec.PodMetricsEndpoints
+			Expect(endpoints).Should(HaveLen(1), "endpoints should be of size 1")
+			Expect(endpoints[0].Interval).Should(Equal(monitoringv1.Duration("30s")), "should be set as spec")
+			Expect(endpoints[0].ScrapeTimeout).Should(Equal(monitoringv1.Duration("60s")), "should be set as spec")
+		})
+
+		By("verifying Pooler PodMonitor properties", func() {
+			var podMonitor *monitoringv1.PodMonitor
+
+			podMonitor, err := env.GetPodMonitor(map[string]string{
+				utils.PgbouncerNameLabel: poolerName,
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			endpoints := podMonitor.Spec.PodMetricsEndpoints
+			Expect(endpoints).Should(HaveLen(1), "endpoints should be of size 1")
+			Expect(endpoints[0].Interval).Should(Equal(monitoringv1.Duration("30s")), "should be set as spec")
+			Expect(endpoints[0].ScrapeTimeout).Should(Equal(monitoringv1.Duration("60s")), "should be set as spec")
 		})
 	})
 })

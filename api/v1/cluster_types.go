@@ -3296,6 +3296,9 @@ func (cluster *Cluster) BuildPodMonitor() *monitoringv1.PodMonitor {
 	meta := metav1.ObjectMeta{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name,
+		Labels: map[string]string{
+			utils.ClusterLabelName: cluster.Name,
+		},
 	}
 	cluster.SetInheritedDataAndOwnership(&meta)
 

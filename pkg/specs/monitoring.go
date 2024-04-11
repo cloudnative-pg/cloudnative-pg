@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package specs
 
 import (
 	"context"
@@ -35,27 +35,27 @@ type PodMonitorManager interface {
 }
 
 type PodMonitorManagerController struct {
-	manager   PodMonitorManager
-	ctx       context.Context
-	discovery discovery.DiscoveryInterface
-	client    client.Client
+	Manager   PodMonitorManager
+	Ctx       context.Context
+	Discovery discovery.DiscoveryInterface
+	Client    client.Client
 }
 
 func (p PodMonitorManagerController) AssertPodMonitorFunctionality() (bool, error) {
-	havePodMonitorCRD, err := utils.PodMonitorExist(p.discovery)
+	havePodMonitorCRD, err := utils.PodMonitorExist(p.Discovery)
 	if err != nil {
 		return false, err
 	}
 
-	if !havePodMonitorCRD && p.manager.IsPodMonitorEnabled() {
+	if !havePodMonitorCRD && p.Manager.IsPodMonitorEnabled() {
 		return false, nil
 	}
 
 	return true, nil
 }
 
-func (p PodMonitorManagerController) createOrPatchPodMonitor() error {
-	contextLogger := log.FromContext(p.ctx)
+func (p PodMonitorManagerController) CreateOrPatchPodMonitor() error {
+	contextLogger := log.FromContext(p.Ctx)
 
 	havePodMonitorCRD, err := p.AssertPodMonitorFunctionality()
 	if err != nil {
@@ -66,14 +66,14 @@ func (p PodMonitorManagerController) createOrPatchPodMonitor() error {
 	}
 
 	// Build expected PodMonitor
-	expectedPodMonitor := p.manager.BuildPodMonitor()
+	expectedPodMonitor := p.Manager.BuildPodMonitor()
 	expectedPodMonitorString := MarshalPodMonitor(*expectedPodMonitor)
 	contextLogger.Debug(fmt.Sprintf("Expected PodMonitor is: %s", expectedPodMonitorString))
 
 	// We get the current pod monitor
 	podMonitor := &monitoringv1.PodMonitor{}
-	if err := p.client.Get(
-		p.ctx,
+	if err := p.Client.Get(
+		p.Ctx,
 		client.ObjectKeyFromObject(expectedPodMonitor),
 		podMonitor,
 	); err != nil {
@@ -83,21 +83,22 @@ func (p PodMonitorManagerController) createOrPatchPodMonitor() error {
 		podMonitor = nil
 	}
 
-	if !p.manager.IsPodMonitorEnabled() && podMonitor != nil {
+	if !p.Manager.IsPodMonitorEnabled() && podMonitor != nil {
 		// `PodMonitor` is disabled but it still exists
 		contextLogger.Info("Deleting PodMonitor")
-		if err := p.client.Delete(p.ctx, podMonitor); err != nil {
+		if err := p.Client.Delete(p.Ctx, podMonitor); err != nil {
 			if !apierrs.IsNotFound(err) {
 				return err
 			}
 		}
-	} else if p.manager.IsPodMonitorEnabled() && podMonitor == nil {
+	} else if p.Manager.IsPodMonitorEnabled() && podMonitor == nil {
 		// `PodMonitor` is enabled, but it still not yet reconciled
 		contextLogger.Info("Creating PodMonitor")
-		if err := p.client.Create(p.ctx, expectedPodMonitor); err != nil {
+		if err := p.Client.Create(p.Ctx, expectedPodMonitor); err != nil {
 			return err
 		}
-	} else {
+	} else if podMonitor != nil {
+		// PodMonitor exists, and we fall back to not monitoring status change
 		origPodMonitor := podMonitor.DeepCopy()
 		podMonitor.Spec = expectedPodMonitor.Spec
 		// We don't override the current labels/annotations given that there could be data that isn't managed by us
@@ -110,7 +111,7 @@ func (p PodMonitorManagerController) createOrPatchPodMonitor() error {
 
 		// Patch the PodMonitor, so we always reconcile it with the cluster changes
 		contextLogger.Debug("Patching PodMonitor")
-		return p.client.Patch(p.ctx, podMonitor, client.MergeFrom(origPodMonitor))
+		return p.Client.Patch(p.Ctx, podMonitor, client.MergeFrom(origPodMonitor))
 	}
 
 	// No operation needed

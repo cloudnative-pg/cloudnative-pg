@@ -17,21 +17,25 @@ limitations under the License.
 package utils
 
 import (
+	"errors"
+	"fmt"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/labels"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// GetPodMonitor gathers the current PodMonitor in a namespace
-func (env TestingEnvironment) GetPodMonitor(namespace string, name string) (*monitoringv1.PodMonitor, error) {
-	podMonitor := &monitoringv1.PodMonitor{}
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}
+// GetPodMonitor gathers the current PodMonitor for some specified criteria
+func (env TestingEnvironment) GetPodMonitor(labelSelector map[string]string) (*monitoringv1.PodMonitor, error) {
+	podMonitor := &monitoringv1.PodMonitorList{}
+	labelSelectorList := labels.SelectorFromSet(labelSelector)
 
-	err := GetObject(&env, namespacedName, podMonitor)
+	err := GetObjectList(&env, podMonitor, ctrlclient.MatchingLabelsSelector{Selector: labelSelectorList})
 	if err != nil {
 		return nil, err
 	}
-	return podMonitor, nil
+
+	if len(podMonitor.Items) == 0 {
+		return nil, errors.New(fmt.Sprintf("PodMonitor not found: %v", podMonitor.Items))
+	}
+	return podMonitor.Items[0], nil
 }

@@ -8,6 +8,9 @@ spec:
 
   monitoring:
     enablePodMonitor: true
+    podMonitorConfiguration:
+      podMonitorInterval: 30s
+      podMonitorScrapeTimeout: 60s
 
   storage:
     size: 1Gi
@@ -25,3 +28,6 @@ spec:
 
   monitoring:
     enablePodMonitor: true
+    podMonitorConfiguration:
+      podMonitorInterval: 30s
+      podMonitorScrapeTimeout: 60s
