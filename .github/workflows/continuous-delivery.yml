@@ -363,8 +363,7 @@ jobs:
           flavor: |
             suffix=-ubi8
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
+            type=raw,value=${{ steps.build-meta.outputs.tag_name }}
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -1851,7 +1850,7 @@ jobs:
 
   e2e-openshift:
     name: Run E2E on OpenShift
-    if: | 
+    if: |
       always() && !cancelled() &&
       vars.OPENSHIFT_ENABLED == 'true' &&
       needs.generate-jobs.outputs.openshiftEnabled == 'true' &&
