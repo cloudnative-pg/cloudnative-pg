@@ -148,6 +148,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
+				time.Sleep(time.Second * 10)
 			})
 
 			By("disabling the replica mode on the src cluster", func() {
@@ -157,6 +158,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
+				time.Sleep(time.Second * 10)
 			})
 
 			var newPrimaryPod *corev1.Pod
