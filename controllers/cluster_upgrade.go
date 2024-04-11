@@ -80,7 +80,7 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	// report an error if there is no primary. This condition should never happen because
-	// `updateTargetPrimaryFromPods()` is executed before this function
+	// `reconcileTargetPrimaryFromPods()` is executed before this function
 	if primaryPostgresqlStatus == nil {
 		return false, fmt.Errorf("expected 1 primary PostgreSQL but none found")
 	}
