@@ -23,8 +23,8 @@ github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWR
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/cloudnative-pg/cnpg-i v0.0.0-20240409091715-caf6b1b23daa h1:2+6rqFfsIhDcTL71zWCFLhw6xJZ1QmsJowwxziMGs3U=
-github.com/cloudnative-pg/cnpg-i v0.0.0-20240409091715-caf6b1b23daa/go.mod h1:msnHf8liP4/peqnXI6ReoRZdgaxOMp6F0vTAQcPPIZg=
+github.com/cloudnative-pg/cnpg-i v0.0.0-20240410134146-aa2f566849ce h1:RL8oOzqLLWzV9VS/x9IJIu9oG6n0b5EwXF85VufaKwM=
+github.com/cloudnative-pg/cnpg-i v0.0.0-20240410134146-aa2f566849ce/go.mod h1:msnHf8liP4/peqnXI6ReoRZdgaxOMp6F0vTAQcPPIZg=
 github.com/cpuguy83/go-md2man/v2 v2.0.3/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
