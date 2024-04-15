@@ -776,10 +776,14 @@ func (r *ClusterReconciler) handleRollingUpdate(
 
 	// If we need to roll out a restart of any instance, this is the right moment
 	done, err := r.rolloutRequiredInstances(ctx, cluster, &instancesStatus)
-	if err != nil {
+	switch {
+	case err == errLogShippingReplicaElected:
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+
+	case err != nil:
 		return ctrl.Result{}, err
-	}
-	if done {
+
+	case done:
 		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
 		return ctrl.Result{}, ErrNextLoop
 	}
