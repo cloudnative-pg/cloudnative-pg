@@ -71,7 +71,7 @@ func (err *CloudRestoreError) Error() string {
 // IsRetriable returns true whether the error is temporary, and
 // it could be a good idea to retry the restore later
 func (err *CloudRestoreError) IsRetriable() bool {
-	return err.ExitCode == networkErrorCode && err.HasRestoreErrorCodes
+	return (err.ExitCode == networkErrorCode || err.ExitCode == generalErrorCode) && err.HasRestoreErrorCodes
 }
 
 // UnmarshalBarmanCloudRestoreExitCode returns the correct error
