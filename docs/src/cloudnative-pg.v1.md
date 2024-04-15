@@ -2239,6 +2239,13 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>PluginStatus is the status of the loaded plugins</p>
 </td>
 </tr>
+<tr><td><code>switchReplicaClusterStatus</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SwitchReplicaClusterStatus"><i>SwitchReplicaClusterStatus</i></a>
+</td>
+<td>
+   <p>SwitchReplicaClusterStatus is the status of the switch to replica cluster</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -4833,6 +4840,30 @@ Size cannot be decreased.</p>
 </td>
 <td>
    <p>Template to be used to generate the Persistent Volume Claim</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SwitchReplicaClusterStatus     {#postgresql-cnpg-io-v1-SwitchReplicaClusterStatus}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>inProgress</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>InProgress indicates if there is an ongoing procedure of switching a cluster to a replica cluster.</p>
 </td>
 </tr>
 </tbody>

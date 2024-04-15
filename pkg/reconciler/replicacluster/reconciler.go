@@ -1,4 +1,4 @@
-package switchexternalcluster
+package replicacluster
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/switchexternalcluster/common"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -29,11 +28,11 @@ func Reconcile(
 
 	contextLogger := log.FromContext(ctx)
 	// finish transition
-	if common.IsDesignatedPrimaryTransitionCompleted(cluster) {
-		return &ctrl.Result{RequeueAfter: time.Second}, finishTransition(ctx, cli, cluster)
+	if IsDesignatedPrimaryTransitionCompleted(cluster) {
+		return &ctrl.Result{RequeueAfter: time.Second}, cleanupTransitionMetadata(ctx, cli, cluster)
 	}
 	// waiting for the instance manager
-	if common.IsDesignatedPrimaryTransitionRequested(cluster) {
+	if IsDesignatedPrimaryTransitionRequested(cluster) {
 		contextLogger.Info("waiting transition")
 		return nil, nil
 	}
@@ -62,10 +61,9 @@ func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clus
 	)
 
 	origCluster := cluster.DeepCopy()
-	// if nothing is present this is the starting phase
-	common.SetDesignatedPrimaryTransitionRequested(cluster)
-	common.SetFenceRequest(cluster)
-
+	setDesignatedPrimaryTransitionRequestedCondition(cluster)
+	setFenceRequestCondition(cluster)
+	cluster.Status.SwitchReplicaClusterStatus.InProgress = true
 	if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
 		return nil, err
 	}
@@ -73,10 +71,10 @@ func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clus
 	return &ctrl.Result{RequeueAfter: time.Second}, err
 }
 
-func finishTransition(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) error {
+func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("finishing transition")
-	if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, common.ConditionFence, metav1.ConditionTrue) &&
+	if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, conditionFence, metav1.ConditionTrue) &&
 		cluster.IsInstanceFenced("*") {
 		if err := utils.NewFencingMetadataExecutor(cli).RemoveFencing().ForAllInstances().Execute(
 			ctx,
@@ -87,8 +85,9 @@ func finishTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clu
 		}
 	}
 	origCluster := cluster.DeepCopy()
-	meta.RemoveStatusCondition(&cluster.Status.Conditions, common.ConditionDesignatedPrimaryTransition)
-	meta.RemoveStatusCondition(&cluster.Status.Conditions, common.ConditionFence)
+	meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionDesignatedPrimaryTransition)
+	meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionFence)
+	cluster.Status.SwitchReplicaClusterStatus.InProgress = false
 
 	return cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }

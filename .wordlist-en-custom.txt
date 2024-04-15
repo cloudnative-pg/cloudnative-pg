@@ -392,6 +392,7 @@ StorageClass
 StorageConfiguration
 Storages
 SuccessfullyExtracted
+SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
@@ -1137,6 +1138,7 @@ superuserSecret
 superuserSecretVersion
 sv
 svc
+switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint

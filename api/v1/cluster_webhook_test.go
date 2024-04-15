@@ -2656,6 +2656,59 @@ var _ = Describe("replica mode validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
+	It("should complain if enabled is set to off during a transition", func() {
+		old := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				LatestGeneratedNode: 1,
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: false,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				LatestGeneratedNode: 1,
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterChange(old)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(result[0].Field).To(Equal("spec.replica.enabled"))
+	})
+
 	It("is valid when the pg_basebackup bootstrap option is used", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
