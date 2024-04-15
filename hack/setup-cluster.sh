@@ -38,6 +38,7 @@ ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
+PROM_CHART_VERSION=${PROM_CHART_VERSION:-9.0.1}
 NODES=${NODES:-3}
 # This option is telling the docker to use node image with certain arch, i.e kindest/node in kind.
 # In M1/M2,  if enable amd64 emulation then we keep it as linux/amd64.
@@ -405,7 +406,6 @@ deploy_csi_host_path() {
   done
 }
 
-
 deploy_pyroscope() {
   helm repo add pyroscope-io https://grafana.github.io/helm-charts
 
@@ -450,6 +450,11 @@ spec:
 EOF
 
   kubectl -n cnpg-system patch deployment cnpg-controller-manager --patch-file "${annotations}"
+}
+
+deploy_prometheus_crds() {
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds --version "${PROM_CHART_VERSION}"
 }
 
 load_image_registry() {
@@ -540,6 +545,7 @@ create() {
 
   deploy_fluentd
   deploy_csi_host_path
+  deploy_prometheus_crds
 
   echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }
@@ -612,6 +618,12 @@ deploy() {
   deploy_operator
 
   echo "${bright}Done deploying manifests from current worktree on cluster ${CLUSTER_NAME}${reset}"
+}
+
+reload() {
+  # Build and reload controller
+  load
+  deploy
 }
 
 print_image() {
@@ -740,7 +752,7 @@ main() {
       prepare "${dest_dir}"
       ;;
 
-    create | load | load-helper-images | deploy | print-image | export-logs | destroy | pyroscope)
+    create | load | load-helper-images | reload | deploy | print-image | export-logs | destroy | pyroscope)
       ensure_registry
       "${command//-/_}"
       ;;

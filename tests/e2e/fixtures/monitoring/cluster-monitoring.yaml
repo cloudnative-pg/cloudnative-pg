@@ -1,0 +1,27 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-monitoring
+spec:
+  instances: 1
+
+  monitoring:
+    enablePodMonitor: true
+
+  storage:
+    size: 1Gi
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: cluster-pooler-monitoring
+spec:
+  cluster:
+    name: cluster-monitoring
+
+  pgbouncer:
+    poolMode: session
+
+  monitoring:
+    enablePodMonitor: true
