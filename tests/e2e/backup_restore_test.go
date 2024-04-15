@@ -497,7 +497,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		It("verify tags in backed files", func() {
 			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
-			tags, err := testUtils.GetFileTagsOnMinio(minioEnv, "*[0-9].gz")
+			tags, err := testUtils.GetFileTagsOnMinio(minioEnv, minioPath(clusterName, "*1.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
 
@@ -513,7 +513,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			AssertNewPrimary(namespace, clusterName, oldPrimary)
 
-			tags, err = testUtils.GetFileTagsOnMinio(minioEnv, "*.history.gz")
+			tags, err = testUtils.GetFileTagsOnMinio(minioEnv, minioPath(clusterName, "*.history.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
 		})

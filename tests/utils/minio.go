@@ -575,7 +575,7 @@ func GetFileTagsOnMinio(minioEnv *MinioEnv, path string) (TagSet, error) {
 	var output TagSet
 	// Make sure we have a registered backup to access
 	out, _, err := RunUncheckedRetry(fmt.Sprintf(
-		"kubectl exec -n %v %v -- sh -c 'mc find minio --name %v | head -n1'",
+		"kubectl exec -n %v %v -- sh -c 'mc find minio --path %v | head -n1'",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
 		path))
