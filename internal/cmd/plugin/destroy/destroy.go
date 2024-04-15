@@ -32,10 +32,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// Destroy implements the destroy subcommand
-func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) error {
-	instanceName := fmt.Sprintf("%s-%s", clusterName, instanceID)
-
+// Destroy implements destroy subcommand
+func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool) error {
 	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
 		return fmt.Errorf("error deleting instance %s: %v", instanceName, err)
 	}
@@ -94,7 +92,7 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 		Name:      instanceName,
 	}, &pod)
 	if apierrs.IsNotFound(err) {
-		return nil
+		return fmt.Errorf("could not found instance %s in cluster %s: %v", instanceName, clusterName, err)
 	}
 	if err != nil {
 		return err
