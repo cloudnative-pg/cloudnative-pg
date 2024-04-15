@@ -38,4 +38,18 @@ var _ = Describe("LSN handling functions", func() {
 			Expect(LSN("3BB/A9FFFBE8").Parse()).Should(Equal(int64(4104545893352)))
 		})
 	})
+
+	Describe("Less", func() {
+		It("handles errors in the same way as the zero LSN value", func() {
+			Expect(LSN("").Less("3/23")).To(BeTrue())
+			Expect(LSN("3/23").Less("")).To(BeFalse())
+		})
+
+		It("works correctly for good LSNs", func() {
+			Expect(LSN("1/23").Less(LSN("1/24"))).To(BeTrue())
+			Expect(LSN("1/24").Less(LSN("1/23"))).To(BeFalse())
+			Expect(LSN("1/23").Less(LSN("2/23"))).To(BeTrue())
+			Expect(LSN("2/23").Less(LSN("1/23"))).To(BeFalse())
+		})
+	})
 })
