@@ -38,3 +38,6 @@ cloudnative-pg-catalog.yaml
 
 # asdf package manager
 .tool-versions
+
+# MacOS files
+**/.DS_Store
