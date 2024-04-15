@@ -447,6 +447,7 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 		r.validateUnixPermissionIdentifierChange,
 		r.validateReplicationSlotsChange,
 		r.validateWALLevelChange,
+		r.validateReplicaClusterChange,
 	}
 	for _, validate := range validations {
 		allErrs = append(allErrs, validate(old)...)
@@ -1869,6 +1870,21 @@ func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path
 	}
 
 	return result
+}
+
+func (r *Cluster) validateReplicaClusterChange(old *Cluster) field.ErrorList {
+	if r.Status.SwitchReplicaClusterStatus.InProgress {
+		return nil
+	}
+	if r.IsReplica() == old.IsReplica() {
+		return nil
+	}
+	return field.ErrorList{
+		field.Forbidden(
+			field.NewPath("spec", "replica", "enabled"),
+			"cannot modify the field while there is an ongoing operation to enable the replica cluster",
+		),
+	}
 }
 
 func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.ErrorList {
