@@ -21,13 +21,15 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 var (
 	fenceOnCmd = &cobra.Command{
 		Use:   "on [cluster] [node]",
 		Short: `Fence an instance named [cluster]-[node] or [node]`,
-		Args:  cobra.ExactArgs(2),
+		Args:  plugin.RequiresArguments(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			node := args[1]
@@ -42,7 +44,7 @@ var (
 	fenceOffCmd = &cobra.Command{
 		Use:   "off [cluster] [node]",
 		Short: `Remove fence for an instance named [cluster]-[node] or [node]`,
-		Args:  cobra.ExactArgs(2),
+		Args:  plugin.RequiresArguments(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			node := args[1]
