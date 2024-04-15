@@ -53,6 +53,7 @@ import (
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/switchexternalcluster/common"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -110,9 +111,7 @@ func (r *InstanceReconciler) Reconcile(
 	contextLogger.Debug("Reconciling Cluster", "cluster", cluster)
 
 	// Reconcile PostgreSQL instance parameters
-	if err := r.reconcileInstance(cluster); err != nil {
-		return reconcile.Result{}, err
-	}
+	r.reconcileInstance(cluster)
 
 	// Takes care of the `.check-empty-wal-archive` file
 	if err := r.reconcileCheckWalArchiveFile(cluster); err != nil {
@@ -164,7 +163,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	if r.instance.IsFenced() || r.instance.MightBeUnavailable() {
 		contextLogger.Info("Instance could be down, will not proceed with the reconciliation loop")
-		return reconcile.Result{}, nil
+		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
 	if r.instance.IsServerHealthy() != nil {
@@ -274,7 +273,7 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 		return false, err
 	}
 	restartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
-	if r.instance.RequiresDesignatedPrimaryTransition || restartRequested {
+	if restartRequested {
 		if err := r.instance.RequestAndWaitRestartSmartFast(); err != nil {
 			return true, err
 		}
@@ -893,16 +892,29 @@ func (r *InstanceReconciler) RefreshSecrets(
 }
 
 // reconcileInstance sets PostgreSQL instance parameters to current values
-func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
+	detectRequiresDesignatedPrimaryTransition := func() bool {
+		if !cluster.IsReplica() {
+			return false
+		}
+
+		if !externalcluster.IsDesignatedPrimaryTransitionRequested(cluster) {
+			return false
+		}
+
+		if !r.instance.IsFenced() && !r.instance.MightBeUnavailable() {
+			return false
+		}
+
+		isPrimary, _ := r.instance.IsPrimary()
+		return isPrimary
+	}
+
 	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
 	r.instance.MaxSwitchoverDelay = cluster.GetMaxSwitchoverDelay()
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
-	if err := r.instance.DetectNeedsDesignatedPrimaryTransition(cluster); err != nil {
-		return fmt.Errorf("encountered an error while detecting designated error transition: %w", err)
-	}
-
-	return nil
+	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
 }
 
 // reconcileAutoConf reconciles the permission of `postgresql.auto.conf`
@@ -1169,6 +1181,9 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	oldCluster := cluster.DeepCopy()
 	cluster.Status.CurrentPrimary = r.instance.PodName
 	cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
+	if r.instance.RequiresDesignatedPrimaryTransition {
+		externalcluster.SetDesignatedPrimaryTransitionCompleted(cluster)
+	}
 	return changed, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 

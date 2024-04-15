@@ -739,24 +739,6 @@ func (instance *Instance) IsPrimary() (bool, error) {
 	return true, nil
 }
 
-// DetectNeedsDesignatedPrimaryTransition returns true if the instance is a primary that requires to be migrated to a
-// designatedPrimary
-func (instance *Instance) DetectNeedsDesignatedPrimaryTransition(cluster *apiv1.Cluster) error {
-	if !cluster.IsReplica() {
-		instance.RequiresDesignatedPrimaryTransition = false
-		return nil
-	}
-
-	isPrimary, err := instance.IsPrimary()
-	if err != nil {
-		return err
-	}
-
-	instance.RequiresDesignatedPrimaryTransition = isPrimary
-
-	return nil
-}
-
 // Demote demotes an existing PostgreSQL instance
 func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
