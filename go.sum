@@ -23,8 +23,8 @@ github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWR
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/cloudnative-pg/cnpg-i v0.0.0-20240409091715-caf6b1b23daa h1:2+6rqFfsIhDcTL71zWCFLhw6xJZ1QmsJowwxziMGs3U=
-github.com/cloudnative-pg/cnpg-i v0.0.0-20240409091715-caf6b1b23daa/go.mod h1:msnHf8liP4/peqnXI6ReoRZdgaxOMp6F0vTAQcPPIZg=
+github.com/cloudnative-pg/cnpg-i v0.0.0-20240410134146-aa2f566849ce h1:RL8oOzqLLWzV9VS/x9IJIu9oG6n0b5EwXF85VufaKwM=
+github.com/cloudnative-pg/cnpg-i v0.0.0-20240410134146-aa2f566849ce/go.mod h1:msnHf8liP4/peqnXI6ReoRZdgaxOMp6F0vTAQcPPIZg=
 github.com/cpuguy83/go-md2man/v2 v2.0.3/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
@@ -172,8 +172,8 @@ github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.73.0 h1:M7SQPR01PKW0vraTxrZvg0IKpVpTb3c0Rs0F753uTlI=
-github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.73.0/go.mod h1:yJ3CawR/A5qEYFEeCOUVYLTwYxmacfHQhJS+b/2QiaM=
+github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.73.1 h1:VvIIWSQbvGaDgIeTrOintF/czS6UpLB086EUslAm7aI=
+github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.73.1/go.mod h1:yJ3CawR/A5qEYFEeCOUVYLTwYxmacfHQhJS+b/2QiaM=
 github.com/prometheus/client_golang v1.19.0 h1:ygXvpU1AoN1MhdzckN+PyD9QJOSD4x7kmXYlnfbA6JU=
 github.com/prometheus/client_golang v1.19.0/go.mod h1:ZRM9uEAypZakd+q/x7+gmsvXdURP+DABIEIjnmDdp+k=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
