@@ -1,4 +1,4 @@
-package replicacluster
+package replicaclusterswitch
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// Reconcile reconciles the cluster hibernation status.
+// Reconcile reconciles the cluster replica cluster switching.
 func Reconcile(
 	ctx context.Context,
 	cli client.Client,
@@ -26,7 +26,7 @@ func Reconcile(
 		return nil, nil
 	}
 
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).WithName("replica_cluster")
 
 	if isDesignatedPrimaryTransitionCompleted(cluster) {
 		return &ctrl.Result{RequeueAfter: time.Second}, cleanupTransitionMetadata(ctx, cli, cluster)
@@ -34,7 +34,7 @@ func Reconcile(
 
 	// waiting for the instance manager
 	if IsDesignatedPrimaryTransitionRequested(cluster) {
-		contextLogger.Info("waiting transition")
+		contextLogger.Info("waiting for the instance manager to transition the primary instance to a designated primary")
 		return nil, nil
 	}
 
@@ -57,8 +57,8 @@ func containsPrimaryInstance(instances postgres.PostgresqlStatusList) bool {
 }
 
 func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) (*ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("starting transition")
+	contextLogger := log.FromContext(ctx).WithName("replica_cluster_start_transition")
+	contextLogger.Info("starting the transition to replica cluster")
 	err := utils.NewFencingMetadataExecutor(cli).AddFencing().ForAllInstances().Execute(
 		ctx,
 		client.ObjectKeyFromObject(cluster),
@@ -94,8 +94,8 @@ func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clus
 }
 
 func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx)
-	contextLogger.Info("finishing transition")
+	contextLogger := log.FromContext(ctx).WithName("replica_cluster_cleanup_transition")
+	contextLogger.Info("removing all the unnecessary metadata from the cluster object")
 	if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, conditionFence, metav1.ConditionTrue) &&
 		cluster.IsInstanceFenced("*") {
 		if err := utils.NewFencingMetadataExecutor(cli).RemoveFencing().ForAllInstances().Execute(

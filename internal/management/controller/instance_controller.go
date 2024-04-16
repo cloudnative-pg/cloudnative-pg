@@ -53,7 +53,7 @@ import (
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicacluster"
+	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
