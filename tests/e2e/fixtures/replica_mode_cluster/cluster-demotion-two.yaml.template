@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-two
 spec:
-  instances: 1
+  instances: 2
 
   bootstrap:
     pg_basebackup:
