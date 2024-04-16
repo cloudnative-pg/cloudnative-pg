@@ -24,6 +24,7 @@ IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --e
 ifneq (,${IMAGE_TAG})
 CONTROLLER_IMG = ${IMAGE_NAME}:${IMAGE_TAG}
 BUNDLE_IMG = ${IMAGE_NAME}:bundle-${IMAGE_TAG}
+CATALOG_IMG = ${IMAGE_NAME}:catalog-${IMAGE_TAG}
 endif
 endif
 
@@ -45,7 +46,9 @@ CONTROLLER_TOOLS_VERSION ?= v0.14.0
 GORELEASER_VERSION ?= v1.25.1
 SPELLCHECK_VERSION ?= 0.36.0
 WOKE_VERSION ?= 0.19.0
-OPERATOR_SDK_VERSION ?= 1.34.1
+OPERATOR_SDK_VERSION ?= v1.34.1
+OPM_VERSION ?= v1.38.0
+PREFLIGHT_VERSION ?= 1.9.1
 OPENSHIFT_VERSIONS ?= v4.11-v4.15
 ARCH ?= amd64
 
@@ -161,7 +164,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	    - Image: ${BUNDLE_IMG}" | envsubst > cloudnative-pg-operator-template.yaml
 	$(OPM) alpha render-template semver -o yaml < cloudnative-pg-operator-template.yaml > catalog/catalog.yaml ;\
 	$(OPM) validate catalog/ ;\
-	DOCKER_BUILDKIT=1 docker build --push -f catalog.Dockerfile -t ${IMAGE_NAME}:catalog-${VERSION} . ;\
+	DOCKER_BUILDKIT=1 docker build --push -f catalog.Dockerfile -t ${CATALOG_IMG} . ;\
 	echo -e "apiVersion: operators.coreos.com/v1alpha1\n\
 	kind: CatalogSource\n\
 	metadata:\n\
@@ -169,7 +172,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	   namespace: operators\n\
 	spec:\n\
 	   sourceType: grpc\n\
-	   image: ${IMAGE_NAME}:catalog-${VERSION}\n\
+	   image: ${CATALOG_IMG}\n\
 	   secrets:\n\
        - cnpg-pull-secret" | envsubst > cloudnative-pg-catalog.yaml ;\
 
@@ -339,10 +342,8 @@ ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version 2>/dev/null | aw
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
-	GO_ARCH=$(shell go env GOARCH) ;\
-	SDK_OS="linux" ;\
-	if [ $$(uname) = "Darwin" ]; then SDK_OS="darwin"; fi ;\
-	curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${SDK_OS}_$${GO_ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSL "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
 	chmod +x "$(LOCALBIN)/operator-sdk" ;\
 	}
 OPERATOR_SDK=$(LOCALBIN)/operator-sdk
@@ -352,15 +353,34 @@ endif
 
 .PHONY: opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(shell PATH="$(LOCALBIN):$${PATH}" which opm 2>/dev/null))
+ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" opm version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPM_VERSION))
 	@{ \
 	set -e ;\
+	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	OPM_VERSION=$$(curl -s -LH "Accept:application/json" -w "%(http_code)" https://github.com/operator-framework/operator-registry/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/') ;\
-	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/$${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(LOCALBIN)/opm";\
+	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(LOCALBIN)/opm";\
 	chmod +x $(LOCALBIN)/opm ;\
 	}
 OPM=$(LOCALBIN)/opm
 else
 OPM=$(shell which opm)
+endif
+
+.PHONY: preflight
+preflight: ## Download preflight locally if necessary.
+ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" preflight --version 2>/dev/null | awk '{print $$3}'), $(PREFLIGHT_VERSION))
+	@{ \
+	set -e ;\
+	mkdir -p $(LOCALBIN) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	if [ "$${OS}" != "linux" ] ; then \
+		echo "Unsupported OS: $${OS}" ;\
+	else \
+		curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(LOCALBIN)/preflight" ;\
+		chmod +x $(LOCALBIN)/preflight ;\
+	fi \
+	}
+PREFLIGHT=$(LOCALBIN)/preflight
+else
+PREFLIGHT=$(shell which PREFLIGHT)
 endif
