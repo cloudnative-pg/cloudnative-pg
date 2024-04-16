@@ -2634,6 +2634,9 @@ var _ = Describe("replica mode validation", func() {
 
 	It("doesn't complain about initdb if we enable the external cluster on an existing cluster", func() {
 		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
 					Enabled: true,
@@ -2647,9 +2650,6 @@ var _ = Describe("replica mode validation", func() {
 						Name: "test",
 					},
 				},
-			},
-			Status: ClusterStatus{
-				LatestGeneratedNode: 1,
 			},
 		}
 		result := cluster.validateReplicaMode()
@@ -2658,6 +2658,9 @@ var _ = Describe("replica mode validation", func() {
 
 	It("should complain if enabled is set to off during a transition", func() {
 		old := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
 					Enabled: true,
@@ -2673,7 +2676,6 @@ var _ = Describe("replica mode validation", func() {
 				},
 			},
 			Status: ClusterStatus{
-				LatestGeneratedNode: 1,
 				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
 					InProgress: true,
 				},
@@ -2681,6 +2683,9 @@ var _ = Describe("replica mode validation", func() {
 		}
 
 		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
 					Enabled: false,
@@ -2696,7 +2701,6 @@ var _ = Describe("replica mode validation", func() {
 				},
 			},
 			Status: ClusterStatus{
-				LatestGeneratedNode: 1,
 				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
 					InProgress: true,
 				},

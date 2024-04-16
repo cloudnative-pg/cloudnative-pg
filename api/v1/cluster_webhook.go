@@ -1873,18 +1873,24 @@ func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path
 }
 
 func (r *Cluster) validateReplicaClusterChange(old *Cluster) field.ErrorList {
-	if !r.Status.SwitchReplicaClusterStatus.InProgress {
-		return nil
-	}
+	// If the replication role didn't change then everything
+	// is fine
 	if r.IsReplica() == old.IsReplica() {
 		return nil
 	}
-	return field.ErrorList{
-		field.Forbidden(
-			field.NewPath("spec", "replica", "enabled"),
-			"cannot modify the field while there is an ongoing operation to enable the replica cluster",
-		),
+
+	// We disallow changing the replication role when
+	// being in a replication cluster switchover
+	if r.Status.SwitchReplicaClusterStatus.InProgress {
+		return field.ErrorList{
+			field.Forbidden(
+				field.NewPath("spec", "replica", "enabled"),
+				"cannot modify the field while there is an ongoing operation to enable the replica cluster",
+			),
+		}
 	}
+
+	return nil
 }
 
 func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.ErrorList {
@@ -1924,7 +1930,7 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
 		// this is needed because we only want to validate this during cluster creation, currently if we would have
 		// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
-		r.Status.LatestGeneratedNode == 0 {
+		len(r.ObjectMeta.ResourceVersion) == 0 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "replicaCluster"),
 			r.Spec.ReplicaCluster,

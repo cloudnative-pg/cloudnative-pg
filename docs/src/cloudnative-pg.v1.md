@@ -2239,7 +2239,7 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>PluginStatus is the status of the loaded plugins</p>
 </td>
 </tr>
-<tr><td><code>switchReplicaClusterStatus</code> <B>[Required]</B><br/>
+<tr><td><code>switchReplicaClusterStatus</code><br/>
 <a href="#postgresql-cnpg-io-v1-SwitchReplicaClusterStatus"><i>SwitchReplicaClusterStatus</i></a>
 </td>
 <td>
@@ -4859,7 +4859,7 @@ Size cannot be decreased.</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>inProgress</code> <B>[Required]</B><br/>
+<tr><td><code>inProgress</code><br/>
 <i>bool</i>
 </td>
 <td>
