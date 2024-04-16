@@ -160,6 +160,13 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
 				time.Sleep(time.Second * 10)
+				Eventually(func(g Gomega) {
+					cluster, err := env.GetCluster(namespace, clusterOneName)
+					g.Expect(err).ToNot(HaveOccurred())
+					condition := getReplicaClusterSwitchCondition(cluster.Status.Conditions)
+					g.Expect(condition).ToNot(BeNil())
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+				}).Should(Succeed())
 			})
 
 			By("disabling the replica mode on the src cluster", func() {
@@ -169,13 +176,6 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
-				Eventually(func(g Gomega) {
-					cluster, err := env.GetCluster(namespace, clusterOneName)
-					g.Expect(err).ToNot(HaveOccurred())
-					condition := getReplicaClusterSwitchCondition(cluster.Status.Conditions)
-					g.Expect(condition).ToNot(BeNil())
-					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
-				}).Should(Succeed())
 			})
 
 			var newPrimaryPod *corev1.Pod
