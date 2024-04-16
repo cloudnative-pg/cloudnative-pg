@@ -27,10 +27,11 @@ func Reconcile(
 	}
 
 	contextLogger := log.FromContext(ctx)
-	// finish transition
-	if IsDesignatedPrimaryTransitionCompleted(cluster) {
+
+	if isDesignatedPrimaryTransitionCompleted(cluster) {
 		return &ctrl.Result{RequeueAfter: time.Second}, cleanupTransitionMetadata(ctx, cli, cluster)
 	}
+
 	// waiting for the instance manager
 	if IsDesignatedPrimaryTransitionRequested(cluster) {
 		contextLogger.Info("waiting transition")
@@ -43,7 +44,8 @@ func Reconcile(
 			hasPrimary = true
 		}
 	}
-	// cluster is not in a reliable state or has already transitioned
+
+	// cluster is not in a reliable state or is already a replica, either way we have no interest
 	if !hasPrimary {
 		return nil, nil
 	}
@@ -61,8 +63,25 @@ func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clus
 	)
 
 	origCluster := cluster.DeepCopy()
-	setDesignatedPrimaryTransitionRequestedCondition(cluster)
-	setFenceRequestCondition(cluster)
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    conditionDesignatedPrimaryTransition,
+		Status:  metav1.ConditionFalse,
+		Reason:  "ReplicaClusterAfterCreation",
+		Message: "Enabled external cluster after a node was generated",
+	})
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    conditionFence,
+		Status:  metav1.ConditionTrue,
+		Reason:  "ReplicaClusterAfterCreation",
+		Message: "Enabled external cluster after a node was generated",
+	})
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    ConditionReplicaClusterSwitch,
+		Status:  metav1.ConditionFalse,
+		Reason:  "ReplicaEnabledSetTrue",
+		Message: "Starting the Replica cluster transition",
+	})
+
 	cluster.Status.SwitchReplicaClusterStatus.InProgress = true
 	if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
 		return nil, err
@@ -87,6 +106,12 @@ func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *
 	origCluster := cluster.DeepCopy()
 	meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionDesignatedPrimaryTransition)
 	meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionFence)
+	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+		Type:    ConditionReplicaClusterSwitch,
+		Status:  metav1.ConditionTrue,
+		Reason:  "ReplicaEnabledSetTrue",
+		Message: "Completed the Replica cluster transition",
+	})
 	cluster.Status.SwitchReplicaClusterStatus.InProgress = false
 
 	return cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))

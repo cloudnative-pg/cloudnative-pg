@@ -24,10 +24,12 @@ import (
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicacluster"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -124,6 +126,15 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					"cluster-demotion-two.yaml.template"
 			)
 
+			getReplicaClusterSwitchCondition := func(conditions []metav1.Condition) *metav1.Condition {
+				for _, condition := range conditions {
+					if condition.Type == replicacluster.ConditionReplicaClusterSwitch {
+						return &condition
+					}
+				}
+				return nil
+			}
+
 			namespace, err := env.CreateUniqueNamespace("replica-promotion-demotion")
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
@@ -158,7 +169,13 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
-				time.Sleep(time.Second * 10)
+				Eventually(func(g Gomega) {
+					cluster, err := env.GetCluster(namespace, clusterOneName)
+					g.Expect(err).ToNot(HaveOccurred())
+					condition := getReplicaClusterSwitchCondition(cluster.Status.Conditions)
+					g.Expect(condition).ToNot(BeNil())
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+				}).Should(Succeed())
 			})
 
 			var newPrimaryPod *corev1.Pod
