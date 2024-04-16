@@ -1873,7 +1873,7 @@ func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path
 }
 
 func (r *Cluster) validateReplicaClusterChange(old *Cluster) field.ErrorList {
-	if r.Status.SwitchReplicaClusterStatus.InProgress {
+	if !r.Status.SwitchReplicaClusterStatus.InProgress {
 		return nil
 	}
 	if r.IsReplica() == old.IsReplica() {
