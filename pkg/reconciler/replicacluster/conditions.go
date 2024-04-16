@@ -10,6 +10,9 @@ import (
 const (
 	conditionDesignatedPrimaryTransition = "ReplicaClusterDesignatedPrimaryTransition"
 	conditionFence                       = "ReplicaClusterFencing"
+	// ConditionReplicaClusterSwitch is is a consumer facing condition and should not be used to decide actions
+	// inside the code
+	ConditionReplicaClusterSwitch = "ReplicaClusterSwitch"
 )
 
 // IsDesignatedPrimaryTransitionRequested returns a boolean indicating if the instance primary should transition to
@@ -18,8 +21,8 @@ func IsDesignatedPrimaryTransitionRequested(cluster *apiv1.Cluster) bool {
 	return meta.IsStatusConditionFalse(cluster.Status.Conditions, conditionDesignatedPrimaryTransition)
 }
 
-// IsDesignatedPrimaryTransitionCompleted returns a boolean indicating if the transition is complete
-func IsDesignatedPrimaryTransitionCompleted(cluster *apiv1.Cluster) bool {
+// isDesignatedPrimaryTransitionCompleted returns a boolean indicating if the transition is complete
+func isDesignatedPrimaryTransitionCompleted(cluster *apiv1.Cluster) bool {
 	return meta.IsStatusConditionTrue(cluster.Status.Conditions, conditionDesignatedPrimaryTransition)
 }
 
@@ -30,25 +33,5 @@ func SetDesignatedPrimaryTransitionCompleted(cluster *apiv1.Cluster) {
 		Status:  metav1.ConditionTrue,
 		Reason:  "TransitionCompleted",
 		Message: "Instance Manager has completed the DesignatedPrimary transition",
-	})
-}
-
-// setDesignatedPrimaryTransitionRequestedCondition creates the condition
-func setDesignatedPrimaryTransitionRequestedCondition(cluster *apiv1.Cluster) {
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:    conditionDesignatedPrimaryTransition,
-		Status:  metav1.ConditionFalse,
-		Reason:  "ReplicaClusterAfterCreation",
-		Message: "Enabled external cluster after a node was generated",
-	})
-}
-
-// setFenceRequestCondition creates the condition
-func setFenceRequestCondition(cluster *apiv1.Cluster) {
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:    conditionFence,
-		Status:  metav1.ConditionTrue,
-		Reason:  "ReplicaClusterAfterCreation",
-		Message: "Enabled external cluster after a node was generated",
 	})
 }
