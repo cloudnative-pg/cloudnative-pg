@@ -18,6 +18,7 @@ package operatorclient
 
 import (
 	"context"
+	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -97,10 +98,13 @@ func (e *extendedClient) Delete(
 	if err != nil {
 		return err
 	}
-	if err := e.Client.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
-		contextLogger.Error(err, "while patching before delete")
-		return err
+	if !reflect.DeepEqual(origObj, obj) {
+		if err := e.Client.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
+			contextLogger.Error(err, "while patching before delete")
+			return err
+		}
 	}
+
 	return e.Client.Delete(ctx, obj, opts...)
 }
 
