@@ -26,9 +26,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-// NewCmd create the new "promote" subcommand
+// NewCmd create the new "destroy" subcommand
 func NewCmd() *cobra.Command {
-	promoteCmd := &cobra.Command{
+	destroyCmd := &cobra.Command{
 		Use:   "destroy [cluster] [node] ",
 		Short: "Destroy the instance named [cluster]-[node] or [node] with the associated PVC",
 		Args:  plugin.RequiresArguments(2),
@@ -45,8 +45,8 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	promoteCmd.Flags().BoolP("keep-pvc", "k", false,
+	destroyCmd.Flags().BoolP("keep-pvc", "k", false,
 		"Keep the PVC but detach it from instance")
 
-	return promoteCmd
+	return destroyCmd
 }
