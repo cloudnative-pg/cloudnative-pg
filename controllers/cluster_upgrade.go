@@ -179,13 +179,12 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		// Given that, we refuse to promote a replica when the streaming connection
 		// is not active.
 		if !targetInstance.IsWalReceiverActive {
-			contextLogger.Info(
-				"The primary needs to be restarted, but the chosen new primary is still "+
-					"not connected via streaming replication, waiting for 5 seconds",
-				"reason", reason,
+			contextLogger.Warning(
+				"chosen new primary is still not connected via streaming replication, "+
+					"interrupting the primaryPodUpdate",
+				"updateReason", reason,
 				"currentPrimary", primaryPod.Name,
 				"targetPrimary", targetInstance.Pod.Name,
-				"podList", podList,
 			)
 			return false, errLogShippingReplicaElected
 		}
