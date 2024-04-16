@@ -921,12 +921,14 @@ type ClusterStatus struct {
 	PluginStatus []PluginStatus `json:"pluginStatus,omitempty"`
 
 	// SwitchReplicaClusterStatus is the status of the switch to replica cluster
+	// +optional
 	SwitchReplicaClusterStatus SwitchReplicaClusterStatus `json:"switchReplicaClusterStatus,omitempty"`
 }
 
 // SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster
 type SwitchReplicaClusterStatus struct {
 	// InProgress indicates if there is an ongoing procedure of switching a cluster to a replica cluster.
+	// +optional
 	InProgress bool `json:"inProgress,omitempty"`
 }
 
