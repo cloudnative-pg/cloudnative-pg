@@ -737,14 +737,20 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).WithName("handle_rolling_update")
 
 	// If we need to roll out a restart of any instance, this is the right moment
 	done, err := r.rolloutRequiredInstances(ctx, cluster, &instancesStatus)
-	if err != nil {
+	switch {
+	case errors.Is(err, errLogShippingReplicaElected):
+		contextLogger.Warning(
+			"The primary needs to be restarted, but the chosen new primary is still " +
+				"not connected via streaming replication, waiting for 5 seconds",
+		)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case err != nil:
 		return ctrl.Result{}, err
-	}
-	if done {
+	case done:
 		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
 		return ctrl.Result{}, ErrNextLoop
 	}
