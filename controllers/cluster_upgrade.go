@@ -179,7 +179,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		// Given that, we refuse to promote a replica when the streaming connection
 		// is not active.
 		if !targetInstance.IsWalReceiverActive {
-			contextLogger.Warning(
+			contextLogger.Info(
 				"chosen new primary is still not connected via streaming replication, "+
 					"interrupting the primaryPodUpdate",
 				"updateReason", reason,
