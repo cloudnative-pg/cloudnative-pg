@@ -163,7 +163,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	if r.instance.IsFenced() || r.instance.MightBeUnavailable() {
 		contextLogger.Info("Instance could be down, will not proceed with the reconciliation loop")
-		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		return reconcile.Result{}, nil
 	}
 
 	if r.instance.IsServerHealthy() != nil {
