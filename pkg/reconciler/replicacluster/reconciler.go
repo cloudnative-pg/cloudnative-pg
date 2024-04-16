@@ -38,19 +38,22 @@ func Reconcile(
 		return nil, nil
 	}
 
-	var hasPrimary bool
-	for _, item := range instances.Items {
-		if item.IsPrimary {
-			hasPrimary = true
-		}
-	}
-
-	// cluster is not in a reliable state or is already a replica, either way we have no interest
-	if !hasPrimary {
+	if !containsPrimaryInstance(instances) {
+		// no primary instance present means that we have no work to do
 		return nil, nil
 	}
 
 	return startTransition(ctx, cli, cluster)
+}
+
+func containsPrimaryInstance(instances postgres.PostgresqlStatusList) bool {
+	for _, item := range instances.Items {
+		if item.IsPrimary {
+			return true
+		}
+	}
+
+	return false
 }
 
 func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) (*ctrl.Result, error) {
