@@ -174,9 +174,9 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		}
 
 		// Before promoting a replica, the instance manager will wait for the WAL receiver
-		// process to be down. We're doing that to avoid loosing data written on the primary.
+		// process to be down. We're doing that to avoid losing data written on the primary.
 		// This protection can work only when the streaming connection is active.
-		// Given that, we refuse promoting a replica when the streaming connection
+		// Given that, we refuse to promote a replica when the streaming connection
 		// is not active.
 		if !targetInstance.IsWalReceiverActive {
 			contextLogger.Info(

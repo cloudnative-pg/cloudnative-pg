@@ -777,7 +777,7 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	// If we need to roll out a restart of any instance, this is the right moment
 	done, err := r.rolloutRequiredInstances(ctx, cluster, &instancesStatus)
 	switch {
-	case err == errLogShippingReplicaElected:
+	case errors.Is(err, errLogShippingReplicaElected):
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 
 	case err != nil:
