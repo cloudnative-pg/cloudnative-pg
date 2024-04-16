@@ -1110,7 +1110,6 @@ func AssertFastFailOver(
 		}
 		lm := clusterName + "-1"
 		err = env.DeletePod(namespace, lm, quickDelete)
-
 		Expect(err).ToNot(HaveOccurred())
 	})
 
