@@ -59,6 +59,12 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			maxReattachTime = 180
 			maxFailoverTime = 20
 		}
+
+		// OpenShift ha sa higher time to recover than a standard and simple Kubernetes cluster
+		if IsOpenshift() {
+			maxReattachTime = 120
+			maxFailoverTime = 20
+		}
 	})
 
 	JustAfterEach(func() {
