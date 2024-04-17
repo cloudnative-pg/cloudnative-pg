@@ -35,7 +35,7 @@ import (
 // Destroy implements destroy subcommand
 func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool) error {
 	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
-		return fmt.Errorf("error deleting instance %s: %v", instanceName, err)
+		return err
 	}
 
 	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instanceName, plugin.Namespace)
@@ -59,6 +59,10 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 					clusterName, err)
 			}
 		}
+		fmt.Printf("Instance %s of cluster %s has been destroyed and the PVC was kept\n",
+			instanceName,
+			clusterName,
+		)
 		return nil
 	}
 
@@ -81,6 +85,8 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 		}
 	}
 
+	fmt.Printf("Instance %s of cluster %s is destroyed\n", instanceName, clusterName)
+
 	return nil
 }
 
@@ -92,7 +98,7 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 		Name:      instanceName,
 	}, &pod)
 	if apierrs.IsNotFound(err) {
-		return fmt.Errorf("could not found instance %s in cluster %s: %v", instanceName, clusterName, err)
+		return fmt.Errorf("could not found instance %s in cluster %s", instanceName, clusterName)
 	}
 	if err != nil {
 		return err
