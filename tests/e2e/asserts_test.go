@@ -720,7 +720,8 @@ func minioPath(serverName, fileName string) string {
 	// the * regexes enable matching these typical paths:
 	// 	minio/backups/serverName/base/20220618T140300/data.tar
 	// 	minio/backups/serverName/wals/0000000100000000/000000010000000000000002.gz
-	return filepath.Join("*", serverName, "*", "*", fileName)
+	//  minio/backups/serverName/wals/00000002.history.gz
+	return filepath.Join("*", serverName, "*", fileName)
 }
 
 // CheckPointAndSwitchWalOnPrimary trigger a checkpoint and switch wal on primary pod and returns the latest WAL file
