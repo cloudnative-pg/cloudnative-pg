@@ -122,7 +122,10 @@ func (r *PoolerReconciler) reconcileService(
 	resources *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
-	expectedService := pgbouncer.Service(pooler, resources.Cluster)
+	expectedService, err := pgbouncer.Service(pooler, resources.Cluster)
+	if err != nil {
+		return err
+	}
 	if err := ctrl.SetControllerReference(pooler, expectedService, r.Scheme); err != nil {
 		return err
 	}

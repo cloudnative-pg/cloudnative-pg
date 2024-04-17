@@ -256,6 +256,34 @@ spec:
               memory: 500Mi
 ```
 
+## Service Template
+
+Sometimes, your pooler will require some different labels, annotations, or even change
+the type of the service, you can achive that by using the `serviceTemplate` field:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+  serviceTemplate:
+    metadata:
+      labels:
+        app: pooler
+    spec:
+      type: LoadBalancer
+  pgbouncer:
+    poolMode: session
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "10"
+```
+
 ## High availability (HA)
 
 Because of Kubernetes' deployments, you can configure your pooler to run on a

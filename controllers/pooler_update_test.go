@@ -233,8 +233,9 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 		By("making sure the service doesn't exist", func() {
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler, cluster)
-			err := env.client.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
+			expectedSVC, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			err = env.client.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 
@@ -243,7 +244,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler, cluster)
+			expectedSVC, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
 			err = env.client.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -261,7 +263,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler, cluster)
+			expectedSVC, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
 			err = env.client.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(previousService.Spec).To(BeEquivalentTo(svc.Spec))
@@ -277,7 +280,8 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			svc := &corev1.Service{}
-			expectedSVC := pgbouncer.Service(pooler, cluster)
+			expectedSVC, err := pgbouncer.Service(pooler, cluster)
+			Expect(err).ToNot(HaveOccurred())
 			err = env.client.Get(ctx, types.NamespacedName{Name: expectedSVC.Name, Namespace: expectedSVC.Namespace}, svc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(previousResourceVersion).ToNot(Equal(svc.ResourceVersion))

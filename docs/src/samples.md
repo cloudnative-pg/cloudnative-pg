@@ -123,3 +123,8 @@ your PostgreSQL cluster.
 : [`cluster-restore-with-tablespaces.yaml`](samples/cluster-restore-with-tablespaces.yaml)
 
 For a list of available options, see [API reference](cloudnative-pg.v1.md).
+
+## Pooler configuration
+
+**Pooler with custom service config**
+: [`pooler-external.yaml`](samples/pooler-external.yaml)
