@@ -18,6 +18,7 @@ package status
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -29,6 +30,7 @@ import (
 	"github.com/cheynewallace/tabby"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -55,7 +57,8 @@ type PostgresqlStatus struct {
 	InstanceStatus *postgres.PostgresqlStatusList `json:"instanceStatus"`
 
 	// PrimaryPod contains the primary Pod
-	PrimaryPod corev1.Pod
+	PrimaryPod              corev1.Pod
+	PodDisruptionBudgetList policyv1.PodDisruptionBudgetList
 }
 
 func (fullStatus *PostgresqlStatus) getReplicationSlotList() postgres.PgReplicationSlotList {
@@ -118,6 +121,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printRoleManagerStatus()
 	status.printTablespacesStatus()
 	status.printInstancesStatus()
+	status.printPodDisruptionBudgetStatus()
 
 	if nonFatalError != nil {
 		return nonFatalError
@@ -148,11 +152,16 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 		managedPods,
 		specs.PostgresContainerName)
 
+	var pdbl policyv1.PodDisruptionBudgetList
+	if err := plugin.Client.List(ctx, &pdbl, client.MatchingLabels{utils.ClusterLabelName: clusterName}); err != nil {
+		return nil, fmt.Errorf("while extracting PodDisruptionBudgetList: %w", err)
+	}
 	// Extract the status from the instances
 	status := PostgresqlStatus{
-		Cluster:        &cluster,
-		InstanceStatus: &instancesStatus,
-		PrimaryPod:     primaryPod,
+		Cluster:                 &cluster,
+		InstanceStatus:          &instancesStatus,
+		PrimaryPod:              primaryPod,
+		PodDisruptionBudgetList: pdbl,
 	}
 	return &status, nil
 }
@@ -788,6 +797,41 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 	}
 
 	fmt.Println(color(headerMessage))
+	status.Print()
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
+	const header = "PodDisruptionBudget status"
+
+	fmt.Println(aurora.Green(header))
+
+	if len(fullStatus.PodDisruptionBudgetList.Items) == 0 {
+		fmt.Println("No active PodDisruptionBudgets found")
+		return
+	}
+
+	status := tabby.New()
+	status.AddHeader(
+		"Name",
+		"Selectors",
+		"Expected Pods",
+		"Current Healthy",
+		"Desired Healthy",
+		"Disruptions Allowed",
+	)
+
+	for _, item := range fullStatus.PodDisruptionBudgetList.Items {
+		serialized, _ := json.Marshal(item.Spec.Selector)
+		status.AddLine(item.Name,
+			string(serialized),
+			item.Status.ExpectedPods,
+			item.Status.CurrentHealthy,
+			item.Status.DesiredHealthy,
+			item.Status.DisruptionsAllowed,
+		)
+	}
+
 	status.Print()
 	fmt.Println()
 }
