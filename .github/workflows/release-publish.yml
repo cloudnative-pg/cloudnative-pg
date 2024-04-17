@@ -121,6 +121,7 @@ jobs:
           echo "IMAGES=${images}" >> $GITHUB_ENV
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "version=${commit_version}" >> $GITHUB_OUTPUT
+          echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
           echo "author_email=${author_email}" >> $GITHUB_OUTPUT
