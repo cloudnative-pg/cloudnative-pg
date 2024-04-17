@@ -71,3 +71,19 @@ spec:
 Clusters utilizing these catalogs maintain continuous monitoring.
 Any alterations to the images within a catalog trigger automatic updates for
 **all associated clusters** referencing that specific entry.
+
+## CloudNativePG Catalogs
+
+The CloudNativePG project maintains `ClusterImageCatalogs` for the images it provides. These catalogs are regularly
+updated with the latest images for each major version. By applying the `ClusterImageCatalog.yaml` file from the
+CloudNativePG project's GitHub repositories, cluster administrators can ensure that their clusters are automatically
+updated to the latest version within the specified major release.
+
+* [cloudnative-pg/postgres-containers](https://github.com/cloudnative-pg/postgres-containers):
+  ```shell
+  kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml
+  ```
+* [cloudnative-pg/postgis-containers](https://github.com/cloudnative-pg/postgis-containers)
+  ```shell
+  kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml
+  ```
