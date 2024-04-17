@@ -120,7 +120,6 @@ jobs:
           commit_short=$(git rev-parse --short "${commit_sha}")
           echo "IMAGES=${images}" >> $GITHUB_ENV
           echo "DATE=${commit_date}" >> $GITHUB_ENV
-          echo "version=${commit_version}" >> $GITHUB_OUTPUT
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
@@ -147,7 +146,6 @@ jobs:
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
-          VERSION: ${{ steps.build-meta.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
       -
@@ -217,7 +215,7 @@ jobs:
           file: Dockerfile
           push: true
           build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
+            VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
       -
         name: Generate SBOM for image
@@ -235,7 +233,7 @@ jobs:
           file: Dockerfile-ubi8
           push: true
           build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
+            VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
       -
         name: Generate SBOM for image UBI8
@@ -253,7 +251,7 @@ jobs:
           file: Dockerfile-ubi9
           push: true
           build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
+            VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
       -
         name: Generate SBOM for image UBI9
