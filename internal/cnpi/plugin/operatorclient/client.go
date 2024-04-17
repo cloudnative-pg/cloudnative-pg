@@ -20,6 +20,7 @@ import (
 	"context"
 	"reflect"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
@@ -99,7 +100,7 @@ func (e *extendedClient) Delete(
 		return err
 	}
 	if !reflect.DeepEqual(origObj, obj) {
-		if err := e.Client.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
+		if err := e.Client.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil && !apierrors.IsNotFound(err) {
 			contextLogger.Error(err, "while patching before delete")
 			return err
 		}
