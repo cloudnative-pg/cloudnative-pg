@@ -31,12 +31,12 @@ type LSN string
 func (lsn LSN) Less(other LSN) bool {
 	p1, err := lsn.Parse()
 	if err != nil {
-		return false
+		p1 = 0
 	}
 
 	p2, err := other.Parse()
 	if err != nil {
-		return false
+		p2 = 0
 	}
 
 	return p1 < p2

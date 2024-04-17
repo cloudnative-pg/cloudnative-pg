@@ -3137,6 +3137,8 @@ with an explanation of the cause</p>
 
 - [ServiceAccountTemplate](#postgresql-cnpg-io-v1-ServiceAccountTemplate)
 
+- [ServiceTemplateSpec](#postgresql-cnpg-io-v1-ServiceTemplateSpec)
+
 
 <p>Metadata is a structure similar to the metav1.ObjectMeta, but still
 parseable by controller-gen to create a suitable CRD for the user.
@@ -3767,6 +3769,13 @@ Pooler name should never match with any cluster name within the same namespace.<
 </td>
 <td>
    <p>The configuration of the monitoring infrastructure of this pooler.</p>
+</td>
+</tr>
+<tr><td><code>serviceTemplate</code><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceTemplateSpec"><i>ServiceTemplateSpec</i></a>
+</td>
+<td>
+   <p>Template for the Service to be created</p>
 </td>
 </tr>
 </tbody>
@@ -4708,6 +4717,40 @@ Map keys are the secret names, map values are the versions</p>
 <td>
    <p>Metadata are the metadata to be used for the generated
 service account</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ServiceTemplateSpec     {#postgresql-cnpg-io-v1-ServiceTemplateSpec}
+
+
+**Appears in:**
+
+- [PoolerSpec](#postgresql-cnpg-io-v1-PoolerSpec)
+
+
+<p>ServiceTemplateSpec is a structure allowing the user to set
+a template for Service generation.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>metadata</code><br/>
+<a href="#postgresql-cnpg-io-v1-Metadata"><i>Metadata</i></a>
+</td>
+<td>
+   <p>Standard object's metadata.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata</p>
+</td>
+</tr>
+<tr><td><code>spec</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#servicespec-v1-core"><i>core/v1.ServiceSpec</i></a>
+</td>
+<td>
+   <p>Specification of the desired behavior of the service.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
 </td>
 </tr>
 </tbody>

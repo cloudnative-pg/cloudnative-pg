@@ -40,6 +40,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// errLogShippingReplicaElected is raised when the pod update process need
+// to select a new primary before upgrading the old primary, but the chosen
+// instance is not connected via streaming replication
+var errLogShippingReplicaElected = errors.New("log shipping replica elected as a new post-switchover primary")
+
 type rolloutReason = string
 
 func (r *ClusterReconciler) rolloutRequiredInstances(
@@ -159,23 +164,39 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		// as the pod list is sorted in the same order we use for switchover / failover.
 		// This may not be true for replica clusters, where every instance is a replica
 		// from the PostgreSQL point-of-view.
-		targetPrimary := podList.Items[1].Pod.Name
+		targetInstance := podList.Items[1]
 
 		// If this is a replica cluster, the target primary we chose may be
 		// the one we're trying to upgrade, as the list isn't sorted. In
 		// this case, we promote the first instance of the list
-		if targetPrimary == primaryPod.Name {
-			targetPrimary = podList.Items[0].Pod.Name
+		if targetInstance.Pod.Name == primaryPod.Name {
+			targetInstance = podList.Items[0]
+		}
+
+		// Before promoting a replica, the instance manager will wait for the WAL receiver
+		// process to be down. We're doing that to avoid losing data written on the primary.
+		// This protection can work only when the streaming connection is active.
+		// Given that, we refuse to promote a replica when the streaming connection
+		// is not active.
+		if !targetInstance.IsWalReceiverActive {
+			contextLogger.Info(
+				"chosen new primary is still not connected via streaming replication, "+
+					"interrupting the primaryPodUpdate",
+				"updateReason", reason,
+				"currentPrimary", primaryPod.Name,
+				"targetPrimary", targetInstance.Pod.Name,
+			)
+			return false, errLogShippingReplicaElected
 		}
 
 		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
 			"reason", reason,
 			"currentPrimary", primaryPod.Name,
-			"targetPrimary", targetPrimary,
+			"targetPrimary", targetInstance.Pod.Name,
 			"podList", podList)
 		r.Recorder.Eventf(cluster, "Normal", "Switchover",
-			"Initiating switchover to %s to upgrade %s", targetPrimary, primaryPod.Name)
-		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
+			"Initiating switchover to %s to upgrade %s", targetInstance.Pod.Name, primaryPod.Name)
+		return true, r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name)
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary

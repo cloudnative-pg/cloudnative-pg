@@ -18,27 +18,35 @@ package destroy
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-// NewCmd create the new "promote" subcommand
+// NewCmd create the new "destroy" subcommand
 func NewCmd() *cobra.Command {
-	promoteCmd := &cobra.Command{
-		Use:   "destroy [CLUSTER_NAME] [INSTANCE_ID]",
-		Short: "Destroy the instance named [CLUSTER_NAME] and [INSTANCE_ID] with the associated PVC",
-		Args:  cobra.ExactArgs(2),
+	destroyCmd := &cobra.Command{
+		Use:   "destroy [cluster] [node]",
+		Short: "Destroy the instance named [cluster]-[node] or [node] with the associated PVC",
+		Args:  plugin.RequiresArguments(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]
-			instanceID := args[1]
+			node := args[1]
+			if _, err := strconv.Atoi(args[1]); err == nil {
+				node = fmt.Sprintf("%s-%s", clusterName, node)
+			}
+
 			keepPVC, _ := cmd.Flags().GetBool("keep-pvc")
-			return Destroy(ctx, clusterName, instanceID, keepPVC)
+			return Destroy(ctx, clusterName, node, keepPVC)
 		},
 	}
 
-	promoteCmd.Flags().BoolP("keep-pvc", "k", false,
+	destroyCmd.Flags().BoolP("keep-pvc", "k", false,
 		"Keep the PVC but detach it from instance")
 
-	return promoteCmd
+	return destroyCmd
 }

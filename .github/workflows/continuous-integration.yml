@@ -19,6 +19,7 @@ env:
   GOLANG_VERSION: "1.22.x"
   GOLANGCI_LINT_VERSION: "v1.57"
   KUBEBUILDER_VERSION: "2.3.1"
+  KIND_VERSION: "v0.22.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   API_DOC_NAME: "cloudnative-pg.v1.md"
   SLACK_USERNAME: "cnpg-bot"
@@ -392,6 +393,7 @@ jobs:
       controller_img: ${{ env.CONTROLLER_IMG }}
       controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
       bundle_img: ${{ env.BUNDLE_IMG }}
+      catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
     steps:
       - name: Checkout
@@ -641,6 +643,14 @@ jobs:
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
 
+      - name: Generate SBOM for image
+        uses: anchore/sbom-action@v0.15.10
+        with:
+          image: ${{ steps.docker-meta.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}.spdx
+          upload-artifact: true
+          upload-artifact-retention: 7d
+
       - name: Build and push UBI8
         uses: docker/build-push-action@v5
         with:
@@ -652,6 +662,14 @@ jobs:
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
 
+      - name: Generate SBOM for image
+        uses: anchore/sbom-action@v0.15.10
+        with:
+          image: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}-ubi8.spdx
+          upload-artifact: true
+          upload-artifact-retention: 7d
+
       - name: Build and push UBI9
         uses: docker/build-push-action@v5
         with:
@@ -662,6 +680,14 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
+
+      - name: Generate SBOM for image
+        uses: anchore/sbom-action@v0.15.10
+        with:
+          image: ${{ steps.docker-meta-ubi9.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}-ubi9.spdx
+          upload-artifact: true
+          upload-artifact-retention: 7d
 
       - name: Output images
         env:
@@ -675,6 +701,7 @@ jobs:
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -721,6 +748,7 @@ jobs:
           IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+          CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
           make olm-catalog
 
@@ -733,6 +761,54 @@ jobs:
             bundle/
             cloudnative-pg-catalog.yaml
           retention-days: 7
+
+  preflight:
+    name: Run openshift-preflight test
+    runs-on: ubuntu-22.04
+    needs:
+      - buildx
+      - olm-bundle
+    if: |
+      (always() && !cancelled()) &&
+      needs.olm-bundle.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
+
+      - name: Setup tools
+        run: |
+          make operator-sdk preflight
+
+      - name: Run preflight container test
+        env:
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
+          PFLT_ARTIFACTS: "preflight_results"
+        run: |
+          bin/preflight check container ${CONTROLLER_IMG}
+
+      - name: Archive the preflight results
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight_results
+          path: |
+            preflight_results
+          retention-days: 7
+
+      - name: Check preflight container results
+        run: |
+          for dir in `ls preflight_results`; do
+              PASS=`jq -r .passed preflight_results/$dir/results.json`
+              if [[ "$PASS" == "false" ]]
+              then
+                exit 1
+              fi
+          done
 
   olm-scorecard:
     name: Run OLM scorecard test
@@ -748,11 +824,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: "Setting up KinD cluster"
+      - name: Setting up KinD cluster
         uses: helm/kind-action@v1.9.0
         with:
           wait: "600s"
-          version: "v0.20.0"
+          version: ${{ env.KIND_VERSION }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -775,7 +851,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
 
-      - name: "Running Scorecard tests"
+      - name: Running Scorecard tests
         env:
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
         run: |
