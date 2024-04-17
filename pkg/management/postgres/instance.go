@@ -543,6 +543,11 @@ func (instance *Instance) Reload(ctx context.Context) error {
 	contextLogger.Info("Requesting configuration reload",
 		"pgdata", instance.PgData)
 
+	// Need to reload certificates if they changed
+	if instance.primaryPool != nil {
+		instance.primaryPool.ShutdownConnections()
+	}
+
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
 	if err != nil {
