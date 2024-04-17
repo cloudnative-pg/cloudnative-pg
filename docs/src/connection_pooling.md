@@ -259,7 +259,7 @@ spec:
 ## Service Template
 
 Sometimes, your pooler will require some different labels, annotations, or even change
-the type of the service, you can achive that by using the `serviceTemplate` field:
+the type of the service, you can achieve that by using the `serviceTemplate` field:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
