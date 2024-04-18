@@ -98,7 +98,7 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 		Name:      instanceName,
 	}, &pod)
 	if apierrs.IsNotFound(err) {
-		return fmt.Errorf("could not found instance %s in cluster %s", instanceName, clusterName)
+		return fmt.Errorf("could not found instance %s in cluster %s: %w", instanceName, clusterName, err)
 	}
 	if err != nil {
 		return err
