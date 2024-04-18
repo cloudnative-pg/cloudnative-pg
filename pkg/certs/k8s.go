@@ -46,7 +46,7 @@ var (
 	errSecretsMountNotRefreshed = errors.New("secrets mount still not refreshed")
 
 	mountedSecretCheckBackoff = wait.Backoff{
-		Duration: 10 * time.Millisecond,
+		Duration: 60 * time.Millisecond,
 		Jitter:   0.1,
 		Factor:   2,
 		Steps:    10,
