@@ -57,7 +57,9 @@ type PostgresqlStatus struct {
 	InstanceStatus *postgres.PostgresqlStatusList `json:"instanceStatus"`
 
 	// PrimaryPod contains the primary Pod
-	PrimaryPod              corev1.Pod
+	PrimaryPod corev1.Pod
+
+	// PodDisruptionBudgetList prints every PDBs that contains as label selector the cluster
 	PodDisruptionBudgetList policyv1.PodDisruptionBudgetList
 }
 
