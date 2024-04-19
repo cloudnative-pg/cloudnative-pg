@@ -201,6 +201,70 @@ data:
             usage: "GAUGE"
             description: "Time at which these statistics were last reset"
 
+    pg_stat_checkpointer:
+      runonserver: ">=17.0.0"
+      query: |
+        SELECT num_timed AS checkpoints_timed
+          , num_requested AS checkpoints_req
+          , restartpoints_timed
+          , restartpoints_req
+          , restartpoints_done
+          , write_time
+          , sync_time
+          , buffers_written
+          , EXTRACT(EPOCH FROM stats_reset) AS stats_reset_time
+        FROM pg_catalog.pg_stat_checkpointer
+      metrics:
+        - checkpoints_timed:
+            usage: "COUNTER"
+            description: "Number of scheduled checkpoints that have been performed"
+        - checkpoints_req:
+            usage: "COUNTER"
+            description: "Number of requested checkpoints that have been performed"
+        - restartpoints_timed:
+            usage: "COUNTER"
+            description: "Number of scheduled restartpoints due to timeout or after a failed attempt to perform it"
+        - restartpoints_req:
+            usage: "COUNTER"
+            description: "Number of requested restartpoints that have been performed"
+        - restartpoints_done:
+            usage: "COUNTER"
+            description: "Number of restartpoints that have been performed"
+        - write_time:
+            usage: "COUNTER"
+            description: "Total amount of time that has been spent in the portion of processing checkpoints and restartpoints where files are written to disk, in milliseconds"
+        - sync_time:
+            usage: "COUNTER"
+            description: "Total amount of time that has been spent in the portion of processing checkpoints and restartpoints where files are synchronized to disk, in milliseconds"
+        - buffers_written:
+            usage: "COUNTER"
+            description: "Number of buffers written during checkpoints and restartpoints"
+        - stats_reset_time:
+            usage: "GAUGE"
+            description: "Time at which these statistics were last reset"
+
+    pg_stat_bgwriter:
+      runonserver: ">=17.0.0"
+      query: |
+        SELECT buffers_clean
+          , maxwritten_clean
+          , buffers_alloc
+          , EXTRACT(EPOCH FROM stats_reset) AS stats_reset_time
+        FROM pg_catalog.pg_stat_bgwriter
+      metrics:
+        - buffers_clean:
+            usage: "COUNTER"
+            description: "Number of buffers written by the background writer"
+        - maxwritten_clean:
+            usage: "COUNTER"
+            description: "Number of times the background writer stopped a cleaning scan because it had written too many buffers"
+        - buffers_alloc:
+            usage: "COUNTER"
+            description: "Number of buffers allocated"
+        - stats_reset_time:
+            usage: "GAUGE"
+            description: "Time at which these statistics were last reset"
+
     pg_stat_bgwriter:
       runonserver: "<17.0.0"
       query: |

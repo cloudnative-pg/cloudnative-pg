@@ -2420,7 +2420,7 @@ func DeleteTableUsingPgBouncerService(
 }
 
 func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curlPodName string, expectPresent bool) {
-	By("collecting and verify a set of default metrics on each pod", func() {
+	By("collecting and verifying a set of default metrics on each pod", func() {
 		defaultMetrics := []string{
 			"cnpg_pg_settings_setting",
 			"cnpg_backends_waiting_total",
@@ -2430,6 +2430,13 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 			"cnpg_pg_stat_bgwriter",
 			"cnpg_pg_stat_database",
 		}
+
+		if env.PostgresVersion > 16 {
+			defaultMetrics = append(defaultMetrics,
+				"cnpg_pg_stat_checkpointer",
+			)
+		}
+
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
