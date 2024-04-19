@@ -769,6 +769,7 @@ initializingPVC
 instanceID
 instanceName
 instanceNames
+instanceRole
 instancesReportedState
 instancesStatus
 inuse
@@ -955,6 +956,7 @@ podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
 podName
+podRole
 podmonitor
 podtemplates
 poolMode
